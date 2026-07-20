@@ -973,3 +973,11 @@
   .budget-app-root .table thead th:last-child,
   .budget-app-root .table tbody td:last-child { padding-right: 0.25rem; }
 }
+
+/* ------------------------- import: DIY-CSV help ------------------------- */
+.budget-app-root .import-help { margin-top: 14px; font-size: 0.85rem; color: var(--text-muted); }
+.budget-app-root .import-help summary { cursor: pointer; font-weight: 600; }
+.budget-app-root .import-help summary:focus-visible { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
+.budget-app-root .import-help p, .budget-app-root .import-help ul { margin: 8px 0 0; }
+.budget-app-root .import-help ul { padding-left: 20px; }
+.budget-app-root .import-help code { font-size: 0.9em; }

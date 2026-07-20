@@ -140,6 +140,7 @@ function isoParts(y, mo, d) {
   if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
 function parseStatementDate(raw) {
   const s = (raw ?? '').toString().trim();
   if (!s) return null;
@@ -151,9 +152,39 @@ function parseStatementDate(raw) {
     if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }     // tolerate MM/DD
     return isoParts(+m[3], mo, d);
   }
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);                        // YYYYMMDD (Absa/SB)
+  if (m) return isoParts(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})[ -]([A-Za-z]{3,})[ -](\d{4})$/);       // DD Mon YYYY
+  if (m) {
+    const mo = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    if (mo) return isoParts(+m[3], mo, +m[1]);
+  }
   const dt = new Date(s);                                        // last-resort fallback
   if (!isNaN(dt.getTime())) return isoParts(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
   return null;
+}
+
+/* Parse a statement amount cell to a Number, or null if empty/unparseable.
+   Tolerates the spread of SA bank export styles: "R 1 234.56", "1,234.56",
+   decimal-comma "1 234,56" / "1.234,56", parenthesised negatives "(123.45)",
+   trailing minus "123.45-", and Cr/Dr markers (Cr → credit/positive,
+   Dr → debit/negative). Zero is a valid return — callers decide to skip it. */
+function normalizeAmount(raw) {
+  let s = (raw ?? '').toString().trim();
+  if (!s) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1).trim(); }
+  const marker = s.match(/(cr|dr)\.?\s*$/i);
+  if (marker) { if (marker[1].toLowerCase() === 'dr') neg = true; s = s.slice(0, marker.index).trim(); }
+  if (s.endsWith('-')) { neg = true; s = s.slice(0, -1).trim(); }
+  if (s.startsWith('-')) { neg = true; s = s.slice(1).trim(); }
+  if (s.startsWith('+')) s = s.slice(1).trim();
+  s = s.replace(/^(r|zar)\s*/i, '').replace(/[\s\u00A0\u202F']/g, '');
+  if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');  // decimal comma
+  else s = s.replace(/,/g, '');                                                       // thousands comma
+  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(s);
+  return neg ? -n : n;
 }
 
 /* Sanitise a string for safe use as a single path segment (folder/file name):
@@ -179,4 +210,4 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, parseNum, patchFrontmatter, safeSeg, collapsePath };
+module.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, safeSeg, collapsePath };

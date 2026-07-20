@@ -110,6 +110,36 @@ Removing a document row never deletes the uploaded file; deadlines
 shift each filing season, so the seeded dates are defaults to verify on
 sars.gov.za.
 
+## CSV import — supported formats
+
+Columns are matched by **header name**, not position, so most bank CSV exports
+work out of the box: **Discovery Bank, FNB, Capitec, Nedbank, Standard Bank and
+Absa** statement exports are all recognised. The importer needs a header row
+with a date column, a description column, and either a single signed amount
+column or a **Debit + Credit** pair (Capitec's "Money In"/"Money Out" style
+included — debits import as negative amounts). Amount cells tolerate the local
+quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives,
+trailing minus, and `Cr`/`Dr` markers.
+
+### Importing your own data (Google Sheets / Excel)
+
+Anything not covered by a bank export can be imported from a hand-built sheet.
+Create three columns with this exact header row:
+
+| Date | Title | Amount |
+|------|-------|--------|
+| 2026-07-01 | Woolworths | -249.99 |
+| 2026-07-02 | Salary | 25000 |
+
+- **Date** — `YYYY-MM-DD` or `DD/MM/YYYY`
+- **Title** — the transaction description (used for auto-categorisation rules)
+- **Amount** — negative for money out, positive for money in
+
+Then export as CSV — Google Sheets: *File → Download → Comma-separated values
+(.csv)*; Excel: *File → Save As → CSV UTF-8* — and drop the file on the Import
+screen. `Description` works as a header instead of `Title`, and separate
+`Debit`/`Credit` columns instead of `Amount`, if that's easier.
+
 ## CSV import — parity notes with the Laravel app
 
 - **`" ZA"` suffix**: Discovery card rows carry a trailing country code
@@ -159,7 +189,9 @@ Mostly done — the brand subtitle and avatar initials now come from the
 still opinionated:
 
 - `main.js` / `controller.js` — `currency: 'R'` and `month_start_day: 23` (payday)
-- `shell.js` / `views/import.js` — CSV import is written around Discovery/FNB exports
+- `shell.js` / `views/import.js` — CSV import targets SA bank exports
+  (Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa), with a generic
+  Date/Title/Amount format as the escape hatch
 
 ### Their install steps
 
