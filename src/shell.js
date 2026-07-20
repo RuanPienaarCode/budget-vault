@@ -62,7 +62,7 @@ const SHELL_HTML = `
     </button>
 
     <span class="brand">
-      <span class="brand-logo" aria-hidden="true"></span>
+      <span class="brand-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></span>
       <span class="brand-text">
         <b>Budget Vault</b>
         <span class="brand-sub" id="brandSub">Obsidian vault budget</span>

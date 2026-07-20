@@ -262,14 +262,13 @@
 
 .budget-app-root .topbar .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 0; }
 .budget-app-root .brand-logo {
-  width: 40px; height: 40px; border-radius: 14px; flex: none; position: relative;
+  width: 40px; height: 40px; border-radius: 14px; flex: none;
+  display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
   box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--color-primary) 60%, transparent);
+  color: #fff;
 }
-.budget-app-root .brand-logo::after {
-  content: ""; position: absolute; inset: 9px; border-radius: 7px;
-  background: color-mix(in srgb, #04050b 55%, transparent);
-}
+.budget-app-root .brand-logo .ico svg { width: 22px; height: 22px; }
 .budget-app-root .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .budget-app-root .brand-text b { font-size: 16px; font-weight: 600; letter-spacing: .2px; color: var(--text-primary); white-space: nowrap; }
 .budget-app-root .brand-sub { font-size: 11px; color: var(--text-light); letter-spacing: .4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
