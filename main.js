@@ -165,6 +165,7 @@ var require_util = __commonJS((exports2, module2) => {
       return null;
     return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
+  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   function parseStatementDate(raw) {
     const s = (raw ?? "").toString().trim();
     if (!s)
@@ -182,10 +183,54 @@ var require_util = __commonJS((exports2, module2) => {
       }
       return isoParts(+m[3], mo, d);
     }
+    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m)
+      return isoParts(+m[1], +m[2], +m[3]);
+    m = s.match(/^(\d{1,2})[ -]([A-Za-z]{3,})[ -](\d{4})$/);
+    if (m) {
+      const mo = MONTHS[m[2].slice(0, 3).toLowerCase()];
+      if (mo)
+        return isoParts(+m[3], mo, +m[1]);
+    }
     const dt = new Date(s);
     if (!isNaN(dt.getTime()))
       return isoParts(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
     return null;
+  }
+  function normalizeAmount(raw) {
+    let s = (raw ?? "").toString().trim();
+    if (!s)
+      return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) {
+      neg = true;
+      s = s.slice(1, -1).trim();
+    }
+    const marker = s.match(/(cr|dr)\.?\s*$/i);
+    if (marker) {
+      if (marker[1].toLowerCase() === "dr")
+        neg = true;
+      s = s.slice(0, marker.index).trim();
+    }
+    if (s.endsWith("-")) {
+      neg = true;
+      s = s.slice(0, -1).trim();
+    }
+    if (s.startsWith("-")) {
+      neg = true;
+      s = s.slice(1).trim();
+    }
+    if (s.startsWith("+"))
+      s = s.slice(1).trim();
+    s = s.replace(/^(r|zar)\s*/i, "").replace(/[\s\u00A0\u202F']/g, "");
+    if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s))
+      s = s.replace(/\./g, "").replace(",", ".");
+    else
+      s = s.replace(/,/g, "");
+    if (!/^\d+(\.\d+)?$/.test(s))
+      return null;
+    const n = Number(s);
+    return neg ? -n : n;
   }
   function safeSeg(s) {
     return (s ?? "").toString().replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim();
@@ -204,7 +249,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, parseNum, patchFrontmatter, safeSeg, collapsePath };
+  module2.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, safeSeg, collapsePath };
 });
 
 // src/shell.js
@@ -508,7 +553,7 @@ var require_shell = __commonJS((exports2, module2) => {
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Import CSV</h1>
-          <div class="sub-note">Discovery Bank &amp; FNB statement exports</div>
+          <div class="sub-note">Bank statement exports — Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa — or your own CSV</div>
         </div>
         <div class="card mb-4">
           <div class="body-pad" style="padding-top:34px">
@@ -518,6 +563,20 @@ var require_shell = __commonJS((exports2, module2) => {
               <span class="hint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <details class="import-help">
+              <summary>Not one of the supported banks? Build your own CSV</summary>
+              <p>Columns are matched by header name, so any CSV with a header row of
+                <code>Date,Title,Amount</code> imports fine. In Google Sheets or Excel, make three columns:</p>
+              <ul>
+                <li><strong>Date</strong> — <code>2026-07-01</code> or <code>01/07/2026</code></li>
+                <li><strong>Title</strong> — the transaction description, e.g. <code>Woolworths</code></li>
+                <li><strong>Amount</strong> — negative for money out, positive for money in, e.g. <code>-249.99</code></li>
+              </ul>
+              <p>Then <em>File → Download → Comma-separated values (.csv)</em> in Sheets, or
+                <em>File → Save As → CSV UTF-8</em> in Excel, and drop the file above.
+                Separate <code>Debit</code>/<code>Credit</code> (or <code>Money Out</code>/<code>Money In</code>)
+                columns also work — debits import as negative amounts.</p>
+            </details>
             <div class="import-progress hidden" id="importProgress" role="status" aria-live="polite">
               <div class="ip-label"><span id="ipText">Reading statement…</span><span id="ipPct" class="num"></span></div>
               <div class="cat-bar" style="min-width:0"><i class="cat-bar-fill" id="ipBar" style="width:0%"></i></div>
@@ -2394,7 +2453,12 @@ var require_tax = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, safeSeg } = require_util();
+  var { el, parseCsv, parseStatementDate, normalizeAmount, safeSeg } = require_util();
+  var DATE_COLS = ["value date", "date", "transaction date", "posting date", "trans date"];
+  var DESC_COLS = ["description", "title", "narrative", "details", "transaction description", "reference", "payee", "memo"];
+  var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "value"];
+  var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
+  var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile } = ctx;
     function autoCategorise(desc) {
@@ -2437,10 +2501,11 @@ var require_import = __commonJS((exports2, module2) => {
         return toast("Empty CSV", true);
       let headerIdx = rows.findIndex((r) => {
         const low2 = r.map((c) => c.trim().toLowerCase());
-        return low2.includes("amount") && (low2.includes("date") || low2.includes("value date") || low2.some((c) => c.includes("date")));
+        const has = (names) => names.some((n) => low2.includes(n));
+        return (has(DATE_COLS) || low2.some((c) => c.includes("date"))) && (has(AMOUNT_COLS) || has(DEBIT_COLS) && has(CREDIT_COLS));
       });
       if (headerIdx === -1)
-        return toast("Could not find a header row with Date + Amount columns", true);
+        return toast("Could not find a header row with Date + Amount (or Debit/Credit) columns", true);
       const header = rows[headerIdx].map((c) => c.trim());
       const low = header.map((c) => c.toLowerCase());
       const col = (names) => {
@@ -2451,11 +2516,14 @@ var require_import = __commonJS((exports2, module2) => {
         }
         return -1;
       };
-      const iDate = col(["value date", "date", "transaction date"]);
-      const iDesc = col(["description", "narrative", "details"]);
-      const iAmount = col(["amount"]);
-      if (iDate === -1 || iAmount === -1 || iDesc === -1)
-        return toast("Missing Date / Description / Amount columns", true);
+      const iDate = col(DATE_COLS);
+      let iDesc = col(DESC_COLS);
+      if (iDesc === -1)
+        iDesc = low.findIndex((c) => c.includes("desc"));
+      const iAmount = col(AMOUNT_COLS);
+      const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+      if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
+        return toast("Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)", true);
       const seen = dedupSet();
       const items = [];
       let skipped = 0;
@@ -2471,13 +2539,23 @@ var require_import = __commonJS((exports2, module2) => {
         let desc = (r[iDesc] || "").trim();
         if (desc.endsWith(" ZA"))
           desc = desc.slice(0, -3);
-        const rawAmount = (r[iAmount] || "").trim().replace(/[,\s]/g, "");
-        if (rawDate && desc && rawAmount !== "" && !isNaN(Number(rawAmount)) && Number(rawAmount) !== 0) {
+        let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
+        if (amount == null && iCredit !== -1) {
+          const c = normalizeAmount(r[iCredit]);
+          if (c != null && c !== 0)
+            amount = Math.abs(c);
+        }
+        if (amount == null && iDebit !== -1) {
+          const d = normalizeAmount(r[iDebit]);
+          if (d != null && d !== 0)
+            amount = -Math.abs(d);
+        }
+        if (rawDate && desc && amount != null && amount !== 0) {
           const date = parseStatementDate(rawDate);
           if (!date) {
             skipped++;
           } else {
-            items.push({ date, desc, amount: parseFloat(Number(rawAmount).toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
+            items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
           }
         } else if (rawDate || desc) {
           skipped++;

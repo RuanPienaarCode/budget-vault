@@ -1,9 +1,20 @@
 'use strict';
-/* CSV import — Discovery Bank / FNB statement exports: parse, auto-categorise
-   via Data/Categorisation Rules.csv, dedupe against existing transactions,
-   review, commit. */
+/* CSV import — bank statement exports (Discovery, FNB, Capitec, Nedbank,
+   Standard Bank, Absa) or any CSV with Date/Title/Amount headers: parse,
+   auto-categorise via Data/Categorisation Rules.csv, dedupe against existing
+   transactions, review, commit. Columns are matched by header name, so a
+   hand-built Google Sheets / Excel export works the same as a bank's. */
 
-const { el, parseCsv, parseStatementDate, safeSeg } = require('../util');
+const { el, parseCsv, parseStatementDate, normalizeAmount, safeSeg } = require('../util');
+
+/* Header-name aliases, lowercase. Exact match wins in array order; amount can
+   come from a single signed column OR a debit + credit pair (Capitec "Money
+   In"/"Money Out", Nedbank/Absa/Standard Bank Debit/Credit statements). */
+const DATE_COLS = ['value date', 'date', 'transaction date', 'posting date', 'trans date'];
+const DESC_COLS = ['description', 'title', 'narrative', 'details', 'transaction description', 'reference', 'payee', 'memo'];
+const AMOUNT_COLS = ['amount', 'transaction amount', 'amount (zar)', 'value'];
+const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out', 'withdrawal', 'withdrawals', 'paid out'];
+const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
   const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile } = ctx;
@@ -41,16 +52,21 @@ module.exports = function registerImport(ctx) {
     if (!rows.length) return toast('Empty CSV', true);
     let headerIdx = rows.findIndex(r => {
       const low = r.map(c => c.trim().toLowerCase());
-      return low.includes('amount') && (low.includes('date') || low.includes('value date') || low.some(c => c.includes('date')));
+      const has = names => names.some(n => low.includes(n));
+      return (has(DATE_COLS) || low.some(c => c.includes('date'))) &&
+             (has(AMOUNT_COLS) || (has(DEBIT_COLS) && has(CREDIT_COLS)));
     });
-    if (headerIdx === -1) return toast('Could not find a header row with Date + Amount columns', true);
+    if (headerIdx === -1) return toast('Could not find a header row with Date + Amount (or Debit/Credit) columns', true);
     const header = rows[headerIdx].map(c => c.trim());
     const low = header.map(c => c.toLowerCase());
     const col = names => { for (const n of names) { const i = low.indexOf(n); if (i !== -1) return i; } return -1; };
-    const iDate = col(['value date', 'date', 'transaction date']);
-    const iDesc = col(['description', 'narrative', 'details']);
-    const iAmount = col(['amount']);
-    if (iDate === -1 || iAmount === -1 || iDesc === -1) return toast('Missing Date / Description / Amount columns', true);
+    const iDate = col(DATE_COLS);
+    let iDesc = col(DESC_COLS);
+    if (iDesc === -1) iDesc = low.findIndex(c => c.includes('desc'));  // e.g. "Transaction Descr."
+    const iAmount = col(AMOUNT_COLS);
+    const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+    if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1)))
+      return toast('Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)', true);
 
     const seen = dedupSet();
     const items = [];
@@ -71,12 +87,22 @@ module.exports = function registerImport(ctx) {
       // rows with the " ZA" country code — strip it so descriptions (and
       // therefore dedup keys + categorisation) match the app's form.
       if (desc.endsWith(' ZA')) desc = desc.slice(0, -3);
-      const rawAmount = (r[iAmount] || '').trim().replace(/[,\s]/g, '');
-      if (rawDate && desc && rawAmount !== '' && !isNaN(Number(rawAmount)) && Number(rawAmount) !== 0) {
+      /* Amount: a single signed column when present, else credit (positive) /
+         debit (negated — statements list debits as positive numbers). */
+      let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
+      if (amount == null && iCredit !== -1) {
+        const c = normalizeAmount(r[iCredit]);
+        if (c != null && c !== 0) amount = Math.abs(c);
+      }
+      if (amount == null && iDebit !== -1) {
+        const d = normalizeAmount(r[iDebit]);
+        if (d != null && d !== 0) amount = -Math.abs(d);
+      }
+      if (rawDate && desc && amount != null && amount !== 0) {
         const date = parseStatementDate(rawDate);
         if (!date) { skipped++; }
         else {
-          items.push({ date, desc, amount: parseFloat(Number(rawAmount).toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
+          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
         }
       } else if (rawDate || desc) { skipped++; }
       if (showBar && (i % CHUNK === CHUNK - 1)) {
