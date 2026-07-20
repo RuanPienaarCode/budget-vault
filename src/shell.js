@@ -64,7 +64,7 @@ const SHELL_HTML = `
     <span class="brand">
       <span class="brand-logo" aria-hidden="true"></span>
       <span class="brand-text">
-        <b>Smart Budget App</b>
+        <b>Budget Vault</b>
         <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
       </span>
     </span>
@@ -78,7 +78,7 @@ const SHELL_HTML = `
     </div>
 
     <div class="ml-auto">
-      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">SB</button>
+      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
     </div>
   </header>
 
