@@ -8,6 +8,17 @@
 
 No accounts. No cloud service. No telemetry. Budget Vault reads and writes ordinary markdown files in a folder of your vault, so your financial data syncs however your vault syncs, stays readable without the plugin, and never leaves your devices.
 
+## Why budget on your own data?
+
+Most budgeting apps ask you to hand your bank statements to someone else's server and trust them with it. Budget Vault flips that:
+
+- **You own your data.** Every account, budget and transaction is a plain markdown file sitting in *your* vault, on *your* devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours.
+- **Nobody else sees it.** The plugin makes zero network requests. Your financial history is never uploaded, analysed, or monetised — it can't be, because it never leaves your vault.
+- **Access it anywhere with your own cloud.** Put your vault in iCloud Drive (or use Obsidian Sync, Dropbox, Syncthing…) and your budget follows you to every device — synced by a cloud *you* control, encrypted with *your* account, invisible to us.
+- **Use it through the Obsidian app.** The free [Obsidian](https://obsidian.md) app on desktop, iPhone and Android is the only thing you need. Open your vault, tap the wallet icon, and your budget is there.
+
+> **📱 Phone tip:** if your vault lives in iCloud Drive, mark it as downloaded on your phone (Files app → long-press the vault folder → *Download Now*, or simply open the vault in Obsidian once and let it finish syncing). A locally-downloaded vault means the budget opens instantly instead of waiting on iCloud to fetch files.
+
 ## Features
 
 - **Dashboard** — spending trend across recent periods, budget vs actual at a glance
