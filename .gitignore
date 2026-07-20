@@ -1,0 +1,5 @@
+# Live user settings — never commit
+data.json
+
+# OS noise
+.DS_Store
