@@ -81,13 +81,13 @@ class OnboardingWizard extends Modal {
   }
 
   onOpen() {
-    this.titleEl.setText('Set up Smart Budget');
+    this.titleEl.setText('Set up Budget Vault');
     this.renderStep();
   }
   onClose() {
     this.contentEl.empty();
     if (!this.finished) {
-      new Notice('Setup skipped — run "Smart Budget: Set up budget" from the command palette anytime.', 6000);
+      new Notice('Setup skipped — run "Budget Vault: Set up budget" from the command palette anytime.', 6000);
       // Don't nag on every launch; the command and the settings-tab button remain.
       this.plugin.settings.onboarded = true;
       this.plugin.saveSettings();
@@ -155,7 +155,7 @@ class OnboardingWizard extends Modal {
 
   /* -------------------------------- steps -------------------------------- */
   render_folder(c) {
-    c.createEl('p', { text: 'Smart Budget stores everything — categories, accounts, budgets and transactions — as plain markdown files in your vault, so your data syncs with the vault and stays yours.' });
+    c.createEl('p', { text: 'Budget Vault stores everything — categories, accounts, budgets and transactions — as plain markdown files in your vault, so your data syncs with the vault and stays yours.' });
     new Setting(c)
       .setName('Budget folder')
       .setDesc('Vault path where the budget files live (created if it doesn\'t exist).')
@@ -330,9 +330,9 @@ class OnboardingWizard extends Modal {
           (name ? `household: "${name.replace(/"/g, '')}"\n` : '') +
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
-          `- **currency** — symbol shown before every amount in the Smart Budget plugin.\n` +
+          `- **currency** — symbol shown before every amount in the Budget Vault plugin.\n` +
           `- **household** — name shown in the dashboard greeting.\n\n` +
-          `Edit the values above directly, or change them in **Settings → Smart Budget** —\n` +
+          `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
         for (const cat of STARTER_CATEGORIES) {
           if (!this.data.cats.has(cat.name)) continue;

@@ -1,4 +1,4 @@
-# Smart Budget — Obsidian plugin
+# Budget Vault — Obsidian plugin
 
 Port of the standalone HTML budget app (now archived at
 `Pienaar Family/Finances/Budget/Archive/Budget App.html`) into a vault-local
@@ -77,7 +77,7 @@ real stylesheet and grep it rather than guessing:
 
 The phone needs no build step — iCloud syncs the built `main.js`. Enable the
 plugin on iOS once: Settings → Community plugins → turn off Restricted mode →
-enable Smart Budget.
+enable Budget Vault.
 
 ## Data settings
 
@@ -198,8 +198,8 @@ still opinionated:
 1. Copy the `budget-app` folder into `.obsidian/plugins/` (create it if missing)
 2. Copy the starter budget folder anywhere in their vault
 3. Settings → Community plugins → **turn off Restricted mode** → Reload → enable
-   Smart Budget (Restricted mode is per-device, so repeat on their phone)
-4. Settings → Smart Budget → set **Budget folder**, **currency**, **month start day**
+   Budget Vault (Restricted mode is per-device, so repeat on their phone)
+4. Settings → Budget Vault → set **Budget folder**, **currency**, **month start day**
 5. Wallet icon in the ribbon
 
 Obsidian will warn that it's third-party code — expected for a manual install.

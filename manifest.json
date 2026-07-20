@@ -1,6 +1,6 @@
 {
   "id": "budget-app",
-  "name": "Smart Budget",
+  "name": "Budget Vault",
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
   "description": "Personal budget dashboard — reads and writes markdown files in your vault's budget folder. Dashboard, transactions, budgets, savings, accounts, owed money, services, tax and CSV import.",

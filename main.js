@@ -315,7 +315,7 @@ var require_shell = __commonJS((exports2, module2) => {
     <span class="brand">
       <span class="brand-logo" aria-hidden="true"></span>
       <span class="brand-text">
-        <b>Smart Budget App</b>
+        <b>Budget Vault</b>
         <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
       </span>
     </span>
@@ -329,7 +329,7 @@ var require_shell = __commonJS((exports2, module2) => {
     </div>
 
     <div class="ml-auto">
-      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">SB</button>
+      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
     </div>
   </header>
 
@@ -2839,7 +2839,7 @@ var require_controller = __commonJS((exports2, module2) => {
       const name = (S.settings.household || "").trim();
       $("#brandSub").textContent = name ? `${name} · Obsidian` : "Obsidian vault budget";
       const words = name.split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w));
-      const initials = words.length ? (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase() : "SB";
+      const initials = words.length ? (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase() : "BV";
       const av = $("#topbarAvatar");
       av.textContent = initials;
       av.setAttribute("aria-label", name ? `Budget settings — ${name}` : "Open budget settings");
@@ -3145,13 +3145,13 @@ var require_onboarding = __commonJS((exports2, module2) => {
       return this.mode === "connect" ? ["folder", "existing", "name", "period", "currency", "finish"] : ["folder", "name", "period", "currency", "categories", "account", "finish"];
     }
     onOpen() {
-      this.titleEl.setText("Set up Smart Budget");
+      this.titleEl.setText("Set up Budget Vault");
       this.renderStep();
     }
     onClose() {
       this.contentEl.empty();
       if (!this.finished) {
-        new Notice('Setup skipped — run "Smart Budget: Set up budget" from the command palette anytime.', 6000);
+        new Notice('Setup skipped — run "Budget Vault: Set up budget" from the command palette anytime.', 6000);
         this.plugin.settings.onboarded = true;
         this.plugin.saveSettings();
       }
@@ -3231,7 +3231,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
         this.data.name = fm.household;
     }
     render_folder(c) {
-      c.createEl("p", { text: "Smart Budget stores everything — categories, accounts, budgets and transactions — as plain markdown files in your vault, so your data syncs with the vault and stays yours." });
+      c.createEl("p", { text: "Budget Vault stores everything — categories, accounts, budgets and transactions — as plain markdown files in your vault, so your data syncs with the vault and stays yours." });
       new Setting(c).setName("Budget folder").setDesc("Vault path where the budget files live (created if it doesn't exist).").addText((t) => t.setPlaceholder("Finances/Budget").setValue(this.data.folder).onChange((v) => {
         this.data.folder = v;
       }));
@@ -3387,10 +3387,10 @@ currency: "${cur.replace(/"/g, "")}"
 # Budget Settings
 
 ` + `- **month_start_day** — the financial period starts on this day of the month.
-` + `- **currency** — symbol shown before every amount in the Smart Budget plugin.
+` + `- **currency** — symbol shown before every amount in the Budget Vault plugin.
 ` + `- **household** — name shown in the dashboard greeting.
 
-` + `Edit the values above directly, or change them in **Settings → Smart Budget** —
+` + `Edit the values above directly, or change them in **Settings → Budget Vault** —
 ` + `the plugin writes them back to this file, so they sync to every device with the vault.
 `);
           for (const cat of STARTER_CATEGORIES) {
