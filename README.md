@@ -1,130 +1,74 @@
-# Budget Vault — Obsidian plugin
+# Budget Vault
 
-Port of the standalone HTML budget app (now archived at
-`Pienaar Family/Finances/Budget/Archive/Budget App.html`) into a vault-local
-Obsidian plugin. Reads and writes the markdown files in the budget folder
-through the Vault API — works on desktop **and Obsidian iOS/Android**
-(no Node/Electron APIs anywhere in `src/`; keep it that way).
+> A personal budget dashboard that lives inside your Obsidian vault — every account, budget and transaction stored as plain markdown you own.
 
-**Status (17 Jul 2026):** in use on desktop + iPhone. We're testing and tweaking
-it on our own vault first — sharing with friends comes *after* that settles.
-See [Sharing it with friends](#sharing-it-with-friends--later) for the checklist
-to work through when that day comes.
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.4.0-7c3aed)
+![Mobile ready](https://img.shields.io/badge/mobile-iOS%20%26%20Android-blue)
 
-## Layout
+No accounts. No cloud service. No telemetry. Budget Vault reads and writes ordinary markdown files in a folder of your vault, so your financial data syncs however your vault syncs, stays readable without the plugin, and never leaves your devices.
 
-```
-manifest.json        plugin identity (isDesktopOnly: false)
-styles.css           all styling, scoped under .budget-app-root
-main.js              BUILD OUTPUT — do not edit by hand
-build.sh             bundles src/ into main.js (bun, fallback npx esbuild)
-src/
-  main.js            plugin class, ribbon, command, Settings.md read/update
-  constants.js       VIEW_TYPE, defaults, category type order, month names
-  util.js            el() DOM builder, lucide icons, md/frontmatter/CSV parsing
-  modal.js           FieldModal + askFields (window.prompt replacement)
-  shell.js           static view markup (SHELL_HTML)
-  io.js              vault file access rooted at the budget folder
-  period.js          payday-month math + per-period summaries
-  load.js            loadVault — reads all budget files into state
-  categories.js      category <select> builders + create-category flow
-  controller.js      mounts the shell, assembles ctx, view switching, wiring
-  view.js            BudgetView (ItemView)
-  settings-tab.js    plugin settings tab
-  views/             one module per screen
-    dashboard.js  transactions.js  budgets.js  accounts.js
-    savings.js    owed.js          services.js tax.js
-    import.js
-```
+## Features
 
-Modules communicate through a shared `ctx` object assembled in
-`controller.js`; each module's `register(ctx)` adds its functions onto it.
-Registration order matters for destructuring (io → period → load →
-categories → views); anything defined later (e.g. `switchView`) must be
-called as `ctx.switchView(...)` at call time.
+- **Dashboard** — spending trend across recent periods, budget vs actual at a glance
+- **Transactions** — browse, search, filter and edit your full history, stored one markdown file per account per month
+- **Budgets** — set amounts per category per period, with live "left / over" feedback as you type
+- **Payday-aligned periods** — months can start on your payday (e.g. the 25th) instead of the 1st
+- **CSV import** — drop a bank statement export, review with automatic categorisation and duplicate detection, commit
+- **Auto-categorisation rules** — pattern → category rules learned from your corrections, stored in a plain CSV
+- **Savings & investments, accounts, owed money, subscriptions** — dedicated screens for each
+- **Tax season tracking** — a per-year SARS checklist with document uploads stored alongside it in the vault
+- **Desktop and mobile** — no Node or Electron APIs; works on Obsidian for iOS and Android
 
-## Editing workflow
+## Installation
 
-1. Edit files under `src/`
-2. `./build.sh`
-3. Reload Obsidian (or toggle the plugin off/on) to pick up the new bundle
+Budget Vault is not (yet) in the community plugin store, so installation is manual:
 
-`styles.css` is **not** bundled — Obsidian reads it directly, so a styling-only
-change just needs step 3.
+1. Download this repository and copy `manifest.json`, `main.js` and `styles.css` into `<your vault>/.obsidian/plugins/budget-app/` (create the folder)
+2. In Obsidian: **Settings → Community plugins** → turn off Restricted mode → enable **Budget Vault**
+3. A setup wizard opens on first run — pick a budget folder, currency and period style, and it scaffolds starter categories and your first account for you
+4. Open the app from the wallet icon in the ribbon
 
-**Prefer the plugin toggle over "Reload app".** We've observed Obsidian serve a
-stale cached `styles.css` even across a Cmd+R app reload (symptom: one missing
-declaration, e.g. drawer rows centring because `justify-content: flex-start`
-wasn't in the loaded sheet). Disabling and re-enabling the plugin (Settings →
-Community plugins, or from the console:
-`app.plugins.disablePlugin('budget-app').then(() => app.plugins.enablePlugin('budget-app'))`)
-always re-reads both `main.js` and `styles.css` from disk.
+Obsidian will warn that this is third-party code — that's expected for a manual install. On mobile, repeat step 2 once (Restricted mode is per-device); the plugin files arrive via your normal vault sync.
 
-### Styling gotcha
+## How your data is stored
 
-Obsidian's `app.css` styles bare `button` / `select` / `input` elements, which
-the standalone HTML never had to fight. Most notably `button { justify-content:
-center }` and `select, input[type=checkbox] { appearance: none }`. The reset at
-the top of `styles.css` neutralises them; if a control ever renders subtly wrong
-(centred when it should be flush left, a missing dropdown chevron, an odd
-height), that reset is the first place to look. To diagnose, extract Obsidian's
-real stylesheet and grep it rather than guessing:
+Everything lives in one vault folder you choose (default `Finances/Budget`):
 
 ```
-# app.css lives inside /Applications/Obsidian.app/Contents/Resources/obsidian.asar
-# (asar header: 4 uint32 length prefixes, JSON at offset 16, files at 8+pickleSize)
+Finances/Budget/
+├── Settings.md              currency, month start day, household name
+├── Categories/              one file per category (type, colour)
+├── Accounts/                one file per account
+├── Budgets/                 one file per period (YYYY-MM.md)
+├── Transactions/
+│   └── <Account>/
+│       └── YYYY-MM.md       markdown table of that month's transactions
+├── Data/
+│   └── Categorisation Rules.csv
+├── Tax/                     one file + document folder per tax year
+├── Owed Money.md
+└── Services.md
 ```
 
-The phone needs no build step — iCloud syncs the built `main.js`. Enable the
-plugin on iOS once: Settings → Community plugins → turn off Restricted mode →
-enable Budget Vault.
+It's all ordinary markdown tables and frontmatter — readable and editable without the plugin, diffable in git, portable forever.
 
-## Data settings
+## CSV import
 
-`month_start_day` and `currency` live in `Settings.md` inside the budget
-folder (synced with the vault). The plugin's settings tab edits that file
-in place; folder path / theme / open-on-startup are per-device plugin data.
+Columns are matched by **header name**, not position, so most bank exports work as-is. Recognised out of the box:
 
-## Budget page — parity notes with the Laravel app
+| Bank | Format |
+|------|--------|
+| Discovery Bank | single signed Amount column (filenames auto-select the account) |
+| FNB | single signed Amount column |
+| Capitec | Money In / Money Out pair |
+| Nedbank, Standard Bank, Absa | Debit / Credit pair |
 
-Like the app's Budget page, every category is always listed (grouped by type),
-whether or not it has a budget this period. Unbudgeted categories are
-display-only zero rows — they are **not** written to `Budgets/<period>.md`
-unless given an amount or a note, so period files stay small. Rows already in
-the file persist even at amount 0 (deliberate zero budgets survive); ✕ clears
-a row from the file. Each amount input shows a live remaining line beneath it
-(`R 629,45 left` / red `R 73,99 over`).
+Amount cells tolerate real-world quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives, trailing minus, and `Cr`/`Dr` markers. Duplicate rows are detected against your existing history and skipped automatically, so re-importing an overlapping statement is safe.
 
-## Tax page
+### Importing your own data
 
-SARS return tracking, one file per tax year: `Tax/<year>.md` holds the season
-frontmatter (`taxpayer_type`, `assessment`, editable deadlines) plus two tables —
-`## Progress` (steps, status `todo`/`busy`/`done`/`n/a`) and `## Documents`
-(status `needed`/`uploaded`/`n/a`). Uploaded certificates (PDFs, images) are
-written via the Vault binary API into `Tax/<year>/` next to the file, so they
-sync to iOS and open in Obsidian's own viewers. New years are seeded with a
-starter SARS checklist (IRP5, bank IT3(b)s, investment IT3(b)/(c), TFSA
-certificate, medical, freelance income + expenses, IRP6 provisional
-deadlines) — edit the sources to match your own banks and providers.
-Removing a document row never deletes the uploaded file; deadlines
-shift each filing season, so the seeded dates are defaults to verify on
-sars.gov.za.
-
-## CSV import — supported formats
-
-Columns are matched by **header name**, not position, so most bank CSV exports
-work out of the box: **Discovery Bank, FNB, Capitec, Nedbank, Standard Bank and
-Absa** statement exports are all recognised. The importer needs a header row
-with a date column, a description column, and either a single signed amount
-column or a **Debit + Credit** pair (Capitec's "Money In"/"Money Out" style
-included — debits import as negative amounts). Amount cells tolerate the local
-quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives,
-trailing minus, and `Cr`/`Dr` markers.
-
-### Importing your own data (Google Sheets / Excel)
-
-Anything not covered by a bank export can be imported from a hand-built sheet.
-Create three columns with this exact header row:
+Anything else can be imported from a hand-built Google Sheets or Excel file with this header row:
 
 | Date | Title | Amount |
 |------|-------|--------|
@@ -132,74 +76,36 @@ Create three columns with this exact header row:
 | 2026-07-02 | Salary | 25000 |
 
 - **Date** — `YYYY-MM-DD` or `DD/MM/YYYY`
-- **Title** — the transaction description (used for auto-categorisation rules)
+- **Title** — the transaction description
 - **Amount** — negative for money out, positive for money in
 
-Then export as CSV — Google Sheets: *File → Download → Comma-separated values
-(.csv)*; Excel: *File → Save As → CSV UTF-8* — and drop the file on the Import
-screen. `Description` works as a header instead of `Title`, and separate
-`Debit`/`Credit` columns instead of `Amount`, if that's easier.
+Export as CSV (Sheets: *File → Download → .csv* · Excel: *File → Save As → CSV UTF-8*) and drop it on the Import screen. `Description` also works instead of `Title`, and separate `Debit`/`Credit` columns instead of `Amount`.
 
-## CSV import — parity notes with the Laravel app
+> **Note:** deleting an imported transaction doesn't leave a tombstone — if you re-import a statement containing it, it comes back and must be deleted again.
 
-- **`" ZA"` suffix**: Discovery card rows carry a trailing country code
-  (`"VOVO TELO CAPETOWN ZA"`). The Laravel app strips it on import
-  (`CsvImportService`), so the vault's descriptions are stored without it.
-  The plugin does the same — this keeps dedup keys and categorisation rules
-  aligned. (Verified 2026-07-17: with the strip in place a full-history
-  re-import reports 0 new for a synced account.)
-- **Zero-amount rows** are skipped, matching the app.
-- **Tombstones**: the Laravel app soft-deletes transactions, so a row the
-  user deleted there stays deleted across re-imports. The vault has no
-  tombstones — a transaction deleted from a monthly file (or deleted in the
-  app before it was seeded here) **comes back on the next CSV re-import** and
-  must be re-deleted by hand. Known, accepted limitation.
+## Development
 
-## Sharing it with friends — later
+Source lives in `src/` as small vanilla-JS modules — no framework, no dependencies. `main.js` at the repo root is the build output; never edit it by hand.
 
-**Not yet.** The plan is: use it, test it, tweak it here first. Only once it has
-settled do we package it for anyone else. This section is the checklist for that
-day, written up while it was fresh — it is *not* a to-do list for now.
+```bash
+./build.sh   # bundles src/ into main.js (bun, falls back to npx esbuild)
+```
 
-### The hard rule: never send the data folder
+Then toggle the plugin off/on in Obsidian to pick up the new bundle. `styles.css` isn't bundled — Obsidian reads it directly, so styling changes only need the toggle.
 
-The plugin is only the app. The budget folder next to it holds real money data —
-live account balances, net worth, ~5 700 transactions back to 2022, who owes the
-household what, every subscription. **A friend must never receive a copy of it.**
-They need an empty scaffold of the same shape, nothing more.
-
-Likewise **never copy `data.json`** — it pins `budgetFolder` to our vault path
-and will simply be wrong in theirs. Let it regenerate from defaults.
-
-### What a friend actually needs
-
-| Send | Notes |
+| Area | Where |
 |------|-------|
-| `manifest.json`, `main.js`, `styles.css` | the whole app; drop into `<their vault>/.obsidian/plugins/budget-app/` |
-| `src/`, `build.sh`, `README.md` | optional — only if they'll edit it; not loaded at runtime |
-| A starter budget folder | `Settings.md`, a few generic `Categories/*.md`, an `Accounts/*.md` or two, empty `Budgets/`, `Transactions/`, `Data/`, plus `Owed Money.md` and `Services.md` |
+| Plugin entry, commands, settings | `src/main.js`, `src/settings-tab.js` |
+| App shell, view switching | `src/shell.js`, `src/controller.js` |
+| Vault I/O and parsing | `src/io.js`, `src/util.js`, `src/load.js` |
+| One module per screen | `src/views/*.js` |
 
-The scaffold is not optional: `loadVault` shows the "Budget folder not found"
-screen unless at least one category or transaction file exists.
+Modules communicate through a shared `ctx` object assembled in `controller.js`; each module registers its functions onto it.
 
-### Genericise before shipping
+## Privacy
 
-Mostly done — the brand subtitle and avatar initials now come from the
-`household` setting in `Settings.md` (generic defaults when unset). What's
-still opinionated:
+Budget Vault makes **no network requests** — no analytics, no update checks, no external fonts or scripts. Your data is only ever read from and written to your own vault.
 
-- `main.js` / `controller.js` — `currency: 'R'` and `month_start_day: 23` (payday)
-- `shell.js` / `views/import.js` — CSV import targets SA bank exports
-  (Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa), with a generic
-  Date/Title/Amount format as the escape hatch
+## License
 
-### Their install steps
-
-1. Copy the `budget-app` folder into `.obsidian/plugins/` (create it if missing)
-2. Copy the starter budget folder anywhere in their vault
-3. Settings → Community plugins → **turn off Restricted mode** → Reload → enable
-   Budget Vault (Restricted mode is per-device, so repeat on their phone)
-4. Settings → Budget Vault → set **Budget folder**, **currency**, **month start day**
-5. Wallet icon in the ribbon
-
-Obsidian will warn that it's third-party code — expected for a manual install.
+[MIT](LICENSE) © Ruan Pienaar
