@@ -98,6 +98,7 @@ Then toggle the plugin off/on in Obsidian to pick up the new bundle. `styles.css
 | Plugin entry, commands, settings | `src/main.js`, `src/settings-tab.js` |
 | App shell, view switching | `src/shell.js`, `src/controller.js` |
 | Vault I/O and parsing | `src/io.js`, `src/util.js`, `src/load.js` |
+| Country profiles (currency format, tax checklists, banks) | `src/locale.js` |
 | One module per screen | `src/views/*.js` |
 
 Modules communicate through a shared `ctx` object assembled in `controller.js`; each module registers its functions onto it.

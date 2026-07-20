@@ -7,6 +7,7 @@ const { Notice } = require('obsidian');
 const { el, setIco } = require('./util');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
+const { localeFor } = require('./locale');
 
 const registerIo = require('./io');
 const registerPeriod = require('./period');
@@ -38,7 +39,7 @@ function mountApp(view) {
   /* ------------------------------- state -------------------------------- */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R' },
+    settings: { month_start_day: 23, currency: 'R', country: 'za' },
     categories: [],            // {name, type, color}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
@@ -66,18 +67,25 @@ function mountApp(view) {
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
-  /* South African Rand formatting — space thousands separator, comma decimals.
-     The symbol comes from Settings.md (`currency`). */
+  /* Country locale profile for the configured country (Settings.md `country`,
+     default South Africa). Resolved per call so a settings change applies on
+     the next render without re-mounting. */
+  const locale = () => localeFor(S.settings.country);
+
+  /* Amount formatting — thousands/decimal separators come from the country
+     profile (SA: "R 1 234,56"; US: "$ 1,234.56"). The symbol itself comes
+     from Settings.md (`currency`). */
   function money(v, decimals = 2) {
+    const loc = locale();
     const sign = v < 0 ? '-' : '';
     const parts = Math.abs(v).toFixed(decimals).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    return `${S.settings.currency} ${sign}${parts[0]}${decimals > 0 ? ',' + parts[1] : ''}`;
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
+    return `${S.settings.currency} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
   }
   const typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
 
   /* --------------------------- assemble ctx ----------------------------- */
-  const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge };
+  const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge, locale };
   registerIo(ctx);          // basePath, readFile, writeFile, mdFilesIn, …
   registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
   registerLoad(ctx);        // loadVault
@@ -109,7 +117,7 @@ function mountApp(view) {
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, owed: ctx.renderOwed, services: ctx.renderServices,
-       tax: ctx.renderTax, import: () => {}, connect: () => {} })[S.view]();
+       tax: ctx.renderTax, import: ctx.renderImport, connect: () => {} })[S.view]();
   }
   ctx.switchView = switchView;
   ctx.render = render;
