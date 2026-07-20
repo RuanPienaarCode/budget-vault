@@ -140,7 +140,7 @@ function mountApp(view) {
     const words = name.split(/\s+/).filter(w => /^[\p{L}\p{N}]/u.test(w));
     const initials = words.length
       ? (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase()
-      : 'SB';
+      : 'BV';
     const av = $('#topbarAvatar');
     av.textContent = initials;
     av.setAttribute('aria-label', name ? `Budget settings — ${name}` : 'Open budget settings');
