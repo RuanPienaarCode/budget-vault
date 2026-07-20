@@ -102,11 +102,14 @@ class BudgetPlugin extends Plugin {
       await this.app.vault.modify(f, text);  // the watcher treats this as ours
       this._lastWrite = Date.now();          // (single intentional reloadViews)
     } else {
-      const defaults = { month_start_day: '23', currency: 'R' };
+      // No Settings.md yet — create it with defaults plus the requested key,
+      // whatever that key is (country/household included, not just the two
+      // defaults).
+      const defaults = { month_start_day: '23', currency: 'R', country: 'za' };
       defaults[key] = value;
       this._lastWrite = Date.now();
       await this.app.vault.create(path,
-        `---\nmonth_start_day: ${defaults.month_start_day}\ncurrency: ${defaults.currency}\n---\n\n# Budget Settings\n`);
+        '---\n' + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n# Budget Settings\n');
       this._lastWrite = Date.now();
     }
   }

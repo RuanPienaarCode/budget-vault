@@ -19,6 +19,9 @@ module.exports = function registerLoad(ctx) {
         S.settings.month_start_day = Math.min(28, Math.max(1, n));
       }
       if (fm.currency) S.settings.currency = fm.currency;
+      // Country code (za/us/uk/…) — localeFor falls back to za for unknown
+      // values, so a hand-edited Settings.md can't break the app.
+      S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
       S.settings.household = fm.household || '';
     }
     S.categories = [];

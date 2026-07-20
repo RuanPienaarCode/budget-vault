@@ -1,74 +1,39 @@
 'use strict';
-/* Tax — SARS return tracking per tax year, saved to Tax/<year>.md with the
-   uploaded documents stored in Tax/<year>/. A SA tax year N runs 1 Mar N-1 to
-   28/29 Feb N; filing season opens mid-year. Steps + documents are seeded with
-   a starter SARS checklist when a year is created — edit sources to match
-   your own banks, providers and income. */
+/* Tax — tax-return tracking per tax year, saved to Tax/<year>.md with the
+   uploaded documents stored in Tax/<year>/. Everything country-specific —
+   authority name, tax-year span, deadlines, taxpayer-type labels and the
+   starter checklist seeded when a year is created — comes from the country
+   profile in locale.js (Settings.md `country`, default South Africa / SARS).
+   Edit seeded sources to match your own banks, providers and income. */
 
 const { el, escMd, icoEl, safeSeg, patchFrontmatter } = require('../util');
 const { askFields, confirmModal } = require('../modal');
 
-/* Filing-season deadlines shift a little every year — these are editable
-   defaults (2026-season dates carried forward as a pattern). */
-const seedDeadlines = year => ({
-  deadline_standard: `${year}-10-23`,
-  deadline_provisional: `${year + 1}-01-22`,
-});
-
-const SEED_STEPS = (year) => [
-  { step: 'Confirm taxpayer status on eFiling', notes: 'Maintain Registered Particulars — provisional vs standard' },
-  { step: 'Check auto-assessment status on the eFiling dashboard', notes: '' },
-  { step: 'Gather documents', notes: 'See the Documents list below' },
-  { step: 'Open the ITR12 return on eFiling', notes: 'sars.gov.za or the SARS MobiApp' },
-  { step: 'Review pre-populated data', notes: 'IRP5, medical certificate, bank IT3(b)s — check both banks reflect' },
-  { step: 'Add freelance income & deductible expenses', notes: 'Invoiced total; home office %, software, equipment, internet/phone portion, accounting fees' },
-  { step: 'Declare investment income', notes: 'IT3(b)/IT3(c) from your investment provider: interest, dividends, capital gains on sales' },
-  { step: 'Declare TFSA contributions', notes: 'Contribution certificate; check R36 000/yr & R500 000 lifetime limits' },
-  { step: 'Claim out-of-pocket medical expenses', notes: 'Qualifying expenses not covered by the aid' },
-  { step: 'Submit the ITR12', notes: '' },
-  { step: 'Respond to SARS verification requests', notes: 'Within the timeframe SARS gives' },
-  { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: 'Provisional taxpayers only — mark N/A if standard' },
-  { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: 'Provisional taxpayers only — mark N/A if standard' },
-].map(s => ({ status: 'todo', due: '', notes: '', ...s }));
-
-const SEED_DOCS = [
-  { name: 'IRP5 / IT3(a) employee certificate', source: 'Employer', notes: 'Usually pre-populated' },
-  { name: 'IT3(b) interest certificate', source: 'Your bank', notes: 'One per bank you hold accounts with' },
-  { name: 'IT3(b) interest certificate', source: 'Your second bank', notes: 'Remove if not applicable' },
-  { name: 'IT3(b) / IT3(c) investment certificates', source: 'Investment provider', notes: 'Interest, dividends, capital gains' },
-  { name: 'TFSA contribution certificate', source: 'Investment provider', notes: 'Growth is exempt; contributions still declared' },
-  { name: 'Medical aid tax certificate', source: 'Medical aid scheme', notes: 'Usually pre-populated' },
-  { name: 'Out-of-pocket medical expenses summary', source: 'Own records', notes: '' },
-  { name: 'Invoiced income summary', source: 'Freelance business', notes: 'Total invoiced for the tax year' },
-  { name: 'Business expense records', source: 'Freelance business', notes: 'Home office, software, equipment, internet/phone, accounting' },
-  { name: 'SARS letters & notices', source: 'SARS', notes: '' },
-].map(d => ({ status: 'needed', file: '', notes: '', ...d }));
-
 module.exports = function registerTax(ctx) {
-  const { S, $, app, toast, writeFile, writeBinary, fileAt } = ctx;
+  const { S, $, app, toast, writeFile, writeBinary, fileAt, locale } = ctx;
 
-  /* The season we'd file for today: tax year N ends Feb N, filing runs
-     roughly Jul N – Jan N+1, so Mar onwards points at the current year. */
+  /* The tax year we'd be dealing with today, per the country profile. */
   function currentTaxYear() {
-    const now = new Date();
-    return now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    return locale().currentTaxYear(new Date());
   }
   const T = () => S.tax[S.taxYear];
   const mark = () => { S.taxDirty = true; $('#taxSave').disabled = false; };
 
   /* ------------------------------ render -------------------------------- */
   function renderTax() {
+    const loc = locale();
     const years = Object.keys(S.tax).sort();
     $('#taxEmptyCard').classList.toggle('hidden', years.length > 0);
     $('#taxContent').classList.toggle('hidden', !years.length);
     if (!years.length) {
+      $('#taxEmptyIntro').textContent = loc.taxIntro;
       $('#taxStart').textContent = `Start tracking the ${currentTaxYear()} tax year`;
       return;
     }
 
     const t = T();
     $('#taxSubNote').innerHTML = '';
-    $('#taxSubNote').append(`Tax year ${S.taxYear} (1 Mar ${+S.taxYear - 1} – end Feb ${S.taxYear}) · saved to `,
+    $('#taxSubNote').append(`Tax year ${S.taxYear} (${loc.yearSpan(+S.taxYear)}) · saved to `,
       el('code', {}, `Tax/${S.taxYear}.md`));
 
     const sel = $('#taxYearSel'); sel.innerHTML = '';
@@ -81,7 +46,7 @@ module.exports = function registerTax(ctx) {
   }
 
   function activeDeadline(t) {
-    return t.taxpayer_type === 'standard' ? t.deadline_standard : t.deadline_provisional;
+    return locale().activeDeadline(t);
   }
   function daysTo(iso) {
     const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -104,43 +69,30 @@ module.exports = function registerTax(ctx) {
     const docs = t.docs.filter(x => x.status !== 'n/a');
     const ready = docs.filter(x => x.status === 'uploaded').length;
     tile('Documents in', `${ready} / ${docs.length}`, ready === docs.length && docs.length ? 'text-success' : '');
-    tile('Taxpayer', t.taxpayer_type === 'provisional' ? 'Provisional'
-      : t.taxpayer_type === 'standard' ? 'Standard' : 'Unknown');
+    const typeLabel = (locale().taxpayerTypes.find(([v]) => v === t.taxpayer_type) || [])[1];
+    tile('Taxpayer', typeLabel || 'Unknown');
   }
 
   function renderSeason(t) {
+    const loc = locale();
     const b = $('#taxSeasonBody'); b.innerHTML = '';
     const field = (label, control) => el('label', { class: 'tax-field' }, el('span', { class: 'l' }, label), control);
     b.append(el('div', { class: 'row tax-season-row' },
       field('Taxpayer type', el('select', { class: 'form-select form-select-sm',
         onchange: e => { t.taxpayer_type = e.target.value; mark(); renderTax(); } },
-        ...[['provisional', 'Provisional'], ['standard', 'Standard'], ['unknown', 'Unknown — confirm on eFiling']]
+        ...loc.taxpayerTypes
           .map(([v, l]) => el('option', { value: v, ...(t.taxpayer_type === v ? { selected: '' } : {}) }, l)))),
       field('Assessment', el('select', { class: 'form-select form-select-sm',
         onchange: e => { t.assessment = e.target.value; mark(); renderTax(); } },
-        ...[['submit-requested', 'SARS asked me to submit'], ['auto-assessed', 'Auto-assessed'], ['unknown', 'Not checked yet']]
+        ...loc.assessments
           .map(([v, l]) => el('option', { value: v, ...(t.assessment === v ? { selected: '' } : {}) }, l)))),
-      field('Deadline (standard)', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_standard,
+      field(loc.deadlineLabels[0], el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_standard,
         placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_standard = e.target.value.trim(); mark(); renderTax(); } })),
-      field('Deadline (provisional)', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_provisional,
+      field(loc.deadlineLabels[1], el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_provisional,
         placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_provisional = e.target.value.trim(); mark(); renderTax(); } }))));
 
-    const msgs = [];
-    if (t.assessment === 'submit-requested') {
-      msgs.push('SARS has asked for a return — you were not auto-assessed. Work through the steps below and file the ITR12 on eFiling.');
-    } else if (t.assessment === 'auto-assessed') {
-      msgs.push('SARS auto-assessed this year. Check the assessment on eFiling — if income is missing or you disagree, file an ITR12 before the deadline; otherwise nothing more may be needed.');
-    } else {
-      msgs.push('Check your auto-assessment status on the eFiling dashboard — SARS either auto-calculates or asks you to submit, depending on your income mix.');
-    }
-    if (t.taxpayer_type === 'provisional') {
-      msgs.push('As a provisional taxpayer you also file IRP6 returns twice a year — they are in the steps below.');
-    } else if (t.taxpayer_type === 'unknown') {
-      msgs.push('Salary plus freelance income usually means provisional taxpayer — confirm under "Maintain Registered Particulars" on eFiling.');
-    }
-    b.append(el('p', { class: 'tax-season-msg' }, msgs.join(' ')));
-    b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' },
-      'Always type sars.gov.za into the browser yourself — SARS never asks for passwords or OTPs by email, SMS or phone.'));
+    b.append(el('p', { class: 'tax-season-msg' }, loc.seasonMsgs(t).join(' ')));
+    b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' }, loc.safetyNote));
   }
 
   const STEP_CYCLE = { todo: 'busy', busy: 'done', done: 'n/a', 'n/a': 'todo' };
@@ -292,8 +244,9 @@ module.exports = function registerTax(ctx) {
       taxpayer_type: t.taxpayer_type, assessment: t.assessment,
       deadline_standard: t.deadline_standard || null, deadline_provisional: t.deadline_provisional || null,
     });
+    const loc = locale();
     const lines = ['---', ...fm.split('\n'), '---', '', `# Tax Year ${year}`, '',
-      `SARS return tracking for the ${year} tax year (1 Mar ${+year - 1} – end Feb ${year}).`,
+      `${loc.authority === 'Tax' ? 'Tax' : loc.authority} return tracking for the ${year} tax year (${loc.yearSpan(+year)}).`,
       'Step `status` is `todo`, `busy`, `done` or `n/a`; document `status` is `needed`, `uploaded` or `n/a`.',
       `Uploaded files live in \`Tax/${year}/\`.`, '',
       '## Progress', '',
@@ -337,11 +290,13 @@ module.exports = function registerTax(ctx) {
   }
 
   function seedTaxYear(year) {
+    const loc = locale();
     S.tax[String(year)] = {
       fmRaw: '',
-      taxpayer_type: 'provisional', assessment: 'submit-requested',
-      ...seedDeadlines(year),
-      steps: SEED_STEPS(year), docs: SEED_DOCS.map(d => ({ ...d })),
+      taxpayer_type: loc.defaultTaxpayerType, assessment: loc.defaultAssessment,
+      ...loc.seedDeadlines(year),
+      steps: loc.seedSteps(year).map(s => ({ status: 'todo', due: '', notes: '', ...s })),
+      docs: loc.seedDocs().map(d => ({ status: 'needed', file: '', notes: '', ...d })),
     };
   }
 
@@ -357,7 +312,7 @@ module.exports = function registerTax(ctx) {
     const years = Object.keys(S.tax).map(Number);
     const suggested = years.length ? Math.max(...years) + 1 : currentTaxYear();
     const r = await askFields(app, 'New tax year', [
-      { key: 'year', label: 'Tax year (ends Feb of this year)', type: 'number', value: String(suggested) },
+      { key: 'year', label: locale().yearHint, type: 'number', value: String(suggested) },
     ]);
     if (!r) return;
     const year = parseInt(r.year, 10);

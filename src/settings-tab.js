@@ -6,6 +6,7 @@
 const { PluginSettingTab, Setting, normalizePath } = require('obsidian');
 const { DEFAULT_SETTINGS } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
+const { PROFILES, COUNTRY_ORDER } = require('./locale');
 
 class BudgetSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -96,6 +97,19 @@ class BudgetSettingTab extends PluginSettingTab {
             await this.plugin.updateBudgetSettingsMd('month_start_day', String(n));
             this.plugin.reloadViews();
           }, 800);
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Country')
+      .setDesc('Drives amount formatting, bank-statement date order and the Tax view\'s checklist (SARS, IRS, HMRC, …). Existing tax years keep their data — only labels and new-year seeds change.')
+      .addDropdown(d => {
+        for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
+        const cur = (md.country ?? 'za').toString().trim().toLowerCase();
+        d.setValue(PROFILES[cur] ? cur : 'za');
+        d.onChange(async v => {
+          await this.plugin.updateBudgetSettingsMd('country', v);
+          this.plugin.reloadViews();
         });
       });
 

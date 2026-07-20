@@ -141,15 +141,18 @@ function isoParts(y, mo, d) {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-function parseStatementDate(raw) {
+/* dayFirst picks the reading of ambiguous XX/YY/YYYY dates: true → DD/MM
+   (SA, UK, AU, EU), false → MM/DD (US, CA). Unambiguous values (13+ in the
+   month slot) are corrected either way. */
+function parseStatementDate(raw, dayFirst = true) {
   const s = (raw ?? '').toString().trim();
   if (!s) return null;
   let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);      // ISO: YYYY-MM-DD
   if (m) return isoParts(+m[1], +m[2], +m[3]);
-  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);          // DD/MM/YYYY (SA)
+  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);          // DD/MM/YYYY or MM/DD/YYYY
   if (m) {
-    let d = +m[1], mo = +m[2];
-    if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }     // tolerate MM/DD
+    let d = dayFirst ? +m[1] : +m[2], mo = dayFirst ? +m[2] : +m[1];
+    if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }     // tolerate the other order
     return isoParts(+m[3], mo, d);
   }
   m = s.match(/^(\d{4})(\d{2})(\d{2})$/);                        // YYYYMMDD (Absa/SB)
@@ -165,7 +168,7 @@ function parseStatementDate(raw) {
 }
 
 /* Parse a statement amount cell to a Number, or null if empty/unparseable.
-   Tolerates the spread of SA bank export styles: "R 1 234.56", "1,234.56",
+   Tolerates the spread of bank export styles: "R 1 234.56", "$1,234.56",
    decimal-comma "1 234,56" / "1.234,56", parenthesised negatives "(123.45)",
    trailing minus "123.45-", and Cr/Dr markers (Cr → credit/positive,
    Dr → debit/negative). Zero is a valid return — callers decide to skip it. */
@@ -179,7 +182,7 @@ function normalizeAmount(raw) {
   if (s.endsWith('-')) { neg = true; s = s.slice(0, -1).trim(); }
   if (s.startsWith('-')) { neg = true; s = s.slice(1).trim(); }
   if (s.startsWith('+')) s = s.slice(1).trim();
-  s = s.replace(/^(r|zar)\s*/i, '').replace(/[\s\u00A0\u202F']/g, '');
+  s = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, '').replace(/[\s\u00A0\u202F']/g, '');
   if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');  // decimal comma
   else s = s.replace(/,/g, '');                                                       // thousands comma
   if (!/^\d+(\.\d+)?$/.test(s)) return null;

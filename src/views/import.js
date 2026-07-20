@@ -1,9 +1,10 @@
 'use strict';
-/* CSV import — bank statement exports (Discovery, FNB, Capitec, Nedbank,
-   Standard Bank, Absa) or any CSV with Date/Title/Amount headers: parse,
-   auto-categorise via Data/Categorisation Rules.csv, dedupe against existing
-   transactions, review, commit. Columns are matched by header name, so a
-   hand-built Google Sheets / Excel export works the same as a bank's. */
+/* CSV import — bank statement exports (the banks named in the country
+   profile) or any CSV with Date/Title/Amount headers: parse, auto-categorise
+   via Data/Categorisation Rules.csv, dedupe against existing transactions,
+   review, commit. Columns are matched by header name, so a hand-built
+   Google Sheets / Excel export works the same as a bank's. Date order for
+   ambiguous DD/MM vs MM/DD dates follows the country profile. */
 
 const { el, parseCsv, parseStatementDate, normalizeAmount, safeSeg } = require('../util');
 
@@ -17,7 +18,16 @@ const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out'
 const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile } = ctx;
+  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale } = ctx;
+
+  /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
+  function renderImport() {
+    const loc = locale();
+    $('#importSubNote').textContent = loc.banks
+      ? `Bank statement exports — ${loc.banks} — or your own CSV`
+      : 'Bank statement CSV exports — or any CSV with Date / Description / Amount columns';
+    if (loc.importHint) $('#importDropHint').textContent = loc.importHint;
+  }
 
   function autoCategorise(desc) {
     const d = desc.trim().toLowerCase();
@@ -73,6 +83,7 @@ module.exports = function registerImport(ctx) {
     let skipped = 0;
     const label0 = detectAccountLabel(file.name);
     const dataRows = rows.slice(headerIdx + 1);
+    const loc = locale();
 
     /* Auto-categorisation is O(rows × rules); chunk with a progress bar for
        anything sizeable so the UI stays responsive. */
@@ -83,10 +94,10 @@ module.exports = function registerImport(ctx) {
       const r = dataRows[i];
       const rawDate = (r[iDate] || '').trim();
       let desc = (r[iDesc] || '').trim();
-      // Parity with the Laravel app's CsvImportService: Discovery suffixes card
-      // rows with the " ZA" country code — strip it so descriptions (and
-      // therefore dedup keys + categorisation) match the app's form.
-      if (desc.endsWith(' ZA')) desc = desc.slice(0, -3);
+      // Some banks suffix card rows with a country code (Discovery: " ZA") —
+      // strip it so descriptions (and therefore dedup keys + categorisation)
+      // stay clean. Which suffix, if any, comes from the country profile.
+      if (loc.stripDescSuffix && desc.endsWith(loc.stripDescSuffix)) desc = desc.slice(0, -loc.stripDescSuffix.length);
       /* Amount: a single signed column when present, else credit (positive) /
          debit (negated — statements list debits as positive numbers). */
       let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
@@ -99,7 +110,7 @@ module.exports = function registerImport(ctx) {
         if (d != null && d !== 0) amount = -Math.abs(d);
       }
       if (rawDate && desc && amount != null && amount !== 0) {
-        const date = parseStatementDate(rawDate);
+        const date = parseStatementDate(rawDate, loc.dayFirst);
         if (!date) { skipped++; }
         else {
           items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
@@ -236,5 +247,5 @@ module.exports = function registerImport(ctx) {
     ctx.switchView('transactions');
   }
 
-  Object.assign(ctx, { handleCsvFile, commitImport });
+  Object.assign(ctx, { handleCsvFile, commitImport, renderImport });
 };

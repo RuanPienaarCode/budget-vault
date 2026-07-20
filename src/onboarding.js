@@ -6,6 +6,7 @@
    of the app. Nothing is written to disk until the final step's button. */
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
+const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
    user unticks what they don't want; more can be added in-app afterwards. */
@@ -65,6 +66,7 @@ class OnboardingWizard extends Modal {
     this.data = {
       folder: plugin.settings.budgetFolder || 'Finances/Budget',
       name: '',
+      country: 'za',
       periodMode: 'payday',         // 'calendar' | 'payday'
       payday: 25,
       currency: 'R',
@@ -76,8 +78,8 @@ class OnboardingWizard extends Modal {
 
   steps() {
     return this.mode === 'connect'
-      ? ['folder', 'existing', 'name', 'period', 'currency', 'finish']
-      : ['folder', 'name', 'period', 'currency', 'categories', 'account', 'finish'];
+      ? ['folder', 'existing', 'name', 'country', 'period', 'currency', 'finish']
+      : ['folder', 'name', 'country', 'period', 'currency', 'categories', 'account', 'finish'];
   }
 
   onOpen() {
@@ -146,6 +148,9 @@ class OnboardingWizard extends Modal {
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     const day = parseInt(fm.month_start_day, 10);
     if (day >= 1 && day <= 28) { this.data.payday = day; this.data.periodMode = day === 1 ? 'calendar' : 'payday'; }
+    if (fm.country && PROFILES[fm.country.toString().trim().toLowerCase()]) {
+      this.data.country = fm.country.toString().trim().toLowerCase();
+    }
     if (fm.currency) {
       if (CURRENCIES.some(([v]) => v === fm.currency)) this.data.currency = fm.currency;
       else { this.data.currency = '__custom__'; this.data.customCurrency = fm.currency; }
@@ -177,6 +182,23 @@ class OnboardingWizard extends Modal {
         .setPlaceholder('e.g. Alex, or The Smiths')
         .setValue(this.data.name)
         .onChange(v => { this.data.name = v; }));
+  }
+
+  render_country(c) {
+    new Setting(c)
+      .setName('Country')
+      .setDesc('Sets the default currency, amount formatting, bank-statement date order and the Tax view\'s return checklist (SARS, IRS, HMRC, …). You can still override the currency on the next steps.')
+      .addDropdown(d => {
+        for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
+        d.setValue(this.data.country);
+        d.onChange(v => {
+          this.data.country = v;
+          // Re-default the currency to the country's — the currency step
+          // remains for overriding it.
+          this.data.currency = CURRENCIES.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : '__custom__';
+          if (this.data.currency === '__custom__') this.data.customCurrency = PROFILES[v].currency;
+        });
+      });
   }
 
   render_period(c) {
@@ -262,6 +284,7 @@ class OnboardingWizard extends Modal {
     const rows = [
       ['Folder', this.data.folder],
       ['Name', this.data.name.trim() || '—'],
+      ['Country', localeFor(this.data.country).label],
       ['Budget month', day === 1 ? 'Calendar month' : `Payday to payday (day ${day})`],
       ['Currency', this.currencySymbol()],
     ];
@@ -320,17 +343,19 @@ class OnboardingWizard extends Modal {
         await p.saveSettings();
         await p.updateBudgetSettingsMd('month_start_day', String(day));
         await p.updateBudgetSettingsMd('currency', `"${cur.replace(/"/g, '')}"`);
+        await p.updateBudgetSettingsMd('country', this.data.country);
         if (name) await p.updateBudgetSettingsMd('household', `"${name.replace(/"/g, '')}"`);
       } else {
         for (const sub of ['Categories', 'Accounts', 'Budgets', 'Transactions', 'Tax', 'Data']) {
           await this.ensureFolder(normalizePath(`${folder}/${sub}`));
         }
         await this.writeIfAbsent(normalizePath(`${folder}/Settings.md`),
-          `---\nmonth_start_day: ${day}\ncurrency: "${cur.replace(/"/g, '')}"\n` +
+          `---\nmonth_start_day: ${day}\ncurrency: "${cur.replace(/"/g, '')}"\ncountry: ${this.data.country}\n` +
           (name ? `household: "${name.replace(/"/g, '')}"\n` : '') +
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
           `- **currency** — symbol shown before every amount in the Budget Vault plugin.\n` +
+          `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, other).\n` +
           `- **household** — name shown in the dashboard greeting.\n\n` +
           `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
