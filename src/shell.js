@@ -302,7 +302,7 @@ const SHELL_HTML = `
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Import CSV</h1>
-          <div class="sub-note">Discovery Bank &amp; FNB statement exports</div>
+          <div class="sub-note">Bank statement exports — Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa — or your own CSV</div>
         </div>
         <div class="card mb-4">
           <div class="body-pad" style="padding-top:34px">
@@ -312,6 +312,20 @@ const SHELL_HTML = `
               <span class="hint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <details class="import-help">
+              <summary>Not one of the supported banks? Build your own CSV</summary>
+              <p>Columns are matched by header name, so any CSV with a header row of
+                <code>Date,Title,Amount</code> imports fine. In Google Sheets or Excel, make three columns:</p>
+              <ul>
+                <li><strong>Date</strong> — <code>2026-07-01</code> or <code>01/07/2026</code></li>
+                <li><strong>Title</strong> — the transaction description, e.g. <code>Woolworths</code></li>
+                <li><strong>Amount</strong> — negative for money out, positive for money in, e.g. <code>-249.99</code></li>
+              </ul>
+              <p>Then <em>File → Download → Comma-separated values (.csv)</em> in Sheets, or
+                <em>File → Save As → CSV UTF-8</em> in Excel, and drop the file above.
+                Separate <code>Debit</code>/<code>Credit</code> (or <code>Money Out</code>/<code>Money In</code>)
+                columns also work — debits import as negative amounts.</p>
+            </details>
             <div class="import-progress hidden" id="importProgress" role="status" aria-live="polite">
               <div class="ip-label"><span id="ipText">Reading statement…</span><span id="ipPct" class="num"></span></div>
               <div class="cat-bar" style="min-width:0"><i class="cat-bar-fill" id="ipBar" style="width:0%"></i></div>
