@@ -179,14 +179,14 @@ const SHELL_HTML = `
       <section id="view-tax" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Tax</h1>
-          <div class="sub-note" id="taxSubNote">SARS return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
+          <div class="sub-note" id="taxSubNote">Tax return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
         </div>
 
         <div class="card hidden" id="taxEmptyCard">
           <div class="card-h" style="justify-content:center"><h2>No tax year yet</h2></div>
           <div class="body-pad">
-            <p>Track a SARS return season here — progress steps, the documents you need
-              (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.</p>
+            <p id="taxEmptyIntro">Track a tax return season here — progress steps, the documents
+              you need and the files themselves, stored in the vault.</p>
             <p style="margin-top:1.2rem"><button class="btn-gradient" id="taxStart" style="padding:0.55rem 1.5rem"></button></p>
           </div>
         </div>
@@ -302,14 +302,14 @@ const SHELL_HTML = `
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Import CSV</h1>
-          <div class="sub-note">Bank statement exports — Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa — or your own CSV</div>
+          <div class="sub-note" id="importSubNote">Bank statement CSV exports — or your own CSV</div>
         </div>
         <div class="card mb-4">
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
               <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
-              <span class="hint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
+              <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
             <details class="import-help">

@@ -166,7 +166,7 @@ var require_util = __commonJS((exports2, module2) => {
     return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   }
   var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-  function parseStatementDate(raw) {
+  function parseStatementDate(raw, dayFirst = true) {
     const s = (raw ?? "").toString().trim();
     if (!s)
       return null;
@@ -175,7 +175,7 @@ var require_util = __commonJS((exports2, module2) => {
       return isoParts(+m[1], +m[2], +m[3]);
     m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
     if (m) {
-      let d = +m[1], mo = +m[2];
+      let d = dayFirst ? +m[1] : +m[2], mo = dayFirst ? +m[2] : +m[1];
       if (mo > 12 && d <= 12) {
         const t = d;
         d = mo;
@@ -222,7 +222,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     if (s.startsWith("+"))
       s = s.slice(1).trim();
-    s = s.replace(/^(r|zar)\s*/i, "").replace(/[\s\u00A0\u202F']/g, "");
+    s = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, "").replace(/[\s\u00A0\u202F']/g, "");
     if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s))
       s = s.replace(/\./g, "").replace(",", ".");
     else
@@ -313,7 +313,7 @@ var require_shell = __commonJS((exports2, module2) => {
     </button>
 
     <span class="brand">
-      <span class="brand-logo" aria-hidden="true"></span>
+      <span class="brand-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></span>
       <span class="brand-text">
         <b>Budget Vault</b>
         <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
@@ -430,14 +430,14 @@ var require_shell = __commonJS((exports2, module2) => {
       <section id="view-tax" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Tax</h1>
-          <div class="sub-note" id="taxSubNote">SARS return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
+          <div class="sub-note" id="taxSubNote">Tax return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
         </div>
 
         <div class="card hidden" id="taxEmptyCard">
           <div class="card-h" style="justify-content:center"><h2>No tax year yet</h2></div>
           <div class="body-pad">
-            <p>Track a SARS return season here — progress steps, the documents you need
-              (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.</p>
+            <p id="taxEmptyIntro">Track a tax return season here — progress steps, the documents
+              you need and the files themselves, stored in the vault.</p>
             <p style="margin-top:1.2rem"><button class="btn-gradient" id="taxStart" style="padding:0.55rem 1.5rem"></button></p>
           </div>
         </div>
@@ -553,14 +553,14 @@ var require_shell = __commonJS((exports2, module2) => {
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Import CSV</h1>
-          <div class="sub-note">Bank statement exports — Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa — or your own CSV</div>
+          <div class="sub-note" id="importSubNote">Bank statement CSV exports — or your own CSV</div>
         </div>
         <div class="card mb-4">
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
               <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
-              <span class="hint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
+              <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
             <details class="import-help">
@@ -706,6 +706,412 @@ var require_modal = __commonJS((exports2, module2) => {
     return new Promise((res) => new ConfirmModal(app, opts, res).open());
   }
   module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal };
+});
+
+// src/locale.js
+var require_locale = __commonJS((exports2, module2) => {
+  var genericTax = (authority) => ({
+    authority,
+    taxIntro: `Track a ${authority === "Tax" ? "tax" : authority} return season here — progress steps, the documents you need and where each one comes from, with the files themselves stored in your vault.`,
+    yearHint: "Tax year (calendar year)",
+    yearSpan: (y) => `Jan – Dec ${y}`,
+    currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
+    seedDeadlines: () => ({ deadline_standard: "", deadline_provisional: "" }),
+    deadlineLabels: ["Deadline", "Alternative deadline"],
+    activeDeadline: (t) => t.deadline_standard || t.deadline_provisional,
+    defaultTaxpayerType: "unknown",
+    defaultAssessment: "unknown",
+    taxpayerTypes: [
+      ["provisional", "Self-employed / files a return"],
+      ["standard", "Tax withheld by employer"],
+      ["unknown", "Unknown"]
+    ],
+    assessments: [
+      ["submit-requested", "Return required"],
+      ["auto-assessed", "No return required this year"],
+      ["unknown", "Not checked yet"]
+    ],
+    seasonMsgs(t) {
+      const msgs = [];
+      if (t.assessment === "submit-requested")
+        msgs.push("A return is required — work through the steps below.");
+      else if (t.assessment === "auto-assessed")
+        msgs.push("Marked as no return required this year — keep the documents anyway in case that changes.");
+      else
+        msgs.push("Check with your tax authority whether you need to file a return this year.");
+      if (t.taxpayer_type === "provisional")
+        msgs.push("Self-employment or untaxed income usually means extra payments during the year — check your authority's schedule.");
+      return msgs;
+    },
+    safetyNote: "Always type your tax authority's web address into the browser yourself — tax authorities never ask for passwords or OTPs by email, SMS or phone.",
+    seedSteps: () => [
+      { step: "Confirm whether you must file a return", notes: "" },
+      { step: "Gather income statements", notes: "Employer certificates, bank interest, investment statements" },
+      { step: "Gather deduction records", notes: "Receipts for anything claimable — medical, donations, work expenses" },
+      { step: "Complete the return", notes: "" },
+      { step: "Submit before the deadline", notes: "" },
+      { step: "Pay any balance due", notes: "" },
+      { step: "Respond to tax authority queries", notes: "" }
+    ],
+    seedDocs: () => [
+      { name: "Employment income statement", source: "Employer", notes: "" },
+      { name: "Bank interest statement", source: "Your bank", notes: "One per bank" },
+      { name: "Investment income statements", source: "Investment provider", notes: "" },
+      { name: "Deduction receipts", source: "Own records", notes: "" },
+      { name: "Letters & notices", source: "Tax authority", notes: "" }
+    ]
+  });
+  var PROFILES = {
+    za: {
+      label: "South Africa",
+      currency: "R",
+      thousands: " ",
+      decimal: ",",
+      dayFirst: true,
+      stripDescSuffix: " ZA",
+      banks: "Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa",
+      importHint: null,
+      authority: "SARS",
+      taxIntro: "Track a SARS return season here — progress steps, the documents you need (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.",
+      yearHint: "Tax year (ends Feb of this year)",
+      yearSpan: (y) => `1 Mar ${y - 1} – end Feb ${y}`,
+      currentTaxYear: (now) => now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1,
+      seedDeadlines: (y) => ({ deadline_standard: `${y}-10-23`, deadline_provisional: `${y + 1}-01-22` }),
+      deadlineLabels: ["Deadline (standard)", "Deadline (provisional)"],
+      activeDeadline: (t) => t.taxpayer_type === "standard" ? t.deadline_standard : t.deadline_provisional,
+      defaultTaxpayerType: "provisional",
+      defaultAssessment: "submit-requested",
+      taxpayerTypes: [
+        ["provisional", "Provisional"],
+        ["standard", "Standard"],
+        ["unknown", "Unknown — confirm on eFiling"]
+      ],
+      assessments: [
+        ["submit-requested", "SARS asked me to submit"],
+        ["auto-assessed", "Auto-assessed"],
+        ["unknown", "Not checked yet"]
+      ],
+      seasonMsgs(t) {
+        const msgs = [];
+        if (t.assessment === "submit-requested") {
+          msgs.push("SARS has asked for a return — you were not auto-assessed. Work through the steps below and file the ITR12 on eFiling.");
+        } else if (t.assessment === "auto-assessed") {
+          msgs.push("SARS auto-assessed this year. Check the assessment on eFiling — if income is missing or you disagree, file an ITR12 before the deadline; otherwise nothing more may be needed.");
+        } else {
+          msgs.push("Check your auto-assessment status on the eFiling dashboard — SARS either auto-calculates or asks you to submit, depending on your income mix.");
+        }
+        if (t.taxpayer_type === "provisional") {
+          msgs.push("As a provisional taxpayer you also file IRP6 returns twice a year — they are in the steps below.");
+        } else if (t.taxpayer_type === "unknown") {
+          msgs.push('Salary plus freelance income usually means provisional taxpayer — confirm under "Maintain Registered Particulars" on eFiling.');
+        }
+        return msgs;
+      },
+      safetyNote: "Always type sars.gov.za into the browser yourself — SARS never asks for passwords or OTPs by email, SMS or phone.",
+      seedSteps: (year) => [
+        { step: "Confirm taxpayer status on eFiling", notes: "Maintain Registered Particulars — provisional vs standard" },
+        { step: "Check auto-assessment status on the eFiling dashboard", notes: "" },
+        { step: "Gather documents", notes: "See the Documents list below" },
+        { step: "Open the ITR12 return on eFiling", notes: "sars.gov.za or the SARS MobiApp" },
+        { step: "Review pre-populated data", notes: "IRP5, medical certificate, bank IT3(b)s — check both banks reflect" },
+        { step: "Add freelance income & deductible expenses", notes: "Invoiced total; home office %, software, equipment, internet/phone portion, accounting fees" },
+        { step: "Declare investment income", notes: "IT3(b)/IT3(c) from your investment provider: interest, dividends, capital gains on sales" },
+        { step: "Declare TFSA contributions", notes: "Contribution certificate; check R36 000/yr & R500 000 lifetime limits" },
+        { step: "Claim out-of-pocket medical expenses", notes: "Qualifying expenses not covered by the aid" },
+        { step: "Submit the ITR12", notes: "" },
+        { step: "Respond to SARS verification requests", notes: "Within the timeframe SARS gives" },
+        { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: "Provisional taxpayers only — mark N/A if standard" },
+        { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: "Provisional taxpayers only — mark N/A if standard" }
+      ],
+      seedDocs: () => [
+        { name: "IRP5 / IT3(a) employee certificate", source: "Employer", notes: "Usually pre-populated" },
+        { name: "IT3(b) interest certificate", source: "Your bank", notes: "One per bank you hold accounts with" },
+        { name: "IT3(b) interest certificate", source: "Your second bank", notes: "Remove if not applicable" },
+        { name: "IT3(b) / IT3(c) investment certificates", source: "Investment provider", notes: "Interest, dividends, capital gains" },
+        { name: "TFSA contribution certificate", source: "Investment provider", notes: "Growth is exempt; contributions still declared" },
+        { name: "Medical aid tax certificate", source: "Medical aid scheme", notes: "Usually pre-populated" },
+        { name: "Out-of-pocket medical expenses summary", source: "Own records", notes: "" },
+        { name: "Invoiced income summary", source: "Freelance business", notes: "Total invoiced for the tax year" },
+        { name: "Business expense records", source: "Freelance business", notes: "Home office, software, equipment, internet/phone, accounting" },
+        { name: "SARS letters & notices", source: "SARS", notes: "" }
+      ]
+    },
+    us: {
+      label: "United States",
+      currency: "$",
+      thousands: ",",
+      decimal: ".",
+      dayFirst: false,
+      banks: "Chase, Bank of America, Wells Fargo, Citi, Capital One",
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      authority: "IRS",
+      taxIntro: "Track an IRS filing season here — progress steps, the documents you need (W-2, 1099s, 1098, …) and the files themselves, stored in the vault.",
+      yearHint: "Tax year (calendar year)",
+      yearSpan: (y) => `Jan – Dec ${y}`,
+      currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
+      seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-04-15`, deadline_provisional: `${y + 1}-10-15` }),
+      deadlineLabels: ["Filing deadline", "Extension deadline"],
+      activeDeadline: (t) => t.deadline_standard,
+      defaultTaxpayerType: "unknown",
+      defaultAssessment: "submit-requested",
+      taxpayerTypes: [
+        ["provisional", "Pays estimated tax (1040-ES)"],
+        ["standard", "Withholding only (W-2)"],
+        ["unknown", "Unknown"]
+      ],
+      assessments: [
+        ["submit-requested", "Return required"],
+        ["auto-assessed", "Not required to file this year"],
+        ["unknown", "Not checked yet"]
+      ],
+      seasonMsgs(t) {
+        const msgs = [];
+        if (t.assessment === "auto-assessed")
+          msgs.push("Marked as not required to file — most people with income above the standard deduction still are, so keep the documents in case that changes.");
+        else
+          msgs.push("Work through the steps below and file Form 1040 by the April deadline. An extension (Form 4868) extends filing to October, but any balance is still due in April.");
+        if (t.taxpayer_type === "provisional")
+          msgs.push("You also make quarterly estimated payments — the 1040-ES steps are below.");
+        else if (t.taxpayer_type === "unknown")
+          msgs.push("Freelance or side income with no withholding usually means quarterly estimated payments (Form 1040-ES).");
+        return msgs;
+      },
+      safetyNote: "Always type irs.gov into the browser yourself — the IRS never initiates contact by email, SMS or phone to ask for personal or payment details.",
+      seedSteps: (year) => [
+        { step: "Gather income documents", notes: "W-2s and 1099s — most arrive by end of January" },
+        { step: "Decide standard vs itemized deduction", notes: "Itemize only if mortgage interest + SALT + charity beat the standard deduction" },
+        { step: "Report freelance / self-employment income", notes: "Schedule C income minus business expenses; Schedule SE for self-employment tax" },
+        { step: "Report investment income", notes: "1099-INT, 1099-DIV, 1099-B — interest, dividends, capital gains" },
+        { step: "Check IRA / HSA contributions", notes: "Prior-year contributions allowed until the filing deadline" },
+        { step: "File Form 1040", notes: "IRS Free File, tax software, or a preparer — e-file with direct deposit is fastest" },
+        { step: "Pay any balance due", notes: "Due by the April deadline even if you file an extension" },
+        { step: "Respond to IRS notices", notes: "Within the timeframe on the letter" },
+        { step: `1040-ES estimated payment ${year + 1} — Q1`, due: `${year + 1}-04-15`, notes: "Estimated-tax payers only — mark N/A if withholding covers you" },
+        { step: `1040-ES estimated payment ${year + 1} — Q2`, due: `${year + 1}-06-15`, notes: "Estimated-tax payers only — mark N/A if withholding covers you" }
+      ],
+      seedDocs: () => [
+        { name: "W-2 wage statement", source: "Employer", notes: "One per employer" },
+        { name: "1099-NEC / 1099-K freelance income", source: "Clients / platforms", notes: "" },
+        { name: "1099-INT interest statement", source: "Your bank", notes: "One per bank" },
+        { name: "1099-DIV / 1099-B investment statements", source: "Broker", notes: "Dividends, sales, capital gains" },
+        { name: "1098 mortgage interest statement", source: "Mortgage lender", notes: "If itemizing" },
+        { name: "HSA forms (5498-SA / 1099-SA)", source: "HSA custodian", notes: "" },
+        { name: "Charitable donation receipts", source: "Own records", notes: "If itemizing" },
+        { name: "Business expense records", source: "Own records", notes: "Home office, software, equipment, mileage" },
+        { name: "Prior-year return", source: "Own records", notes: "For AGI and carryovers" },
+        { name: "IRS letters & notices", source: "IRS", notes: "" }
+      ]
+    },
+    uk: {
+      label: "United Kingdom",
+      currency: "£",
+      thousands: ",",
+      decimal: ".",
+      dayFirst: true,
+      banks: "Barclays, HSBC, Lloyds, NatWest, Monzo, Starling",
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      authority: "HMRC",
+      taxIntro: "Track an HMRC Self Assessment season here — progress steps, the documents you need (P60, P11D, interest statements, …) and the files themselves, stored in the vault.",
+      yearHint: "Tax year (ends 5 Apr of this year)",
+      yearSpan: (y) => `6 Apr ${y - 1} – 5 Apr ${y}`,
+      currentTaxYear: (now) => now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1,
+      seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-01-31`, deadline_provisional: `${y}-10-31` }),
+      deadlineLabels: ["Online filing deadline", "Paper filing deadline"],
+      activeDeadline: (t) => t.deadline_standard,
+      defaultTaxpayerType: "unknown",
+      defaultAssessment: "unknown",
+      taxpayerTypes: [
+        ["provisional", "Self Assessment"],
+        ["standard", "PAYE only"],
+        ["unknown", "Unknown — check on gov.uk"]
+      ],
+      assessments: [
+        ["submit-requested", "Notice to file received"],
+        ["auto-assessed", "Not required (PAYE settles it)"],
+        ["unknown", "Not checked yet"]
+      ],
+      seasonMsgs(t) {
+        const msgs = [];
+        if (t.assessment === "submit-requested")
+          msgs.push("HMRC expects a Self Assessment return — file the SA100 online by 31 January and pay what's due the same day.");
+        else if (t.assessment === "auto-assessed")
+          msgs.push("PAYE should settle your tax this year. Keep the documents anyway — untaxed income over the allowances would mean registering for Self Assessment.");
+        else
+          msgs.push('Use the "Check if you need to send a Self Assessment tax return" tool on gov.uk — register by 5 October if you do.');
+        if (t.taxpayer_type === "provisional")
+          msgs.push("Payments on account may be due on 31 January and 31 July if your last bill was over £1,000.");
+        return msgs;
+      },
+      safetyNote: "Always type gov.uk into the browser yourself — HMRC never asks for passwords or bank details by email or SMS.",
+      seedSteps: () => [
+        { step: "Check if you need to file / register for Self Assessment", notes: "gov.uk tool; register by 5 Oct if new — you need your UTR" },
+        { step: "Gather employment documents", notes: "P60 (or P45 if you changed jobs), P11D for benefits" },
+        { step: "Gather bank interest & dividend statements", notes: "Interest over the savings allowance and dividends over the allowance are taxable" },
+        { step: "Total self-employment income & expenses", notes: "Invoiced total minus allowable expenses; check the £1,000 trading allowance" },
+        { step: "Claim reliefs", notes: "Pension contributions, Gift Aid donations, marriage allowance" },
+        { step: "File the SA100 online", notes: "gov.uk — sign in with your Government Gateway ID" },
+        { step: "Pay the balance (and first payment on account)", due: "", notes: "Both due 31 January" },
+        { step: "Second payment on account", notes: "Due 31 July, if payments on account apply" },
+        { step: "Respond to HMRC queries", notes: "" }
+      ],
+      seedDocs: () => [
+        { name: "P60 end-of-year certificate", source: "Employer", notes: "" },
+        { name: "P45 (if you changed jobs)", source: "Previous employer", notes: "Remove if not applicable" },
+        { name: "P11D benefits statement", source: "Employer", notes: "Remove if not applicable" },
+        { name: "Bank interest statements", source: "Your bank", notes: "One per bank" },
+        { name: "Dividend vouchers", source: "Broker / companies", notes: "" },
+        { name: "Self-employment income & expense records", source: "Own records", notes: "" },
+        { name: "Pension contribution statement", source: "Pension provider", notes: "" },
+        { name: "Gift Aid donation summary", source: "Own records", notes: "" },
+        { name: "HMRC letters & notices", source: "HMRC", notes: "" }
+      ]
+    },
+    eu: {
+      label: "Eurozone (generic)",
+      currency: "€",
+      thousands: ".",
+      decimal: ",",
+      dayFirst: true,
+      banks: null,
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      ...genericTax("Tax")
+    },
+    au: {
+      label: "Australia",
+      currency: "$",
+      thousands: ",",
+      decimal: ".",
+      dayFirst: true,
+      banks: "CommBank, Westpac, ANZ, NAB",
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      authority: "ATO",
+      taxIntro: "Track an ATO tax-return season here — progress steps, the documents you need (income statement, dividend statements, deduction receipts, …) and the files themselves, stored in the vault.",
+      yearHint: "Tax year (ends 30 Jun of this year)",
+      yearSpan: (y) => `1 Jul ${y - 1} – 30 Jun ${y}`,
+      currentTaxYear: (now) => now.getMonth() + 1 >= 7 ? now.getFullYear() : now.getFullYear() - 1,
+      seedDeadlines: (y) => ({ deadline_standard: `${y}-10-31`, deadline_provisional: `${y + 1}-05-15` }),
+      deadlineLabels: ["Self-lodgement deadline", "Tax agent deadline (typical)"],
+      activeDeadline: (t) => t.deadline_standard,
+      defaultTaxpayerType: "unknown",
+      defaultAssessment: "submit-requested",
+      taxpayerTypes: [
+        ["provisional", "PAYG instalments"],
+        ["standard", "PAYG withholding only"],
+        ["unknown", "Unknown"]
+      ],
+      assessments: [
+        ["submit-requested", "Return required"],
+        ["auto-assessed", "Non-lodgment advice (no return needed)"],
+        ["unknown", "Not checked yet"]
+      ],
+      seasonMsgs(t) {
+        const msgs = [];
+        if (t.assessment === "auto-assessed")
+          msgs.push("Lodge a non-lodgment advice on myGov so the ATO knows no return is coming.");
+        else
+          msgs.push("Wait for pre-fill to complete (usually late July) before lodging through myTax on myGov — lodge by 31 October, or engage a tax agent before then for a later deadline.");
+        if (t.taxpayer_type === "provisional")
+          msgs.push("PAYG instalments are usually paid quarterly through the year — the ATO issues the activity statements.");
+        return msgs;
+      },
+      safetyNote: "Always type ato.gov.au or my.gov.au into the browser yourself — the ATO never asks for passwords or payment by email, SMS or phone.",
+      seedSteps: () => [
+        { step: "Confirm your income statement is tax-ready", notes: "Employers finalise Single Touch Payroll by mid-July" },
+        { step: "Wait for pre-fill to complete", notes: "Bank interest, dividends and health-fund data flow in by late July" },
+        { step: "Gather deduction records", notes: "Work-related expenses, working-from-home diary/logbook, donations" },
+        { step: "Declare investment income", notes: "Interest, dividends (with franking credits), capital gains on sales" },
+        { step: "Add private health insurance details", notes: "Statement pre-fills; affects the Medicare levy surcharge" },
+        { step: "Lodge through myTax on myGov", notes: "Or via a registered tax agent" },
+        { step: "Check the notice of assessment & pay any balance", notes: "" },
+        { step: "Respond to ATO queries", notes: "" }
+      ],
+      seedDocs: () => [
+        { name: "Income statement (STP)", source: "Employer via myGov", notes: "Wait until marked tax-ready" },
+        { name: "Bank interest summary", source: "Your bank", notes: "One per bank" },
+        { name: "Dividend statements", source: "Broker / registries", notes: "Include franking credits" },
+        { name: "Private health insurance statement", source: "Health fund", notes: "" },
+        { name: "Work-related deduction receipts", source: "Own records", notes: "Including working-from-home records" },
+        { name: "Capital gains records", source: "Broker / own records", notes: "For any assets sold" },
+        { name: "ATO letters & notices", source: "ATO", notes: "" }
+      ]
+    },
+    ca: {
+      label: "Canada",
+      currency: "$",
+      thousands: ",",
+      decimal: ".",
+      dayFirst: false,
+      banks: "RBC, TD, Scotiabank, BMO, CIBC",
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      authority: "CRA",
+      taxIntro: "Track a CRA tax-filing season here — progress steps, the documents you need (T4, T5, RRSP receipts, …) and the files themselves, stored in the vault.",
+      yearHint: "Tax year (calendar year)",
+      yearSpan: (y) => `Jan – Dec ${y}`,
+      currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
+      seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-04-30`, deadline_provisional: `${y + 1}-06-15` }),
+      deadlineLabels: ["Filing deadline", "Self-employed deadline"],
+      activeDeadline: (t) => t.taxpayer_type === "provisional" ? t.deadline_provisional : t.deadline_standard,
+      defaultTaxpayerType: "unknown",
+      defaultAssessment: "submit-requested",
+      taxpayerTypes: [
+        ["provisional", "Self-employed / pays instalments"],
+        ["standard", "Employee (T4 only)"],
+        ["unknown", "Unknown"]
+      ],
+      assessments: [
+        ["submit-requested", "Return required"],
+        ["auto-assessed", "No return needed this year"],
+        ["unknown", "Not checked yet"]
+      ],
+      seasonMsgs(t) {
+        const msgs = [];
+        if (t.assessment === "auto-assessed")
+          msgs.push("Even with no tax owing, filing keeps benefit and credit payments (GST/HST credit, CCB) flowing — consider filing anyway.");
+        else
+          msgs.push("Work through the steps below and file by 30 April. Self-employed filers have until 15 June, but any balance is still due 30 April.");
+        if (t.taxpayer_type === "provisional")
+          msgs.push("The CRA may require quarterly instalments if you owe more than $3,000 in two consecutive years.");
+        return msgs;
+      },
+      safetyNote: "Always type canada.ca into the browser yourself — the CRA never demands payment or asks for credentials by email, SMS or phone.",
+      seedSteps: () => [
+        { step: "Gather tax slips", notes: "T4, T5, T3, T4A — most arrive by end of February; also in CRA My Account" },
+        { step: "Total RRSP contributions", notes: "Including first-60-days contributions; check your deduction limit" },
+        { step: "Gather receipts", notes: "Medical, donations, childcare, tuition" },
+        { step: "Total self-employment income & expenses", notes: "Form T2125 — income minus business expenses" },
+        { step: "File via NETFILE-certified software", notes: "Auto-fill my return pulls slips from CRA My Account" },
+        { step: "Pay any balance due", notes: "Due 30 April even if filing by the self-employed deadline" },
+        { step: "Check the notice of assessment", notes: "Confirms refund/balance and next year's RRSP room" },
+        { step: "Respond to CRA review requests", notes: "" }
+      ],
+      seedDocs: () => [
+        { name: "T4 employment income slip", source: "Employer", notes: "One per employer" },
+        { name: "T5 investment income slip", source: "Your bank / broker", notes: "" },
+        { name: "T3 trust income slip", source: "Fund provider", notes: "Remove if not applicable" },
+        { name: "T4A pension / self-employment slip", source: "Payer", notes: "Remove if not applicable" },
+        { name: "RRSP contribution receipts", source: "Financial institution", notes: "Including first-60-days" },
+        { name: "Medical expense receipts", source: "Own records", notes: "" },
+        { name: "Donation receipts", source: "Own records", notes: "" },
+        { name: "Business income & expense records", source: "Own records", notes: "If self-employed" },
+        { name: "CRA letters & notices", source: "CRA", notes: "" }
+      ]
+    },
+    other: {
+      label: "Other / not listed",
+      currency: "$",
+      thousands: ",",
+      decimal: ".",
+      dayFirst: true,
+      banks: null,
+      importHint: "Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.",
+      ...genericTax("Tax")
+    }
+  };
+  var COUNTRY_ORDER = ["za", "us", "uk", "eu", "au", "ca", "other"];
+  function localeFor(code) {
+    return PROFILES[(code || "za").toString().trim().toLowerCase()] || PROFILES.za;
+  }
+  module2.exports = { PROFILES, COUNTRY_ORDER, localeFor };
 });
 
 // src/io.js
@@ -935,6 +1341,7 @@ var require_load = __commonJS((exports2, module2) => {
         }
         if (fm.currency)
           S.settings.currency = fm.currency;
+        S.settings.country = (fm.country || "za").toString().trim().toLowerCase();
         S.settings.household = fm.household || "";
       }
       S.categories = [];
@@ -2013,42 +2420,10 @@ var require_services = __commonJS((exports2, module2) => {
 var require_tax = __commonJS((exports2, module2) => {
   var { el, escMd, icoEl, safeSeg, patchFrontmatter } = require_util();
   var { askFields, confirmModal } = require_modal();
-  var seedDeadlines = (year) => ({
-    deadline_standard: `${year}-10-23`,
-    deadline_provisional: `${year + 1}-01-22`
-  });
-  var SEED_STEPS = (year) => [
-    { step: "Confirm taxpayer status on eFiling", notes: "Maintain Registered Particulars — provisional vs standard" },
-    { step: "Check auto-assessment status on the eFiling dashboard", notes: "" },
-    { step: "Gather documents", notes: "See the Documents list below" },
-    { step: "Open the ITR12 return on eFiling", notes: "sars.gov.za or the SARS MobiApp" },
-    { step: "Review pre-populated data", notes: "IRP5, medical certificate, bank IT3(b)s — check both banks reflect" },
-    { step: "Add freelance income & deductible expenses", notes: "Invoiced total; home office %, software, equipment, internet/phone portion, accounting fees" },
-    { step: "Declare investment income", notes: "IT3(b)/IT3(c) from your investment provider: interest, dividends, capital gains on sales" },
-    { step: "Declare TFSA contributions", notes: "Contribution certificate; check R36 000/yr & R500 000 lifetime limits" },
-    { step: "Claim out-of-pocket medical expenses", notes: "Qualifying expenses not covered by the aid" },
-    { step: "Submit the ITR12", notes: "" },
-    { step: "Respond to SARS verification requests", notes: "Within the timeframe SARS gives" },
-    { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: "Provisional taxpayers only — mark N/A if standard" },
-    { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: "Provisional taxpayers only — mark N/A if standard" }
-  ].map((s) => ({ status: "todo", due: "", notes: "", ...s }));
-  var SEED_DOCS = [
-    { name: "IRP5 / IT3(a) employee certificate", source: "Employer", notes: "Usually pre-populated" },
-    { name: "IT3(b) interest certificate", source: "Your bank", notes: "One per bank you hold accounts with" },
-    { name: "IT3(b) interest certificate", source: "Your second bank", notes: "Remove if not applicable" },
-    { name: "IT3(b) / IT3(c) investment certificates", source: "Investment provider", notes: "Interest, dividends, capital gains" },
-    { name: "TFSA contribution certificate", source: "Investment provider", notes: "Growth is exempt; contributions still declared" },
-    { name: "Medical aid tax certificate", source: "Medical aid scheme", notes: "Usually pre-populated" },
-    { name: "Out-of-pocket medical expenses summary", source: "Own records", notes: "" },
-    { name: "Invoiced income summary", source: "Freelance business", notes: "Total invoiced for the tax year" },
-    { name: "Business expense records", source: "Freelance business", notes: "Home office, software, equipment, internet/phone, accounting" },
-    { name: "SARS letters & notices", source: "SARS", notes: "" }
-  ].map((d) => ({ status: "needed", file: "", notes: "", ...d }));
   module2.exports = function registerTax(ctx) {
-    const { S, $, app, toast, writeFile, writeBinary, fileAt } = ctx;
+    const { S, $, app, toast, writeFile, writeBinary, fileAt, locale } = ctx;
     function currentTaxYear() {
-      const now = new Date;
-      return now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      return locale().currentTaxYear(new Date);
     }
     const T = () => S.tax[S.taxYear];
     const mark = () => {
@@ -2056,16 +2431,18 @@ var require_tax = __commonJS((exports2, module2) => {
       $("#taxSave").disabled = false;
     };
     function renderTax() {
+      const loc = locale();
       const years = Object.keys(S.tax).sort();
       $("#taxEmptyCard").classList.toggle("hidden", years.length > 0);
       $("#taxContent").classList.toggle("hidden", !years.length);
       if (!years.length) {
+        $("#taxEmptyIntro").textContent = loc.taxIntro;
         $("#taxStart").textContent = `Start tracking the ${currentTaxYear()} tax year`;
         return;
       }
       const t = T();
       $("#taxSubNote").innerHTML = "";
-      $("#taxSubNote").append(`Tax year ${S.taxYear} (1 Mar ${+S.taxYear - 1} – end Feb ${S.taxYear}) · saved to `, el("code", {}, `Tax/${S.taxYear}.md`));
+      $("#taxSubNote").append(`Tax year ${S.taxYear} (${loc.yearSpan(+S.taxYear)}) · saved to `, el("code", {}, `Tax/${S.taxYear}.md`));
       const sel = $("#taxYearSel");
       sel.innerHTML = "";
       for (const y of years)
@@ -2076,7 +2453,7 @@ var require_tax = __commonJS((exports2, module2) => {
       renderDocs(t);
     }
     function activeDeadline(t) {
-      return t.taxpayer_type === "standard" ? t.deadline_standard : t.deadline_provisional;
+      return locale().activeDeadline(t);
     }
     function daysTo(iso) {
       const m = (iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2097,9 +2474,11 @@ var require_tax = __commonJS((exports2, module2) => {
       const docs = t.docs.filter((x) => x.status !== "n/a");
       const ready = docs.filter((x) => x.status === "uploaded").length;
       tile("Documents in", `${ready} / ${docs.length}`, ready === docs.length && docs.length ? "text-success" : "");
-      tile("Taxpayer", t.taxpayer_type === "provisional" ? "Provisional" : t.taxpayer_type === "standard" ? "Standard" : "Unknown");
+      const typeLabel = (locale().taxpayerTypes.find(([v]) => v === t.taxpayer_type) || [])[1];
+      tile("Taxpayer", typeLabel || "Unknown");
     }
     function renderSeason(t) {
+      const loc = locale();
       const b = $("#taxSeasonBody");
       b.innerHTML = "";
       const field = (label, control) => el("label", { class: "tax-field" }, el("span", { class: "l" }, label), control);
@@ -2110,14 +2489,14 @@ var require_tax = __commonJS((exports2, module2) => {
           mark();
           renderTax();
         }
-      }, ...[["provisional", "Provisional"], ["standard", "Standard"], ["unknown", "Unknown — confirm on eFiling"]].map(([v, l]) => el("option", { value: v, ...t.taxpayer_type === v ? { selected: "" } : {} }, l)))), field("Assessment", el("select", {
+      }, ...loc.taxpayerTypes.map(([v, l]) => el("option", { value: v, ...t.taxpayer_type === v ? { selected: "" } : {} }, l)))), field("Assessment", el("select", {
         class: "form-select form-select-sm",
         onchange: (e) => {
           t.assessment = e.target.value;
           mark();
           renderTax();
         }
-      }, ...[["submit-requested", "SARS asked me to submit"], ["auto-assessed", "Auto-assessed"], ["unknown", "Not checked yet"]].map(([v, l]) => el("option", { value: v, ...t.assessment === v ? { selected: "" } : {} }, l)))), field("Deadline (standard)", el("input", {
+      }, ...loc.assessments.map(([v, l]) => el("option", { value: v, ...t.assessment === v ? { selected: "" } : {} }, l)))), field(loc.deadlineLabels[0], el("input", {
         type: "text",
         class: "form-control form-control-sm",
         value: t.deadline_standard,
@@ -2127,7 +2506,7 @@ var require_tax = __commonJS((exports2, module2) => {
           mark();
           renderTax();
         }
-      })), field("Deadline (provisional)", el("input", {
+      })), field(loc.deadlineLabels[1], el("input", {
         type: "text",
         class: "form-control form-control-sm",
         value: t.deadline_provisional,
@@ -2138,21 +2517,8 @@ var require_tax = __commonJS((exports2, module2) => {
           renderTax();
         }
       }))));
-      const msgs = [];
-      if (t.assessment === "submit-requested") {
-        msgs.push("SARS has asked for a return — you were not auto-assessed. Work through the steps below and file the ITR12 on eFiling.");
-      } else if (t.assessment === "auto-assessed") {
-        msgs.push("SARS auto-assessed this year. Check the assessment on eFiling — if income is missing or you disagree, file an ITR12 before the deadline; otherwise nothing more may be needed.");
-      } else {
-        msgs.push("Check your auto-assessment status on the eFiling dashboard — SARS either auto-calculates or asks you to submit, depending on your income mix.");
-      }
-      if (t.taxpayer_type === "provisional") {
-        msgs.push("As a provisional taxpayer you also file IRP6 returns twice a year — they are in the steps below.");
-      } else if (t.taxpayer_type === "unknown") {
-        msgs.push('Salary plus freelance income usually means provisional taxpayer — confirm under "Maintain Registered Particulars" on eFiling.');
-      }
-      b.append(el("p", { class: "tax-season-msg" }, msgs.join(" ")));
-      b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, "Always type sars.gov.za into the browser yourself — SARS never asks for passwords or OTPs by email, SMS or phone."));
+      b.append(el("p", { class: "tax-season-msg" }, loc.seasonMsgs(t).join(" ")));
+      b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, loc.safetyNote));
     }
     const STEP_CYCLE = { todo: "busy", busy: "done", done: "n/a", "n/a": "todo" };
     const STEP_LABEL = { todo: "To do", busy: "Busy", done: "Done", "n/a": "N/A" };
@@ -2337,6 +2703,7 @@ var require_tax = __commonJS((exports2, module2) => {
         deadline_standard: t.deadline_standard || null,
         deadline_provisional: t.deadline_provisional || null
       });
+      const loc = locale();
       const lines = [
         "---",
         ...fm.split(`
@@ -2345,7 +2712,7 @@ var require_tax = __commonJS((exports2, module2) => {
         "",
         `# Tax Year ${year}`,
         "",
-        `SARS return tracking for the ${year} tax year (1 Mar ${+year - 1} – end Feb ${year}).`,
+        `${loc.authority === "Tax" ? "Tax" : loc.authority} return tracking for the ${year} tax year (${loc.yearSpan(+year)}).`,
         "Step `status` is `todo`, `busy`, `done` or `n/a`; document `status` is `needed`, `uploaded` or `n/a`.",
         `Uploaded files live in \`Tax/${year}/\`.`,
         "",
@@ -2394,13 +2761,14 @@ var require_tax = __commonJS((exports2, module2) => {
       renderTax();
     }
     function seedTaxYear(year) {
+      const loc = locale();
       S.tax[String(year)] = {
         fmRaw: "",
-        taxpayer_type: "provisional",
-        assessment: "submit-requested",
-        ...seedDeadlines(year),
-        steps: SEED_STEPS(year),
-        docs: SEED_DOCS.map((d) => ({ ...d }))
+        taxpayer_type: loc.defaultTaxpayerType,
+        assessment: loc.defaultAssessment,
+        ...loc.seedDeadlines(year),
+        steps: loc.seedSteps(year).map((s) => ({ status: "todo", due: "", notes: "", ...s })),
+        docs: loc.seedDocs().map((d) => ({ status: "needed", file: "", notes: "", ...d }))
       };
     }
     async function startTax() {
@@ -2414,7 +2782,7 @@ var require_tax = __commonJS((exports2, module2) => {
       const years = Object.keys(S.tax).map(Number);
       const suggested = years.length ? Math.max(...years) + 1 : currentTaxYear();
       const r = await askFields(app, "New tax year", [
-        { key: "year", label: "Tax year (ends Feb of this year)", type: "number", value: String(suggested) }
+        { key: "year", label: locale().yearHint, type: "number", value: String(suggested) }
       ]);
       if (!r)
         return;
@@ -2460,7 +2828,13 @@ var require_import = __commonJS((exports2, module2) => {
   var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
   var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
-    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile } = ctx;
+    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale } = ctx;
+    function renderImport() {
+      const loc = locale();
+      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — ${loc.banks} — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
+      if (loc.importHint)
+        $("#importDropHint").textContent = loc.importHint;
+    }
     function autoCategorise(desc) {
       const d = desc.trim().toLowerCase();
       let best = "", bestLen = 0;
@@ -2529,6 +2903,7 @@ var require_import = __commonJS((exports2, module2) => {
       let skipped = 0;
       const label0 = detectAccountLabel(file.name);
       const dataRows = rows.slice(headerIdx + 1);
+      const loc = locale();
       const showBar = dataRows.length > 400;
       if (showBar)
         importProgress("start", "Categorising transactions…");
@@ -2537,8 +2912,8 @@ var require_import = __commonJS((exports2, module2) => {
         const r = dataRows[i];
         const rawDate = (r[iDate] || "").trim();
         let desc = (r[iDesc] || "").trim();
-        if (desc.endsWith(" ZA"))
-          desc = desc.slice(0, -3);
+        if (loc.stripDescSuffix && desc.endsWith(loc.stripDescSuffix))
+          desc = desc.slice(0, -loc.stripDescSuffix.length);
         let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
         if (amount == null && iCredit !== -1) {
           const c = normalizeAmount(r[iCredit]);
@@ -2551,7 +2926,7 @@ var require_import = __commonJS((exports2, module2) => {
             amount = -Math.abs(d);
         }
         if (rawDate && desc && amount != null && amount !== 0) {
-          const date = parseStatementDate(rawDate);
+          const date = parseStatementDate(rawDate, loc.dayFirst);
           if (!date) {
             skipped++;
           } else {
@@ -2700,7 +3075,7 @@ var require_import = __commonJS((exports2, module2) => {
       toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? "" : "s"}` + (newRules ? `, saved ${newRules} new rules` : ""));
       ctx.switchView("transactions");
     }
-    Object.assign(ctx, { handleCsvFile, commitImport });
+    Object.assign(ctx, { handleCsvFile, commitImport, renderImport });
   };
 });
 
@@ -2710,6 +3085,7 @@ var require_controller = __commonJS((exports2, module2) => {
   var { el, setIco } = require_util();
   var { SHELL_HTML } = require_shell();
   var { confirmModal } = require_modal();
+  var { localeFor } = require_locale();
   var registerIo = require_io();
   var registerPeriod = require_period();
   var registerLoad = require_load();
@@ -2735,7 +3111,7 @@ var require_controller = __commonJS((exports2, module2) => {
     const $$ = (s) => root.querySelectorAll(s);
     const S = {
       loaded: false,
-      settings: { month_start_day: 23, currency: "R" },
+      settings: { month_start_day: 23, currency: "R", country: "za" },
       categories: [],
       accounts: [],
       budgets: {},
@@ -2763,14 +3139,16 @@ var require_controller = __commonJS((exports2, module2) => {
       clearTimeout(t._h);
       t._h = setTimeout(() => t.classList.remove("show"), 2600);
     }
+    const locale = () => localeFor(S.settings.country);
     function money(v, decimals = 2) {
+      const loc = locale();
       const sign = v < 0 ? "-" : "";
       const parts = Math.abs(v).toFixed(decimals).split(".");
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-      return `${S.settings.currency} ${sign}${parts[0]}${decimals > 0 ? "," + parts[1] : ""}`;
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
+      return `${S.settings.currency} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ""}`;
     }
     const typeBadge = (type) => el("span", { class: `category-badge badge-${type}` }, type);
-    const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge };
+    const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge, locale };
     registerIo(ctx);
     registerPeriod(ctx);
     registerLoad(ctx);
@@ -2811,7 +3189,7 @@ var require_controller = __commonJS((exports2, module2) => {
         owed: ctx.renderOwed,
         services: ctx.renderServices,
         tax: ctx.renderTax,
-        import: () => {},
+        import: ctx.renderImport,
         connect: () => {}
       })[S.view]();
     }
@@ -3074,6 +3452,7 @@ var require_view = __commonJS((exports2, module2) => {
 // src/onboarding.js
 var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
+  var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
   var STARTER_CATEGORIES = [
     { name: "Salary", type: "income", color: "#22c55e" },
     { name: "Other income", type: "income", color: "#4ade80" },
@@ -3131,6 +3510,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       this.data = {
         folder: plugin.settings.budgetFolder || "Finances/Budget",
         name: "",
+        country: "za",
         periodMode: "payday",
         payday: 25,
         currency: "R",
@@ -3142,7 +3522,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       };
     }
     steps() {
-      return this.mode === "connect" ? ["folder", "existing", "name", "period", "currency", "finish"] : ["folder", "name", "period", "currency", "categories", "account", "finish"];
+      return this.mode === "connect" ? ["folder", "existing", "name", "country", "period", "currency", "finish"] : ["folder", "name", "country", "period", "currency", "categories", "account", "finish"];
     }
     onOpen() {
       this.titleEl.setText("Set up Budget Vault");
@@ -3219,6 +3599,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
         this.data.payday = day;
         this.data.periodMode = day === 1 ? "calendar" : "payday";
       }
+      if (fm.country && PROFILES[fm.country.toString().trim().toLowerCase()]) {
+        this.data.country = fm.country.toString().trim().toLowerCase();
+      }
       if (fm.currency) {
         if (CURRENCIES.some(([v]) => v === fm.currency))
           this.data.currency = fm.currency;
@@ -3243,6 +3626,19 @@ var require_onboarding = __commonJS((exports2, module2) => {
       new Setting(c).setName("Your name or nickname").setDesc("Shown in the dashboard greeting and the top bar. Leave blank to skip.").addText((t) => t.setPlaceholder("e.g. Alex, or The Smiths").setValue(this.data.name).onChange((v) => {
         this.data.name = v;
       }));
+    }
+    render_country(c) {
+      new Setting(c).setName("Country").setDesc("Sets the default currency, amount formatting, bank-statement date order and the Tax view's return checklist (SARS, IRS, HMRC, …). You can still override the currency on the next steps.").addDropdown((d) => {
+        for (const code of COUNTRY_ORDER)
+          d.addOption(code, PROFILES[code].label);
+        d.setValue(this.data.country);
+        d.onChange((v) => {
+          this.data.country = v;
+          this.data.currency = CURRENCIES.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : "__custom__";
+          if (this.data.currency === "__custom__")
+            this.data.customCurrency = PROFILES[v].currency;
+        });
+      });
     }
     render_period(c) {
       new Setting(c).setName("Budget month").setDesc("Calendar runs 1st → end of month. Payday runs from your payday to the day before the next one.").addDropdown((d) => d.addOption("calendar", "Calendar month (1st to end of month)").addOption("payday", "Payday to payday").setValue(this.data.periodMode).onChange((v) => {
@@ -3314,6 +3710,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       const rows = [
         ["Folder", this.data.folder],
         ["Name", this.data.name.trim() || "—"],
+        ["Country", localeFor(this.data.country).label],
         ["Budget month", day === 1 ? "Calendar month" : `Payday to payday (day ${day})`],
         ["Currency", this.currencySymbol()]
       ];
@@ -3371,6 +3768,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
           await p.saveSettings();
           await p.updateBudgetSettingsMd("month_start_day", String(day));
           await p.updateBudgetSettingsMd("currency", `"${cur.replace(/"/g, "")}"`);
+          await p.updateBudgetSettingsMd("country", this.data.country);
           if (name)
             await p.updateBudgetSettingsMd("household", `"${name.replace(/"/g, "")}"`);
         } else {
@@ -3380,6 +3778,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
           await this.writeIfAbsent(normalizePath(`${folder}/Settings.md`), `---
 month_start_day: ${day}
 currency: "${cur.replace(/"/g, "")}"
+country: ${this.data.country}
 ` + (name ? `household: "${name.replace(/"/g, "")}"
 ` : "") + `tags: [finance, finance/budget, vault-meta]
 ---
@@ -3388,6 +3787,7 @@ currency: "${cur.replace(/"/g, "")}"
 
 ` + `- **month_start_day** — the financial period starts on this day of the month.
 ` + `- **currency** — symbol shown before every amount in the Budget Vault plugin.
+` + `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, other).
 ` + `- **household** — name shown in the dashboard greeting.
 
 ` + `Edit the values above directly, or change them in **Settings → Budget Vault** —
@@ -3487,6 +3887,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, normalizePath } = require("obsidian");
   var { DEFAULT_SETTINGS } = require_constants();
   var { OnboardingWizard } = require_onboarding();
+  var { PROFILES, COUNTRY_ORDER } = require_locale();
 
   class BudgetSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -3539,6 +3940,16 @@ var require_settings_tab = __commonJS((exports2, module2) => {
             await this.plugin.updateBudgetSettingsMd("month_start_day", String(n));
             this.plugin.reloadViews();
           }, 800);
+        });
+      });
+      new Setting(containerEl).setName("Country").setDesc("Drives amount formatting, bank-statement date order and the Tax view's checklist (SARS, IRS, HMRC, …). Existing tax years keep their data — only labels and new-year seeds change.").addDropdown((d) => {
+        for (const code of COUNTRY_ORDER)
+          d.addOption(code, PROFILES[code].label);
+        const cur = (md.country ?? "za").toString().trim().toLowerCase();
+        d.setValue(PROFILES[cur] ? cur : "za");
+        d.onChange(async (v) => {
+          await this.plugin.updateBudgetSettingsMd("country", v);
+          this.plugin.reloadViews();
         });
       });
       new Setting(containerEl).setName("Currency symbol").setDesc("Shown before every amount, e.g. R.").addText((t) => {
@@ -3654,12 +4065,12 @@ ${key}: ${value}
       await this.app.vault.modify(f, text);
       this._lastWrite = Date.now();
     } else {
-      const defaults = { month_start_day: "23", currency: "R" };
+      const defaults = { month_start_day: "23", currency: "R", country: "za" };
       defaults[key] = value;
       this._lastWrite = Date.now();
       await this.app.vault.create(path, `---
-month_start_day: ${defaults.month_start_day}
-currency: ${defaults.currency}
+` + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join(`
+`) + `
 ---
 
 # Budget Settings
