@@ -1,0 +1,54 @@
+# A tag push (no 'v' prefix) triggers this. Why each part is load-bearing:
+#   - permissions: contents:write creates the release; id-token + attestations mint provenance.
+#   - "Verify tag matches manifest version": Obsidian matches the release tag to manifest.version
+#     EXACTLY. This step fails the run before publishing a mismatched tag, so you never ship a
+#     release Obsidian can't find.
+#   - attest-build-provenance@v2: lets anyone run `gh attestation verify main.js -R owner/repo`.
+#   - gh release create with the three raw assets: manifest.json + main.js + styles.css as
+#     individual files, never a zip and never the auto source archive.
+name: Release Obsidian plugin
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+  # Required to mint build-provenance attestations for the release assets.
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches manifest version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          MANIFEST_VERSION=$(jq -r .version manifest.json)
+          if [ "$TAG" != "$MANIFEST_VERSION" ]; then
+            echo "Tag '$TAG' does not match manifest version '$MANIFEST_VERSION'." >&2
+            echo "Obsidian matches releases to the manifest version exactly — no 'v' prefix." >&2
+            exit 1
+          fi
+
+      # Lets anyone verify the shipped assets came from this repo and this
+      # workflow: `gh attestation verify main.js -R RuanPienaarCode/budget-vault`
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            styles.css
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF#refs/tags/}" \
+            --title "${GITHUB_REF#refs/tags/}" \
+            --generate-notes \
+            main.js manifest.json styles.css
