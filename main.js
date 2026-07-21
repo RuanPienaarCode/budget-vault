@@ -2875,7 +2875,7 @@ var require_import = __commonJS((exports2, module2) => {
       return set;
     }
     function detectAccountLabel(filename) {
-      const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/);
+      const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) || filename.match(/^(\d{6,})\D/);
       if (m) {
         const acc = S.accounts.find((a) => a.account_number === m[1]);
         if (acc)
