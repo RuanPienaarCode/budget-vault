@@ -3,7 +3,7 @@
 #   - "Verify tag matches manifest version": Obsidian matches the release tag to manifest.version
 #     EXACTLY. This step fails the run before publishing a mismatched tag, so you never ship a
 #     release Obsidian can't find.
-#   - attest-build-provenance@v2: lets anyone run `gh attestation verify main.js -R owner/repo`.
+#   - attest-build-provenance@v4: lets anyone run `gh attestation verify main.js -R owner/repo`.
 #   - gh release create with the three raw assets: manifest.json + main.js + styles.css as
 #     individual files, never a zip and never the auto source archive.
 name: Release Obsidian plugin
@@ -23,7 +23,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify tag matches manifest version
         run: |
@@ -38,7 +38,7 @@ jobs:
       # Lets anyone verify the shipped assets came from this repo and this
       # workflow: `gh attestation verify main.js -R RuanPienaarCode/budget-vault`
       - name: Attest release assets
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             main.js
