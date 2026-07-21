@@ -1937,7 +1937,7 @@ var require_transactions = __commonJS((exports2, module2) => {
 
 // src/views/budgets.js
 var require_budgets = __commonJS((exports2, module2) => {
-  var { el, escMd, patchFrontmatter } = require_util();
+  var { el, escMd, icoEl, patchFrontmatter } = require_util();
   var { TYPE_ORDER } = require_constants();
   module2.exports = function registerBudgets(ctx) {
     const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
@@ -2018,7 +2018,7 @@ var require_budgets = __commonJS((exports2, module2) => {
               draft2.splice(i, 1);
             renderBudgets();
           }
-        } }, "\uD83D\uDDD1"))));
+        } }, icoEl(["trash-2", "trash"])))));
       }
       t.append(body);
     }
@@ -3683,26 +3683,26 @@ var require_onboarding = __commonJS((exports2, module2) => {
         this.data.name = fm.household;
     }
     render_welcome(c) {
-      c.createEl("h2", { text: "\uD83D\uDC4B Welcome to Budget Vault!" });
+      c.createEl("h2", { text: "Welcome to Budget Vault!" });
       c.createEl("p", { text: "Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else's server. If your vault syncs to your phone, your budget rides along for free." });
       const intro = c.createEl("p");
       intro.createEl("b", { text: "Here's the plan — this wizard sets you up:" });
       const setup = c.createEl("ol", { cls: "budget-onb-journey" });
       for (const t of [
-        "\uD83D\uDCC1 Create your budget folder — we scaffold the whole structure for you",
-        "\uD83C\uDF0D Pick your country & currency — so amounts, dates and tax stuff look right",
-        "\uD83C\uDFF7️ Choose your budget categories — tick the ones that fit your life",
-        "\uD83C\uDFE6 Add your first account — and what's in it right now"
+        "Create your budget folder — we scaffold the whole structure for you",
+        "Pick your country & currency — so amounts, dates and tax stuff look right",
+        "Choose your budget categories — tick the ones that fit your life",
+        "Add your first account — and what's in it right now"
       ])
         setup.createEl("li", { text: t });
       const then = c.createEl("p");
       then.createEl("b", { text: "Then the fun starts in the app:" });
       const inApp = c.createEl("ol", { cls: "budget-onb-journey" });
       for (const t of [
-        "\uD83D\uDCB0 Set your budget — give every category a number to aim for",
-        "\uD83D\uDCE5 Import your bank's CSV — transactions sort themselves as you teach it",
-        "➕ Add new categories anytime — your budget grows with you",
-        "\uD83D\uDCCA Review as you go — the dashboard shows exactly where the money went"
+        "Set your budget — give every category a number to aim for",
+        "Import your bank's CSV — transactions sort themselves as you teach it",
+        "Add new categories anytime — your budget grows with you",
+        "Review as you go — the dashboard shows exactly where the money went"
       ])
         inApp.createEl("li", { text: t });
       c.createEl("p", { text: "About two minutes of setup. Ready?" });
