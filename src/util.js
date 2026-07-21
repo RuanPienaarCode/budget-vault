@@ -50,6 +50,23 @@ function parseFrontmatter(text) {
   // serializer can write back keys it doesn't model (tags, aliases, …).
   return { fm, raw: m ? m[1] : '', body: m ? text.slice(m[0].length) : text };
 }
+/* "Is the last character an unescaped pipe?" and "split on unescaped pipes".
+   Hand-rolled rather than /(?<!\\)\|/ on purpose: a lookbehind *literal* is a
+   parse-time SyntaxError on WebKit before iOS 16.4, which would take down the
+   whole bundle — not just this function — on a device Obsidian itself still
+   supports (iOS 14.5+). Same char-by-char shape as parseCsv below. */
+const endsWithBarePipe = s => s.endsWith('|') && s[s.length - 2] !== '\\';
+function splitBarePipes(s) {
+  const cells = [];
+  let cur = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '|' && s[i - 1] !== '\\') { cells.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  cells.push(cur);
+  return cells;
+}
 function parseMdTable(text) {
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
@@ -59,8 +76,8 @@ function parseMdTable(text) {
     // there and unescaped — a hand-edited row with no trailing pipe must not
     // lose its final cell's last character.
     let inner = t.slice(1);
-    if (/(?<!\\)\|$/.test(inner)) inner = inner.slice(0, -1);
-    const cells = inner.split(/(?<!\\)\|/).map(c => c.trim());
+    if (endsWithBarePipe(inner)) inner = inner.slice(0, -1);
+    const cells = splitBarePipes(inner).map(c => c.trim());
     rows.push(cells);
   }
   return rows;
