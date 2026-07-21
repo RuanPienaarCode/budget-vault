@@ -952,8 +952,11 @@
     );
   }
 
+  /* Cards go full-bleed — the container gives up its side gutters entirely
+     and each card keeps a little internal padding instead. Loose elements
+     (period banners) get their own inline padding below. */
   .budget-app-root .main-content {
-    padding: 0.75rem 0.6rem;
+    padding: 0.75rem 0;
     padding-bottom: max(3rem, var(--bud-bottom-chrome));
   }
 
@@ -973,7 +976,9 @@
   .budget-app-root .card-h h2 { font-size: 17px; }
   .budget-app-root .hero { padding: 24px 16px; }
 
-  .budget-app-root .financial-period-banner { padding: 0.25rem 0 0.9rem; margin-bottom: 0.25rem; }
+  /* Banners sit loose in the now-gutterless main-content, so they carry
+     their own side padding to stay clear of the screen edge. */
+  .budget-app-root .financial-period-banner { padding: 0.25rem 14px 0.9rem; margin-bottom: 0.25rem; }
 
   /* Table cells are the biggest win — 1rem each side across every column. */
   .budget-app-root .table thead th { padding: 0.6rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.04em; }
