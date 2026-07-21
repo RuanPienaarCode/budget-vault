@@ -22,7 +22,7 @@ class FieldModal extends Modal {
       if (f.type === 'select') {
         this.values[f.key] = f.value ?? f.options[0];
         s.addDropdown(d => {
-          for (const o of f.options) d.addOption(o, o.label ?? o);
+          for (const o of f.options) d.addOption(o.value ?? o, o.label ?? o);
           d.setValue(this.values[f.key]);
           d.onChange(v => { this.values[f.key] = v; });
         });

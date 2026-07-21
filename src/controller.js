@@ -276,6 +276,8 @@ function mountApp(view) {
   $('#budSave').addEventListener('click', ctx.saveBudget);
   $('#budCopyPrev').addEventListener('click', ctx.copyPreviousBudget);
   $('#budAddCat').addEventListener('click', ctx.addNewCategory);
+  $('#acctAdd').addEventListener('click', ctx.addAccount);
+  $('#savAdd').addEventListener('click', ctx.addAccount);
   $('#owedSave').addEventListener('click', ctx.saveOwed);
   $('#owedAdd').addEventListener('click', ctx.addOwed);
   $('#svcSave').addEventListener('click', ctx.saveServices);

@@ -526,7 +526,12 @@ var require_shell = __commonJS((exports2, module2) => {
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
         <div class="card mb-4" id="savingsGoalsCard">
-          <div class="card-h"><div><h2>Goals</h2><div class="sub">Progress toward each target</div></div></div>
+          <div class="card-h" style="align-items:center">
+            <div><h2>Goals</h2><div class="sub">Progress toward each target</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="savAdd"><span class="ico" data-ico="plus"></span> New account</button>
+            </div>
+          </div>
           <div class="body-pad" id="savingsGoals"></div>
         </div>
         <div id="savingsSections"></div>
@@ -536,6 +541,9 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Accounts</h1>
           <div class="sub-note">Click a balance to update it — the account's markdown file is rewritten.</div>
+        </div>
+        <div class="row mb-4" style="justify-content:flex-end">
+          <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
       </section>
@@ -666,7 +674,7 @@ var require_modal = __commonJS((exports2, module2) => {
           this.values[f.key] = f.value ?? f.options[0];
           s.addDropdown((d) => {
             for (const o of f.options)
-              d.addOption(o, o.label ?? o);
+              d.addOption(o.value ?? o, o.label ?? o);
             d.setValue(this.values[f.key]);
             d.onChange((v) => {
               this.values[f.key] = v;
@@ -1227,6 +1235,7 @@ var require_io = __commonJS((exports2, module2) => {
       fileAt,
       mdFilesIn,
       subfoldersIn,
+      ensureFolder,
       lastWriteAt: () => plugin._lastWrite || 0
     });
   };
@@ -2142,15 +2151,32 @@ var require_budgets = __commonJS((exports2, module2) => {
 
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
-  var { el, patchFrontmatter } = require_util();
+  var { el, patchFrontmatter, safeSeg } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerAccounts(ctx) {
-    const { S, $, app, money, toast, writeFile } = ctx;
+    const { S, $, app, money, toast, writeFile, ensureFolder, relPath } = ctx;
     const ACCT_GROUPS = [
       ["Bank accounts", ["checking", "credit_card", "cash"]],
       ["Savings", ["savings"]],
-      ["Investments", ["investment"]]
+      ["Investments", ["investment"]],
+      ["Other", ["other"]]
     ];
+    const ACCT_TYPES = ACCT_GROUPS.flatMap(([, types]) => types);
+    const ACCT_TYPE_LABELS = {
+      checking: "Cheque / current account",
+      savings: "Savings account",
+      credit_card: "Credit card",
+      cash: "Cash",
+      investment: "Investment",
+      other: "Other"
+    };
+    const ACCT_TYPE_OPTIONS = ACCT_TYPES.map((v) => ({ value: v, label: ACCT_TYPE_LABELS[v] }));
+    function parseAmount(v) {
+      const s = String(v ?? "").trim();
+      if (!s)
+        return null;
+      return parseFloat(s.replace(",", ".").replace(/[^\d.-]/g, ""));
+    }
     function renderAccounts() {
       const wrap = $("#acctSections");
       wrap.innerHTML = "";
@@ -2168,8 +2194,8 @@ var require_accounts = __commonJS((exports2, module2) => {
             ]);
             if (!r)
               return;
-            const num = parseFloat(String(r.balance).replace(",", ".").replace(/[^\d.-]/g, ""));
-            if (isNaN(num))
+            const num = parseAmount(r.balance);
+            if (num === null || isNaN(num))
               return toast("Not a number", true);
             a.balance = num;
             a.balance_updated = new Date().toISOString().slice(0, 10);
@@ -2180,6 +2206,9 @@ var require_accounts = __commonJS((exports2, module2) => {
           grid.append(el("div", { class: "mini" }, el("div", { class: "l" }, a.name), v, el("div", { class: "s" }, [a.type.replace("_", " "), a.institution].filter(Boolean).join(" · "), a.credit_limit ? ` · limit ${money(a.credit_limit, 0)}` : "", a.monthly_contribution ? ` · ${money(a.monthly_contribution, 0)}/m` : ""), el("div", { class: "s2" }, a.balance_updated ? `updated ${a.balance_updated}` : "")));
         }
         wrap.append(el("div", { class: "card mb-4" }, el("div", { class: "card-h" }, el("div", {}, el("h2", {}, title), el("div", { class: "sub" }, `${accounts.length} accounts`)), el("div", { class: "legend" }, el("span", {}, el("b", { class: "num", style: "font-size:15px;color:var(--text-primary)" }, money(total))))), el("div", { class: "body-pad" }, grid)));
+      }
+      if (!S.accounts.length) {
+        wrap.append(el("div", { class: "card" }, el("div", { class: "body-pad" }, el("p", { class: "text-muted", style: "margin:0" }, "No accounts yet. Use “New account” above to add a bank account, savings pot or investment."))));
       }
     }
     async function saveAccount(a) {
@@ -2229,7 +2258,70 @@ ${fm}
 # ${a.name}
 `));
     }
-    Object.assign(ctx, { renderAccounts, saveAccount });
+    async function addAccount() {
+      const r = await askFields(app, "New account", [
+        { key: "name", label: "Account name", type: "text", placeholder: "e.g. Easy Equities TFSA" },
+        { key: "type", label: "Type", type: "select", options: ACCT_TYPE_OPTIONS, value: "savings" },
+        { key: "institution", label: "Institution", type: "text", placeholder: "e.g. Easy Equities" },
+        { key: "balance", label: "Current balance", type: "number", value: "0" },
+        {
+          key: "goal_amount",
+          label: "Savings goal (optional)",
+          type: "number",
+          desc: "Shows a progress bar on Savings & Investments."
+        },
+        {
+          key: "total_invested",
+          label: "Total invested (optional)",
+          type: "number",
+          desc: "What you have put in, so growth can be shown against it."
+        }
+      ]);
+      if (!r)
+        return;
+      const name = safeSeg(r.name);
+      if (!name)
+        return toast("Account name required", true);
+      if (S.accounts.some((a) => a.name.toLowerCase() === name.toLowerCase()))
+        return toast("Account already exists", true);
+      if (!ACCT_TYPES.includes(r.type))
+        return toast("Invalid type", true);
+      const balance = parseAmount(r.balance) ?? 0;
+      const goal = parseAmount(r.goal_amount);
+      const invested = parseAmount(r.total_invested);
+      if ([balance, goal, invested].some((n) => n !== null && isNaN(n)))
+        return toast("Not a number", true);
+      const acct = {
+        name,
+        type: r.type,
+        institution: (r.institution || "").trim(),
+        account_number: "",
+        tx_label: "",
+        balance,
+        balance_updated: new Date().toISOString().slice(0, 10),
+        credit_limit: null,
+        goal_amount: goal,
+        target_date: "",
+        monthly_contribution: null,
+        total_invested: invested,
+        starting_amount: null,
+        inception_date: "",
+        tags: "[finance, finance/budget, finance/budget/accounts]",
+        body: `
+
+# ${name}
+
+Transactions are stored under \`Transactions/${name}/\` as monthly files.
+`
+      };
+      await saveAccount(acct);
+      await ensureFolder(relPath(`Transactions/${name}`));
+      S.accounts.push(acct);
+      S.accounts.sort((a, b) => a.name.localeCompare(b.name));
+      ctx.render();
+      toast(`Created Accounts/${name}.md`);
+    }
+    Object.assign(ctx, { renderAccounts, saveAccount, addAccount });
   };
 });
 
@@ -2278,9 +2370,10 @@ var require_savings = __commonJS((exports2, module2) => {
           if (a.monthly_contribution)
             parts.push(`${money(a.monthly_contribution, 0)}/m`);
           const card = el("div", { class: "mini" }, el("div", { class: "l" }, a.name), el("div", { class: "v num" }, money(a.balance)), el("div", { class: "s" }, parts.filter(Boolean).join(" · ")));
-          if (a.total_invested) {
-            const growth = a.balance - a.total_invested;
-            card.append(el("div", { class: `s2 num ${growth >= 0 ? "text-success" : "text-danger"}` }, `${growth >= 0 ? "▲" : "▼"} ${money(Math.abs(growth), 0)} vs ${money(a.total_invested, 0)} in`));
+          const baseline = a.total_invested || a.starting_amount;
+          if (baseline) {
+            const growth = a.balance - baseline;
+            card.append(el("div", { class: `s2 num ${growth >= 0 ? "text-success" : "text-danger"}` }, `${growth >= 0 ? "▲" : "▼"} ${money(Math.abs(growth), 0)} vs ${money(baseline, 0)} in`));
           } else if (a.inception_date) {
             card.append(el("div", { class: "s2" }, `since ${a.inception_date}`));
           }
@@ -3445,6 +3538,8 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#budSave").addEventListener("click", ctx.saveBudget);
     $("#budCopyPrev").addEventListener("click", ctx.copyPreviousBudget);
     $("#budAddCat").addEventListener("click", ctx.addNewCategory);
+    $("#acctAdd").addEventListener("click", ctx.addAccount);
+    $("#savAdd").addEventListener("click", ctx.addAccount);
     $("#owedSave").addEventListener("click", ctx.saveOwed);
     $("#owedAdd").addEventListener("click", ctx.addOwed);
     $("#svcSave").addEventListener("click", ctx.saveServices);

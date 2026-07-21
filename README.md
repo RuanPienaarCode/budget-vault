@@ -37,7 +37,7 @@ Budget Vault is not (yet) in the community plugin store, so installation is manu
 
 1. Download this repository and copy `manifest.json`, `main.js` and `styles.css` into `<your vault>/.obsidian/plugins/budget-app/` (create the folder)
 2. In Obsidian: **Settings → Community plugins** → turn off Restricted mode → enable **Budget Vault**
-3. A setup wizard opens on first run — pick a budget folder, currency and period style, and it scaffolds starter categories and your first account (with its current balance, if you know it) for you
+3. A setup wizard opens on first run — pick a budget folder, currency and period style, and it scaffolds starter categories and your first account (with its current balance, if you know it) for you — add more accounts anytime from **Accounts** or **Savings & Investments** → New account
 4. Open the app from the wallet icon in the ribbon
 
 Obsidian will warn that this is third-party code — that's expected for a manual install. On mobile, repeat step 2 once (Restricted mode is per-device); the plugin files arrive via your normal vault sync.

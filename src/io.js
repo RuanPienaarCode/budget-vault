@@ -79,7 +79,7 @@ module.exports = function registerIo(ctx) {
   }
 
   Object.assign(ctx, {
-    basePath, relPath, readFile, writeFile, writeBinary, fileAt, mdFilesIn, subfoldersIn,
+    basePath, relPath, readFile, writeFile, writeBinary, fileAt, mdFilesIn, subfoldersIn, ensureFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   });
 };
