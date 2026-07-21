@@ -21,6 +21,9 @@ const STARTER_CATEGORIES = [
   { name: 'Medical', type: 'expense', color: '#f87171' },
   { name: 'Clothing', type: 'expense', color: '#c084fc' },
   { name: 'Bank fees', type: 'expense', color: '#94a3b8' },
+  { name: 'Home loan / bond repayment', type: 'debt', color: '#fb923c' },
+  { name: 'Car repayment', type: 'debt', color: '#f97316' },
+  { name: 'Credit card & other debt', type: 'debt', color: '#ea580c' },
   { name: 'Subscriptions', type: 'services', color: '#818cf8' },
   { name: 'Insurance', type: 'insurance', color: '#2dd4bf' },
   { name: 'Giving', type: 'giving', color: '#fb923c' },
@@ -72,7 +75,7 @@ class OnboardingWizard extends Modal {
       currency: 'R',
       customCurrency: '',
       cats: new Set(STARTER_CATEGORIES.map(c => c.name)),
-      acctName: '', acctType: 'checking', acctInstitution: '',
+      acctName: '', acctType: 'checking', acctInstitution: '', acctBalance: '',
     };
   }
 
@@ -277,6 +280,16 @@ class OnboardingWizard extends Modal {
       .addText(t => t
         .setValue(this.data.acctInstitution)
         .onChange(v => { this.data.acctInstitution = v; }));
+    new Setting(c)
+      .setName('Current balance')
+      .setDesc('Optional — what\'s in the account right now (your latest bank statement\'s closing balance, or check your banking app). Balances are a snapshot you keep up to date yourself, so importing only recent transactions never throws this off. You can update it any time by clicking the balance on the Accounts page.')
+      .addText(t => {
+        t.inputEl.type = 'number';
+        t.inputEl.step = '0.01';
+        t.setPlaceholder('0.00')
+          .setValue(this.data.acctBalance)
+          .onChange(v => { this.data.acctBalance = v; });
+      });
   }
 
   render_finish(c) {
@@ -291,6 +304,8 @@ class OnboardingWizard extends Modal {
     if (this.mode === 'create') {
       rows.push(['Categories', `${this.data.cats.size} starter categories`]);
       rows.push(['First account', this.data.acctName.trim() || '—']);
+      const bal = parseFloat(String(this.data.acctBalance).replace(',', '.').replace(/[^\d.-]/g, ''));
+      if (this.data.acctName.trim() && !isNaN(bal) && bal !== 0) rows.push(['Opening balance', `${this.currencySymbol()} ${bal.toFixed(2)}`]);
     }
     c.createEl('p', {
       text: this.mode === 'connect'
@@ -371,10 +386,11 @@ class OnboardingWizard extends Modal {
           const safe = safeFileName(acct);
           const today = new Date();
           const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          const bal = parseFloat(String(this.data.acctBalance).replace(',', '.').replace(/[^\d.-]/g, ''));
           await this.writeIfAbsent(normalizePath(`${folder}/Accounts/${safe}.md`),
             `---\ntype: ${this.data.acctType}\n` +
             (this.data.acctInstitution.trim() ? `institution: ${this.data.acctInstitution.trim()}\n` : '') +
-            `balance: 0.00\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
+            `balance: ${(isNaN(bal) ? 0 : bal).toFixed(2)}\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
           await this.ensureFolder(normalizePath(`${folder}/Transactions/${safe}`));
         }
         const period = currentPeriodFor(day);
