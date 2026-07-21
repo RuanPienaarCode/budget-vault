@@ -3590,7 +3590,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       };
     }
     steps() {
-      return this.mode === "connect" ? ["folder", "existing", "name", "country", "period", "currency", "finish"] : ["folder", "name", "country", "period", "currency", "categories", "account", "finish"];
+      return this.mode === "connect" ? ["welcome", "folder", "existing", "name", "country", "period", "currency", "finish"] : ["welcome", "folder", "name", "country", "period", "currency", "categories", "account", "finish"];
     }
     onOpen() {
       this.titleEl.setText("Set up Budget Vault");
@@ -3609,7 +3609,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
       c.empty();
       const steps = this.steps();
       const step = steps[this.stepIdx];
-      c.createDiv({ cls: "budget-onb-step", text: `Step ${this.stepIdx + 1} of ${steps.length}` });
+      if (step !== "welcome")
+        c.createDiv({ cls: "budget-onb-step", text: `Step ${this.stepIdx} of ${steps.length - 1}` });
       this["render_" + step](c);
       const nav = new Setting(c);
       if (this.stepIdx > 0)
@@ -3618,7 +3619,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
           this.renderStep();
         }));
       nav.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
-      nav.addButton((b) => b.setButtonText(step === "finish" ? this.mode === "connect" ? "Connect budget" : "Create my budget" : "Next").setCta().onClick(() => this.next()));
+      nav.addButton((b) => b.setButtonText(step === "finish" ? this.mode === "connect" ? "Connect budget" : "Create my budget" : step === "welcome" ? "Let's go!" : "Next").setCta().onClick(() => this.next()));
     }
     async next() {
       const step = this.steps()[this.stepIdx];
@@ -3680,6 +3681,31 @@ var require_onboarding = __commonJS((exports2, module2) => {
       }
       if (fm.household)
         this.data.name = fm.household;
+    }
+    render_welcome(c) {
+      c.createEl("h2", { text: "\uD83D\uDC4B Welcome to Budget Vault!" });
+      c.createEl("p", { text: "Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else's server. If your vault syncs to your phone, your budget rides along for free." });
+      const intro = c.createEl("p");
+      intro.createEl("b", { text: "Here's the plan — this wizard sets you up:" });
+      const setup = c.createEl("ol", { cls: "budget-onb-journey" });
+      for (const t of [
+        "\uD83D\uDCC1 Create your budget folder — we scaffold the whole structure for you",
+        "\uD83C\uDF0D Pick your country & currency — so amounts, dates and tax stuff look right",
+        "\uD83C\uDFF7️ Choose your budget categories — tick the ones that fit your life",
+        "\uD83C\uDFE6 Add your first account — and what's in it right now"
+      ])
+        setup.createEl("li", { text: t });
+      const then = c.createEl("p");
+      then.createEl("b", { text: "Then the fun starts in the app:" });
+      const inApp = c.createEl("ol", { cls: "budget-onb-journey" });
+      for (const t of [
+        "\uD83D\uDCB0 Set your budget — give every category a number to aim for",
+        "\uD83D\uDCE5 Import your bank's CSV — transactions sort themselves as you teach it",
+        "➕ Add new categories anytime — your budget grows with you",
+        "\uD83D\uDCCA Review as you go — the dashboard shows exactly where the money went"
+      ])
+        inApp.createEl("li", { text: t });
+      c.createEl("p", { text: "About two minutes of setup. Ready?" });
     }
     render_folder(c) {
       c.createEl("p", { text: "Budget Vault stores everything — categories, accounts, budgets and transactions — as plain markdown files in your vault, so your data syncs with the vault and stays yours." });
