@@ -60,7 +60,7 @@ class BudgetSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    new Setting(containerEl).setName('Budget data settings').setHeading()
+    new Setting(containerEl).setName('Budget data').setHeading()
       .setDesc('Stored in Settings.md inside the budget folder, so they apply on every device.');
 
     const fmSection = containerEl.createDiv();
