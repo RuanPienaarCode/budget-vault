@@ -245,7 +245,12 @@ const SHELL_HTML = `
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
         <div class="card mb-4" id="savingsGoalsCard">
-          <div class="card-h"><div><h2>Goals</h2><div class="sub">Progress toward each target</div></div></div>
+          <div class="card-h" style="align-items:center">
+            <div><h2>Goals</h2><div class="sub">Progress toward each target</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="savAdd"><span class="ico" data-ico="plus"></span> New account</button>
+            </div>
+          </div>
           <div class="body-pad" id="savingsGoals"></div>
         </div>
         <div id="savingsSections"></div>
@@ -255,6 +260,9 @@ const SHELL_HTML = `
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Accounts</h1>
           <div class="sub-note">Click a balance to update it — the account's markdown file is rewritten.</div>
+        </div>
+        <div class="row mb-4" style="justify-content:flex-end">
+          <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
       </section>

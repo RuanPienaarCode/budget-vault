@@ -54,10 +54,13 @@ module.exports = function registerSavings(ctx) {
           el('div', { class: 'l' }, a.name),
           el('div', { class: 'v num' }, money(a.balance)),
           el('div', { class: 's' }, parts.filter(Boolean).join(' · ')));
-        if (a.total_invested) {
-          const growth = a.balance - a.total_invested;
+        // total_invested (what you've put in) is the better baseline; fall back to
+        // starting_amount (what it opened with) so that field isn't inert.
+        const baseline = a.total_invested || a.starting_amount;
+        if (baseline) {
+          const growth = a.balance - baseline;
           card.append(el('div', { class: `s2 num ${growth >= 0 ? 'text-success' : 'text-danger'}` },
-            `${growth >= 0 ? '▲' : '▼'} ${money(Math.abs(growth), 0)} vs ${money(a.total_invested, 0)} in`));
+            `${growth >= 0 ? '▲' : '▼'} ${money(Math.abs(growth), 0)} vs ${money(baseline, 0)} in`));
         } else if (a.inception_date) {
           card.append(el('div', { class: 's2' }, `since ${a.inception_date}`));
         }
