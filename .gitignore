@@ -1,5 +1,10 @@
 # Live user settings — never commit
 data.json
 
+# Internal audit reports — keep them local. They catalogue previously-fixed
+# weaknesses, which is a map worth having privately and not worth publishing
+# alongside a public plugin.
+AUDIT-*.html
+
 # OS noise
 .DS_Store
