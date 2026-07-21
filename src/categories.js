@@ -9,6 +9,12 @@ const { askFields, confirmModal } = require('./modal');
 module.exports = function registerCategories(ctx) {
   const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
 
+  /* Bumped whenever the category list changes (create/delete). Selects built
+     earlier compare against this on open and rebuild their options if stale —
+     so a category added through one row's select shows up in every other
+     select on the page without a re-render. */
+  let catsVersion = 1;
+
   function fillCatOptions(sel, current) {
     sel.innerHTML = '';
     sel.append(el('option', { value: '' }, '— none —'));
@@ -43,6 +49,7 @@ module.exports = function registerCategories(ctx) {
     const cat = { name: realName, type, color: '#888888' };
     S.categories.push(cat);
     S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
+    catsVersion++;
     toast(`Created Categories/${safe}.md`);
     return cat;
   }
@@ -59,26 +66,38 @@ module.exports = function registerCategories(ctx) {
       cur = sel.value; onchange(cur);
     });
   }
-  function catSelect(current, onchange) {
-    const sel = el('select', { class: 'category-select' });
-    fillCatOptions(sel, current);
-    wireCatChange(sel, current, onchange);
-    return sel;
-  }
-  /* Lazy variant for large lists (CSV import review). */
-  function lazyCatSelect(current, onchange) {
-    const sel = el('select', { class: 'category-select' });
-    sel.append(el('option', { value: current, selected: '' }, current || '— none —'));
-    let built = false;
-    const build = () => {
-      if (built) return; built = true;
+  /* Refresh a select's options on open when the category list has changed
+     since they were last built. Rebuild only on a version mismatch — never
+     unconditionally — so arrow-key navigation inside an open dropdown isn't
+     disturbed by needless rebuilds. */
+  function refreshOnOpen(sel, getVersion, setVersion) {
+    const refresh = () => {
+      if (getVersion() === catsVersion) return;
+      setVersion(catsVersion);
       const val = sel.value;
       fillCatOptions(sel, val);
       sel.value = val;
     };
-    sel.addEventListener('mousedown', build);
-    sel.addEventListener('focus', build);
-    sel.addEventListener('keydown', build);
+    sel.addEventListener('mousedown', refresh);
+    sel.addEventListener('focus', refresh);
+    sel.addEventListener('keydown', refresh);
+  }
+  function catSelect(current, onchange) {
+    const sel = el('select', { class: 'category-select' });
+    fillCatOptions(sel, current);
+    let builtVersion = catsVersion;
+    refreshOnOpen(sel, () => builtVersion, v => builtVersion = v);
+    wireCatChange(sel, current, onchange);
+    return sel;
+  }
+  /* Lazy variant for large lists (Transactions table, CSV import review):
+     starts with just the current value and builds the full list on first
+     open — version 0 forces that initial build through the same path. */
+  function lazyCatSelect(current, onchange) {
+    const sel = el('select', { class: 'category-select' });
+    sel.append(el('option', { value: current, selected: '' }, current || '— none —'));
+    let builtVersion = 0;
+    refreshOnOpen(sel, () => builtVersion, v => builtVersion = v);
     wireCatChange(sel, current, onchange);
     return sel;
   }
@@ -113,6 +132,7 @@ module.exports = function registerCategories(ctx) {
     }
     if (file) await vault.trash(file, false);
     S.categories = S.categories.filter(c => c.name !== name);
+    catsVersion++;
     toast(`Deleted category "${name}"`);
     return true;
   }

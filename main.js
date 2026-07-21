@@ -1534,6 +1534,7 @@ var require_categories = __commonJS((exports2, module2) => {
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerCategories(ctx) {
     const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
+    let catsVersion = 1;
     function fillCatOptions(sel, current) {
       sel.innerHTML = "";
       sel.append(el("option", { value: "" }, "— none —"));
@@ -1589,6 +1590,7 @@ Budget category of type **${type}**.
       const cat = { name: realName, type, color: "#888888" };
       S.categories.push(cat);
       S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
+      catsVersion++;
       toast(`Created Categories/${safe}.md`);
       return cat;
     }
@@ -1611,27 +1613,32 @@ Budget category of type **${type}**.
         onchange(cur);
       });
     }
+    function refreshOnOpen(sel, getVersion, setVersion) {
+      const refresh = () => {
+        if (getVersion() === catsVersion)
+          return;
+        setVersion(catsVersion);
+        const val = sel.value;
+        fillCatOptions(sel, val);
+        sel.value = val;
+      };
+      sel.addEventListener("mousedown", refresh);
+      sel.addEventListener("focus", refresh);
+      sel.addEventListener("keydown", refresh);
+    }
     function catSelect(current, onchange) {
       const sel = el("select", { class: "category-select" });
       fillCatOptions(sel, current);
+      let builtVersion = catsVersion;
+      refreshOnOpen(sel, () => builtVersion, (v) => builtVersion = v);
       wireCatChange(sel, current, onchange);
       return sel;
     }
     function lazyCatSelect(current, onchange) {
       const sel = el("select", { class: "category-select" });
       sel.append(el("option", { value: current, selected: "" }, current || "— none —"));
-      let built = false;
-      const build = () => {
-        if (built)
-          return;
-        built = true;
-        const val = sel.value;
-        fillCatOptions(sel, val);
-        sel.value = val;
-      };
-      sel.addEventListener("mousedown", build);
-      sel.addEventListener("focus", build);
-      sel.addEventListener("keydown", build);
+      let builtVersion = 0;
+      refreshOnOpen(sel, () => builtVersion, (v) => builtVersion = v);
       wireCatChange(sel, current, onchange);
       return sel;
     }
@@ -1665,6 +1672,7 @@ Budget category of type **${type}**.
       if (file)
         await vault.trash(file, false);
       S.categories = S.categories.filter((c) => c.name !== name);
+      catsVersion++;
       toast(`Deleted category "${name}"`);
       return true;
     }
