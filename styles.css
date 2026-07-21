@@ -133,7 +133,11 @@
 }
 
 .budget-app-root a { color: inherit; text-decoration: none; }
-.budget-app-root .hidden { display: none !important; }
+/* Doubled class beats every (0,2,0) display rule in this sheet (e.g.
+   .budget-app-root .header-period-pill { display: flex }) regardless of source
+   order, without !important. Nothing in src/ sets display inline, so
+   specificity alone decides. */
+.budget-app-root .hidden.hidden { display: none; }
 .budget-app-root .text-success { color: var(--color-success); }
 .budget-app-root .text-danger { color: var(--color-danger); }
 .budget-app-root .text-warning { color: var(--color-warning); }
@@ -315,7 +319,8 @@
    line, so the pill used to overlap the brand text and push the avatar off the
    edge. Drop the brand block — it's decoration, and Obsidian's own mobile
    header already names the view — leaving one row of menu | pill | avatar.
-   `.hidden` is `!important`, so a hidden pill still collapses cleanly. */
+   `.hidden.hidden` outranks the pill's display:flex, so a hidden pill still
+   collapses cleanly. */
 @media (max-width: 600px) {
   .budget-app-root .topbar {
     height: var(--navbar-height);
@@ -757,7 +762,9 @@
    render like the block value it replaced, not an inline-flex button. */
 .budget-app-root .mini button.v { display: block; width: 100%; text-align: left; }
 .budget-app-root .mini button.v:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
-.budget-app-root .mini .v:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+/* Plain underline only — the thickness/offset longhands are flagged as
+   partially supported by the directory's CSS lint at minAppVersion 1.4. */
+.budget-app-root .mini .v:hover { text-decoration: underline; }
 .budget-app-root .mini .s { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .budget-app-root .mini .s2 { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
 /* Fixed N-up KPI rows (summary tiles) — not clickable, unlike account tiles. */
