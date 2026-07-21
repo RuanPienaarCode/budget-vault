@@ -66,6 +66,21 @@ var require_util = __commonJS((exports2, module2) => {
       }
     return { fm, raw: m ? m[1] : "", body: m ? text.slice(m[0].length) : text };
   }
+  var endsWithBarePipe = (s) => s.endsWith("|") && s[s.length - 2] !== "\\";
+  function splitBarePipes(s) {
+    const cells = [];
+    let cur = "";
+    for (let i = 0;i < s.length; i++) {
+      const ch = s[i];
+      if (ch === "|" && s[i - 1] !== "\\") {
+        cells.push(cur);
+        cur = "";
+      } else
+        cur += ch;
+    }
+    cells.push(cur);
+    return cells;
+  }
   function parseMdTable(text) {
     const rows = [];
     for (const line of text.split(/\r?\n/)) {
@@ -73,9 +88,9 @@ var require_util = __commonJS((exports2, module2) => {
       if (!t.startsWith("|") || /^\|[\s:|-]+\|$/.test(t))
         continue;
       let inner = t.slice(1);
-      if (/(?<!\\)\|$/.test(inner))
+      if (endsWithBarePipe(inner))
         inner = inner.slice(0, -1);
-      const cells = inner.split(/(?<!\\)\|/).map((c) => c.trim());
+      const cells = splitBarePipes(inner).map((c) => c.trim());
       rows.push(cells);
     }
     return rows;
@@ -3912,7 +3927,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         this.plugin.settings.openOnStartup = v;
         await this.plugin.saveSettings();
       }));
-      new Setting(containerEl).setName("Budget data settings").setHeading().setDesc("Stored in Settings.md inside the budget folder, so they apply on every device.");
+      new Setting(containerEl).setName("Budget data").setHeading().setDesc("Stored in Settings.md inside the budget folder, so they apply on every device.");
       const fmSection = containerEl.createDiv();
       this.renderMdSettings(fmSection);
     }
