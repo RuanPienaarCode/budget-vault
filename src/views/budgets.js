@@ -2,7 +2,7 @@
 /* Budget page — per-period category amounts, edited as a draft and saved to
    Budgets/<period>.md. */
 
-const { el, escMd, patchFrontmatter } = require('../util');
+const { el, escMd, icoEl, patchFrontmatter } = require('../util');
 const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerBudgets(ctx) {
@@ -79,7 +79,7 @@ module.exports = function registerBudgets(ctx) {
               if (i !== -1 && !d.inFile) draft.splice(i, 1);
               renderBudgets();
             }
-          } }, '🗑'))));
+          } }, icoEl(['trash-2', 'trash'])))));
     }
     t.append(body);
   }

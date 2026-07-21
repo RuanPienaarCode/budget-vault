@@ -165,25 +165,25 @@ class OnboardingWizard extends Modal {
 
   /* -------------------------------- steps -------------------------------- */
   render_welcome(c) {
-    c.createEl('h2', { text: '👋 Welcome to Budget Vault!' });
+    c.createEl('h2', { text: 'Welcome to Budget Vault!' });
     c.createEl('p', { text: 'Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else\'s server. If your vault syncs to your phone, your budget rides along for free.' });
     const intro = c.createEl('p');
     intro.createEl('b', { text: 'Here\'s the plan — this wizard sets you up:' });
     const setup = c.createEl('ol', { cls: 'budget-onb-journey' });
     for (const t of [
-      '📁 Create your budget folder — we scaffold the whole structure for you',
-      '🌍 Pick your country & currency — so amounts, dates and tax stuff look right',
-      '🏷️ Choose your budget categories — tick the ones that fit your life',
-      '🏦 Add your first account — and what\'s in it right now',
+      'Create your budget folder — we scaffold the whole structure for you',
+      'Pick your country & currency — so amounts, dates and tax stuff look right',
+      'Choose your budget categories — tick the ones that fit your life',
+      'Add your first account — and what\'s in it right now',
     ]) setup.createEl('li', { text: t });
     const then = c.createEl('p');
     then.createEl('b', { text: 'Then the fun starts in the app:' });
     const inApp = c.createEl('ol', { cls: 'budget-onb-journey' });
     for (const t of [
-      '💰 Set your budget — give every category a number to aim for',
-      '📥 Import your bank\'s CSV — transactions sort themselves as you teach it',
-      '➕ Add new categories anytime — your budget grows with you',
-      '📊 Review as you go — the dashboard shows exactly where the money went',
+      'Set your budget — give every category a number to aim for',
+      'Import your bank\'s CSV — transactions sort themselves as you teach it',
+      'Add new categories anytime — your budget grows with you',
+      'Review as you go — the dashboard shows exactly where the money went',
     ]) inApp.createEl('li', { text: t });
     c.createEl('p', { text: 'About two minutes of setup. Ready?' });
   }
