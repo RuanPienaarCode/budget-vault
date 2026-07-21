@@ -2,17 +2,38 @@
 /* Accounts — grouped balance tiles; clicking a balance updates the account's
    markdown file in place. */
 
-const { el, patchFrontmatter } = require('../util');
+const { el, patchFrontmatter, safeSeg } = require('../util');
 const { askFields } = require('../modal');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, money, toast, writeFile } = ctx;
+  const { S, $, app, money, toast, writeFile, ensureFolder, relPath } = ctx;
 
+  // Every type the loader can produce must appear in exactly one group, or an
+  // account renders nowhere on this page — including `other`, which is what a
+  // file with no `type:` in its frontmatter falls back to (load.js).
   const ACCT_GROUPS = [
     ['Bank accounts', ['checking', 'credit_card', 'cash']],
     ['Savings', ['savings']],
     ['Investments', ['investment']],
+    ['Other', ['other']],
   ];
+  const ACCT_TYPES = ACCT_GROUPS.flatMap(([, types]) => types);
+  // Same labels the setup wizard uses (onboarding.js ACCOUNT_TYPES), so a type
+  // reads the same whether the account was created there or here.
+  const ACCT_TYPE_LABELS = {
+    checking: 'Cheque / current account', savings: 'Savings account',
+    credit_card: 'Credit card', cash: 'Cash', investment: 'Investment', other: 'Other',
+  };
+  const ACCT_TYPE_OPTIONS = ACCT_TYPES.map(v => ({ value: v, label: ACCT_TYPE_LABELS[v] }));
+
+  /* Blank → null (field left empty); unparseable → NaN. Callers decide which of
+     the two they accept — the balance prompt rejects both, the optional fields
+     on the create form treat blank as "not set". */
+  function parseAmount(v) {
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    return parseFloat(s.replace(',', '.').replace(/[^\d.-]/g, ''));
+  }
 
   function renderAccounts() {
     const wrap = $('#acctSections'); wrap.innerHTML = '';
@@ -28,8 +49,8 @@ module.exports = function registerAccounts(ctx) {
             { key: 'balance', label: 'New balance', type: 'number', value: a.balance.toFixed(2) },
           ]);
           if (!r) return;
-          const num = parseFloat(String(r.balance).replace(',', '.').replace(/[^\d.-]/g, ''));
-          if (isNaN(num)) return toast('Not a number', true);
+          const num = parseAmount(r.balance);
+          if (num === null || isNaN(num)) return toast('Not a number', true);
           a.balance = num;
           a.balance_updated = new Date().toISOString().slice(0, 10);
           await saveAccount(a);
@@ -50,6 +71,11 @@ module.exports = function registerAccounts(ctx) {
           el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${accounts.length} accounts`)),
           el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total))))),
         el('div', { class: 'body-pad' }, grid)));
+    }
+    if (!S.accounts.length) {
+      wrap.append(el('div', { class: 'card' }, el('div', { class: 'body-pad' },
+        el('p', { class: 'text-muted', style: 'margin:0' },
+          'No accounts yet. Use “New account” above to add a bank account, savings pot or investment.'))));
     }
   }
 
@@ -86,5 +112,56 @@ module.exports = function registerAccounts(ctx) {
     await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
   }
 
-  Object.assign(ctx, { renderAccounts, saveAccount });
+  /* Create an account file + its in-memory record. Reachable from both the
+     Accounts page and Savings & Investments. */
+  async function addAccount() {
+    const r = await askFields(app, 'New account', [
+      { key: 'name', label: 'Account name', type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
+      { key: 'type', label: 'Type', type: 'select', options: ACCT_TYPE_OPTIONS, value: 'savings' },
+      { key: 'institution', label: 'Institution', type: 'text', placeholder: 'e.g. Easy Equities' },
+      { key: 'balance', label: 'Current balance', type: 'number', value: '0' },
+      { key: 'goal_amount', label: 'Savings goal (optional)', type: 'number',
+        desc: 'Shows a progress bar on Savings & Investments.' },
+      { key: 'total_invested', label: 'Total invested (optional)', type: 'number',
+        desc: 'What you have put in, so growth can be shown against it.' },
+    ]);
+    if (!r) return;
+
+    // The loader takes an account's name from its FILENAME, and saveAccount
+    // writes back to `Accounts/<name>.md` — so the name held in memory has to be
+    // the sanitised path segment. Store anything else and the first balance edit
+    // would write to a different file than the one created here.
+    const name = safeSeg(r.name);
+    if (!name) return toast('Account name required', true);
+    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) return toast('Account already exists', true);
+    if (!ACCT_TYPES.includes(r.type)) return toast('Invalid type', true);
+
+    const balance = parseAmount(r.balance) ?? 0;
+    const goal = parseAmount(r.goal_amount);
+    const invested = parseAmount(r.total_invested);
+    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) return toast('Not a number', true);
+
+    const acct = {
+      name, type: r.type, institution: (r.institution || '').trim(),
+      account_number: '', tx_label: '',
+      balance, balance_updated: new Date().toISOString().slice(0, 10),
+      credit_limit: null, goal_amount: goal, target_date: '',
+      monthly_contribution: null, total_invested: invested,
+      starting_amount: null, inception_date: '',
+      tags: '[finance, finance/budget, finance/budget/accounts]',
+      body: `\n\n# ${name}\n\nTransactions are stored under \`Transactions/${name}/\` as monthly files.\n`,
+    };
+    // No fmRaw — saveAccount's build-from-model branch writes the full
+    // frontmatter block and skips every null field.
+    await saveAccount(acct);
+    // Match the setup wizard: pre-create the account's transactions folder so
+    // it's importable and visible in the file explorer right away.
+    await ensureFolder(relPath(`Transactions/${name}`));
+    S.accounts.push(acct);
+    S.accounts.sort((a, b) => a.name.localeCompare(b.name));
+    ctx.render();   // not renderAccounts — Savings & Investments has this button too
+    toast(`Created Accounts/${name}.md`);
+  }
+
+  Object.assign(ctx, { renderAccounts, saveAccount, addAccount });
 };
