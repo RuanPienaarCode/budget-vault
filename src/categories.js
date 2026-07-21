@@ -2,7 +2,7 @@
 /* Category <select> builders + the create-category flow, shared by the
    Transactions table, Budget page and CSV import review. */
 
-const { el, parseFrontmatter } = require('./util');
+const { el, parseFrontmatter, learnPattern } = require('./util');
 const { TYPE_ORDER } = require('./constants');
 const { askFields, confirmModal } = require('./modal');
 
@@ -137,5 +137,32 @@ module.exports = function registerCategories(ctx) {
     return true;
   }
 
-  Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect });
+  /* Learn pattern → category rules from {desc, cat} pairs: descriptions are
+     trimmed of trailing reference noise (learnPattern) so rules generalise,
+     deduped against existing patterns (first rule for a pattern wins — an
+     established rule is never silently overwritten), then the rules CSV is
+     rewritten once. Returns how many rules were added. Shared by the CSV
+     import commit and the Transactions-page save. */
+  async function learnRules(pairs) {
+    const have = new Set(S.rules.map(r => r.pattern.trim().toLowerCase()));
+    let added = 0;
+    for (const { desc, cat } of pairs) {
+      if (!cat) continue;
+      const pattern = learnPattern(desc);
+      const key = pattern.trim().toLowerCase();
+      if (!key || have.has(key)) continue;
+      S.rules.push({ pattern, category: cat });
+      have.add(key);
+      added++;
+    }
+    if (added) {
+      S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: 'base' }));
+      const csv = 'pattern,category\n' + S.rules.map(r =>
+        [r.pattern, r.category].map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\n') + '\n';
+      await writeFile('Data/Categorisation Rules.csv', csv);
+    }
+    return added;
+  }
+
+  Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, learnRules });
 };

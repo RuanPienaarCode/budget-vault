@@ -207,6 +207,30 @@ function normalizeAmount(raw) {
   return neg ? -n : n;
 }
 
+/* Trim trailing reference noise (masked card numbers, statement refs, phone /
+   meter numbers, caps+digit ref codes) from a transaction description so a
+   learned categorisation rule generalises to next month's version of the same
+   merchant. Internal whitespace is preserved byte-for-byte — rule matching is
+   exact/substring against the raw description, so collapsing spaces would
+   break it. Falls back to the untrimmed description if trimming would leave
+   fewer than 4 characters. */
+function learnPattern(desc) {
+  let s = (desc ?? '').toString().trim();
+  for (;;) {
+    const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
+    if (!m) break;
+    const w = m[2];
+    const digits = (w.match(/\d/g) || []).length;
+    const noise = /\*{2,}/.test(w) ||                          // masked card: 400738******3558
+      /\d{4,}/.test(w) ||                                      // long digit run: refs, phone, meter numbers
+      (digits > 0 && digits / w.length >= 0.4) ||              // digit-heavy token: I8816879
+      (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODSS3MMGJMQ
+    if (!noise) break;
+    s = m[1];
+  }
+  return s.length >= 4 ? s : (desc ?? '').toString().trim();
+}
+
 /* Sanitise a string for safe use as a single path segment (folder/file name):
    strip path separators and filesystem-illegal characters, and neutralise
    "../" traversal attempts (dot runs, leading dots). */
@@ -230,4 +254,4 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, safeSeg, collapsePath };
+module.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath };
