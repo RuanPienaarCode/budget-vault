@@ -6,7 +6,7 @@ const { el, escMd, patchFrontmatter } = require('../util');
 const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory } = ctx;
+  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
 
   let budDraft = null, budDraftPeriod = null;
   /* Like the Laravel app's Budget page, the draft covers EVERY category — rows
@@ -68,9 +68,18 @@ module.exports = function registerBudgets(ctx) {
           remainingEl)),
         el('td', { class: `num${overActual ? ' text-danger' : ' text-muted'}`, style: 'white-space:nowrap' }, money(actual)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px', onchange: e => { d.notes = e.target.value; mark(); } })),
-        el('td', {}, d.inFile
-          ? el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
-          : '')));
+        el('td', { style: 'white-space:nowrap' },
+          d.inFile
+            ? el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
+            : '',
+          el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Delete category ${d.category}`, title: 'Delete this category everywhere', onclick: async () => {
+            if (await promptDeleteCategory(d.category)) {
+              const draft = budgetDraft();
+              const i = draft.indexOf(d);
+              if (i !== -1 && !d.inFile) draft.splice(i, 1);
+              renderBudgets();
+            }
+          } }, '🗑'))));
     }
     t.append(body);
   }

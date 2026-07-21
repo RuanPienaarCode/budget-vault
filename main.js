@@ -10,7 +10,7 @@ var require_constants = __commonJS((exports2, module2) => {
     openOnStartup: false,
     onboarded: false
   };
-  var TYPE_ORDER = ["income", "expense", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
+  var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, TYPE_ORDER, MONTHS };
 });
@@ -1529,11 +1529,11 @@ var require_load = __commonJS((exports2, module2) => {
 
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el } = require_util();
+  var { el, parseFrontmatter } = require_util();
   var { TYPE_ORDER } = require_constants();
-  var { askFields } = require_modal();
+  var { askFields, confirmModal } = require_modal();
   module2.exports = function registerCategories(ctx) {
-    const { S, app, toast, writeFile } = ctx;
+    const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
     function fillCatOptions(sel, current) {
       sel.innerHTML = "";
       sel.append(el("option", { value: "" }, "— none —"));
@@ -1635,7 +1635,40 @@ Budget category of type **${type}**.
       wireCatChange(sel, current, onchange);
       return sel;
     }
-    Object.assign(ctx, { fillCatOptions, promptCreateCategory, catSelect, lazyCatSelect });
+    async function promptDeleteCategory(name) {
+      if (!S.categories.some((c) => c.name === name))
+        return false;
+      let used = 0;
+      for (const f of Object.values(S.txFiles)) {
+        for (const r of f.rows)
+          if (r.cat === name)
+            used++;
+      }
+      const ok = await confirmModal(app, {
+        title: "Delete category",
+        message: `Delete "${name}"? ` + (used ? `${used} existing transaction${used === 1 ? "" : "s"} keep the name and will show it as "(missing)" until re-categorised. ` : "") + "Past budget files are not changed, and the category file goes to your vault trash.",
+        confirmText: "Delete"
+      });
+      if (!ok)
+        return false;
+      const safe = name.replace(/[\\/:*?"<>|]/g, "-").trim();
+      let file = fileAt(`Categories/${safe}.md`);
+      if (!file) {
+        for (const f of mdFilesIn("Categories")) {
+          const { fm } = parseFrontmatter(await vault.cachedRead(f));
+          if ((fm.name || f.basename) === name) {
+            file = f;
+            break;
+          }
+        }
+      }
+      if (file)
+        await vault.trash(file, false);
+      S.categories = S.categories.filter((c) => c.name !== name);
+      toast(`Deleted category "${name}"`);
+      return true;
+    }
+    Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect });
   };
 });
 
@@ -1899,7 +1932,7 @@ var require_budgets = __commonJS((exports2, module2) => {
   var { el, escMd, patchFrontmatter } = require_util();
   var { TYPE_ORDER } = require_constants();
   module2.exports = function registerBudgets(ctx) {
-    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory } = ctx;
+    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
     let budDraft = null, budDraftPeriod = null;
     function budgetDraft() {
       if (budDraftPeriod !== S.period || !budDraft) {
@@ -1962,14 +1995,22 @@ var require_budgets = __commonJS((exports2, module2) => {
         } }), remainingEl)), el("td", { class: `num${overActual ? " text-danger" : " text-muted"}`, style: "white-space:nowrap" }, money(actual)), el("td", {}, el("input", { type: "text", class: "form-control form-control-sm", value: d.notes, style: "width:230px", onchange: (e) => {
           d.notes = e.target.value;
           mark();
-        } })), el("td", {}, d.inFile ? el("button", { class: "btn-ghost", style: "padding:0.2rem 0.6rem;font-size:0.78rem", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
+        } })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost", style: "padding:0.2rem 0.6rem;font-size:0.78rem", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
           d.amount = 0;
           d.amountRaw = null;
           d.notes = "";
           d.inFile = false;
           mark();
           renderBudgets();
-        } }, "✕") : "")));
+        } }, "✕") : "", el("button", { class: "btn-ghost", style: "padding:0.2rem 0.6rem;font-size:0.78rem", "aria-label": `Delete category ${d.category}`, title: "Delete this category everywhere", onclick: async () => {
+          if (await promptDeleteCategory(d.category)) {
+            const draft2 = budgetDraft();
+            const i = draft2.indexOf(d);
+            if (i !== -1 && !d.inFile)
+              draft2.splice(i, 1);
+            renderBudgets();
+          }
+        } }, "\uD83D\uDDD1"))));
       }
       t.append(body);
     }
@@ -3479,6 +3520,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
     { name: "Medical", type: "expense", color: "#f87171" },
     { name: "Clothing", type: "expense", color: "#c084fc" },
     { name: "Bank fees", type: "expense", color: "#94a3b8" },
+    { name: "Home loan / bond repayment", type: "debt", color: "#fb923c" },
+    { name: "Car repayment", type: "debt", color: "#f97316" },
+    { name: "Credit card & other debt", type: "debt", color: "#ea580c" },
     { name: "Subscriptions", type: "services", color: "#818cf8" },
     { name: "Insurance", type: "insurance", color: "#2dd4bf" },
     { name: "Giving", type: "giving", color: "#fb923c" },
@@ -3533,7 +3577,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
         cats: new Set(STARTER_CATEGORIES.map((c) => c.name)),
         acctName: "",
         acctType: "checking",
-        acctInstitution: ""
+        acctInstitution: "",
+        acctBalance: ""
       };
     }
     steps() {
@@ -3719,6 +3764,13 @@ var require_onboarding = __commonJS((exports2, module2) => {
       new Setting(c).setName("Bank / institution").setDesc("Optional.").addText((t) => t.setValue(this.data.acctInstitution).onChange((v) => {
         this.data.acctInstitution = v;
       }));
+      new Setting(c).setName("Current balance").setDesc("Optional — what's in the account right now (your latest bank statement's closing balance, or check your banking app). Balances are a snapshot you keep up to date yourself, so importing only recent transactions never throws this off. You can update it any time by clicking the balance on the Accounts page.").addText((t) => {
+        t.inputEl.type = "number";
+        t.inputEl.step = "0.01";
+        t.setPlaceholder("0.00").setValue(this.data.acctBalance).onChange((v) => {
+          this.data.acctBalance = v;
+        });
+      });
     }
     render_finish(c) {
       const day = this.monthStartDay();
@@ -3732,6 +3784,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (this.mode === "create") {
         rows.push(["Categories", `${this.data.cats.size} starter categories`]);
         rows.push(["First account", this.data.acctName.trim() || "—"]);
+        const bal = parseFloat(String(this.data.acctBalance).replace(",", ".").replace(/[^\d.-]/g, ""));
+        if (this.data.acctName.trim() && !isNaN(bal) && bal !== 0)
+          rows.push(["Opening balance", `${this.currencySymbol()} ${bal.toFixed(2)}`]);
       }
       c.createEl("p", {
         text: this.mode === "connect" ? "Connecting to the existing budget folder and saving these settings into its Settings.md:" : "This will create the budget folder with Settings.md, your categories, the first budget file and empty Owed Money / Services files:"
@@ -3830,10 +3885,11 @@ Budget category of type **${cat.type}**.
             const safe = safeFileName(acct);
             const today = new Date;
             const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+            const bal = parseFloat(String(this.data.acctBalance).replace(",", ".").replace(/[^\d.-]/g, ""));
             await this.writeIfAbsent(normalizePath(`${folder}/Accounts/${safe}.md`), `---
 type: ${this.data.acctType}
 ` + (this.data.acctInstitution.trim() ? `institution: ${this.data.acctInstitution.trim()}
-` : "") + `balance: 0.00
+` : "") + `balance: ${(isNaN(bal) ? 0 : bal).toFixed(2)}
 balance_updated: ${ymd}
 tags: [finance, finance/budget, finance/budget/accounts]
 ---

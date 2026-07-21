@@ -2,12 +2,12 @@
 /* Category <select> builders + the create-category flow, shared by the
    Transactions table, Budget page and CSV import review. */
 
-const { el } = require('./util');
+const { el, parseFrontmatter } = require('./util');
 const { TYPE_ORDER } = require('./constants');
-const { askFields } = require('./modal');
+const { askFields, confirmModal } = require('./modal');
 
 module.exports = function registerCategories(ctx) {
-  const { S, app, toast, writeFile } = ctx;
+  const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
 
   function fillCatOptions(sel, current) {
     sel.innerHTML = '';
@@ -83,5 +83,39 @@ module.exports = function registerCategories(ctx) {
     return sel;
   }
 
-  Object.assign(ctx, { fillCatOptions, promptCreateCategory, catSelect, lazyCatSelect });
+  /* Delete a category after confirmation: the file goes to the vault's trash
+     (recoverable), the in-memory list drops it. Existing transactions and past
+     budget files are deliberately untouched — selects already render a stored
+     name with no category file as "(missing)". Returns true if deleted. */
+  async function promptDeleteCategory(name) {
+    if (!S.categories.some(c => c.name === name)) return false;
+    let used = 0;
+    for (const f of Object.values(S.txFiles)) {
+      for (const r of f.rows) if (r.cat === name) used++;
+    }
+    const ok = await confirmModal(app, {
+      title: 'Delete category',
+      message: `Delete "${name}"? ` +
+        (used ? `${used} existing transaction${used === 1 ? '' : 's'} keep the name and will show it as "(missing)" until re-categorised. ` : '') +
+        'Past budget files are not changed, and the category file goes to your vault trash.',
+      confirmText: 'Delete',
+    });
+    if (!ok) return false;
+    // The filename is the sanitised name; older or hand-made files may differ,
+    // so fall back to scanning frontmatter `name` for an exact match.
+    const safe = name.replace(/[\\/:*?"<>|]/g, '-').trim();
+    let file = fileAt(`Categories/${safe}.md`);
+    if (!file) {
+      for (const f of mdFilesIn('Categories')) {
+        const { fm } = parseFrontmatter(await vault.cachedRead(f));
+        if ((fm.name || f.basename) === name) { file = f; break; }
+      }
+    }
+    if (file) await vault.trash(file, false);
+    S.categories = S.categories.filter(c => c.name !== name);
+    toast(`Deleted category "${name}"`);
+    return true;
+  }
+
+  Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect });
 };
