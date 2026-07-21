@@ -247,6 +247,21 @@ var require_util = __commonJS((exports2, module2) => {
     const n = Number(s);
     return neg ? -n : n;
   }
+  function learnPattern(desc) {
+    let s = (desc ?? "").toString().trim();
+    for (;; ) {
+      const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
+      if (!m)
+        break;
+      const w = m[2];
+      const digits = (w.match(/\d/g) || []).length;
+      const noise = /\*{2,}/.test(w) || /\d{4,}/.test(w) || digits > 0 && digits / w.length >= 0.4 || digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w);
+      if (!noise)
+        break;
+      s = m[1];
+    }
+    return s.length >= 4 ? s : (desc ?? "").toString().trim();
+  }
   function safeSeg(s) {
     return (s ?? "").toString().replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim();
   }
@@ -264,7 +279,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, safeSeg, collapsePath };
+  module2.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath };
 });
 
 // src/shell.js
@@ -1529,7 +1544,7 @@ var require_load = __commonJS((exports2, module2) => {
 
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter } = require_util();
+  var { el, parseFrontmatter, learnPattern } = require_util();
   var { TYPE_ORDER } = require_constants();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerCategories(ctx) {
@@ -1676,7 +1691,31 @@ Budget category of type **${type}**.
       toast(`Deleted category "${name}"`);
       return true;
     }
-    Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect });
+    async function learnRules(pairs) {
+      const have = new Set(S.rules.map((r) => r.pattern.trim().toLowerCase()));
+      let added = 0;
+      for (const { desc, cat } of pairs) {
+        if (!cat)
+          continue;
+        const pattern = learnPattern(desc);
+        const key = pattern.trim().toLowerCase();
+        if (!key || have.has(key))
+          continue;
+        S.rules.push({ pattern, category: cat });
+        have.add(key);
+        added++;
+      }
+      if (added) {
+        S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" }));
+        const csv = `pattern,category
+` + S.rules.map((r) => [r.pattern, r.category].map((v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(",")).join(`
+`) + `
+`;
+        await writeFile("Data/Categorisation Rules.csv", csv);
+      }
+      return added;
+    }
+    Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, learnRules });
   };
 });
 
@@ -1844,7 +1883,8 @@ var require_dashboard = __commonJS((exports2, module2) => {
 var require_transactions = __commonJS((exports2, module2) => {
   var { el, escMd, patchFrontmatter } = require_util();
   module2.exports = function registerTransactions(ctx) {
-    const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect } = ctx;
+    const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+    const pendingLearns = new Map;
     function renderTransactions() {
       $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const accSel = $("#txAccount");
@@ -1887,6 +1927,10 @@ var require_transactions = __commonJS((exports2, module2) => {
         };
         body.append(el("tr", {}, el("td", { class: "text-muted", style: "white-space:nowrap" }, r.date), el("td", {}, r.desc), el("td", { class: "text-muted" }, item.label), el("td", {}, lazyCatSelect(r.cat, (v) => {
           r.cat = v;
+          if (v)
+            pendingLearns.set(r.desc, v);
+          else
+            pendingLearns.delete(r.desc);
           mark();
         })), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", { type: "checkbox", ...r.excluded ? { checked: "" } : {}, onchange: (e) => {
           r.excluded = e.target.checked;
@@ -1928,8 +1972,13 @@ var require_transactions = __commonJS((exports2, module2) => {
         f.dirty = false;
         n++;
       }
+      let learned = 0;
+      if (pendingLearns.size) {
+        learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })));
+        pendingLearns.clear();
+      }
       $("#txSave").disabled = true;
-      toast(`Saved ${n} file${n === 1 ? "" : "s"}`);
+      toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
     Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions });
   };
@@ -2892,7 +2941,7 @@ var require_import = __commonJS((exports2, module2) => {
   var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
   var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
-    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale } = ctx;
+    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules } = ctx;
     function renderImport() {
       const loc = locale();
       $("#importSubNote").textContent = loc.banks ? `Bank statement exports — ${loc.banks} — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
@@ -3117,22 +3166,7 @@ var require_import = __commonJS((exports2, module2) => {
       const touched = additions;
       let newRules = 0;
       if ($("#impRemember").checked) {
-        const have = new Set(S.rules.map((r) => r.pattern.trim().toLowerCase()));
-        for (const it of toAdd) {
-          if (it.manual && it.cat && !have.has(it.desc.trim().toLowerCase())) {
-            S.rules.push({ pattern: it.desc.trim(), category: it.cat });
-            have.add(it.desc.trim().toLowerCase());
-            newRules++;
-          }
-        }
-        if (newRules) {
-          S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" }));
-          const csv = `pattern,category
-` + S.rules.map((r) => [r.pattern, r.category].map((v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(",")).join(`
-`) + `
-`;
-          await writeFile("Data/Categorisation Rules.csv", csv);
-        }
+        newRules = await learnRules(toAdd.filter((it) => it.manual && it.cat).map((it) => ({ desc: it.desc, cat: it.cat })));
       }
       S.pendingImport = null;
       $("#importReview").classList.add("hidden");

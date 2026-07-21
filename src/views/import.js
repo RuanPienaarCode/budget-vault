@@ -18,7 +18,7 @@ const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out'
 const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale } = ctx;
+  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules } = ctx;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -229,20 +229,7 @@ module.exports = function registerImport(ctx) {
     const touched = additions;
     let newRules = 0;
     if ($('#impRemember').checked) {
-      const have = new Set(S.rules.map(r => r.pattern.trim().toLowerCase()));
-      for (const it of toAdd) {
-        if (it.manual && it.cat && !have.has(it.desc.trim().toLowerCase())) {
-          S.rules.push({ pattern: it.desc.trim(), category: it.cat });
-          have.add(it.desc.trim().toLowerCase());
-          newRules++;
-        }
-      }
-      if (newRules) {
-        S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: 'base' }));
-        const csv = 'pattern,category\n' + S.rules.map(r =>
-          [r.pattern, r.category].map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\n') + '\n';
-        await writeFile('Data/Categorisation Rules.csv', csv);
-      }
+      newRules = await learnRules(toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat })));
     }
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
