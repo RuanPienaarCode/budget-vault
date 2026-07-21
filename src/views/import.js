@@ -48,7 +48,11 @@ module.exports = function registerImport(ctx) {
     return set;
   }
   function detectAccountLabel(filename) {
-    const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/);
+    // Discovery-style "Label_12345_..." or a bare account number ("62351028991.csv",
+    // "62351028991 (3).csv" — FNB names exports after the account alone). The bare
+    // form needs 6+ digits so a leading year ("2026-07 export.csv") never matches.
+    const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) ||
+              filename.match(/^(\d{6,})\D/);
     if (m) {
       const acc = S.accounts.find(a => a.account_number === m[1]);
       if (acc) return acc.tx_label || acc.name;
