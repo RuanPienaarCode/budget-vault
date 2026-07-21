@@ -694,6 +694,7 @@
 }
 .budget-app-root .badge-income      { background: var(--color-info-light); color: var(--color-info); }
 .budget-app-root .badge-expense     { background: var(--color-danger-light); color: var(--color-danger); }
+.budget-app-root .badge-debt        { background: color-mix(in srgb, #f97316 14%, transparent); color: #fb923c; }
 .budget-app-root .badge-services    { background: var(--color-info-light); color: var(--color-info); }
 .budget-app-root .badge-insurance   { background: var(--color-warning-light); color: var(--color-warning); }
 .budget-app-root .badge-giving      { background: color-mix(in srgb, var(--color-giving) 14%, transparent); color: var(--color-giving); }
@@ -709,6 +710,7 @@
 .budget-app-root:not(.bud-dark) .badge-income,
 .budget-app-root:not(.bud-dark) .badge-services   { color: #0369a1; }
 .budget-app-root:not(.bud-dark) .badge-expense    { color: #be123c; }
+.budget-app-root:not(.bud-dark) .badge-debt       { color: #c2410c; }
 .budget-app-root:not(.bud-dark) .badge-insurance  { color: #a16207; }
 .budget-app-root:not(.bud-dark) .badge-savings    { color: #15803d; }
 .budget-app-root:not(.bud-dark) .badge-giving     { color: #be185d; }
