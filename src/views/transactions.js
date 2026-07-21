@@ -8,7 +8,12 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect } = ctx;
+  const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+
+  /* Category changes made here teach the auto-categoriser too (not just the
+     import review): desc → category, flushed to the rules CSV on save. A Map
+     so re-picking the same transaction keeps only the final choice. */
+  const pendingLearns = new Map();
 
   function renderTransactions() {
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? 'Whole history' : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -50,7 +55,11 @@ module.exports = function registerTransactions(ctx) {
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, r.date),
         el('td', {}, r.desc),
         el('td', { class: 'text-muted' }, item.label),
-        el('td', {}, lazyCatSelect(r.cat, v => { r.cat = v; mark(); })),
+        el('td', {}, lazyCatSelect(r.cat, v => {
+          r.cat = v;
+          if (v) pendingLearns.set(r.desc, v); else pendingLearns.delete(r.desc);
+          mark();
+        })),
         el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(r.amount)),
         el('td', {}, el('input', { type: 'checkbox', ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px', onchange: e => { r.note = e.target.value; mark(); } }))));
@@ -83,8 +92,13 @@ module.exports = function registerTransactions(ctx) {
       await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile(f));
       f.dirty = false; n++;
     }
+    let learned = 0;
+    if (pendingLearns.size) {
+      learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })));
+      pendingLearns.clear();
+    }
     $('#txSave').disabled = true;
-    toast(`Saved ${n} file${n === 1 ? '' : 's'}`);
+    toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
   Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions });
