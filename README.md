@@ -66,20 +66,20 @@ It's all ordinary markdown tables and frontmatter — readable and editable with
 
 ## CSV import
 
-Columns are matched by **header name**, not position, so most bank exports work as-is. Recognised out of the box:
+At this time the importer works with **basic CSV bank statements** — a plain CSV with Date / Description / Amount columns — and has been tested against real exports from these banks:
 
 | Bank | Format |
 |------|--------|
 | Discovery Bank | single signed Amount column (filenames auto-select the account) |
-| FNB | single signed Amount column |
-| Capitec | Money In / Money Out pair |
-| Nedbank, Standard Bank, Absa | Debit / Credit pair |
+| FNB | single signed Amount column (filenames auto-select the account) |
+
+More banks will be added over time. Columns are matched by **header name**, not position, so exports from other banks may well work as-is — but they haven't been verified yet. If your bank isn't listed (or its export doesn't import cleanly), you can always build your own transactions CSV — see below.
 
 Amount cells tolerate real-world quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives, trailing minus, and `Cr`/`Dr` markers. Duplicate rows are detected against your existing history and skipped automatically, so re-importing an overlapping statement is safe.
 
 ### Importing your own data
 
-Anything else can be imported from a hand-built Google Sheets or Excel file with this header row:
+If your bank isn't supported yet, export or retype your statement into a Google Sheets or Excel file with this header row:
 
 | Date | Title | Amount |
 |------|-------|--------|
