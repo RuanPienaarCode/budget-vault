@@ -2718,7 +2718,7 @@ var require_tax = __commonJS((exports2, module2) => {
       let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
       pendingDocTarget = null;
       if (!target) {
-        const NEW = "➕ New document row";
+        const NEW = "＋ New document row";
         const open = t.docs.filter((d) => !d.file).map((d) => `${d.name} — ${d.source}`);
         const r = await askFields(app, `Attach "${file.name}"`, [
           { key: "to", label: "Attach to", type: "select", options: [...open, NEW], value: open[0] ?? NEW }
