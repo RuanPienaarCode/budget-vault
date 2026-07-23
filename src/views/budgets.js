@@ -96,9 +96,15 @@ module.exports = function registerBudgets(ctx) {
     const n = S.settings.month_start_day;
     const meta = S.budgetMeta[S.period];
     const fm = patchFrontmatter((meta && meta.raw) || '', { period: S.period });
+    // Correct English ordinal for any day (1st, 2nd, 3rd, 21st, 22nd, 23rd, …) —
+    // the old hardcoded "rd"/"nd" only read right for the default day 23.
+    const ordinal = d => { const v = d % 100; return d + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
+    const rangeNote = n === 1
+      ? 'With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month.'
+      : 'With `month_start_day: ' + n + '`, this period runs from the ' + ordinal(n) +
+        ' of the previous month to the ' + ordinal(n - 1) + ' of this month.';
     const lines = ['---', fm, '---', '', `# Budget — ${S.period}`, '',
-      'With `month_start_day: ' + n + '`, this period runs from the ' + n +
-      'rd of the previous month to the ' + (n - 1) + 'nd of this month.', '',
+      rangeNote, '',
       '| Category | Type | Amount | Notes |', '|----------|------|-------:|-------|'];
     const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
     for (const d of rows) {
