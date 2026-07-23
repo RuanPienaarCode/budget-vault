@@ -2089,6 +2089,11 @@ var require_budgets = __commonJS((exports2, module2) => {
       const n = S.settings.month_start_day;
       const meta = S.budgetMeta[S.period];
       const fm = patchFrontmatter(meta && meta.raw || "", { period: S.period });
+      const ordinal = (d) => {
+        const v = d % 100;
+        return d + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th");
+      };
+      const rangeNote = n === 1 ? "With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month." : "With `month_start_day: " + n + "`, this period runs from the " + ordinal(n) + " of the previous month to the " + ordinal(n - 1) + " of this month.";
       const lines = [
         "---",
         fm,
@@ -2096,7 +2101,7 @@ var require_budgets = __commonJS((exports2, module2) => {
         "",
         `# Budget — ${S.period}`,
         "",
-        "With `month_start_day: " + n + "`, this period runs from the " + n + "rd of the previous month to the " + (n - 1) + "nd of this month.",
+        rangeNote,
         "",
         "| Category | Type | Amount | Notes |",
         "|----------|------|-------:|-------|"
@@ -3242,19 +3247,33 @@ var require_import = __commonJS((exports2, module2) => {
         const month = it.date.slice(0, 7);
         const key = `${label}/${month}`;
         if (!additions.has(key))
-          additions.set(key, { month, rows: [] });
-        additions.get(key).rows.push({ date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded, note: it.excluded ? "Excluded during import" : "" });
+          additions.set(key, { month, entries: [] });
+        additions.get(key).entries.push({
+          row: { date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded, note: it.excluded ? "Excluded during import" : "" },
+          src: it
+        });
       }
       const TX_FM = "tags: [finance, finance/budget, finance/budget/transactions]";
-      for (const [key, { month, rows }] of additions) {
-        const existing = S.txFiles[key];
-        const fileModel = existing ? { ...existing, rows: existing.rows.concat(rows) } : { label, month, rows, dirty: false, fmRaw: TX_FM };
-        await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
-      }
-      for (const [key, { month, rows }] of additions) {
-        if (!S.txFiles[key])
-          S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
-        S.txFiles[key].rows.push(...rows);
+      const lab = (p.label || "").trim().toLowerCase();
+      let done = 0;
+      try {
+        for (const [key, { month, entries }] of additions) {
+          const rows = entries.map((e) => e.row);
+          const existing = S.txFiles[key];
+          const fileModel = existing ? { ...existing, rows: existing.rows.concat(rows) } : { label, month, rows, dirty: false, fmRaw: TX_FM };
+          await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+          if (!S.txFiles[key])
+            S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
+          S.txFiles[key].rows.push(...rows);
+          for (const e of entries) {
+            e.src.include = false;
+            p.seen.add(`${e.src.date}|${e.src.desc.trim().toLowerCase()}|${e.src.amount.toFixed(2)}|${lab}`);
+          }
+          done += rows.length;
+        }
+      } catch (err) {
+        renderImportReview();
+        return toast(`Import stopped after ${done} row${done === 1 ? "" : "s"} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest.`, true);
       }
       const touched = additions;
       let newRules = 0;

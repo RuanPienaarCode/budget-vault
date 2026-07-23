@@ -201,30 +201,48 @@ module.exports = function registerImport(ctx) {
     const toAdd = p.items.filter(i => i.include && !i.dup);
     if (!toAdd.length) return toast('Nothing selected to import', true);
 
-    // Group the new rows per month WITHOUT touching S yet. We write every file
-    // first and only merge into S.txFiles once all writes succeed — so a failed
-    // write (iCloud/disk error) leaves memory untouched and a retry can't
-    // duplicate rows. serializeTxFile is fed a cloned row array (concat), so it
-    // never mutates the live S.txFiles rows during the write phase.
-    const additions = new Map();   // key -> { month, rows: [] }
+    // Group the new rows per month, keeping a back-reference to each source item
+    // so a committed row can be neutralised after it lands.
+    const additions = new Map();   // key -> { month, entries: [{ row, src }] }
     for (const it of toAdd) {
       const month = it.date.slice(0, 7);
       const key = `${label}/${month}`;
-      if (!additions.has(key)) additions.set(key, { month, rows: [] });
-      additions.get(key).rows.push({ date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded, note: it.excluded ? 'Excluded during import' : '' });
+      if (!additions.has(key)) additions.set(key, { month, entries: [] });
+      additions.get(key).entries.push({
+        row: { date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded, note: it.excluded ? 'Excluded during import' : '' },
+        src: it,
+      });
     }
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
-    for (const [key, { month, rows }] of additions) {
-      const existing = S.txFiles[key];
-      const fileModel = existing
-        ? { ...existing, rows: existing.rows.concat(rows) }
-        : { label, month, rows, dirty: false, fmRaw: TX_FM };
-      await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
-    }
-    // All writes succeeded — now merge into memory.
-    for (const [key, { month, rows }] of additions) {
-      if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
-      S.txFiles[key].rows.push(...rows);
+    const lab = (p.label || '').trim().toLowerCase();
+    // Write each month-file and reflect it in memory in the SAME step — disk and
+    // S.txFiles stay in lockstep per file. If a later file's write fails (iCloud /
+    // disk error), the files already written are modelled in memory AND their
+    // source rows are marked done, so a retry imports only the rest — it can
+    // never re-append a row that already reached disk. serializeTxFile is fed a
+    // cloned row array (concat), so it never mutates live S.txFiles rows.
+    let done = 0;
+    try {
+      for (const [key, { month, entries }] of additions) {
+        const rows = entries.map(e => e.row);
+        const existing = S.txFiles[key];
+        const fileModel = existing
+          ? { ...existing, rows: existing.rows.concat(rows) }
+          : { label, month, rows, dirty: false, fmRaw: TX_FM };
+        await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+        if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
+        S.txFiles[key].rows.push(...rows);
+        // Neutralise the committed items and record them in the dedup snapshot so
+        // a re-render / retry treats them as already-present (no re-import).
+        for (const e of entries) {
+          e.src.include = false;
+          p.seen.add(`${e.src.date}|${e.src.desc.trim().toLowerCase()}|${e.src.amount.toFixed(2)}|${lab}`);
+        }
+        done += rows.length;
+      }
+    } catch (err) {
+      renderImportReview();   // reflect what already landed; the rest stays selectable
+      return toast(`Import stopped after ${done} row${done === 1 ? '' : 's'} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest.`, true);
     }
     const touched = additions;
     let newRules = 0;
