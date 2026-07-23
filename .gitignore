@@ -6,5 +6,10 @@ data.json
 # alongside a public plugin.
 AUDIT-*.html
 
+# Internal dev docs — roadmaps, issue breakdowns, working notes. Kept local:
+# they are sliced from real account statements, so their reasoning leans on
+# personal financial detail. Publishable docs belong in README.md instead.
+dev-docs/
+
 # OS noise
 .DS_Store
