@@ -225,7 +225,7 @@ const SHELL_HTML = `
                 <button class="btn-ghost" id="taxAddDoc"><span class="ico" data-ico="plus"></span> Add document</button>
               </div>
             </div>
-            <div class="body-pad" style="padding-top:14px">
+            <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
               <button type="button" class="upload-area" id="taxDrop" aria-controls="taxFileInput">
                 <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
                 <span class="ua-line">Drop a tax document here, or click to choose a file.</span>
