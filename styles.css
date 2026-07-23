@@ -437,7 +437,13 @@
   padding: 2rem 2.5rem 4rem;
   overflow-x: hidden;
 }
-@media (max-width: 768px) { .budget-app-root .main-content { padding: 1rem; } }
+@media (max-width: 768px) {
+  /* Full-bleed on mobile: drop the side gutters so cards run edge-to-edge.
+     Cards keep their own inner padding; page-title banners get a side inset
+     below so their titles align with card content instead of hugging the edge. */
+  .budget-app-root .main-content { padding: 1rem 0; }
+  .budget-app-root .financial-period-banner { padding-left: 20px; padding-right: 20px; }
+}
 
 .budget-app-root .financial-period-banner {
   background: transparent;
