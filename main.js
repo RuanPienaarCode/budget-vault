@@ -3197,7 +3197,7 @@ var require_import = __commonJS((exports2, module2) => {
         p.label = accSel.value;
         renderImportReview();
       };
-      const lab = (p.label || "").trim().toLowerCase();
+      const lab = safeSeg(p.label || "").trim().toLowerCase();
       let dupes = 0;
       for (const it of p.items) {
         it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
@@ -3254,7 +3254,7 @@ var require_import = __commonJS((exports2, module2) => {
         });
       }
       const TX_FM = "tags: [finance, finance/budget, finance/budget/transactions]";
-      const lab = (p.label || "").trim().toLowerCase();
+      const lab = label.trim().toLowerCase();
       let done = 0;
       try {
         for (const [key, { month, entries }] of additions) {

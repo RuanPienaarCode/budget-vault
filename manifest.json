@@ -1,9 +1,9 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "minAppVersion": "1.4.0",
-  "description": "Personal budget dashboard — reads and writes markdown files in your vault's budget folder. Dashboard, transactions, budgets, savings, accounts, owed money, services, tax, and CSV import (Discovery Bank and FNB statements, or your own CSV).",
+  "description": "Take charge of your money — track spending, budgets, savings, accounts and tax, and import your bank statements in a tap. Your data stays yours: private files on your own devices, no account, no cloud, no subscription. Works on phone and computer.",
   "author": "Ruan Pienaar",
   "isDesktopOnly": false
 }

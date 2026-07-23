@@ -151,7 +151,11 @@ module.exports = function registerImport(ctx) {
     if (!p.label && labels.length) p.label = accSel.value;
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
 
-    const lab = (p.label || '').trim().toLowerCase();
+    // Canonicalise to the same sanitised form dedupSet keys by (f.label is the
+    // safeSeg'd folder name). Probing with the raw label would miss duplicates
+    // whenever a label carries a filesystem-illegal char (e.g. tx_label "FNB/Joint"),
+    // re-importing rows that are already on disk.
+    const lab = safeSeg(p.label || '').trim().toLowerCase();
     let dupes = 0;
     for (const it of p.items) {
       it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
@@ -214,7 +218,9 @@ module.exports = function registerImport(ctx) {
       });
     }
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
-    const lab = (p.label || '').trim().toLowerCase();
+    // Same canonical form dedupSet / renderImportReview key by (the safeSeg'd
+    // folder label), so a retry after a partial failure recognises landed rows.
+    const lab = label.trim().toLowerCase();
     // Write each month-file and reflect it in memory in the SAME step — disk and
     // S.txFiles stay in lockstep per file. If a later file's write fails (iCloud /
     // disk error), the files already written are modelled in memory AND their
