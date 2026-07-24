@@ -32,6 +32,7 @@ class FieldModal extends Modal {
           t.setValue(this.values[f.key]);
           if (f.placeholder) t.setPlaceholder(f.placeholder);
           if (f.type === 'number') { t.inputEl.type = 'number'; t.inputEl.step = '0.01'; }
+          if (f.type === 'date') t.inputEl.type = 'date';
           t.onChange(v => { this.values[f.key] = v; });
           firstInputs.push(t.inputEl);
         });

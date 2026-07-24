@@ -53,6 +53,9 @@ class BudgetView extends ItemView {
     }
     this.appCtl = null;
     this.contentEl.empty();
+    // Clear any inline height left by the keyboard-viewport fix — the leaf's
+    // contentEl is reused by the next view, and a stale height:Npx would cap it.
+    this.contentEl.style.height = '';
     this.contentEl.classList.remove('budget-app-root', 'bud-dark');
   }
 }
