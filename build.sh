@@ -15,4 +15,12 @@ else
 fi
 
 node --check main.js
+
+# Guard tests — run in bare node (no obsidian dependency). set -e fails the
+# build if a country profile drops a key the views read.
+for t in tests/*.test.cjs; do
+  [ -e "$t" ] || continue
+  node "$t"
+done
+
 echo "Built main.js OK — reload Obsidian (or the plugin) to pick it up."
