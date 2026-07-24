@@ -40,8 +40,13 @@ module.exports = function registerServices(ctx) {
           el('td', { class: 'text-muted' }, s.provider),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
             onchange: e => { s.amount = parseFloat(e.target.value) || 0; mark(); renderServices(); } })),
-          el('td', { class: 'text-muted' }, s.cycle),
-          el('td', { class: 'text-muted' }, s.next || '—'),
+          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
+            onchange: e => { s.cycle = e.target.value === 'annual' ? 'annual' : 'monthly'; mark(); renderServices(); } },
+            el('option', { value: 'monthly', ...(s.cycle === 'monthly' ? { selected: '' } : {}) }, 'monthly'),
+            el('option', { value: 'annual', ...(s.cycle === 'annual' ? { selected: '' } : {}) }, 'annual'))),
+          el('td', {}, el('input', { type: 'date', class: 'form-control form-control-sm', value: s.next, style: 'width:140px',
+            'aria-label': `Next billing date for ${s.name}`,
+            onchange: e => { s.next = e.target.value.trim(); mark(); } })),
           el('td', {}, el('input', { type: 'checkbox', ...(s.active ? { checked: '' } : {}),
             onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
           el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Remove ${s.name}`,
@@ -74,13 +79,18 @@ module.exports = function registerServices(ctx) {
     const r = await askFields(app, 'New service', [
       { key: 'name', label: 'Service name', type: 'text' },
       { key: 'provider', label: 'Provider', type: 'text' },
-      { key: 'amount', label: 'Monthly amount', type: 'number', value: '0' },
+      { key: 'amount', label: 'Amount per billing cycle', type: 'number', value: '0' },
+      { key: 'cycle', label: 'Billing cycle', type: 'select', value: 'monthly', options: [
+        { value: 'monthly', label: 'Monthly' }, { value: 'annual', label: 'Annual' }] },
+      { key: 'next', label: 'Next billing (optional)', type: 'date' },
       { key: 'category', label: 'Budget category', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
     ]);
     if (!r || !r.name.trim()) return;
     const amount = parseFloat(String(r.amount).replace(',', '.'));
     if (isNaN(amount)) return toast('Not a number', true);
-    S.services.push({ name: r.name.trim(), provider: (r.provider || '').trim(), amount, cycle: 'monthly', next: '', category: (r.category || '').trim(), active: true, notes: '' });
+    const next = /^\d{4}-\d{2}-\d{2}$/.test((r.next || '').trim()) ? r.next.trim() : '';
+    S.services.push({ name: r.name.trim(), provider: (r.provider || '').trim(), amount,
+      cycle: r.cycle === 'annual' ? 'annual' : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '' });
     S.servicesDirty = true; $('#svcSave').disabled = false; renderServices();
   }
 
