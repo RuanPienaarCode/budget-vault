@@ -386,6 +386,65 @@ const PROFILES = {
     ],
   },
 
+  cn: {
+    label: 'China (mainland)',
+    currency: '¥',
+    thousands: ',', decimal: '.',
+    dayFirst: false,   // Chinese statements are big-endian YYYY-MM-DD → month before day when reduced
+    banks: 'ICBC, China Construction Bank, Agricultural Bank of China, Bank of China, China Merchants Bank',
+    importHint: 'Any CSV with a Date, Description and Amount (or Debit/Credit) header row works.',
+    authority: 'STA',
+    taxIntro: 'Track a China Individual Income Tax (IIT) annual reconciliation here — progress steps, the documents you need and the files themselves, stored in the vault. Filing is through the 个人所得税 app or etax.chinatax.gov.cn.',
+    yearHint: 'Tax year (calendar year)',
+    yearSpan: y => `Jan – Dec ${y}`,
+    /* Annual reconciliation runs 1 Mar – 30 Jun of the following year, so up
+       to June you are still settling the prior calendar year. */
+    currentTaxYear: now => (now.getMonth() + 1 <= 6 ? now.getFullYear() - 1 : now.getFullYear()),
+    seedDeadlines: y => ({ deadline_standard: `${y + 1}-06-30`, deadline_provisional: `${y + 1}-03-01` }),
+    deadlineLabels: ['Reconciliation deadline', 'Reconciliation window opens'],
+    activeDeadline: t => t.deadline_standard,
+    defaultTaxpayerType: 'unknown',
+    defaultAssessment: 'unknown',
+    taxpayerTypes: [
+      ['provisional', 'Business / freelance income (prepaid, trued up annually)'],
+      ['standard', 'Employer withholds monthly'],
+      ['unknown', 'Unknown — check in the 个人所得税 app'],
+    ],
+    assessments: [
+      ['submit-requested', 'Annual reconciliation required'],
+      ['auto-assessed', 'Exempt from reconciliation'],
+      ['unknown', 'Not checked yet'],
+    ],
+    seasonMsgs(t) {
+      const msgs = [];
+      if (t.assessment === 'submit-requested') msgs.push('The annual IIT reconciliation (汇算清缴) is required — complete it in the 个人所得税 app between 1 March and 30 June of the following year.');
+      else if (t.assessment === 'auto-assessed') msgs.push('You appear exempt from the annual reconciliation (single employer, income within the threshold, or tax already settled monthly). Keep records anyway — a second income source can change that.');
+      else msgs.push('Check in the 个人所得税 app whether you need the annual reconciliation — multiple income sources or under-withheld tax usually mean yes.');
+      if (t.taxpayer_type === 'provisional') msgs.push('Business or labour-service income is usually prepaid monthly or quarterly and trued up in the annual reconciliation.');
+      return msgs;
+    },
+    safetyNote: 'Always type chinatax.gov.cn or open the official 个人所得税 app yourself — the STA never asks for passwords or verification codes by SMS, email or phone.',
+    seedSteps: year => [
+      { step: 'Confirm whether you must do the annual reconciliation', notes: '个人所得税 app → 办税 → 综合所得年度汇算' },
+      { step: 'Check pre-filled comprehensive income', notes: 'Wages, labour remuneration, author\'s remuneration and royalties pre-fill' },
+      { step: 'Confirm special additional deductions', notes: 'Children\'s education, housing loan interest or rent, elderly care, continuing education, infant care under 3, serious-illness medical' },
+      { step: 'Declare other comprehensive income', notes: 'Freelance / labour-service income from other payers not already withheld' },
+      { step: 'Declare investment or overseas income', notes: 'Interest, dividends and any taxable foreign income — remove if not applicable' },
+      { step: 'Submit the annual reconciliation', due: `${year + 1}-06-30`, notes: '1 Mar – 30 Jun, in the app or on etax.chinatax.gov.cn' },
+      { step: 'Claim the refund or pay the balance due', notes: 'Refunds pay to your linked bank card; balances due by 30 June' },
+      { step: 'Respond to STA queries', notes: '' },
+    ],
+    seedDocs: () => [
+      { name: 'Comprehensive-income withholding records', source: 'Employer / payers', notes: 'Pre-fills in the 个人所得税 app' },
+      { name: 'Labour-service / author-remuneration / royalty records', source: 'Other payers', notes: 'Remove if not applicable' },
+      { name: 'Special additional deduction records', source: 'Own records', notes: 'Education, housing, elderly/infant care, medical' },
+      { name: 'Housing loan interest or rent records', source: 'Bank / landlord', notes: '' },
+      { name: 'Investment income records', source: 'Bank / broker', notes: 'If applicable' },
+      { name: 'Overseas income records', source: 'Own records', notes: 'Remove if not applicable' },
+      { name: 'STA letters & notices', source: 'STA', notes: '' },
+    ],
+  },
+
   other: {
     label: 'Other / not listed',
     currency: '$',
@@ -398,7 +457,7 @@ const PROFILES = {
 };
 
 /* Dropdown order — South Africa first (the pre-country default). */
-const COUNTRY_ORDER = ['za', 'us', 'uk', 'eu', 'au', 'ca', 'other'];
+const COUNTRY_ORDER = ['za', 'us', 'uk', 'eu', 'au', 'ca', 'cn', 'other'];
 
 /* Resolve a Settings.md `country` value to a profile; unknown/missing → za
    (every install before the country setting existed was South African). */

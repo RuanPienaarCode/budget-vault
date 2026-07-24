@@ -396,7 +396,7 @@ class OnboardingWizard extends Modal {
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
           `- **currency** — symbol shown before every amount in the Budget Vault plugin.\n` +
-          `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, other).\n` +
+          `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).\n` +
           `- **household** — name shown in the dashboard greeting.\n\n` +
           `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
