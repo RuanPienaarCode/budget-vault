@@ -11,5 +11,8 @@ AUDIT-*.html
 # personal financial detail. Publishable docs belong in README.md instead.
 dev-docs/
 
+# Local design-preview harness (browser mock of the plugin) — dev-only, never shipped
+_preview/
+
 # OS noise
 .DS_Store

@@ -216,7 +216,7 @@ class OnboardingWizard extends Modal {
   render_country(c) {
     new Setting(c)
       .setName('Country')
-      .setDesc('Sets the default currency, amount formatting, bank-statement date order and the Tax view\'s return checklist (SARS, IRS, HMRC, …). You can still override the currency on the next steps.')
+      .setDesc('Sets the default currency, amount formatting, bank-statement date order and the Tax view\'s return checklist (tailored to your country\'s tax authority). You can still override the currency on the next steps.')
       .addDropdown(d => {
         for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
         d.setValue(this.data.country);
