@@ -271,6 +271,7 @@ function mountApp(view) {
     await ctx.loadVault(); closeDrawer(); render(); toast('Reloaded from disk');
   });
   $('#txSave').addEventListener('click', ctx.saveTransactions);
+  $('#txAdd').addEventListener('click', ctx.addTransaction);
   for (const id of ['txAccount', 'txCategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
   $('#txSearch').addEventListener('input', () => { clearTimeout(S._q); S._q = setTimeout(ctx.renderTransactions, 200); });
   $('#budSave').addEventListener('click', ctx.saveBudget);

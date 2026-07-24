@@ -425,6 +425,7 @@ var require_shell = __commonJS((exports2, module2) => {
             </div>
             <div class="row">
               <span id="txCount" class="count-note"></span>
+              <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> Add transaction</button>
               <button class="btn-gradient" id="txSave" disabled>Save changes</button>
             </div>
           </div>
@@ -690,6 +691,8 @@ var require_modal = __commonJS((exports2, module2) => {
               t.inputEl.type = "number";
               t.inputEl.step = "0.01";
             }
+            if (f.type === "date")
+              t.inputEl.type = "date";
             t.onChange((v) => {
               this.values[f.key] = v;
             });
@@ -1951,9 +1954,10 @@ var require_dashboard = __commonJS((exports2, module2) => {
 
 // src/views/transactions.js
 var require_transactions = __commonJS((exports2, module2) => {
-  var { el, escMd, patchFrontmatter } = require_util();
+  var { el, escMd, patchFrontmatter, normalizeAmount, safeSeg } = require_util();
+  var { askFields } = require_modal();
   module2.exports = function registerTransactions(ctx) {
-    const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
     const pendingLearns = new Map;
     function renderTransactions() {
       $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -2033,6 +2037,62 @@ var require_transactions = __commonJS((exports2, module2) => {
       return lines.join(`
 `);
     }
+    async function addTransaction() {
+      const labels = [...new Set([
+        ...S.accounts.map((a) => a.tx_label || a.name),
+        ...Object.values(S.txFiles).map((f) => f.label)
+      ])].sort();
+      if (!labels.length)
+        return toast("Add an account first — every transaction belongs to one", true);
+      const now = new Date;
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const r = await askFields(app, "Add transaction", [
+        { key: "date", label: "Date", type: "date", value: today },
+        { key: "desc", label: "Description", type: "text", placeholder: "e.g. Cash — vegetables at the market" },
+        { key: "label", label: "Account", type: "select", options: labels, value: $("#txAccount").value || labels[0] },
+        { key: "dir", label: "Direction", type: "select", value: "out", options: [
+          { value: "out", label: "Money out" },
+          { value: "in", label: "Money in" }
+        ] },
+        { key: "amount", label: "Amount", type: "number", placeholder: "0.00", desc: "Always positive — direction sets the sign" },
+        { key: "cat", label: "Category", type: "select", options: [
+          { value: "", label: "— none —" },
+          ...S.categories.map((c) => ({ value: c.name, label: c.name }))
+        ], value: "" },
+        { key: "note", label: "Note", type: "text", placeholder: "optional" }
+      ]);
+      if (!r)
+        return;
+      const date = r.date.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+        return toast("Date must be YYYY-MM-DD", true);
+      const desc = r.desc.trim();
+      if (!desc)
+        return toast("Description is required", true);
+      const label = safeSeg(r.label);
+      if (!label)
+        return toast("Invalid account name", true);
+      let amount = normalizeAmount(r.amount);
+      if (amount == null || amount === 0)
+        return toast("Amount must be a number other than 0", true);
+      amount = parseFloat((r.dir === "in" ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
+      const month = date.slice(0, 7);
+      const key = `${label}/${month}`;
+      const row = { date, desc, cat: r.cat, amount, excluded: false, note: (r.note || "").trim() };
+      const TX_FM = "tags: [finance, finance/budget, finance/budget/transactions]";
+      const existing = S.txFiles[key];
+      const fileModel = existing ? { ...existing, rows: existing.rows.concat([row]) } : { label, month, rows: [row], dirty: false, fmRaw: TX_FM };
+      try {
+        await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+      } catch (err) {
+        return toast(`Could not save the transaction (${err.message || err})`, true);
+      }
+      if (!S.txFiles[key])
+        S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
+      S.txFiles[key].rows.push(row);
+      renderTransactions();
+      toast(`Added ${money(amount)} · ${label} · ${month}`);
+    }
     async function saveTransactions() {
       let n = 0;
       for (const f of Object.values(S.txFiles)) {
@@ -2050,7 +2110,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       $("#txSave").disabled = true;
       toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
-    Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions });
+    Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions, addTransaction });
   };
 });
 
@@ -3609,6 +3669,7 @@ var require_controller = __commonJS((exports2, module2) => {
       toast("Reloaded from disk");
     });
     $("#txSave").addEventListener("click", ctx.saveTransactions);
+    $("#txAdd").addEventListener("click", ctx.addTransaction);
     for (const id of ["txAccount", "txCategory", "txWholeHistory"])
       $("#" + id).addEventListener("change", ctx.renderTransactions);
     $("#txSearch").addEventListener("input", () => {
@@ -3741,6 +3802,7 @@ var require_view = __commonJS((exports2, module2) => {
       }
       this.appCtl = null;
       this.contentEl.empty();
+      this.contentEl.style.height = "";
       this.contentEl.classList.remove("budget-app-root", "bud-dark");
     }
   }

@@ -2,13 +2,14 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, escMd, patchFrontmatter } = require('../util');
+const { el, escMd, patchFrontmatter, normalizeAmount, safeSeg } = require('../util');
+const { askFields } = require('../modal');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -85,6 +86,60 @@ module.exports = function registerTransactions(ctx) {
     return lines.join('\n');
   }
 
+  /* Manual entry — cash spends, transfers, savings deposits, anything that
+     never reaches a bank CSV. Written to disk immediately (same lockstep
+     pattern as the CSV import commit), so there's nothing extra to save. */
+  async function addTransaction() {
+    const labels = [...new Set([
+      ...S.accounts.map(a => a.tx_label || a.name),
+      ...Object.values(S.txFiles).map(f => f.label)])].sort();
+    if (!labels.length) return toast('Add an account first — every transaction belongs to one', true);
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const r = await askFields(app, 'Add transaction', [
+      { key: 'date', label: 'Date', type: 'date', value: today },
+      { key: 'desc', label: 'Description', type: 'text', placeholder: 'e.g. Cash — vegetables at the market' },
+      { key: 'label', label: 'Account', type: 'select', options: labels, value: $('#txAccount').value || labels[0] },
+      { key: 'dir', label: 'Direction', type: 'select', value: 'out', options: [
+        { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }] },
+      { key: 'amount', label: 'Amount', type: 'number', placeholder: '0.00', desc: 'Always positive — direction sets the sign' },
+      { key: 'cat', label: 'Category', type: 'select', options: [
+        { value: '', label: '— none —' }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: '' },
+      { key: 'note', label: 'Note', type: 'text', placeholder: 'optional' },
+    ]);
+    if (!r) return;
+    const date = r.date.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Date must be YYYY-MM-DD', true);
+    const desc = r.desc.trim();
+    if (!desc) return toast('Description is required', true);
+    const label = safeSeg(r.label);
+    if (!label) return toast('Invalid account name', true);
+    let amount = normalizeAmount(r.amount);
+    if (amount == null || amount === 0) return toast('Amount must be a number other than 0', true);
+    amount = parseFloat((r.dir === 'in' ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
+
+    const month = date.slice(0, 7);
+    const key = `${label}/${month}`;
+    const row = { date, desc, cat: r.cat, amount, excluded: false, note: (r.note || '').trim() };
+    const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
+    // Write first, then mirror into S.txFiles — memory never models a row the
+    // disk doesn't have. serializeTxFile gets a cloned rows array (concat), so
+    // a failed write leaves the live model untouched.
+    const existing = S.txFiles[key];
+    const fileModel = existing
+      ? { ...existing, rows: existing.rows.concat([row]) }
+      : { label, month, rows: [row], dirty: false, fmRaw: TX_FM };
+    try {
+      await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+    } catch (err) {
+      return toast(`Could not save the transaction (${err.message || err})`, true);
+    }
+    if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
+    S.txFiles[key].rows.push(row);
+    renderTransactions();
+    toast(`Added ${money(amount)} · ${label} · ${month}`);
+  }
+
   async function saveTransactions() {
     let n = 0;
     for (const f of Object.values(S.txFiles)) {
@@ -101,5 +156,5 @@ module.exports = function registerTransactions(ctx) {
     toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
-  Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions });
+  Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions, addTransaction });
 };
