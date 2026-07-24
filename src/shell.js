@@ -188,6 +188,7 @@ const SHELL_HTML = `
           <div class="body-pad">
             <p id="taxEmptyIntro">Track a tax return season here — progress steps, the documents
               you need and the files themselves, stored in the vault.</p>
+            <p class="text-muted" id="taxEmptyHint" style="font-size:12.5px"></p>
             <p style="margin-top:1.2rem"><button class="btn-gradient" id="taxStart" style="padding:0.55rem 1.5rem"></button></p>
           </div>
         </div>

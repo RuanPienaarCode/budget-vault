@@ -19,6 +19,15 @@ module.exports = function registerTax(ctx) {
   const T = () => S.tax[S.taxYear];
   const mark = () => { S.taxDirty = true; $('#taxSave').disabled = false; };
 
+  /* Shown on the empty card and in the Season card. The seeded steps, docs and
+     deadline dates are country-profile defaults, not authoritative guidance. */
+  function disclaimer() {
+    const a = locale().authority;
+    return 'This tracker is a personal checklist, not tax advice. Seeded steps, documents and ' +
+      `deadline dates are editable starting points that change from year to year — confirm anything ` +
+      `important with ${a === 'Tax' ? 'your tax authority' : a} or a registered tax professional.`;
+  }
+
   /* ------------------------------ render -------------------------------- */
   function renderTax() {
     const loc = locale();
@@ -27,6 +36,9 @@ module.exports = function registerTax(ctx) {
     $('#taxContent').classList.toggle('hidden', !years.length);
     if (!years.length) {
       $('#taxEmptyIntro').textContent = loc.taxIntro;
+      $('#taxEmptyHint').textContent =
+        `Labels, tax-year dates and the starter checklist follow your country — currently ${loc.label}, ` +
+        'changeable in the plugin settings. ' + disclaimer();
       $('#taxStart').textContent = `Start tracking the ${currentTaxYear()} tax year`;
       return;
     }
@@ -92,7 +104,8 @@ module.exports = function registerTax(ctx) {
         placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_provisional = e.target.value.trim(); mark(); renderTax(); } }))));
 
     b.append(el('p', { class: 'tax-season-msg' }, loc.seasonMsgs(t).join(' ')));
-    b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' }, loc.safetyNote));
+    b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0 0 6px' }, loc.safetyNote));
+    b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' }, disclaimer()));
   }
 
   const STEP_CYCLE = { todo: 'busy', busy: 'done', done: 'n/a', 'n/a': 'todo' };
