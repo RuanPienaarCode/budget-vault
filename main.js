@@ -469,6 +469,7 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad">
             <p id="taxEmptyIntro">Track a tax return season here — progress steps, the documents
               you need and the files themselves, stored in the vault.</p>
+            <p class="text-muted" id="taxEmptyHint" style="font-size:12.5px"></p>
             <p style="margin-top:1.2rem"><button class="btn-gradient" id="taxStart" style="padding:0.55rem 1.5rem"></button></p>
           </div>
         </div>
@@ -2676,7 +2677,25 @@ var require_services = __commonJS((exports2, module2) => {
               mark();
               renderServices();
             }
-          })), el("td", { class: "text-muted" }, s.cycle), el("td", { class: "text-muted" }, s.next || "—"), el("td", {}, el("input", {
+          })), el("td", {}, el("select", {
+            class: "form-select form-select-sm",
+            "aria-label": `Billing cycle for ${s.name}`,
+            onchange: (e) => {
+              s.cycle = e.target.value === "annual" ? "annual" : "monthly";
+              mark();
+              renderServices();
+            }
+          }, el("option", { value: "monthly", ...s.cycle === "monthly" ? { selected: "" } : {} }, "monthly"), el("option", { value: "annual", ...s.cycle === "annual" ? { selected: "" } : {} }, "annual"))), el("td", {}, el("input", {
+            type: "date",
+            class: "form-control form-control-sm",
+            value: s.next,
+            style: "width:140px",
+            "aria-label": `Next billing date for ${s.name}`,
+            onchange: (e) => {
+              s.next = e.target.value.trim();
+              mark();
+            }
+          })), el("td", {}, el("input", {
             type: "checkbox",
             ...s.active ? { checked: "" } : {},
             onchange: (e) => {
@@ -2731,7 +2750,12 @@ var require_services = __commonJS((exports2, module2) => {
       const r = await askFields(app, "New service", [
         { key: "name", label: "Service name", type: "text" },
         { key: "provider", label: "Provider", type: "text" },
-        { key: "amount", label: "Monthly amount", type: "number", value: "0" },
+        { key: "amount", label: "Amount per billing cycle", type: "number", value: "0" },
+        { key: "cycle", label: "Billing cycle", type: "select", value: "monthly", options: [
+          { value: "monthly", label: "Monthly" },
+          { value: "annual", label: "Annual" }
+        ] },
+        { key: "next", label: "Next billing (optional)", type: "date" },
         { key: "category", label: "Budget category", type: "select", options: ["", ...S.categories.map((c) => c.name)], value: "" }
       ]);
       if (!r || !r.name.trim())
@@ -2739,7 +2763,17 @@ var require_services = __commonJS((exports2, module2) => {
       const amount = parseFloat(String(r.amount).replace(",", "."));
       if (isNaN(amount))
         return toast("Not a number", true);
-      S.services.push({ name: r.name.trim(), provider: (r.provider || "").trim(), amount, cycle: "monthly", next: "", category: (r.category || "").trim(), active: true, notes: "" });
+      const next = /^\d{4}-\d{2}-\d{2}$/.test((r.next || "").trim()) ? r.next.trim() : "";
+      S.services.push({
+        name: r.name.trim(),
+        provider: (r.provider || "").trim(),
+        amount,
+        cycle: r.cycle === "annual" ? "annual" : "monthly",
+        next,
+        category: (r.category || "").trim(),
+        active: true,
+        notes: ""
+      });
       S.servicesDirty = true;
       $("#svcSave").disabled = false;
       renderServices();
@@ -2762,6 +2796,10 @@ var require_tax = __commonJS((exports2, module2) => {
       S.taxDirty = true;
       $("#taxSave").disabled = false;
     };
+    function disclaimer() {
+      const a = locale().authority;
+      return "This tracker is a personal checklist, not tax advice. Seeded steps, documents and " + `deadline dates are editable starting points that change from year to year — confirm anything ` + `important with ${a === "Tax" ? "your tax authority" : a} or a registered tax professional.`;
+    }
     function renderTax() {
       const loc = locale();
       const years = Object.keys(S.tax).sort();
@@ -2769,6 +2807,7 @@ var require_tax = __commonJS((exports2, module2) => {
       $("#taxContent").classList.toggle("hidden", !years.length);
       if (!years.length) {
         $("#taxEmptyIntro").textContent = loc.taxIntro;
+        $("#taxEmptyHint").textContent = `Labels, tax-year dates and the starter checklist follow your country — currently ${loc.label}, ` + "changeable in the plugin settings. " + disclaimer();
         $("#taxStart").textContent = `Start tracking the ${currentTaxYear()} tax year`;
         return;
       }
@@ -2850,7 +2889,8 @@ var require_tax = __commonJS((exports2, module2) => {
         }
       }))));
       b.append(el("p", { class: "tax-season-msg" }, loc.seasonMsgs(t).join(" ")));
-      b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, loc.safetyNote));
+      b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0 0 6px" }, loc.safetyNote));
+      b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, disclaimer()));
     }
     const STEP_CYCLE = { todo: "busy", busy: "done", done: "n/a", "n/a": "todo" };
     const STEP_LABEL = { todo: "To do", busy: "Busy", done: "Done", "n/a": "N/A" };
