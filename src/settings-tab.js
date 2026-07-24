@@ -102,7 +102,7 @@ class BudgetSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Country')
-      .setDesc('Drives amount formatting, bank-statement date order and the Tax view\'s checklist (SARS, IRS, HMRC, …). Existing tax years keep their data — only labels and new-year seeds change.')
+      .setDesc('Drives amount formatting, bank-statement date order and the Tax view\'s checklist (tailored to your country\'s tax authority). Existing tax years keep their data — only labels and new-year seeds change.')
       .addDropdown(d => {
         for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
         const cur = (md.country ?? 'za').toString().trim().toLowerCase();
