@@ -121,7 +121,7 @@ const SHELL_HTML = `
               <div class="sub" id="dashBudgetSub"></div>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="dashBudget"></table></div>
           </div>
         </div>
@@ -148,7 +148,7 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="txSave" disabled>Save changes</button>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table table-hover" id="txTable"></table></div>
           </div>
         </div>
@@ -171,7 +171,7 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="budSave" disabled>Save budget</button>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="budTable"></table></div>
           </div>
         </div>
@@ -215,7 +215,7 @@ const SHELL_HTML = `
                 <button class="btn-gradient" id="taxSave" disabled>Save changes</button>
               </div>
             </div>
-            <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+            <div class="body-pad body-pad-tight">
               <div class="table-responsive"><table class="table table-hover" id="taxStepsTable"></table></div>
             </div>
           </div>
@@ -227,7 +227,7 @@ const SHELL_HTML = `
                 <button class="btn-ghost" id="taxAddDoc"><span class="ico" data-ico="plus"></span> Add document</button>
               </div>
             </div>
-            <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+            <div class="body-pad body-pad-tight">
               <button type="button" class="upload-area" id="taxDrop" aria-controls="taxFileInput">
                 <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
                 <span class="ua-line">Drop a tax document here, or click to choose a file.</span>
@@ -283,7 +283,7 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="owedSave" disabled>Save changes</button>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table table-hover" id="owedTable"></table></div>
           </div>
         </div>
@@ -303,7 +303,7 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="svcSave" disabled>Save changes</button>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table table-hover" id="svcTable"></table></div>
           </div>
         </div>
@@ -357,7 +357,7 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="impCommit">Import rows</button>
             </div>
           </div>
-          <div class="body-pad" style="padding-left:20px;padding-right:20px;padding-top:14px">
+          <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table table-hover" id="impTable"></table></div>
           </div>
         </div>
