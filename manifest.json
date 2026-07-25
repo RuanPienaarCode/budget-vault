@@ -1,9 +1,9 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "minAppVersion": "1.4.0",
-  "description": "Take charge of your money — track spending, budgets, savings, accounts and tax, and import your bank statements in a tap. Your data stays yours: private files on your own devices, no account, no cloud, no subscription. Works on phone and computer.",
+  "description": "Take charge of your money \u2014 track spending, budgets, savings, accounts and tax, and import your bank statements in a tap. Your data stays yours: private files on your own devices, no account, no cloud, no subscription. Works on phone and computer.",
   "author": "Ruan Pienaar",
   "isDesktopOnly": false
 }

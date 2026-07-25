@@ -502,6 +502,11 @@
 .budget-app-root .card-h h2 { font-size: 18px; font-weight: 600; letter-spacing: .2px; margin: 0; color: var(--text-primary); }
 .budget-app-root .card-h .sub { font-size: 13px; color: var(--ink-faint); letter-spacing: .3px; margin-top: 5px; }
 .budget-app-root .body-pad { padding: 20px 44px 40px; }
+/* Table-bearing card bodies want narrower side gutters than the 44px default
+   so wide tables get more room. Was an inline style per card; moved to a class
+   so the mobile rule below can flush it to the card edge (inline can't be
+   overridden by a stylesheet without !important). */
+.budget-app-root .body-pad-tight { padding-left: 20px; padding-right: 20px; padding-top: 14px; }
 @media (max-width: 768px) {
   .budget-app-root .card-h { padding: 24px 20px 0; }
   .budget-app-root .body-pad { padding: 16px 20px 28px; }
@@ -979,6 +984,10 @@
 
   .budget-app-root .card-h { padding: 18px 14px 0; }
   .budget-app-root .body-pad { padding: 14px 14px 22px; }
+  /* Table cards go fully edge-to-edge on mobile — the .table-responsive scroll
+     region then owns the full card width (cell padding still keeps text off the
+     rim). Overrides the desktop .body-pad-tight side gutters above. */
+  .budget-app-root .body-pad-tight { padding-left: 0; padding-right: 0; }
   .budget-app-root .card-h h2 { font-size: 17px; }
   .budget-app-root .hero { padding: 24px 16px; }
 
