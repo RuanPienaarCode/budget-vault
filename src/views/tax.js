@@ -10,7 +10,7 @@ const { el, escMd, icoEl, safeSeg, patchFrontmatter } = require('../util');
 const { askFields, confirmModal } = require('../modal');
 
 module.exports = function registerTax(ctx) {
-  const { S, $, app, toast, writeFile, writeBinary, fileAt, locale } = ctx;
+  const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
 
   /* The tax year we'd be dealing with today, per the country profile. */
   function currentTaxYear() {
@@ -54,7 +54,29 @@ module.exports = function registerTax(ctx) {
     renderTaxKpis(t);
     renderSeason(t);
     renderSteps(t);
+    renderFigures(t);
     renderDocs(t);
+    renderOrphanYears();
+  }
+
+  /* Prior-year folders with no page behind them are invisible to the year
+     picker — offer to seed a page rather than leaving the files stranded. */
+  function renderOrphanYears() {
+    const box = $('#taxSubNote');
+    const orphans = (S.taxOrphanYears || []).filter(y => !S.tax[y]);
+    if (!orphans.length) return;
+    box.append(' · ');
+    for (const y of orphans) {
+      const b = el('button', { class: 'btn-ghost', style: 'padding:0.1rem 0.5rem;font-size:0.78rem',
+        'aria-label': `Create a tax page for ${y}, which already has documents` }, `Tax/${y}/ has files — add ${y}`);
+      b.addEventListener('click', async () => {
+        seedTaxYear(+y);
+        S.taxYear = y;
+        await saveTax();
+        renderTax();
+      });
+      box.append(b);
+    }
   }
 
   function activeDeadline(t) {
@@ -81,6 +103,7 @@ module.exports = function registerTax(ctx) {
     const docs = t.docs.filter(x => x.status !== 'n/a');
     const ready = docs.filter(x => x.status === 'uploaded').length;
     tile('Documents in', `${ready} / ${docs.length}`, ready === docs.length && docs.length ? 'text-success' : '');
+    tile('Figures', String((t.figures || []).length));
     const typeLabel = (locale().taxpayerTypes.find(([v]) => v === t.taxpayer_type) || [])[1];
     tile('Taxpayer', typeLabel || 'Unknown');
   }
@@ -103,9 +126,96 @@ module.exports = function registerTax(ctx) {
       field(loc.deadlineLabels[1], el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_provisional,
         placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_provisional = e.target.value.trim(); mark(); renderTax(); } }))));
 
+    // Outcome fields only once there is an outcome — they are noise before it.
+    if (t.assessment === 'assessed') {
+      const num = (label, key, placeholder) => field(label, el('input', { type: 'text',
+        class: 'form-control form-control-sm', value: t[key] === null || t[key] === undefined ? '' : String(t[key]),
+        placeholder, onchange: e => {
+          const raw = e.target.value.trim();
+          const n = Number(raw.replace(/[^\d.-]/g, ''));
+          t[key] = raw === '' ? null : (Number.isFinite(n) ? n : null);
+          mark(); renderTax();
+        } }));
+      b.append(el('div', { class: 'row tax-season-row' },
+        field('Assessment date', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_date,
+          placeholder: 'YYYY-MM-DD', onchange: e => { t.assessment_date = e.target.value.trim(); mark(); renderTax(); } })),
+        field('Reference', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_ref,
+          placeholder: 'Notice / document no.', onchange: e => { t.assessment_ref = e.target.value.trim(); mark(); } })),
+        num('Result (− = refund)', 'assessment_result', '-1250.00'),
+        num('Taxable income assessed', 'assessment_income', '0.00')));
+    }
+
     b.append(el('p', { class: 'tax-season-msg' }, loc.seasonMsgs(t).join(' ')));
+
+    // Locale-aware checks over the captured figures. The profile decides what
+    // is worth saying; the view only picks the callout colour.
+    for (const m of loc.figureChecks(t.figures || [], +S.taxYear, t) || []) {
+      b.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
+        icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
+    }
+
     b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0 0 6px' }, loc.safetyNote));
     b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' }, disclaimer()));
+  }
+
+  /* ------------------------------ figures -------------------------------- */
+  function renderFigures(t) {
+    const loc = locale();
+    const figures = t.figures || (t.figures = []);
+    $('#taxFiguresSub').textContent =
+      'Amounts from your certificates, by source code — what the documents actually say, so the checks above have something to read.';
+
+    const tbl = $('#taxFiguresTable'); tbl.innerHTML = '';
+    tbl.append(el('thead', {}, el('tr', {},
+      el('th', { scope: 'col' }, loc.figureCodeLabel), el('th', { scope: 'col' }, 'Description'),
+      el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
+      el('th', { scope: 'col' }, ''))));
+
+    const body = el('tbody', {});
+    // Free text doesn't feed the totals or the checks, so it only marks dirty —
+    // same as the Steps/Docs notes fields. Code and amount do re-render.
+    const txt = (obj, key, width) => el('input', { type: 'text', class: 'form-control form-control-sm',
+      value: obj[key], style: `min-width:${width}`, onchange: e => { obj[key] = e.target.value; mark(); } });
+    for (const f of figures) {
+      body.append(el('tr', {},
+        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code, style: 'width:90px',
+          onchange: e => { f.code = e.target.value.trim(); mark(); renderTax(); } })),
+        el('td', {}, txt(f, 'description', '180px')),
+        el('td', {}, txt(f, 'source', '140px')),
+        el('td', { class: 'num' }, el('input', { type: 'text', class: 'form-control form-control-sm num', style: 'width:130px',
+          value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
+          onchange: e => {
+            const n = Number(e.target.value.replace(/[^\d.-]/g, ''));
+            f.amount = Number.isFinite(n) ? n : 0; mark(); renderTax();
+          } })),
+        el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
+          'aria-label': `Remove figure ${f.code}`,
+          onclick: () => { figures.splice(figures.indexOf(f), 1); mark(); renderTax(); } }, '✕'))));
+    }
+    if (!figures.length) {
+      body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' },
+        'No figures yet — add the amounts off your certificates to unlock the checks.')));
+    }
+    tbl.append(body);
+
+    // Totals grouped by code: one row per code, which is the shape a return
+    // asks for (three banks' interest is one 4201 line, not three).
+    if (figures.length) {
+      const byCode = new Map();
+      for (const f of figures) {
+        const k = (f.code || '').trim() || '—';
+        byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
+      }
+      const foot = el('tfoot', {});
+      for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
+        foot.append(el('tr', { class: 'tax-fig-total' },
+          el('td', { style: 'font-weight:600' }, code),
+          el('td', { colspan: '2', class: 'text-muted' }, `Total for ${code}`),
+          el('td', { class: 'num', style: 'font-weight:600' }, money(total)),
+          el('td', {})));
+      }
+      tbl.append(foot);
+    }
   }
 
   const STEP_CYCLE = { todo: 'busy', busy: 'done', done: 'n/a', 'n/a': 'todo' };
@@ -159,16 +269,20 @@ module.exports = function registerTax(ctx) {
       // (and the file itself) stays.
       pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderTax(); });
 
-      let fileCell;
-      if (d.file) {
-        fileCell = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': `Open ${d.file}` },
-          icoEl(['paperclip']), d.file);
-        fileCell.addEventListener('click', () => openDoc(d.file));
-      } else {
-        fileCell = el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
-          'aria-label': `Upload file for ${d.name}` }, icoEl(['cloud-upload', 'upload-cloud']), ' Upload');
-        fileCell.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
+      // A row can carry several certificates — providers routinely issue an
+      // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
+      const fileCell = el('div', { class: 'tax-doc-files' });
+      for (const name of fileList(d)) {
+        const link = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': `Open ${name}` },
+          icoEl(['paperclip']), name);
+        link.addEventListener('click', () => openDoc(name));
+        fileCell.append(link);
       }
+      const addBtn = el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
+        'aria-label': `${d.file ? 'Add another file to' : 'Upload file for'} ${d.name}` },
+        icoEl(['cloud-upload', 'upload-cloud']), d.file ? ' Add' : ' Upload');
+      addBtn.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
+      fileCell.append(addBtn);
       body.append(el('tr', { class: d.status === 'n/a' ? 'svc-inactive' : '' },
         el('td', { style: 'font-weight:600' }, d.name),
         el('td', { class: 'text-muted' }, d.source),
@@ -179,9 +293,10 @@ module.exports = function registerTax(ctx) {
         el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
           'aria-label': `Remove document ${d.name}`,
           onclick: async () => {
-            const go = !d.file || await confirmModal(app, {
+            const kept = fileList(d);
+            const go = !kept.length || await confirmModal(app, {
               title: 'Remove document row',
-              message: `Remove "${d.name}" from the list? The uploaded file ${d.file} stays in Tax/${S.taxYear}/ — delete it from the vault yourself if you want it gone.`,
+              message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
               confirmText: 'Remove row',
             });
             if (!go) return;
@@ -191,6 +306,15 @@ module.exports = function registerTax(ctx) {
     if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
     tbl.append(body);
   }
+
+  /* The File cell holds a ';'-separated list. A bare filename parses as a
+     one-element list, so pages written before this stay readable. safeSeg
+     doesn't touch ';', so taxSeg strips it too — otherwise a filename
+     containing one would split into two phantom entries on the next load. */
+  const FILE_SEP = ';';
+  const taxSeg = s => safeSeg(s).replace(/;/g, '-');
+  const fileList = d => (d.file || '').split(FILE_SEP).map(s => s.trim()).filter(Boolean);
+  const setFileList = (d, names) => { d.file = names.join(`${FILE_SEP} `); };
 
   function openDoc(name) {
     const f = fileAt(`Tax/${S.taxYear}/${name}`);
@@ -206,6 +330,20 @@ module.exports = function registerTax(ctx) {
     const t = T();
     let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
     pendingDocTarget = null;
+
+    const buf = await file.arrayBuffer();
+
+    // A re-sent certificate is byte-identical to the one already filed —
+    // uniquifying the name would keep both. Match on content instead.
+    const dupe = await findDuplicate(buf);
+    if (dupe) {
+      const reuse = await confirmModal(app, {
+        title: 'Already in this tax year',
+        message: `"${file.name}" is byte-identical to ${dupe}, already stored in Tax/${S.taxYear}/. Point the row at the existing file instead of saving a second copy?`,
+        confirmText: 'Use the existing file',
+      });
+      if (reuse) return attachExisting(t, dupe);
+    }
 
     if (!target) {
       const NEW = '＋ New document row';
@@ -227,7 +365,7 @@ module.exports = function registerTax(ctx) {
       }
     }
 
-    let name = safeSeg(file.name) || 'document';
+    let name = taxSeg(file.name) || 'document';
     // Uniquify so a re-upload never silently overwrites an earlier certificate.
     if (fileAt(`Tax/${S.taxYear}/${name}`)) {
       const dot = name.lastIndexOf('.');
@@ -237,16 +375,82 @@ module.exports = function registerTax(ctx) {
       name = `${stem} (${i})${ext}`;
     }
     try {
-      await writeBinary(`Tax/${S.taxYear}/${name}`, await file.arrayBuffer());
+      await writeBinary(`Tax/${S.taxYear}/${name}`, buf);
     } catch (e) {
       return toast(e.message || String(e), true);
     }
-    target.file = name;
+    setFileList(target, [...fileList(target), name]);
     target.status = 'uploaded';
+
+    // Most tax certificates ship password-protected, and Obsidian's PDF viewer
+    // can't open those — say so on the row rather than letting the link fail
+    // silently later. Detection only; decrypting is not the plugin's job.
+    if (isEncryptedPdf(buf)) {
+      const hint = 'Password-protected — open outside Obsidian.';
+      if (!target.notes.includes(hint)) target.notes = target.notes ? `${target.notes} ${hint}` : hint;
+      toast(`Uploaded ${name} — password-protected, so it won't preview in Obsidian.`);
+    } else {
+      toast(`Uploaded ${name}`);
+    }
     // The binary is already on disk — save the markdown too so the two never
     // drift apart (an unsaved row pointing at a saved file, or vice versa).
     await saveTax();
-    toast(`Uploaded ${name}`);
+  }
+
+  /* SHA-256 over the upload, compared against everything already filed for the
+     year. Re-hashing a handful of small PDFs per upload is cheaper than the
+     schema change a stored-hash column would need. */
+  async function findDuplicate(buf) {
+    const digest = async b => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', b)))
+      .map(x => x.toString(16).padStart(2, '0')).join('');
+    let mine;
+    try { mine = await digest(buf); } catch { return null; }   // no subtle crypto → skip the check
+    const seen = new Set();
+    for (const d of T().docs) for (const n of fileList(d)) seen.add(n);
+    for (const n of seen) {
+      const f = fileAt(`Tax/${S.taxYear}/${n}`);
+      if (!f) continue;
+      try {
+        if (await digest(await app.vault.readBinary(f)) === mine) return n;
+      } catch { /* unreadable — treat as not-a-match */ }
+    }
+    return null;
+  }
+
+  async function attachExisting(t, name) {
+    const NEW = '＋ New document row';
+    const rows = t.docs.map(d => `${d.name} — ${d.source}`);
+    const r = await askFields(app, `Point a row at "${name}"`, [
+      { key: 'to', label: 'Attach to', type: 'select', options: [...rows, NEW], value: rows[0] ?? NEW },
+    ]);
+    if (!r) return;
+    let target;
+    if (r.to === NEW) {
+      const n = await askFields(app, 'New document', [
+        { key: 'name', label: 'Document name', type: 'text', value: name.replace(/\.[^.]+$/, '') },
+        { key: 'source', label: 'Source', type: 'text' },
+      ]);
+      if (!n || !n.name.trim()) return;
+      target = { name: n.name.trim(), source: (n.source || '').trim(), status: 'needed', file: '', notes: '' };
+      t.docs.push(target);
+    } else {
+      target = t.docs[rows.indexOf(r.to)];
+    }
+    if (!fileList(target).includes(name)) setFileList(target, [...fileList(target), name]);
+    target.status = 'uploaded';
+    await saveTax();
+    renderTax();
+    toast(`Linked ${name} — no second copy written.`);
+  }
+
+  /* A PDF trailer carrying /Encrypt is password-protected. Scan the tail, where
+     the trailer lives, rather than the whole buffer. */
+  function isEncryptedPdf(buf) {
+    const bytes = new Uint8Array(buf);
+    if (bytes.length < 5 || bytes[0] !== 0x25 || bytes[1] !== 0x50) return false;   // not "%P…"
+    const tail = bytes.subarray(Math.max(0, bytes.length - 4096));
+    const s = Array.from(tail).map(b => String.fromCharCode(b)).join('');
+    return s.includes('/Encrypt');
   }
 
   /* ------------------------------ persist -------------------------------- */
@@ -256,6 +460,9 @@ module.exports = function registerTax(ctx) {
       kind: 'tax', tax_year: year,
       taxpayer_type: t.taxpayer_type, assessment: t.assessment,
       deadline_standard: t.deadline_standard || null, deadline_provisional: t.deadline_provisional || null,
+      assessment_date: t.assessment_date || null, assessment_ref: t.assessment_ref || null,
+      assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result : null,
+      assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income : null,
     });
     const loc = locale();
     const lines = ['---', ...fm.split('\n'), '---', '', `# Tax Year ${year}`, '',
@@ -270,6 +477,14 @@ module.exports = function registerTax(ctx) {
       '| Document | Source | Status | File | Notes |',
       '|----------|--------|--------|------|-------|');
     for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${d.status} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+    // Emit the header even when empty so the section is discoverable in the
+    // raw file rather than appearing only once a figure is added.
+    lines.push('', '## Figures', '',
+      `| ${loc.figureCodeLabel} | Description | Source | Amount |`,
+      '|------|-------------|--------|--------|');
+    for (const f of (t.figures || [])) {
+      lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${Number(f.amount || 0).toFixed(2)} |`);
+    }
     lines.push('');
     return lines.join('\n');
   }
@@ -302,14 +517,33 @@ module.exports = function registerTax(ctx) {
     mark(); renderTax();
   }
 
+  async function addTaxFigure() {
+    if (!S.taxYear) return;
+    const r = await askFields(app, 'New figure', [
+      { key: 'code', label: locale().figureCodeLabel, type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'source', label: 'Source (which certificate)', type: 'text' },
+      { key: 'amount', label: 'Amount', type: 'text', placeholder: '0.00' },
+    ]);
+    if (!r || !r.code.trim()) return;
+    const n = Number((r.amount || '').replace(/[^\d.-]/g, ''));
+    T().figures.push({
+      code: r.code.trim(), description: (r.description || '').trim(),
+      source: (r.source || '').trim(), amount: Number.isFinite(n) ? n : 0,
+    });
+    mark(); renderTax();
+  }
+
   function seedTaxYear(year) {
     const loc = locale();
     S.tax[String(year)] = {
       fmRaw: '',
       taxpayer_type: loc.defaultTaxpayerType, assessment: loc.defaultAssessment,
+      assessment_date: '', assessment_ref: '', assessment_result: null, assessment_income: null,
       ...loc.seedDeadlines(year),
       steps: loc.seedSteps(year).map(s => ({ status: 'todo', due: '', notes: '', ...s })),
       docs: loc.seedDocs().map(d => ({ status: 'needed', file: '', notes: '', ...d })),
+      figures: [],
     };
   }
 
@@ -352,5 +586,5 @@ module.exports = function registerTax(ctx) {
     renderTax();
   }
 
-  Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, newTaxYear, startTax, changeTaxYear, handleTaxFile });
+  Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile });
 };

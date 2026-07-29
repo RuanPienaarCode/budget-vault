@@ -475,7 +475,7 @@ var require_shell = __commonJS((exports2, module2) => {
         </div>
 
         <div id="taxContent">
-          <div class="mini-grid mini-kpis-4 mb-4" id="taxKpis"></div>
+          <div class="mini-grid mini-kpis-5 mb-4" id="taxKpis"></div>
 
           <div class="card mb-4">
             <div class="card-h" style="align-items:center">
@@ -498,6 +498,18 @@ var require_shell = __commonJS((exports2, module2) => {
             </div>
             <div class="body-pad body-pad-tight">
               <div class="table-responsive"><table class="table table-hover" id="taxStepsTable"></table></div>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-h" style="align-items:center">
+              <div><h2>Figures</h2><div class="sub" id="taxFiguresSub"></div></div>
+              <div class="row">
+                <button class="btn-ghost" id="taxAddFigure"><span class="ico" data-ico="plus"></span> Add figure</button>
+              </div>
+            </div>
+            <div class="body-pad body-pad-tight">
+              <div class="table-responsive"><table class="table table-hover" id="taxFiguresTable"></table></div>
             </div>
           </div>
 
@@ -752,10 +764,59 @@ var require_modal = __commonJS((exports2, module2) => {
 
 // src/locale.js
 var require_locale = __commonJS((exports2, module2) => {
+  var fmtAmt = (p, v) => {
+    const parts = Math.abs(v).toFixed(2).split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, p.thousands);
+    return (v < 0 ? "-" : "") + p.currency + parts.join(p.decimal);
+  };
+  var sumCodes = (figures, ...codes) => (figures || []).filter((f) => codes.includes((f.code || "").trim())).reduce((a, f) => a + (f.amount || 0), 0);
+  var ZA_INCOME_CODES = [
+    "3601",
+    "3605",
+    "3606",
+    "3610",
+    "3615",
+    "3616",
+    "3617",
+    "3699",
+    "3701",
+    "3702",
+    "3707",
+    "3713",
+    "3718",
+    "3801",
+    "3802",
+    "3805",
+    "3806",
+    "3808",
+    "3810"
+  ];
+  var reconcileAssessed = (p, figures, t, employmentCodes) => {
+    if (!t || t.assessment !== "assessed" || typeof t.assessment_income !== "number")
+      return [];
+    if (!employmentCodes || !employmentCodes.length)
+      return [];
+    const fmt = (v) => fmtAmt(p, v);
+    const rows = (figures || []).filter((f) => (f.amount || 0) > 0);
+    if (!rows.length)
+      return [];
+    const employment = sumCodes(figures, ...employmentCodes);
+    const others = rows.filter((f) => !employmentCodes.includes((f.code || "").trim()));
+    const msgs = [];
+    if (employment > 0 && t.assessment_income < employment - 1) {
+      msgs.push({ ok: false, text: `Assessed taxable income ${fmt(t.assessment_income)} is below your captured employment income ${fmt(employment)} — check the assessment against your certificates.` });
+    } else if (employment > 0 && Math.abs(t.assessment_income - employment) <= 1 && others.length) {
+      msgs.push({ ok: false, text: `Assessed taxable income ${fmt(t.assessment_income)} matches your employment income exactly, so none of the other ${others.length} captured figure${others.length === 1 ? "" : "s"} reached it. Confirm each was exempt rather than omitted — if any was trade income, a correction is due before the deadline.` });
+    } else if (employment > 0) {
+      msgs.push({ ok: true, text: `Assessed taxable income ${fmt(t.assessment_income)} is consistent with the ${fmt(employment)} of employment income captured.` });
+    }
+    return msgs;
+  };
   var genericTax = (authority) => ({
     authority,
     taxIntro: `Track a ${authority === "Tax" ? "tax" : authority} return season here — progress steps, the documents you need and where each one comes from, with the files themselves stored in your vault.`,
     yearHint: "Tax year (calendar year)",
+    figureCodeLabel: "Code",
     yearSpan: (y) => `Jan – Dec ${y}`,
     currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
     seedDeadlines: () => ({ deadline_standard: "", deadline_provisional: "" }),
@@ -771,8 +832,12 @@ var require_locale = __commonJS((exports2, module2) => {
     assessments: [
       ["submit-requested", "Return required"],
       ["auto-assessed", "No return required this year"],
+      ["assessed", "Assessed — notice received"],
       ["unknown", "Not checked yet"]
     ],
+    figureChecks() {
+      return [];
+    },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === "submit-requested")
@@ -816,6 +881,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "SARS",
       taxIntro: "Track a SARS return season here — progress steps, the documents you need (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.",
       yearHint: "Tax year (ends Feb of this year)",
+      figureCodeLabel: "Source code",
       yearSpan: (y) => `1 Mar ${y - 1} – end Feb ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1,
       seedDeadlines: (y) => ({ deadline_standard: `${y}-10-23`, deadline_provisional: `${y + 1}-01-22` }),
@@ -831,8 +897,35 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "SARS asked me to submit"],
         ["auto-assessed", "Auto-assessed"],
+        ["assessed", "Assessed — ITA34 received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks(figures, year, t) {
+        const fmt = (v) => fmtAmt(this, v);
+        const msgs = [];
+        const localInterest = sumCodes(figures, "4201");
+        if (localInterest > 0) {
+          const exempt = 23800;
+          msgs.push(localInterest <= exempt ? { ok: true, text: `Local interest ${fmt(localInterest)} is under the ${fmt(exempt)} under-65 exemption — ${fmt(exempt - localInterest)} of headroom.` } : { ok: false, text: `Local interest ${fmt(localInterest)} exceeds the ${fmt(exempt)} under-65 exemption — ${fmt(localInterest - exempt)} is taxable.` });
+        }
+        const foreignInterest = sumCodes(figures, "4218");
+        if (foreignInterest > 0) {
+          msgs.push({ ok: true, text: `Foreign interest ${fmt(foreignInterest)} gets no exemption — declare it separately from local interest.` });
+        }
+        const tfsa = sumCodes(figures, "4219");
+        if (tfsa > 36000) {
+          msgs.push({ ok: false, text: `TFSA contributions ${fmt(tfsa)} exceed the ${fmt(36000)} annual limit — 40% penalty on the ${fmt(tfsa - 36000)} excess.` });
+        } else if (tfsa > 0) {
+          msgs.push({ ok: true, text: `TFSA ${fmt(tfsa)} of ${fmt(36000)} used — ${fmt(36000 - tfsa)} of headroom before the year closes.` });
+        }
+        const gains = sumCodes(figures, "4250");
+        if (gains > 40000) {
+          msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(40000)} annual exclusion — ${fmt(gains - 40000)} feeds into taxable income.` });
+        } else if (gains > 0) {
+          msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(40000)} annual exclusion.` });
+        }
+        return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES));
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "submit-requested") {
@@ -861,6 +954,8 @@ var require_locale = __commonJS((exports2, module2) => {
         { step: "Declare TFSA contributions", notes: "Contribution certificate; check R36 000/yr & R500 000 lifetime limits" },
         { step: "Claim out-of-pocket medical expenses", notes: "Qualifying expenses not covered by the aid" },
         { step: "Submit the ITR12", notes: "" },
+        { step: "Check the ITA34 against your own figures", notes: "Assessed taxable income should account for every income figure you captured — anything missing was either exempt or omitted" },
+        { step: "Decide on a Request for Correction", due: `${year}-10-23`, notes: "Only if something was left out — undeclared trade income is the one with real consequence" },
         { step: "Respond to SARS verification requests", notes: "Within the timeframe SARS gives" },
         { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: "Provisional taxpayers only — mark N/A if standard" },
         { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: "Provisional taxpayers only — mark N/A if standard" }
@@ -869,8 +964,9 @@ var require_locale = __commonJS((exports2, module2) => {
         { name: "IRP5 / IT3(a) employee certificate", source: "Employer", notes: "Usually pre-populated" },
         { name: "IT3(b) interest certificate", source: "Your bank", notes: "One per bank you hold accounts with" },
         { name: "IT3(b) interest certificate", source: "Your second bank", notes: "Remove if not applicable" },
-        { name: "IT3(b) / IT3(c) investment certificates", source: "Investment provider", notes: "Interest, dividends, capital gains" },
-        { name: "TFSA contribution certificate", source: "Investment provider", notes: "Growth is exempt; contributions still declared" },
+        { name: "IT3(b) investment income certificate", source: "Investment provider", notes: "Interest, dividends, REIT distributions" },
+        { name: "IT3(c) capital gains statement", source: "Investment provider", notes: "Disposals during the year — remove if nothing was sold" },
+        { name: "IT3(s) TFSA contribution certificate", source: "Investment provider", notes: "Growth is exempt; contributions still declared" },
         { name: "Medical aid tax certificate", source: "Medical aid scheme", notes: "Usually pre-populated" },
         { name: "Out-of-pocket medical expenses summary", source: "Own records", notes: "" },
         { name: "Invoiced income summary", source: "Freelance business", notes: "Total invoiced for the tax year" },
@@ -889,6 +985,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "IRS",
       taxIntro: "Track an IRS filing season here — progress steps, the documents you need (W-2, 1099s, 1098, …) and the files themselves, stored in the vault.",
       yearHint: "Tax year (calendar year)",
+      figureCodeLabel: "Form line",
       yearSpan: (y) => `Jan – Dec ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
       seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-04-15`, deadline_provisional: `${y + 1}-10-15` }),
@@ -904,8 +1001,12 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "Return required"],
         ["auto-assessed", "Not required to file this year"],
+        ["assessed", "Assessed — IRS notice received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks() {
+        return [];
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "auto-assessed")
@@ -955,6 +1056,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "HMRC",
       taxIntro: "Track an HMRC Self Assessment season here — progress steps, the documents you need (P60, P11D, interest statements, …) and the files themselves, stored in the vault.",
       yearHint: "Tax year (ends 5 Apr of this year)",
+      figureCodeLabel: "Box",
       yearSpan: (y) => `6 Apr ${y - 1} – 5 Apr ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1,
       seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-01-31`, deadline_provisional: `${y}-10-31` }),
@@ -970,8 +1072,12 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "Notice to file received"],
         ["auto-assessed", "Not required (PAYE settles it)"],
+        ["assessed", "Assessed — SA302 / calculation received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks() {
+        return [];
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "submit-requested")
@@ -1029,6 +1135,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "ATO",
       taxIntro: "Track an ATO tax-return season here — progress steps, the documents you need (income statement, dividend statements, deduction receipts, …) and the files themselves, stored in the vault.",
       yearHint: "Tax year (ends 30 Jun of this year)",
+      figureCodeLabel: "Label",
       yearSpan: (y) => `1 Jul ${y - 1} – 30 Jun ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 >= 7 ? now.getFullYear() : now.getFullYear() - 1,
       seedDeadlines: (y) => ({ deadline_standard: `${y}-10-31`, deadline_provisional: `${y + 1}-05-15` }),
@@ -1044,8 +1151,12 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "Return required"],
         ["auto-assessed", "Non-lodgment advice (no return needed)"],
+        ["assessed", "Assessed — notice of assessment received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks() {
+        return [];
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "auto-assessed")
@@ -1088,6 +1199,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "CRA",
       taxIntro: "Track a CRA tax-filing season here — progress steps, the documents you need (T4, T5, RRSP receipts, …) and the files themselves, stored in the vault.",
       yearHint: "Tax year (calendar year)",
+      figureCodeLabel: "Line",
       yearSpan: (y) => `Jan – Dec ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear(),
       seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-04-30`, deadline_provisional: `${y + 1}-06-15` }),
@@ -1103,8 +1215,12 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "Return required"],
         ["auto-assessed", "No return needed this year"],
+        ["assessed", "Assessed — notice of assessment received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks() {
+        return [];
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "auto-assessed")
@@ -1149,6 +1265,7 @@ var require_locale = __commonJS((exports2, module2) => {
       authority: "STA",
       taxIntro: "Track a China Individual Income Tax (IIT) annual reconciliation here — progress steps, the documents you need and the files themselves, stored in the vault. Filing is through the 个人所得税 app or etax.chinatax.gov.cn.",
       yearHint: "Tax year (calendar year)",
+      figureCodeLabel: "Item",
       yearSpan: (y) => `Jan – Dec ${y}`,
       currentTaxYear: (now) => now.getMonth() + 1 <= 6 ? now.getFullYear() - 1 : now.getFullYear(),
       seedDeadlines: (y) => ({ deadline_standard: `${y + 1}-06-30`, deadline_provisional: `${y + 1}-03-01` }),
@@ -1164,8 +1281,12 @@ var require_locale = __commonJS((exports2, module2) => {
       assessments: [
         ["submit-requested", "Annual reconciliation required"],
         ["auto-assessed", "Exempt from reconciliation"],
+        ["assessed", "Settled — reconciliation result received"],
         ["unknown", "Not checked yet"]
       ],
+      figureChecks() {
+        return [];
+      },
       seasonMsgs(t) {
         const msgs = [];
         if (t.assessment === "submit-requested")
@@ -1586,12 +1707,30 @@ var require_load = __commonJS((exports2, module2) => {
           const t = (s || "").trim().toLowerCase().replace(/[-\s]/g, "");
           return t === "uploaded" ? "uploaded" : t === "n/a" || t === "na" ? "n/a" : "needed";
         };
+        const figAmount = (s) => {
+          const t = (s || "").toString().replace(/[^\d.,-]/g, "");
+          if (!t)
+            return 0;
+          const norm = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+          const n = Number(norm);
+          return Number.isFinite(n) ? n : 0;
+        };
+        const signedNum = (v) => {
+          if (v === undefined || v === null || v === "")
+            return null;
+          const n = Number(String(v).replace(/[^\d.-]/g, ""));
+          return Number.isFinite(n) ? n : null;
+        };
         S.tax[f.basename] = {
           fmRaw: raw,
           taxpayer_type: ["provisional", "standard"].includes(fm.taxpayer_type) ? fm.taxpayer_type : "unknown",
-          assessment: ["auto-assessed", "submit-requested"].includes(fm.assessment) ? fm.assessment : "unknown",
+          assessment: ["auto-assessed", "submit-requested", "assessed"].includes(fm.assessment) ? fm.assessment : "unknown",
           deadline_standard: fm.deadline_standard || "",
           deadline_provisional: fm.deadline_provisional || "",
+          assessment_date: fm.assessment_date || "",
+          assessment_ref: fm.assessment_ref || "",
+          assessment_result: signedNum(fm.assessment_result),
+          assessment_income: signedNum(fm.assessment_income),
           steps: parseMdTable(section("progress")).slice(1).filter((c) => c[0]).map((c) => ({
             step: unescMd(c[0]),
             status: stepStatus(c[1]),
@@ -1604,11 +1743,18 @@ var require_load = __commonJS((exports2, module2) => {
             status: docStatus(c[2]),
             file: unescMd(c[3] || ""),
             notes: unescMd(c[4] || "")
+          })),
+          figures: parseMdTable(section("figures")).slice(1).filter((c) => c[0]).map((c) => ({
+            code: unescMd(c[0]),
+            description: unescMd(c[1] || ""),
+            source: unescMd(c[2] || ""),
+            amount: figAmount(c[3])
           }))
         };
       }
       if (!S.taxYear || !S.tax[S.taxYear])
         S.taxYear = Object.keys(S.tax).sort().pop() || null;
+      S.taxOrphanYears = subfoldersIn("Tax").map((f) => f.name).filter((n) => /^\d{4}$/.test(n) && !S.tax[n]).sort();
       if (!S.period)
         S.period = currentPeriod();
     }
@@ -2787,7 +2933,7 @@ var require_tax = __commonJS((exports2, module2) => {
   var { el, escMd, icoEl, safeSeg, patchFrontmatter } = require_util();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerTax(ctx) {
-    const { S, $, app, toast, writeFile, writeBinary, fileAt, locale } = ctx;
+    const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
     function currentTaxYear() {
       return locale().currentTaxYear(new Date);
     }
@@ -2821,7 +2967,30 @@ var require_tax = __commonJS((exports2, module2) => {
       renderTaxKpis(t);
       renderSeason(t);
       renderSteps(t);
+      renderFigures(t);
       renderDocs(t);
+      renderOrphanYears();
+    }
+    function renderOrphanYears() {
+      const box = $("#taxSubNote");
+      const orphans = (S.taxOrphanYears || []).filter((y) => !S.tax[y]);
+      if (!orphans.length)
+        return;
+      box.append(" · ");
+      for (const y of orphans) {
+        const b = el("button", {
+          class: "btn-ghost",
+          style: "padding:0.1rem 0.5rem;font-size:0.78rem",
+          "aria-label": `Create a tax page for ${y}, which already has documents`
+        }, `Tax/${y}/ has files — add ${y}`);
+        b.addEventListener("click", async () => {
+          seedTaxYear(+y);
+          S.taxYear = y;
+          await saveTax();
+          renderTax();
+        });
+        box.append(b);
+      }
     }
     function activeDeadline(t) {
       return locale().activeDeadline(t);
@@ -2845,6 +3014,7 @@ var require_tax = __commonJS((exports2, module2) => {
       const docs = t.docs.filter((x) => x.status !== "n/a");
       const ready = docs.filter((x) => x.status === "uploaded").length;
       tile("Documents in", `${ready} / ${docs.length}`, ready === docs.length && docs.length ? "text-success" : "");
+      tile("Figures", String((t.figures || []).length));
       const typeLabel = (locale().taxpayerTypes.find(([v]) => v === t.taxpayer_type) || [])[1];
       tile("Taxpayer", typeLabel || "Unknown");
     }
@@ -2888,9 +3058,116 @@ var require_tax = __commonJS((exports2, module2) => {
           renderTax();
         }
       }))));
+      if (t.assessment === "assessed") {
+        const num = (label, key, placeholder) => field(label, el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: t[key] === null || t[key] === undefined ? "" : String(t[key]),
+          placeholder,
+          onchange: (e) => {
+            const raw = e.target.value.trim();
+            const n = Number(raw.replace(/[^\d.-]/g, ""));
+            t[key] = raw === "" ? null : Number.isFinite(n) ? n : null;
+            mark();
+            renderTax();
+          }
+        }));
+        b.append(el("div", { class: "row tax-season-row" }, field("Assessment date", el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: t.assessment_date,
+          placeholder: "YYYY-MM-DD",
+          onchange: (e) => {
+            t.assessment_date = e.target.value.trim();
+            mark();
+            renderTax();
+          }
+        })), field("Reference", el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: t.assessment_ref,
+          placeholder: "Notice / document no.",
+          onchange: (e) => {
+            t.assessment_ref = e.target.value.trim();
+            mark();
+          }
+        })), num("Result (− = refund)", "assessment_result", "-1250.00"), num("Taxable income assessed", "assessment_income", "0.00")));
+      }
       b.append(el("p", { class: "tax-season-msg" }, loc.seasonMsgs(t).join(" ")));
+      for (const m of loc.figureChecks(t.figures || [], +S.taxYear, t) || []) {
+        b.append(el("p", { class: `tax-check ${m.ok ? "tax-check-ok" : "tax-check-warn"}` }, icoEl(m.ok ? ["circle-check", "check-circle"] : ["alert-triangle", "triangle-alert"]), " ", m.text));
+      }
       b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0 0 6px" }, loc.safetyNote));
       b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, disclaimer()));
+    }
+    function renderFigures(t) {
+      const loc = locale();
+      const figures = t.figures || (t.figures = []);
+      $("#taxFiguresSub").textContent = "Amounts from your certificates, by source code — what the documents actually say, so the checks above have something to read.";
+      const tbl = $("#taxFiguresTable");
+      tbl.innerHTML = "";
+      tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, loc.figureCodeLabel), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, ""))));
+      const body = el("tbody", {});
+      const txt = (obj, key, width) => el("input", {
+        type: "text",
+        class: "form-control form-control-sm",
+        value: obj[key],
+        style: `min-width:${width}`,
+        onchange: (e) => {
+          obj[key] = e.target.value;
+          mark();
+        }
+      });
+      for (const f of figures) {
+        body.append(el("tr", {}, el("td", {}, el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: f.code,
+          style: "width:90px",
+          onchange: (e) => {
+            f.code = e.target.value.trim();
+            mark();
+            renderTax();
+          }
+        })), el("td", {}, txt(f, "description", "180px")), el("td", {}, txt(f, "source", "140px")), el("td", { class: "num" }, el("input", {
+          type: "text",
+          class: "form-control form-control-sm num",
+          style: "width:130px",
+          value: f.amount === 0 ? "" : String(f.amount),
+          placeholder: "0.00",
+          onchange: (e) => {
+            const n = Number(e.target.value.replace(/[^\d.-]/g, ""));
+            f.amount = Number.isFinite(n) ? n : 0;
+            mark();
+            renderTax();
+          }
+        })), el("td", {}, el("button", {
+          class: "btn-ghost",
+          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
+          "aria-label": `Remove figure ${f.code}`,
+          onclick: () => {
+            figures.splice(figures.indexOf(f), 1);
+            mark();
+            renderTax();
+          }
+        }, "✕"))));
+      }
+      if (!figures.length) {
+        body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No figures yet — add the amounts off your certificates to unlock the checks.")));
+      }
+      tbl.append(body);
+      if (figures.length) {
+        const byCode = new Map;
+        for (const f of figures) {
+          const k = (f.code || "").trim() || "—";
+          byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
+        }
+        const foot = el("tfoot", {});
+        for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
+          foot.append(el("tr", { class: "tax-fig-total" }, el("td", { style: "font-weight:600" }, code), el("td", { colspan: "2", class: "text-muted" }, `Total for ${code}`), el("td", { class: "num", style: "font-weight:600" }, money(total)), el("td", {})));
+        }
+        tbl.append(foot);
+      }
     }
     const STEP_CYCLE = { todo: "busy", busy: "done", done: "n/a", "n/a": "todo" };
     const STEP_LABEL = { todo: "To do", busy: "Busy", done: "Done", "n/a": "N/A" };
@@ -2966,21 +3243,22 @@ var require_tax = __commonJS((exports2, module2) => {
           mark();
           renderTax();
         });
-        let fileCell;
-        if (d.file) {
-          fileCell = el("button", { class: "btn-ghost tax-doc-link", "aria-label": `Open ${d.file}` }, icoEl(["paperclip"]), d.file);
-          fileCell.addEventListener("click", () => openDoc(d.file));
-        } else {
-          fileCell = el("button", {
-            class: "btn-ghost",
-            style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-            "aria-label": `Upload file for ${d.name}`
-          }, icoEl(["cloud-upload", "upload-cloud"]), " Upload");
-          fileCell.addEventListener("click", () => {
-            pendingDocTarget = d;
-            $("#taxFileInput").click();
-          });
+        const fileCell = el("div", { class: "tax-doc-files" });
+        for (const name of fileList(d)) {
+          const link = el("button", { class: "btn-ghost tax-doc-link", "aria-label": `Open ${name}` }, icoEl(["paperclip"]), name);
+          link.addEventListener("click", () => openDoc(name));
+          fileCell.append(link);
         }
+        const addBtn = el("button", {
+          class: "btn-ghost",
+          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
+          "aria-label": `${d.file ? "Add another file to" : "Upload file for"} ${d.name}`
+        }, icoEl(["cloud-upload", "upload-cloud"]), d.file ? " Add" : " Upload");
+        addBtn.addEventListener("click", () => {
+          pendingDocTarget = d;
+          $("#taxFileInput").click();
+        });
+        fileCell.append(addBtn);
         body.append(el("tr", { class: d.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, d.name), el("td", { class: "text-muted" }, d.source), el("td", {}, pill), el("td", {}, fileCell), el("td", {}, el("input", {
           type: "text",
           class: "form-control form-control-sm",
@@ -2995,9 +3273,10 @@ var require_tax = __commonJS((exports2, module2) => {
           style: "padding:0.2rem 0.6rem;font-size:0.78rem",
           "aria-label": `Remove document ${d.name}`,
           onclick: async () => {
-            const go = !d.file || await confirmModal(app, {
+            const kept = fileList(d);
+            const go = !kept.length || await confirmModal(app, {
               title: "Remove document row",
-              message: `Remove "${d.name}" from the list? The uploaded file ${d.file} stays in Tax/${S.taxYear}/ — delete it from the vault yourself if you want it gone.`,
+              message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
               confirmText: "Remove row"
             });
             if (!go)
@@ -3012,6 +3291,12 @@ var require_tax = __commonJS((exports2, module2) => {
         body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No documents yet.")));
       tbl.append(body);
     }
+    const FILE_SEP = ";";
+    const taxSeg = (s) => safeSeg(s).replace(/;/g, "-");
+    const fileList = (d) => (d.file || "").split(FILE_SEP).map((s) => s.trim()).filter(Boolean);
+    const setFileList = (d, names) => {
+      d.file = names.join(`${FILE_SEP} `);
+    };
     function openDoc(name) {
       const f = fileAt(`Tax/${S.taxYear}/${name}`);
       if (!f)
@@ -3025,6 +3310,17 @@ var require_tax = __commonJS((exports2, module2) => {
       const t = T();
       let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
       pendingDocTarget = null;
+      const buf = await file.arrayBuffer();
+      const dupe = await findDuplicate(buf);
+      if (dupe) {
+        const reuse = await confirmModal(app, {
+          title: "Already in this tax year",
+          message: `"${file.name}" is byte-identical to ${dupe}, already stored in Tax/${S.taxYear}/. Point the row at the existing file instead of saving a second copy?`,
+          confirmText: "Use the existing file"
+        });
+        if (reuse)
+          return attachExisting(t, dupe);
+      }
       if (!target) {
         const NEW = "＋ New document row";
         const open = t.docs.filter((d) => !d.file).map((d) => `${d.name} — ${d.source}`);
@@ -3046,7 +3342,7 @@ var require_tax = __commonJS((exports2, module2) => {
           target = t.docs.filter((d) => !d.file)[open.indexOf(r.to)];
         }
       }
-      let name = safeSeg(file.name) || "document";
+      let name = taxSeg(file.name) || "document";
       if (fileAt(`Tax/${S.taxYear}/${name}`)) {
         const dot = name.lastIndexOf(".");
         const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
@@ -3056,14 +3352,80 @@ var require_tax = __commonJS((exports2, module2) => {
         name = `${stem} (${i})${ext}`;
       }
       try {
-        await writeBinary(`Tax/${S.taxYear}/${name}`, await file.arrayBuffer());
+        await writeBinary(`Tax/${S.taxYear}/${name}`, buf);
       } catch (e) {
         return toast(e.message || String(e), true);
       }
-      target.file = name;
+      setFileList(target, [...fileList(target), name]);
+      target.status = "uploaded";
+      if (isEncryptedPdf(buf)) {
+        const hint = "Password-protected — open outside Obsidian.";
+        if (!target.notes.includes(hint))
+          target.notes = target.notes ? `${target.notes} ${hint}` : hint;
+        toast(`Uploaded ${name} — password-protected, so it won't preview in Obsidian.`);
+      } else {
+        toast(`Uploaded ${name}`);
+      }
+      await saveTax();
+    }
+    async function findDuplicate(buf) {
+      const digest = async (b) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b))).map((x) => x.toString(16).padStart(2, "0")).join("");
+      let mine;
+      try {
+        mine = await digest(buf);
+      } catch {
+        return null;
+      }
+      const seen = new Set;
+      for (const d of T().docs)
+        for (const n of fileList(d))
+          seen.add(n);
+      for (const n of seen) {
+        const f = fileAt(`Tax/${S.taxYear}/${n}`);
+        if (!f)
+          continue;
+        try {
+          if (await digest(await app.vault.readBinary(f)) === mine)
+            return n;
+        } catch {}
+      }
+      return null;
+    }
+    async function attachExisting(t, name) {
+      const NEW = "＋ New document row";
+      const rows = t.docs.map((d) => `${d.name} — ${d.source}`);
+      const r = await askFields(app, `Point a row at "${name}"`, [
+        { key: "to", label: "Attach to", type: "select", options: [...rows, NEW], value: rows[0] ?? NEW }
+      ]);
+      if (!r)
+        return;
+      let target;
+      if (r.to === NEW) {
+        const n = await askFields(app, "New document", [
+          { key: "name", label: "Document name", type: "text", value: name.replace(/\.[^.]+$/, "") },
+          { key: "source", label: "Source", type: "text" }
+        ]);
+        if (!n || !n.name.trim())
+          return;
+        target = { name: n.name.trim(), source: (n.source || "").trim(), status: "needed", file: "", notes: "" };
+        t.docs.push(target);
+      } else {
+        target = t.docs[rows.indexOf(r.to)];
+      }
+      if (!fileList(target).includes(name))
+        setFileList(target, [...fileList(target), name]);
       target.status = "uploaded";
       await saveTax();
-      toast(`Uploaded ${name}`);
+      renderTax();
+      toast(`Linked ${name} — no second copy written.`);
+    }
+    function isEncryptedPdf(buf) {
+      const bytes = new Uint8Array(buf);
+      if (bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80)
+        return false;
+      const tail = bytes.subarray(Math.max(0, bytes.length - 4096));
+      const s = Array.from(tail).map((b) => String.fromCharCode(b)).join("");
+      return s.includes("/Encrypt");
     }
     function serializeTax(year) {
       const t = S.tax[year];
@@ -3073,7 +3435,11 @@ var require_tax = __commonJS((exports2, module2) => {
         taxpayer_type: t.taxpayer_type,
         assessment: t.assessment,
         deadline_standard: t.deadline_standard || null,
-        deadline_provisional: t.deadline_provisional || null
+        deadline_provisional: t.deadline_provisional || null,
+        assessment_date: t.assessment_date || null,
+        assessment_ref: t.assessment_ref || null,
+        assessment_result: typeof t.assessment_result === "number" ? t.assessment_result : null,
+        assessment_income: typeof t.assessment_income === "number" ? t.assessment_income : null
       });
       const loc = locale();
       const lines = [
@@ -3098,6 +3464,10 @@ var require_tax = __commonJS((exports2, module2) => {
       lines.push("", "## Documents", "", "| Document | Source | Status | File | Notes |", "|----------|--------|--------|------|-------|");
       for (const d of t.docs)
         lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${d.status} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+      lines.push("", "## Figures", "", `| ${loc.figureCodeLabel} | Description | Source | Amount |`, "|------|-------------|--------|--------|");
+      for (const f of t.figures || []) {
+        lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${Number(f.amount || 0).toFixed(2)} |`);
+      }
       lines.push("");
       return lines.join(`
 `);
@@ -3132,15 +3502,41 @@ var require_tax = __commonJS((exports2, module2) => {
       mark();
       renderTax();
     }
+    async function addTaxFigure() {
+      if (!S.taxYear)
+        return;
+      const r = await askFields(app, "New figure", [
+        { key: "code", label: locale().figureCodeLabel, type: "text" },
+        { key: "description", label: "Description", type: "text" },
+        { key: "source", label: "Source (which certificate)", type: "text" },
+        { key: "amount", label: "Amount", type: "text", placeholder: "0.00" }
+      ]);
+      if (!r || !r.code.trim())
+        return;
+      const n = Number((r.amount || "").replace(/[^\d.-]/g, ""));
+      T().figures.push({
+        code: r.code.trim(),
+        description: (r.description || "").trim(),
+        source: (r.source || "").trim(),
+        amount: Number.isFinite(n) ? n : 0
+      });
+      mark();
+      renderTax();
+    }
     function seedTaxYear(year) {
       const loc = locale();
       S.tax[String(year)] = {
         fmRaw: "",
         taxpayer_type: loc.defaultTaxpayerType,
         assessment: loc.defaultAssessment,
+        assessment_date: "",
+        assessment_ref: "",
+        assessment_result: null,
+        assessment_income: null,
         ...loc.seedDeadlines(year),
         steps: loc.seedSteps(year).map((s) => ({ status: "todo", due: "", notes: "", ...s })),
-        docs: loc.seedDocs().map((d) => ({ status: "needed", file: "", notes: "", ...d }))
+        docs: loc.seedDocs().map((d) => ({ status: "needed", file: "", notes: "", ...d })),
+        figures: []
       };
     }
     async function startTax() {
@@ -3187,7 +3583,7 @@ var require_tax = __commonJS((exports2, module2) => {
       S.taxYear = year;
       renderTax();
     }
-    Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, newTaxYear, startTax, changeTaxYear, handleTaxFile });
+    Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile });
   };
 });
 
@@ -3728,6 +4124,7 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#taxSave").addEventListener("click", ctx.saveTax);
     $("#taxAddStep").addEventListener("click", ctx.addTaxStep);
     $("#taxAddDoc").addEventListener("click", ctx.addTaxDoc);
+    $("#taxAddFigure").addEventListener("click", ctx.addTaxFigure);
     $("#taxNewYear").addEventListener("click", ctx.newTaxYear);
     $("#taxStart").addEventListener("click", ctx.startTax);
     $("#taxYearSel").addEventListener("change", (e) => ctx.changeTaxYear(e.target.value));

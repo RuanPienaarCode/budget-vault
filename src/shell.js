@@ -194,7 +194,7 @@ const SHELL_HTML = `
         </div>
 
         <div id="taxContent">
-          <div class="mini-grid mini-kpis-4 mb-4" id="taxKpis"></div>
+          <div class="mini-grid mini-kpis-5 mb-4" id="taxKpis"></div>
 
           <div class="card mb-4">
             <div class="card-h" style="align-items:center">
@@ -217,6 +217,18 @@ const SHELL_HTML = `
             </div>
             <div class="body-pad body-pad-tight">
               <div class="table-responsive"><table class="table table-hover" id="taxStepsTable"></table></div>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-h" style="align-items:center">
+              <div><h2>Figures</h2><div class="sub" id="taxFiguresSub"></div></div>
+              <div class="row">
+                <button class="btn-ghost" id="taxAddFigure"><span class="ico" data-ico="plus"></span> Add figure</button>
+              </div>
+            </div>
+            <div class="body-pad body-pad-tight">
+              <div class="table-responsive"><table class="table table-hover" id="taxFiguresTable"></table></div>
             </div>
           </div>
 

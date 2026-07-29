@@ -19,14 +19,16 @@
 const assert = require('assert');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('../src/locale');
 
-const STRING_KEYS = ['label', 'currency', 'thousands', 'decimal', 'authority', 'taxIntro', 'yearHint', 'safetyNote'];
+const STRING_KEYS = ['label', 'currency', 'thousands', 'decimal', 'authority', 'taxIntro', 'yearHint', 'safetyNote', 'figureCodeLabel'];
 const NULLABLE_KEYS = ['banks', 'importHint'];   // must be PRESENT, may be null (za importHint / eu banks)
 const BOOL_KEYS = ['dayFirst'];
 const ARRAY_KEYS = ['deadlineLabels', 'taxpayerTypes', 'assessments'];
-const FN_KEYS = ['yearSpan', 'currentTaxYear', 'seedDeadlines', 'activeDeadline', 'seasonMsgs', 'seedSteps', 'seedDocs'];
+const FN_KEYS = ['yearSpan', 'currentTaxYear', 'seedDeadlines', 'activeDeadline', 'seasonMsgs', 'seedSteps', 'seedDocs', 'figureChecks'];
 const ENUM_KEYS = {
   defaultTaxpayerType: ['provisional', 'standard', 'unknown'],
-  defaultAssessment: ['submit-requested', 'auto-assessed', 'unknown'],
+  // 'assessed' is a terminal state no profile defaults to, but the enum must
+  // permit it so a country could seed straight into it.
+  defaultAssessment: ['submit-requested', 'auto-assessed', 'assessed', 'unknown'],
 };
 const OPTIONAL = ['stripDescSuffix'];   // za-only; guarded at import.js (`if (loc.stripDescSuffix …)`)
 
@@ -60,7 +62,7 @@ for (const code of Object.keys(PROFILES)) {
     for (const v of values) if (!p[k].some(r => r[0] === v)) fail(code, `${k} is missing the required value "${v}"`);
   };
   pairs('taxpayerTypes', ['provisional', 'standard', 'unknown']);
-  pairs('assessments', ['submit-requested', 'auto-assessed', 'unknown']);
+  pairs('assessments', ['submit-requested', 'auto-assessed', 'assessed', 'unknown']);
   if (Array.isArray(p.deadlineLabels) && p.deadlineLabels.length < 2) fail(code, 'deadlineLabels needs 2 entries (standard + alternative)');
 
   // Exercise the functions the way the views do — fixed inputs (no Date.now),
@@ -76,6 +78,26 @@ for (const code of Object.keys(PROFILES)) {
     assert.ok(Array.isArray(p.seasonMsgs(fakeT)), 'seasonMsgs must return an array');
     for (const step of p.seedSteps(Y)) assert.ok(step && typeof step.step === 'string', 'each seedSteps row needs a string .step');
     for (const doc of p.seedDocs()) assert.ok(doc && typeof doc.name === 'string', 'each seedDocs row needs a string .name');
+
+    // figureChecks must tolerate every shape the view can hand it — an empty
+    // table, junk rows, and a fully-populated assessed year — and always return
+    // {ok, text} pairs. A profile that throws here would blank the Tax page.
+    const assessedT = { ...fakeT, assessment: 'assessed', assessment_income: 400000, assessment_result: -1250 };
+    for (const [figs, tt] of [
+      [[], fakeT],
+      [[{ code: '', description: '', source: '', amount: 0 }], fakeT],
+      [[{ code: '4201', description: 'Interest', source: 'Bank', amount: 5000 },
+        { code: '3601', description: 'Salary', source: 'Employer', amount: 400000 },
+        { code: '4219', description: 'TFSA', source: 'Provider', amount: 20000 },
+        { code: '4250', description: 'Gains', source: 'Provider', amount: 500 }], assessedT],
+    ]) {
+      const out = p.figureChecks(figs, Y, tt);
+      assert.ok(Array.isArray(out), 'figureChecks must return an array');
+      for (const m of out) {
+        assert.strictEqual(typeof m.ok, 'boolean', 'each figureChecks message needs a boolean .ok');
+        assert.ok(m.text && typeof m.text === 'string', 'each figureChecks message needs a non-empty .text');
+      }
+    }
   } catch (e) {
     fail(code, `function exercise threw: ${e.message}`);
   }

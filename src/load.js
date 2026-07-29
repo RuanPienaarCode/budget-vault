@@ -126,9 +126,9 @@ module.exports = function registerLoad(ctx) {
       if (!/^\d{4}$/.test(f.basename)) continue;
       const text = await vault.cachedRead(f);
       const { fm, raw, body } = parseFrontmatter(text);
-      // The body holds two tables under "## Progress" and "## Documents".
-      // parseMdTable reads every table row in the text it's given, so slice
-      // the body by heading first and parse each section on its own.
+      // The body holds three tables under "## Progress", "## Documents" and
+      // "## Figures". parseMdTable reads every table row in the text it's
+      // given, so slice the body by heading first and parse each on its own.
       const section = (name) => {
         for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
           if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
@@ -143,12 +143,35 @@ module.exports = function registerLoad(ctx) {
         const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
         return t === 'uploaded' ? 'uploaded' : (t === 'n/a' || t === 'na') ? 'n/a' : 'needed';
       };
+      // Figures are written as raw numbers, but a hand-edited file may carry a
+      // currency symbol or either separator convention — coerce rather than
+      // throw, mirroring how stepStatus falls back instead of failing.
+      const figAmount = s => {
+        const t = (s || '').toString().replace(/[^\d.,-]/g, '');
+        if (!t) return 0;
+        const norm = t.lastIndexOf(',') > t.lastIndexOf('.')
+          ? t.replace(/\./g, '').replace(',', '.')   // 1.234,56 / 1 234,56
+          : t.replace(/,/g, '');                     // 1,234.56 / 1234.56
+        const n = Number(norm);
+        return Number.isFinite(n) ? n : 0;
+      };
+      const signedNum = v => {
+        if (v === undefined || v === null || v === '') return null;
+        const n = Number(String(v).replace(/[^\d.-]/g, ''));
+        return Number.isFinite(n) ? n : null;
+      };
       S.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         taxpayer_type: ['provisional', 'standard'].includes(fm.taxpayer_type) ? fm.taxpayer_type : 'unknown',
-        assessment: ['auto-assessed', 'submit-requested'].includes(fm.assessment) ? fm.assessment : 'unknown',
+        assessment: ['auto-assessed', 'submit-requested', 'assessed'].includes(fm.assessment) ? fm.assessment : 'unknown',
         deadline_standard: fm.deadline_standard || '',
         deadline_provisional: fm.deadline_provisional || '',
+        // Assessment outcome — only meaningful once `assessment` is 'assessed'.
+        // Result is signed the way tax authorities print it: negative = refund.
+        assessment_date: fm.assessment_date || '',
+        assessment_ref: fm.assessment_ref || '',
+        assessment_result: signedNum(fm.assessment_result),
+        assessment_income: signedNum(fm.assessment_income),
         steps: parseMdTable(section('progress')).slice(1).filter(c => c[0]).map(c => ({
           step: unescMd(c[0]), status: stepStatus(c[1]), due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
         })),
@@ -156,9 +179,21 @@ module.exports = function registerLoad(ctx) {
           name: unescMd(c[0]), source: unescMd(c[1] || ''), status: docStatus(c[2]),
           file: unescMd(c[3] || ''), notes: unescMd(c[4] || ''),
         })),
+        // Absent on every page written before the Figures table existed — an
+        // empty list keeps those loading unchanged.
+        figures: parseMdTable(section('figures')).slice(1).filter(c => c[0]).map(c => ({
+          code: unescMd(c[0]), description: unescMd(c[1] || ''),
+          source: unescMd(c[2] || ''), amount: figAmount(c[3]),
+        })),
       };
     }
     if (!S.taxYear || !S.tax[S.taxYear]) S.taxYear = Object.keys(S.tax).sort().pop() || null;
+
+    // Prior-year certificates often land in Tax/<year>/ before anyone creates
+    // the matching page, leaving the folder invisible to the view. Surface the
+    // orphans so the Tax page can offer to seed a page for them.
+    S.taxOrphanYears = subfoldersIn('Tax')
+      .map(f => f.name).filter(n => /^\d{4}$/.test(n) && !S.tax[n]).sort();
 
     if (!S.period) S.period = currentPeriod();
   }
