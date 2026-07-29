@@ -28,7 +28,7 @@ Most budgeting apps ask you to hand your bank statements to someone else's serve
 - **CSV import** — drop a bank statement export, review with automatic categorisation and duplicate detection, commit
 - **Auto-categorisation rules** — pattern → category rules learned from your corrections, stored in a plain CSV
 - **Savings & investments, accounts, owed money, subscriptions** — dedicated screens for each
-- **Tax season tracking** — a per-year SARS checklist with document uploads stored alongside it in the vault
+- **Tax season tracking** — a per-year checklist with document uploads stored alongside it in the vault, plus a Figures table that records the amounts off each certificate and checks them against your country's thresholds and your final assessment
 - **Desktop and mobile** — no Node or Electron APIs; works on Obsidian for iOS and Android
 
 ## Installation

@@ -286,6 +286,7 @@ function mountApp(view) {
   $('#taxSave').addEventListener('click', ctx.saveTax);
   $('#taxAddStep').addEventListener('click', ctx.addTaxStep);
   $('#taxAddDoc').addEventListener('click', ctx.addTaxDoc);
+  $('#taxAddFigure').addEventListener('click', ctx.addTaxFigure);
   $('#taxNewYear').addEventListener('click', ctx.newTaxYear);
   $('#taxStart').addEventListener('click', ctx.startTax);
   $('#taxYearSel').addEventListener('change', e => ctx.changeTaxYear(e.target.value));

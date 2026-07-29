@@ -781,13 +781,15 @@
 .budget-app-root .mini .s { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .budget-app-root .mini .s2 { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
 /* Fixed N-up KPI rows (summary tiles) — not clickable, unlike account tiles. */
+.budget-app-root .mini-kpis-5 { grid-template-columns: repeat(5, 1fr); }
 .budget-app-root .mini-kpis-4 { grid-template-columns: repeat(4, 1fr); }
 .budget-app-root .mini-kpis-3 { grid-template-columns: repeat(3, 1fr); }
-.budget-app-root .mini-kpis-4 .v, .budget-app-root .mini-kpis-3 .v { cursor: default; }
-.budget-app-root .mini-kpis-4 .v:hover, .budget-app-root .mini-kpis-3 .v:hover { text-decoration: none; }
+.budget-app-root .mini-kpis-5 .v, .budget-app-root .mini-kpis-4 .v, .budget-app-root .mini-kpis-3 .v { cursor: default; }
+.budget-app-root .mini-kpis-5 .v:hover, .budget-app-root .mini-kpis-4 .v:hover, .budget-app-root .mini-kpis-3 .v:hover { text-decoration: none; }
 .budget-app-root .mini .v small { font-size: 15px; color: var(--ink-faint); font-weight: 500; }
-@media (max-width: 900px) { .budget-app-root .mini-kpis-4 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-3 { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .budget-app-root .mini-kpis-5 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-5 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-5, .budget-app-root .mini-kpis-3 { grid-template-columns: 1fr; } }
 
 /* ============================================================
    STATUS PILLS + GOALS (Owed Money, Savings)
@@ -826,6 +828,20 @@
 .budget-app-root .tax-field { display: flex; flex-direction: column; gap: 5px; min-width: 160px; }
 .budget-app-root .tax-field > .l { font-size: 11.5px; font-weight: 600; color: var(--ink-faint); letter-spacing: .3px; }
 .budget-app-root .tax-season-msg { margin: 0 0 8px; color: var(--text-muted); font-size: 13.5px; line-height: 1.55; }
+
+/* Figure checks — a callout per statutory/reconciliation message. */
+.budget-app-root .tax-check {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 0 8px; padding: 8px 11px; border-radius: 8px;
+  font-size: 13px; line-height: 1.5; border-left: 3px solid transparent;
+}
+.budget-app-root .tax-check .ico svg { width: 0.9rem; height: 0.9rem; flex: 0 0 auto; margin-top: 2px; }
+.budget-app-root .tax-check-ok { background: rgba(64, 160, 96, 0.10); border-left-color: var(--color-green, #40a060); }
+.budget-app-root .tax-check-warn { background: rgba(214, 150, 40, 0.12); border-left-color: var(--color-orange, #d69628); }
+
+/* A document row can carry several certificates. */
+.budget-app-root .tax-doc-files { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.budget-app-root .tax-fig-total td { border-top: 1px solid var(--background-modifier-border); color: var(--text-muted); }
 
 /* Budget page: "remaining" line under each amount input */
 .budget-app-root .bud-amt-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; }

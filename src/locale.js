@@ -14,11 +14,63 @@
    Settings.md (vault-synced, like `currency`); a missing key means South
    Africa, which is what every pre-country install was. */
 
+/* Format an amount with a profile's own separators. figureChecks methods use
+   method shorthand so `this` is the profile they were read off. */
+const fmtAmt = (p, v) => {
+  const parts = Math.abs(v).toFixed(2).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, p.thousands);
+  return (v < 0 ? '-' : '') + p.currency + parts.join(p.decimal);
+};
+
+/* Sum the figure rows carrying any of the given codes. */
+const sumCodes = (figures, ...codes) => (figures || [])
+  .filter(f => codes.includes((f.code || '').trim()))
+  .reduce((a, f) => a + (f.amount || 0), 0);
+
+/* SARS remuneration + fringe-benefit codes — what an IRP5 contributes to
+   taxable income. Deliberately excludes investment codes (4201/4218/4250/…),
+   which are exempt or separately assessed. */
+const ZA_INCOME_CODES = [
+  '3601', '3605', '3606', '3610', '3615', '3616', '3617', '3699',
+  '3701', '3702', '3707', '3713', '3718',
+  '3801', '3802', '3805', '3806', '3808', '3810',
+];
+
+/* Compare what the authority assessed against what was captured.
+
+   The check that earns its keep is the second one: an assessment whose taxable
+   income matches employment income *to the cent* has picked up nothing else —
+   so any other income figure on the page was either exempt or never declared.
+   It asks rather than accuses, because "exempt" is the common answer and only
+   the filer knows which. `employmentCodes` empty (generic profiles) → no
+   checks, since "which codes are income" is jurisdictional. */
+const reconcileAssessed = (p, figures, t, employmentCodes) => {
+  if (!t || t.assessment !== 'assessed' || typeof t.assessment_income !== 'number') return [];
+  if (!employmentCodes || !employmentCodes.length) return [];
+  const fmt = v => fmtAmt(p, v);
+  const rows = (figures || []).filter(f => (f.amount || 0) > 0);
+  if (!rows.length) return [];
+
+  const employment = sumCodes(figures, ...employmentCodes);
+  const others = rows.filter(f => !employmentCodes.includes((f.code || '').trim()));
+  const msgs = [];
+
+  if (employment > 0 && t.assessment_income < employment - 1) {
+    msgs.push({ ok: false, text: `Assessed taxable income ${fmt(t.assessment_income)} is below your captured employment income ${fmt(employment)} — check the assessment against your certificates.` });
+  } else if (employment > 0 && Math.abs(t.assessment_income - employment) <= 1 && others.length) {
+    msgs.push({ ok: false, text: `Assessed taxable income ${fmt(t.assessment_income)} matches your employment income exactly, so none of the other ${others.length} captured figure${others.length === 1 ? '' : 's'} reached it. Confirm each was exempt rather than omitted — if any was trade income, a correction is due before the deadline.` });
+  } else if (employment > 0) {
+    msgs.push({ ok: true, text: `Assessed taxable income ${fmt(t.assessment_income)} is consistent with the ${fmt(employment)} of employment income captured.` });
+  }
+  return msgs;
+};
+
 /* Shared generic tax content for countries without a dedicated profile. */
 const genericTax = (authority) => ({
   authority,
   taxIntro: `Track a ${authority === 'Tax' ? 'tax' : authority} return season here — progress steps, the documents you need and where each one comes from, with the files themselves stored in your vault.`,
   yearHint: 'Tax year (calendar year)',
+  figureCodeLabel: 'Code',
   yearSpan: y => `Jan – Dec ${y}`,
   currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
   seedDeadlines: () => ({ deadline_standard: '', deadline_provisional: '' }),
@@ -34,8 +86,13 @@ const genericTax = (authority) => ({
   assessments: [
     ['submit-requested', 'Return required'],
     ['auto-assessed', 'No return required this year'],
+    ['assessed', 'Assessed — notice received'],
     ['unknown', 'Not checked yet'],
   ],
+  /* No jurisdiction knowledge here — thresholds and the set of codes that
+     count as income are both country-specific, so a generic profile has
+     nothing safe to assert. Countries with a profile override this. */
+  figureChecks() { return []; },
   seasonMsgs(t) {
     const msgs = [];
     if (t.assessment === 'submit-requested') msgs.push('A return is required — work through the steps below.');
@@ -75,6 +132,7 @@ const PROFILES = {
     authority: 'SARS',
     taxIntro: 'Track a SARS return season here — progress steps, the documents you need (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.',
     yearHint: 'Tax year (ends Feb of this year)',
+    figureCodeLabel: 'Source code',
     yearSpan: y => `1 Mar ${y - 1} – end Feb ${y}`,
     currentTaxYear: now => (now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1),
     /* Filing-season deadlines shift a little every year — editable defaults
@@ -92,8 +150,47 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'SARS asked me to submit'],
       ['auto-assessed', 'Auto-assessed'],
+      ['assessed', 'Assessed — ITA34 received'],
       ['unknown', 'Not checked yet'],
     ],
+    /* Thresholds are the current published figures, not permanent ones — the
+       page labels them as defaults to verify. The under-65 interest exemption
+       is hard-coded because the plugin holds no date of birth; over-65s get a
+       higher one and the message says so. */
+    figureChecks(figures, year, t) {
+      const fmt = v => fmtAmt(this, v);
+      const msgs = [];
+
+      const localInterest = sumCodes(figures, '4201');
+      if (localInterest > 0) {
+        const exempt = 23800;   // under 65; R34 500 from 65
+        msgs.push(localInterest <= exempt
+          ? { ok: true, text: `Local interest ${fmt(localInterest)} is under the ${fmt(exempt)} under-65 exemption — ${fmt(exempt - localInterest)} of headroom.` }
+          : { ok: false, text: `Local interest ${fmt(localInterest)} exceeds the ${fmt(exempt)} under-65 exemption — ${fmt(localInterest - exempt)} is taxable.` });
+      }
+      // Foreign interest (4218) carries no exemption — a separate ITR12 line
+      // that must never be folded into the 4201 test.
+      const foreignInterest = sumCodes(figures, '4218');
+      if (foreignInterest > 0) {
+        msgs.push({ ok: true, text: `Foreign interest ${fmt(foreignInterest)} gets no exemption — declare it separately from local interest.` });
+      }
+
+      const tfsa = sumCodes(figures, '4219');
+      if (tfsa > 36000) {
+        msgs.push({ ok: false, text: `TFSA contributions ${fmt(tfsa)} exceed the ${fmt(36000)} annual limit — 40% penalty on the ${fmt(tfsa - 36000)} excess.` });
+      } else if (tfsa > 0) {
+        msgs.push({ ok: true, text: `TFSA ${fmt(tfsa)} of ${fmt(36000)} used — ${fmt(36000 - tfsa)} of headroom before the year closes.` });
+      }
+
+      const gains = sumCodes(figures, '4250');
+      if (gains > 40000) {
+        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(40000)} annual exclusion — ${fmt(gains - 40000)} feeds into taxable income.` });
+      } else if (gains > 0) {
+        msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(40000)} annual exclusion.` });
+      }
+
+      return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES));
+    },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'submit-requested') {
@@ -122,6 +219,8 @@ const PROFILES = {
       { step: 'Declare TFSA contributions', notes: 'Contribution certificate; check R36 000/yr & R500 000 lifetime limits' },
       { step: 'Claim out-of-pocket medical expenses', notes: 'Qualifying expenses not covered by the aid' },
       { step: 'Submit the ITR12', notes: '' },
+      { step: 'Check the ITA34 against your own figures', notes: 'Assessed taxable income should account for every income figure you captured — anything missing was either exempt or omitted' },
+      { step: 'Decide on a Request for Correction', due: `${year}-10-23`, notes: 'Only if something was left out — undeclared trade income is the one with real consequence' },
       { step: 'Respond to SARS verification requests', notes: 'Within the timeframe SARS gives' },
       { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: 'Provisional taxpayers only — mark N/A if standard' },
       { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: 'Provisional taxpayers only — mark N/A if standard' },
@@ -130,8 +229,11 @@ const PROFILES = {
       { name: 'IRP5 / IT3(a) employee certificate', source: 'Employer', notes: 'Usually pre-populated' },
       { name: 'IT3(b) interest certificate', source: 'Your bank', notes: 'One per bank you hold accounts with' },
       { name: 'IT3(b) interest certificate', source: 'Your second bank', notes: 'Remove if not applicable' },
-      { name: 'IT3(b) / IT3(c) investment certificates', source: 'Investment provider', notes: 'Interest, dividends, capital gains' },
-      { name: 'TFSA contribution certificate', source: 'Investment provider', notes: 'Growth is exempt; contributions still declared' },
+      // Providers issue these as separate certificates — one row each, so a
+      // three-PDF provider doesn't have to be split by hand every year.
+      { name: 'IT3(b) investment income certificate', source: 'Investment provider', notes: 'Interest, dividends, REIT distributions' },
+      { name: 'IT3(c) capital gains statement', source: 'Investment provider', notes: 'Disposals during the year — remove if nothing was sold' },
+      { name: 'IT3(s) TFSA contribution certificate', source: 'Investment provider', notes: 'Growth is exempt; contributions still declared' },
       { name: 'Medical aid tax certificate', source: 'Medical aid scheme', notes: 'Usually pre-populated' },
       { name: 'Out-of-pocket medical expenses summary', source: 'Own records', notes: '' },
       { name: 'Invoiced income summary', source: 'Freelance business', notes: 'Total invoiced for the tax year' },
@@ -150,6 +252,7 @@ const PROFILES = {
     authority: 'IRS',
     taxIntro: 'Track an IRS filing season here — progress steps, the documents you need (W-2, 1099s, 1098, …) and the files themselves, stored in the vault.',
     yearHint: 'Tax year (calendar year)',
+    figureCodeLabel: 'Form line',
     yearSpan: y => `Jan – Dec ${y}`,
     currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-04-15`, deadline_provisional: `${y + 1}-10-15` }),
@@ -165,8 +268,10 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'Return required'],
       ['auto-assessed', 'Not required to file this year'],
+      ['assessed', 'Assessed — IRS notice received'],
       ['unknown', 'Not checked yet'],
     ],
+    figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'auto-assessed') msgs.push('Marked as not required to file — most people with income above the standard deduction still are, so keep the documents in case that changes.');
@@ -212,6 +317,7 @@ const PROFILES = {
     authority: 'HMRC',
     taxIntro: 'Track an HMRC Self Assessment season here — progress steps, the documents you need (P60, P11D, interest statements, …) and the files themselves, stored in the vault.',
     yearHint: 'Tax year (ends 5 Apr of this year)',
+    figureCodeLabel: 'Box',
     yearSpan: y => `6 Apr ${y - 1} – 5 Apr ${y}`,
     currentTaxYear: now => (now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1),
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-01-31`, deadline_provisional: `${y}-10-31` }),
@@ -227,8 +333,10 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'Notice to file received'],
       ['auto-assessed', 'Not required (PAYE settles it)'],
+      ['assessed', 'Assessed — SA302 / calculation received'],
       ['unknown', 'Not checked yet'],
     ],
+    figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'submit-requested') msgs.push('HMRC expects a Self Assessment return — file the SA100 online by 31 January and pay what\'s due the same day.');
@@ -282,6 +390,7 @@ const PROFILES = {
     authority: 'ATO',
     taxIntro: 'Track an ATO tax-return season here — progress steps, the documents you need (income statement, dividend statements, deduction receipts, …) and the files themselves, stored in the vault.',
     yearHint: 'Tax year (ends 30 Jun of this year)',
+    figureCodeLabel: 'Label',
     yearSpan: y => `1 Jul ${y - 1} – 30 Jun ${y}`,
     currentTaxYear: now => (now.getMonth() + 1 >= 7 ? now.getFullYear() : now.getFullYear() - 1),
     seedDeadlines: y => ({ deadline_standard: `${y}-10-31`, deadline_provisional: `${y + 1}-05-15` }),
@@ -297,8 +406,10 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'Return required'],
       ['auto-assessed', 'Non-lodgment advice (no return needed)'],
+      ['assessed', 'Assessed — notice of assessment received'],
       ['unknown', 'Not checked yet'],
     ],
+    figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'auto-assessed') msgs.push('Lodge a non-lodgment advice on myGov so the ATO knows no return is coming.');
@@ -338,6 +449,7 @@ const PROFILES = {
     authority: 'CRA',
     taxIntro: 'Track a CRA tax-filing season here — progress steps, the documents you need (T4, T5, RRSP receipts, …) and the files themselves, stored in the vault.',
     yearHint: 'Tax year (calendar year)',
+    figureCodeLabel: 'Line',
     yearSpan: y => `Jan – Dec ${y}`,
     currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-04-30`, deadline_provisional: `${y + 1}-06-15` }),
@@ -353,8 +465,10 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'Return required'],
       ['auto-assessed', 'No return needed this year'],
+      ['assessed', 'Assessed — notice of assessment received'],
       ['unknown', 'Not checked yet'],
     ],
+    figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'auto-assessed') msgs.push('Even with no tax owing, filing keeps benefit and credit payments (GST/HST credit, CCB) flowing — consider filing anyway.');
@@ -396,6 +510,7 @@ const PROFILES = {
     authority: 'STA',
     taxIntro: 'Track a China Individual Income Tax (IIT) annual reconciliation here — progress steps, the documents you need and the files themselves, stored in the vault. Filing is through the 个人所得税 app or etax.chinatax.gov.cn.',
     yearHint: 'Tax year (calendar year)',
+    figureCodeLabel: 'Item',
     yearSpan: y => `Jan – Dec ${y}`,
     /* Annual reconciliation runs 1 Mar – 30 Jun of the following year, so up
        to June you are still settling the prior calendar year. */
@@ -413,8 +528,10 @@ const PROFILES = {
     assessments: [
       ['submit-requested', 'Annual reconciliation required'],
       ['auto-assessed', 'Exempt from reconciliation'],
+      ['assessed', 'Settled — reconciliation result received'],
       ['unknown', 'Not checked yet'],
     ],
+    figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
       if (t.assessment === 'submit-requested') msgs.push('The annual IIT reconciliation (汇算清缴) is required — complete it in the 个人所得税 app between 1 March and 30 June of the following year.');
