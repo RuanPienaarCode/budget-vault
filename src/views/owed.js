@@ -1,13 +1,17 @@
 'use strict';
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
-const { el, escMd, icoEl } = require('../util');
+const { el, dateInput, keepScroll, escMd, icoEl } = require('../util');
 const { askFields } = require('../modal');
 
 module.exports = function registerOwed(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
-  function renderOwed() {
+  const mark = () => { S.owedDirty = true; $('#owedSave').disabled = false; };
+
+  /* The only thing outside the table that reads a row, so an edited amount can
+     refresh here without rebuilding the field being typed in. */
+  function renderOwedKpis() {
     const outstanding = S.owed.filter(o => o.status !== 'paid').reduce((s, o) => s + o.amount, 0);
     const paid = S.owed.filter(o => o.status === 'paid').reduce((s, o) => s + o.amount, 0);
     const kpis = $('#owedKpis'); kpis.innerHTML = '';
@@ -16,32 +20,52 @@ module.exports = function registerOwed(ctx) {
     tile('Outstanding', money(outstanding), outstanding > 0 ? 'text-warning' : '');
     tile('Paid', money(paid), 'text-success');
     tile('Entries', String(S.owed.length));
+  }
 
-    const mark = () => { S.owedDirty = true; $('#owedSave').disabled = false; };
-    const t = $('#owedTable'); t.innerHTML = '';
-    t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Person'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
-      el('th', { scope: 'col' }, 'Due date'), el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));
-    const body = el('tbody', {});
-    for (const o of S.owed) {
-      const pill = el('button', { class: `status-pill status-${o.status}` },
-        icoEl(o.status === 'paid' ? ['circle-check', 'check-circle'] : ['hourglass']),
-        o.status === 'paid' ? 'Paid' : 'Outstanding');
-      pill.addEventListener('click', () => { o.status = o.status === 'paid' ? 'outstanding' : 'paid'; mark(); renderOwed(); });
-      body.append(el('tr', {},
-        el('td', { style: 'font-weight:600' }, o.person),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description, style: 'width:220px',
-          onchange: e => { o.description = e.target.value; mark(); } })),
-        el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: o.amount || '',
-          onchange: e => { o.amount = parseFloat(e.target.value) || 0; mark(); renderOwed(); } })),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.due, placeholder: 'YYYY-MM-DD', style: 'width:120px',
-          onchange: e => { o.due = e.target.value.trim(); mark(); } })),
-        el('td', {}, pill),
-        el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Remove ${o.person}`,
-          onclick: () => { S.owed.splice(S.owed.indexOf(o), 1); mark(); renderOwed(); } }, '✕'))));
+  /* focusPerson: after a rebuild, put focus back on that row's status pill.
+     Rebuilding the table drops focus to <body>, and cycling status is the main
+     interaction here — a keyboard or screen-reader user was being ejected to
+     the top of the page on every single click. */
+  function renderOwed(focusPerson) {
+    renderOwedKpis();
+    const t = $('#owedTable');
+    keepScroll(t, () => {
+      t.innerHTML = '';
+      t.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Person'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
+        el('th', { scope: 'col' }, 'Due date'), el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));
+      const body = el('tbody', {});
+      for (const o of S.owed) {
+        const pill = el('button', { class: `status-pill status-${o.status}`,
+          'aria-label': `${o.person}: ${o.status === 'paid' ? 'Paid' : 'Outstanding'} — click to change` },
+          icoEl(o.status === 'paid' ? ['circle-check', 'check-circle'] : ['hourglass']),
+          o.status === 'paid' ? 'Paid' : 'Outstanding');
+        pill.addEventListener('click', () => { o.status = o.status === 'paid' ? 'outstanding' : 'paid'; mark(); renderOwed(o.person); });
+        body.append(el('tr', {},
+          el('td', { style: 'font-weight:600' }, o.person),
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description, style: 'width:220px',
+            'aria-label': `Description for ${o.person}`,
+            onchange: e => { o.description = e.target.value; mark(); } })),
+          // Only the KPI tiles read the amount — refresh those, never this table,
+          // or the rebuild lands between the tap that leaves this field and the
+          // tap that arrives at the next one.
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: o.amount || '',
+            'aria-label': `Amount for ${o.person}`,
+            onchange: e => { o.amount = parseFloat(e.target.value) || 0; mark(); renderOwedKpis(); } })),
+          el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Due date for ${o.person}` },
+            v => { o.due = v; mark(); })),
+          el('td', {}, pill),
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${o.person}`,
+            onclick: () => { S.owed.splice(S.owed.indexOf(o), 1); mark(); renderOwed(); } }, '✕'))));
+      }
+      if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No entries yet.')));
+      t.append(body);
+    });
+    if (focusPerson) {
+      const i = S.owed.findIndex(o => o.person === focusPerson);
+      const pill = t.querySelectorAll('.status-pill')[i];
+      if (pill) pill.focus();
     }
-    if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No entries yet.')));
-    t.append(body);
   }
 
   function serializeOwed() {

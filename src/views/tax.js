@@ -6,7 +6,7 @@
    profile in locale.js (Settings.md `country`, default South Africa / SARS).
    Edit seeded sources to match your own banks, providers and income. */
 
-const { el, escMd, icoEl, safeSeg, patchFrontmatter } = require('../util');
+const { el, dateInput, keepScroll, escMd, icoEl, safeSeg, patchFrontmatter, yamlStr } = require('../util');
 const { askFields, confirmModal } = require('../modal');
 
 module.exports = function registerTax(ctx) {
@@ -70,6 +70,11 @@ module.exports = function registerTax(ctx) {
       const b = el('button', { class: 'btn-ghost', style: 'padding:0.1rem 0.5rem;font-size:0.78rem',
         'aria-label': `Create a tax page for ${y}, which already has documents` }, `Tax/${y}/ has files — add ${y}`);
       b.addEventListener('click', async () => {
+        // Through the guarded switch: seeding straight into S.taxYear would
+        // save the NEW year, clear S.taxDirty and disable Save while the
+        // previous year's unsaved edits were still sitting in memory —
+        // unreachable, unwarned, and gone at the next reload.
+        if (!await confirmDiscard()) return;
         seedTaxYear(+y);
         S.taxYear = y;
         await saveTax();
@@ -108,37 +113,52 @@ module.exports = function registerTax(ctx) {
     tile('Taxpayer', typeLabel || 'Unknown');
   }
 
+  /* Editable fields never call renderTax(). `change` fires on blur, so on a
+     phone the rebuild lands between the tap that leaves a field and the tap
+     that arrives at the next one — the DOM under the finger is replaced, and
+     the arriving tap hits whatever now occupies those coordinates (an "Add …"
+     button opens a modal; a <select> opens the native picker). Each field
+     refreshes only what actually reads it; the containers below hold the
+     pieces that more than one field feeds. */
+  let checksBox = null;
+
   function renderSeason(t) {
     const loc = locale();
     const b = $('#taxSeasonBody'); b.innerHTML = '';
     const field = (label, control) => el('label', { class: 'tax-field' }, el('span', { class: 'l' }, label), control);
+    // The two selects rebuild the whole card — taxpayer type and assessment
+    // status change which fields exist and what the season message says. Safe
+    // to do here: a select commits on close, with no keyboard and no next tap
+    // already in flight.
     b.append(el('div', { class: 'row tax-season-row' },
       field('Taxpayer type', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderTax(); } },
+        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderSeason(t); renderTaxKpis(t); } },
         ...loc.taxpayerTypes
           .map(([v, l]) => el('option', { value: v, ...(t.taxpayer_type === v ? { selected: '' } : {}) }, l)))),
       field('Assessment', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.assessment = e.target.value; mark(); renderTax(); } },
+        onchange: e => { t.assessment = e.target.value; mark(); renderSeason(t); renderTaxKpis(t); } },
         ...loc.assessments
           .map(([v, l]) => el('option', { value: v, ...(t.assessment === v ? { selected: '' } : {}) }, l)))),
-      field(loc.deadlineLabels[0], el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_standard,
-        placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_standard = e.target.value.trim(); mark(); renderTax(); } })),
-      field(loc.deadlineLabels[1], el('input', { type: 'text', class: 'form-control form-control-sm', value: t.deadline_provisional,
-        placeholder: 'YYYY-MM-DD', onchange: e => { t.deadline_provisional = e.target.value.trim(); mark(); renderTax(); } }))));
+      // Only the Deadline KPI tile reads these.
+      field(loc.deadlineLabels[0], dateInput(t.deadline_standard, { class: 'form-control form-control-sm' },
+        v => { t.deadline_standard = v; mark(); renderTaxKpis(t); })),
+      field(loc.deadlineLabels[1], dateInput(t.deadline_provisional, { class: 'form-control form-control-sm' },
+        v => { t.deadline_provisional = v; mark(); renderTaxKpis(t); }))));
 
     // Outcome fields only once there is an outcome — they are noise before it.
     if (t.assessment === 'assessed') {
-      const num = (label, key, placeholder) => field(label, el('input', { type: 'text',
+      const num = (label, key, placeholder) => field(label, el('input', { type: 'text', inputmode: 'decimal',
         class: 'form-control form-control-sm', value: t[key] === null || t[key] === undefined ? '' : String(t[key]),
         placeholder, onchange: e => {
           const raw = e.target.value.trim();
           const n = Number(raw.replace(/[^\d.-]/g, ''));
           t[key] = raw === '' ? null : (Number.isFinite(n) ? n : null);
-          mark(); renderTax();
+          mark(); renderChecks(t);   // the assessed-vs-captured reconciliation reads these
         } }));
       b.append(el('div', { class: 'row tax-season-row' },
-        field('Assessment date', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_date,
-          placeholder: 'YYYY-MM-DD', onchange: e => { t.assessment_date = e.target.value.trim(); mark(); renderTax(); } })),
+        // Nothing else displays the date or the reference — mark only.
+        field('Assessment date', dateInput(t.assessment_date, { class: 'form-control form-control-sm' },
+          v => { t.assessment_date = v; mark(); })),
         field('Reference', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_ref,
           placeholder: 'Notice / document no.', onchange: e => { t.assessment_ref = e.target.value.trim(); mark(); } })),
         num('Result (− = refund)', 'assessment_result', '-1250.00'),
@@ -147,15 +167,25 @@ module.exports = function registerTax(ctx) {
 
     b.append(el('p', { class: 'tax-season-msg' }, loc.seasonMsgs(t).join(' ')));
 
-    // Locale-aware checks over the captured figures. The profile decides what
-    // is worth saying; the view only picks the callout colour.
-    for (const m of loc.figureChecks(t.figures || [], +S.taxYear, t) || []) {
-      b.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
-        icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
-    }
+    checksBox = el('div', {});
+    b.append(checksBox);
+    renderChecks(t);
 
     b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0 0 6px' }, loc.safetyNote));
     b.append(el('p', { class: 'text-muted', style: 'font-size:12.5px;margin:0' }, disclaimer()));
+  }
+
+  /* Locale-aware checks over the captured figures. The profile decides what is
+     worth saying; the view only picks the callout colour. Its own container so
+     an edited figure or assessed amount can refresh the callouts without
+     rebuilding the field being typed in. */
+  function renderChecks(t) {
+    if (!checksBox) return;
+    checksBox.innerHTML = '';
+    for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t) || []) {
+      checksBox.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
+        icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
+    }
   }
 
   /* ------------------------------ figures -------------------------------- */
@@ -165,88 +195,110 @@ module.exports = function registerTax(ctx) {
     $('#taxFiguresSub').textContent =
       'Amounts from your certificates, by source code — what the documents actually say, so the checks above have something to read.';
 
-    const tbl = $('#taxFiguresTable'); tbl.innerHTML = '';
-    tbl.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, loc.figureCodeLabel), el('th', { scope: 'col' }, 'Description'),
-      el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
-      el('th', { scope: 'col' }, ''))));
+    const tbl = $('#taxFiguresTable');
+    keepScroll(tbl, () => {
+      tbl.innerHTML = '';
+      tbl.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, loc.figureCodeLabel), el('th', { scope: 'col' }, 'Description'),
+        el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
+        el('th', { scope: 'col' }, ''))));
 
-    const body = el('tbody', {});
-    // Free text doesn't feed the totals or the checks, so it only marks dirty —
-    // same as the Steps/Docs notes fields. Code and amount do re-render.
-    const txt = (obj, key, width) => el('input', { type: 'text', class: 'form-control form-control-sm',
-      value: obj[key], style: `min-width:${width}`, onchange: e => { obj[key] = e.target.value; mark(); } });
-    for (const f of figures) {
-      body.append(el('tr', {},
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code, style: 'width:90px',
-          onchange: e => { f.code = e.target.value.trim(); mark(); renderTax(); } })),
-        el('td', {}, txt(f, 'description', '180px')),
-        el('td', {}, txt(f, 'source', '140px')),
-        el('td', { class: 'num' }, el('input', { type: 'text', class: 'form-control form-control-sm num', style: 'width:130px',
-          value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
-          onchange: e => {
-            const n = Number(e.target.value.replace(/[^\d.-]/g, ''));
-            f.amount = Number.isFinite(n) ? n : 0; mark(); renderTax();
-          } })),
-        el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
-          'aria-label': `Remove figure ${f.code}`,
-          onclick: () => { figures.splice(figures.indexOf(f), 1); mark(); renderTax(); } }, '✕'))));
-    }
-    if (!figures.length) {
-      body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' },
-        'No figures yet — add the amounts off your certificates to unlock the checks.')));
-    }
-    tbl.append(body);
-
-    // Totals grouped by code: one row per code, which is the shape a return
-    // asks for (three banks' interest is one 4201 line, not three).
-    if (figures.length) {
-      const byCode = new Map();
+      const body = el('tbody', {});
+      // Free text doesn't feed the totals or the checks, so it only marks dirty —
+      // same as the Steps/Docs notes fields. Code and amount refresh the totals
+      // row and the callouts, but never this table's own body.
+      const txt = (obj, key, width) => el('input', { type: 'text', class: 'form-control form-control-sm',
+        value: obj[key], style: `min-width:${width}`, onchange: e => { obj[key] = e.target.value; mark(); } });
+      const refresh = () => { mark(); renderFigureTotals(t); renderChecks(t); };
       for (const f of figures) {
-        const k = (f.code || '').trim() || '—';
-        byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
+        body.append(el('tr', {},
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code, style: 'width:90px',
+            onchange: e => { f.code = e.target.value.trim(); refresh(); } })),
+          el('td', {}, txt(f, 'description', '180px')),
+          el('td', {}, txt(f, 'source', '140px')),
+          el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num', style: 'width:130px',
+            value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
+            onchange: e => {
+              const n = Number(e.target.value.replace(/[^\d.-]/g, ''));
+              f.amount = Number.isFinite(n) ? n : 0; refresh();
+            } })),
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+            'aria-label': `Remove figure ${f.code}`,
+            onclick: () => {
+              figures.splice(figures.indexOf(f), 1);
+              mark(); renderFigures(t); renderChecks(t); renderTaxKpis(t);
+            } }, '✕'))));
       }
-      const foot = el('tfoot', {});
-      for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
-        foot.append(el('tr', { class: 'tax-fig-total' },
-          el('td', { style: 'font-weight:600' }, code),
-          el('td', { colspan: '2', class: 'text-muted' }, `Total for ${code}`),
-          el('td', { class: 'num', style: 'font-weight:600' }, money(total)),
-          el('td', {})));
+      if (!figures.length) {
+        body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' },
+          'No figures yet — add the amounts off your certificates to unlock the checks.')));
       }
-      tbl.append(foot);
+      tbl.append(body);
+      renderFigureTotals(t);
+    });
+  }
+
+  /* Totals grouped by code: one row per code, which is the shape a return asks
+     for (three banks' interest is one 4201 line, not three). Replaced on its
+     own so a figure edit leaves the input it was typed into standing. */
+  function renderFigureTotals(t) {
+    const tbl = $('#taxFiguresTable');
+    const old = tbl.querySelector('tfoot');
+    if (old) old.remove();
+    const figures = t.figures || [];
+    if (!figures.length) return;
+    const byCode = new Map();
+    for (const f of figures) {
+      const k = (f.code || '').trim() || '—';
+      byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
     }
+    const foot = el('tfoot', {});
+    for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
+      foot.append(el('tr', { class: 'tax-fig-total' },
+        el('td', { style: 'font-weight:600' }, code),
+        el('td', { colspan: '2', class: 'text-muted' }, `Total for ${code}`),
+        el('td', { class: 'num', style: 'font-weight:600' }, money(total)),
+        el('td', {})));
+    }
+    tbl.append(foot);
   }
 
   const STEP_CYCLE = { todo: 'busy', busy: 'done', done: 'n/a', 'n/a': 'todo' };
   const STEP_LABEL = { todo: 'To do', busy: 'Busy', done: 'Done', 'n/a': 'N/A' };
   const STEP_ICO = { todo: ['circle'], busy: ['hourglass'], done: ['circle-check', 'check-circle'], 'n/a': ['circle-slash', 'slash'] };
 
+  const stepOverdue = s => s.status !== 'done' && s.status !== 'n/a' && daysTo(s.due) !== null && daysTo(s.due) < 0;
+
   function renderSteps(t) {
-    const tbl = $('#taxStepsTable'); tbl.innerHTML = '';
-    tbl.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Step'), el('th', { scope: 'col' }, 'Status'),
-      el('th', { scope: 'col' }, 'Due'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
-    const body = el('tbody', {});
-    for (const s of t.steps) {
-      const overdue = s.status !== 'done' && s.status !== 'n/a' && daysTo(s.due) !== null && daysTo(s.due) < 0;
-      const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`,
-        'aria-label': `Status: ${STEP_LABEL[s.status]} — click to change` },
-        icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
-      pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderTax(); });
-      body.append(el('tr', { class: s.status === 'n/a' ? 'svc-inactive' : '' },
-        el('td', { style: 'font-weight:600' }, s.step),
-        el('td', {}, pill),
-        el('td', {}, el('input', { type: 'text', class: `form-control form-control-sm ${overdue ? 'tax-overdue' : ''}`, value: s.due,
-          placeholder: 'YYYY-MM-DD', style: 'width:120px', onchange: e => { s.due = e.target.value.trim(); mark(); renderTax(); } })),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes, style: 'min-width:220px',
-          onchange: e => { s.notes = e.target.value; mark(); } })),
-        el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
-          'aria-label': `Remove step ${s.step}`,
-          onclick: () => { t.steps.splice(t.steps.indexOf(s), 1); mark(); renderTax(); } }, '✕'))));
-    }
-    if (!t.steps.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No steps yet.')));
-    tbl.append(body);
+    const tbl = $('#taxStepsTable');
+    keepScroll(tbl, () => {
+      tbl.innerHTML = '';
+      tbl.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Step'), el('th', { scope: 'col' }, 'Status'),
+        el('th', { scope: 'col' }, 'Due'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
+      const body = el('tbody', {});
+      for (const s of t.steps) {
+        const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`,
+          'aria-label': `Status: ${STEP_LABEL[s.status]} — click to change` },
+          icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
+        pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t); renderTaxKpis(t); });
+        body.append(el('tr', { class: s.status === 'n/a' ? 'svc-inactive' : '' },
+          el('td', { style: 'font-weight:600' }, s.step),
+          el('td', {}, pill),
+          // A step's due date is read by nothing but its own overdue styling —
+          // the Deadline KPI comes off the season card, not from here.
+          el('td', {}, dateInput(s.due, { class: `form-control form-control-sm ${stepOverdue(s) ? 'tax-overdue' : ''}`,
+            style: 'width:120px', 'aria-label': `Due date for ${s.step}` },
+            (v, e) => { s.due = v; mark(); e.target.classList.toggle('tax-overdue', stepOverdue(s)); })),
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes, style: 'min-width:220px',
+            onchange: e => { s.notes = e.target.value; mark(); } })),
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+            'aria-label': `Remove step ${s.step}`,
+            onclick: () => { t.steps.splice(t.steps.indexOf(s), 1); mark(); renderSteps(t); renderTaxKpis(t); } }, '✕'))));
+      }
+      if (!t.steps.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No steps yet.')));
+      tbl.append(body);
+    });
   }
 
   const DOC_CYCLE = { needed: 'n/a', uploaded: 'needed', 'n/a': 'needed' };
@@ -256,55 +308,58 @@ module.exports = function registerTax(ctx) {
   function renderDocs(t) {
     $('#taxDocsSub').innerHTML = '';
     $('#taxDocsSub').append('Certificates & records for the return · files stored in ', el('code', {}, `Tax/${S.taxYear}/`));
-    const tbl = $('#taxDocsTable'); tbl.innerHTML = '';
-    tbl.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col' }, 'Status'),
-      el('th', { scope: 'col' }, 'File'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
-    const body = el('tbody', {});
-    for (const d of t.docs) {
-      const pill = el('button', { class: `status-pill tax-${d.status.replace('/', '')}`,
-        'aria-label': `Status: ${DOC_LABEL[d.status]} — click to change` },
-        icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
-      // Cycling away from "uploaded" only changes the status — the file link
-      // (and the file itself) stays.
-      pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderTax(); });
+    const tbl = $('#taxDocsTable');
+    keepScroll(tbl, () => {
+      tbl.innerHTML = '';
+      tbl.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col' }, 'Status'),
+        el('th', { scope: 'col' }, 'File'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
+      const body = el('tbody', {});
+      for (const d of t.docs) {
+        const pill = el('button', { class: `status-pill tax-${d.status.replace('/', '')}`,
+          'aria-label': `Status: ${DOC_LABEL[d.status]} — click to change` },
+          icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
+        // Cycling away from "uploaded" only changes the status — the file link
+        // (and the file itself) stays.
+        pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderDocs(t); renderTaxKpis(t); });
 
-      // A row can carry several certificates — providers routinely issue an
-      // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
-      const fileCell = el('div', { class: 'tax-doc-files' });
-      for (const name of fileList(d)) {
-        const link = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': `Open ${name}` },
-          icoEl(['paperclip']), name);
-        link.addEventListener('click', () => openDoc(name));
-        fileCell.append(link);
+        // A row can carry several certificates — providers routinely issue an
+        // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
+        const fileCell = el('div', { class: 'tax-doc-files' });
+        for (const name of fileList(d)) {
+          const link = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': `Open ${name}` },
+            icoEl(['paperclip']), name);
+          link.addEventListener('click', () => openDoc(name));
+          fileCell.append(link);
+        }
+        const addBtn = el('button', { class: 'btn-ghost btn-ghost-sm',
+          'aria-label': `${d.file ? 'Add another file to' : 'Upload file for'} ${d.name}` },
+          icoEl(['cloud-upload', 'upload-cloud']), d.file ? ' Add' : ' Upload');
+        addBtn.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
+        fileCell.append(addBtn);
+        body.append(el('tr', { class: d.status === 'n/a' ? 'svc-inactive' : '' },
+          el('td', { style: 'font-weight:600' }, d.name),
+          el('td', { class: 'text-muted' }, d.source),
+          el('td', {}, pill),
+          el('td', {}, fileCell),
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'min-width:180px',
+            onchange: e => { d.notes = e.target.value; mark(); } })),
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+            'aria-label': `Remove document ${d.name}`,
+            onclick: async () => {
+              const kept = fileList(d);
+              const go = !kept.length || await confirmModal(app, {
+                title: 'Remove document row',
+                message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
+                confirmText: 'Remove row',
+              });
+              if (!go) return;
+              t.docs.splice(t.docs.indexOf(d), 1); mark(); renderDocs(t); renderTaxKpis(t);
+            } }, '✕'))));
       }
-      const addBtn = el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
-        'aria-label': `${d.file ? 'Add another file to' : 'Upload file for'} ${d.name}` },
-        icoEl(['cloud-upload', 'upload-cloud']), d.file ? ' Add' : ' Upload');
-      addBtn.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
-      fileCell.append(addBtn);
-      body.append(el('tr', { class: d.status === 'n/a' ? 'svc-inactive' : '' },
-        el('td', { style: 'font-weight:600' }, d.name),
-        el('td', { class: 'text-muted' }, d.source),
-        el('td', {}, pill),
-        el('td', {}, fileCell),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'min-width:180px',
-          onchange: e => { d.notes = e.target.value; mark(); } })),
-        el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem',
-          'aria-label': `Remove document ${d.name}`,
-          onclick: async () => {
-            const kept = fileList(d);
-            const go = !kept.length || await confirmModal(app, {
-              title: 'Remove document row',
-              message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
-              confirmText: 'Remove row',
-            });
-            if (!go) return;
-            t.docs.splice(t.docs.indexOf(d), 1); mark(); renderTax();
-          } }, '✕'))));
-    }
-    if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
-    tbl.append(body);
+      if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
+      tbl.append(body);
+    });
   }
 
   /* The File cell holds a ';'-separated list. A bare filename parses as a
@@ -330,6 +385,7 @@ module.exports = function registerTax(ctx) {
     const t = T();
     let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
     pendingDocTarget = null;
+    let created = false;   // did THIS call push a new row? (rolled back on write failure)
 
     const buf = await file.arrayBuffer();
 
@@ -347,9 +403,15 @@ module.exports = function registerTax(ctx) {
 
     if (!target) {
       const NEW = '＋ New document row';
-      const open = t.docs.filter(d => !d.file).map(d => `${d.name} — ${d.source}`);
+      // Options carry the row INDEX as their value. Two rows can share a label
+      // — the ZA seed ships two "IT3(b) interest certificate" rows — and both
+      // indexOf and the dropdown itself collapse duplicates, so a label lookup
+      // silently attaches the second bank's certificate to the first row.
+      const openRows = t.docs.filter(d => !d.file);
+      const options = openRows.map((d, i) => ({ value: String(i), label: `${d.name} — ${d.source}` }));
       const r = await askFields(app, `Attach "${file.name}"`, [
-        { key: 'to', label: 'Attach to', type: 'select', options: [...open, NEW], value: open[0] ?? NEW },
+        { key: 'to', label: 'Attach to', type: 'select',
+          options: [...options, { value: NEW, label: NEW }], value: options.length ? '0' : NEW },
       ]);
       if (!r) return;
       if (r.to === NEW) {
@@ -360,8 +422,10 @@ module.exports = function registerTax(ctx) {
         if (!n || !n.name.trim()) return;
         target = { name: n.name.trim(), source: (n.source || '').trim(), status: 'needed', file: '', notes: '' };
         t.docs.push(target);
+        created = true;
       } else {
-        target = t.docs.filter(d => !d.file)[open.indexOf(r.to)];
+        target = openRows[Number(r.to)];
+        if (!target) return;
       }
     }
 
@@ -377,6 +441,9 @@ module.exports = function registerTax(ctx) {
     try {
       await writeBinary(`Tax/${S.taxYear}/${name}`, buf);
     } catch (e) {
+      // A row created a moment ago for this upload has nothing behind it now —
+      // leaving it would show an empty "Needed" row that no save was told about.
+      if (created) t.docs.splice(t.docs.indexOf(target), 1);
       return toast(e.message || String(e), true);
     }
     setFileList(target, [...fileList(target), name]);
@@ -392,6 +459,9 @@ module.exports = function registerTax(ctx) {
     } else {
       toast(`Uploaded ${name}`);
     }
+    // Show the new attachment (and the "Documents in" tile) before the write —
+    // the row was only in memory until now, so nothing on screen reflected it.
+    renderDocs(t); renderTaxKpis(t);
     // The binary is already on disk — save the markdown too so the two never
     // drift apart (an unsaved row pointing at a saved file, or vice versa).
     await saveTax();
@@ -419,9 +489,10 @@ module.exports = function registerTax(ctx) {
 
   async function attachExisting(t, name) {
     const NEW = '＋ New document row';
-    const rows = t.docs.map(d => `${d.name} — ${d.source}`);
+    const options = t.docs.map((d, i) => ({ value: String(i), label: `${d.name} — ${d.source}` }));
     const r = await askFields(app, `Point a row at "${name}"`, [
-      { key: 'to', label: 'Attach to', type: 'select', options: [...rows, NEW], value: rows[0] ?? NEW },
+      { key: 'to', label: 'Attach to', type: 'select',
+        options: [...options, { value: NEW, label: NEW }], value: options.length ? '0' : NEW },
     ]);
     if (!r) return;
     let target;
@@ -434,7 +505,8 @@ module.exports = function registerTax(ctx) {
       target = { name: n.name.trim(), source: (n.source || '').trim(), status: 'needed', file: '', notes: '' };
       t.docs.push(target);
     } else {
-      target = t.docs[rows.indexOf(r.to)];
+      target = t.docs[Number(r.to)];
+      if (!target) return;
     }
     if (!fileList(target).includes(name)) setFileList(target, [...fileList(target), name]);
     target.status = 'uploaded';
@@ -459,8 +531,13 @@ module.exports = function registerTax(ctx) {
     const fm = patchFrontmatter(t.fmRaw || '', {
       kind: 'tax', tax_year: year,
       taxpayer_type: t.taxpayer_type, assessment: t.assessment,
-      deadline_standard: t.deadline_standard || null, deadline_provisional: t.deadline_provisional || null,
-      assessment_date: t.assessment_date || null, assessment_ref: t.assessment_ref || null,
+      // Quoted: these are free-text fields. An unquoted "ITA34: 2026/0031"
+      // makes the whole block unparseable to Obsidian while this plugin's own
+      // first-colon parser still reads it, so the damage stays invisible here.
+      deadline_standard: t.deadline_standard ? yamlStr(t.deadline_standard) : null,
+      deadline_provisional: t.deadline_provisional ? yamlStr(t.deadline_provisional) : null,
+      assessment_date: t.assessment_date ? yamlStr(t.assessment_date) : null,
+      assessment_ref: t.assessment_ref ? yamlStr(t.assessment_ref) : null,
       assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result : null,
       assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income : null,
     });
@@ -564,25 +641,35 @@ module.exports = function registerTax(ctx) {
     if (!r) return;
     const year = parseInt(r.year, 10);
     if (!year || year < 2000 || year > 2100) return toast('Not a valid year', true);
-    if (S.tax[String(year)]) { S.taxYear = String(year); return renderTax(); }
+    if (S.tax[String(year)]) return changeTaxYear(String(year));
+    if (!await confirmDiscard()) return;
     seedTaxYear(year);
     S.taxYear = String(year);
     await saveTax();
     renderTax();
   }
 
+  /* Every path that changes S.taxYear goes through this first. Discarding
+     re-reads the whole vault, so it uses the shared reloadFromDisk rather than
+     loadVault directly — otherwise a stale budget draft survives the reset and
+     unsaved Owed/Services edits vanish behind still-enabled Save buttons. */
+  async function confirmDiscard() {
+    if (!S.taxDirty) return true;
+    const go = await confirmModal(app, {
+      title: 'Unsaved tax changes',
+      message: 'Switching tax year will discard your unsaved edits. Continue?',
+      confirmText: 'Discard & switch',
+    });
+    if (!go) return false;
+    await ctx.reloadFromDisk();
+    return true;
+  }
+
   async function changeTaxYear(year) {
-    if (S.taxDirty) {
-      const go = await confirmModal(app, {
-        title: 'Unsaved tax changes',
-        message: 'Switching tax year will discard your unsaved edits. Continue?',
-        confirmText: 'Discard & switch',
-      });
-      if (!go) { renderTax(); return; }   // re-render to snap the select back
-      await ctx.loadVault();
-      $('#taxSave').disabled = true;      // edits discarded — nothing left to save
-    }
-    S.taxYear = year;
+    if (!await confirmDiscard()) { renderTax(); return; }   // re-render snaps the select back
+    // The reload may have dropped the year entirely (a page deleted on another
+    // device), so fall back to whatever loadVault settled on.
+    S.taxYear = S.tax[year] ? year : S.taxYear;
     renderTax();
   }
 

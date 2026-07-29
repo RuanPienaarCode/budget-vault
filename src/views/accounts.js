@@ -2,7 +2,7 @@
 /* Accounts — grouped balance tiles; clicking a balance updates the account's
    markdown file in place. */
 
-const { el, patchFrontmatter, safeSeg } = require('../util');
+const { el, patchFrontmatter, safeSeg, yamlStr } = require('../util');
 const { askFields } = require('../modal');
 
 module.exports = function registerAccounts(ctx) {
@@ -52,6 +52,7 @@ module.exports = function registerAccounts(ctx) {
           const num = parseAmount(r.balance);
           if (num === null || isNaN(num)) return toast('Not a number', true);
           a.balance = num;
+          a.balanceRaw = null;   // the user just gave us a clean figure
           a.balance_updated = new Date().toISOString().slice(0, 10);
           await saveAccount(a);
           renderAccounts();
@@ -86,7 +87,9 @@ module.exports = function registerAccounts(ctx) {
     // for byte. The body was already preserved via a.body.
     if (a.fmRaw) {
       const fm = patchFrontmatter(a.fmRaw, {
-        balance: a.balance.toFixed(2),
+        // Write the original cell back untouched when the loader could not
+        // strictly parse it and the user has not since edited the balance.
+        balance: a.balanceRaw != null ? a.balanceRaw : a.balance.toFixed(2),
         balance_updated: a.balance_updated || null,
       });
       await writeFile(`Accounts/${a.name}.md`, `---\n${fm}\n---` + (a.body || `\n\n# ${a.name}\n`));
@@ -95,8 +98,8 @@ module.exports = function registerAccounts(ctx) {
     // Legacy fallback: no captured frontmatter (a file the loader never saw) —
     // rebuild from the model.
     const lines = ['---', `type: ${a.type}`];
-    if (a.institution) lines.push(`institution: ${a.institution}`);
-    if (a.account_number) lines.push(`account_number: "${a.account_number}"`);
+    if (a.institution) lines.push(`institution: ${yamlStr(a.institution)}`);
+    if (a.account_number) lines.push(`account_number: ${yamlStr(a.account_number)}`);
     lines.push(`balance: ${a.balance.toFixed(2)}`);
     if (a.balance_updated) lines.push(`balance_updated: ${a.balance_updated}`);
     if (a.credit_limit) lines.push(`credit_limit: ${a.credit_limit.toFixed(2)}`);
@@ -106,7 +109,7 @@ module.exports = function registerAccounts(ctx) {
     if (a.total_invested) lines.push(`total_invested: ${a.total_invested.toFixed(2)}`);
     if (a.starting_amount) lines.push(`starting_amount: ${a.starting_amount.toFixed(2)}`);
     if (a.inception_date) lines.push(`inception_date: ${a.inception_date}`);
-    if (a.tx_label) lines.push(`tx_label: "${a.tx_label}"`);
+    if (a.tx_label) lines.push(`tx_label: ${yamlStr(a.tx_label)}`);
     if (a.tags) lines.push(`tags: ${a.tags}`);
     lines.push('---');
     await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));

@@ -6,7 +6,7 @@
    Google Sheets / Excel export works the same as a bank's. Date order for
    ambiguous DD/MM vs MM/DD dates follows the country profile. */
 
-const { el, parseCsv, parseStatementDate, normalizeAmount, safeSeg } = require('../util');
+const { el, parseCsv, parseStatementDate, normalizeAmount } = require('../util');
 
 /* Header-name aliases, lowercase. Exact match wins in array order; amount can
    come from a single signed column OR a debit + credit pair (Capitec "Money
@@ -18,7 +18,7 @@ const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out'
 const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules } = ctx;
+  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -29,14 +29,22 @@ module.exports = function registerImport(ctx) {
     if (loc.importHint) $('#importDropHint').textContent = loc.importHint;
   }
 
-  function autoCategorise(desc) {
+  /* Normalise the rule list ONCE per import, not once per row. Rules grow
+     monotonically (learnRules adds one per new merchant every import), so the
+     inner-loop lowercasing was rows × rules: measured 51ms at 1,200 rows and
+     2,000 rules on desktop, several hundred on a phone. The length test comes
+     before includes() for the same reason — it's the cheaper comparison. */
+  function prepareRules() {
+    return S.rules
+      .map(r => ({ p: r.pattern.trim().toLowerCase(), category: r.category }))
+      .filter(r => r.p);
+  }
+  function autoCategorise(desc, rules) {
     const d = desc.trim().toLowerCase();
     let best = '', bestLen = 0;
-    for (const r of S.rules) {
-      const p = r.pattern.trim().toLowerCase();
-      if (!p) continue;
-      if (p === d) return r.category;
-      if (d.includes(p) && p.length > bestLen) { best = r.category; bestLen = p.length; }
+    for (const r of rules) {
+      if (r.p === d) return r.category;
+      if (r.p.length > bestLen && d.includes(r.p)) { best = r.category; bestLen = r.p.length; }
     }
     return best;
   }
@@ -74,7 +82,11 @@ module.exports = function registerImport(ctx) {
     const header = rows[headerIdx].map(c => c.trim());
     const low = header.map(c => c.toLowerCase());
     const col = names => { for (const n of names) { const i = low.indexOf(n); if (i !== -1) return i; } return -1; };
-    const iDate = col(DATE_COLS);
+    // Both fall back to a substring match, mirroring the loose test the header
+    // row itself was detected with — otherwise a file headed "Date Posted" or
+    // "Effective Date" passes detection and then fails as "missing columns".
+    let iDate = col(DATE_COLS);
+    if (iDate === -1) iDate = low.findIndex(c => c.includes('date'));
     let iDesc = col(DESC_COLS);
     if (iDesc === -1) iDesc = low.findIndex(c => c.includes('desc'));  // e.g. "Transaction Descr."
     const iAmount = col(AMOUNT_COLS);
@@ -91,7 +103,11 @@ module.exports = function registerImport(ctx) {
 
     /* Auto-categorisation is O(rows × rules); chunk with a progress bar for
        anything sizeable so the UI stays responsive. */
-    const showBar = dataRows.length > 400;
+    // Threshold sized to where the work is actually perceptible: 400 rows
+    // against a typical rule set is a few milliseconds, so the bar used to
+    // flash for nothing.
+    const rules = prepareRules();
+    const showBar = dataRows.length > 1500;
     if (showBar) importProgress('start', 'Categorising transactions…');
     const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
     for (let i = 0; i < dataRows.length; i++) {
@@ -117,7 +133,7 @@ module.exports = function registerImport(ctx) {
         const date = parseStatementDate(rawDate, loc.dayFirst);
         if (!date) { skipped++; }
         else {
-          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
+          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
         }
       } else if (rawDate || desc) { skipped++; }
       if (showBar && (i % CHUNK === CHUNK - 1)) {
@@ -151,11 +167,11 @@ module.exports = function registerImport(ctx) {
     if (!p.label && labels.length) p.label = accSel.value;
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
 
-    // Canonicalise to the same sanitised form dedupSet keys by (f.label is the
-    // safeSeg'd folder name). Probing with the raw label would miss duplicates
-    // whenever a label carries a filesystem-illegal char (e.g. tx_label "FNB/Joint"),
-    // re-importing rows that are already on disk.
-    const lab = safeSeg(p.label || '').trim().toLowerCase();
+    // Canonicalise through txSegment — the same resolver commitImport writes
+    // with, and the same string dedupSet keyed by. Probing with the raw label
+    // (or with a differently-sanitised one) would miss duplicates and re-import
+    // rows that are already on disk.
+    const lab = txSegment(p.label || '').trim().toLowerCase();
     let dupes = 0;
     for (const it of p.items) {
       it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
@@ -178,19 +194,24 @@ module.exports = function registerImport(ctx) {
 
     const t = $('#impTable'); t.innerHTML = '';
     t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, ''), el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Import')),
+      el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'),
       el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Excl.'))));
     const body = el('tbody', {});
     for (const it of p.items) {
       const cls = (it.dup ? 'imp-dup' : '') + (inCurrent(it) ? ' imp-current' : '');
       body.append(el('tr', { class: cls.trim() },
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('input', { type: 'checkbox', ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked })),
+          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}`,
+            ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked })),
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, it.date),
         el('td', {}, it.desc),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
-        el('td', {}, it.dup ? (it.cat || '') : lazyCatSelect(it.cat, v => { it.cat = v; it.manual = true; })),
-        el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', onchange: e => it.excluded = e.target.checked }))));
+        el('td', {}, it.dup ? (it.cat || '') : lazyCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),
+        // `checked` reflects the model: after a partial-failure re-render the
+        // ticks used to vanish while the rows stayed excluded.
+        el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
+          ...(it.excluded ? { checked: '' } : {}), onchange: e => it.excluded = e.target.checked }))));
     }
     t.append(body);
   }
@@ -198,9 +219,11 @@ module.exports = function registerImport(ctx) {
   async function commitImport() {
     const p = S.pendingImport;
     if (!p || !p.label) return toast('Pick an account first', true);
-    // Sanitise the label before it becomes a folder name — it can originate
-    // from an Accounts file's tx_label, which may be edited on a synced device.
-    const label = safeSeg(p.label);
+    // Resolve the label before it becomes a folder name — it can originate from
+    // an Accounts file's tx_label, which may be edited on a synced device.
+    // txSegment keeps an existing folder's on-disk name so the S.txFiles key
+    // below and the path written match exactly.
+    const label = txSegment(p.label);
     if (!label) return toast('Invalid account name for import', true);
     const toAdd = p.items.filter(i => i.include && !i.dup);
     if (!toAdd.length) return toast('Nothing selected to import', true);
@@ -218,7 +241,7 @@ module.exports = function registerImport(ctx) {
       });
     }
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
-    // Same canonical form dedupSet / renderImportReview key by (the safeSeg'd
+    // Same canonical form dedupSet / renderImportReview key by (the txSegment'd
     // folder label), so a retry after a partial failure recognises landed rows.
     const lab = label.trim().toLowerCase();
     // Write each month-file and reflect it in memory in the SAME step — disk and

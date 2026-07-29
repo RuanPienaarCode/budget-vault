@@ -7,6 +7,7 @@ const { PluginSettingTab, Setting, normalizePath } = require('obsidian');
 const { DEFAULT_SETTINGS } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
+const { yamlStr } = require('./util');
 
 class BudgetSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -122,7 +123,7 @@ class BudgetSettingTab extends PluginSettingTab {
           clearTimeout(this._curTimer);
           this._curTimer = setTimeout(async () => {
             if (!v.trim()) return;
-            await this.plugin.updateBudgetSettingsMd('currency', v.trim());
+            await this.plugin.updateBudgetSettingsMd('currency', yamlStr(v.trim()));
             this.plugin.reloadViews();
           }, 800);
         });

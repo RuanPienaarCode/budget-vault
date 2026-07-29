@@ -32,6 +32,32 @@ var require_util = __commonJS((exports2, module2) => {
       n.append(kid?.nodeType ? kid : document.createTextNode(kid ?? ""));
     return n;
   };
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  function dateInput(value, attrs, commit) {
+    const v = (value ?? "").toString().trim();
+    const picker = v === "" || ISO_DATE.test(v);
+    return el("input", {
+      type: picker ? "date" : "text",
+      value: v,
+      ...picker ? {} : {
+        placeholder: "YYYY-MM-DD",
+        inputmode: "numeric",
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        spellcheck: "false"
+      },
+      ...attrs,
+      onchange: (e) => commit(e.target.value.trim(), e)
+    });
+  }
+  function keepScroll(elm, rebuild) {
+    const box = elm.parentElement;
+    const left = box ? box.scrollLeft : 0;
+    rebuild();
+    if (box)
+      box.scrollLeft = left;
+  }
   function setIco(elm, names) {
     for (const n of Array.isArray(names) ? names : [names]) {
       try {
@@ -44,6 +70,7 @@ var require_util = __commonJS((exports2, module2) => {
   function icoEl(names, cls) {
     const s = document.createElement("span");
     s.className = "ico" + (cls ? " " + cls : "");
+    s.setAttribute("aria-hidden", "true");
     setIco(s, names);
     return s;
   }
@@ -99,7 +126,7 @@ var require_util = __commonJS((exports2, module2) => {
     const t = (s ?? "").toString().trim();
     if (/^-?\d+(\.\d+)?$/.test(t))
       return { ok: true, value: parseFloat(t) };
-    return { ok: false, value: parseFloat(t) || 0, raw: t };
+    return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
   }
   function patchFrontmatter(raw, updates) {
     const has = (k) => Object.prototype.hasOwnProperty.call(updates, k);
@@ -262,8 +289,17 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return s.length >= 4 ? s : (desc ?? "").toString().trim();
   }
+  var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   function safeSeg(s) {
-    return (s ?? "").toString().replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim();
+    const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
+    return WIN_RESERVED.test(out) ? `${out}-` : out;
+  }
+  var yamlStr = (v) => `"${String(v ?? "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+  function csvCell(v) {
+    let s = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(s))
+      s = `'${s}`;
+    return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }
   function collapsePath(p) {
     const out = [];
@@ -279,7 +315,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };
 });
 
 // src/shell.js
@@ -380,6 +416,9 @@ var require_shell = __commonJS((exports2, module2) => {
       </section>
 
       <section id="view-dashboard" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Dashboard</h1>
+        </div>
         <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">
@@ -1553,7 +1592,7 @@ var require_period = __commonJS((exports2, module2) => {
 var require_load = __commonJS((exports2, module2) => {
   var { TFile } = require("obsidian");
   var { TYPE_ORDER } = require_constants();
-  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum } = require_util();
+  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require_util();
   module2.exports = function registerLoad(ctx) {
     const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod } = ctx;
     async function loadVault() {
@@ -1569,15 +1608,19 @@ var require_load = __commonJS((exports2, module2) => {
         S.settings.country = (fm.country || "za").toString().trim().toLowerCase();
         S.settings.household = fm.household || "";
       }
+      const read = async (files) => {
+        const texts = await Promise.all(files.map((f) => vault.cachedRead(f)));
+        return files.map((file, i) => ({ file, text: texts[i] }));
+      };
       S.categories = [];
-      for (const f of mdFilesIn("Categories")) {
-        const { fm } = parseFrontmatter(await vault.cachedRead(f));
-        S.categories.push({ name: fm.name || f.basename, type: fm.type || "expense", color: fm.color || "#888" });
+      for (const { file, text } of await read(mdFilesIn("Categories"))) {
+        const { fm } = parseFrontmatter(text);
+        S.categories.push({ name: fm.name || file.basename, type: fm.type || "expense", color: fm.color || "#888" });
       }
       S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
       S.accounts = [];
-      for (const f of mdFilesIn("Accounts")) {
-        const { fm, body, raw } = parseFrontmatter(await vault.cachedRead(f));
+      for (const { file: f, text: acctText } of await read(mdFilesIn("Accounts"))) {
+        const { fm, body, raw } = parseFrontmatter(acctText);
         S.accounts.push({
           name: f.basename,
           fmRaw: raw,
@@ -1585,7 +1628,7 @@ var require_load = __commonJS((exports2, module2) => {
           institution: fm.institution || "",
           account_number: fm.account_number || "",
           tx_label: fm.tx_label || "",
-          balance: parseFloat(fm.balance || "0") || 0,
+          ...((bal) => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || "0")),
           balance_updated: fm.balance_updated || "",
           credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
           goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
@@ -1601,11 +1644,8 @@ var require_load = __commonJS((exports2, module2) => {
       S.accounts.sort((a, b) => a.name.localeCompare(b.name));
       S.budgets = {};
       S.budgetMeta = {};
-      for (const f of mdFilesIn("Budgets")) {
-        if (!/^\d{4}-\d{2}$/.test(f.basename))
-          continue;
+      for (const { file: f, text } of await read(mdFilesIn("Budgets").filter((f2) => /^\d{4}-\d{2}$/.test(f2.basename)))) {
         const period = f.basename;
-        const text = await vault.cachedRead(f);
         const { raw } = parseFrontmatter(text);
         S.budgetMeta[period] = { raw };
         const rows = parseMdTable(text);
@@ -1615,34 +1655,39 @@ var require_load = __commonJS((exports2, module2) => {
         });
       }
       S.txFiles = {};
+      const txFiles = [];
       for (const acct of subfoldersIn("Transactions")) {
         for (const f of acct.children) {
           if (!(f instanceof TFile) || f.extension !== "md" || !/^\d{4}-\d{2}$/.test(f.basename))
             continue;
-          const month = f.basename;
-          const text = await vault.cachedRead(f);
-          const { raw } = parseFrontmatter(text);
-          const rows = parseMdTable(text);
-          S.txFiles[`${acct.name}/${month}`] = {
-            label: acct.name,
-            month,
-            dirty: false,
-            fmRaw: raw,
-            rows: rows.slice(1).map((c) => {
-              const amt = parseNum(c[3]);
-              return {
-                date: c[0],
-                desc: unescMd(c[1]),
-                cat: unescMd(c[2]),
-                amount: amt.value,
-                amountRaw: amt.ok ? null : amt.raw,
-                excluded: (c[4] || "").toLowerCase() === "yes",
-                note: unescMd(c[5] || "")
-              };
-            })
-          };
+          txFiles.push({ acct, f });
         }
       }
+      const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
+      txFiles.forEach(({ acct, f }, i) => {
+        const month = f.basename;
+        const text = txTexts[i];
+        const { raw } = parseFrontmatter(text);
+        const rows = parseMdTable(text);
+        S.txFiles[`${acct.name}/${month}`] = {
+          label: acct.name,
+          month,
+          dirty: false,
+          fmRaw: raw,
+          rows: rows.slice(1).map((c) => {
+            const amt = parseNum(c[3]);
+            return {
+              date: c[0],
+              desc: unescMd(c[1]),
+              cat: unescMd(c[2]),
+              amount: amt.value,
+              amountRaw: amt.ok ? null : amt.raw,
+              excluded: (c[4] || "").toLowerCase() === "yes",
+              note: unescMd(c[5] || "")
+            };
+          })
+        };
+      });
       S.rules = [];
       const rulesCsv = await readFile("Data/Categorisation Rules.csv");
       if (rulesCsv)
@@ -1687,10 +1732,7 @@ var require_load = __commonJS((exports2, module2) => {
         }
       S.tax = {};
       S.taxDirty = false;
-      for (const f of mdFilesIn("Tax")) {
-        if (!/^\d{4}$/.test(f.basename))
-          continue;
-        const text = await vault.cachedRead(f);
+      for (const { file: f, text } of await read(mdFilesIn("Tax").filter((f2) => /^\d{4}$/.test(f2.basename)))) {
         const { fm, raw, body } = parseFrontmatter(text);
         const section = (name) => {
           for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
@@ -1758,13 +1800,21 @@ var require_load = __commonJS((exports2, module2) => {
       if (!S.period)
         S.period = currentPeriod();
     }
-    Object.assign(ctx, { loadVault });
+    function txSegment(label) {
+      const want = safeSeg(label);
+      for (const f of Object.values(S.txFiles)) {
+        if (f.label === label || safeSeg(f.label) === want)
+          return f.label;
+      }
+      return want;
+    }
+    Object.assign(ctx, { loadVault, txSegment });
   };
 });
 
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter, learnPattern } = require_util();
+  var { el, parseFrontmatter, learnPattern, safeSeg, yamlStr, csvCell } = require_util();
   var { TYPE_ORDER } = require_constants();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerCategories(ctx) {
@@ -1809,8 +1859,16 @@ var require_categories = __commonJS((exports2, module2) => {
         toast("Invalid type", true);
         return null;
       }
-      const safe = realName.replace(/[\\/:*?"<>|]/g, "-").trim();
-      const nameLine = safe !== realName ? `name: "${realName}"
+      const safe = safeSeg(realName);
+      if (!safe) {
+        toast("That name has no usable characters for a filename", true);
+        return null;
+      }
+      if (fileAt(`Categories/${safe}.md`)) {
+        toast(`Categories/${safe}.md already exists`, true);
+        return null;
+      }
+      const nameLine = safe !== realName ? `name: ${yamlStr(realName)}
 ` : "";
       await writeFile(`Categories/${safe}.md`, `---
 ${nameLine}type: ${type}
@@ -1861,16 +1919,16 @@ Budget category of type **${type}**.
       sel.addEventListener("focus", refresh);
       sel.addEventListener("keydown", refresh);
     }
-    function catSelect(current, onchange) {
-      const sel = el("select", { class: "category-select" });
+    function catSelect(current, onchange, label) {
+      const sel = el("select", { class: "category-select", ...label ? { "aria-label": label } : {} });
       fillCatOptions(sel, current);
       let builtVersion = catsVersion;
       refreshOnOpen(sel, () => builtVersion, (v) => builtVersion = v);
       wireCatChange(sel, current, onchange);
       return sel;
     }
-    function lazyCatSelect(current, onchange) {
-      const sel = el("select", { class: "category-select" });
+    function lazyCatSelect(current, onchange, label) {
+      const sel = el("select", { class: "category-select", ...label ? { "aria-label": label } : {} });
       sel.append(el("option", { value: current, selected: "" }, current || "— none —"));
       let builtVersion = 0;
       refreshOnOpen(sel, () => builtVersion, (v) => builtVersion = v);
@@ -1893,7 +1951,7 @@ Budget category of type **${type}**.
       });
       if (!ok)
         return false;
-      const safe = name.replace(/[\\/:*?"<>|]/g, "-").trim();
+      const safe = safeSeg(name);
       let file = fileAt(`Categories/${safe}.md`);
       if (!file) {
         for (const f of mdFilesIn("Categories")) {
@@ -1928,7 +1986,7 @@ Budget category of type **${type}**.
       if (added) {
         S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" }));
         const csv = `pattern,category
-` + S.rules.map((r) => [r.pattern, r.category].map((v) => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(",")).join(`
+` + S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
 `) + `
 `;
         await writeFile("Data/Categorisation Rules.csv", csv);
@@ -2101,26 +2159,28 @@ var require_dashboard = __commonJS((exports2, module2) => {
 
 // src/views/transactions.js
 var require_transactions = __commonJS((exports2, module2) => {
-  var { el, escMd, patchFrontmatter, normalizeAmount, safeSeg } = require_util();
+  var { el, escMd, patchFrontmatter, normalizeAmount, yamlStr } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerTransactions(ctx) {
-    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
     function renderTransactions() {
       $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
-      const accSel = $("#txAccount");
-      const labels = [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort();
-      if (accSel.options.length !== labels.length + 1) {
-        accSel.innerHTML = '<option value="">All accounts</option>';
-        for (const l of labels)
-          accSel.append(el("option", { value: l }, l));
-      }
-      const catSel = $("#txCategory");
-      if (catSel.options.length !== S.categories.length + 2) {
-        catSel.innerHTML = '<option value="">All categories</option><option value="__none__">Uncategorised</option>';
-        for (const c of S.categories)
-          catSel.append(el("option", { value: c.name }, c.name));
-      }
+      const syncOptions = (sel, values, fixed) => {
+        const current = [...sel.options].slice(fixed.length).map((o) => o.value);
+        if (current.length === values.length && current.every((v, i) => v === values[i]))
+          return;
+        const keep = sel.value;
+        sel.innerHTML = "";
+        for (const [value, label] of fixed)
+          sel.append(el("option", { value }, label));
+        for (const v of values)
+          sel.append(el("option", { value: v }, v));
+        sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "";
+      };
+      syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", "All accounts"]]);
+      syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", "All categories"], ["__none__", "Uncategorised"]]);
+      const accSel = $("#txAccount"), catSel = $("#txCategory");
       let list;
       if ($("#txWholeHistory").checked) {
         list = [];
@@ -2153,20 +2213,32 @@ var require_transactions = __commonJS((exports2, module2) => {
           else
             pendingLearns.delete(r.desc);
           mark();
-        })), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", { type: "checkbox", ...r.excluded ? { checked: "" } : {}, onchange: (e) => {
-          r.excluded = e.target.checked;
-          mark();
-        } })), el("td", {}, el("input", { type: "text", class: "form-control form-control-sm", value: r.note, style: "width:130px", onchange: (e) => {
-          r.note = e.target.value;
-          mark();
-        } }))));
+        }, `Category for ${r.date} ${r.desc}`)), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", {
+          type: "checkbox",
+          "aria-label": `Exclude ${r.desc} from budget totals`,
+          ...r.excluded ? { checked: "" } : {},
+          onchange: (e) => {
+            r.excluded = e.target.checked;
+            mark();
+          }
+        })), el("td", {}, el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: r.note,
+          style: "width:130px",
+          "aria-label": `Note for ${r.date} ${r.desc}`,
+          onchange: (e) => {
+            r.note = e.target.value;
+            mark();
+          }
+        }))));
       }
       if (!list.length)
         body.append(el("tr", {}, el("td", { colspan: "7", class: "text-muted" }, "No transactions match.")));
       t.append(body);
     }
     function serializeTxFile(f) {
-      const fm = patchFrontmatter(f.fmRaw || "", { account: `"${f.label}"`, month: f.month });
+      const fm = patchFrontmatter(f.fmRaw || "", { account: yamlStr(f.label), month: f.month });
       const lines = [
         "---",
         fm,
@@ -2216,7 +2288,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       const desc = r.desc.trim();
       if (!desc)
         return toast("Description is required", true);
-      const label = safeSeg(r.label);
+      const label = txSegment(r.label);
       if (!label)
         return toast("Invalid account name", true);
       let amount = normalizeAmount(r.amount);
@@ -2329,14 +2401,14 @@ var require_budgets = __commonJS((exports2, module2) => {
         } }), remainingEl)), el("td", { class: `num${overActual ? " text-danger" : " text-muted"}`, style: "white-space:nowrap" }, money(actual)), el("td", {}, el("input", { type: "text", class: "form-control form-control-sm", value: d.notes, style: "width:230px", onchange: (e) => {
           d.notes = e.target.value;
           mark();
-        } })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost", style: "padding:0.2rem 0.6rem;font-size:0.78rem", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
+        } })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
           d.amount = 0;
           d.amountRaw = null;
           d.notes = "";
           d.inFile = false;
           mark();
           renderBudgets();
-        } }, "✕") : "", el("button", { class: "btn-ghost", style: "padding:0.2rem 0.6rem;font-size:0.78rem", "aria-label": `Delete category ${d.category}`, title: "Delete this category everywhere", onclick: async () => {
+        } }, "✕") : "", el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Delete category ${d.category}`, title: "Delete this category everywhere", onclick: async () => {
           if (await promptDeleteCategory(d.category)) {
             const draft2 = budgetDraft();
             const i = draft2.indexOf(d);
@@ -2424,7 +2496,7 @@ var require_budgets = __commonJS((exports2, module2) => {
 
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
-  var { el, patchFrontmatter, safeSeg } = require_util();
+  var { el, patchFrontmatter, safeSeg, yamlStr } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerAccounts(ctx) {
     const { S, $, app, money, toast, writeFile, ensureFolder, relPath } = ctx;
@@ -2471,6 +2543,7 @@ var require_accounts = __commonJS((exports2, module2) => {
             if (num === null || isNaN(num))
               return toast("Not a number", true);
             a.balance = num;
+            a.balanceRaw = null;
             a.balance_updated = new Date().toISOString().slice(0, 10);
             await saveAccount(a);
             renderAccounts();
@@ -2487,7 +2560,7 @@ var require_accounts = __commonJS((exports2, module2) => {
     async function saveAccount(a) {
       if (a.fmRaw) {
         const fm = patchFrontmatter(a.fmRaw, {
-          balance: a.balance.toFixed(2),
+          balance: a.balanceRaw != null ? a.balanceRaw : a.balance.toFixed(2),
           balance_updated: a.balance_updated || null
         });
         await writeFile(`Accounts/${a.name}.md`, `---
@@ -2500,9 +2573,9 @@ ${fm}
       }
       const lines = ["---", `type: ${a.type}`];
       if (a.institution)
-        lines.push(`institution: ${a.institution}`);
+        lines.push(`institution: ${yamlStr(a.institution)}`);
       if (a.account_number)
-        lines.push(`account_number: "${a.account_number}"`);
+        lines.push(`account_number: ${yamlStr(a.account_number)}`);
       lines.push(`balance: ${a.balance.toFixed(2)}`);
       if (a.balance_updated)
         lines.push(`balance_updated: ${a.balance_updated}`);
@@ -2521,7 +2594,7 @@ ${fm}
       if (a.inception_date)
         lines.push(`inception_date: ${a.inception_date}`);
       if (a.tx_label)
-        lines.push(`tx_label: "${a.tx_label}"`);
+        lines.push(`tx_label: ${yamlStr(a.tx_label)}`);
       if (a.tags)
         lines.push(`tags: ${a.tags}`);
       lines.push("---");
@@ -2661,11 +2734,15 @@ var require_savings = __commonJS((exports2, module2) => {
 
 // src/views/owed.js
 var require_owed = __commonJS((exports2, module2) => {
-  var { el, escMd, icoEl } = require_util();
+  var { el, dateInput, keepScroll, escMd, icoEl } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerOwed(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
-    function renderOwed() {
+    const mark = () => {
+      S.owedDirty = true;
+      $("#owedSave").disabled = false;
+    };
+    function renderOwedKpis() {
       const outstanding = S.owed.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amount, 0);
       const paid = S.owed.filter((o) => o.status === "paid").reduce((s, o) => s + o.amount, 0);
       const kpis = $("#owedKpis");
@@ -2674,64 +2751,68 @@ var require_owed = __commonJS((exports2, module2) => {
       tile("Outstanding", money(outstanding), outstanding > 0 ? "text-warning" : "");
       tile("Paid", money(paid), "text-success");
       tile("Entries", String(S.owed.length));
-      const mark = () => {
-        S.owedDirty = true;
-        $("#owedSave").disabled = false;
-      };
+    }
+    function renderOwed(focusPerson) {
+      renderOwedKpis();
       const t = $("#owedTable");
-      t.innerHTML = "";
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Person"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Due date"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, ""))));
-      const body = el("tbody", {});
-      for (const o of S.owed) {
-        const pill = el("button", { class: `status-pill status-${o.status}` }, icoEl(o.status === "paid" ? ["circle-check", "check-circle"] : ["hourglass"]), o.status === "paid" ? "Paid" : "Outstanding");
-        pill.addEventListener("click", () => {
-          o.status = o.status === "paid" ? "outstanding" : "paid";
-          mark();
-          renderOwed();
-        });
-        body.append(el("tr", {}, el("td", { style: "font-weight:600" }, o.person), el("td", {}, el("input", {
-          type: "text",
-          class: "form-control form-control-sm",
-          value: o.description,
-          style: "width:220px",
-          onchange: (e) => {
-            o.description = e.target.value;
+      keepScroll(t, () => {
+        t.innerHTML = "";
+        t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Person"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Due date"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        for (const o of S.owed) {
+          const pill = el("button", {
+            class: `status-pill status-${o.status}`,
+            "aria-label": `${o.person}: ${o.status === "paid" ? "Paid" : "Outstanding"} — click to change`
+          }, icoEl(o.status === "paid" ? ["circle-check", "check-circle"] : ["hourglass"]), o.status === "paid" ? "Paid" : "Outstanding");
+          pill.addEventListener("click", () => {
+            o.status = o.status === "paid" ? "outstanding" : "paid";
             mark();
-          }
-        })), el("td", { class: "num" }, el("input", {
-          type: "number",
-          step: "0.01",
-          class: "form-control form-control-sm",
-          value: o.amount || "",
-          onchange: (e) => {
-            o.amount = parseFloat(e.target.value) || 0;
+            renderOwed(o.person);
+          });
+          body.append(el("tr", {}, el("td", { style: "font-weight:600" }, o.person), el("td", {}, el("input", {
+            type: "text",
+            class: "form-control form-control-sm",
+            value: o.description,
+            style: "width:220px",
+            "aria-label": `Description for ${o.person}`,
+            onchange: (e) => {
+              o.description = e.target.value;
+              mark();
+            }
+          })), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            class: "form-control form-control-sm",
+            value: o.amount || "",
+            "aria-label": `Amount for ${o.person}`,
+            onchange: (e) => {
+              o.amount = parseFloat(e.target.value) || 0;
+              mark();
+              renderOwedKpis();
+            }
+          })), el("td", {}, dateInput(o.due, { class: "form-control form-control-sm", style: "width:120px", "aria-label": `Due date for ${o.person}` }, (v) => {
+            o.due = v;
             mark();
-            renderOwed();
-          }
-        })), el("td", {}, el("input", {
-          type: "text",
-          class: "form-control form-control-sm",
-          value: o.due,
-          placeholder: "YYYY-MM-DD",
-          style: "width:120px",
-          onchange: (e) => {
-            o.due = e.target.value.trim();
-            mark();
-          }
-        })), el("td", {}, pill), el("td", {}, el("button", {
-          class: "btn-ghost",
-          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-          "aria-label": `Remove ${o.person}`,
-          onclick: () => {
-            S.owed.splice(S.owed.indexOf(o), 1);
-            mark();
-            renderOwed();
-          }
-        }, "✕"))));
+          })), el("td", {}, pill), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove ${o.person}`,
+            onclick: () => {
+              S.owed.splice(S.owed.indexOf(o), 1);
+              mark();
+              renderOwed();
+            }
+          }, "✕"))));
+        }
+        if (!S.owed.length)
+          body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No entries yet.")));
+        t.append(body);
+      });
+      if (focusPerson) {
+        const i = S.owed.findIndex((o) => o.person === focusPerson);
+        const pill = t.querySelectorAll(".status-pill")[i];
+        if (pill)
+          pill.focus();
       }
-      if (!S.owed.length)
-        body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No entries yet.")));
-      t.append(body);
     }
     function serializeOwed() {
       const lines = [
@@ -2781,14 +2862,18 @@ var require_owed = __commonJS((exports2, module2) => {
 
 // src/views/services.js
 var require_services = __commonJS((exports2, module2) => {
-  var { el, escMd } = require_util();
+  var { el, dateInput, keepScroll, escMd } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerServices(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
     function monthlyEquiv(s) {
       return s.cycle === "annual" ? s.amount / 12 : s.amount;
     }
-    function renderServices() {
+    const mark = () => {
+      S.servicesDirty = true;
+      $("#svcSave").disabled = false;
+    };
+    function renderServicesKpis() {
       const active = S.services.filter((s) => s.active);
       const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
       const kpis = $("#servicesKpis");
@@ -2798,72 +2883,85 @@ var require_services = __commonJS((exports2, module2) => {
       tile("Per year", money(perMonth * 12));
       tile("Active", String(active.length));
       tile("Total services", String(S.services.length));
-      const mark = () => {
-        S.servicesDirty = true;
-        $("#svcSave").disabled = false;
-      };
-      const t = $("#svcTable");
-      t.innerHTML = "";
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Service"), el("th", { scope: "col" }, "Provider"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Cycle"), el("th", { scope: "col" }, "Next billing"), el("th", { scope: "col" }, "Active"), el("th", { scope: "col" }, ""))));
-      const body = el("tbody", {});
+    }
+    function renderServiceSubtotals() {
       const groups = Object.create(null);
       for (const s of S.services)
         (groups[s.category || "Uncategorised"] ??= []).push(s);
-      for (const cat of Object.keys(groups).sort()) {
-        const gMonthly = groups[cat].filter((s) => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
-        body.append(el("tr", { class: "type-row" }, el("td", { colspan: "6" }, cat), el("td", { class: "num" }, `${money(gMonthly, 0)}/mo`)));
-        for (const s of groups[cat]) {
-          body.append(el("tr", { class: s.active ? "" : "svc-inactive" }, el("td", { style: "font-weight:600" }, s.name), el("td", { class: "text-muted" }, s.provider), el("td", { class: "num" }, el("input", {
-            type: "number",
-            step: "0.01",
-            class: "form-control form-control-sm",
-            value: s.amount || "",
-            onchange: (e) => {
-              s.amount = parseFloat(e.target.value) || 0;
-              mark();
-              renderServices();
-            }
-          })), el("td", {}, el("select", {
-            class: "form-select form-select-sm",
-            "aria-label": `Billing cycle for ${s.name}`,
-            onchange: (e) => {
-              s.cycle = e.target.value === "annual" ? "annual" : "monthly";
-              mark();
-              renderServices();
-            }
-          }, el("option", { value: "monthly", ...s.cycle === "monthly" ? { selected: "" } : {} }, "monthly"), el("option", { value: "annual", ...s.cycle === "annual" ? { selected: "" } : {} }, "annual"))), el("td", {}, el("input", {
-            type: "date",
-            class: "form-control form-control-sm",
-            value: s.next,
-            style: "width:140px",
-            "aria-label": `Next billing date for ${s.name}`,
-            onchange: (e) => {
-              s.next = e.target.value.trim();
-              mark();
-            }
-          })), el("td", {}, el("input", {
-            type: "checkbox",
-            ...s.active ? { checked: "" } : {},
-            onchange: (e) => {
-              s.active = e.target.checked;
-              mark();
-              renderServices();
-            }
-          })), el("td", {}, el("button", {
-            class: "btn-ghost",
-            style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-            "aria-label": `Remove ${s.name}`,
-            onclick: () => {
-              S.services.splice(S.services.indexOf(s), 1);
-              mark();
-              renderServices();
-            }
-          }, "✕"))));
-        }
+      for (const row of $("#svcTable").querySelectorAll("tr.type-row")) {
+        const cat = row.dataset.cat;
+        const list = groups[cat] || [];
+        const gMonthly = list.filter((s) => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
+        row.lastElementChild.textContent = `${money(gMonthly, 0)}/mo`;
       }
-      if (!S.services.length)
-        body.append(el("tr", {}, el("td", { colspan: "7", class: "text-muted" }, "No services yet.")));
-      t.append(body);
+    }
+    function renderServices() {
+      renderServicesKpis();
+      const t = $("#svcTable");
+      keepScroll(t, () => {
+        t.innerHTML = "";
+        t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Service"), el("th", { scope: "col" }, "Provider"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Cycle"), el("th", { scope: "col" }, "Next billing"), el("th", { scope: "col" }, "Active"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        const groups = Object.create(null);
+        for (const s of S.services)
+          (groups[s.category || "Uncategorised"] ??= []).push(s);
+        for (const cat of Object.keys(groups).sort()) {
+          const gMonthly = groups[cat].filter((s) => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
+          body.append(el("tr", { class: "type-row", "data-cat": cat }, el("td", { colspan: "6" }, cat), el("td", { class: "num" }, `${money(gMonthly, 0)}/mo`)));
+          for (const s of groups[cat]) {
+            const refresh = () => {
+              mark();
+              renderServicesKpis();
+              renderServiceSubtotals();
+            };
+            body.append(el("tr", { class: s.active ? "" : "svc-inactive" }, el("td", { style: "font-weight:600" }, s.name), el("td", { class: "text-muted" }, s.provider), el("td", { class: "num" }, el("input", {
+              type: "number",
+              step: "0.01",
+              class: "form-control form-control-sm",
+              value: s.amount || "",
+              "aria-label": `Amount for ${s.name}`,
+              onchange: (e) => {
+                s.amount = parseFloat(e.target.value) || 0;
+                refresh();
+              }
+            })), el("td", {}, el("select", {
+              class: "form-select form-select-sm",
+              "aria-label": `Billing cycle for ${s.name}`,
+              onchange: (e) => {
+                s.cycle = e.target.value === "annual" ? "annual" : "monthly";
+                refresh();
+              }
+            }, el("option", { value: "monthly", ...s.cycle === "monthly" ? { selected: "" } : {} }, "monthly"), el("option", { value: "annual", ...s.cycle === "annual" ? { selected: "" } : {} }, "annual"))), el("td", {}, dateInput(s.next, {
+              class: "form-control form-control-sm",
+              style: "width:140px",
+              "aria-label": `Next billing date for ${s.name}`
+            }, (v) => {
+              s.next = v;
+              mark();
+            })), el("td", {}, el("input", {
+              type: "checkbox",
+              "aria-label": `${s.name} is active`,
+              ...s.active ? { checked: "" } : {},
+              onchange: (e) => {
+                s.active = e.target.checked;
+                mark();
+                renderServices();
+              }
+            })), el("td", {}, el("button", {
+              class: "btn-ghost btn-ghost-sm",
+              "aria-label": `Remove ${s.name}`,
+              onclick: () => {
+                S.services.splice(S.services.indexOf(s), 1);
+                mark();
+                renderServices();
+              }
+            }, "✕"))));
+          }
+        }
+        if (!S.services.length)
+          body.append(el("tr", {}, el("td", { colspan: "7", class: "text-muted" }, "No services yet.")));
+        t.append(body);
+      });
     }
     function serializeServices() {
       const lines = [
@@ -2930,7 +3028,7 @@ var require_services = __commonJS((exports2, module2) => {
 
 // src/views/tax.js
 var require_tax = __commonJS((exports2, module2) => {
-  var { el, escMd, icoEl, safeSeg, patchFrontmatter } = require_util();
+  var { el, dateInput, keepScroll, escMd, icoEl, safeSeg, patchFrontmatter, yamlStr } = require_util();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerTax(ctx) {
     const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
@@ -2984,6 +3082,8 @@ var require_tax = __commonJS((exports2, module2) => {
           "aria-label": `Create a tax page for ${y}, which already has documents`
         }, `Tax/${y}/ has files — add ${y}`);
         b.addEventListener("click", async () => {
+          if (!await confirmDiscard())
+            return;
           seedTaxYear(+y);
           S.taxYear = y;
           await saveTax();
@@ -3018,6 +3118,7 @@ var require_tax = __commonJS((exports2, module2) => {
       const typeLabel = (locale().taxpayerTypes.find(([v]) => v === t.taxpayer_type) || [])[1];
       tile("Taxpayer", typeLabel || "Unknown");
     }
+    let checksBox = null;
     function renderSeason(t) {
       const loc = locale();
       const b = $("#taxSeasonBody");
@@ -3028,39 +3129,30 @@ var require_tax = __commonJS((exports2, module2) => {
         onchange: (e) => {
           t.taxpayer_type = e.target.value;
           mark();
-          renderTax();
+          renderSeason(t);
+          renderTaxKpis(t);
         }
       }, ...loc.taxpayerTypes.map(([v, l]) => el("option", { value: v, ...t.taxpayer_type === v ? { selected: "" } : {} }, l)))), field("Assessment", el("select", {
         class: "form-select form-select-sm",
         onchange: (e) => {
           t.assessment = e.target.value;
           mark();
-          renderTax();
+          renderSeason(t);
+          renderTaxKpis(t);
         }
-      }, ...loc.assessments.map(([v, l]) => el("option", { value: v, ...t.assessment === v ? { selected: "" } : {} }, l)))), field(loc.deadlineLabels[0], el("input", {
-        type: "text",
-        class: "form-control form-control-sm",
-        value: t.deadline_standard,
-        placeholder: "YYYY-MM-DD",
-        onchange: (e) => {
-          t.deadline_standard = e.target.value.trim();
-          mark();
-          renderTax();
-        }
-      })), field(loc.deadlineLabels[1], el("input", {
-        type: "text",
-        class: "form-control form-control-sm",
-        value: t.deadline_provisional,
-        placeholder: "YYYY-MM-DD",
-        onchange: (e) => {
-          t.deadline_provisional = e.target.value.trim();
-          mark();
-          renderTax();
-        }
+      }, ...loc.assessments.map(([v, l]) => el("option", { value: v, ...t.assessment === v ? { selected: "" } : {} }, l)))), field(loc.deadlineLabels[0], dateInput(t.deadline_standard, { class: "form-control form-control-sm" }, (v) => {
+        t.deadline_standard = v;
+        mark();
+        renderTaxKpis(t);
+      })), field(loc.deadlineLabels[1], dateInput(t.deadline_provisional, { class: "form-control form-control-sm" }, (v) => {
+        t.deadline_provisional = v;
+        mark();
+        renderTaxKpis(t);
       }))));
       if (t.assessment === "assessed") {
         const num = (label, key, placeholder) => field(label, el("input", {
           type: "text",
+          inputmode: "decimal",
           class: "form-control form-control-sm",
           value: t[key] === null || t[key] === undefined ? "" : String(t[key]),
           placeholder,
@@ -3069,19 +3161,12 @@ var require_tax = __commonJS((exports2, module2) => {
             const n = Number(raw.replace(/[^\d.-]/g, ""));
             t[key] = raw === "" ? null : Number.isFinite(n) ? n : null;
             mark();
-            renderTax();
+            renderChecks(t);
           }
         }));
-        b.append(el("div", { class: "row tax-season-row" }, field("Assessment date", el("input", {
-          type: "text",
-          class: "form-control form-control-sm",
-          value: t.assessment_date,
-          placeholder: "YYYY-MM-DD",
-          onchange: (e) => {
-            t.assessment_date = e.target.value.trim();
-            mark();
-            renderTax();
-          }
+        b.append(el("div", { class: "row tax-season-row" }, field("Assessment date", dateInput(t.assessment_date, { class: "form-control form-control-sm" }, (v) => {
+          t.assessment_date = v;
+          mark();
         })), field("Reference", el("input", {
           type: "text",
           class: "form-control form-control-sm",
@@ -3094,134 +3179,157 @@ var require_tax = __commonJS((exports2, module2) => {
         })), num("Result (− = refund)", "assessment_result", "-1250.00"), num("Taxable income assessed", "assessment_income", "0.00")));
       }
       b.append(el("p", { class: "tax-season-msg" }, loc.seasonMsgs(t).join(" ")));
-      for (const m of loc.figureChecks(t.figures || [], +S.taxYear, t) || []) {
-        b.append(el("p", { class: `tax-check ${m.ok ? "tax-check-ok" : "tax-check-warn"}` }, icoEl(m.ok ? ["circle-check", "check-circle"] : ["alert-triangle", "triangle-alert"]), " ", m.text));
-      }
+      checksBox = el("div", {});
+      b.append(checksBox);
+      renderChecks(t);
       b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0 0 6px" }, loc.safetyNote));
       b.append(el("p", { class: "text-muted", style: "font-size:12.5px;margin:0" }, disclaimer()));
+    }
+    function renderChecks(t) {
+      if (!checksBox)
+        return;
+      checksBox.innerHTML = "";
+      for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t) || []) {
+        checksBox.append(el("p", { class: `tax-check ${m.ok ? "tax-check-ok" : "tax-check-warn"}` }, icoEl(m.ok ? ["circle-check", "check-circle"] : ["alert-triangle", "triangle-alert"]), " ", m.text));
+      }
     }
     function renderFigures(t) {
       const loc = locale();
       const figures = t.figures || (t.figures = []);
       $("#taxFiguresSub").textContent = "Amounts from your certificates, by source code — what the documents actually say, so the checks above have something to read.";
       const tbl = $("#taxFiguresTable");
-      tbl.innerHTML = "";
-      tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, loc.figureCodeLabel), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, ""))));
-      const body = el("tbody", {});
-      const txt = (obj, key, width) => el("input", {
-        type: "text",
-        class: "form-control form-control-sm",
-        value: obj[key],
-        style: `min-width:${width}`,
-        onchange: (e) => {
-          obj[key] = e.target.value;
-          mark();
-        }
-      });
-      for (const f of figures) {
-        body.append(el("tr", {}, el("td", {}, el("input", {
+      keepScroll(tbl, () => {
+        tbl.innerHTML = "";
+        tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, loc.figureCodeLabel), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        const txt = (obj, key, width) => el("input", {
           type: "text",
           class: "form-control form-control-sm",
-          value: f.code,
-          style: "width:90px",
+          value: obj[key],
+          style: `min-width:${width}`,
           onchange: (e) => {
-            f.code = e.target.value.trim();
+            obj[key] = e.target.value;
             mark();
-            renderTax();
           }
-        })), el("td", {}, txt(f, "description", "180px")), el("td", {}, txt(f, "source", "140px")), el("td", { class: "num" }, el("input", {
-          type: "text",
-          class: "form-control form-control-sm num",
-          style: "width:130px",
-          value: f.amount === 0 ? "" : String(f.amount),
-          placeholder: "0.00",
-          onchange: (e) => {
-            const n = Number(e.target.value.replace(/[^\d.-]/g, ""));
-            f.amount = Number.isFinite(n) ? n : 0;
-            mark();
-            renderTax();
-          }
-        })), el("td", {}, el("button", {
-          class: "btn-ghost",
-          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-          "aria-label": `Remove figure ${f.code}`,
-          onclick: () => {
-            figures.splice(figures.indexOf(f), 1);
-            mark();
-            renderTax();
-          }
-        }, "✕"))));
-      }
-      if (!figures.length) {
-        body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No figures yet — add the amounts off your certificates to unlock the checks.")));
-      }
-      tbl.append(body);
-      if (figures.length) {
-        const byCode = new Map;
+        });
+        const refresh = () => {
+          mark();
+          renderFigureTotals(t);
+          renderChecks(t);
+        };
         for (const f of figures) {
-          const k = (f.code || "").trim() || "—";
-          byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
+          body.append(el("tr", {}, el("td", {}, el("input", {
+            type: "text",
+            class: "form-control form-control-sm",
+            value: f.code,
+            style: "width:90px",
+            onchange: (e) => {
+              f.code = e.target.value.trim();
+              refresh();
+            }
+          })), el("td", {}, txt(f, "description", "180px")), el("td", {}, txt(f, "source", "140px")), el("td", { class: "num" }, el("input", {
+            type: "text",
+            inputmode: "decimal",
+            class: "form-control form-control-sm num",
+            style: "width:130px",
+            value: f.amount === 0 ? "" : String(f.amount),
+            placeholder: "0.00",
+            onchange: (e) => {
+              const n = Number(e.target.value.replace(/[^\d.-]/g, ""));
+              f.amount = Number.isFinite(n) ? n : 0;
+              refresh();
+            }
+          })), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove figure ${f.code}`,
+            onclick: () => {
+              figures.splice(figures.indexOf(f), 1);
+              mark();
+              renderFigures(t);
+              renderChecks(t);
+              renderTaxKpis(t);
+            }
+          }, "✕"))));
         }
-        const foot = el("tfoot", {});
-        for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
-          foot.append(el("tr", { class: "tax-fig-total" }, el("td", { style: "font-weight:600" }, code), el("td", { colspan: "2", class: "text-muted" }, `Total for ${code}`), el("td", { class: "num", style: "font-weight:600" }, money(total)), el("td", {})));
+        if (!figures.length) {
+          body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No figures yet — add the amounts off your certificates to unlock the checks.")));
         }
-        tbl.append(foot);
+        tbl.append(body);
+        renderFigureTotals(t);
+      });
+    }
+    function renderFigureTotals(t) {
+      const tbl = $("#taxFiguresTable");
+      const old = tbl.querySelector("tfoot");
+      if (old)
+        old.remove();
+      const figures = t.figures || [];
+      if (!figures.length)
+        return;
+      const byCode = new Map;
+      for (const f of figures) {
+        const k = (f.code || "").trim() || "—";
+        byCode.set(k, (byCode.get(k) || 0) + (f.amount || 0));
       }
+      const foot = el("tfoot", {});
+      for (const [code, total] of [...byCode].sort((a, b) => a[0].localeCompare(b[0]))) {
+        foot.append(el("tr", { class: "tax-fig-total" }, el("td", { style: "font-weight:600" }, code), el("td", { colspan: "2", class: "text-muted" }, `Total for ${code}`), el("td", { class: "num", style: "font-weight:600" }, money(total)), el("td", {})));
+      }
+      tbl.append(foot);
     }
     const STEP_CYCLE = { todo: "busy", busy: "done", done: "n/a", "n/a": "todo" };
     const STEP_LABEL = { todo: "To do", busy: "Busy", done: "Done", "n/a": "N/A" };
     const STEP_ICO = { todo: ["circle"], busy: ["hourglass"], done: ["circle-check", "check-circle"], "n/a": ["circle-slash", "slash"] };
+    const stepOverdue = (s) => s.status !== "done" && s.status !== "n/a" && daysTo(s.due) !== null && daysTo(s.due) < 0;
     function renderSteps(t) {
       const tbl = $("#taxStepsTable");
-      tbl.innerHTML = "";
-      tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Step"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "Due"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
-      const body = el("tbody", {});
-      for (const s of t.steps) {
-        const overdue = s.status !== "done" && s.status !== "n/a" && daysTo(s.due) !== null && daysTo(s.due) < 0;
-        const pill = el("button", {
-          class: `status-pill tax-${s.status.replace("/", "")}`,
-          "aria-label": `Status: ${STEP_LABEL[s.status]} — click to change`
-        }, icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
-        pill.addEventListener("click", () => {
-          s.status = STEP_CYCLE[s.status];
-          mark();
-          renderTax();
-        });
-        body.append(el("tr", { class: s.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, s.step), el("td", {}, pill), el("td", {}, el("input", {
-          type: "text",
-          class: `form-control form-control-sm ${overdue ? "tax-overdue" : ""}`,
-          value: s.due,
-          placeholder: "YYYY-MM-DD",
-          style: "width:120px",
-          onchange: (e) => {
-            s.due = e.target.value.trim();
+      keepScroll(tbl, () => {
+        tbl.innerHTML = "";
+        tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Step"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "Due"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        for (const s of t.steps) {
+          const pill = el("button", {
+            class: `status-pill tax-${s.status.replace("/", "")}`,
+            "aria-label": `Status: ${STEP_LABEL[s.status]} — click to change`
+          }, icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
+          pill.addEventListener("click", () => {
+            s.status = STEP_CYCLE[s.status];
             mark();
-            renderTax();
-          }
-        })), el("td", {}, el("input", {
-          type: "text",
-          class: "form-control form-control-sm",
-          value: s.notes,
-          style: "min-width:220px",
-          onchange: (e) => {
-            s.notes = e.target.value;
+            renderSteps(t);
+            renderTaxKpis(t);
+          });
+          body.append(el("tr", { class: s.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, s.step), el("td", {}, pill), el("td", {}, dateInput(s.due, {
+            class: `form-control form-control-sm ${stepOverdue(s) ? "tax-overdue" : ""}`,
+            style: "width:120px",
+            "aria-label": `Due date for ${s.step}`
+          }, (v, e) => {
+            s.due = v;
             mark();
-          }
-        })), el("td", {}, el("button", {
-          class: "btn-ghost",
-          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-          "aria-label": `Remove step ${s.step}`,
-          onclick: () => {
-            t.steps.splice(t.steps.indexOf(s), 1);
-            mark();
-            renderTax();
-          }
-        }, "✕"))));
-      }
-      if (!t.steps.length)
-        body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No steps yet.")));
-      tbl.append(body);
+            e.target.classList.toggle("tax-overdue", stepOverdue(s));
+          })), el("td", {}, el("input", {
+            type: "text",
+            class: "form-control form-control-sm",
+            value: s.notes,
+            style: "min-width:220px",
+            onchange: (e) => {
+              s.notes = e.target.value;
+              mark();
+            }
+          })), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove step ${s.step}`,
+            onclick: () => {
+              t.steps.splice(t.steps.indexOf(s), 1);
+              mark();
+              renderSteps(t);
+              renderTaxKpis(t);
+            }
+          }, "✕"))));
+        }
+        if (!t.steps.length)
+          body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No steps yet.")));
+        tbl.append(body);
+      });
     }
     const DOC_CYCLE = { needed: "n/a", uploaded: "needed", "n/a": "needed" };
     const DOC_LABEL = { needed: "Needed", uploaded: "Uploaded", "n/a": "N/A" };
@@ -3230,66 +3338,68 @@ var require_tax = __commonJS((exports2, module2) => {
       $("#taxDocsSub").innerHTML = "";
       $("#taxDocsSub").append("Certificates & records for the return · files stored in ", el("code", {}, `Tax/${S.taxYear}/`));
       const tbl = $("#taxDocsTable");
-      tbl.innerHTML = "";
-      tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Document"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "File"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
-      const body = el("tbody", {});
-      for (const d of t.docs) {
-        const pill = el("button", {
-          class: `status-pill tax-${d.status.replace("/", "")}`,
-          "aria-label": `Status: ${DOC_LABEL[d.status]} — click to change`
-        }, icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
-        pill.addEventListener("click", () => {
-          d.status = DOC_CYCLE[d.status];
-          mark();
-          renderTax();
-        });
-        const fileCell = el("div", { class: "tax-doc-files" });
-        for (const name of fileList(d)) {
-          const link = el("button", { class: "btn-ghost tax-doc-link", "aria-label": `Open ${name}` }, icoEl(["paperclip"]), name);
-          link.addEventListener("click", () => openDoc(name));
-          fileCell.append(link);
+      keepScroll(tbl, () => {
+        tbl.innerHTML = "";
+        tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Document"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "File"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        for (const d of t.docs) {
+          const pill = el("button", {
+            class: `status-pill tax-${d.status.replace("/", "")}`,
+            "aria-label": `Status: ${DOC_LABEL[d.status]} — click to change`
+          }, icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
+          pill.addEventListener("click", () => {
+            d.status = DOC_CYCLE[d.status];
+            mark();
+            renderDocs(t);
+            renderTaxKpis(t);
+          });
+          const fileCell = el("div", { class: "tax-doc-files" });
+          for (const name of fileList(d)) {
+            const link = el("button", { class: "btn-ghost tax-doc-link", "aria-label": `Open ${name}` }, icoEl(["paperclip"]), name);
+            link.addEventListener("click", () => openDoc(name));
+            fileCell.append(link);
+          }
+          const addBtn = el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `${d.file ? "Add another file to" : "Upload file for"} ${d.name}`
+          }, icoEl(["cloud-upload", "upload-cloud"]), d.file ? " Add" : " Upload");
+          addBtn.addEventListener("click", () => {
+            pendingDocTarget = d;
+            $("#taxFileInput").click();
+          });
+          fileCell.append(addBtn);
+          body.append(el("tr", { class: d.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, d.name), el("td", { class: "text-muted" }, d.source), el("td", {}, pill), el("td", {}, fileCell), el("td", {}, el("input", {
+            type: "text",
+            class: "form-control form-control-sm",
+            value: d.notes,
+            style: "min-width:180px",
+            onchange: (e) => {
+              d.notes = e.target.value;
+              mark();
+            }
+          })), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove document ${d.name}`,
+            onclick: async () => {
+              const kept = fileList(d);
+              const go = !kept.length || await confirmModal(app, {
+                title: "Remove document row",
+                message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
+                confirmText: "Remove row"
+              });
+              if (!go)
+                return;
+              t.docs.splice(t.docs.indexOf(d), 1);
+              mark();
+              renderDocs(t);
+              renderTaxKpis(t);
+            }
+          }, "✕"))));
         }
-        const addBtn = el("button", {
-          class: "btn-ghost",
-          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-          "aria-label": `${d.file ? "Add another file to" : "Upload file for"} ${d.name}`
-        }, icoEl(["cloud-upload", "upload-cloud"]), d.file ? " Add" : " Upload");
-        addBtn.addEventListener("click", () => {
-          pendingDocTarget = d;
-          $("#taxFileInput").click();
-        });
-        fileCell.append(addBtn);
-        body.append(el("tr", { class: d.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, d.name), el("td", { class: "text-muted" }, d.source), el("td", {}, pill), el("td", {}, fileCell), el("td", {}, el("input", {
-          type: "text",
-          class: "form-control form-control-sm",
-          value: d.notes,
-          style: "min-width:180px",
-          onchange: (e) => {
-            d.notes = e.target.value;
-            mark();
-          }
-        })), el("td", {}, el("button", {
-          class: "btn-ghost",
-          style: "padding:0.2rem 0.6rem;font-size:0.78rem",
-          "aria-label": `Remove document ${d.name}`,
-          onclick: async () => {
-            const kept = fileList(d);
-            const go = !kept.length || await confirmModal(app, {
-              title: "Remove document row",
-              message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
-              confirmText: "Remove row"
-            });
-            if (!go)
-              return;
-            t.docs.splice(t.docs.indexOf(d), 1);
-            mark();
-            renderTax();
-          }
-        }, "✕"))));
-      }
-      if (!t.docs.length)
-        body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No documents yet.")));
-      tbl.append(body);
+        if (!t.docs.length)
+          body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No documents yet.")));
+        tbl.append(body);
+      });
     }
     const FILE_SEP = ";";
     const taxSeg = (s) => safeSeg(s).replace(/;/g, "-");
@@ -3310,6 +3420,7 @@ var require_tax = __commonJS((exports2, module2) => {
       const t = T();
       let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
       pendingDocTarget = null;
+      let created = false;
       const buf = await file.arrayBuffer();
       const dupe = await findDuplicate(buf);
       if (dupe) {
@@ -3323,9 +3434,16 @@ var require_tax = __commonJS((exports2, module2) => {
       }
       if (!target) {
         const NEW = "＋ New document row";
-        const open = t.docs.filter((d) => !d.file).map((d) => `${d.name} — ${d.source}`);
+        const openRows = t.docs.filter((d) => !d.file);
+        const options = openRows.map((d, i) => ({ value: String(i), label: `${d.name} — ${d.source}` }));
         const r = await askFields(app, `Attach "${file.name}"`, [
-          { key: "to", label: "Attach to", type: "select", options: [...open, NEW], value: open[0] ?? NEW }
+          {
+            key: "to",
+            label: "Attach to",
+            type: "select",
+            options: [...options, { value: NEW, label: NEW }],
+            value: options.length ? "0" : NEW
+          }
         ]);
         if (!r)
           return;
@@ -3338,8 +3456,11 @@ var require_tax = __commonJS((exports2, module2) => {
             return;
           target = { name: n.name.trim(), source: (n.source || "").trim(), status: "needed", file: "", notes: "" };
           t.docs.push(target);
+          created = true;
         } else {
-          target = t.docs.filter((d) => !d.file)[open.indexOf(r.to)];
+          target = openRows[Number(r.to)];
+          if (!target)
+            return;
         }
       }
       let name = taxSeg(file.name) || "document";
@@ -3354,6 +3475,8 @@ var require_tax = __commonJS((exports2, module2) => {
       try {
         await writeBinary(`Tax/${S.taxYear}/${name}`, buf);
       } catch (e) {
+        if (created)
+          t.docs.splice(t.docs.indexOf(target), 1);
         return toast(e.message || String(e), true);
       }
       setFileList(target, [...fileList(target), name]);
@@ -3366,6 +3489,8 @@ var require_tax = __commonJS((exports2, module2) => {
       } else {
         toast(`Uploaded ${name}`);
       }
+      renderDocs(t);
+      renderTaxKpis(t);
       await saveTax();
     }
     async function findDuplicate(buf) {
@@ -3393,9 +3518,15 @@ var require_tax = __commonJS((exports2, module2) => {
     }
     async function attachExisting(t, name) {
       const NEW = "＋ New document row";
-      const rows = t.docs.map((d) => `${d.name} — ${d.source}`);
+      const options = t.docs.map((d, i) => ({ value: String(i), label: `${d.name} — ${d.source}` }));
       const r = await askFields(app, `Point a row at "${name}"`, [
-        { key: "to", label: "Attach to", type: "select", options: [...rows, NEW], value: rows[0] ?? NEW }
+        {
+          key: "to",
+          label: "Attach to",
+          type: "select",
+          options: [...options, { value: NEW, label: NEW }],
+          value: options.length ? "0" : NEW
+        }
       ]);
       if (!r)
         return;
@@ -3410,7 +3541,9 @@ var require_tax = __commonJS((exports2, module2) => {
         target = { name: n.name.trim(), source: (n.source || "").trim(), status: "needed", file: "", notes: "" };
         t.docs.push(target);
       } else {
-        target = t.docs[rows.indexOf(r.to)];
+        target = t.docs[Number(r.to)];
+        if (!target)
+          return;
       }
       if (!fileList(target).includes(name))
         setFileList(target, [...fileList(target), name]);
@@ -3434,10 +3567,10 @@ var require_tax = __commonJS((exports2, module2) => {
         tax_year: year,
         taxpayer_type: t.taxpayer_type,
         assessment: t.assessment,
-        deadline_standard: t.deadline_standard || null,
-        deadline_provisional: t.deadline_provisional || null,
-        assessment_date: t.assessment_date || null,
-        assessment_ref: t.assessment_ref || null,
+        deadline_standard: t.deadline_standard ? yamlStr(t.deadline_standard) : null,
+        deadline_provisional: t.deadline_provisional ? yamlStr(t.deadline_provisional) : null,
+        assessment_date: t.assessment_date ? yamlStr(t.assessment_date) : null,
+        assessment_ref: t.assessment_ref ? yamlStr(t.assessment_ref) : null,
         assessment_result: typeof t.assessment_result === "number" ? t.assessment_result : null,
         assessment_income: typeof t.assessment_income === "number" ? t.assessment_income : null
       });
@@ -3557,30 +3690,34 @@ var require_tax = __commonJS((exports2, module2) => {
       const year = parseInt(r.year, 10);
       if (!year || year < 2000 || year > 2100)
         return toast("Not a valid year", true);
-      if (S.tax[String(year)]) {
-        S.taxYear = String(year);
-        return renderTax();
-      }
+      if (S.tax[String(year)])
+        return changeTaxYear(String(year));
+      if (!await confirmDiscard())
+        return;
       seedTaxYear(year);
       S.taxYear = String(year);
       await saveTax();
       renderTax();
     }
+    async function confirmDiscard() {
+      if (!S.taxDirty)
+        return true;
+      const go = await confirmModal(app, {
+        title: "Unsaved tax changes",
+        message: "Switching tax year will discard your unsaved edits. Continue?",
+        confirmText: "Discard & switch"
+      });
+      if (!go)
+        return false;
+      await ctx.reloadFromDisk();
+      return true;
+    }
     async function changeTaxYear(year) {
-      if (S.taxDirty) {
-        const go = await confirmModal(app, {
-          title: "Unsaved tax changes",
-          message: "Switching tax year will discard your unsaved edits. Continue?",
-          confirmText: "Discard & switch"
-        });
-        if (!go) {
-          renderTax();
-          return;
-        }
-        await ctx.loadVault();
-        $("#taxSave").disabled = true;
+      if (!await confirmDiscard()) {
+        renderTax();
+        return;
       }
-      S.taxYear = year;
+      S.taxYear = S.tax[year] ? year : S.taxYear;
       renderTax();
     }
     Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile });
@@ -3589,32 +3726,32 @@ var require_tax = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, normalizeAmount, safeSeg } = require_util();
+  var { el, parseCsv, parseStatementDate, normalizeAmount } = require_util();
   var DATE_COLS = ["value date", "date", "transaction date", "posting date", "trans date"];
   var DESC_COLS = ["description", "title", "narrative", "details", "transaction description", "reference", "payee", "memo"];
   var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "value"];
   var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
   var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
-    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules } = ctx;
+    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
     function renderImport() {
       const loc = locale();
       $("#importSubNote").textContent = loc.banks ? `Bank statement exports — ${loc.banks} — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
     }
-    function autoCategorise(desc) {
+    function prepareRules() {
+      return S.rules.map((r) => ({ p: r.pattern.trim().toLowerCase(), category: r.category })).filter((r) => r.p);
+    }
+    function autoCategorise(desc, rules) {
       const d = desc.trim().toLowerCase();
       let best = "", bestLen = 0;
-      for (const r of S.rules) {
-        const p = r.pattern.trim().toLowerCase();
-        if (!p)
-          continue;
-        if (p === d)
+      for (const r of rules) {
+        if (r.p === d)
           return r.category;
-        if (d.includes(p) && p.length > bestLen) {
+        if (r.p.length > bestLen && d.includes(r.p)) {
           best = r.category;
-          bestLen = p.length;
+          bestLen = r.p.length;
         }
       }
       return best;
@@ -3658,7 +3795,9 @@ var require_import = __commonJS((exports2, module2) => {
         }
         return -1;
       };
-      const iDate = col(DATE_COLS);
+      let iDate = col(DATE_COLS);
+      if (iDate === -1)
+        iDate = low.findIndex((c) => c.includes("date"));
       let iDesc = col(DESC_COLS);
       if (iDesc === -1)
         iDesc = low.findIndex((c) => c.includes("desc"));
@@ -3672,7 +3811,8 @@ var require_import = __commonJS((exports2, module2) => {
       const label0 = detectAccountLabel(file.name);
       const dataRows = rows.slice(headerIdx + 1);
       const loc = locale();
-      const showBar = dataRows.length > 400;
+      const rules = prepareRules();
+      const showBar = dataRows.length > 1500;
       if (showBar)
         importProgress("start", "Categorising transactions…");
       const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
@@ -3698,7 +3838,7 @@ var require_import = __commonJS((exports2, module2) => {
           if (!date) {
             skipped++;
           } else {
-            items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc), include: true, excluded: false });
+            items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
           }
         } else if (rawDate || desc) {
           skipped++;
@@ -3754,7 +3894,7 @@ var require_import = __commonJS((exports2, module2) => {
         p.label = accSel.value;
         renderImportReview();
       };
-      const lab = safeSeg(p.label || "").trim().toLowerCase();
+      const lab = txSegment(p.label || "").trim().toLowerCase();
       let dupes = 0;
       for (const it of p.items) {
         it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
@@ -3778,14 +3918,24 @@ var require_import = __commonJS((exports2, module2) => {
       $("#impLegend").append(el("span", { class: "imp-legend-swatch" }), el("span", {}, `${curCount} in the current period — ${periodTitle(cur)}`));
       const t = $("#impTable");
       t.innerHTML = "";
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, ""), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Import")), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
       const body = el("tbody", {});
       for (const it of p.items) {
         const cls = (it.dup ? "imp-dup" : "") + (inCurrent(it) ? " imp-current" : "");
-        body.append(el("tr", { class: cls.trim() }, el("td", {}, it.dup ? el("span", { class: "category-badge badge-dup" }, "dup") : el("input", { type: "checkbox", ...it.include ? { checked: "" } : {}, onchange: (e) => it.include = e.target.checked })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : lazyCatSelect(it.cat, (v) => {
+        body.append(el("tr", { class: cls.trim() }, el("td", {}, it.dup ? el("span", { class: "category-badge badge-dup" }, "dup") : el("input", {
+          type: "checkbox",
+          "aria-label": `Import ${it.date} ${it.desc}, ${money(it.amount)}`,
+          ...it.include ? { checked: "" } : {},
+          onchange: (e) => it.include = e.target.checked
+        })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : lazyCatSelect(it.cat, (v) => {
           it.cat = v;
           it.manual = true;
-        })), el("td", {}, it.dup ? "" : el("input", { type: "checkbox", onchange: (e) => it.excluded = e.target.checked }))));
+        }, `Category for ${it.desc}`)), el("td", {}, it.dup ? "" : el("input", {
+          type: "checkbox",
+          "aria-label": `Exclude ${it.desc} from budget totals`,
+          ...it.excluded ? { checked: "" } : {},
+          onchange: (e) => it.excluded = e.target.checked
+        }))));
       }
       t.append(body);
     }
@@ -3793,7 +3943,7 @@ var require_import = __commonJS((exports2, module2) => {
       const p = S.pendingImport;
       if (!p || !p.label)
         return toast("Pick an account first", true);
-      const label = safeSeg(p.label);
+      const label = txSegment(p.label);
       if (!label)
         return toast("Invalid account name for import", true);
       const toAdd = p.items.filter((i) => i.include && !i.dup);
@@ -4000,10 +4150,21 @@ var require_controller = __commonJS((exports2, module2) => {
     function hasDirty() {
       return Object.values(S.txFiles).some((f) => f.dirty) || $("#budSave") && !$("#budSave").disabled || S.owedDirty || S.servicesDirty || S.taxDirty || !!S.pendingImport;
     }
-    async function connectVault() {
+    async function reloadFromDisk() {
       ctx.invalidateBudgetDraft();
+      S.pendingImport = null;
+      $("#importReview").classList.add("hidden");
+      await ctx.loadVault();
+      for (const id of ["#budSave", "#owedSave", "#svcSave", "#taxSave"]) {
+        const b = $(id);
+        if (b)
+          b.disabled = true;
+      }
+    }
+    ctx.reloadFromDisk = reloadFromDisk;
+    async function connectVault() {
       try {
-        await ctx.loadVault();
+        await reloadFromDisk();
       } catch (e) {
         S.loaded = false;
         $("#connectErr").textContent = e.message || String(e);
@@ -4026,7 +4187,31 @@ var require_controller = __commonJS((exports2, module2) => {
       switchView(S.view === "connect" ? "dashboard" : S.view);
       toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
     }
+    let lastInputAt = 0;
+    view.registerDomEvent(root, "input", () => {
+      lastInputAt = Date.now();
+    });
+    function isEditing() {
+      const a = document.activeElement;
+      if (a && root.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName))
+        return true;
+      return Date.now() - lastInputAt < 3000;
+    }
     let reloadTimer = null;
+    function scheduleReload(delay) {
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(async () => {
+        if (Date.now() - ctx.lastWriteAt() < 2000)
+          return;
+        if (hasDirty())
+          return;
+        if (isEditing())
+          return scheduleReload(1500);
+        await connectVault();
+        if (S.loaded)
+          toast("Reloaded — files changed in the vault");
+      }, delay);
+    }
     const onFsChange = (file) => {
       const path = file?.path || "";
       const bp = ctx.basePath();
@@ -4036,14 +4221,7 @@ var require_controller = __commonJS((exports2, module2) => {
         return;
       if (hasDirty())
         return;
-      clearTimeout(reloadTimer);
-      reloadTimer = setTimeout(async () => {
-        if (hasDirty() || Date.now() - ctx.lastWriteAt() < 2000)
-          return;
-        await connectVault();
-        if (S.loaded)
-          toast("Reloaded — files changed in the vault");
-      }, 800);
+      scheduleReload(800);
     };
     view.registerEvent(vault.on("modify", onFsChange));
     view.registerEvent(vault.on("create", onFsChange));
@@ -4098,8 +4276,7 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#reloadLink").addEventListener("click", async () => {
       if (!S.loaded)
         return closeDrawer();
-      ctx.invalidateBudgetDraft();
-      await ctx.loadVault();
+      await reloadFromDisk();
       closeDrawer();
       render();
       toast("Reloaded from disk");
@@ -4170,6 +4347,13 @@ var require_controller = __commonJS((exports2, module2) => {
         applyTheme();
         await connectVault();
       },
+      destroy: () => {
+        clearTimeout(reloadTimer);
+        clearTimeout(S._q);
+        const t = $("#toast");
+        if (t)
+          clearTimeout(t._h);
+      },
       reload: async () => {
         if (hasDirty()) {
           new Notice('Budget: unsaved changes — reload skipped. Save (or "Reload from disk" to discard), then retry.', 7000);
@@ -4222,10 +4406,12 @@ var require_view = __commonJS((exports2, module2) => {
           const h = vv.offsetTop + vv.height - top;
           if (h > 120)
             root.style.height = `${h}px`;
-          const a = document.activeElement;
-          if (a && root.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) {
-            window.setTimeout(() => a.scrollIntoView({ block: "center" }), 60);
-          }
+          window.setTimeout(() => {
+            const a = document.activeElement;
+            if (a && root.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) {
+              a.scrollIntoView({ block: "center" });
+            }
+          }, 60);
         } else {
           root.style.height = "";
         }
@@ -4237,6 +4423,8 @@ var require_view = __commonJS((exports2, module2) => {
       if (this.appCtl && this.appCtl.hasDirty()) {
         new Notice("Budget: the view closed with unsaved changes — they were not written to disk.", 8000);
       }
+      if (this.appCtl)
+        this.appCtl.destroy();
       this.appCtl = null;
       this.contentEl.empty();
       this.contentEl.style.height = "";
@@ -4726,6 +4914,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { DEFAULT_SETTINGS } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
+  var { yamlStr } = require_util();
 
   class BudgetSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -4797,7 +4986,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           this._curTimer = setTimeout(async () => {
             if (!v.trim())
               return;
-            await this.plugin.updateBudgetSettingsMd("currency", v.trim());
+            await this.plugin.updateBudgetSettingsMd("currency", yamlStr(v.trim()));
             this.plugin.reloadViews();
           }, 800);
         });

@@ -2,14 +2,14 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, escMd, patchFrontmatter, normalizeAmount, safeSeg } = require('../util');
+const { el, escMd, patchFrontmatter, normalizeAmount, yamlStr } = require('../util');
 const { askFields } = require('../modal');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules } = ctx;
+  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules, txSegment } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -18,17 +18,26 @@ module.exports = function registerTransactions(ctx) {
 
   function renderTransactions() {
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? 'Whole history' : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
-    const accSel = $('#txAccount');
-    const labels = [...new Set(Object.values(S.txFiles).map(f => f.label))].sort();
-    if (accSel.options.length !== labels.length + 1) {
-      accSel.innerHTML = '<option value="">All accounts</option>';
-      for (const l of labels) accSel.append(el('option', { value: l }, l));
-    }
-    const catSel = $('#txCategory');
-    if (catSel.options.length !== S.categories.length + 2) {
-      catSel.innerHTML = '<option value="">All categories</option><option value="__none__">Uncategorised</option>';
-      for (const c of S.categories) catSel.append(el('option', { value: c.name }, c.name));
-    }
+    /* Rebuild these on CONTENT, not option count. Comparing counts meant a
+       rename on another device (one label out, one in) left the select showing
+       a name that no longer matches anything — the table then reads "0 rows"
+       with no explanation and no way back short of reopening the view.
+       The previous selection is re-applied, and falls back to "all" if the
+       value it pointed at is gone. */
+    const syncOptions = (sel, values, fixed) => {
+      const current = [...sel.options].slice(fixed.length).map(o => o.value);
+      if (current.length === values.length && current.every((v, i) => v === values[i])) return;
+      const keep = sel.value;
+      sel.innerHTML = '';
+      for (const [value, label] of fixed) sel.append(el('option', { value }, label));
+      for (const v of values) sel.append(el('option', { value: v }, v));
+      sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+    };
+    syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
+      [['', 'All accounts']]);
+    syncOptions($('#txCategory'), S.categories.map(c => c.name),
+      [['', 'All categories'], ['__none__', 'Uncategorised']]);
+    const accSel = $('#txAccount'), catSel = $('#txCategory');
     let list;
     if ($('#txWholeHistory').checked) {
       list = [];
@@ -60,10 +69,13 @@ module.exports = function registerTransactions(ctx) {
           r.cat = v;
           if (v) pendingLearns.set(r.desc, v); else pendingLearns.delete(r.desc);
           mark();
-        })),
+        }, `Category for ${r.date} ${r.desc}`)),
         el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(r.amount)),
-        el('td', {}, el('input', { type: 'checkbox', ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px', onchange: e => { r.note = e.target.value; mark(); } }))));
+        el('td', {}, el('input', { type: 'checkbox', 'aria-label': `Exclude ${r.desc} from budget totals`,
+          ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
+        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
+          'aria-label': `Note for ${r.date} ${r.desc}`,
+          onchange: e => { r.note = e.target.value; mark(); } }))));
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No transactions match.')));
     t.append(body);
@@ -73,7 +85,7 @@ module.exports = function registerTransactions(ctx) {
     // Preserve the file's own frontmatter (tags, any hand-added keys); patch only
     // the account label + month. amountRaw !== null means the loader could not
     // strictly parse that cell — write it back verbatim rather than corrupting it.
-    const fm = patchFrontmatter(f.fmRaw || '', { account: `"${f.label}"`, month: f.month });
+    const fm = patchFrontmatter(f.fmRaw || '', { account: yamlStr(f.label), month: f.month });
     const lines = ['---', fm, '---', '',
       '| Date | Description | Category | Amount | Excluded | Note |',
       '|------|-------------|----------|-------:|----------|------|'];
@@ -112,7 +124,9 @@ module.exports = function registerTransactions(ctx) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Date must be YYYY-MM-DD', true);
     const desc = r.desc.trim();
     if (!desc) return toast('Description is required', true);
-    const label = safeSeg(r.label);
+    // txSegment, not safeSeg: the key below and the path further down must be
+    // the same string, and an existing folder keeps its on-disk name.
+    const label = txSegment(r.label);
     if (!label) return toast('Invalid account name', true);
     let amount = normalizeAmount(r.amount);
     if (amount == null || amount === 0) return toast('Amount must be a number other than 0', true);

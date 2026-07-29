@@ -99,6 +99,9 @@ const SHELL_HTML = `
       </section>
 
       <section id="view-dashboard" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Dashboard</h1>
+        </div>
         <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">

@@ -70,9 +70,9 @@ module.exports = function registerBudgets(ctx) {
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px', onchange: e => { d.notes = e.target.value; mark(); } })),
         el('td', { style: 'white-space:nowrap' },
           d.inFile
-            ? el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
+            ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
             : '',
-          el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Delete category ${d.category}`, title: 'Delete this category everywhere', onclick: async () => {
+          el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Delete category ${d.category}`, title: 'Delete this category everywhere', onclick: async () => {
             if (await promptDeleteCategory(d.category)) {
               const draft = budgetDraft();
               const i = draft.indexOf(d);
