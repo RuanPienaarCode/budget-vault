@@ -113,6 +113,41 @@ module.exports = function registerCategories(ctx) {
     return sel;
   }
 
+  /* Deferred variant: renders as a button and becomes a real <select> on first
+     interaction. lazyCatSelect already removed the ~40k <option> nodes at 800
+     rows; the 800 <select> ELEMENTS are what was left, and a native select is
+     the most expensive control in a mobile WebView — each carries a picker and
+     an accessibility subtree. This takes selects at rest from 800 to 0 and
+     drops ~3,200 listeners, at the cost of one extra tap the first time a row
+     is categorised. The button carries the same accessible name, so nothing is
+     lost for a screen reader; it just announces as a button until used. */
+  function deferredCatSelect(current, onchange, label) {
+    const wrap = el('span', { class: 'cat-cell' });
+    let value = current;
+    const btn = el('button', {
+      type: 'button',
+      class: `cat-cell-btn${value ? '' : ' cat-cell-empty'}`,
+      'aria-label': label ? `${label} — currently ${value || 'uncategorised'}` : undefined,
+    }, value || '— none —');
+    let swapped = false;
+    const swap = () => {
+      if (swapped) return;          // click also focuses; swap exactly once
+      swapped = true;
+      const sel = lazyCatSelect(value, v => { value = v; onchange(v); }, label);
+      wrap.replaceChildren(sel);
+      sel.focus();
+      // Open the picker straight away so the swap costs no extra interaction on
+      // desktop; mobile ignores this and shows the control ready to tap.
+      if (typeof sel.showPicker === 'function') {
+        try { sel.showPicker(); } catch (e) { /* not allowed outside a user gesture */ }
+      }
+    };
+    btn.addEventListener('click', swap);
+    btn.addEventListener('focus', swap);
+    wrap.append(btn);
+    return wrap;
+  }
+
   /* Delete a category after confirmation: the file goes to the vault's trash
      (recoverable), the in-memory list drops it. Existing transactions and past
      budget files are deliberately untouched — selects already render a stored
@@ -176,5 +211,5 @@ module.exports = function registerCategories(ctx) {
     return added;
   }
 
-  Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, learnRules });
+  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules });
 };

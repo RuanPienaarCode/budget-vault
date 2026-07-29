@@ -166,5 +166,5 @@ module.exports = function registerAccounts(ctx) {
     toast(`Created Accounts/${name}.md`);
   }
 
-  Object.assign(ctx, { renderAccounts, saveAccount, addAccount });
+  ctx.provide({ renderAccounts, saveAccount, addAccount });
 };

@@ -3,6 +3,69 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.19 — 2026-07-29
+
+The structural half of the audit — the work deliberately held back from 1.0.18
+so that data-integrity fixes and refactors did not ship in the same release.
+No file-format change.
+
+### Changed — structure
+
+- **Unsaved-work detection can no longer be forgotten.** Each view registers its
+  own dirty predicate instead of `hasDirty()` enumerating four different
+  mechanisms. The old shape failed *open*: a view missing from that list looked
+  clean to the file watcher, which then reloaded the vault over the user's
+  edits. The Budget page's state, which lived only in a button's `disabled`
+  attribute, is now backed by a real flag.
+- **`ctx` collisions throw at mount.** Sixty-five keys shared one flat namespace
+  with no detection; a silent overwrite would have surfaced later as "the wrong
+  function ran".
+- **`render` and `switchView` are available to every module.** They were
+  attached after the register chain, creating an unwritten "destructure
+  everything except these two" rule. The load-bearing register order is now
+  documented where it is easy to break.
+- The Tax page's per-field refresh lists collapsed into one `refreshDerived()`.
+  Each handler used to name its own dependents in a comment — knowledge that
+  grows with every field. The rule is now stated once: a handler may rebuild any
+  subtree with no focusable controls in it, never the one holding the control
+  that fired.
+
+### Changed — performance
+
+- **The transactions table renders 100 rows at a time** with a "show more"
+  control, instead of building up to 800 at once and rebuilding all of them on
+  every search pause and filter change.
+- **Category cells are a button until first use.** A native `<select>` is the
+  most expensive control in a mobile WebView; at a full page this is the
+  difference between zero and a hundred of them.
+- **The import review is paged too.** It previously rendered every parsed row —
+  a 12-month export froze the screen right after "Preparing review… 95%", for
+  longer than the progress bar had been measuring. It now says plainly how many
+  rows are shown and that all of them will import.
+
+### Fixed — accessibility
+
+- Cycling a tax step or document status no longer throws keyboard and
+  screen-reader users to the top of the page.
+- Switching view moves focus to the new page's heading.
+- Accessible names on the remaining table controls: budget amounts and notes,
+  tax figures, step and document notes.
+
+### Internal
+
+- **The round-trip tests now drive the real `loadVault`.** They used to parse
+  with a hand-written copy of the loader, so changing a column in `load.js`
+  alone left every test green while every save corrupted data. A new in-memory
+  vault harness closes that for transactions, budgets, owed, services and tax at
+  once, and pins that the memory key and the written path agree.
+- New tests for period maths (untested until now, and it decides which month
+  every figure is attributed to), `normalizeAmount`, `parseStatementDate` and
+  `learnPattern`.
+- New contract test: every `$('#id')` resolves, every drawer link has a section,
+  every section has a render-map entry, and no two modules publish the same
+  `ctx` key. All were true; now a rename fails the build instead of shipping.
+- Test assertions across the suite: 195 → 247. Dead CSS removed.
+
 ## 1.0.18 — 2026-07-29
 
 A full audit pass across logic, mobile behaviour, data integrity, accessibility

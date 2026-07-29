@@ -9,12 +9,18 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules, txSegment } = ctx;
+  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
      so re-picking the same transaction keeps only the final choice. */
   const pendingLearns = new Map();
+
+  /* Windowing state. `renderToken` changes whenever the FILTERS change, which
+     is what resets the window — a plain re-render (a category edit, a reload)
+     must not throw the reader back to the first page. */
+  const PAGE = 100;
+  let shown = PAGE, shownFor = null;
 
   function renderTransactions() {
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? 'Whole history' : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -47,12 +53,23 @@ module.exports = function registerTransactions(ctx) {
       list = txInPeriod(S.period).reverse();
     }
     const acc = accSel.value, cat = catSel.value, q = $('#txSearch').value.trim().toLowerCase();
+    const renderToken = `${acc}|${cat}|${q}|${$('#txWholeHistory').checked}|${S.period}`;
     list = list.filter(t =>
       (!acc || t.label === acc) &&
       (!cat || (cat === '__none__' ? !t.cat : t.cat === cat)) &&
       (!q || t.desc.toLowerCase().includes(q)));
-    if (list.length > 800) list = list.slice(0, 800);
-    $('#txCount').textContent = `${list.length} rows`;
+    /* Window the table. The old shape sliced to 800 and built every one: ~13,600
+       nodes and, before deferredCatSelect, 800 native <select>s — rebuilt in full
+       on every search pause and filter change. Render a page at a time instead
+       and let the reader ask for more; the data pipeline is not the cost here
+       (building and sorting all 5,700 rows measures under a millisecond). */
+    const total = list.length;
+    if (shownFor !== renderToken) { shown = PAGE; shownFor = renderToken; }
+    const visible = list.slice(0, shown);
+    $('#txCount').textContent = total > visible.length
+      ? `${visible.length} of ${total} rows`
+      : `${total} rows`;
+    list = visible;
     const t = $('#txTable'); t.innerHTML = '';
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col' }, 'Account'),
@@ -65,7 +82,10 @@ module.exports = function registerTransactions(ctx) {
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, r.date),
         el('td', {}, r.desc),
         el('td', { class: 'text-muted' }, item.label),
-        el('td', {}, lazyCatSelect(r.cat, v => {
+        // deferredCatSelect: a button until first use. See categories.js — at a
+        // full page of rows this is the difference between 0 and 100 native
+        // selects, and a select is the priciest control in a mobile WebView.
+        el('td', {}, deferredCatSelect(r.cat, v => {
           r.cat = v;
           if (v) pendingLearns.set(r.desc, v); else pendingLearns.delete(r.desc);
           mark();
@@ -78,6 +98,12 @@ module.exports = function registerTransactions(ctx) {
           onchange: e => { r.note = e.target.value; mark(); } }))));
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No transactions match.')));
+    if (total > list.length) {
+      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
+        `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
+      more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
+      body.append(el('tr', {}, el('td', { colspan: '7', style: 'padding:0' }, more)));
+    }
     t.append(body);
   }
 
@@ -170,5 +196,5 @@ module.exports = function registerTransactions(ctx) {
     toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
-  Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions, addTransaction });
+  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction });
 };

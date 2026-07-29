@@ -74,5 +74,5 @@ module.exports = function registerSavings(ctx) {
     }
   }
 
-  Object.assign(ctx, { renderSavings });
+  ctx.provide({ renderSavings });
 };

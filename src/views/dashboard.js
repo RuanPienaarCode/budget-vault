@@ -165,5 +165,5 @@ module.exports = function registerDashboard(ctx) {
     wrap.append(svg);
   }
 
-  Object.assign(ctx, { renderDashboard, renderTrend });
+  ctx.provide({ renderDashboard, renderTrend });
 };

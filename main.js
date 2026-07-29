@@ -1451,7 +1451,7 @@ var require_io = __commonJS((exports2, module2) => {
         return [];
       return f.children.filter((c) => c instanceof TFolder);
     }
-    Object.assign(ctx, {
+    ctx.provide({
       basePath,
       relPath,
       readFile,
@@ -1574,7 +1574,7 @@ var require_period = __commonJS((exports2, module2) => {
         spend: budget.filter((b) => b.type !== "income" && b.type !== "transfer").reduce((a, b) => a + b.amount, 0)
       };
     }
-    Object.assign(ctx, {
+    ctx.provide({
       periodRange,
       currentPeriod,
       shiftPeriod,
@@ -1808,7 +1808,7 @@ var require_load = __commonJS((exports2, module2) => {
       }
       return want;
     }
-    Object.assign(ctx, { loadVault, txSegment });
+    ctx.provide({ loadVault, txSegment });
   };
 });
 
@@ -1935,6 +1935,36 @@ Budget category of type **${type}**.
       wireCatChange(sel, current, onchange);
       return sel;
     }
+    function deferredCatSelect(current, onchange, label) {
+      const wrap = el("span", { class: "cat-cell" });
+      let value = current;
+      const btn = el("button", {
+        type: "button",
+        class: `cat-cell-btn${value ? "" : " cat-cell-empty"}`,
+        "aria-label": label ? `${label} — currently ${value || "uncategorised"}` : undefined
+      }, value || "— none —");
+      let swapped = false;
+      const swap = () => {
+        if (swapped)
+          return;
+        swapped = true;
+        const sel = lazyCatSelect(value, (v) => {
+          value = v;
+          onchange(v);
+        }, label);
+        wrap.replaceChildren(sel);
+        sel.focus();
+        if (typeof sel.showPicker === "function") {
+          try {
+            sel.showPicker();
+          } catch (e) {}
+        }
+      };
+      btn.addEventListener("click", swap);
+      btn.addEventListener("focus", swap);
+      wrap.append(btn);
+      return wrap;
+    }
     async function promptDeleteCategory(name) {
       if (!S.categories.some((c) => c.name === name))
         return false;
@@ -1993,7 +2023,7 @@ Budget category of type **${type}**.
       }
       return added;
     }
-    Object.assign(ctx, { fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, learnRules });
+    ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules });
   };
 });
 
@@ -2153,7 +2183,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       svg.style.color = "var(--text-primary)";
       wrap.append(svg);
     }
-    Object.assign(ctx, { renderDashboard, renderTrend });
+    ctx.provide({ renderDashboard, renderTrend });
   };
 });
 
@@ -2162,8 +2192,10 @@ var require_transactions = __commonJS((exports2, module2) => {
   var { el, escMd, patchFrontmatter, normalizeAmount, yamlStr } = require_util();
   var { askFields } = require_modal();
   module2.exports = function registerTransactions(ctx) {
-    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, lazyCatSelect, learnRules, txSegment } = ctx;
+    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
+    const PAGE = 100;
+    let shown = PAGE, shownFor = null;
     function renderTransactions() {
       $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const syncOptions = (sel, values, fixed) => {
@@ -2192,10 +2224,16 @@ var require_transactions = __commonJS((exports2, module2) => {
         list = txInPeriod(S.period).reverse();
       }
       const acc = accSel.value, cat = catSel.value, q = $("#txSearch").value.trim().toLowerCase();
+      const renderToken = `${acc}|${cat}|${q}|${$("#txWholeHistory").checked}|${S.period}`;
       list = list.filter((t2) => (!acc || t2.label === acc) && (!cat || (cat === "__none__" ? !t2.cat : t2.cat === cat)) && (!q || t2.desc.toLowerCase().includes(q)));
-      if (list.length > 800)
-        list = list.slice(0, 800);
-      $("#txCount").textContent = `${list.length} rows`;
+      const total = list.length;
+      if (shownFor !== renderToken) {
+        shown = PAGE;
+        shownFor = renderToken;
+      }
+      const visible = list.slice(0, shown);
+      $("#txCount").textContent = total > visible.length ? `${visible.length} of ${total} rows` : `${total} rows`;
+      list = visible;
       const t = $("#txTable");
       t.innerHTML = "";
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"))));
@@ -2206,7 +2244,7 @@ var require_transactions = __commonJS((exports2, module2) => {
           item._file.dirty = true;
           $("#txSave").disabled = false;
         };
-        body.append(el("tr", {}, el("td", { class: "text-muted", style: "white-space:nowrap" }, r.date), el("td", {}, r.desc), el("td", { class: "text-muted" }, item.label), el("td", {}, lazyCatSelect(r.cat, (v) => {
+        body.append(el("tr", {}, el("td", { class: "text-muted", style: "white-space:nowrap" }, r.date), el("td", {}, r.desc), el("td", { class: "text-muted" }, item.label), el("td", {}, deferredCatSelect(r.cat, (v) => {
           r.cat = v;
           if (v)
             pendingLearns.set(r.desc, v);
@@ -2235,6 +2273,14 @@ var require_transactions = __commonJS((exports2, module2) => {
       }
       if (!list.length)
         body.append(el("tr", {}, el("td", { colspan: "7", class: "text-muted" }, "No transactions match.")));
+      if (total > list.length) {
+        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
+        more.addEventListener("click", () => {
+          shown += PAGE;
+          renderTransactions();
+        });
+        body.append(el("tr", {}, el("td", { colspan: "7", style: "padding:0" }, more)));
+      }
       t.append(body);
     }
     function serializeTxFile(f) {
@@ -2329,7 +2375,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       $("#txSave").disabled = true;
       toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
-    Object.assign(ctx, { renderTransactions, serializeTxFile, saveTransactions, addTransaction });
+    ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction });
   };
 });
 
@@ -2340,6 +2386,7 @@ var require_budgets = __commonJS((exports2, module2) => {
   module2.exports = function registerBudgets(ctx) {
     const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
     let budDraft = null, budDraftPeriod = null;
+    let budDirty = false;
     function budgetDraft() {
       if (budDraftPeriod !== S.period || !budDraft) {
         budDraft = (S.budgets[S.period] || []).map((r) => ({ ...r, inFile: true }));
@@ -2349,6 +2396,7 @@ var require_budgets = __commonJS((exports2, module2) => {
             budDraft.push({ category: c.name, type: c.type, amount: 0, notes: "", inFile: false });
         }
         budDraftPeriod = S.period;
+        budDirty = false;
         $("#budSave").disabled = true;
       }
       return budDraft;
@@ -2356,11 +2404,13 @@ var require_budgets = __commonJS((exports2, module2) => {
     function invalidateBudgetDraft() {
       budDraft = null;
       budDraftPeriod = null;
+      budDirty = false;
     }
     function budgetDirty() {
       const b = $("#budSave");
-      return !!b && !b.disabled;
+      return budDirty || !!b && !b.disabled;
     }
+    ctx.registerDirty(budgetDirty);
     function renderBudgets() {
       $("#budPeriodLabel").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const draft = budgetDraft();
@@ -2369,7 +2419,10 @@ var require_budgets = __commonJS((exports2, module2) => {
       t.innerHTML = "";
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Type"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col", class: "num" }, "Actual so far"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
       const body = el("tbody", {});
-      const mark = () => $("#budSave").disabled = false;
+      const mark = () => {
+        budDirty = true;
+        $("#budSave").disabled = false;
+      };
       const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
       let lastType = null;
       for (const d of rows) {
@@ -2393,15 +2446,29 @@ var require_budgets = __commonJS((exports2, module2) => {
           remainingEl.className = "bud-remaining" + (over ? " over" : "");
         };
         updateRemaining();
-        body.append(el("tr", {}, el("td", {}, d.category), el("td", {}, typeBadge(d.type)), el("td", { class: "num" }, el("div", { class: "bud-amt-wrap" }, el("input", { type: "number", step: "0.01", class: "form-control form-control-sm", value: d.amount || "", onchange: (e) => {
-          d.amount = parseFloat(e.target.value) || 0;
-          d.amountRaw = null;
-          mark();
-          updateRemaining();
-        } }), remainingEl)), el("td", { class: `num${overActual ? " text-danger" : " text-muted"}`, style: "white-space:nowrap" }, money(actual)), el("td", {}, el("input", { type: "text", class: "form-control form-control-sm", value: d.notes, style: "width:230px", onchange: (e) => {
-          d.notes = e.target.value;
-          mark();
-        } })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
+        body.append(el("tr", {}, el("td", {}, d.category), el("td", {}, typeBadge(d.type)), el("td", { class: "num" }, el("div", { class: "bud-amt-wrap" }, el("input", {
+          type: "number",
+          step: "0.01",
+          class: "form-control form-control-sm",
+          value: d.amount || "",
+          "aria-label": `Budget amount for ${d.category}`,
+          onchange: (e) => {
+            d.amount = parseFloat(e.target.value) || 0;
+            d.amountRaw = null;
+            mark();
+            updateRemaining();
+          }
+        }), remainingEl)), el("td", { class: `num${overActual ? " text-danger" : " text-muted"}`, style: "white-space:nowrap" }, money(actual)), el("td", {}, el("input", {
+          type: "text",
+          class: "form-control form-control-sm",
+          value: d.notes,
+          style: "width:230px",
+          "aria-label": `Notes for ${d.category}`,
+          onchange: (e) => {
+            d.notes = e.target.value;
+            mark();
+          }
+        })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
           d.amount = 0;
           d.amountRaw = null;
           d.notes = "";
@@ -2454,6 +2521,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       lines.push("");
       await writeFile(`Budgets/${y}-${m}.md`, lines.join(`
 `));
+      budDirty = false;
       $("#budSave").disabled = true;
       toast(`Budget saved to Budgets/${S.period}.md`);
     }
@@ -2490,7 +2558,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       budgetDraft().push({ category: cat.name, type: cat.type, amount: 0, notes: "", inFile: false });
       renderBudgets();
     }
-    Object.assign(ctx, { renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
+    ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
   };
 });
 
@@ -2667,7 +2735,7 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
       ctx.render();
       toast(`Created Accounts/${name}.md`);
     }
-    Object.assign(ctx, { renderAccounts, saveAccount, addAccount });
+    ctx.provide({ renderAccounts, saveAccount, addAccount });
   };
 });
 
@@ -2728,7 +2796,7 @@ var require_savings = __commonJS((exports2, module2) => {
         wrap.append(el("div", { class: "card mb-4" }, el("div", { class: "card-h" }, el("div", {}, el("h2", {}, title), el("div", { class: "sub" }, `${list.length} accounts`)), el("div", { class: "legend" }, el("span", {}, el("b", { class: "num", style: "font-size:15px;color:var(--text-primary)" }, money(total))))), el("div", { class: "body-pad" }, grid)));
       }
     }
-    Object.assign(ctx, { renderSavings });
+    ctx.provide({ renderSavings });
   };
 });
 
@@ -2742,6 +2810,7 @@ var require_owed = __commonJS((exports2, module2) => {
       S.owedDirty = true;
       $("#owedSave").disabled = false;
     };
+    ctx.registerDirty(() => S.owedDirty);
     function renderOwedKpis() {
       const outstanding = S.owed.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amount, 0);
       const paid = S.owed.filter((o) => o.status === "paid").reduce((s, o) => s + o.amount, 0);
@@ -2856,7 +2925,7 @@ var require_owed = __commonJS((exports2, module2) => {
       $("#owedSave").disabled = false;
       renderOwed();
     }
-    Object.assign(ctx, { renderOwed, saveOwed, addOwed });
+    ctx.provide({ renderOwed, saveOwed, addOwed, serializeOwed });
   };
 });
 
@@ -2873,6 +2942,7 @@ var require_services = __commonJS((exports2, module2) => {
       S.servicesDirty = true;
       $("#svcSave").disabled = false;
     };
+    ctx.registerDirty(() => S.servicesDirty);
     function renderServicesKpis() {
       const active = S.services.filter((s) => s.active);
       const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
@@ -3022,7 +3092,7 @@ var require_services = __commonJS((exports2, module2) => {
       $("#svcSave").disabled = false;
       renderServices();
     }
-    Object.assign(ctx, { renderServices, saveServices, addService });
+    ctx.provide({ renderServices, saveServices, addService, serializeServices });
   };
 });
 
@@ -3040,6 +3110,7 @@ var require_tax = __commonJS((exports2, module2) => {
       S.taxDirty = true;
       $("#taxSave").disabled = false;
     };
+    ctx.registerDirty(() => S.taxDirty);
     function disclaimer() {
       const a = locale().authority;
       return "This tracker is a personal checklist, not tax advice. Seeded steps, documents and " + `deadline dates are editable starting points that change from year to year — confirm anything ` + `important with ${a === "Tax" ? "your tax authority" : a} or a registered tax professional.`;
@@ -3119,6 +3190,11 @@ var require_tax = __commonJS((exports2, module2) => {
       tile("Taxpayer", typeLabel || "Unknown");
     }
     let checksBox = null;
+    const refreshDerived = (t) => {
+      renderTaxKpis(t);
+      renderChecks(t);
+      renderFigureTotals(t);
+    };
     function renderSeason(t) {
       const loc = locale();
       const b = $("#taxSeasonBody");
@@ -3130,7 +3206,7 @@ var require_tax = __commonJS((exports2, module2) => {
           t.taxpayer_type = e.target.value;
           mark();
           renderSeason(t);
-          renderTaxKpis(t);
+          refreshDerived(t);
         }
       }, ...loc.taxpayerTypes.map(([v, l]) => el("option", { value: v, ...t.taxpayer_type === v ? { selected: "" } : {} }, l)))), field("Assessment", el("select", {
         class: "form-select form-select-sm",
@@ -3138,16 +3214,16 @@ var require_tax = __commonJS((exports2, module2) => {
           t.assessment = e.target.value;
           mark();
           renderSeason(t);
-          renderTaxKpis(t);
+          refreshDerived(t);
         }
       }, ...loc.assessments.map(([v, l]) => el("option", { value: v, ...t.assessment === v ? { selected: "" } : {} }, l)))), field(loc.deadlineLabels[0], dateInput(t.deadline_standard, { class: "form-control form-control-sm" }, (v) => {
         t.deadline_standard = v;
         mark();
-        renderTaxKpis(t);
+        refreshDerived(t);
       })), field(loc.deadlineLabels[1], dateInput(t.deadline_provisional, { class: "form-control form-control-sm" }, (v) => {
         t.deadline_provisional = v;
         mark();
-        renderTaxKpis(t);
+        refreshDerived(t);
       }))));
       if (t.assessment === "assessed") {
         const num = (label, key, placeholder) => field(label, el("input", {
@@ -3161,12 +3237,13 @@ var require_tax = __commonJS((exports2, module2) => {
             const n = Number(raw.replace(/[^\d.-]/g, ""));
             t[key] = raw === "" ? null : Number.isFinite(n) ? n : null;
             mark();
-            renderChecks(t);
+            refreshDerived(t);
           }
         }));
         b.append(el("div", { class: "row tax-season-row" }, field("Assessment date", dateInput(t.assessment_date, { class: "form-control form-control-sm" }, (v) => {
           t.assessment_date = v;
           mark();
+          refreshDerived(t);
         })), field("Reference", el("input", {
           type: "text",
           class: "form-control form-control-sm",
@@ -3207,6 +3284,7 @@ var require_tax = __commonJS((exports2, module2) => {
           class: "form-control form-control-sm",
           value: obj[key],
           style: `min-width:${width}`,
+          "aria-label": `${key} for figure ${obj.code || ""}`.trim(),
           onchange: (e) => {
             obj[key] = e.target.value;
             mark();
@@ -3214,8 +3292,7 @@ var require_tax = __commonJS((exports2, module2) => {
         });
         const refresh = () => {
           mark();
-          renderFigureTotals(t);
-          renderChecks(t);
+          refreshDerived(t);
         };
         for (const f of figures) {
           body.append(el("tr", {}, el("td", {}, el("input", {
@@ -3223,6 +3300,7 @@ var require_tax = __commonJS((exports2, module2) => {
             class: "form-control form-control-sm",
             value: f.code,
             style: "width:90px",
+            "aria-label": `${loc.figureCodeLabel} for ${f.description || "this figure"}`,
             onchange: (e) => {
               f.code = e.target.value.trim();
               refresh();
@@ -3234,6 +3312,7 @@ var require_tax = __commonJS((exports2, module2) => {
             style: "width:130px",
             value: f.amount === 0 ? "" : String(f.amount),
             placeholder: "0.00",
+            "aria-label": `Amount for ${f.code || "this figure"}`,
             onchange: (e) => {
               const n = Number(e.target.value.replace(/[^\d.-]/g, ""));
               f.amount = Number.isFinite(n) ? n : 0;
@@ -3246,8 +3325,7 @@ var require_tax = __commonJS((exports2, module2) => {
               figures.splice(figures.indexOf(f), 1);
               mark();
               renderFigures(t);
-              renderChecks(t);
-              renderTaxKpis(t);
+              refreshDerived(t);
             }
           }, "✕"))));
         }
@@ -3281,7 +3359,7 @@ var require_tax = __commonJS((exports2, module2) => {
     const STEP_LABEL = { todo: "To do", busy: "Busy", done: "Done", "n/a": "N/A" };
     const STEP_ICO = { todo: ["circle"], busy: ["hourglass"], done: ["circle-check", "check-circle"], "n/a": ["circle-slash", "slash"] };
     const stepOverdue = (s) => s.status !== "done" && s.status !== "n/a" && daysTo(s.due) !== null && daysTo(s.due) < 0;
-    function renderSteps(t) {
+    function renderSteps(t, focusStep) {
       const tbl = $("#taxStepsTable");
       keepScroll(tbl, () => {
         tbl.innerHTML = "";
@@ -3295,7 +3373,7 @@ var require_tax = __commonJS((exports2, module2) => {
           pill.addEventListener("click", () => {
             s.status = STEP_CYCLE[s.status];
             mark();
-            renderSteps(t);
+            renderSteps(t, s.step);
             renderTaxKpis(t);
           });
           body.append(el("tr", { class: s.status === "n/a" ? "svc-inactive" : "" }, el("td", { style: "font-weight:600" }, s.step), el("td", {}, pill), el("td", {}, dateInput(s.due, {
@@ -3311,6 +3389,7 @@ var require_tax = __commonJS((exports2, module2) => {
             class: "form-control form-control-sm",
             value: s.notes,
             style: "min-width:220px",
+            "aria-label": `Notes for ${s.step}`,
             onchange: (e) => {
               s.notes = e.target.value;
               mark();
@@ -3330,11 +3409,17 @@ var require_tax = __commonJS((exports2, module2) => {
           body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No steps yet.")));
         tbl.append(body);
       });
+      if (focusStep) {
+        const i = t.steps.findIndex((s) => s.step === focusStep);
+        const pill = tbl.querySelectorAll(".status-pill")[i];
+        if (pill)
+          pill.focus();
+      }
     }
     const DOC_CYCLE = { needed: "n/a", uploaded: "needed", "n/a": "needed" };
     const DOC_LABEL = { needed: "Needed", uploaded: "Uploaded", "n/a": "N/A" };
     const DOC_ICO = { needed: ["hourglass"], uploaded: ["circle-check", "check-circle"], "n/a": ["circle-slash", "slash"] };
-    function renderDocs(t) {
+    function renderDocs(t, focusDoc) {
       $("#taxDocsSub").innerHTML = "";
       $("#taxDocsSub").append("Certificates & records for the return · files stored in ", el("code", {}, `Tax/${S.taxYear}/`));
       const tbl = $("#taxDocsTable");
@@ -3350,7 +3435,7 @@ var require_tax = __commonJS((exports2, module2) => {
           pill.addEventListener("click", () => {
             d.status = DOC_CYCLE[d.status];
             mark();
-            renderDocs(t);
+            renderDocs(t, d.name);
             renderTaxKpis(t);
           });
           const fileCell = el("div", { class: "tax-doc-files" });
@@ -3373,6 +3458,7 @@ var require_tax = __commonJS((exports2, module2) => {
             class: "form-control form-control-sm",
             value: d.notes,
             style: "min-width:180px",
+            "aria-label": `Notes for ${d.name}`,
             onchange: (e) => {
               d.notes = e.target.value;
               mark();
@@ -3400,6 +3486,12 @@ var require_tax = __commonJS((exports2, module2) => {
           body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No documents yet.")));
         tbl.append(body);
       });
+      if (focusDoc) {
+        const i = t.docs.findIndex((d) => d.name === focusDoc);
+        const pill = tbl.querySelectorAll(".status-pill")[i];
+        if (pill)
+          pill.focus();
+      }
     }
     const FILE_SEP = ";";
     const taxSeg = (s) => safeSeg(s).replace(/;/g, "-");
@@ -3720,7 +3812,7 @@ var require_tax = __commonJS((exports2, module2) => {
       S.taxYear = S.tax[year] ? year : S.taxYear;
       renderTax();
     }
-    Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile });
+    ctx.provide({ renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile, serializeTax });
   };
 });
 
@@ -3733,7 +3825,7 @@ var require_import = __commonJS((exports2, module2) => {
   var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
   var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
-    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
+    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
     function renderImport() {
       const loc = locale();
       $("#importSubNote").textContent = loc.banks ? `Bank statement exports — ${loc.banks} — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
@@ -3853,6 +3945,7 @@ var require_import = __commonJS((exports2, module2) => {
         await new Promise((res) => setTimeout(res, 0));
       }
       S.pendingImport = { items, label: label0, seen, skipped, filename: file.name };
+      importShown = IMPORT_PAGE;
       renderImportReview();
       if (showBar)
         importProgress("done");
@@ -3875,6 +3968,8 @@ var require_import = __commonJS((exports2, module2) => {
         pct.textContent = p + "%";
       }
     }
+    const IMPORT_PAGE = 200;
+    let importShown = IMPORT_PAGE;
     function renderImportReview() {
       const p = S.pendingImport;
       if (!p)
@@ -3920,14 +4015,15 @@ var require_import = __commonJS((exports2, module2) => {
       t.innerHTML = "";
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Import")), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
       const body = el("tbody", {});
-      for (const it of p.items) {
+      const visible = p.items.slice(0, importShown);
+      for (const it of visible) {
         const cls = (it.dup ? "imp-dup" : "") + (inCurrent(it) ? " imp-current" : "");
         body.append(el("tr", { class: cls.trim() }, el("td", {}, it.dup ? el("span", { class: "category-badge badge-dup" }, "dup") : el("input", {
           type: "checkbox",
           "aria-label": `Import ${it.date} ${it.desc}, ${money(it.amount)}`,
           ...it.include ? { checked: "" } : {},
           onchange: (e) => it.include = e.target.checked
-        })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : lazyCatSelect(it.cat, (v) => {
+        })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : deferredCatSelect(it.cat, (v) => {
           it.cat = v;
           it.manual = true;
         }, `Category for ${it.desc}`)), el("td", {}, it.dup ? "" : el("input", {
@@ -3936,6 +4032,16 @@ var require_import = __commonJS((exports2, module2) => {
           ...it.excluded ? { checked: "" } : {},
           onchange: (e) => it.excluded = e.target.checked
         }))));
+      }
+      if (p.items.length > visible.length) {
+        const rest = p.items.length - visible.length;
+        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, `Show ${Math.min(IMPORT_PAGE, rest)} more of ${rest} remaining`);
+        more.addEventListener("click", () => {
+          importShown += IMPORT_PAGE;
+          renderImportReview();
+        });
+        body.append(el("tr", {}, el("td", { colspan: "6", style: "padding:0" }, more)));
+        $("#impStats").textContent += ` · showing ${visible.length}, all ${p.items.length} will import`;
       }
       t.append(body);
     }
@@ -3992,7 +4098,7 @@ var require_import = __commonJS((exports2, module2) => {
       toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? "" : "s"}` + (newRules ? `, saved ${newRules} new rules` : ""));
       ctx.switchView("transactions");
     }
-    Object.assign(ctx, { handleCsvFile, commitImport, renderImport });
+    ctx.provide({ handleCsvFile, commitImport, renderImport });
   };
 });
 
@@ -4066,6 +4172,17 @@ var require_controller = __commonJS((exports2, module2) => {
     }
     const typeBadge = (type) => el("span", { class: `category-badge badge-${type}` }, type);
     const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge, locale };
+    ctx.provide = (obj) => {
+      for (const k of Object.keys(obj)) {
+        if (k in ctx)
+          throw new Error(`Budget: ctx.${k} is already defined — two modules are publishing the same name.`);
+      }
+      Object.assign(ctx, obj);
+    };
+    const dirtyChecks = [];
+    ctx.registerDirty = (fn) => dirtyChecks.push(fn);
+    ctx.switchView = (v) => switchView(v);
+    ctx.render = () => render();
     registerIo(ctx);
     registerPeriod(ctx);
     registerLoad(ctx);
@@ -4092,6 +4209,11 @@ var require_controller = __commonJS((exports2, module2) => {
       $(`#view-${v}`).classList.remove("hidden");
       closeDrawer();
       render();
+      const h = $(`#view-${v} h1`);
+      if (h) {
+        h.setAttribute("tabindex", "-1");
+        h.focus();
+      }
     }
     function render() {
       if (!S.loaded)
@@ -4110,8 +4232,6 @@ var require_controller = __commonJS((exports2, module2) => {
         connect: () => {}
       })[S.view]();
     }
-    ctx.switchView = switchView;
-    ctx.render = render;
     function openDrawer() {
       const d = $("#appDrawer");
       d.classList.add("open");
@@ -4147,8 +4267,10 @@ var require_controller = __commonJS((exports2, module2) => {
       if (S.loaded && S.view === "dashboard")
         ctx.renderTrend();
     }
+    ctx.registerDirty(() => Object.values(S.txFiles).some((f) => f.dirty));
+    ctx.registerDirty(() => !!S.pendingImport);
     function hasDirty() {
-      return Object.values(S.txFiles).some((f) => f.dirty) || $("#budSave") && !$("#budSave").disabled || S.owedDirty || S.servicesDirty || S.taxDirty || !!S.pendingImport;
+      return dirtyChecks.some((fn) => fn());
     }
     async function reloadFromDisk() {
       ctx.invalidateBudgetDraft();

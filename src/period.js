@@ -85,7 +85,7 @@ module.exports = function registerPeriod(ctx) {
     };
   }
 
-  Object.assign(ctx, {
+  ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, txInPeriod,
     catType, periodSummary, budgetTotals,
   });

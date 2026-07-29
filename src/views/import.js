@@ -18,7 +18,7 @@ const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out'
 const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, lazyCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
+  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -143,6 +143,7 @@ module.exports = function registerImport(ctx) {
     }
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
     S.pendingImport = { items, label: label0, seen, skipped, filename: file.name };
+    importShown = IMPORT_PAGE;   // a fresh file starts at the first page
     renderImportReview();
     if (showBar) importProgress('done');
   }
@@ -154,6 +155,15 @@ module.exports = function registerImport(ctx) {
     if (text) lbl.textContent = text;
     if (frac != null) { const p = Math.round(frac * 100); bar.style.width = p + '%'; pct.textContent = p + '%'; }
   }
+
+  /* The review table had no cap at all: a 12-month export (2,000 rows) built
+     ~30,000 nodes and 6,000 native controls in one uninterruptible pass, so the
+     screen froze right after the progress bar reached "Preparing review… 95%" —
+     a stall longer than everything the bar was actually measuring. Render a
+     page at a time; the checkboxes below operate on p.items, not on the DOM, so
+     selecting all still covers rows that were never rendered. */
+  const IMPORT_PAGE = 200;
+  let importShown = IMPORT_PAGE;
 
   function renderImportReview() {
     const p = S.pendingImport;
@@ -198,7 +208,8 @@ module.exports = function registerImport(ctx) {
       el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'),
       el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Excl.'))));
     const body = el('tbody', {});
-    for (const it of p.items) {
+    const visible = p.items.slice(0, importShown);
+    for (const it of visible) {
       const cls = (it.dup ? 'imp-dup' : '') + (inCurrent(it) ? ' imp-current' : '');
       body.append(el('tr', { class: cls.trim() },
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
@@ -207,11 +218,21 @@ module.exports = function registerImport(ctx) {
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, it.date),
         el('td', {}, it.desc),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
-        el('td', {}, it.dup ? (it.cat || '') : lazyCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),
+        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),
         // `checked` reflects the model: after a partial-failure re-render the
         // ticks used to vanish while the rows stayed excluded.
         el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
           ...(it.excluded ? { checked: '' } : {}), onchange: e => it.excluded = e.target.checked }))));
+    }
+    if (p.items.length > visible.length) {
+      const rest = p.items.length - visible.length;
+      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
+        `Show ${Math.min(IMPORT_PAGE, rest)} more of ${rest} remaining`);
+      more.addEventListener('click', () => { importShown += IMPORT_PAGE; renderImportReview(); });
+      body.append(el('tr', {}, el('td', { colspan: '6', style: 'padding:0' }, more)));
+      // Say so out loud — a silent cap reads as "these are all the rows", and
+      // the user is about to press a button that imports the ones off-screen too.
+      $('#impStats').textContent += ` · showing ${visible.length}, all ${p.items.length} will import`;
     }
     t.append(body);
   }
@@ -285,5 +306,5 @@ module.exports = function registerImport(ctx) {
     ctx.switchView('transactions');
   }
 
-  Object.assign(ctx, { handleCsvFile, commitImport, renderImport });
+  ctx.provide({ handleCsvFile, commitImport, renderImport });
 };

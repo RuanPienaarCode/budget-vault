@@ -234,5 +234,5 @@ module.exports = function registerLoad(ctx) {
     return want;
   }
 
-  Object.assign(ctx, { loadVault, txSegment });
+  ctx.provide({ loadVault, txSegment });
 };

@@ -10,6 +10,7 @@ module.exports = function registerServices(ctx) {
 
   function monthlyEquiv(s) { return s.cycle === 'annual' ? s.amount / 12 : s.amount; }
   const mark = () => { S.servicesDirty = true; $('#svcSave').disabled = false; };
+  ctx.registerDirty(() => S.servicesDirty);
 
   /* Split out so an edited amount can refresh the totals without rebuilding
      the row it was typed into — on a phone `change` fires on blur, so a full
@@ -121,5 +122,5 @@ module.exports = function registerServices(ctx) {
     S.servicesDirty = true; $('#svcSave').disabled = false; renderServices();
   }
 
-  Object.assign(ctx, { renderServices, saveServices, addService });
+  ctx.provide({ renderServices, saveServices, addService, serializeServices });
 };
