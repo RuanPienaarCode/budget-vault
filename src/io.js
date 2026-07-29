@@ -78,7 +78,7 @@ module.exports = function registerIo(ctx) {
     return f.children.filter(c => c instanceof TFolder);
   }
 
-  Object.assign(ctx, {
+  ctx.provide({
     basePath, relPath, readFile, writeFile, writeBinary, fileAt, mdFilesIn, subfoldersIn, ensureFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   });

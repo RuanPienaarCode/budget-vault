@@ -9,6 +9,12 @@ module.exports = function registerBudgets(ctx) {
   const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
 
   let budDraft = null, budDraftPeriod = null;
+  /* This page's dirty state used to live only in the DOM, read back off
+     #budSave.disabled. That gates the file watcher, and reading a button
+     fails OPEN — if the button is ever missing it reports "clean" and the
+     watcher reloads over unsaved edits. Back it with a real flag; the DOM
+     check stays as a fallback for any path that only touches the button. */
+  let budDirty = false;
   /* Like the Laravel app's Budget page, the draft covers EVERY category — rows
      present in Budgets/<period>.md carry their amounts (inFile: true); all
      other categories appear as zero rows (inFile: false) that only persist
@@ -21,6 +27,7 @@ module.exports = function registerBudgets(ctx) {
         if (!have.has(c.name)) budDraft.push({ category: c.name, type: c.type, amount: 0, notes: '', inFile: false });
       }
       budDraftPeriod = S.period;
+      budDirty = false;
       $('#budSave').disabled = true;
     }
     return budDraft;
@@ -28,9 +35,10 @@ module.exports = function registerBudgets(ctx) {
   // Drop the in-memory draft so it rebuilds from S.budgets on next render.
   // Called after any reload from disk (sync / manual edit) so a stale draft
   // can never be saved over freshly-loaded data.
-  function invalidateBudgetDraft() { budDraft = null; budDraftPeriod = null; }
-  // True when the budget view holds unsaved edits (Save button enabled).
-  function budgetDirty() { const b = $('#budSave'); return !!b && !b.disabled; }
+  function invalidateBudgetDraft() { budDraft = null; budDraftPeriod = null; budDirty = false; }
+  // True when the budget view holds unsaved edits.
+  function budgetDirty() { const b = $('#budSave'); return budDirty || (!!b && !b.disabled); }
+  ctx.registerDirty(budgetDirty);
 
   function renderBudgets() {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -41,7 +49,7 @@ module.exports = function registerBudgets(ctx) {
       el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Type'),
       el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col', class: 'num' }, 'Actual so far'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
     const body = el('tbody', {});
-    const mark = () => $('#budSave').disabled = false;
+    const mark = () => { budDirty = true; $('#budSave').disabled = false; };
     const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
     let lastType = null;
     for (const d of rows) {
@@ -64,10 +72,12 @@ module.exports = function registerBudgets(ctx) {
         el('td', {}, d.category),
         el('td', {}, typeBadge(d.type)),
         el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
-          el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '', onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); } }),
+          el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
+            'aria-label': `Budget amount for ${d.category}`, onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); } }),
           remainingEl)),
         el('td', { class: `num${overActual ? ' text-danger' : ' text-muted'}`, style: 'white-space:nowrap' }, money(actual)),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px', onchange: e => { d.notes = e.target.value; mark(); } })),
+        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
+          'aria-label': `Notes for ${d.category}`, onchange: e => { d.notes = e.target.value; mark(); } })),
         el('td', { style: 'white-space:nowrap' },
           d.inFile
             ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
@@ -113,6 +123,7 @@ module.exports = function registerBudgets(ctx) {
     }
     lines.push('');
     await writeFile(`Budgets/${y}-${m}.md`, lines.join('\n'));
+    budDirty = false;
     $('#budSave').disabled = true;
     toast(`Budget saved to Budgets/${S.period}.md`);
   }
@@ -144,5 +155,5 @@ module.exports = function registerBudgets(ctx) {
     renderBudgets();
   }
 
-  Object.assign(ctx, { renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
+  ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
 };

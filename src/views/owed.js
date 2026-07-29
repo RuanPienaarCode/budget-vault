@@ -8,6 +8,7 @@ module.exports = function registerOwed(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
   const mark = () => { S.owedDirty = true; $('#owedSave').disabled = false; };
+  ctx.registerDirty(() => S.owedDirty);
 
   /* The only thing outside the table that reads a row, so an edited amount can
      refresh here without rebuilding the field being typed in. */
@@ -98,5 +99,6 @@ module.exports = function registerOwed(ctx) {
     S.owedDirty = true; $('#owedSave').disabled = false; renderOwed();
   }
 
-  Object.assign(ctx, { renderOwed, saveOwed, addOwed });
+  // serializeOwed is published so a round-trip test can drive the real one.
+  ctx.provide({ renderOwed, saveOwed, addOwed, serializeOwed });
 };

@@ -18,6 +18,7 @@ module.exports = function registerTax(ctx) {
   }
   const T = () => S.tax[S.taxYear];
   const mark = () => { S.taxDirty = true; $('#taxSave').disabled = false; };
+  ctx.registerDirty(() => S.taxDirty);
 
   /* Shown on the empty card and in the Season card. The seeded steps, docs and
      deadline dates are country-profile defaults, not authoritative guidance. */
@@ -117,10 +118,17 @@ module.exports = function registerTax(ctx) {
      phone the rebuild lands between the tap that leaves a field and the tap
      that arrives at the next one — the DOM under the finger is replaced, and
      the arriving tap hits whatever now occupies those coordinates (an "Add …"
-     button opens a modal; a <select> opens the native picker). Each field
-     refreshes only what actually reads it; the containers below hold the
-     pieces that more than one field feeds. */
+     button opens a modal; a <select> opens the native picker).
+
+     The rule, stated once so it can be applied elsewhere without re-deriving
+     it: a handler may rebuild any subtree containing NO focusable controls; it
+     must never rebuild the subtree holding the control that fired it. The three
+     containers refreshDerived touches — the KPI strip, the check callouts and
+     the figures totals row — are all input-free, so one call covers every field
+     and no handler has to carry its own list of what reads it. That list was
+     O(writers x readers) knowledge living in comments; this is one invariant. */
   let checksBox = null;
+  const refreshDerived = t => { renderTaxKpis(t); renderChecks(t); renderFigureTotals(t); };
 
   function renderSeason(t) {
     const loc = locale();
@@ -132,18 +140,18 @@ module.exports = function registerTax(ctx) {
     // already in flight.
     b.append(el('div', { class: 'row tax-season-row' },
       field('Taxpayer type', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderSeason(t); renderTaxKpis(t); } },
+        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderSeason(t); refreshDerived(t); } },
         ...loc.taxpayerTypes
           .map(([v, l]) => el('option', { value: v, ...(t.taxpayer_type === v ? { selected: '' } : {}) }, l)))),
       field('Assessment', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.assessment = e.target.value; mark(); renderSeason(t); renderTaxKpis(t); } },
+        onchange: e => { t.assessment = e.target.value; mark(); renderSeason(t); refreshDerived(t); } },
         ...loc.assessments
           .map(([v, l]) => el('option', { value: v, ...(t.assessment === v ? { selected: '' } : {}) }, l)))),
       // Only the Deadline KPI tile reads these.
       field(loc.deadlineLabels[0], dateInput(t.deadline_standard, { class: 'form-control form-control-sm' },
-        v => { t.deadline_standard = v; mark(); renderTaxKpis(t); })),
+        v => { t.deadline_standard = v; mark(); refreshDerived(t); })),
       field(loc.deadlineLabels[1], dateInput(t.deadline_provisional, { class: 'form-control form-control-sm' },
-        v => { t.deadline_provisional = v; mark(); renderTaxKpis(t); }))));
+        v => { t.deadline_provisional = v; mark(); refreshDerived(t); }))));
 
     // Outcome fields only once there is an outcome — they are noise before it.
     if (t.assessment === 'assessed') {
@@ -153,12 +161,12 @@ module.exports = function registerTax(ctx) {
           const raw = e.target.value.trim();
           const n = Number(raw.replace(/[^\d.-]/g, ''));
           t[key] = raw === '' ? null : (Number.isFinite(n) ? n : null);
-          mark(); renderChecks(t);   // the assessed-vs-captured reconciliation reads these
+          mark(); refreshDerived(t);
         } }));
       b.append(el('div', { class: 'row tax-season-row' },
         // Nothing else displays the date or the reference — mark only.
         field('Assessment date', dateInput(t.assessment_date, { class: 'form-control form-control-sm' },
-          v => { t.assessment_date = v; mark(); })),
+          v => { t.assessment_date = v; mark(); refreshDerived(t); })),
         field('Reference', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_ref,
           placeholder: 'Notice / document no.', onchange: e => { t.assessment_ref = e.target.value.trim(); mark(); } })),
         num('Result (− = refund)', 'assessment_result', '-1250.00'),
@@ -208,16 +216,19 @@ module.exports = function registerTax(ctx) {
       // same as the Steps/Docs notes fields. Code and amount refresh the totals
       // row and the callouts, but never this table's own body.
       const txt = (obj, key, width) => el('input', { type: 'text', class: 'form-control form-control-sm',
-        value: obj[key], style: `min-width:${width}`, onchange: e => { obj[key] = e.target.value; mark(); } });
-      const refresh = () => { mark(); renderFigureTotals(t); renderChecks(t); };
+        value: obj[key], style: `min-width:${width}`, 'aria-label': `${key} for figure ${obj.code || ''}`.trim(),
+        onchange: e => { obj[key] = e.target.value; mark(); } });
+      const refresh = () => { mark(); refreshDerived(t); };
       for (const f of figures) {
         body.append(el('tr', {},
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code, style: 'width:90px',
+            'aria-label': `${loc.figureCodeLabel} for ${f.description || 'this figure'}`,
             onchange: e => { f.code = e.target.value.trim(); refresh(); } })),
           el('td', {}, txt(f, 'description', '180px')),
           el('td', {}, txt(f, 'source', '140px')),
           el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num', style: 'width:130px',
             value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
+            'aria-label': `Amount for ${f.code || 'this figure'}`,
             onchange: e => {
               const n = Number(e.target.value.replace(/[^\d.-]/g, ''));
               f.amount = Number.isFinite(n) ? n : 0; refresh();
@@ -226,7 +237,7 @@ module.exports = function registerTax(ctx) {
             'aria-label': `Remove figure ${f.code}`,
             onclick: () => {
               figures.splice(figures.indexOf(f), 1);
-              mark(); renderFigures(t); renderChecks(t); renderTaxKpis(t);
+              mark(); renderFigures(t); refreshDerived(t);
             } }, '✕'))));
       }
       if (!figures.length) {
@@ -269,7 +280,10 @@ module.exports = function registerTax(ctx) {
 
   const stepOverdue = s => s.status !== 'done' && s.status !== 'n/a' && daysTo(s.due) !== null && daysTo(s.due) < 0;
 
-  function renderSteps(t) {
+  /* focusStep / focusDoc: rebuilding a table drops focus to <body>, and cycling
+     a status pill is the main interaction on this page — without this a keyboard
+     or screen-reader user is ejected to the top on every single click. */
+  function renderSteps(t, focusStep) {
     const tbl = $('#taxStepsTable');
     keepScroll(tbl, () => {
       tbl.innerHTML = '';
@@ -281,7 +295,7 @@ module.exports = function registerTax(ctx) {
         const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`,
           'aria-label': `Status: ${STEP_LABEL[s.status]} — click to change` },
           icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
-        pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t); renderTaxKpis(t); });
+        pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t, s.step); renderTaxKpis(t); });
         body.append(el('tr', { class: s.status === 'n/a' ? 'svc-inactive' : '' },
           el('td', { style: 'font-weight:600' }, s.step),
           el('td', {}, pill),
@@ -291,6 +305,7 @@ module.exports = function registerTax(ctx) {
             style: 'width:120px', 'aria-label': `Due date for ${s.step}` },
             (v, e) => { s.due = v; mark(); e.target.classList.toggle('tax-overdue', stepOverdue(s)); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes, style: 'min-width:220px',
+            'aria-label': `Notes for ${s.step}`,
             onchange: e => { s.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
             'aria-label': `Remove step ${s.step}`,
@@ -299,13 +314,18 @@ module.exports = function registerTax(ctx) {
       if (!t.steps.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No steps yet.')));
       tbl.append(body);
     });
+    if (focusStep) {
+      const i = t.steps.findIndex(s => s.step === focusStep);
+      const pill = tbl.querySelectorAll('.status-pill')[i];
+      if (pill) pill.focus();
+    }
   }
 
   const DOC_CYCLE = { needed: 'n/a', uploaded: 'needed', 'n/a': 'needed' };
   const DOC_LABEL = { needed: 'Needed', uploaded: 'Uploaded', 'n/a': 'N/A' };
   const DOC_ICO = { needed: ['hourglass'], uploaded: ['circle-check', 'check-circle'], 'n/a': ['circle-slash', 'slash'] };
 
-  function renderDocs(t) {
+  function renderDocs(t, focusDoc) {
     $('#taxDocsSub').innerHTML = '';
     $('#taxDocsSub').append('Certificates & records for the return · files stored in ', el('code', {}, `Tax/${S.taxYear}/`));
     const tbl = $('#taxDocsTable');
@@ -321,7 +341,7 @@ module.exports = function registerTax(ctx) {
           icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
         // Cycling away from "uploaded" only changes the status — the file link
         // (and the file itself) stays.
-        pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderDocs(t); renderTaxKpis(t); });
+        pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderDocs(t, d.name); renderTaxKpis(t); });
 
         // A row can carry several certificates — providers routinely issue an
         // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
@@ -343,6 +363,7 @@ module.exports = function registerTax(ctx) {
           el('td', {}, pill),
           el('td', {}, fileCell),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'min-width:180px',
+            'aria-label': `Notes for ${d.name}`,
             onchange: e => { d.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
             'aria-label': `Remove document ${d.name}`,
@@ -360,6 +381,11 @@ module.exports = function registerTax(ctx) {
       if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
       tbl.append(body);
     });
+    if (focusDoc) {
+      const i = t.docs.findIndex(d => d.name === focusDoc);
+      const pill = tbl.querySelectorAll('.status-pill')[i];
+      if (pill) pill.focus();
+    }
   }
 
   /* The File cell holds a ';'-separated list. A bare filename parses as a
@@ -673,5 +699,5 @@ module.exports = function registerTax(ctx) {
     renderTax();
   }
 
-  Object.assign(ctx, { renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile });
+  ctx.provide({ renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile, serializeTax });
 };

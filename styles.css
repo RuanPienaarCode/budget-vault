@@ -903,15 +903,6 @@
 /* ============================================================
    ALERTS / TOAST
    ============================================================ */
-.budget-app-root .alert {
-  border: none;
-  border-radius: var(--radius);
-  font-size: 0.875rem;
-  padding: 0.875rem 1.1rem;
-  border-left: 4px solid;
-  margin-bottom: 1rem;
-}
-.budget-app-root .alert-warning { background: var(--color-warning-light); color: var(--text-primary); border-left-color: var(--color-warning); }
 .budget-app-root #toast {
   position: absolute;
   bottom: max(22px, calc(22px + env(safe-area-inset-bottom))); left: 50%;
@@ -940,7 +931,6 @@
 
 /* misc layout helpers */
 .budget-app-root .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.budget-app-root .spacer { flex: 1; }
 .budget-app-root .count-note { font-size: 13px; color: var(--text-muted); }
 .budget-app-root #connect-card { max-width: 640px; margin: 8vh auto 0; text-align: center; }
 .budget-app-root #connect-card .body-pad { padding-top: 10px; }
@@ -1091,3 +1081,29 @@
   .budget-app-root .badge-dup         { background: rgba(127, 127, 127, .14); }
   .budget-app-root .mini              { background: rgba(127, 127, 127, .05); }
 }
+
+/* Deferred category cell (Transactions / import review). Renders as a button
+   until first use, then swaps in the real <select> — see deferredCatSelect in
+   categories.js for why. Both states have to occupy the same box so the row
+   doesn't jump when the swap happens. */
+.budget-app-root .cat-cell { display: inline-block; min-width: 130px; }
+.budget-app-root .cat-cell-btn {
+  width: 100%;
+  min-height: 28px;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.budget-app-root .cat-cell-btn:hover { border-color: var(--border-color); background: var(--surface); }
+.budget-app-root .cat-cell-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.budget-app-root .cat-cell-empty { color: var(--text-light); font-style: italic; }
+.budget-app-root .cat-cell .category-select { width: 100%; }

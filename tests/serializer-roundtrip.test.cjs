@@ -61,7 +61,10 @@ for (const n of [-123.45, 0, 1000, -0.01, 999999.99, 42]) {
 }
 
 /* ---- 3. REAL serializeTxFile → loader parse → field-for-field equality ---- */
-const ctx = { S: {} };
+// NOTE: this file guards the serializer against a MIRROR of the loader (below).
+// tests/vault-roundtrip.test.cjs drives the real loadVault instead and is the
+// stronger guarantee; this one stays for the focused escaping/amount cases.
+const ctx = { S: {}, registerDirty() {}, provide(o) { Object.assign(ctx, o); } };
 registerTransactions(ctx);                 // no calls at register time; only defines fns
 const { serializeTxFile } = ctx;
 ok(typeof serializeTxFile === 'function', 'serializeTxFile must be exposed on ctx');

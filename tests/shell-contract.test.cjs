@@ -1,0 +1,95 @@
+'use strict';
+/* The shell.js ↔ src/ id contract.
+
+   The whole app DOM is one HTML string in src/shell.js, and ~150 places query
+   into it by hardcoded `$('#id')`. Nothing checks that an id still exists: a
+   rename produces a button that silently does nothing, or — worse, and this
+   actually happened — a dirty check that reads a missing element, returns
+   "clean", and lets the file watcher reload over unsaved work.
+
+   Three invariants, all currently true, pinned so a rename becomes a build
+   failure instead of a bug report:
+
+     1. every `$('#id')` in src/ resolves to an id in shell.js
+     2. every drawer link's data-view has a matching <section id="view-*">
+     3. every such section has an entry in controller.js's render dispatch map
+
+   Pure text analysis — no DOM, no bundler. Wired into ./build.sh.
+     node tests/shell-contract.test.cjs
+*/
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+let checks = 0;
+const ok = (c, m) => { assert.ok(c, m); checks++; };
+const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
+
+const SRC = path.join(__dirname, '..', 'src');
+const shell = fs.readFileSync(path.join(SRC, 'shell.js'), 'utf8');
+const controller = fs.readFileSync(path.join(SRC, 'controller.js'), 'utf8');
+
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+    const p = path.join(dir, e.name);
+    return e.isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : [];
+  });
+}
+
+/* ---- 1. every queried id exists in the shell ---- */
+const shellIds = new Set([...shell.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+ok(shellIds.size > 50, `shell.js should define plenty of ids (found ${shellIds.size})`);
+
+const missing = [];
+for (const file of walk(SRC)) {
+  const text = fs.readFileSync(file, 'utf8');
+  for (const m of text.matchAll(/\$\('#([A-Za-z][\w-]*)'\)/g)) {
+    if (!shellIds.has(m[1])) missing.push(`${path.relative(SRC, file)} queries #${m[1]}`);
+  }
+}
+eq(missing, [], 'every $(\'#id\') must resolve to an id defined in shell.js');
+
+/* ---- 2. drawer links ↔ view sections ---- */
+const views = [...shell.matchAll(/data-view="([^"]+)"/g)].map(m => m[1]);
+ok(views.length >= 8, `expected the full drawer (found ${views.length} links)`);
+const sections = new Set([...shell.matchAll(/id="view-([^"]+)"/g)].map(m => m[1]));
+eq(views.filter(v => !sections.has(v)), [],
+  'every drawer link must have a matching <section id="view-*">');
+
+/* ---- 3. every view section is reachable from the render dispatch map ---- */
+// The map lives in controller.js render(); grab the object literal after it.
+const mapBlock = controller.match(/\(\{\s*dashboard:[\s\S]*?\}\)\[S\.view\]\(\)/);
+ok(mapBlock, 'controller.js must still carry the render dispatch map');
+const dispatched = new Set([...mapBlock[0].matchAll(/(\w+)\s*:/g)].map(m => m[1]));
+const undispatched = [...sections].filter(v => !dispatched.has(v));
+eq(undispatched, [],
+  'every view section must have an entry in the render dispatch map — a missing ' +
+  'one is a TypeError the moment the user opens that view');
+
+/* ---- 4. every dispatched view still has a section ---- */
+eq([...dispatched].filter(v => !sections.has(v)), [],
+  'the dispatch map must not reference a view section that no longer exists');
+
+/* ---- 5. no module publishes the same ctx key twice ---- */
+// ctx.provide throws on a collision at mount, but only for the code path that
+// actually runs; catch it statically across every module instead.
+const provided = new Map();
+const dupes = [];
+for (const file of walk(SRC)) {
+  const text = fs.readFileSync(file, 'utf8');
+  for (const m of text.matchAll(/ctx\.provide\(\{([\s\S]*?)\}\)/g)) {
+    for (const k of m[1].matchAll(/(?:^|[,{\s])([A-Za-z_]\w*)\s*(?:[,:}]|$)/g)) {
+      const key = k[1];
+      const rel = path.relative(SRC, file);
+      if (provided.has(key) && provided.get(key) !== rel) {
+        dupes.push(`${key}: ${provided.get(key)} and ${rel}`);
+      }
+      provided.set(key, rel);
+    }
+  }
+}
+eq(dupes, [], 'two modules must not publish the same name onto ctx');
+ok(provided.size > 30, `ctx should carry the full published surface (found ${provided.size})`);
+
+console.log(`PASS — shell id contract + ctx namespace intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys).`);

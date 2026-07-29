@@ -86,9 +86,40 @@ function mountApp(view) {
 
   /* --------------------------- assemble ctx ----------------------------- */
   const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge, locale };
+
+  /* Every module publishes onto this one flat namespace — 60+ keys with no
+     collision detection, where a silent overwrite would show up much later as
+     "the wrong function ran". Throw at mount instead. */
+  ctx.provide = obj => {
+    for (const k of Object.keys(obj)) {
+      if (k in ctx) throw new Error(`Budget: ctx.${k} is already defined — two modules are publishing the same name.`);
+    }
+    Object.assign(ctx, obj);
+  };
+
+  /* A view reports "I have unsaved edits" by registering a predicate rather
+     than by adding a line to hasDirty(). The old shape failed OPEN: a view that
+     forgot its entry looked clean to the file watcher, which then reloaded the
+     vault over the user's unsaved work 800ms after any sync event. Registering
+     is done by the view itself, so forgetting is no longer possible. */
+  const dirtyChecks = [];
+  ctx.registerDirty = fn => dirtyChecks.push(fn);
+
+  /* Assigned BEFORE the register chain so view modules can destructure them
+     like anything else. They used to be attached afterwards, which meant every
+     module had to reach through `ctx.render()` late and there was an unwritten
+     "destructure everything except render/switchView" rule waiting to bite. */
+  ctx.switchView = v => switchView(v);
+  ctx.render = () => render();
+
+  /* Order is load-bearing: io before all (writeFile/readFile); period before
+     load/dashboard/transactions/budgets/import (currentPeriod, txInPeriod);
+     categories before transactions/budgets/import (lazyCatSelect); transactions
+     before import (serializeTxFile). Reordering these silently produces
+     "x is not a function" a whole screen away from the cause. */
   registerIo(ctx);          // basePath, readFile, writeFile, mdFilesIn, …
   registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
-  registerLoad(ctx);        // loadVault
+  registerLoad(ctx);        // loadVault, txSegment
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
   registerDashboard(ctx);
   registerTransactions(ctx);
@@ -111,6 +142,11 @@ function mountApp(view) {
     $(`#view-${v}`).classList.remove('hidden');
     closeDrawer();
     render();
+    /* Move focus to the new route's heading. closeDrawer() puts it back on the
+       hamburger, which tells a screen-reader user only that the drawer shut —
+       not that the whole content region changed underneath. */
+    const h = $(`#view-${v} h1`);
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
   }
   function render() {
     if (!S.loaded) return;
@@ -119,9 +155,6 @@ function mountApp(view) {
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, owed: ctx.renderOwed, services: ctx.renderServices,
        tax: ctx.renderTax, import: ctx.renderImport, connect: () => {} })[S.view]();
   }
-  ctx.switchView = switchView;
-  ctx.render = render;
-
   /* ---------------------- drawer + theme (app shell) --------------------- */
   function openDrawer() {
     const d = $('#appDrawer');
@@ -162,11 +195,14 @@ function mountApp(view) {
     if (S.loaded && S.view === 'dashboard') ctx.renderTrend();
   }
 
-  /* --------------------------- dirty tracking ---------------------------- */
+  /* --------------------------- dirty tracking ----------------------------
+     Gates the file watcher, so a false negative here means unsaved work gets
+     overwritten by a sync. Every view registers its own predicate (see
+     ctx.registerDirty above); the two below have no view module of their own. */
+  ctx.registerDirty(() => Object.values(S.txFiles).some(f => f.dirty));
+  ctx.registerDirty(() => !!S.pendingImport);
   function hasDirty() {
-    return Object.values(S.txFiles).some(f => f.dirty) ||
-      ($('#budSave') && !$('#budSave').disabled) ||
-      S.owedDirty || S.servicesDirty || S.taxDirty || !!S.pendingImport;
+    return dirtyChecks.some(fn => fn());
   }
 
   /* ------------------------------ bootstrap ------------------------------ */
