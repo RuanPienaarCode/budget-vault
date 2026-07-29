@@ -35,7 +35,7 @@ Module._load = function (request, parent, isMain) {
   return origLoad.apply(this, arguments);
 };
 
-const { escMd, unescMd, parseMdTable, parseNum, parseFrontmatter } = require('../src/util');
+const { escMd, unescMd, parseMdTable, parseNum, parseFrontmatter, safeSeg, yamlStr, csvCell, parseCsv } = require('../src/util');
 const registerTransactions = require('../src/views/transactions');
 
 let checks = 0;
@@ -85,8 +85,11 @@ const rows = [
   { date: '2026-07-03', desc: 'Salary', cat: 'Income', amount: 42000.5, amountRaw: null, excluded: false, note: 'multi\nline note' },
   { date: '2026-07-04', desc: 'Transfer to savings', cat: 'Transfer between accounts', amount: -500, amountRaw: null, excluded: true, note: 'excluded' },
   { date: '2026-07-05', desc: 'café ¥ 个人所得税', cat: '', amount: 0, amountRaw: null, excluded: false, note: '' },
-  // Non-strict amount cell (hand-edited "1 234,56") must survive byte-for-byte via amountRaw.
-  { date: '2026-07-06', desc: 'Legacy row', cat: 'Bank fees', amount: 1, amountRaw: '1 234,56', excluded: false, note: '' },
+  // Non-strict amount cell (hand-edited "1 234,56") must survive byte-for-byte
+  // via amountRaw. `amount` is the reader's interpretation of that cell and is
+  // NOT written back — it was parseFloat's 1 until parseNum learned to defer to
+  // normalizeAmount, which reads the decimal comma correctly.
+  { date: '2026-07-06', desc: 'Legacy row', cat: 'Bank fees', amount: 1234.56, amountRaw: '1 234,56', excluded: false, note: '' },
 ];
 
 // serializeTxFile sorts f.rows in place; feed a clone and compare order-independently.
@@ -102,6 +105,49 @@ for (const orig of rows) {
   ok(got, `row must round-trip: ${orig.desc}`);
   if (got) eq(got, orig, `every field must match for: ${orig.desc}`);
 }
+
+/* ---- 3b. Non-strict amount cells are read, not guessed at ---- */
+// parseFloat used to return a plausible-looking wrong number for every one of
+// these, which then reached the totals and (for account balances) got written
+// straight back over the real figure.
+for (const [cell, want] of [['1 234,56', 1234.56], ['1,234.56', 1234.56], ['1.234,56', 1234.56],
+                            ['R150.00', 150], ['(123.45)', -123.45], ['123.45-', -123.45]]) {
+  const n = parseNum(cell);
+  eq(n.ok, false, `${cell} is not a canonical cell`);
+  eq(n.raw, cell, `${cell} must be preserved verbatim for write-back`);
+  eq(n.value, want, `${cell} must be READ as ${want}, not guessed at`);
+}
+
+/* ---- 3c. safeSeg is the single canonicaliser for a path segment ---- */
+// The in-memory txFiles key and the path written to disk are both derived from
+// this. If it is not idempotent and not NFC, a lookup misses while the write
+// still lands on the existing file — rebuilding that month with only new rows.
+for (const v of ['FNB:Joint', 'FNB Cheque', 'a*b?c"d<e>f|g', '../../evil', 'Re\u0065\u0308nboog', 'FNB\u00A0Cheque']) {
+  const once = safeSeg(v);
+  eq(safeSeg(once), once, `safeSeg must be idempotent for: ${JSON.stringify(v)}`);
+  ok(!once.includes('..'), `safeSeg must never emit '..' for: ${JSON.stringify(v)}`);
+  ok(!/[\\/]/.test(once), `safeSeg must never emit a separator for: ${JSON.stringify(v)}`);
+}
+// 'Ree\u0308nboog' (decomposed, what macOS/iCloud hands you) and 'Re\u00EBnboog'
+// (composed) are the same word; safeSeg must not let them key two different ways.
+eq(safeSeg('Re\u0065\u0308nboog'), safeSeg('Re\u00EBnboog'),
+  'decomposed and composed forms must canonicalise to one string');
+eq(safeSeg('CON'), 'CON-', 'Windows device names must be suffixed');
+eq(safeSeg('foo.'), 'foo', 'a trailing dot the OS would strip must be stripped here first');
+
+/* ---- 3d. YAML + CSV escaping ---- */
+eq(yamlStr('ITA34: 2026/0031'), '"ITA34: 2026/0031"', 'a colon in free text must be quoted');
+eq(yamlStr('Kids "school" fees'), '"Kids \\"school\\" fees"', 'embedded quotes must be escaped');
+eq(yamlStr('C:\\Users'), '"C:\\\\Users"', 'backslashes must be escaped');
+// Assert on the value a spreadsheet actually sees, i.e. after CSV parsing —
+// csvCell also quotes, so the raw string starts with '"'.
+for (const v of ['=1+1', '@SUM(A1)', '+1', '-1+1']) {
+  const seen = parseCsv(`${csvCell(v)}\n`)[0][0];
+  ok(seen.startsWith("'"), `a formula-leading cell must be neutralised: ${v}`);
+  eq(seen.slice(1), v, `...without altering the text itself: ${v}`);
+}
+eq(csvCell('Woolworths'), 'Woolworths', 'an ordinary cell must be left alone');
+eq(parseCsv(`${csvCell('PnP, Sandton')}\n`)[0][0], 'PnP, Sandton', 'a comma must still round-trip');
 
 /* ---- 4. Frontmatter preservation: unmodeled keys survive the write-back ---- */
 const { raw } = parseFrontmatter(text);

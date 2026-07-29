@@ -36,10 +36,16 @@ class BudgetView extends ItemView {
         const top = root.getBoundingClientRect().top;
         const h = (vv.offsetTop + vv.height) - top;
         if (h > 120) root.style.height = `${h}px`;
-        const a = document.activeElement;
-        if (a && root.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) {
-          window.setTimeout(() => a.scrollIntoView({ block: 'center' }), 60);
-        }
+        // Re-read the focused element inside the timeout rather than capturing
+        // it now: a re-render between the two would leave us holding a detached
+        // node, and scrolling that into view is a silent no-op that strands the
+        // real field behind the keyboard.
+        window.setTimeout(() => {
+          const a = document.activeElement;
+          if (a && root.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) {
+            a.scrollIntoView({ block: 'center' });
+          }
+        }, 60);
       } else {
         root.style.height = '';
       }
@@ -51,6 +57,9 @@ class BudgetView extends ItemView {
     if (this.appCtl && this.appCtl.hasDirty()) {
       new Notice('Budget: the view closed with unsaved changes — they were not written to disk.', 8000);
     }
+    // Stop the hand-scheduled timers before the DOM goes away, or a pending
+    // reload/search debounce fires against an emptied root.
+    if (this.appCtl) this.appCtl.destroy();
     this.appCtl = null;
     this.contentEl.empty();
     // Clear any inline height left by the keyboard-viewport fix — the leaf's

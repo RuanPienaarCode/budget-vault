@@ -2,7 +2,7 @@
 /* Category <select> builders + the create-category flow, shared by the
    Transactions table, Budget page and CSV import review. */
 
-const { el, parseFrontmatter, learnPattern } = require('./util');
+const { el, parseFrontmatter, learnPattern, safeSeg, yamlStr, csvCell } = require('./util');
 const { TYPE_ORDER } = require('./constants');
 const { askFields, confirmModal } = require('./modal');
 
@@ -42,8 +42,17 @@ module.exports = function registerCategories(ctx) {
     if (S.categories.some(c => c.name.toLowerCase() === realName.toLowerCase())) { toast('Category already exists', true); return null; }
     const type = r.type;
     if (!TYPE_ORDER.includes(type)) { toast('Invalid type', true); return null; }
-    const safe = realName.replace(/[\\/:*?"<>|]/g, '-').trim();
-    const nameLine = safe !== realName ? `name: "${realName}"\n` : '';
+    // safeSeg, not a local copy of it: a name like ".hidden" would otherwise
+    // write a dotfile Obsidian never indexes, so the category vanishes on the
+    // next load and promptDeleteCategory can never find it again.
+    const safe = safeSeg(realName);
+    if (!safe) { toast('That name has no usable characters for a filename', true); return null; }
+    // Two display names can sanitise to one filename ("Kids/School" and
+    // "Kids:School"). The name check above compares display names, so probe
+    // the resolved path too — otherwise the second write silently replaces
+    // the first category file.
+    if (fileAt(`Categories/${safe}.md`)) { toast(`Categories/${safe}.md already exists`, true); return null; }
+    const nameLine = safe !== realName ? `name: ${yamlStr(realName)}\n` : '';
     await writeFile(`Categories/${safe}.md`,
       `---\n${nameLine}type: ${type}\ncolor: "#888888"\ntags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${realName}\n\nBudget category of type **${type}**.\n`);
     const cat = { name: realName, type, color: '#888888' };
@@ -82,8 +91,8 @@ module.exports = function registerCategories(ctx) {
     sel.addEventListener('focus', refresh);
     sel.addEventListener('keydown', refresh);
   }
-  function catSelect(current, onchange) {
-    const sel = el('select', { class: 'category-select' });
+  function catSelect(current, onchange, label) {
+    const sel = el('select', { class: 'category-select', ...(label ? { 'aria-label': label } : {}) });
     fillCatOptions(sel, current);
     let builtVersion = catsVersion;
     refreshOnOpen(sel, () => builtVersion, v => builtVersion = v);
@@ -93,8 +102,10 @@ module.exports = function registerCategories(ctx) {
   /* Lazy variant for large lists (Transactions table, CSV import review):
      starts with just the current value and builds the full list on first
      open — version 0 forces that initial build through the same path. */
-  function lazyCatSelect(current, onchange) {
-    const sel = el('select', { class: 'category-select' });
+  // `label` is the accessible name — a bare <select> in a table cell is only
+  // named by its column header, which AT reads solely in table-navigation mode.
+  function lazyCatSelect(current, onchange, label) {
+    const sel = el('select', { class: 'category-select', ...(label ? { 'aria-label': label } : {}) });
     sel.append(el('option', { value: current, selected: '' }, current || '— none —'));
     let builtVersion = 0;
     refreshOnOpen(sel, () => builtVersion, v => builtVersion = v);
@@ -121,8 +132,9 @@ module.exports = function registerCategories(ctx) {
     });
     if (!ok) return false;
     // The filename is the sanitised name; older or hand-made files may differ,
-    // so fall back to scanning frontmatter `name` for an exact match.
-    const safe = name.replace(/[\\/:*?"<>|]/g, '-').trim();
+    // so fall back to scanning frontmatter `name` for an exact match — which
+    // also covers files written before safeSeg was used here.
+    const safe = safeSeg(name);
     let file = fileAt(`Categories/${safe}.md`);
     if (!file) {
       for (const f of mdFilesIn('Categories')) {
@@ -158,7 +170,7 @@ module.exports = function registerCategories(ctx) {
     if (added) {
       S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: 'base' }));
       const csv = 'pattern,category\n' + S.rules.map(r =>
-        [r.pattern, r.category].map(v => /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v).join(',')).join('\n') + '\n';
+        [r.pattern, r.category].map(csvCell).join(',')).join('\n') + '\n';
       await writeFile('Data/Categorisation Rules.csv', csv);
     }
     return added;

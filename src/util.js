@@ -15,6 +15,39 @@ const el = (tag, attrs = {}, ...kids) => {
   return n;
 };
 
+/* A date field, built to behave on a phone: a native <input type="date"> gives
+   the picker and no soft keyboard, so iOS autocorrect/autofill never gets a
+   chance to interfere with a YYYY-MM-DD value. Only used when the stored value
+   is empty or already a real ISO date though — these files are hand-editable,
+   and a date input renders free text ("end of October") as blank and would
+   silently discard it on the first edit. Those fall back to a text field with
+   the correction features switched off. `commit` receives (value, event). */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function dateInput(value, attrs, commit) {
+  const v = (value ?? '').toString().trim();
+  const picker = v === '' || ISO_DATE.test(v);
+  return el('input', {
+    type: picker ? 'date' : 'text',
+    value: v,
+    ...(picker ? {} : {
+      placeholder: 'YYYY-MM-DD', inputmode: 'numeric',
+      autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false',
+    }),
+    ...attrs,
+    onchange: e => commit(e.target.value.trim(), e),
+  });
+}
+
+/* Rebuilding a table's innerHTML resets its scroll container to the left edge.
+   On a phone every table here is wider than the screen, so that yanks the
+   columns out from under the reader. Call around a rebuild to hold position. */
+function keepScroll(elm, rebuild) {
+  const box = elm.parentElement;
+  const left = box ? box.scrollLeft : 0;
+  rebuild();
+  if (box) box.scrollLeft = left;
+}
+
 /* Lucide icons: try each name until one renders (icon names occasionally get
    renamed between the lucide versions Obsidian ships). */
 function setIco(elm, names) {
@@ -26,6 +59,9 @@ function setIco(elm, names) {
 function icoEl(names, cls) {
   const s = document.createElement('span');
   s.className = 'ico' + (cls ? ' ' + cls : '');
+  // Decorative: every icon here sits next to its own text label, and a future
+  // lucide version adding default <title>s would otherwise double-announce it.
+  s.setAttribute('aria-hidden', 'true');
   setIco(s, names);
   return s;
 }
@@ -86,11 +122,17 @@ function parseMdTable(text) {
 /* Strict numeric-cell parse. Returns { ok, value, raw }. `ok` is true only for
    a plain decimal (the app's on-disk format); anything else (e.g. "1 234,56",
    "R100") is preserved verbatim in `raw` so a serializer can write it back
-   unchanged instead of silently coercing it to a wrong number. */
+   unchanged instead of silently coercing it to a wrong number.
+
+   The fallback `value` still has to be the reader's best guess, because it
+   feeds every total and KPI — but it must not be a *plausible wrong number*.
+   Bare parseFloat reads "1,234.56" as 1 and "R150.00" as 0, which shows up as
+   a quietly wrong balance rather than an obvious error. normalizeAmount knows
+   both separator conventions and every statement flavour, so use it. */
 function parseNum(s) {
   const t = (s ?? '').toString().trim();
   if (/^-?\d+(\.\d+)?$/.test(t)) return { ok: true, value: parseFloat(t) };
-  return { ok: false, value: parseFloat(t) || 0, raw: t };
+  return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
 }
 
 /* Patch specific keys inside a YAML frontmatter block while preserving key
@@ -233,13 +275,54 @@ function learnPattern(desc) {
 
 /* Sanitise a string for safe use as a single path segment (folder/file name):
    strip path separators and filesystem-illegal characters, and neutralise
-   "../" traversal attempts (dot runs, leading dots). */
+   "../" traversal attempts (dot runs, leading dots).
+
+   This is also the ONE canonicaliser for path segments, and that matters more
+   than the sanitising. A transactions file is looked up in memory by a key and
+   written to a path; if the two are derived by different functions the lookup
+   can miss while the write still lands on the existing file — which rebuilds
+   that month from scratch, holding only the new rows. So:
+     - NFC, because Obsidian's normalizePath folds to NFC on the way to disk. A
+       decomposed "ë" (what macOS/iCloud hands you) would otherwise key one way
+       and write another.
+     - NBSP variants folded to a plain space, for the same reason.
+     - Control chars and bidi overrides removed: invisible in a filename, and
+       the bidi ones let "IT3b<RLO>fdp.exe" render as "IT3bexe.pdf".
+     - Trailing dots/spaces stripped and Windows device names suffixed, because
+       the OS silently rewrites both and every later lookup then misses. */
+const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 function safeSeg(s) {
-  return (s ?? '').toString()
+  const out = (s ?? '').toString()
+    .normalize('NFC')
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/[\x00-\x1F\x7F]/g, '')
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\.{2,}/g, '-')
     .replace(/^\.+/, '')
-    .trim();
+    .trim()
+    .replace(/[. ]+$/, '');
+  return WIN_RESERVED.test(out) ? `${out}-` : out;
+}
+
+/* Quote a value for use as a YAML frontmatter scalar. Everything written into
+   frontmatter goes through here: an unescaped quote, backslash or a bare
+   "Ref: ABC-1" makes the whole block unparseable to Obsidian, which drops the
+   note's properties from the metadata cache — while this plugin's own
+   first-colon parser reads it back happily, so the breakage is invisible from
+   inside the app. */
+const yamlStr = v => `"${String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+/* Quote a value for a CSV cell. Beyond the usual quote/comma/newline rules,
+   a leading =, +, -, @, tab or CR makes the cell a live formula in Excel and
+   LibreOffice. The categorisation rules file is written from bank statement
+   descriptions — which anyone who can send the user a payment reference gets
+   to influence — and it is explicitly a file the user opens in a spreadsheet.
+   Prefix those with an apostrophe so they stay inert. */
+function csvCell(v) {
+  let s = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 /* Collapse '.' and '..' segments in a '/'-path; returns null if it escapes the
@@ -254,4 +337,4 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { el, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };

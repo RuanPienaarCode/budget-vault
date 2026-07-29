@@ -25,6 +25,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # main.js is a committed build artifact and this workflow publishes the
+      # COMMITTED file — so a src/ change released without running ./build.sh
+      # would ship a stale bundle with nothing to catch it. Rebuild and diff.
+      # build.sh also runs the guard tests, which otherwise only ever run on a
+      # developer's machine.
+      # Pinned deliberately: the check below is a BYTE comparison, so a floating
+      # "latest" would fail the release whenever bun changes its output — a false
+      # alarm that looks identical to a real stale bundle. Bump this in the same
+      # commit as any local bun upgrade.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.17"
+
+      - name: Rebuild and verify the committed bundle is current
+        run: |
+          ./build.sh
+          if ! git diff --exit-code -- main.js; then
+            echo "main.js does not match src/ — run ./build.sh and commit the result." >&2
+            echo "If bun was upgraded locally, pin the new version in this workflow too." >&2
+            exit 1
+          fi
+
       - name: Verify tag matches manifest version
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
@@ -32,6 +54,13 @@ jobs:
           if [ "$TAG" != "$MANIFEST_VERSION" ]; then
             echo "Tag '$TAG' does not match manifest version '$MANIFEST_VERSION'." >&2
             echo "Obsidian matches releases to the manifest version exactly — no 'v' prefix." >&2
+            exit 1
+          fi
+          # versions.json maps plugin version -> minAppVersion. Obsidian reads it
+          # to decide which release an older app is allowed to install; a missing
+          # entry silently strands users on the previous version.
+          if ! jq -e --arg v "$MANIFEST_VERSION" 'has($v)' versions.json >/dev/null; then
+            echo "versions.json has no entry for '$MANIFEST_VERSION'." >&2
             exit 1
           fi
 

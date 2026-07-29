@@ -170,12 +170,30 @@ function mountApp(view) {
   }
 
   /* ------------------------------ bootstrap ------------------------------ */
-  async function connectVault() {
-    // Every reload rebuilds S from disk; drop the per-period budget draft so a
-    // stale pre-reload draft can never be saved over freshly-loaded data.
+  /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
+     reset — it replaces S.budgets, S.owed, S.services and S.tax and clears
+     their dirty flags — so everything holding a pre-reload draft or snapshot
+     has to be dropped in the same breath or it gets saved over the fresh data
+     later. Three callers used to do this cleanup by hand, and the tax-year
+     switch forgot, which silently discarded Owed/Services edits and left a
+     stale budget draft armed behind an enabled Save button. */
+  async function reloadFromDisk() {
     ctx.invalidateBudgetDraft();
+    // The import review's dedup snapshot was taken against the pre-reload
+    // transactions; keeping it would re-import every row as "new".
+    S.pendingImport = null;
+    $('#importReview').classList.add('hidden');
+    await ctx.loadVault();
+    for (const id of ['#budSave', '#owedSave', '#svcSave', '#taxSave']) {
+      const b = $(id);
+      if (b) b.disabled = true;
+    }
+  }
+  ctx.reloadFromDisk = reloadFromDisk;
+
+  async function connectVault() {
     try {
-      await ctx.loadVault();
+      await reloadFromDisk();
     } catch (e) {
       S.loaded = false;
       $('#connectErr').textContent = e.message || String(e);
@@ -200,23 +218,48 @@ function mountApp(view) {
     toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
   }
 
+  /* Dirty flags are only set on `change`, which fires on blur — so a field
+     being typed into right now counts as neither clean nor dirty. Without this
+     an external file change (iCloud, Obsidian Sync) sails past hasDirty() and
+     reloads the vault out from under a half-entered value, replacing the DOM
+     and popping a toast for no reason the reader can see. Treat "a field in
+     this view has focus" and "a keystroke landed a moment ago" as editing. */
+  let lastInputAt = 0;
+  view.registerDomEvent(root, 'input', () => { lastInputAt = Date.now(); });
+  function isEditing() {
+    const a = document.activeElement;
+    // INPUT/TEXTAREA only — deliberately not SELECT. A <select> keeps focus
+    // indefinitely after a value is picked, so treating it as "mid-edit" would
+    // suppress reloads forever for anyone who touched a filter and walked away.
+    if (a && root.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return true;
+    return Date.now() - lastInputAt < 3000;
+  }
+
   /* Reload when budget files change on disk (sync, manual edits) — but never
      while there are unsaved edits in the view, and not for our own writes. */
   let reloadTimer = null;
+  function scheduleReload(delay) {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(async () => {
+      // Re-check at fire time: an edit (or another of our own writes) may have
+      // landed during the debounce — don't clobber it.
+      if (Date.now() - ctx.lastWriteAt() < 2000) return;
+      if (hasDirty()) return;
+      // Mid-edit: come back later rather than dropping the change on the floor.
+      // Returning here would strand the view on stale data indefinitely, since
+      // no further event will be emitted for a change already delivered.
+      if (isEditing()) return scheduleReload(1500);
+      await connectVault();
+      if (S.loaded) toast('Reloaded — files changed in the vault');
+    }, delay);
+  }
   const onFsChange = (file) => {
     const path = file?.path || '';
     const bp = ctx.basePath();
     if (path !== bp && !path.startsWith(bp + '/')) return;
     if (Date.now() - ctx.lastWriteAt() < 2000) return;
     if (hasDirty()) return;
-    clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(async () => {
-      // Re-check at fire time: an edit (or another of our own writes) may have
-      // landed during the 800ms debounce — don't clobber it.
-      if (hasDirty() || Date.now() - ctx.lastWriteAt() < 2000) return;
-      await connectVault();
-      if (S.loaded) toast('Reloaded — files changed in the vault');
-    }, 800);
+    scheduleReload(800);
   };
   view.registerEvent(vault.on('modify', onFsChange));
   view.registerEvent(vault.on('create', onFsChange));
@@ -267,8 +310,7 @@ function mountApp(view) {
   }
   $('#reloadLink').addEventListener('click', async () => {
     if (!S.loaded) return closeDrawer();
-    ctx.invalidateBudgetDraft();
-    await ctx.loadVault(); closeDrawer(); render(); toast('Reloaded from disk');
+    await reloadFromDisk(); closeDrawer(); render(); toast('Reloaded from disk');
   });
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
@@ -312,6 +354,17 @@ function mountApp(view) {
 
   return {
     start: async () => { applyTheme(); await connectVault(); },
+    /* Called from BudgetView.onClose. These three timers are scheduled by hand
+       rather than through Obsidian's register* helpers, so nothing unwinds them
+       automatically — and a reload timer that fires after contentEl.empty()
+       re-reads the whole vault into a dead view and then throws on the first
+       null query result. */
+    destroy: () => {
+      clearTimeout(reloadTimer);
+      clearTimeout(S._q);
+      const t = $('#toast');
+      if (t) clearTimeout(t._h);
+    },
     // Dirty-aware reload used by settings changes (plugin.reloadViews): decline
     // rather than silently discard unsaved edits. The file watcher calls
     // connectVault directly (it already gates on hasDirty before scheduling).

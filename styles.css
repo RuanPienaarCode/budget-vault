@@ -1027,3 +1027,67 @@
 .budget-app-root .import-help p, .budget-app-root .import-help ul { margin: 8px 0 0; }
 .budget-app-root .import-help ul { padding-left: 20px; }
 .budget-app-root .import-help code { font-size: 0.9em; }
+
+/* ============================================================
+   AUDIT FIXES — 2026-07-29
+   ============================================================ */
+
+/* Visually-hidden label text. Used where a column header has to exist for the
+   control beneath it but would be noise on screen (the import Include column). */
+.budget-app-root .sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Light-mode status pills. The .badge-* family already carries darker inks for
+   the pale light tints (see "Light-mode badge foregrounds" above); the pills
+   were missed and sat at ~2.1:1 against their own backgrounds. Dark theme keeps
+   the brights, which clear AA on the dark tints. */
+.budget-app-root:not(.bud-dark) .status-outstanding,
+.budget-app-root:not(.bud-dark) .tax-busy,
+.budget-app-root:not(.bud-dark) .tax-needed    { color: #92610a; }
+.budget-app-root:not(.bud-dark) .status-paid,
+.budget-app-root:not(.bud-dark) .tax-done,
+.budget-app-root:not(.bud-dark) .tax-uploaded  { color: #15803d; }
+
+/* Row-action buttons. Previously an inline padding repeated at eight call
+   sites, rendering ~21px tall — under the 24px floor and thin for a fingertip
+   on a phone, which this plugin explicitly targets. */
+.budget-app-root .btn-ghost-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  min-height: 28px;
+}
+
+/* Date fields. iOS WKWebView's date control has a large intrinsic minimum that
+   a bare `width` cannot shrink below — it clips the value instead of resizing —
+   while desktop Chromium renders it wider than the sibling text inputs in the
+   same row. Give it an explicit range rather than a fixed width. */
+.budget-app-root input[type='date'].form-control {
+  width: 100%;
+  min-width: 140px;
+  max-width: 200px;
+}
+
+/* color-mix() is Safari 16.2+; the plugin supports iOS 14.5. Below that every
+   color-mix declaration is invalid and the property falls back to its initial
+   value — cards lose their surface fill and badges lose their pill entirely.
+   Mirrors the hand-written @supports fallback already used for backdrop-filter. */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .budget-app-root { --surface-glass-light: rgba(255, 255, 255, .92); }
+  .budget-app-root.bud-dark .card,
+  .budget-app-root:not(.bud-dark) .card { background: var(--surface); }
+  .budget-app-root .badge-debt        { background: #fdecdb; }
+  .budget-app-root .badge-giving      { background: #fbe0ee; }
+  .budget-app-root .badge-investment  { background: #ece3fa; color: var(--color-investment); }
+  .budget-app-root .badge-luxuries    { background: #daf7ec; }
+  .budget-app-root .badge-transfer,
+  .budget-app-root .badge-dup         { background: rgba(127, 127, 127, .14); }
+  .budget-app-root .mini              { background: rgba(127, 127, 127, .05); }
+}

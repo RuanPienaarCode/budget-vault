@@ -2,15 +2,20 @@
 /* Services — recurring subscriptions grouped by budget category, saved to
    Services.md. */
 
-const { el, escMd } = require('../util');
+const { el, dateInput, keepScroll, escMd } = require('../util');
 const { askFields } = require('../modal');
 
 module.exports = function registerServices(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
   function monthlyEquiv(s) { return s.cycle === 'annual' ? s.amount / 12 : s.amount; }
+  const mark = () => { S.servicesDirty = true; $('#svcSave').disabled = false; };
 
-  function renderServices() {
+  /* Split out so an edited amount can refresh the totals without rebuilding
+     the row it was typed into — on a phone `change` fires on blur, so a full
+     rebuild lands between the tap that leaves a field and the one arriving at
+     the next, and the arriving tap hits whatever now occupies those pixels. */
+  function renderServicesKpis() {
     const active = S.services.filter(s => s.active);
     const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
     const kpis = $('#servicesKpis'); kpis.innerHTML = '';
@@ -20,41 +25,63 @@ module.exports = function registerServices(ctx) {
     tile('Per year', money(perMonth * 12));
     tile('Active', String(active.length));
     tile('Total services', String(S.services.length));
+  }
 
-    const mark = () => { S.servicesDirty = true; $('#svcSave').disabled = false; };
-    const t = $('#svcTable'); t.innerHTML = '';
-    t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Service'), el('th', { scope: 'col' }, 'Provider'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
-      el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));
-    const body = el('tbody', {});
-    const groups = Object.create(null);   // null-proto: a "__proto__"/"constructor" category can't crash the view
+  /* The per-category subtotal rows are the other thing an amount feeds. They
+     hold no inputs, so they are safe to replace in place. */
+  function renderServiceSubtotals() {
+    const groups = Object.create(null);
     for (const s of S.services) (groups[s.category || 'Uncategorised'] ??= []).push(s);
-    for (const cat of Object.keys(groups).sort()) {
-      const gMonthly = groups[cat].filter(s => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
-      body.append(el('tr', { class: 'type-row' },
-        el('td', { colspan: '6' }, cat),
-        el('td', { class: 'num' }, `${money(gMonthly, 0)}/mo`)));
-      for (const s of groups[cat]) {
-        body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
-          el('td', { style: 'font-weight:600' }, s.name),
-          el('td', { class: 'text-muted' }, s.provider),
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
-            onchange: e => { s.amount = parseFloat(e.target.value) || 0; mark(); renderServices(); } })),
-          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
-            onchange: e => { s.cycle = e.target.value === 'annual' ? 'annual' : 'monthly'; mark(); renderServices(); } },
-            el('option', { value: 'monthly', ...(s.cycle === 'monthly' ? { selected: '' } : {}) }, 'monthly'),
-            el('option', { value: 'annual', ...(s.cycle === 'annual' ? { selected: '' } : {}) }, 'annual'))),
-          el('td', {}, el('input', { type: 'date', class: 'form-control form-control-sm', value: s.next, style: 'width:140px',
-            'aria-label': `Next billing date for ${s.name}`,
-            onchange: e => { s.next = e.target.value.trim(); mark(); } })),
-          el('td', {}, el('input', { type: 'checkbox', ...(s.active ? { checked: '' } : {}),
-            onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
-          el('td', {}, el('button', { class: 'btn-ghost', style: 'padding:0.2rem 0.6rem;font-size:0.78rem', 'aria-label': `Remove ${s.name}`,
-            onclick: () => { S.services.splice(S.services.indexOf(s), 1); mark(); renderServices(); } }, '✕'))));
-      }
+    for (const row of $('#svcTable').querySelectorAll('tr.type-row')) {
+      const cat = row.dataset.cat;
+      const list = groups[cat] || [];
+      const gMonthly = list.filter(s => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
+      row.lastElementChild.textContent = `${money(gMonthly, 0)}/mo`;
     }
-    if (!S.services.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No services yet.')));
-    t.append(body);
+  }
+
+  function renderServices() {
+    renderServicesKpis();
+    const t = $('#svcTable');
+    keepScroll(t, () => {
+      t.innerHTML = '';
+      t.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Service'), el('th', { scope: 'col' }, 'Provider'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
+        el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));
+      const body = el('tbody', {});
+      const groups = Object.create(null);   // null-proto: a "__proto__"/"constructor" category can't crash the view
+      for (const s of S.services) (groups[s.category || 'Uncategorised'] ??= []).push(s);
+      for (const cat of Object.keys(groups).sort()) {
+        const gMonthly = groups[cat].filter(s => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
+        body.append(el('tr', { class: 'type-row', 'data-cat': cat },
+          el('td', { colspan: '6' }, cat),
+          el('td', { class: 'num' }, `${money(gMonthly, 0)}/mo`)));
+        for (const s of groups[cat]) {
+          const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
+          body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
+            el('td', { style: 'font-weight:600' }, s.name),
+            el('td', { class: 'text-muted' }, s.provider),
+            el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
+              'aria-label': `Amount for ${s.name}`,
+              onchange: e => { s.amount = parseFloat(e.target.value) || 0; refresh(); } })),
+            el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
+              onchange: e => { s.cycle = e.target.value === 'annual' ? 'annual' : 'monthly'; refresh(); } },
+              el('option', { value: 'monthly', ...(s.cycle === 'monthly' ? { selected: '' } : {}) }, 'monthly'),
+              el('option', { value: 'annual', ...(s.cycle === 'annual' ? { selected: '' } : {}) }, 'annual'))),
+            // dateInput, not a bare type="date": a hand-edited "end of month"
+            // renders blank in a date input, hiding a value that is still on disk.
+            el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm', style: 'width:140px',
+              'aria-label': `Next billing date for ${s.name}` },
+              v => { s.next = v; mark(); })),
+            el('td', {}, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
+              onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
+            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,
+              onclick: () => { S.services.splice(S.services.indexOf(s), 1); mark(); renderServices(); } }, '✕'))));
+        }
+      }
+      if (!S.services.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No services yet.')));
+      t.append(body);
+    });
   }
 
   function serializeServices() {

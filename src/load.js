@@ -3,7 +3,7 @@
 
 const { TFile } = require('obsidian');
 const { TYPE_ORDER } = require('./constants');
-const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum } = require('./util');
+const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require('./util');
 
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod } = ctx;
@@ -24,24 +24,39 @@ module.exports = function registerLoad(ctx) {
       S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
       S.settings.household = fm.household || '';
     }
+    /* Reads go out in parallel; parsing stays serial. Every loop below used to
+       await one file at a time — ~163 sequential round trips on a real vault,
+       and on mobile each one crosses the Capacitor bridge (an iCloud-backed
+       file may have to be materialised first). Parsing all 5,700 transactions
+       measures ~7ms, so the wait was almost entirely I/O latency. Ordering and
+       results are unchanged: `read` keeps each file paired with its own text. */
+    const read = async files => {
+      const texts = await Promise.all(files.map(f => vault.cachedRead(f)));
+      return files.map((file, i) => ({ file, text: texts[i] }));
+    };
+
     S.categories = [];
-    for (const f of mdFilesIn('Categories')) {
-      const { fm } = parseFrontmatter(await vault.cachedRead(f));
+    for (const { file, text } of await read(mdFilesIn('Categories'))) {
+      const { fm } = parseFrontmatter(text);
       // Prefer the exact name from frontmatter — filenames drop filesystem-illegal
       // chars, so the frontmatter `name` is the source of truth.
-      S.categories.push({ name: fm.name || f.basename, type: fm.type || 'expense', color: fm.color || '#888' });
+      S.categories.push({ name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888' });
     }
     S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
 
     S.accounts = [];
-    for (const f of mdFilesIn('Accounts')) {
-      const { fm, body, raw } = parseFrontmatter(await vault.cachedRead(f));
+    for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {
+      const { fm, body, raw } = parseFrontmatter(acctText);
       S.accounts.push({
         name: f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
-        balance: parseFloat(fm.balance || '0') || 0,
+        // parseNum, not parseFloat: a hand-edited "1,234.56" read as 1 would be
+        // written straight back as 1.00 on the next balance edit, destroying the
+        // real figure. balanceRaw preserves anything the strict parse rejected,
+        // exactly as amountRaw does for transaction cells.
+        ...(bal => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || '0')),
         balance_updated: fm.balance_updated || '',
         credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
         goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
@@ -58,10 +73,8 @@ module.exports = function registerLoad(ctx) {
 
     S.budgets = {};
     S.budgetMeta = {};
-    for (const f of mdFilesIn('Budgets')) {
-      if (!/^\d{4}-\d{2}$/.test(f.basename)) continue;
+    for (const { file: f, text } of await read(mdFilesIn('Budgets').filter(f => /^\d{4}-\d{2}$/.test(f.basename)))) {
       const period = f.basename;
-      const text = await vault.cachedRead(f);
       const { raw } = parseFrontmatter(text);
       S.budgetMeta[period] = { raw };   // verbatim frontmatter for lossless write-back
       const rows = parseMdTable(text);
@@ -72,24 +85,31 @@ module.exports = function registerLoad(ctx) {
     }
 
     S.txFiles = {};
+    // Flattened first so every month file across every account goes out in one
+    // batch — this is the bulk of the read count on a real vault.
+    const txFiles = [];
     for (const acct of subfoldersIn('Transactions')) {
       for (const f of acct.children) {
         if (!(f instanceof TFile) || f.extension !== 'md' || !/^\d{4}-\d{2}$/.test(f.basename)) continue;
-        const month = f.basename;
-        const text = await vault.cachedRead(f);
-        const { raw } = parseFrontmatter(text);
-        const rows = parseMdTable(text);
-        S.txFiles[`${acct.name}/${month}`] = {
-          label: acct.name, month, dirty: false, fmRaw: raw,
-          rows: rows.slice(1).map(c => {
-            const amt = parseNum(c[3]);
-            return { date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]),
-              amount: amt.value, amountRaw: amt.ok ? null : amt.raw,
-              excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || '') };
-          }),
-        };
+        txFiles.push({ acct, f });
       }
     }
+    const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
+    txFiles.forEach(({ acct, f }, i) => {
+      const month = f.basename;
+      const text = txTexts[i];
+      const { raw } = parseFrontmatter(text);
+      const rows = parseMdTable(text);
+      S.txFiles[`${acct.name}/${month}`] = {
+        label: acct.name, month, dirty: false, fmRaw: raw,
+        rows: rows.slice(1).map(c => {
+          const amt = parseNum(c[3]);
+          return { date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]),
+            amount: amt.value, amountRaw: amt.ok ? null : amt.raw,
+            excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || '') };
+        }),
+      };
+    });
 
     S.rules = [];
     const rulesCsv = await readFile('Data/Categorisation Rules.csv');
@@ -122,9 +142,7 @@ module.exports = function registerLoad(ctx) {
       });
     }
     S.tax = {}; S.taxDirty = false;
-    for (const f of mdFilesIn('Tax')) {
-      if (!/^\d{4}$/.test(f.basename)) continue;
-      const text = await vault.cachedRead(f);
+    for (const { file: f, text } of await read(mdFilesIn('Tax').filter(f => /^\d{4}$/.test(f.basename)))) {
       const { fm, raw, body } = parseFrontmatter(text);
       // The body holds three tables under "## Progress", "## Documents" and
       // "## Figures". parseMdTable reads every table row in the text it's
@@ -198,5 +216,23 @@ module.exports = function registerLoad(ctx) {
     if (!S.period) S.period = currentPeriod();
   }
 
-  Object.assign(ctx, { loadVault });
+  /* Resolve an account label to the exact folder segment to key by AND write
+     to. Both must be the same string: S.txFiles is keyed by the folder name as
+     it exists on disk, so a writer that re-sanitises the label can miss the
+     lookup while the write still lands on the existing file — rebuilding that
+     month from scratch with only the new rows.
+
+     A folder that already exists wins verbatim. Re-sanitising it would create a
+     second, near-identical folder and split the account in half; and the name
+     is self-evidently legal, because the filesystem is already holding it. Only
+     a label that has never been written gets sanitised into a new segment. */
+  function txSegment(label) {
+    const want = safeSeg(label);
+    for (const f of Object.values(S.txFiles)) {
+      if (f.label === label || safeSeg(f.label) === want) return f.label;
+    }
+    return want;
+  }
+
+  Object.assign(ctx, { loadVault, txSegment });
 };
