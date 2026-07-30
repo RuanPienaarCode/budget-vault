@@ -75,29 +75,35 @@ function daysApart(a, b) {
 
 /* Index every existing row once per import: the exact keys, plus a
    `label|amount` bucket for the near pass so it stays a hash lookup instead of
-   a scan over the whole vault per incoming row. */
+   a scan over the whole vault per incoming row.
+
+   `exact` is a COUNT per key, not a membership set. Some transactions really do
+   repeat identically — three "Returned debit order fee" -12.50 on one day, two
+   R120 shop visits — and a Set collapses them to one. The effect was silent and
+   permanent data loss: when an early export listed a charge once and a later
+   export listed it twice, the second copy matched the same single key, was
+   flagged a duplicate, and never landed in any import. Counting means N copies
+   on the statement reconcile against N copies in the vault.
+
+   Bucket entries carry a unique `id` because duplicate rows share a key, and
+   the near pass consumes candidates individually — keying consumption by the
+   string would let one absorbed row block its identical twin. */
 function buildIndex(txFiles) {
-  const exact = new Set();
+  const exact = new Map();
   const byAmount = new Map();
+  const index = { exact, byAmount, seq: 0 };
   for (const f of Object.values(txFiles || {})) {
-    const label = String(f.label || '').trim().toLowerCase();
-    for (const r of f.rows || []) {
-      const key = txKey(r.date, r.desc, r.amount, f.label);
-      exact.add(key);
-      const bucket = `${label}|${Number(r.amount).toFixed(2)}`;
-      if (!byAmount.has(bucket)) byAmount.set(bucket, []);
-      byAmount.get(bucket).push({ date: r.date, desc: r.desc, key });
-    }
+    for (const r of f.rows || []) addToIndex(index, r.date, r.desc, r.amount, f.label);
   }
-  return { exact, byAmount };
+  return index;
 }
 
 function addToIndex(index, date, desc, amount, label) {
   const key = txKey(date, desc, amount, label);
-  index.exact.add(key);
+  index.exact.set(key, (index.exact.get(key) || 0) + 1);
   const bucket = `${String(label).trim().toLowerCase()}|${Number(amount).toFixed(2)}`;
   if (!index.byAmount.has(bucket)) index.byAmount.set(bucket, []);
-  index.byAmount.get(bucket).push({ date, desc, key });
+  index.byAmount.get(bucket).push({ id: index.seq++, date, desc, key });
   return key;
 }
 
@@ -114,7 +120,7 @@ function findNearDuplicate(item, index, label, incomingKeys, consumed, range) {
   if (!bucket) return null;
   let best = null, bestGap = Infinity;
   for (const cand of bucket) {
-    if (consumed.has(cand.key)) continue;
+    if (consumed.has(cand.id)) continue;
     if (incomingKeys.has(cand.key)) continue;            // still in the file → accounted for
     if (range && (cand.date < range.min || cand.date > range.max)) continue;
     const gap = daysApart(item.date, cand.date);
@@ -138,17 +144,27 @@ function flagItems(items, index, label, range) {
   const incomingKeys = new Set(items.map(it => txKey(it.date, it.desc, it.amount, lab)));
   let dupes = 0, nears = 0;
 
+  /* Match the statement's copies against the vault's copies one-for-one. The
+     Nth identical row on the statement is only a duplicate while the vault
+     still has an Nth identical row to pair it with; beyond that it is a real
+     transaction the vault is missing. */
+  const usedExact = new Map();
   for (const it of items) {
-    it.dup = index.exact.has(txKey(it.date, it.desc, it.amount, lab));
-    if (it.dup) { it.include = false; it.autoExcluded = true; dupes++; }
-    else if (it.autoExcluded) { it.include = true; it.autoExcluded = false; }  // no longer a dup for this account → re-include
+    const key = txKey(it.date, it.desc, it.amount, lab);
+    const have = index.exact.get(key) || 0;
+    const used = usedExact.get(key) || 0;
+    it.dup = used < have;
+    if (it.dup) {
+      usedExact.set(key, used + 1);
+      it.include = false; it.autoExcluded = true; dupes++;
+    } else if (it.autoExcluded) { it.include = true; it.autoExcluded = false; }  // no longer a dup for this account → re-include
   }
 
   const consumed = new Set();
   for (const it of items) {
     const hit = it.dup ? null : findNearDuplicate(it, index, lab, incomingKeys, consumed, range);
     if (hit) {
-      consumed.add(hit.key);
+      consumed.add(hit.id);
       it.near = hit;
       nears++;
       if (!it.nearAuto) { it.include = false; it.nearAuto = true; }
