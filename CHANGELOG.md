@@ -14,7 +14,7 @@ file-format change.
   detection held the existing transactions in a membership set — it could
   answer "has this date/description/amount been seen before?" but not "how many
   times?". Some transactions genuinely repeat identically: three `Returned
-  debit order fee` -12.50 on one day, two shop visits of the same amount.
+  debit order fee` -9.00 on one day, two shop visits of the same amount.
 
   When an early statement listed such a charge once and a later statement
   listed it twice, the second copy matched the same single entry, was flagged a
@@ -49,8 +49,8 @@ between statement exports. No file-format change.
   terminal descriptor and a provisional timestamp, then again a few days later
   once they settle, with a normalised merchant string and a new time.
 
-      8 Jun export   2026-06-08 12:07  "Checkers Rondebosch SB002256 ZA"  Pending
-      22 Jun export  2026-06-08 20:13  "Checkers Rondebosch RONDEBOSCH"   Apple Pay
+      8 Jun export   2026-06-08 12:07  "GROCER ONE TERM0099 ZA"  Pending
+      22 Jun export  2026-06-08 20:13  "GROCER ONE CITYVILLE"   Apple Pay
 
   Duplicate detection keyed on `date|description|amount|account`, and **two of
   those four fields change when a charge settles** — so the settled row read as
