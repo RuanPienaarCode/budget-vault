@@ -3,6 +3,7 @@
    Obsidian) does not support. One modal can collect several fields at once. */
 
 const { Modal, Setting } = require('obsidian');
+const { el, normalizeAmount } = require('./util');
 
 class FieldModal extends Modal {
   constructor(app, title, fields, resolve) {
@@ -78,4 +79,159 @@ function confirmModal(app, opts) {
   return new Promise(res => new ConfirmModal(app, opts, res).open());
 }
 
-module.exports = { FieldModal, askFields, ConfirmModal, confirmModal };
+/* Split modal — carve one bank line into several category lines.
+   `opts`: { tx: {date, desc, label, amount}, categories: [name], money }
+   Resolves to [{ amount, cat, note }, …] (already signed like the original)
+   or null on cancel.
+
+   Two decisions baked into the UI, both worth stating plainly:
+
+   • Parts are typed as POSITIVE magnitudes and the original's direction is
+     applied on the way out — the same idiom as Add transaction's "always
+     positive, direction sets the sign". A split can then never accidentally
+     flip a spend into income, which no amount of sign-checking after the
+     fact makes as safe.
+   • The parts must sum to the original EXACTLY. There is no "close enough":
+     the whole point is that the period totals are unchanged by splitting,
+     so the OK button stays disabled until the remainder is zero. */
+class SplitModal extends Modal {
+  constructor(app, opts, resolve) {
+    super(app);
+    this.opts = opts;
+    this.resolve = resolve;
+    this.result = null;
+    // Work in magnitudes; sign is re-applied in submit().
+    this.sign = opts.tx.amount < 0 ? -1 : 1;
+    this.total = Math.abs(opts.tx.amount);
+    this.parts = [
+      { mag: this.total, cat: opts.tx.cat || '', note: '' },
+      { mag: 0, cat: '', note: '' },
+    ];
+  }
+
+  onOpen() {
+    const { tx, money } = this.opts;
+    this.titleEl.setText('Split transaction');
+    const c = this.contentEl;
+
+    c.append(el('div', { class: 'budget-split-head' },
+      el('div', { class: 'budget-split-desc' }, tx.desc),
+      el('div', { class: 'budget-split-meta' },
+        [tx.date, tx.label, money(tx.amount)].filter(Boolean).join(' · '))));
+
+    this.partsEl = el('div', { class: 'budget-split-parts' });
+    c.append(this.partsEl);
+
+    const addBtn = el('button', { type: 'button', class: 'budget-split-add' }, '＋ Add part');
+    // Seed the new part with what's still unallocated: adding a part is nearly
+    // always "and the rest goes here", so this usually balances in one click.
+    addBtn.addEventListener('click', () => {
+      this.parts.push({ mag: Math.max(0, this.remainder()), cat: '', note: '' });
+      this.renderParts();
+      this.refresh();
+    });
+    c.append(addBtn);
+
+    this.footEl = el('div', { class: 'budget-split-foot', role: 'status' });
+    c.append(this.footEl);
+    c.append(el('div', { class: 'budget-split-hint' },
+      'Amounts are entered as positive — the split keeps the original’s direction. ' +
+      'The original line stays in the file marked Excluded, so the totals are unchanged ' +
+      'and re-importing this statement will not duplicate it.'));
+
+    const foot = new Setting(c);
+    foot.addButton(b => b.setButtonText('Cancel').onClick(() => this.close()));
+    foot.addButton(b => {
+      this.okBtn = b;
+      b.setButtonText('Split').setCta().onClick(() => this.submit());
+    });
+
+    this.renderParts();
+    this.refresh();
+  }
+
+  /* Rounded to cents at every step: comparing raw float sums against the
+     original is how a 0.004 remainder ends up permanently un-zeroable. */
+  allocated() {
+    return Math.round(this.parts.reduce((a, p) => a + (p.mag || 0), 0) * 100) / 100;
+  }
+  remainder() { return Math.round((this.total - this.allocated()) * 100) / 100; }
+
+  renderParts() {
+    this.partsEl.replaceChildren();
+    this.parts.forEach((p, i) => {
+      const amt = el('input', {
+        type: 'text', class: 'budget-split-amt', inputmode: 'decimal',
+        autocomplete: 'off', autocorrect: 'off', spellcheck: 'false',
+        value: p.mag ? p.mag.toFixed(2) : '',
+        placeholder: '0.00', 'aria-label': `Amount for part ${i + 1}`,
+      });
+      amt.addEventListener('input', () => {
+        p.mag = Math.abs(normalizeAmount(amt.value) ?? 0);
+        this.refresh();
+      });
+
+      const cat = el('select', { class: 'budget-split-cat', 'aria-label': `Category for part ${i + 1}` });
+      cat.append(el('option', { value: '' }, '— none —'));
+      for (const name of this.opts.categories) cat.append(el('option', { value: name }, name));
+      cat.value = p.cat;
+      cat.addEventListener('change', () => { p.cat = cat.value; });
+
+      const note = el('input', {
+        type: 'text', class: 'budget-split-note', value: p.note,
+        placeholder: 'Note (optional)', 'aria-label': `Note for part ${i + 1}`,
+      });
+      note.addEventListener('input', () => { p.note = note.value; });
+
+      const row = el('div', { class: 'budget-split-part' }, amt, cat, note);
+      // Two parts is the floor — below that it isn't a split.
+      if (this.parts.length > 2) {
+        const del = el('button', {
+          type: 'button', class: 'budget-split-del', 'aria-label': `Remove part ${i + 1}`,
+        }, '✕');
+        del.addEventListener('click', () => {
+          this.parts.splice(i, 1);
+          this.renderParts();
+          this.refresh();
+        });
+        row.append(del);
+      }
+      this.partsEl.append(row);
+    });
+  }
+
+  refresh() {
+    const { money } = this.opts;
+    const rem = this.remainder();
+    const balanced = rem === 0;
+    const allPositive = this.parts.every(p => p.mag > 0);
+    /* The message names the actual blocker. "Balanced" while the Split button
+       sits disabled (the seeded second part is still 0) reads as a bug. */
+    this.footEl.textContent = !balanced
+      ? `Unallocated: ${money(this.sign * rem)}`
+      : allPositive
+        ? `Allocated ${money(this.sign * this.total)} — balanced`
+        : 'Every part needs an amount';
+    this.footEl.classList.toggle('is-balanced', balanced && allPositive);
+    this.footEl.classList.toggle('is-off', !(balanced && allPositive));
+    if (this.okBtn) this.okBtn.setDisabled(!(balanced && allPositive));
+  }
+
+  submit() {
+    if (this.remainder() !== 0 || !this.parts.every(p => p.mag > 0)) return;
+    this.result = this.parts.map(p => ({
+      amount: parseFloat((this.sign * p.mag).toFixed(2)),
+      cat: p.cat,
+      note: p.note.trim(),
+    }));
+    this.close();
+  }
+
+  onClose() { this.contentEl.empty(); this.resolve(this.result); }
+}
+
+function askSplit(app, opts) {
+  return new Promise(res => new SplitModal(app, opts, res).open());
+}
+
+module.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };

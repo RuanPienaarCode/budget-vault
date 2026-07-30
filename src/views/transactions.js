@@ -2,8 +2,8 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, escMd, patchFrontmatter, normalizeAmount, yamlStr } = require('../util');
-const { askFields } = require('../modal');
+const { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr } = require('../util');
+const { askFields, askSplit } = require('../modal');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
@@ -73,7 +73,8 @@ module.exports = function registerTransactions(ctx) {
     const t = $('#txTable'); t.innerHTML = '';
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col' }, 'Account'),
-      el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Excl.'), el('th', { scope: 'col' }, 'Note'))));
+      el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Excl.'), el('th', { scope: 'col' }, 'Note'),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Split')))));
     const body = el('tbody', {});
     for (const item of list) {
       const r = item._row;
@@ -95,16 +96,77 @@ module.exports = function registerTransactions(ctx) {
           ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': `Note for ${r.date} ${r.desc}`,
-          onchange: e => { r.note = e.target.value; mark(); } }))));
+          onchange: e => { r.note = e.target.value; mark(); } })),
+        el('td', {}, splitButton(item))));
     }
-    if (!list.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No transactions match.')));
+    if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, 'No transactions match.')));
     if (total > list.length) {
       const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
         `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
       more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
-      body.append(el('tr', {}, el('td', { colspan: '7', style: 'padding:0' }, more)));
+      body.append(el('tr', {}, el('td', { colspan: '8', style: 'padding:0' }, more)));
     }
     t.append(body);
+  }
+
+  /* ------------------------------- splitting -------------------------------
+     One bank line often covers several categories — a supermarket shop that
+     is half groceries and half household, a card payment covering two people.
+     A split carves it into parts that sum back to the original.
+
+     The original row is KEPT and marked excluded rather than deleted. That is
+     the whole design, and it is not squeamishness:
+
+       • Every total (dashboard, budget-vs-actual, trend) is computed from
+         non-excluded rows — periodSummary filters them out — so parking the
+         parent as excluded leaves the arithmetic identical to before.
+       • The CSV importer dedupes on `date|desc|amount|label`. Delete the
+         parent and that key vanishes from the file, so re-importing the same
+         statement would cheerfully re-add the original line ON TOP of the
+         parts and silently double-count it. Keeping the parent keeps the key.
+       • It is reversible by hand in the markdown: untick Excluded, delete the
+         parts. Nothing about the split is a one-way door. */
+  function splitButton(item) {
+    const r = item._row;
+    const b = el('button', {
+      type: 'button', class: 'btn-ghost btn-ghost-sm',
+      'aria-label': `Split ${r.date} ${r.desc} into categories`, title: 'Split into categories',
+    }, icoEl(['split', 'git-fork', 'scissors']));
+    b.addEventListener('click', () => splitTransaction(item));
+    return b;
+  }
+
+  async function splitTransaction(item) {
+    const r = item._row;
+    if (!r.amount) return toast('A zero-amount line has nothing to split', true);
+    if (r.excluded) return toast('This line is already excluded — untick it first', true);
+    const parts = await askSplit(app, {
+      tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
+      categories: S.categories.map(c => c.name),
+      money,
+    });
+    if (!parts) return;
+
+    /* amountRaw is the loader's "I could not strictly parse this cell, write it
+       back verbatim" flag. The parent keeps its own (it is unchanged on disk
+       apart from the Excluded column); the parts are new numbers we computed,
+       so they must not inherit it or they would serialise as the parent's
+       amount. */
+    const rows = parts.map(p => ({
+      date: r.date, desc: r.desc, cat: p.cat, amount: p.amount, excluded: false, note: p.note,
+    }));
+    r.excluded = true;
+    const marker = `Split into ${rows.length}`;
+    r.note = r.note ? `${r.note} · ${marker}` : marker;
+    // Same file: every part shares the parent's date, so it shares its month.
+    item._file.rows.push(...rows);
+    item._file.dirty = true;
+    $('#txSave').disabled = false;
+    /* Deliberately NOT fed to pendingLearns: the parts share one description
+       with different categories, so learning from them would teach the
+       auto-categoriser a rule that contradicts itself on every import. */
+    renderTransactions();
+    toast(`Split into ${rows.length} — review, then Save changes`);
   }
 
   function serializeTxFile(f) {
@@ -196,5 +258,5 @@ module.exports = function registerTransactions(ctx) {
     toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
-  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction });
+  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction });
 };

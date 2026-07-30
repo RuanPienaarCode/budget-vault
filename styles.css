@@ -206,6 +206,17 @@
   position: static;
   transition: none;
 }
+/* …and kill Obsidian's tick overlay with it. Obsidian draws the check as
+   `input:checked::after { position: absolute; top: -1px; inset-inline-start:
+   -1px }` — sized and placed against the checkbox, which only works because
+   Obsidian's own rule makes the checkbox `position: relative`. The reset above
+   puts it back to `static`, so that overlay went looking for the nearest
+   POSITIONED ancestor and found `.card` — painting a stray ✓ at the card's
+   top-left corner, one per ticked box, nowhere near the box it belongs to.
+   We restore the native control, which draws its own tick, so the overlay is
+   redundant as well as misplaced. (0,2,2) beats Obsidian's (0,2,1). */
+.budget-app-root input[type='checkbox']::after,
+.budget-app-root input[type='radio']::after { content: none; }
 .budget-app-root h2 { margin: 0; }
 .budget-app-root p { margin: 0 0 0.8em; }
 .budget-app-root code {
@@ -214,6 +225,77 @@
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
+
+/* ---- Neutralise Obsidian's LAYOUT chrome -------------------------------
+   Two of Obsidian's own rules match our markup and win, so they have to be
+   answered by name rather than by hoping our rules come later:
+
+     .workspace-leaf-content .view-content   (0,2,0)
+        Our root IS the view-content, so Obsidian's pane padding and its
+        `overflow: auto` beat the (0,1,0) `.budget-app-root { padding: 0;
+        overflow: hidden }` above — 12px of gutter on each side we never
+        asked for, plus a second scrollbar outside .main-content's own.
+
+     .card
+        Obsidian ships its OWN .card (restricted-mode / new-editor modals).
+        Ours declares colours, radius and shadow so those are safe, but it
+        never declared margin/padding/display — and those fell straight
+        through: `margin: 0 10px; padding: 15px 30px; display: flex`. Every
+        card was therefore 20px narrower and 60px tighter than designed.
+        On a 375px phone that is 80px of screen gone before the first table
+        cell, which is why the earlier full-bleed passes looked like they
+        had done nothing: they were trimming .main-content and .body-pad
+        while the real gutters were on .card and the root.
+
+   Doubled class = (0,2,0), enough to tie .view-content and win on source
+   order (we load after app.css). Same trick as .hidden.hidden above. */
+.budget-app-root.budget-app-root {
+  padding: 0;
+  overflow: hidden;
+}
+.budget-app-root .card {
+  margin: 0;
+  padding: 0;
+  display: block;
+  flex-grow: 0;
+}
+
+/* ---- Neutralise Obsidian's THEME chrome --------------------------------
+   The plugin's theme is its own setting, so it legitimately runs light
+   while Obsidian runs dark (and vice versa). When it does, two things bleed:
+
+   1. color-scheme. Obsidian sets it on .theme-dark, and it inherits, so the
+      UA painted every control we deliberately kept NATIVE — the Excl.
+      checkboxes — in dark: solid dark squares sitting on a white table.
+      Pin it to OUR theme so native controls follow the plugin, not the host.
+
+   2. Obsidian's form-field variables. `input[type=text]:hover` in app.css is
+      (0,2,1) and beats our `.budget-app-root .form-control` (0,2,0), so
+      hovering a Note field repainted it with the dark
+      --background-modifier-form-field-hover — the field went black under the
+      cursor as you typed. Rather than chase each host rule with an ever more
+      specific counter-rule, re-point the variables those rules read at our
+      own palette: it fixes the mismatch in both directions and keeps working
+      when a future Obsidian version adds another rule reading the same vars. */
+.budget-app-root {
+  color-scheme: light;
+
+  --background-modifier-form-field: var(--surface);
+  --background-modifier-form-field-hover: var(--surface);
+  --background-modifier-border: var(--border-color);
+  --background-modifier-border-hover: var(--color-primary);
+  --background-modifier-border-focus: var(--color-primary);
+  --interactive-normal: var(--surface);
+  --interactive-hover: var(--surface);
+  --dropdown-background-hover: var(--surface);
+  --text-normal: var(--text-primary);
+  --checkbox-color: var(--color-primary);
+  --checkbox-color-hover: var(--color-primary-dark);
+  --checkbox-border-color: var(--border-color);
+  --checkbox-border-color-hover: var(--color-primary);
+  --checkbox-marker-color: var(--surface);
+}
+.budget-app-root.bud-dark { color-scheme: dark; }
 
 /* Lucide icon slots (replace the old bootstrap-icons <i> tags) */
 .budget-app-root .ico { display: inline-flex; align-items: center; justify-content: center; }
@@ -851,6 +933,32 @@
 }
 .budget-app-root .bud-remaining.over { color: var(--color-danger); }
 
+/* Budget page: period totals strip, repeated above and below the table */
+.budget-app-root .bud-totals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-glass);
+}
+.budget-app-root .bud-totals-bottom { margin: 14px 0 0; }
+.budget-app-root .bud-total-l {
+  font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--text-light); font-weight: 600;
+}
+.budget-app-root .bud-total-v {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; margin-top: 4px;
+}
+.budget-app-root .bud-total-v.over { color: var(--color-danger); }
+.budget-app-root .bud-total-n { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+@media (max-width: 700px) {
+  .budget-app-root .bud-totals { grid-template-columns: 1fr; gap: 10px; }
+}
+
 /* ============================================================
    UPLOAD AREA
    ============================================================ */
@@ -950,6 +1058,32 @@
 .budget-onb-cat-type { margin-left: auto; font-size: 10.5px; opacity: .5; text-transform: uppercase; letter-spacing: .5px; }
 @media (max-width: 480px) { .budget-onb-cats { grid-template-columns: 1fr; } }
 
+/* ---- Split modal ------------------------------------------------------
+   Modals render in Obsidian's own container, OUTSIDE .budget-app-root, so
+   these cannot be scoped to it. Namespaced .budget-split-* instead — same
+   arrangement as the .budget-onb-* onboarding rules above — and they lean on
+   Obsidian's own form chrome rather than the plugin's palette, because in a
+   modal the host's theme is the right one to match. */
+.budget-split-head { margin-bottom: 12px; }
+.budget-split-desc { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.budget-split-meta { font-size: 12.5px; opacity: .65; margin-top: 2px; }
+.budget-split-parts { display: flex; flex-direction: column; gap: 8px; }
+.budget-split-part { display: flex; gap: 8px; align-items: center; }
+.budget-split-amt { width: 90px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.budget-split-cat { flex: 0 1 150px; min-width: 0; }
+.budget-split-note { flex: 1 1 auto; min-width: 0; }
+.budget-split-del { flex: none; padding: 0 8px; opacity: .6; cursor: pointer; }
+.budget-split-del:hover { opacity: 1; }
+.budget-split-add { margin-top: 10px; font-size: 13px; cursor: pointer; }
+.budget-split-foot { margin-top: 12px; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.budget-split-foot.is-off { color: var(--text-error, #e5534b); }
+.budget-split-foot.is-balanced { color: var(--text-success, #2e9b64); }
+.budget-split-hint { margin-top: 6px; font-size: 12px; line-height: 1.45; opacity: .65; }
+@media (max-width: 480px) {
+  .budget-split-part { flex-wrap: wrap; }
+  .budget-split-cat, .budget-split-note { flex: 1 1 100%; }
+}
+
 /* ============================================================
    MOBILE DENSITY — reclaim horizontal space for data.
    Obsidian mobile already eats ~10-24px of pane padding, then this
@@ -987,6 +1121,16 @@
   .budget-app-root #toast {
     bottom: max(22px, var(--bud-bottom-chrome));
   }
+
+  /* A 30px-radius card whose sides sit ON the screen edge shows two clipped
+     corners and two hairlines running down the bezel. Square the sides and
+     drop the side borders so full-bleed reads as a band, not a cut-off card. */
+  .budget-app-root .card {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  .budget-app-root .card::after { border-radius: 0; }
 
   .budget-app-root .card-h { padding: 18px 14px 0; }
   .budget-app-root .body-pad { padding: 14px 14px 22px; }

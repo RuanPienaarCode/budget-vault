@@ -492,7 +492,9 @@ var require_shell = __commonJS((exports2, module2) => {
             </div>
           </div>
           <div class="body-pad body-pad-tight">
+            <div class="bud-totals" id="budTotalsTop"></div>
             <div class="table-responsive"><table class="table" id="budTable"></table></div>
+            <div class="bud-totals bud-totals-bottom" id="budTotalsBottom"></div>
           </div>
         </div>
       </section>
@@ -706,6 +708,7 @@ var require_shell = __commonJS((exports2, module2) => {
 // src/modal.js
 var require_modal = __commonJS((exports2, module2) => {
   var { Modal, Setting } = require("obsidian");
+  var { el, normalizeAmount } = require_util();
 
   class FieldModal extends Modal {
     constructor(app, title, fields, resolve) {
@@ -798,7 +801,135 @@ var require_modal = __commonJS((exports2, module2) => {
   function confirmModal(app, opts) {
     return new Promise((res) => new ConfirmModal(app, opts, res).open());
   }
-  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal };
+
+  class SplitModal extends Modal {
+    constructor(app, opts, resolve) {
+      super(app);
+      this.opts = opts;
+      this.resolve = resolve;
+      this.result = null;
+      this.sign = opts.tx.amount < 0 ? -1 : 1;
+      this.total = Math.abs(opts.tx.amount);
+      this.parts = [
+        { mag: this.total, cat: opts.tx.cat || "", note: "" },
+        { mag: 0, cat: "", note: "" }
+      ];
+    }
+    onOpen() {
+      const { tx, money } = this.opts;
+      this.titleEl.setText("Split transaction");
+      const c = this.contentEl;
+      c.append(el("div", { class: "budget-split-head" }, el("div", { class: "budget-split-desc" }, tx.desc), el("div", { class: "budget-split-meta" }, [tx.date, tx.label, money(tx.amount)].filter(Boolean).join(" · "))));
+      this.partsEl = el("div", { class: "budget-split-parts" });
+      c.append(this.partsEl);
+      const addBtn = el("button", { type: "button", class: "budget-split-add" }, "＋ Add part");
+      addBtn.addEventListener("click", () => {
+        this.parts.push({ mag: Math.max(0, this.remainder()), cat: "", note: "" });
+        this.renderParts();
+        this.refresh();
+      });
+      c.append(addBtn);
+      this.footEl = el("div", { class: "budget-split-foot", role: "status" });
+      c.append(this.footEl);
+      c.append(el("div", { class: "budget-split-hint" }, "Amounts are entered as positive — the split keeps the original’s direction. " + "The original line stays in the file marked Excluded, so the totals are unchanged " + "and re-importing this statement will not duplicate it."));
+      const foot = new Setting(c);
+      foot.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
+      foot.addButton((b) => {
+        this.okBtn = b;
+        b.setButtonText("Split").setCta().onClick(() => this.submit());
+      });
+      this.renderParts();
+      this.refresh();
+    }
+    allocated() {
+      return Math.round(this.parts.reduce((a, p) => a + (p.mag || 0), 0) * 100) / 100;
+    }
+    remainder() {
+      return Math.round((this.total - this.allocated()) * 100) / 100;
+    }
+    renderParts() {
+      this.partsEl.replaceChildren();
+      this.parts.forEach((p, i) => {
+        const amt = el("input", {
+          type: "text",
+          class: "budget-split-amt",
+          inputmode: "decimal",
+          autocomplete: "off",
+          autocorrect: "off",
+          spellcheck: "false",
+          value: p.mag ? p.mag.toFixed(2) : "",
+          placeholder: "0.00",
+          "aria-label": `Amount for part ${i + 1}`
+        });
+        amt.addEventListener("input", () => {
+          p.mag = Math.abs(normalizeAmount(amt.value) ?? 0);
+          this.refresh();
+        });
+        const cat = el("select", { class: "budget-split-cat", "aria-label": `Category for part ${i + 1}` });
+        cat.append(el("option", { value: "" }, "— none —"));
+        for (const name of this.opts.categories)
+          cat.append(el("option", { value: name }, name));
+        cat.value = p.cat;
+        cat.addEventListener("change", () => {
+          p.cat = cat.value;
+        });
+        const note = el("input", {
+          type: "text",
+          class: "budget-split-note",
+          value: p.note,
+          placeholder: "Note (optional)",
+          "aria-label": `Note for part ${i + 1}`
+        });
+        note.addEventListener("input", () => {
+          p.note = note.value;
+        });
+        const row = el("div", { class: "budget-split-part" }, amt, cat, note);
+        if (this.parts.length > 2) {
+          const del = el("button", {
+            type: "button",
+            class: "budget-split-del",
+            "aria-label": `Remove part ${i + 1}`
+          }, "✕");
+          del.addEventListener("click", () => {
+            this.parts.splice(i, 1);
+            this.renderParts();
+            this.refresh();
+          });
+          row.append(del);
+        }
+        this.partsEl.append(row);
+      });
+    }
+    refresh() {
+      const { money } = this.opts;
+      const rem = this.remainder();
+      const balanced = rem === 0;
+      const allPositive = this.parts.every((p) => p.mag > 0);
+      this.footEl.textContent = !balanced ? `Unallocated: ${money(this.sign * rem)}` : allPositive ? `Allocated ${money(this.sign * this.total)} — balanced` : "Every part needs an amount";
+      this.footEl.classList.toggle("is-balanced", balanced && allPositive);
+      this.footEl.classList.toggle("is-off", !(balanced && allPositive));
+      if (this.okBtn)
+        this.okBtn.setDisabled(!(balanced && allPositive));
+    }
+    submit() {
+      if (this.remainder() !== 0 || !this.parts.every((p) => p.mag > 0))
+        return;
+      this.result = this.parts.map((p) => ({
+        amount: parseFloat((this.sign * p.mag).toFixed(2)),
+        cat: p.cat,
+        note: p.note.trim()
+      }));
+      this.close();
+    }
+    onClose() {
+      this.contentEl.empty();
+      this.resolve(this.result);
+    }
+  }
+  function askSplit(app, opts) {
+    return new Promise((res) => new SplitModal(app, opts, res).open());
+  }
+  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };
 });
 
 // src/locale.js
@@ -2189,8 +2320,8 @@ var require_dashboard = __commonJS((exports2, module2) => {
 
 // src/views/transactions.js
 var require_transactions = __commonJS((exports2, module2) => {
-  var { el, escMd, patchFrontmatter, normalizeAmount, yamlStr } = require_util();
-  var { askFields } = require_modal();
+  var { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr } = require_util();
+  var { askFields, askSplit } = require_modal();
   module2.exports = function registerTransactions(ctx) {
     const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
@@ -2236,7 +2367,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       list = visible;
       const t = $("#txTable");
       t.innerHTML = "";
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"), el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Split")))));
       const body = el("tbody", {});
       for (const item of list) {
         const r = item._row;
@@ -2269,19 +2400,60 @@ var require_transactions = __commonJS((exports2, module2) => {
             r.note = e.target.value;
             mark();
           }
-        }))));
+        })), el("td", {}, splitButton(item))));
       }
       if (!list.length)
-        body.append(el("tr", {}, el("td", { colspan: "7", class: "text-muted" }, "No transactions match.")));
+        body.append(el("tr", {}, el("td", { colspan: "8", class: "text-muted" }, "No transactions match.")));
       if (total > list.length) {
         const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
         more.addEventListener("click", () => {
           shown += PAGE;
           renderTransactions();
         });
-        body.append(el("tr", {}, el("td", { colspan: "7", style: "padding:0" }, more)));
+        body.append(el("tr", {}, el("td", { colspan: "8", style: "padding:0" }, more)));
       }
       t.append(body);
+    }
+    function splitButton(item) {
+      const r = item._row;
+      const b = el("button", {
+        type: "button",
+        class: "btn-ghost btn-ghost-sm",
+        "aria-label": `Split ${r.date} ${r.desc} into categories`,
+        title: "Split into categories"
+      }, icoEl(["split", "git-fork", "scissors"]));
+      b.addEventListener("click", () => splitTransaction(item));
+      return b;
+    }
+    async function splitTransaction(item) {
+      const r = item._row;
+      if (!r.amount)
+        return toast("A zero-amount line has nothing to split", true);
+      if (r.excluded)
+        return toast("This line is already excluded — untick it first", true);
+      const parts = await askSplit(app, {
+        tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
+        categories: S.categories.map((c) => c.name),
+        money
+      });
+      if (!parts)
+        return;
+      const rows = parts.map((p) => ({
+        date: r.date,
+        desc: r.desc,
+        cat: p.cat,
+        amount: p.amount,
+        excluded: false,
+        note: p.note
+      }));
+      r.excluded = true;
+      const marker = `Split into ${rows.length}`;
+      r.note = r.note ? `${r.note} · ${marker}` : marker;
+      item._file.rows.push(...rows);
+      item._file.dirty = true;
+      $("#txSave").disabled = false;
+      renderTransactions();
+      toast(`Split into ${rows.length} — review, then Save changes`);
     }
     function serializeTxFile(f) {
       const fm = patchFrontmatter(f.fmRaw || "", { account: yamlStr(f.label), month: f.month });
@@ -2375,7 +2547,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       $("#txSave").disabled = true;
       toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
-    ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction });
+    ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction });
   };
 });
 
@@ -2411,6 +2583,41 @@ var require_budgets = __commonJS((exports2, module2) => {
       return budDirty || !!b && !b.disabled;
     }
     ctx.registerDirty(budgetDirty);
+    function budgetTotalsStrip() {
+      const draft = budgetDraft();
+      const sum = periodSummary(S.period);
+      let income = 0, budgeted = 0;
+      for (const d of draft) {
+        if (d.type === "income")
+          income += d.amount || 0;
+        else if (d.type !== "transfer")
+          budgeted += d.amount || 0;
+      }
+      const allocPct = income > 0 ? Math.round(budgeted / income * 100) : null;
+      const usedPct = budgeted > 0 ? Math.round(sum.spend / budgeted * 100) : null;
+      return [
+        { label: "Total income", value: money(income), grad: true, note: `${money(sum.income)} received so far` },
+        { label: "Total budgeted", value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : "" },
+        {
+          label: "Total spent",
+          value: money(sum.spend),
+          over: budgeted > 0 && sum.spend > budgeted,
+          note: usedPct !== null ? `${usedPct}% of budget used` : ""
+        }
+      ];
+    }
+    function renderBudgetTotals() {
+      const tiles = budgetTotalsStrip();
+      for (const id of ["#budTotalsTop", "#budTotalsBottom"]) {
+        const host = $(id);
+        if (!host)
+          continue;
+        host.innerHTML = "";
+        for (const t of tiles) {
+          host.append(el("div", { class: "bud-total" }, el("div", { class: "bud-total-l" }, t.label), el("div", { class: `bud-total-v${t.grad ? " grad-txt" : ""}${t.over ? " over" : ""}` }, t.value), t.note ? el("div", { class: "bud-total-n" }, t.note) : ""));
+        }
+      }
+    }
     function renderBudgets() {
       $("#budPeriodLabel").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const draft = budgetDraft();
@@ -2457,6 +2664,7 @@ var require_budgets = __commonJS((exports2, module2) => {
             d.amountRaw = null;
             mark();
             updateRemaining();
+            renderBudgetTotals();
           }
         }), remainingEl)), el("td", { class: `num${overActual ? " text-danger" : " text-muted"}`, style: "white-space:nowrap" }, money(actual)), el("td", {}, el("input", {
           type: "text",
@@ -2486,6 +2694,7 @@ var require_budgets = __commonJS((exports2, module2) => {
         } }, icoEl(["trash-2", "trash"])))));
       }
       t.append(body);
+      renderBudgetTotals();
     }
     async function saveBudget() {
       const draft = budgetDraft().filter((d) => d.category && (d.inFile || d.amount || d.notes && d.notes.trim()));

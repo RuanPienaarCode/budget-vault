@@ -175,7 +175,9 @@ const SHELL_HTML = `
             </div>
           </div>
           <div class="body-pad body-pad-tight">
+            <div class="bud-totals" id="budTotalsTop"></div>
             <div class="table-responsive"><table class="table" id="budTable"></table></div>
+            <div class="bud-totals bud-totals-bottom" id="budTotalsBottom"></div>
           </div>
         </div>
       </section>
