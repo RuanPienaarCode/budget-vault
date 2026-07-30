@@ -4061,28 +4061,22 @@ var require_dedupe = __commonJS((exports2, module2) => {
     return Number.isNaN(ms) ? Infinity : Math.abs(ms) / 86400000;
   }
   function buildIndex(txFiles) {
-    const exact = new Set;
+    const exact = new Map;
     const byAmount = new Map;
+    const index = { exact, byAmount, seq: 0 };
     for (const f of Object.values(txFiles || {})) {
-      const label = String(f.label || "").trim().toLowerCase();
-      for (const r of f.rows || []) {
-        const key = txKey(r.date, r.desc, r.amount, f.label);
-        exact.add(key);
-        const bucket = `${label}|${Number(r.amount).toFixed(2)}`;
-        if (!byAmount.has(bucket))
-          byAmount.set(bucket, []);
-        byAmount.get(bucket).push({ date: r.date, desc: r.desc, key });
-      }
+      for (const r of f.rows || [])
+        addToIndex(index, r.date, r.desc, r.amount, f.label);
     }
-    return { exact, byAmount };
+    return index;
   }
   function addToIndex(index, date, desc, amount, label) {
     const key = txKey(date, desc, amount, label);
-    index.exact.add(key);
+    index.exact.set(key, (index.exact.get(key) || 0) + 1);
     const bucket = `${String(label).trim().toLowerCase()}|${Number(amount).toFixed(2)}`;
     if (!index.byAmount.has(bucket))
       index.byAmount.set(bucket, []);
-    index.byAmount.get(bucket).push({ date, desc, key });
+    index.byAmount.get(bucket).push({ id: index.seq++, date, desc, key });
     return key;
   }
   function findNearDuplicate(item, index, label, incomingKeys, consumed, range) {
@@ -4092,7 +4086,7 @@ var require_dedupe = __commonJS((exports2, module2) => {
       return null;
     let best = null, bestGap = Infinity;
     for (const cand of bucket) {
-      if (consumed.has(cand.key))
+      if (consumed.has(cand.id))
         continue;
       if (incomingKeys.has(cand.key))
         continue;
@@ -4114,9 +4108,14 @@ var require_dedupe = __commonJS((exports2, module2) => {
     const lab = String(label || "").trim().toLowerCase();
     const incomingKeys = new Set(items.map((it) => txKey(it.date, it.desc, it.amount, lab)));
     let dupes = 0, nears = 0;
+    const usedExact = new Map;
     for (const it of items) {
-      it.dup = index.exact.has(txKey(it.date, it.desc, it.amount, lab));
+      const key = txKey(it.date, it.desc, it.amount, lab);
+      const have = index.exact.get(key) || 0;
+      const used = usedExact.get(key) || 0;
+      it.dup = used < have;
       if (it.dup) {
+        usedExact.set(key, used + 1);
         it.include = false;
         it.autoExcluded = true;
         dupes++;
@@ -4129,7 +4128,7 @@ var require_dedupe = __commonJS((exports2, module2) => {
     for (const it of items) {
       const hit = it.dup ? null : findNearDuplicate(it, index, lab, incomingKeys, consumed, range);
       if (hit) {
-        consumed.add(hit.key);
+        consumed.add(hit.id);
         it.near = hit;
         nears++;
         if (!it.nearAuto) {

@@ -121,7 +121,7 @@ const RANGE = { min: '2026-06-01', max: '2026-06-30' };
   const b = { date: '2026-06-11', desc: 'WOOLWORTHS CAPE TOWN', amount: -200 };
   const hitA = findNearDuplicate(a, index, LABEL, new Set(), consumed, RANGE);
   ok(hitA, 'first row matches');
-  consumed.add(hitA.key);
+  consumed.add(hitA.id);
   ok(!findNearDuplicate(b, index, LABEL, new Set(), consumed, RANGE), 'a consumed vault row cannot be matched twice');
 }
 { // different account, same amount and merchant → never a match
@@ -165,6 +165,45 @@ const RANGE = { min: '2026-06-01', max: '2026-06-30' };
     'a row that became an exact dup stays excluded even with a stale near flag');
 }
 
+/* ------------------------------------------------------------- layer 1d
+   Multiplicity. Identical transactions genuinely repeat — three "Returned debit
+   order fee" -12.50 on one day, two R120 shop visits. An exact-key membership
+   Set collapsed them, so when an early export listed a charge once and a later
+   one listed it twice, the second copy was flagged a duplicate and never landed
+   in ANY import: silent, permanent loss. Counts must reconcile one-for-one. */
+{
+  const row = { date: '2026-06-12', desc: 'MARKET HALL CITYVILLE', amount: -120 };
+  const stage = n => Array.from({ length: n }, () => ({ ...row, include: true }));
+
+  // vault has one copy, the statement now lists two → exactly one is new.
+  let items = stage(2);
+  flagItems(items, buildIndex({ f: { label: LABEL, rows: [row] } }), LABEL, RANGE);
+  ok(items.filter(i => i.dup).length === 1, 'vault 1 / statement 2 → one flagged duplicate');
+  ok(items.filter(i => !i.dup).length === 1, 'vault 1 / statement 2 → one row still importable');
+
+  // vault already has both → neither is new.
+  items = stage(2);
+  flagItems(items, buildIndex({ f: { label: LABEL, rows: [row, { ...row }] } }), LABEL, RANGE);
+  ok(items.every(i => i.dup), 'vault 2 / statement 2 → both duplicates');
+
+  // vault has more than the statement → still no false importables.
+  items = stage(1);
+  flagItems(items, buildIndex({ f: { label: LABEL, rows: [row, { ...row }] } }), LABEL, RANGE);
+  ok(items[0].dup, 'vault 2 / statement 1 → duplicate');
+
+  // first import of three identical rows: nothing in the vault, all three land.
+  items = stage(3);
+  flagItems(items, buildIndex({}), LABEL, RANGE);
+  ok(items.every(i => !i.dup && i.include), 'empty vault / statement 3 → all three importable');
+
+  // the near pass must not undo it: identical rows share a key, so consuming a
+  // candidate by key rather than by identity would block the twin.
+  const near = [{ date: '2026-06-12', desc: 'MARKET HALL TERM0042', amount: -120 }];
+  items = stage(2);
+  flagItems(items, buildIndex({ f: { label: LABEL, rows: [near[0], { ...near[0] }] } }), LABEL, RANGE);
+  ok(items.filter(i => i.near).length === 2, 'two pending twins can each absorb one incoming row');
+}
+
 /* ------------------------------------------------------------------ layer 2
    Replay the author's real overlapping exports in order. This is the
    regression that would have caught the original bug. */
@@ -204,33 +243,34 @@ function loadStatement(file) {
   return out;
 }
 
-/* The import the plugin performs, minus the DOM: exact pass, near pass, then
-   commit whatever survives — i.e. the default behaviour of a user who imports
-   a statement and presses the button without overriding anything. */
-function simulateImport(vaultRows, items, label, useNear = true) {
-  const index = buildIndex({ f: { label, rows: vaultRows } });
-  const incomingKeys = new Set(items.map(i => txKey(i.date, i.desc, i.amount, label)));
+function fileRange(items) {
   let range = null;
   for (const it of items) {
     if (!range) range = { min: it.date, max: it.date };
     else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
   }
-  /* Flag every row against the PRE-IMPORT snapshot, then commit the survivors
-     — the order the plugin uses. Indexing as we go would make two identical
-     rows in one statement (three "Returned debit order fee" -12.50 on the same
-     day, in this vault) collapse into one, which the plugin does not do. */
-  const consumed = new Set();
-  const keep = [];
-  for (const it of items) {
-    if (index.exact.has(txKey(it.date, it.desc, it.amount, label))) continue;
-    if (useNear) {
-      const hit = findNearDuplicate(it, index, label, incomingKeys, consumed, range);
-      if (hit) { consumed.add(hit.key); continue; }      // unticked by default → does not land
-    }
-    keep.push(it);
-  }
-  const landed = keep.map(it => ({ date: it.date, desc: it.desc, amount: it.amount }));
-  for (const it of landed) addToIndex(index, it.date, it.desc, it.amount, label);
+  return range;
+}
+
+/* The import the plugin performs, minus the DOM: drives the REAL flagItems,
+   then commits whatever is still ticked — i.e. what a user gets by importing a
+   statement and pressing the button without overriding anything. */
+function simulateNew(vaultRows, items, label) {
+  const index = buildIndex({ f: { label, rows: vaultRows } });
+  const staged = items.map(it => ({ ...it, include: true }));
+  flagItems(staged, index, label, fileRange(staged));
+  const landed = staged.filter(i => i.include && !i.dup)
+    .map(it => ({ date: it.date, desc: it.desc, amount: it.amount }));
+  return vaultRows.concat(landed);
+}
+
+/* The behaviour shipped before this fix: a membership Set of exact keys, no
+   near pass. Written out longhand rather than flag-switching the real code, so
+   the comparison stays honest even as dedupe.js changes. */
+function simulateOld(vaultRows, items, label) {
+  const seen = new Set(vaultRows.map(r => txKey(r.date, r.desc, r.amount, label)));
+  const landed = items.filter(it => !seen.has(txKey(it.date, it.desc, it.amount, label)))
+    .map(it => ({ date: it.date, desc: it.desc, amount: it.amount }));
   return vaultRows.concat(landed);
 }
 
@@ -297,8 +337,8 @@ for (const [acc, list] of byAccount) {
 
   let vaultNew = [], vaultOld = [];
   for (const rows of exports_) {
-    vaultNew = simulateImport(vaultNew, rows, label, true);
-    vaultOld = simulateImport(vaultOld, rows, label, false);   // exact-only, i.e. the old behaviour
+    vaultNew = simulateNew(vaultNew, rows, label);
+    vaultOld = simulateOld(vaultOld, rows, label);
   }
 
   const pairsNew = survivingPairs(vaultNew, exports_);
@@ -308,12 +348,21 @@ for (const [acc, list] of byAccount) {
     `(exact-only leaves ${pairsOld.length})` +
     (pairsNew.length ? `\n     ${pairsNew.slice(0, 8).join('\n     ')}` : ''));
 
-  // The safety half: the near pass must not suppress a real transaction that
-  // the old algorithm kept. Equality, not a threshold — any drift is a bug.
+  /* The safety half. Two claims, weakest first:
+       - never worse than what shipped before (the near pass must not suppress
+         a real transaction the old algorithm kept), and
+       - actually lossless, which the multiplicity fix is what buys: counting
+         exact keys instead of testing membership means N copies on the
+         statement reconcile against N copies in the vault, so a charge listed
+         once in an early export and twice in a later one no longer loses its
+         second copy forever. */
   const missNew = missingVsFinal(vaultNew, finalExport);
   const missOld = missingVsFinal(vaultOld, finalExport);
-  ok(missNew === missOld,
-    `${acc}: near pass loses nothing extra (missing ${missNew}, exact-only ${missOld})`);
+  ok(missNew <= missOld,
+    `${acc}: never loses more than the old algorithm (missing ${missNew}, old ${missOld})`);
+  ok(missNew === 0,
+    `${acc}: every transaction in the final statement survived ${list.length} sequential imports ` +
+    `(missing ${missNew}; the old algorithm lost ${missOld})`);
 
   replays++;
   console.log(`  ${acc}: ${list.length} exports · duplicates ${pairsOld.length} → ${pairsNew.length} · rows ${vaultOld.length} → ${vaultNew.length} · lost ${missOld} → ${missNew}`);

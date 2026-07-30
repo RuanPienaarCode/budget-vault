@@ -3,6 +3,40 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.23 — 2026-07-30
+
+Import no longer discards a transaction that legitimately repeats. No
+file-format change.
+
+### Fixed
+
+- **A repeated transaction could be dropped and never recovered.** Duplicate
+  detection held the existing transactions in a membership set — it could
+  answer "has this date/description/amount been seen before?" but not "how many
+  times?". Some transactions genuinely repeat identically: three `Returned
+  debit order fee` -12.50 on one day, two shop visits of the same amount.
+
+  When an early statement listed such a charge once and a later statement
+  listed it twice, the second copy matched the same single entry, was flagged a
+  duplicate, and never imported — on that statement or any statement after it.
+  It was silent: the row appeared under "duplicates skipped", so nothing looked
+  wrong, and the transaction was simply absent from every total from then on.
+
+  The index now counts occurrences instead of testing membership, and the
+  statement's copies are matched against the vault's copies one for one. The
+  Nth identical row is a duplicate only while the vault still has an Nth
+  identical row to pair it with; beyond that it is a real transaction and
+  imports normally.
+
+  The same fix applies to the near-duplicate pass added in 1.0.22, which
+  identified candidates by their key — so two identical pending rows collapsed
+  to one and only one of them could be matched. Candidates are now tracked
+  individually.
+
+  Replayed across a run of overlapping statements, imports are now lossless:
+  every transaction on the final statement survives, where the previous
+  behaviour dropped one.
+
 ## 1.0.22 — 2026-07-30
 
 Import no longer duplicates a card transaction when the bank rewrites it
