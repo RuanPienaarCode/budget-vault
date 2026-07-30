@@ -681,15 +681,21 @@
 .budget-app-root .table-responsive { overflow-x: auto; border-radius: 0 0 var(--radius) var(--radius); }
 
 /* Section rows inside tables (category type groups) */
+/* Reads as a real heading, not a faint label: a tinted band a shade darker
+   than the rows (a shade lighter in dark mode, same intent), stronger ink,
+   and a hairline above/below so the group boundary is unmistakable. */
 .budget-app-root .table .type-row td {
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.74rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-light);
-  padding: 0.9rem 1rem 0.35rem;
-  background: transparent;
+  letter-spacing: 0.09em;
+  color: var(--text-primary);
+  padding: 0.6rem 1rem;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
 }
+.budget-app-root .table tbody tr.type-row:first-child td { border-top: none; }
 
 /* ============================================================
    BUTTONS — ghost / gradient (Airy Glass)
@@ -941,7 +947,7 @@
 /* Budget page: period totals strip, repeated above and below the table */
 .budget-app-root .bud-totals {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin: 0 0 14px;
   padding: 14px 16px;
@@ -960,6 +966,11 @@
 }
 .budget-app-root .bud-total-v.over { color: var(--color-danger); }
 .budget-app-root .bud-total-n { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+/* Four tiles get cramped before they get narrow — drop to 2×2 first, then to a
+   single column on phones. */
+@media (max-width: 1000px) {
+  .budget-app-root .bud-totals { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 700px) {
   .budget-app-root .bud-totals { grid-template-columns: 1fr; gap: 10px; }
 }
@@ -1002,10 +1013,20 @@
 
 /* Import review rows */
 .budget-app-root .imp-dup { opacity: .45; }
+/* A likely-dup is unticked but still importable, so it must NOT be dimmed the
+   way a hard dup is — the user has to read it and decide. Amber accent + an
+   inline reason naming the row it collided with. */
+.budget-app-root #impTable tbody tr.imp-near { background: var(--color-warning-light); }
+.budget-app-root #impTable tbody tr.imp-near td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
+.budget-app-root .badge-near { background: var(--color-warning-light); color: var(--color-warning); margin-left: 6px; }
+.budget-app-root .imp-near-why { font-size: .78rem; color: var(--text-muted); margin-top: 2px; max-width: 46ch; }
 /* Rows in the current financial period get an emerald accent + faint tint. */
 .budget-app-root #impTable tbody tr.imp-current td:first-child { box-shadow: inset 3px 0 0 var(--color-primary); }
 .budget-app-root #impTable tbody tr.imp-current { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }
 .budget-app-root #impTable tbody tr.imp-current.imp-dup { background: color-mix(in srgb, var(--color-primary) 4%, transparent); }
+/* Declared after .imp-current so the warning wins on a current-period row —
+   "you are about to re-import this" matters more than "this is this month". */
+.budget-app-root #impTable tbody tr.imp-current.imp-near { background: var(--color-warning-light); }
 .budget-app-root .imp-legend { display: inline-flex; align-items: center; gap: 7px; margin-top: 4px; }
 .budget-app-root .imp-legend-swatch {
   width: 22px; height: 10px; border-radius: 3px; flex: none;

@@ -7,6 +7,7 @@
    ambiguous DD/MM vs MM/DD dates follows the country profile. */
 
 const { el, parseCsv, parseStatementDate, normalizeAmount } = require('../util');
+const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 
 /* Header-name aliases, lowercase. Exact match wins in array order; amount can
    come from a single signed column OR a debit + credit pair (Capitec "Money
@@ -48,12 +49,8 @@ module.exports = function registerImport(ctx) {
     }
     return best;
   }
-  function dedupSet() {
-    const set = new Set();
-    for (const f of Object.values(S.txFiles)) {
-      for (const r of f.rows) set.add(`${r.date}|${r.desc.trim().toLowerCase()}|${r.amount.toFixed(2)}|${f.label.trim().toLowerCase()}`);
-    }
-    return set;
+  function dedupIndex() {
+    return buildIndex(S.txFiles);
   }
   function detectAccountLabel(filename) {
     // Discovery-style "Label_12345_..." or a bare account number ("12345678901.csv",
@@ -94,7 +91,7 @@ module.exports = function registerImport(ctx) {
     if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1)))
       return toast('Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)', true);
 
-    const seen = dedupSet();
+    const index = dedupIndex();
     const items = [];
     let skipped = 0;
     const label0 = detectAccountLabel(file.name);
@@ -142,7 +139,15 @@ module.exports = function registerImport(ctx) {
       }
     }
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
-    S.pendingImport = { items, label: label0, seen, skipped, filename: file.name };
+    /* The file's own date span. The near-duplicate pass treats "this row is no
+       longer in the statement" as evidence it settled and was rewritten, so it
+       may only reason about vault rows the statement actually covers. */
+    let range = null;
+    for (const it of items) {
+      if (!range) range = { min: it.date, max: it.date };
+      else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
+    }
+    S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name };
     importShown = IMPORT_PAGE;   // a fresh file starts at the first page
     renderImportReview();
     if (showBar) importProgress('done');
@@ -178,16 +183,14 @@ module.exports = function registerImport(ctx) {
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
 
     // Canonicalise through txSegment — the same resolver commitImport writes
-    // with, and the same string dedupSet keyed by. Probing with the raw label
+    // with, and the same string dedupIndex keyed by. Probing with the raw label
     // (or with a differently-sanitised one) would miss duplicates and re-import
     // rows that are already on disk.
     const lab = txSegment(p.label || '').trim().toLowerCase();
-    let dupes = 0;
-    for (const it of p.items) {
-      it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
-      if (it.dup) { it.include = false; it.autoExcluded = true; dupes++; }
-      else if (it.autoExcluded) { it.include = true; it.autoExcluded = false; }  // no longer a dup for this account → re-include
-    }
+    /* Exact duplicates, then the charges the bank re-dated or re-worded between
+       exports — see src/dedupe.js for both. Near-dups are unticked and labelled,
+       never skipped: the user sees what each collided with and can override. */
+    const { dupes, nears } = flagItems(p.items, p.index, lab, p.range);
     const newOnes = p.items.filter(i => !i.dup);
     const auto = newOnes.filter(i => i.cat).length;
     const cur = currentPeriod();
@@ -195,7 +198,9 @@ module.exports = function registerImport(ctx) {
     const inCurrent = it => it.date >= curRange.start && it.date <= curRange.end;
     const curCount = p.items.filter(inCurrent).length;
     $('#impStats').textContent =
-      `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped · ${auto} auto-categorised` +
+      `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped` +
+      (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
+      ` · ${auto} auto-categorised` +
       (p.skipped ? ` · ${p.skipped} unparseable` : '');
     $('#impLegend').empty();
     $('#impLegend').append(
@@ -210,13 +215,25 @@ module.exports = function registerImport(ctx) {
     const body = el('tbody', {});
     const visible = p.items.slice(0, importShown);
     for (const it of visible) {
-      const cls = (it.dup ? 'imp-dup' : '') + (inCurrent(it) ? ' imp-current' : '');
+      const cls = (it.dup ? 'imp-dup' : it.near ? 'imp-near' : '') + (inCurrent(it) ? ' imp-current' : '');
+      // Spelled out rather than left to the badge: the row is unticked, and the
+      // user needs to know WHICH existing row it collided with to judge whether
+      // this is the bank rewriting a pending charge or a real second purchase.
+      const nearWhy = it.near
+        ? `Looks like the already-imported "${it.near.desc}" on ${it.near.date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.`
+        : '';
       body.append(el('tr', { class: cls.trim() },
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}`,
+          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}${it.near ? '. ' + nearWhy : ''}`,
+            // nearAuto stays TRUE once we have auto-unticked: it records that the
+            // untick already happened, so a re-render (account switch, "show
+            // more") leaves the user's decision — either way — alone.
             ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked })),
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, it.date),
-        el('td', {}, it.desc),
+        el('td', {}, it.desc, ...(it.near ? [
+          el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
+          el('div', { class: 'imp-near-why' }, nearWhy),
+        ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),
         // `checked` reflects the model: after a partial-failure re-render the
@@ -262,7 +279,7 @@ module.exports = function registerImport(ctx) {
       });
     }
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
-    // Same canonical form dedupSet / renderImportReview key by (the txSegment'd
+    // Same canonical form dedupIndex / renderImportReview key by (the txSegment'd
     // folder label), so a retry after a partial failure recognises landed rows.
     const lab = label.trim().toLowerCase();
     // Write each month-file and reflect it in memory in the SAME step — disk and
@@ -286,7 +303,9 @@ module.exports = function registerImport(ctx) {
         // a re-render / retry treats them as already-present (no re-import).
         for (const e of entries) {
           e.src.include = false;
-          p.seen.add(`${e.src.date}|${e.src.desc.trim().toLowerCase()}|${e.src.amount.toFixed(2)}|${lab}`);
+          // Into BOTH layers: a retry must see the landed row as an exact dup,
+          // and the near pass must be able to match a later rewrite of it.
+          addToIndex(p.index, e.src.date, e.src.desc, e.src.amount, lab);
         }
         done += rows.length;
       }

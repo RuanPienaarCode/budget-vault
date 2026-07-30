@@ -3,6 +3,48 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.22 — 2026-07-30
+
+Import no longer duplicates a card transaction when the bank rewrites it
+between statement exports. No file-format change.
+
+### Fixed
+
+- **Duplicate transactions after re-importing an overlapping statement.**
+  Card charges arrive twice from the bank: first as `Pending`, carrying the raw
+  terminal descriptor and a provisional timestamp, then again a few days later
+  once they settle, with a normalised merchant string and a new time.
+
+      8 Jun export   2026-06-08 12:07  "Checkers Rondebosch SB002256 ZA"  Pending
+      22 Jun export  2026-06-08 20:13  "Checkers Rondebosch RONDEBOSCH"   Apple Pay
+
+  Duplicate detection keyed on `date|description|amount|account`, and **two of
+  those four fields change when a charge settles** — so the settled row read as
+  brand new and landed next to the pending one it was meant to replace. Both
+  flavours occur: the description rewritten, and the date shifted by a day
+  (which can duplicate a whole day of debit orders at once).
+
+  Import now runs a second pass for this. A row is flagged when it matches an
+  existing transaction on account and amount, falls within four days, and shares
+  a merchant stem — **and** the incoming statement no longer contains the row it
+  matched. That last condition is what makes it safe: a pending row *vanishes*
+  from later exports once it settles, so a still-present row can never be
+  absorbed by a different one. Without it, two same-amount international fees a
+  day apart would collide on their shared prefix.
+
+  Flagged rows are **unticked and labelled with the transaction they collided
+  with — never silently skipped**, so a genuine second identical purchase is one
+  click away. Replayed over four years of real statements, this removes every
+  pending/settled duplicate while suppressing no real transaction that the
+  previous behaviour kept.
+
+### Added
+
+- **Declarative settings on Obsidian 1.13+.** The settings tab is now also
+  described through `getSettingDefinitions()`, which 1.13 renders itself. Older
+  versions keep the existing imperative tab unchanged. Both describe the same
+  settings, and a test asserts they stay in step.
+
 ## 1.0.20 — 2026-07-30
 
 Split transactions, a Budget totals strip, and the end of a family of layout
