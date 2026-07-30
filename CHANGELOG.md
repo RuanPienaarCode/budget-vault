@@ -3,6 +3,74 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.20 — 2026-07-30
+
+Split transactions, a Budget totals strip, and the end of a family of layout
+bugs caused by Obsidian's own stylesheet reaching into the plugin.
+No file-format change.
+
+### Added
+
+- **Split a transaction across categories.** One bank line often covers two
+  things — half the supermarket shop is groceries, half is household. Each row
+  in Transactions now has a split button that carves it into parts with their
+  own category and note. The parts must sum to the original exactly; the modal
+  will not let you submit while there is a remainder.
+
+  The original line is **kept and marked Excluded** rather than deleted. Every
+  total is computed from non-excluded rows, so the period figures are identical
+  before and after a split — and because the CSV importer dedupes on
+  `date|desc|amount|account`, keeping the original means re-importing the same
+  statement can't re-add the line on top of its own parts. It is reversible by
+  hand in the markdown: untick Excluded and delete the parts.
+- **Budget page totals strip.** Three tiles — total income, total budgeted,
+  total spent — repeated above and below the category table, so the totals stay
+  in reach at either end of a long list. They read the live draft, so they move
+  as you type rather than after you save.
+
+### Fixed — Obsidian's stylesheet was reaching into the plugin
+
+All three of these are the same root cause: `app.css` rules that match the
+plugin's own markup and beat its rules on specificity. They are now answered by
+name rather than by hoping source order wins.
+
+- **Cards were never actually full-bleed on a phone, and rows were cramped.**
+  Obsidian ships its own `.card` class. The plugin's `.card` declared colours
+  and radius, so those were safe — but `margin: 0 10px`, `padding: 15px 30px`
+  and `display: flex` fell straight through, and `.workspace-leaf-content
+  .view-content` added another 12px of gutter each side. That is ~80px of a
+  375px screen gone before the first table cell, which is why the earlier
+  full-bleed passes looked like they had done nothing: they trimmed
+  `.main-content` and `.body-pad` while the real gutters were elsewhere. The
+  Transactions table now gets 373px of a 375px screen instead of 269px. Cards
+  also square their sides at the screen edge instead of showing two clipped
+  corners.
+- **In light mode, note fields turned black under the cursor and the Excl.
+  checkboxes were dark squares.** The plugin's theme is its own setting, so it
+  can legitimately run light while Obsidian runs dark — and then
+  `input[type=text]:hover` (more specific than the plugin's `.form-control`)
+  repainted the field with Obsidian's dark form-field colour, while Obsidian's
+  `color-scheme: dark` made the UA paint the native checkboxes dark. The plugin
+  now pins `color-scheme` to its own theme and re-points the host variables
+  those rules read at its own palette, which fixes the mismatch in both
+  directions.
+- **A stray ✓ at the top-left corner of every card.** Obsidian draws a
+  checkbox's tick as an absolutely-positioned `::after` on the input, which
+  only lands correctly because Obsidian also makes the input `position:
+  relative`. The plugin restores the native checkbox and resets that to
+  `static` — so the tick went looking for the nearest positioned ancestor,
+  found `.card`, and painted itself at the card's corner, one per ticked box.
+  The native control draws its own tick, so the overlay is now switched off.
+
+### Added — tests
+
+- `tests/split-transaction.test.cjs` — guards the split arithmetic (parts sum
+  exactly, cent-rounding so `0.10 + 0.20` balances `0.30` while a one-cent
+  shortfall still blocks), the sign coming from the parent, and the on-disk
+  shape including that non-excluded rows total exactly what they totalled
+  before the split. Runs in bare node, wired into `build.sh`,
+  negative-control-proven.
+
 ## 1.0.19 — 2026-07-29
 
 The structural half of the audit — the work deliberately held back from 1.0.18
