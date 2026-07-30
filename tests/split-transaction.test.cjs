@@ -135,16 +135,16 @@ const { serializeTxFile } = ctx;
 ok(typeof ctx.splitTransaction === 'function', 'splitTransaction must be exposed on ctx');
 
 const parent = {
-  date: '2026-08-10', desc: 'Checkers', cat: 'Groceries',
+  date: '2026-08-10', desc: 'GROCER ONE', cat: 'Groceries',
   amount: -1240.85, amountRaw: null, excluded: true, note: 'Split into 2',
 };
 const file = {
   label: 'FNB Cheque', month: '2026-08', fmRaw: 'kind: transactions',
   rows: [
     parent,
-    { date: '2026-08-10', desc: 'Checkers', cat: 'Groceries', amount: -800, amountRaw: null, excluded: false, note: '' },
-    { date: '2026-08-10', desc: 'Checkers', cat: 'Eating Out', amount: -440.85, amountRaw: null, excluded: false, note: 'snacks' },
-    { date: '2026-08-12', desc: 'Netflix', cat: 'Subscriptions', amount: -199, amountRaw: null, excluded: false, note: '' },
+    { date: '2026-08-10', desc: 'GROCER ONE', cat: 'Groceries', amount: -800, amountRaw: null, excluded: false, note: '' },
+    { date: '2026-08-10', desc: 'GROCER ONE', cat: 'Eating Out', amount: -440.85, amountRaw: null, excluded: false, note: 'snacks' },
+    { date: '2026-08-12', desc: 'STREAM CO', cat: 'Subscriptions', amount: -199, amountRaw: null, excluded: false, note: '' },
   ],
 };
 const back = parseMdTable(serializeTxFile({ ...file, rows: file.rows.map((r) => ({ ...r })) }))
@@ -154,8 +154,8 @@ const back = parseMdTable(serializeTxFile({ ...file, rows: file.rows.map((r) => 
     excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || ''),
   }));
 
-const parts = back.filter((r) => r.desc === 'Checkers' && !r.excluded);
-const kept = back.filter((r) => r.desc === 'Checkers' && r.excluded);
+const parts = back.filter((r) => r.desc === 'GROCER ONE' && !r.excluded);
+const kept = back.filter((r) => r.desc === 'GROCER ONE' && r.excluded);
 eq(kept.length, 1, 'exactly one parent row is kept');
 eq(kept[0].amount, -1240.85, "the parent keeps its amount — that IS the importer's dedup key");
 ok(/Split into 2/.test(kept[0].note), 'the parent says why it is excluded');
