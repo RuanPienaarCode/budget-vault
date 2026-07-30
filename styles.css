@@ -346,7 +346,15 @@
 .budget-app-root .menu-btn[aria-expanded="true"] span { background: #fff; }
 .budget-app-root.bud-dark .menu-btn[aria-expanded="true"] span { background: #05070f; }
 
-.budget-app-root .topbar .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 0; }
+.budget-app-root .topbar .brand {
+  display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 0;
+  /* It's a <button> so the logo routes home — strip the UA chrome back to the
+     plain brand block it looks like. */
+  background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit;
+  cursor: pointer; text-align: left; box-shadow: none;
+}
+.budget-app-root .topbar .brand:hover .brand-text b { color: var(--color-primary); }
+.budget-app-root .topbar .brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
 .budget-app-root .brand-logo {
   width: 40px; height: 40px; border-radius: 14px; flex: none;
   display: flex; align-items: center; justify-content: center;
@@ -677,7 +685,11 @@
 .budget-app-root .table tbody tr:last-child td { border-bottom: none; }
 .budget-app-root .table tbody tr { transition: background 0.12s; }
 .budget-app-root .table.table-hover tbody tr:hover { background: var(--color-primary-light); }
-.budget-app-root .table .num, .budget-app-root .table th.num { text-align: right; }
+/* Money never wraps. In a narrow pane the amount columns get tight enough that
+   "R 12,000.00" breaks after the currency symbol, which doubles the height of
+   every row it hits and leaves the table looking ragged — the horizontal scroll
+   the .table-responsive already provides is the intended overflow, not wrapping. */
+.budget-app-root .table .num, .budget-app-root .table th.num { text-align: right; white-space: nowrap; }
 .budget-app-root .table-responsive { overflow-x: auto; border-radius: 0 0 var(--radius) var(--radius); }
 
 /* Section rows inside tables (category type groups) */
@@ -1160,10 +1172,11 @@
 
   .budget-app-root .card-h { padding: 18px 14px 0; }
   .budget-app-root .body-pad { padding: 14px 14px 22px; }
-  /* Table cards go fully edge-to-edge on mobile — the .table-responsive scroll
-     region then owns the full card width (cell padding still keeps text off the
-     rim). Overrides the desktop .body-pad-tight side gutters above. */
-  .budget-app-root .body-pad-tight { padding-left: 0; padding-right: 0; }
+  /* Table cards go near edge-to-edge on mobile — the .table-responsive scroll
+     region owns almost the full card width, keeping just a 5px rim so the first
+     column doesn't read as touching the bezel (cell padding adds the rest).
+     Overrides the desktop .body-pad-tight side gutters above. */
+  .budget-app-root .body-pad-tight { padding-left: 5px; padding-right: 5px; }
   .budget-app-root .card-h h2 { font-size: 17px; }
   .budget-app-root .hero { padding: 24px 16px; }
 
@@ -1178,6 +1191,11 @@
   .budget-app-root .table tbody td:first-child { padding-left: 0.25rem; }
   .budget-app-root .table thead th:last-child,
   .budget-app-root .table tbody td:last-child { padding-right: 0.25rem; }
+
+  /* The progress bar is the one column that can afford to shrink, and with
+     amounts now unwrappable it has to — 110px of bar was pushing the Remaining
+     column off-screen on every Dashboard row. */
+  .budget-app-root .cat-bar { min-width: 64px; }
 }
 
 /* ------------------------- import: DIY-CSV help ------------------------- */

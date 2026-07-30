@@ -316,6 +316,9 @@ function mountApp(view) {
     app.setting.open();
     app.setting.openTabById('budget-app');
   });
+  // Logo doubles as "home" — no-op until the vault has loaded, same guard the
+  // drawer links use (there is no dashboard to show on the connect screen).
+  $('#brandHome').addEventListener('click', () => { if (S.loaded) switchView('dashboard'); });
   $('#topbarAvatar').addEventListener('click', () => {
     app.setting.open();
     app.setting.openTabById('budget-app');

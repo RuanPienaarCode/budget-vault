@@ -3,6 +3,30 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.25 — 2026-07-30
+
+Small navigation and table-readability pass.
+
+### Added
+
+- **The Budget Vault logo in the top bar is now a link to the Dashboard.**
+  Tapping the wallet icon or the title takes you home from any page, the way a
+  logo does on a website. It is a real button, so it is reachable by keyboard
+  and announced as "Go to Dashboard"; the old markup was inert text.
+
+### Fixed
+
+- **Amounts no longer wrap onto two lines in narrow panes.** In a phone-width
+  pane the money columns got tight enough that a figure broke after the
+  currency symbol, which doubled the height of every row it hit and left the
+  Dashboard's Budget vs Actual table looking ragged. Amounts now stay on one
+  line and the table scrolls sideways instead, which it was already set up to
+  do. The category progress bar gives up a little width to help it fit.
+
+- **Table rows sat flush against the screen edge on phones.** Full-bleed table
+  cards now keep a 5px rim, so the first and last columns read as inside the
+  card rather than touching the bezel.
+
 ## 1.0.24 — 2026-07-30
 
 Housekeeping only — **no functional change**. The plugin behaves exactly as
