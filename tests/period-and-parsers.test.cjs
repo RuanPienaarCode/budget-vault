@@ -177,11 +177,11 @@ for (const [cell, dayFirst, want, why] of [
 
 /* ============================ learnPattern ============================== */
 for (const [desc, want, why] of [
-  ['WOOLWORTHS GARDENS 400738******3558', 'WOOLWORTHS GARDENS', 'masked card number trimmed'],
-  ['CHECKERS SANDTON I8816879', 'CHECKERS SANDTON', 'digit-heavy reference trimmed'],
-  ['VODACOM VODSS3MMGJMQ', 'VODACOM', 'long caps+digit reference trimmed'],
-  ['PICK N PAY', 'PICK N PAY', 'a clean description is left alone'],
-  ['SHOPRITE 123456789', 'SHOPRITE', 'long digit run trimmed'],
+  ['MEGAMART CENTRAL 000000******0000', 'MEGAMART CENTRAL', 'masked card number trimmed'],
+  ['GROCER ONE CENTRAL X0000000', 'GROCER ONE CENTRAL', 'digit-heavy reference trimmed'],
+  ['TELCO CO VODREF0000000', 'TELCO CO', 'long caps+digit reference trimmed'],
+  ['CORNER MART', 'CORNER MART', 'a clean description is left alone'],
+  ['VALUE MART 123456789', 'VALUE MART', 'long digit run trimmed'],
   // The <4-character guard: trimming 'ABC 123456789' would leave 'ABC', which is
   // too short to match anything usefully, so the untrimmed original wins.
   ['ABC 123456789', 'ABC 123456789', 'a stem under 4 chars falls back to the full description'],

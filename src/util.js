@@ -263,10 +263,10 @@ function learnPattern(desc) {
     if (!m) break;
     const w = m[2];
     const digits = (w.match(/\d/g) || []).length;
-    const noise = /\*{2,}/.test(w) ||                          // masked card: 400738******3558
+    const noise = /\*{2,}/.test(w) ||                          // masked card: 000000******0000
       /\d{4,}/.test(w) ||                                      // long digit run: refs, phone, meter numbers
-      (digits > 0 && digits / w.length >= 0.4) ||              // digit-heavy token: I8816879
-      (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODSS3MMGJMQ
+      (digits > 0 && digits / w.length >= 0.4) ||              // digit-heavy token: X0000000
+      (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODREF0000000
     if (!noise) break;
     s = m[1];
   }
