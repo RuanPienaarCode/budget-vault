@@ -12,8 +12,8 @@
    descriptor and a provisional timestamp, then settle a few days later with a
    normalised merchant string and a new time:
 
-     8 Jun export   2026-06-08 12:07  "Checkers Rondebosch SB002256 ZA"  Pending
-     22 Jun export  2026-06-08 20:13  "Checkers Rondebosch RONDEBOSCH"   Apple Pay
+     8 Jun export   2026-06-08 12:07  "GROCER ONE TERM0099 ZA"  Pending
+     22 Jun export  2026-06-08 20:13  "GROCER ONE CITYVILLE"   Apple Pay
 
    Two of the four exact-key fields change, so the settled row reads as brand
    new and lands next to the pending one it was meant to replace. That is what
@@ -31,7 +31,7 @@
    VANISHES from later exports once it settles — that is the signal. If the
    old row is still in the file it matched exactly in layer one, so it can
    never be absorbed by a different row. Without this, two same-amount fees a
-   day apart ("Intl payment fee SpotifyZA" / "…APPLE.COM/BILL", both -0.38)
+   day apart ("Intl payment fee MUSICCO" / "…APPLE.COM/BILL", both -1.20)
    would collide on their shared 14-character prefix. */
 
 /* Window the bank actually needs: pending→settled has never been observed
@@ -60,7 +60,7 @@ function commonPrefixLen(a, b) {
 
 /* Same merchant, allowing for the bank's own rewriting. Equality after
    stripping punctuation covers the whitespace-only variants Discovery emits
-   ("Yoco *Plato" vs "Yoco   *Plato"); the prefix rule covers the rest. */
+   ("Pay *Plato" vs "Pay   *Plato"); the prefix rule covers the rest. */
 function descsLikelySame(a, b) {
   const x = normDesc(a), y = normDesc(b);
   if (!x || !y) return false;
@@ -78,7 +78,7 @@ function daysApart(a, b) {
    a scan over the whole vault per incoming row.
 
    `exact` is a COUNT per key, not a membership set. Some transactions really do
-   repeat identically — three "Returned debit order fee" -12.50 on one day, two
+   repeat identically — three "Returned debit order fee" -9.00 on one day, two
    R120 shop visits — and a Set collapses them to one. The effect was silent and
    permanent data loss: when an early export listed a charge once and a later
    export listed it twice, the second copy matched the same single key, was

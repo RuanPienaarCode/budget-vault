@@ -6,15 +6,19 @@
    descriptor and a provisional timestamp, then again once it settles with a
    normalised merchant string and a new time. Date AND description change, so
    the exact date|desc|amount|account key misses and the settled row lands
-   beside the pending one. That put 61 duplicate rows into the author's vault
-   across Jul 2025 – Jul 2026.
+   beside the pending one. This pattern put 61 duplicate rows into one real vault over a
+   twelve-month span.
 
-   Layer 1 drives the matcher directly with the real observed description pairs
-   (including the ones that MUST NOT match).
-   Layer 2 is the one that matters: it replays REAL overlapping Discovery
-   exports in chronological order through buildIndex/findNearDuplicate — the
-   same functions src/views/import.js calls — and asserts the simulated vault
-   ends up with exactly one row per real transaction.
+   Layer 1 drives the matcher directly with description pairs that MIRROR the
+   rewrites observed on real statements (including the ones that MUST NOT
+   match). Merchant names and amounts here are SYNTHETIC — chosen to preserve
+   the properties that matter: the common-prefix lengths, the 9-character
+   tightest case, the whitespace-only variant, and the 14-character shared-stem
+   collision. Never put real statement data in this repo; it is public.
+   Layer 2 is the one that matters: it replays overlapping statement exports in
+   chronological order through the same functions src/views/import.js calls,
+   and asserts the simulated vault ends up with exactly one row per
+   transaction.
 
    Layer 2 is skipped (not failed) when the statement fixtures aren't present,
    so the suite still runs on a fresh clone.
@@ -35,41 +39,42 @@ let checks = 0;
 const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
 /* ------------------------------------------------------------------ layer 1
-   Merchant matching. Every pair below is real, lifted from the author's
-   statements. */
+   Merchant matching. Synthetic names, real rewrite SHAPES — each pair mirrors
+   a rewrite actually seen on a bank statement, with the prefix arithmetic
+   preserved. */
 const SAME = [
   // pending descriptor -> settled descriptor
-  ['Checkers Rondebosch SB002256', 'Checkers Rondebosch RONDEBOSCH'],
-  ['WOOLWORTHS CANAL WALK', 'WOOLWORTHS CAPE TOWN'],
-  ['WOOLWORTHS PALMYRA ROAD', 'WOOLWORTHS CAPE TOWN'],
-  ['APPLE.COM/BILL ITUNES.COM IE', 'APPLE.COM/BILL 59.00 ZAR'],
-  ['admyt Parking Cape Town', 'admyt Parking ROSEBANK'],
-  ['SHELL VOORBAAI TRUCKPORT Mossel Bay', 'SHELL VOORBAAI TRUCKPO Mossel Bay'],
-  ['SCHOONWINKEL SWELLENDAM', 'SCHOONWINKEL WESTERN CAPE'],
-  ['CAPE NATURE Cape Town', 'CAPE NATURE'],
-  ['VITALITY TRAVEL Johannesburg', 'VITALITY TRAVEL'],
-  ['SpotifyZA Stockholm SE', 'SpotifyZA 94.99 ZAR'],           // 9-char stem — the tightest real case
-  ['JOSHUA GENERATION CHUR CSUNNINGDALE', 'JOSHUA GENERATION CHUR SUNNINGDALE'],
-  ['ENGEN ORANJE SERVICE STA Cape Town', 'ENGEN ORANJE SERVICE S Cape Town'],
-  ['Checkers Kloof Street SB001373', 'Checkers Kloof Street TAMBOERKLOOF'],
-  ['Yoco *Plato Rondebos Cape Town', 'Yoco   *Plato Rondebos Cape Town'],   // whitespace only
-  ['Intl payment fee SpotifyZA', 'Intl payment fee SpotifyZA'],             // identical, date shifted
+  ['GROCER ONE TERM0099', 'GROCER ONE CITYVILLE'],
+  ['MEGAMART NORTHGATE', 'MEGAMART CITYVILLE'],
+  ['MEGAMART PALM ROAD', 'MEGAMART CITYVILLE'],
+  ['SUBSCRIPTION SVC DUBLIN IE', 'SUBSCRIPTION SVC 59.00 ZAR'],
+  ['PARKING CO CITYVILLE', 'PARKING CO NORTHGATE'],
+  ['FUEL STOP TRUCKPORT Rivertown', 'FUEL STOP TRUCKPO Rivertown'],
+  ['VILLAGE STORE HILLSIDE', 'VILLAGE STORE WESTERN REGION'],
+  ['PARKS BOARD Cityville', 'PARKS BOARD'],
+  ['TRAVEL CLUB Metroville', 'TRAVEL CLUB'],
+  ['MusicCoZA Stockholm SE', 'MusicCoZA 94.99 ZAR'],           // 9-char stem — the tightest real case
+  ['COMMUNITY TRUST CNORTHGATE', 'COMMUNITY TRUST NORTHGATE'],
+  ['FUEL STOP CENTRAL STA Cityville', 'FUEL STOP CENTRAL S Cityville'],
+  ['GROCER TWO TERM0173', 'GROCER TWO HILLSIDE'],
+  ['Pay *Corner Cafe Cityville', 'Pay   *Corner Cafe Cityville'],   // whitespace only
+  ['Intl payment fee MUSICCO', 'Intl payment fee MUSICCO'],             // identical, date shifted
 ];
 for (const [a, b] of SAME) ok(descsLikelySame(a, b), `should match: "${a}" vs "${b}"`);
 
 const DIFFERENT = [
-  ['Checkers Rondebosch RONDEBOSCH', 'WOOLWORTHS CAPE TOWN'],
-  ['Yoco   *Plato Rondebos Cape Town', 'Yoco   *Time Out Marke Cape Town'],
-  ['BP PARK DRIVE MILNERTON', 'ENGEN SUNNINGDALE CONV Cape Town'],
-  ['APPLE.COM/BILL 59.00 ZAR', 'SpotifyZA 94.99 ZAR'],
+  ['GROCER ONE CITYVILLE', 'MEGAMART CITYVILLE'],
+  ['Pay   *Corner Cafe Cityville', 'Pay   *Harbour Deli Cityville'],
+  ['CHARGE POINT NORTHGATE', 'PETROL BAY NORTHGATE CONV Cityville'],
+  ['SUBSCRIPTION SVC 59.00 ZAR', 'MusicCoZA 94.99 ZAR'],
 ];
 for (const [a, b] of DIFFERENT) ok(!descsLikelySame(a, b), `should NOT match: "${a}" vs "${b}"`);
 
-/* The prefix rule alone would collide these two -0.38 fees on their shared
+/* The prefix rule alone would collide these two -1.20 fees on their shared
    14-char stem. They are only kept apart by the `accounted` guard in layer 2,
    so pin the hazard explicitly — if someone "fixes" descsLikelySame to reject
    them, the guard is still what we depend on. */
-ok(descsLikelySame('Intl payment fee SpotifyZA', 'Intl payment fee APPLE.COM/BILL'),
+ok(descsLikelySame('Intl payment fee MUSICCO', 'Intl payment fee SUBSCRIPTION'),
   'shared-stem fee descriptions do collide on prefix alone — the accounted guard is load-bearing');
 
 /* ------------------------------------------------------------- layer 1b
@@ -81,52 +86,52 @@ function idx(rows) {
 const RANGE = { min: '2026-06-01', max: '2026-06-30' };
 
 { // the core case: pending row in the vault, settled row incoming
-  const index = idx([{ date: '2026-06-08', desc: 'Checkers Rondebosch SB002256', amount: -866.79 }]);
-  const item = { date: '2026-06-08', desc: 'Checkers Rondebosch RONDEBOSCH', amount: -866.79 };
+  const index = idx([{ date: '2026-06-08', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: '2026-06-08', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
   const hit = findNearDuplicate(item, index, LABEL, new Set([txKey(item.date, item.desc, item.amount, LABEL)]), new Set(), RANGE);
-  ok(hit && hit.desc === 'Checkers Rondebosch SB002256', 'settled row matches the pending row it replaces');
+  ok(hit && hit.desc === 'GROCER ONE TERM0099', 'settled row matches the pending row it replaces');
 }
 { // date shifted a day, description identical (the Jul–Oct 2025 flavour)
-  const index = idx([{ date: '2025-10-01', desc: 'COOL IDEAS364844170 NETCASH', amount: -924 }]);
-  const item = { date: '2025-10-02', desc: 'COOL IDEAS364844170 NETCASH', amount: -924 };
+  const index = idx([{ date: '2025-10-01', desc: 'UTILITY CO364844170 DEBIT', amount: -300.00 }]);
+  const item = { date: '2025-10-02', desc: 'UTILITY CO364844170 DEBIT', amount: -300.00 };
   const hit = findNearDuplicate(item, index, LABEL, new Set(), new Set(), { min: '2025-10-01', max: '2025-10-31' });
   ok(hit && hit.date === '2025-10-01', 'one-day date shift is caught');
 }
 { // the false positive the accounted guard exists to stop
-  const vault = [{ date: '2025-09-22', desc: 'Intl payment fee SpotifyZA', amount: -0.38 }];
+  const vault = [{ date: '2025-09-22', desc: 'Intl payment fee MUSICCO', amount: -1.20 }];
   const index = idx(vault);
   const incoming = [
-    { date: '2025-09-22', desc: 'Intl payment fee SpotifyZA', amount: -0.38 },       // unchanged, exact dup
-    { date: '2025-09-23', desc: 'Intl payment fee APPLE.COM/BILL', amount: -0.38 },  // genuinely new
+    { date: '2025-09-22', desc: 'Intl payment fee MUSICCO', amount: -1.20 },       // unchanged, exact dup
+    { date: '2025-09-23', desc: 'Intl payment fee SUBSCRIPTION', amount: -1.20 },  // genuinely new
   ];
   const keys = new Set(incoming.map(i => txKey(i.date, i.desc, i.amount, LABEL)));
   const hit = findNearDuplicate(incoming[1], index, LABEL, keys, new Set(), { min: '2025-09-01', max: '2025-09-30' });
   ok(!hit, 'a vault row still present in the incoming file cannot be absorbed by a different row');
 }
 { // outside the statement's own span → absent for a boring reason, not evidence
-  const index = idx([{ date: '2026-05-08', desc: 'Checkers Rondebosch SB002256', amount: -866.79 }]);
-  const item = { date: '2026-05-09', desc: 'Checkers Rondebosch RONDEBOSCH', amount: -866.79 };
+  const index = idx([{ date: '2026-05-08', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: '2026-05-09', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
   const hit = findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE);
   ok(!hit, 'vault rows outside the incoming file date range are not candidates');
 }
 { // beyond the window
-  const index = idx([{ date: '2026-06-01', desc: 'Checkers Rondebosch SB002256', amount: -866.79 }]);
-  const item = { date: `2026-06-${String(1 + NEAR_DAYS + 1).padStart(2, '0')}`, desc: 'Checkers Rondebosch RONDEBOSCH', amount: -866.79 };
+  const index = idx([{ date: '2026-06-01', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: `2026-06-${String(1 + NEAR_DAYS + 1).padStart(2, '0')}`, desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
   ok(!findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE), `no match beyond ${NEAR_DAYS} days`);
 }
 { // two genuine same-amount purchases must not both claim one vault row
-  const index = idx([{ date: '2026-06-10', desc: 'WOOLWORTHS CANAL WALK', amount: -200 }]);
+  const index = idx([{ date: '2026-06-10', desc: 'MEGAMART NORTHGATE', amount: -200 }]);
   const consumed = new Set();
-  const a = { date: '2026-06-10', desc: 'WOOLWORTHS CAPE TOWN', amount: -200 };
-  const b = { date: '2026-06-11', desc: 'WOOLWORTHS CAPE TOWN', amount: -200 };
+  const a = { date: '2026-06-10', desc: 'MEGAMART CITYVILLE', amount: -200 };
+  const b = { date: '2026-06-11', desc: 'MEGAMART CITYVILLE', amount: -200 };
   const hitA = findNearDuplicate(a, index, LABEL, new Set(), consumed, RANGE);
   ok(hitA, 'first row matches');
   consumed.add(hitA.id);
   ok(!findNearDuplicate(b, index, LABEL, new Set(), consumed, RANGE), 'a consumed vault row cannot be matched twice');
 }
 { // different account, same amount and merchant → never a match
-  const index = idx([{ date: '2026-06-08', desc: 'Checkers Rondebosch SB002256', amount: -866.79 }]);
-  const item = { date: '2026-06-08', desc: 'Checkers Rondebosch RONDEBOSCH', amount: -866.79 };
+  const index = idx([{ date: '2026-06-08', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: '2026-06-08', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
   ok(!findNearDuplicate(item, index, 'transaction account', new Set(), new Set(), RANGE),
     'matching is per-account');
 }
@@ -167,7 +172,7 @@ const RANGE = { min: '2026-06-01', max: '2026-06-30' };
 
 /* ------------------------------------------------------------- layer 1d
    Multiplicity. Identical transactions genuinely repeat — three "Returned debit
-   order fee" -12.50 on one day, two R120 shop visits. An exact-key membership
+   order fee" -9.00 on one day, two R120 shop visits. An exact-key membership
    Set collapsed them, so when an early export listed a charge once and a later
    one listed it twice, the second copy was flagged a duplicate and never landed
    in ANY import: silent, permanent loss. Counts must reconcile one-for-one. */
@@ -368,4 +373,4 @@ for (const [acc, list] of byAccount) {
   console.log(`  ${acc}: ${list.length} exports · duplicates ${pairsOld.length} → ${pairsNew.length} · rows ${vaultOld.length} → ${vaultNew.length} · lost ${missOld} → ${missNew}`);
 }
 
-console.log(`import-dedupe: ${checks} checks passed (${replays} account replay${replays === 1 ? '' : 's'} over ${files.length} real statement exports)`);
+console.log(`import-dedupe: ${checks} checks passed (${replays} account replay${replays === 1 ? '' : 's'} over ${files.length} statement exports)`);
