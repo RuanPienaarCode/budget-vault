@@ -14,7 +14,7 @@ module.exports = function registerSavings(ctx) {
     const netWorth = S.accounts.reduce((s, a) => s + a.balance, 0);
     const creditDebt = S.accounts.filter(a => a.type === 'credit_card').reduce((s, a) => s + Math.min(0, a.balance), 0);
 
-    const kpis = $('#savingsKpis'); kpis.innerHTML = '';
+    const kpis = $('#savingsKpis'); kpis.empty();
     const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
       el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger');
@@ -23,7 +23,7 @@ module.exports = function registerSavings(ctx) {
     tile('Credit debt', money(creditDebt), 'text-danger');
 
     const withGoals = S.accounts.filter(a => a.goal_amount);
-    const goalsWrap = $('#savingsGoals'); goalsWrap.innerHTML = '';
+    const goalsWrap = $('#savingsGoals'); goalsWrap.empty();
     if (!withGoals.length) {
       goalsWrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         'No goals set yet. Add a goal_amount (and optional target_date) to any account file to track progress here.'));
@@ -42,7 +42,7 @@ module.exports = function registerSavings(ctx) {
       goalsWrap.append(g);
     }
 
-    const wrap = $('#savingsSections'); wrap.innerHTML = '';
+    const wrap = $('#savingsSections'); wrap.empty();
     for (const [title, list] of [['Savings', savings], ['Investments', investments]]) {
       if (!list.length) continue;
       const grid = el('div', { class: 'mini-grid' });

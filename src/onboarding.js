@@ -143,12 +143,12 @@ class OnboardingWizard extends Modal {
 
   detectExisting(folder) {
     const v = this.app.vault;
-    return v.getAbstractFileByPath(normalizePath(folder + '/Settings.md')) instanceof TFile ||
-           v.getAbstractFileByPath(normalizePath(folder + '/Categories')) instanceof TFolder;
+    return !!v.getFileByPath(normalizePath(folder + '/Settings.md')) ||
+           !!v.getFolderByPath(normalizePath(folder + '/Categories'));
   }
   async prefillFromSettingsMd() {
-    const f = this.app.vault.getAbstractFileByPath(normalizePath(this.data.folder + '/Settings.md'));
-    if (!(f instanceof TFile)) return;
+    const f = this.app.vault.getFileByPath(normalizePath(this.data.folder + '/Settings.md'));
+    if (!f) return;
     const { parseFrontmatter } = require('./util');
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     const day = parseInt(fm.month_start_day, 10);

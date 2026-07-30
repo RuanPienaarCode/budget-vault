@@ -15,7 +15,7 @@ module.exports = function registerOwed(ctx) {
   function renderOwedKpis() {
     const outstanding = S.owed.filter(o => o.status !== 'paid').reduce((s, o) => s + o.amount, 0);
     const paid = S.owed.filter(o => o.status === 'paid').reduce((s, o) => s + o.amount, 0);
-    const kpis = $('#owedKpis'); kpis.innerHTML = '';
+    const kpis = $('#owedKpis'); kpis.empty();
     const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
       el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
     tile('Outstanding', money(outstanding), outstanding > 0 ? 'text-warning' : '');
@@ -31,7 +31,7 @@ module.exports = function registerOwed(ctx) {
     renderOwedKpis();
     const t = $('#owedTable');
     keepScroll(t, () => {
-      t.innerHTML = '';
+      t.empty();
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Person'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
         el('th', { scope: 'col' }, 'Due date'), el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));

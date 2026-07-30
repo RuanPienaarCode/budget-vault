@@ -34,7 +34,7 @@ module.exports = function registerTransactions(ctx) {
       const current = [...sel.options].slice(fixed.length).map(o => o.value);
       if (current.length === values.length && current.every((v, i) => v === values[i])) return;
       const keep = sel.value;
-      sel.innerHTML = '';
+      sel.empty();
       for (const [value, label] of fixed) sel.append(el('option', { value }, label));
       for (const v of values) sel.append(el('option', { value: v }, v));
       sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
@@ -70,7 +70,7 @@ module.exports = function registerTransactions(ctx) {
       ? `${visible.length} of ${total} rows`
       : `${total} rows`;
     list = visible;
-    const t = $('#txTable'); t.innerHTML = '';
+    const t = $('#txTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col' }, 'Account'),
       el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Excl.'), el('th', { scope: 'col' }, 'Note'),

@@ -45,11 +45,11 @@ module.exports = function registerTax(ctx) {
     }
 
     const t = T();
-    $('#taxSubNote').innerHTML = '';
+    $('#taxSubNote').empty();
     $('#taxSubNote').append(`Tax year ${S.taxYear} (${loc.yearSpan(+S.taxYear)}) · saved to `,
       el('code', {}, `Tax/${S.taxYear}.md`));
 
-    const sel = $('#taxYearSel'); sel.innerHTML = '';
+    const sel = $('#taxYearSel'); sel.empty();
     for (const y of years) sel.append(el('option', { value: y, ...(y === S.taxYear ? { selected: '' } : {}) }, y));
 
     renderTaxKpis(t);
@@ -97,7 +97,7 @@ module.exports = function registerTax(ctx) {
   }
 
   function renderTaxKpis(t) {
-    const kpis = $('#taxKpis'); kpis.innerHTML = '';
+    const kpis = $('#taxKpis'); kpis.empty();
     const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
       el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
 
@@ -132,7 +132,7 @@ module.exports = function registerTax(ctx) {
 
   function renderSeason(t) {
     const loc = locale();
-    const b = $('#taxSeasonBody'); b.innerHTML = '';
+    const b = $('#taxSeasonBody'); b.empty();
     const field = (label, control) => el('label', { class: 'tax-field' }, el('span', { class: 'l' }, label), control);
     // The two selects rebuild the whole card — taxpayer type and assessment
     // status change which fields exist and what the season message says. Safe
@@ -189,7 +189,7 @@ module.exports = function registerTax(ctx) {
      rebuilding the field being typed in. */
   function renderChecks(t) {
     if (!checksBox) return;
-    checksBox.innerHTML = '';
+    checksBox.empty();
     for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t) || []) {
       checksBox.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
         icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
@@ -205,7 +205,7 @@ module.exports = function registerTax(ctx) {
 
     const tbl = $('#taxFiguresTable');
     keepScroll(tbl, () => {
-      tbl.innerHTML = '';
+      tbl.empty();
       tbl.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, loc.figureCodeLabel), el('th', { scope: 'col' }, 'Description'),
         el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
@@ -286,7 +286,7 @@ module.exports = function registerTax(ctx) {
   function renderSteps(t, focusStep) {
     const tbl = $('#taxStepsTable');
     keepScroll(tbl, () => {
-      tbl.innerHTML = '';
+      tbl.empty();
       tbl.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Step'), el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, 'Due'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
@@ -326,11 +326,11 @@ module.exports = function registerTax(ctx) {
   const DOC_ICO = { needed: ['hourglass'], uploaded: ['circle-check', 'check-circle'], 'n/a': ['circle-slash', 'slash'] };
 
   function renderDocs(t, focusDoc) {
-    $('#taxDocsSub').innerHTML = '';
+    $('#taxDocsSub').empty();
     $('#taxDocsSub').append('Certificates & records for the return · files stored in ', el('code', {}, `Tax/${S.taxYear}/`));
     const tbl = $('#taxDocsTable');
     keepScroll(tbl, () => {
-      tbl.innerHTML = '';
+      tbl.empty();
       tbl.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, 'File'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));

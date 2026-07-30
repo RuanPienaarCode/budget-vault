@@ -1530,8 +1530,8 @@ var require_io = __commonJS((exports2, module2) => {
       } catch (e) {}
     }
     async function readFile(rel) {
-      const f = vault.getAbstractFileByPath(relPath(rel));
-      return f instanceof TFile ? await vault.cachedRead(f) : null;
+      const f = vault.getFileByPath(relPath(rel));
+      return f ? await vault.cachedRead(f) : null;
     }
     function guardedPath(rel) {
       const path = relPath(rel);
@@ -1545,8 +1545,8 @@ var require_io = __commonJS((exports2, module2) => {
     async function writeFile(rel, content) {
       const path = guardedPath(rel);
       stampWrite();
-      const f = vault.getAbstractFileByPath(path);
-      if (f instanceof TFile) {
+      const f = vault.getFileByPath(path);
+      if (f) {
         await vault.modify(f, content);
       } else {
         await ensureFolder(path.split("/").slice(0, -1).join("/"));
@@ -1557,8 +1557,8 @@ var require_io = __commonJS((exports2, module2) => {
     async function writeBinary(rel, data) {
       const path = guardedPath(rel);
       stampWrite();
-      const f = vault.getAbstractFileByPath(path);
-      if (f instanceof TFile) {
+      const f = vault.getFileByPath(path);
+      if (f) {
         await vault.modifyBinary(f, data);
       } else {
         await ensureFolder(path.split("/").slice(0, -1).join("/"));
@@ -1567,18 +1567,17 @@ var require_io = __commonJS((exports2, module2) => {
       stampWrite();
     }
     function fileAt(rel) {
-      const f = vault.getAbstractFileByPath(relPath(rel));
-      return f instanceof TFile ? f : null;
+      return vault.getFileByPath(relPath(rel));
     }
     function mdFilesIn(rel) {
-      const f = vault.getAbstractFileByPath(relPath(rel));
-      if (!(f instanceof TFolder))
+      const f = vault.getFolderByPath(relPath(rel));
+      if (!f)
         return [];
       return f.children.filter((c) => c instanceof TFile && c.extension === "md");
     }
     function subfoldersIn(rel) {
-      const f = vault.getAbstractFileByPath(relPath(rel));
-      if (!(f instanceof TFolder))
+      const f = vault.getFolderByPath(relPath(rel));
+      if (!f)
         return [];
       return f.children.filter((c) => c instanceof TFolder);
     }
@@ -1952,7 +1951,7 @@ var require_categories = __commonJS((exports2, module2) => {
     const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
     let catsVersion = 1;
     function fillCatOptions(sel, current) {
-      sel.innerHTML = "";
+      sel.empty();
       sel.append(el("option", { value: "" }, "— none —"));
       let lastType = null, group = null;
       for (const c of S.categories) {
@@ -2175,7 +2174,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const budgetedPct = sum.income > 0 ? Math.round(bud.spend / sum.income * 100) : null;
       const usedPct = bud.spend > 0 ? Math.round(sum.spend / bud.spend * 100) : null;
       const hero = $("#heroCard");
-      hero.innerHTML = "";
+      hero.empty();
       const cur = S.settings.currency;
       const heroNum = el("div", { class: `hero-num${heroNegative ? " hero-num--negative" : ""}` }, el("small", {}, cur), money(Math.abs(available), 0).slice(cur.length + 1));
       const meter = el("div", { class: `hero-meter${heroNegative ? " over" : ""}` }, el("i", { style: `width:${fillPct}%` }));
@@ -2189,7 +2188,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       hero.append(el("div", { class: "hero-grid" }, el("div", {}, S.settings.household ? el("div", { class: "hero-greet" }, `${greeting}, ${S.settings.household}`) : "", el("div", { class: "hero-lbl" }, heroNegative ? "Overspent this period" : "Remaining this period"), heroNum, el("div", { class: "hero-sub" }, el("b", {}, money(sum.spend)), " spent of ", el("b", {}, money(bud.spend)), " budgeted"), meter), statCol));
       renderTrend();
       const t = $("#dashBudget");
-      t.innerHTML = "";
+      t.empty();
       $("#dashBudgetSub").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Budget"), el("th", { scope: "col", class: "num" }, "Spent"), el("th", { scope: "col", style: "width:26%" }, ""), el("th", { scope: "col", class: "num" }, "Remaining"))));
       const body = el("tbody", {});
@@ -2228,7 +2227,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
     }
     function renderTrend() {
       const wrap = $("#trendChart");
-      wrap.innerHTML = "";
+      wrap.empty();
       const periods = [];
       for (let i = 5;i >= 0; i--)
         periods.push(shiftPeriod(S.period, -i));
@@ -2334,7 +2333,7 @@ var require_transactions = __commonJS((exports2, module2) => {
         if (current.length === values.length && current.every((v, i) => v === values[i]))
           return;
         const keep = sel.value;
-        sel.innerHTML = "";
+        sel.empty();
         for (const [value, label] of fixed)
           sel.append(el("option", { value }, label));
         for (const v of values)
@@ -2366,7 +2365,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       $("#txCount").textContent = total > visible.length ? `${visible.length} of ${total} rows` : `${total} rows`;
       list = visible;
       const t = $("#txTable");
-      t.innerHTML = "";
+      t.empty();
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"), el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Split")))));
       const body = el("tbody", {});
       for (const item of list) {
@@ -2612,7 +2611,7 @@ var require_budgets = __commonJS((exports2, module2) => {
         const host = $(id);
         if (!host)
           continue;
-        host.innerHTML = "";
+        host.empty();
         for (const t of tiles) {
           host.append(el("div", { class: "bud-total" }, el("div", { class: "bud-total-l" }, t.label), el("div", { class: `bud-total-v${t.grad ? " grad-txt" : ""}${t.over ? " over" : ""}` }, t.value), t.note ? el("div", { class: "bud-total-n" }, t.note) : ""));
         }
@@ -2623,7 +2622,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       const draft = budgetDraft();
       const sum = periodSummary(S.period);
       const t = $("#budTable");
-      t.innerHTML = "";
+      t.empty();
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Type"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col", class: "num" }, "Actual so far"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
       const body = el("tbody", {});
       const mark = () => {
@@ -2801,7 +2800,7 @@ var require_accounts = __commonJS((exports2, module2) => {
     }
     function renderAccounts() {
       const wrap = $("#acctSections");
-      wrap.innerHTML = "";
+      wrap.empty();
       for (const [title, types] of ACCT_GROUPS) {
         const accounts = S.accounts.filter((a) => types.includes(a.type));
         if (!accounts.length)
@@ -2961,7 +2960,7 @@ var require_savings = __commonJS((exports2, module2) => {
       const netWorth = S.accounts.reduce((s, a) => s + a.balance, 0);
       const creditDebt = S.accounts.filter((a) => a.type === "credit_card").reduce((s, a) => s + Math.min(0, a.balance), 0);
       const kpis = $("#savingsKpis");
-      kpis.innerHTML = "";
+      kpis.empty();
       const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
       tile("Net worth", money(netWorth), netWorth >= 0 ? "grad-txt" : "text-danger");
       tile("Savings", money(totalSavings));
@@ -2969,7 +2968,7 @@ var require_savings = __commonJS((exports2, module2) => {
       tile("Credit debt", money(creditDebt), "text-danger");
       const withGoals = S.accounts.filter((a) => a.goal_amount);
       const goalsWrap = $("#savingsGoals");
-      goalsWrap.innerHTML = "";
+      goalsWrap.empty();
       if (!withGoals.length) {
         goalsWrap.append(el("p", { class: "text-muted", style: "margin:0" }, "No goals set yet. Add a goal_amount (and optional target_date) to any account file to track progress here."));
       } else {
@@ -2982,7 +2981,7 @@ var require_savings = __commonJS((exports2, module2) => {
         goalsWrap.append(g);
       }
       const wrap = $("#savingsSections");
-      wrap.innerHTML = "";
+      wrap.empty();
       for (const [title, list] of [["Savings", savings], ["Investments", investments]]) {
         if (!list.length)
           continue;
@@ -3024,7 +3023,7 @@ var require_owed = __commonJS((exports2, module2) => {
       const outstanding = S.owed.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amount, 0);
       const paid = S.owed.filter((o) => o.status === "paid").reduce((s, o) => s + o.amount, 0);
       const kpis = $("#owedKpis");
-      kpis.innerHTML = "";
+      kpis.empty();
       const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
       tile("Outstanding", money(outstanding), outstanding > 0 ? "text-warning" : "");
       tile("Paid", money(paid), "text-success");
@@ -3034,7 +3033,7 @@ var require_owed = __commonJS((exports2, module2) => {
       renderOwedKpis();
       const t = $("#owedTable");
       keepScroll(t, () => {
-        t.innerHTML = "";
+        t.empty();
         t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Person"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Due date"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         for (const o of S.owed) {
@@ -3156,7 +3155,7 @@ var require_services = __commonJS((exports2, module2) => {
       const active = S.services.filter((s) => s.active);
       const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
       const kpis = $("#servicesKpis");
-      kpis.innerHTML = "";
+      kpis.empty();
       const tile = (l, v) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: "v num" }, v)));
       tile("Per month", money(perMonth));
       tile("Per year", money(perMonth * 12));
@@ -3178,7 +3177,7 @@ var require_services = __commonJS((exports2, module2) => {
       renderServicesKpis();
       const t = $("#svcTable");
       keepScroll(t, () => {
-        t.innerHTML = "";
+        t.empty();
         t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Service"), el("th", { scope: "col" }, "Provider"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Cycle"), el("th", { scope: "col" }, "Next billing"), el("th", { scope: "col" }, "Active"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         const groups = Object.create(null);
@@ -3336,10 +3335,10 @@ var require_tax = __commonJS((exports2, module2) => {
         return;
       }
       const t = T();
-      $("#taxSubNote").innerHTML = "";
+      $("#taxSubNote").empty();
       $("#taxSubNote").append(`Tax year ${S.taxYear} (${loc.yearSpan(+S.taxYear)}) · saved to `, el("code", {}, `Tax/${S.taxYear}.md`));
       const sel = $("#taxYearSel");
-      sel.innerHTML = "";
+      sel.empty();
       for (const y of years)
         sel.append(el("option", { value: y, ...y === S.taxYear ? { selected: "" } : {} }, y));
       renderTaxKpis(t);
@@ -3385,7 +3384,7 @@ var require_tax = __commonJS((exports2, module2) => {
     }
     function renderTaxKpis(t) {
       const kpis = $("#taxKpis");
-      kpis.innerHTML = "";
+      kpis.empty();
       const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
       const d = daysTo(activeDeadline(t));
       tile("Deadline", d === null ? "—" : d < 0 ? `${-d} d overdue` : `${d} days`, d !== null && d < 0 ? "text-danger" : d !== null && d <= 30 ? "text-warning" : "");
@@ -3407,7 +3406,7 @@ var require_tax = __commonJS((exports2, module2) => {
     function renderSeason(t) {
       const loc = locale();
       const b = $("#taxSeasonBody");
-      b.innerHTML = "";
+      b.empty();
       const field = (label, control) => el("label", { class: "tax-field" }, el("span", { class: "l" }, label), control);
       b.append(el("div", { class: "row tax-season-row" }, field("Taxpayer type", el("select", {
         class: "form-select form-select-sm",
@@ -3474,7 +3473,7 @@ var require_tax = __commonJS((exports2, module2) => {
     function renderChecks(t) {
       if (!checksBox)
         return;
-      checksBox.innerHTML = "";
+      checksBox.empty();
       for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t) || []) {
         checksBox.append(el("p", { class: `tax-check ${m.ok ? "tax-check-ok" : "tax-check-warn"}` }, icoEl(m.ok ? ["circle-check", "check-circle"] : ["alert-triangle", "triangle-alert"]), " ", m.text));
       }
@@ -3485,7 +3484,7 @@ var require_tax = __commonJS((exports2, module2) => {
       $("#taxFiguresSub").textContent = "Amounts from your certificates, by source code — what the documents actually say, so the checks above have something to read.";
       const tbl = $("#taxFiguresTable");
       keepScroll(tbl, () => {
-        tbl.innerHTML = "";
+        tbl.empty();
         tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, loc.figureCodeLabel), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         const txt = (obj, key, width) => el("input", {
@@ -3571,7 +3570,7 @@ var require_tax = __commonJS((exports2, module2) => {
     function renderSteps(t, focusStep) {
       const tbl = $("#taxStepsTable");
       keepScroll(tbl, () => {
-        tbl.innerHTML = "";
+        tbl.empty();
         tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Step"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "Due"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         for (const s of t.steps) {
@@ -3629,11 +3628,11 @@ var require_tax = __commonJS((exports2, module2) => {
     const DOC_LABEL = { needed: "Needed", uploaded: "Uploaded", "n/a": "N/A" };
     const DOC_ICO = { needed: ["hourglass"], uploaded: ["circle-check", "check-circle"], "n/a": ["circle-slash", "slash"] };
     function renderDocs(t, focusDoc) {
-      $("#taxDocsSub").innerHTML = "";
+      $("#taxDocsSub").empty();
       $("#taxDocsSub").append("Certificates & records for the return · files stored in ", el("code", {}, `Tax/${S.taxYear}/`));
       const tbl = $("#taxDocsTable");
       keepScroll(tbl, () => {
-        tbl.innerHTML = "";
+        tbl.empty();
         tbl.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Document"), el("th", { scope: "col" }, "Source"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, "File"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         for (const d of t.docs) {
@@ -4185,7 +4184,7 @@ var require_import = __commonJS((exports2, module2) => {
         return;
       $("#importReview").classList.remove("hidden");
       const accSel = $("#impAccount");
-      accSel.innerHTML = "";
+      accSel.empty();
       const labels = [...new Set([
         ...S.accounts.map((a) => a.tx_label || a.name),
         ...Object.values(S.txFiles).map((f) => f.label)
@@ -4218,10 +4217,10 @@ var require_import = __commonJS((exports2, module2) => {
       const inCurrent = (it) => it.date >= curRange.start && it.date <= curRange.end;
       const curCount = p.items.filter(inCurrent).length;
       $("#impStats").textContent = `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped · ${auto} auto-categorised` + (p.skipped ? ` · ${p.skipped} unparseable` : "");
-      $("#impLegend").innerHTML = "";
+      $("#impLegend").empty();
       $("#impLegend").append(el("span", { class: "imp-legend-swatch" }), el("span", {}, `${curCount} in the current period — ${periodTitle(cur)}`));
       const t = $("#impTable");
-      t.innerHTML = "";
+      t.empty();
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Import")), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
       const body = el("tbody", {});
       const visible = p.items.slice(0, importShown);
@@ -4337,7 +4336,10 @@ var require_controller = __commonJS((exports2, module2) => {
     const vault = app.vault;
     const root = view.contentEl;
     root.classList.add("budget-app-root");
-    root.innerHTML = SHELL_HTML;
+    root.empty();
+    const parsed = new DOMParser().parseFromString(SHELL_HTML, "text/html");
+    while (parsed.body.firstChild)
+      root.appendChild(parsed.body.firstChild);
     root.querySelectorAll("span[data-ico]").forEach((sp) => setIco(sp, sp.getAttribute("data-ico").split("|")));
     const $ = (s) => root.querySelector(s);
     const $$ = (s) => root.querySelectorAll(s);
@@ -4507,7 +4509,7 @@ var require_controller = __commonJS((exports2, module2) => {
           sec.classList.add("hidden");
         $("#view-connect").classList.remove("hidden");
         $("#periodPill").classList.add("hidden");
-        $("#connectPathNote").innerHTML = "";
+        $("#connectPathNote").empty();
         $("#connectPathNote").append("Looked in ", el("code", {}, ctx.basePath()), " but found no Categories/ or Transactions/ inside it. Point the plugin at the Budget folder itself.");
         return;
       }
@@ -4907,11 +4909,11 @@ var require_onboarding = __commonJS((exports2, module2) => {
     }
     detectExisting(folder) {
       const v = this.app.vault;
-      return v.getAbstractFileByPath(normalizePath(folder + "/Settings.md")) instanceof TFile || v.getAbstractFileByPath(normalizePath(folder + "/Categories")) instanceof TFolder;
+      return !!v.getFileByPath(normalizePath(folder + "/Settings.md")) || !!v.getFolderByPath(normalizePath(folder + "/Categories"));
     }
     async prefillFromSettingsMd() {
-      const f = this.app.vault.getAbstractFileByPath(normalizePath(this.data.folder + "/Settings.md"));
-      if (!(f instanceof TFile))
+      const f = this.app.vault.getFileByPath(normalizePath(this.data.folder + "/Settings.md"));
+      if (!f)
         return;
       const { parseFrontmatter } = require_util();
       const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
@@ -5363,7 +5365,7 @@ class BudgetPlugin extends Plugin {
   }
   hasBudgetData() {
     const v = this.app.vault;
-    return v.getAbstractFileByPath(this.settingsMdPath()) instanceof TFile || v.getAbstractFileByPath(normalizePath(this.settings.budgetFolder + "/Categories")) instanceof TFolder;
+    return !!v.getFileByPath(this.settingsMdPath()) || !!v.getFolderByPath(normalizePath(this.settings.budgetFolder + "/Categories"));
   }
   async activateView() {
     const ws = this.app.workspace;
@@ -5389,16 +5391,16 @@ class BudgetPlugin extends Plugin {
     return normalizePath(this.settings.budgetFolder + "/Settings.md");
   }
   async readBudgetSettingsMd() {
-    const f = this.app.vault.getAbstractFileByPath(this.settingsMdPath());
-    if (!(f instanceof TFile))
+    const f = this.app.vault.getFileByPath(this.settingsMdPath());
+    if (!f)
       return {};
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     return fm;
   }
   async updateBudgetSettingsMd(key, value) {
     const path = this.settingsMdPath();
-    const f = this.app.vault.getAbstractFileByPath(path);
-    if (f instanceof TFile) {
+    const f = this.app.vault.getFileByPath(path);
+    if (f) {
       let text = await this.app.vault.read(f);
       const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (m) {

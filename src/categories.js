@@ -16,7 +16,7 @@ module.exports = function registerCategories(ctx) {
   let catsVersion = 1;
 
   function fillCatOptions(sel, current) {
-    sel.innerHTML = '';
+    sel.empty();
     sel.append(el('option', { value: '' }, '— none —'));
     let lastType = null, group = null;
     for (const c of S.categories) {

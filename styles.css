@@ -918,8 +918,13 @@
   font-size: 13px; line-height: 1.5; border-left: 3px solid transparent;
 }
 .budget-app-root .tax-check .ico svg { width: 0.9rem; height: 0.9rem; flex: 0 0 auto; margin-top: 2px; }
-.budget-app-root .tax-check-ok { background: rgba(64, 160, 96, 0.10); border-left-color: var(--color-green, #40a060); }
-.budget-app-root .tax-check-warn { background: rgba(214, 150, 40, 0.12); border-left-color: var(--color-orange, #d69628); }
+/* These two read the PLUGIN's palette, not Obsidian's. They used to say
+   var(--color-green) / var(--color-orange) — names the plugin never defines, so
+   they fell through to Obsidian core and drifted with the host theme, which the
+   sealed-palette rule at the top of this file exists to prevent. (Obsidian 1.13
+   moves its base colours to OKLCH, which would have shifted them again.) */
+.budget-app-root .tax-check-ok { background: rgba(64, 160, 96, 0.10); border-left-color: var(--color-success); }
+.budget-app-root .tax-check-warn { background: rgba(214, 150, 40, 0.12); border-left-color: var(--color-warning); }
 
 /* A document row can carry several certificates. */
 .budget-app-root .tax-doc-files { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }

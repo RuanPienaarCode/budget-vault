@@ -68,7 +68,7 @@ module.exports = function registerBudgets(ctx) {
     for (const id of ['#budTotalsTop', '#budTotalsBottom']) {
       const host = $(id);
       if (!host) continue;
-      host.innerHTML = '';
+      host.empty();
       for (const t of tiles) {
         host.append(el('div', { class: 'bud-total' },
           el('div', { class: 'bud-total-l' }, t.label),
@@ -82,7 +82,7 @@ module.exports = function registerBudgets(ctx) {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    const t = $('#budTable'); t.innerHTML = '';
+    const t = $('#budTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Type'),
       el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col', class: 'num' }, 'Actual so far'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
