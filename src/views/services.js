@@ -19,7 +19,7 @@ module.exports = function registerServices(ctx) {
   function renderServicesKpis() {
     const active = S.services.filter(s => s.active);
     const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
-    const kpis = $('#servicesKpis'); kpis.innerHTML = '';
+    const kpis = $('#servicesKpis'); kpis.empty();
     const tile = (l, v) => kpis.append(el('div', { class: 'mini' },
       el('div', { class: 'l' }, l), el('div', { class: 'v num' }, v)));
     tile('Per month', money(perMonth));
@@ -45,7 +45,7 @@ module.exports = function registerServices(ctx) {
     renderServicesKpis();
     const t = $('#svcTable');
     keepScroll(t, () => {
-      t.innerHTML = '';
+      t.empty();
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Service'), el('th', { scope: 'col' }, 'Provider'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
         el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));

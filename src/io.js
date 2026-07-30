@@ -23,8 +23,8 @@ module.exports = function registerIo(ctx) {
     try { await vault.createFolder(path); } catch (e) { /* raced into existence */ }
   }
   async function readFile(rel) {
-    const f = vault.getAbstractFileByPath(relPath(rel));
-    return f instanceof TFile ? await vault.cachedRead(f) : null;
+    const f = vault.getFileByPath(relPath(rel));
+    return f ? await vault.cachedRead(f) : null;
   }
   // Defence in depth: refuse any write that resolves outside the budget
   // folder. normalizePath does NOT strip "../", so a label like
@@ -42,8 +42,8 @@ module.exports = function registerIo(ctx) {
   async function writeFile(rel, content) {
     const path = guardedPath(rel);
     stampWrite();
-    const f = vault.getAbstractFileByPath(path);
-    if (f instanceof TFile) { await vault.modify(f, content); }
+    const f = vault.getFileByPath(path);
+    if (f) { await vault.modify(f, content); }
     else {
       await ensureFolder(path.split('/').slice(0, -1).join('/'));
       await vault.create(path, content);
@@ -55,8 +55,8 @@ module.exports = function registerIo(ctx) {
   async function writeBinary(rel, data) {
     const path = guardedPath(rel);
     stampWrite();
-    const f = vault.getAbstractFileByPath(path);
-    if (f instanceof TFile) { await vault.modifyBinary(f, data); }
+    const f = vault.getFileByPath(path);
+    if (f) { await vault.modifyBinary(f, data); }
     else {
       await ensureFolder(path.split('/').slice(0, -1).join('/'));
       await vault.createBinary(path, data);
@@ -64,17 +64,16 @@ module.exports = function registerIo(ctx) {
     stampWrite();
   }
   function fileAt(rel) {
-    const f = vault.getAbstractFileByPath(relPath(rel));
-    return f instanceof TFile ? f : null;
+    return vault.getFileByPath(relPath(rel));
   }
   function mdFilesIn(rel) {
-    const f = vault.getAbstractFileByPath(relPath(rel));
-    if (!(f instanceof TFolder)) return [];
+    const f = vault.getFolderByPath(relPath(rel));
+    if (!f) return [];
     return f.children.filter(c => c instanceof TFile && c.extension === 'md');
   }
   function subfoldersIn(rel) {
-    const f = vault.getAbstractFileByPath(relPath(rel));
-    if (!(f instanceof TFolder)) return [];
+    const f = vault.getFolderByPath(relPath(rel));
+    if (!f) return [];
     return f.children.filter(c => c instanceof TFolder);
   }
 

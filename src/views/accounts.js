@@ -36,7 +36,7 @@ module.exports = function registerAccounts(ctx) {
   }
 
   function renderAccounts() {
-    const wrap = $('#acctSections'); wrap.innerHTML = '';
+    const wrap = $('#acctSections'); wrap.empty();
     for (const [title, types] of ACCT_GROUPS) {
       const accounts = S.accounts.filter(a => types.includes(a.type));
       if (!accounts.length) continue;

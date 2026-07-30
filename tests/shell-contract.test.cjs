@@ -14,6 +14,13 @@
      2. every drawer link's data-view has a matching <section id="view-*">
      3. every such section has an entry in controller.js's render dispatch map
 
+   …plus one guarding HOW the shell is mounted (check 6): controller.js parses
+   SHELL_HTML with DOMParser rather than assigning innerHTML. Those two parsers
+   agree on flow content but NOT on table internals or head-only elements at the
+   top level, which a full-document parse relocates or drops. Pinned so adding a
+   bare <tr> to the top of the shell fails the build instead of silently losing
+   a table at mount.
+
    Pure text analysis — no DOM, no bundler. Wired into ./build.sh.
      node tests/shell-contract.test.cjs
 */
@@ -92,4 +99,35 @@ for (const file of walk(SRC)) {
 eq(dupes, [], 'two modules must not publish the same name onto ctx');
 ok(provided.size > 30, `ctx should carry the full published surface (found ${provided.size})`);
 
-console.log(`PASS — shell id contract + ctx namespace intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys).`);
+/* ---- 6. the shell is DOMParser-safe ---- */
+// controller.js mounts via DOMParser (see the header note). A full-document
+// parse relocates table internals and head-only content that appear at the
+// FRAGMENT top level, where innerHTML would have kept them in place. Nested
+// ones are fine — a complete <table> parses identically either way.
+ok(/new DOMParser\(\)\.parseFromString\(SHELL_HTML/.test(controller),
+  'controller.js must mount the shell via DOMParser, not innerHTML');
+ok(!/\.innerHTML\s*=/.test(controller + shell),
+  'shell.js/controller.js must not assign innerHTML — Obsidian review flags it');
+
+const RELOCATED = new Set(['tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'caption', 'col',
+  'colgroup', 'option', 'optgroup', 'head', 'body', 'html', 'title', 'meta', 'link', 'style',
+  'base', 'frame', 'frameset']);
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+  'meta', 'source', 'track', 'wbr']);
+// Grab the SHELL_HTML template literal body, then walk tags tracking depth.
+const shellLiteral = shell.match(/const SHELL_HTML = `([\s\S]*?)`;/);
+ok(shellLiteral, 'shell.js must still define SHELL_HTML as a template literal');
+let depth = 0;
+const topLevelRelocated = [];
+for (const m of shellLiteral[1].matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+  const [, close, tag, , self] = m;
+  const t = tag.toLowerCase();
+  if (close) { depth = Math.max(0, depth - 1); continue; }
+  if (depth === 0 && RELOCATED.has(t)) topLevelRelocated.push(t);
+  if (!VOID.has(t) && !self) depth++;
+}
+eq(topLevelRelocated, [],
+  'no table-internal or head-only element may sit at the top level of SHELL_HTML — ' +
+  'the DOMParser mount in controller.js would relocate or drop it');
+
+console.log(`PASS — shell id contract + ctx namespace + DOMParser safety intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys).`);

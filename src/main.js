@@ -47,8 +47,8 @@ class BudgetPlugin extends Plugin {
   /* True when the configured budget folder already contains budget files. */
   hasBudgetData() {
     const v = this.app.vault;
-    return v.getAbstractFileByPath(this.settingsMdPath()) instanceof TFile ||
-      v.getAbstractFileByPath(normalizePath(this.settings.budgetFolder + '/Categories')) instanceof TFolder;
+    return !!v.getFileByPath(this.settingsMdPath()) ||
+      !!v.getFolderByPath(normalizePath(this.settings.budgetFolder + '/Categories'));
   }
 
   async activateView() {
@@ -76,15 +76,15 @@ class BudgetPlugin extends Plugin {
     return normalizePath(this.settings.budgetFolder + '/Settings.md');
   }
   async readBudgetSettingsMd() {
-    const f = this.app.vault.getAbstractFileByPath(this.settingsMdPath());
-    if (!(f instanceof TFile)) return {};
+    const f = this.app.vault.getFileByPath(this.settingsMdPath());
+    if (!f) return {};
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     return fm;
   }
   async updateBudgetSettingsMd(key, value) {
     const path = this.settingsMdPath();
-    const f = this.app.vault.getAbstractFileByPath(path);
-    if (f instanceof TFile) {
+    const f = this.app.vault.getFileByPath(path);
+    if (f) {
       let text = await this.app.vault.read(f);
       const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (m) {

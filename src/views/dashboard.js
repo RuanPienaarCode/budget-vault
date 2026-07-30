@@ -18,7 +18,7 @@ module.exports = function registerDashboard(ctx) {
     const budgetedPct = sum.income > 0 ? Math.round((bud.spend / sum.income) * 100) : null;
     const usedPct = bud.spend > 0 ? Math.round((sum.spend / bud.spend) * 100) : null;
 
-    const hero = $('#heroCard'); hero.innerHTML = '';
+    const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
     const heroNum = el('div', { class: `hero-num${heroNegative ? ' hero-num--negative' : ''}` },
       el('small', {}, cur), money(Math.abs(available), 0).slice(cur.length + 1));
@@ -55,7 +55,7 @@ module.exports = function registerDashboard(ctx) {
 
     renderTrend();
 
-    const t = $('#dashBudget'); t.innerHTML = '';
+    const t = $('#dashBudget'); t.empty();
     $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Budget'), el('th', { scope: 'col', class: 'num' }, 'Spent'),
@@ -98,7 +98,7 @@ module.exports = function registerDashboard(ctx) {
 
   /* Airy Glass trend chart — inline SVG. */
   function renderTrend() {
-    const wrap = $('#trendChart'); wrap.innerHTML = '';
+    const wrap = $('#trendChart'); wrap.empty();
     const periods = []; for (let i = 5; i >= 0; i--) periods.push(shiftPeriod(S.period, -i));
     const data = periods.map(p => ({
       p, spent: periodSummary(p).spend, budget: budgetTotals(p).spend,

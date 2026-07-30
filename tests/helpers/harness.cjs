@@ -90,6 +90,11 @@ function makeVault(files) {
     async createBinary(p, data) { store.set(p, data); rebuild(); },
     async trash(f) { store.delete(f.path); rebuild(); },
     getAbstractFileByPath(p) { return nodes.get(p) || null; },
+    // Typed getters (Obsidian 1.5+) — src/ prefers these over the
+    // getAbstractFileByPath + instanceof dance. Same null-on-miss contract,
+    // plus null when something of the OTHER kind sits at the path.
+    getFileByPath(p) { const n = nodes.get(p); return n instanceof TFile ? n : null; },
+    getFolderByPath(p) { const n = nodes.get(p); return n instanceof TFolder ? n : null; },
     _store: store,
   };
 
@@ -132,9 +137,12 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
 
   // $ / $$ return inert stand-ins: the register* functions only touch the DOM
   // inside render*/save* handlers, which these tests do not call.
-  const stubEl = { disabled: false, textContent: '', innerHTML: '', value: '', checked: false,
+  // empty() is Obsidian's own Element augmentation, which src/ now uses in
+  // place of `innerHTML = ''` — stub it so a render path reaching this element
+  // fails loudly on real logic rather than on a missing DOM helper.
+  const stubEl = { disabled: false, textContent: '', value: '', checked: false,
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    append() {}, querySelectorAll() { return []; }, querySelector() { return null; },
+    empty() {}, append() {}, querySelectorAll() { return []; }, querySelector() { return null; },
     addEventListener() {}, setAttribute() {}, removeAttribute() {}, focus() {} };
 
   const ctx = {

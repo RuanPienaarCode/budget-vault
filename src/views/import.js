@@ -169,7 +169,7 @@ module.exports = function registerImport(ctx) {
     const p = S.pendingImport;
     if (!p) return;
     $('#importReview').classList.remove('hidden');
-    const accSel = $('#impAccount'); accSel.innerHTML = '';
+    const accSel = $('#impAccount'); accSel.empty();
     const labels = [...new Set([
       ...S.accounts.map(a => a.tx_label || a.name),
       ...Object.values(S.txFiles).map(f => f.label)])].sort();
@@ -197,12 +197,12 @@ module.exports = function registerImport(ctx) {
     $('#impStats').textContent =
       `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped · ${auto} auto-categorised` +
       (p.skipped ? ` · ${p.skipped} unparseable` : '');
-    $('#impLegend').innerHTML = '';
+    $('#impLegend').empty();
     $('#impLegend').append(
       el('span', { class: 'imp-legend-swatch' }),
       el('span', {}, `${curCount} in the current period — ${periodTitle(cur)}`));
 
-    const t = $('#impTable'); t.innerHTML = '';
+    const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Import')),
       el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'),
