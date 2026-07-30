@@ -378,13 +378,13 @@ var require_shell = __commonJS((exports2, module2) => {
       <span></span><span></span><span></span>
     </button>
 
-    <span class="brand">
+    <button type="button" class="brand" id="brandHome" aria-label="Go to Dashboard">
       <span class="brand-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></span>
       <span class="brand-text">
         <b>Budget Vault</b>
         <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
       </span>
-    </span>
+    </button>
 
     <div class="header-period-pill hidden" id="periodPill" role="group" aria-label="Period navigation">
       <button class="pnav-btn" id="prevPeriod" aria-label="Previous period"><span class="ico" data-ico="chevron-left"></span></button>
@@ -4698,6 +4698,10 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#openSettingsBtn").addEventListener("click", () => {
       app.setting.open();
       app.setting.openTabById("budget-app");
+    });
+    $("#brandHome").addEventListener("click", () => {
+      if (S.loaded)
+        switchView("dashboard");
     });
     $("#topbarAvatar").addEventListener("click", () => {
       app.setting.open();
