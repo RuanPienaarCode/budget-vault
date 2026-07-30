@@ -3,6 +3,32 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.24 — 2026-07-30
+
+Housekeeping only — **no functional change**. The plugin behaves exactly as
+1.0.23; `main.js` and `styles.css` are byte-identical. Updating is optional.
+
+### Changed
+
+- **Test fixtures and code comments no longer use real bank-statement data.**
+  Several tests and comments illustrated the duplicate-detection rules with
+  descriptions, amounts and dates copied from a real statement — including
+  merchant names carrying suburbs, a masked card number and transaction
+  reference codes. This repository is public, and that material does not
+  belong in it.
+
+  Everything is now synthetic, chosen to preserve the property each test
+  actually pins: the common-prefix lengths that drive merchant matching, the
+  masked-card pattern, and the digit-ratio thresholds in `learnPattern`. Every
+  suite passes with the same number of checks as before.
+
+  Retailer and bank names elsewhere are unchanged — naming the banks it imports
+  from is what the importer is for, and those identify nobody.
+
+  This release exists so the newest tag points at a source tree free of that
+  data; the published `main.js` never contained it, since the bundler strips
+  comments.
+
 ## 1.0.23 — 2026-07-30
 
 Import no longer discards a transaction that legitimately repeats. No
