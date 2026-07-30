@@ -53,9 +53,16 @@ module.exports = function registerBudgets(ctx) {
     }
     const allocPct = income > 0 ? Math.round((budgeted / income) * 100) : null;
     const usedPct = budgeted > 0 ? Math.round((sum.spend / budgeted) * 100) : null;
+    /* Income minus what's been budgeted — the number that answers "have I given
+       every rand a job yet?". Negative means the plan spends more than it earns,
+       which is the one figure here that deserves red. */
+    const unallocated = income - budgeted;
     return [
       { label: 'Total income', value: money(income), grad: true, note: `${money(sum.income)} received so far` },
       { label: 'Total budgeted', value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : '' },
+      { label: unallocated < 0 ? 'Over-budgeted' : 'Left to budget', value: money(Math.abs(unallocated)),
+        over: unallocated < 0,
+        note: unallocated < 0 ? 'budgeted beyond income' : (income > 0 ? 'income not yet allocated' : '') },
       { label: 'Total spent', value: money(sum.spend), over: budgeted > 0 && sum.spend > budgeted,
         note: usedPct !== null ? `${usedPct}% of budget used` : '' },
     ];

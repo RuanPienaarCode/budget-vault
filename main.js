@@ -2594,9 +2594,16 @@ var require_budgets = __commonJS((exports2, module2) => {
       }
       const allocPct = income > 0 ? Math.round(budgeted / income * 100) : null;
       const usedPct = budgeted > 0 ? Math.round(sum.spend / budgeted * 100) : null;
+      const unallocated = income - budgeted;
       return [
         { label: "Total income", value: money(income), grad: true, note: `${money(sum.income)} received so far` },
         { label: "Total budgeted", value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : "" },
+        {
+          label: unallocated < 0 ? "Over-budgeted" : "Left to budget",
+          value: money(Math.abs(unallocated)),
+          over: unallocated < 0,
+          note: unallocated < 0 ? "budgeted beyond income" : income > 0 ? "income not yet allocated" : ""
+        },
         {
           label: "Total spent",
           value: money(sum.spend),
@@ -4024,9 +4031,138 @@ var require_tax = __commonJS((exports2, module2) => {
   };
 });
 
+// src/dedupe.js
+var require_dedupe = __commonJS((exports2, module2) => {
+  var NEAR_DAYS = 4;
+  var MIN_PREFIX = 8;
+  function txKey(date, desc, amount, label) {
+    return `${date}|${String(desc).trim().toLowerCase()}|${Number(amount).toFixed(2)}|${String(label).trim().toLowerCase()}`;
+  }
+  function normDesc(s) {
+    return String(s).toUpperCase().replace(/[^A-Z0-9]+/g, "");
+  }
+  function commonPrefixLen(a, b) {
+    const n = Math.min(a.length, b.length);
+    let i = 0;
+    while (i < n && a[i] === b[i])
+      i++;
+    return i;
+  }
+  function descsLikelySame(a, b) {
+    const x = normDesc(a), y = normDesc(b);
+    if (!x || !y)
+      return false;
+    if (x === y)
+      return true;
+    return commonPrefixLen(x, y) >= MIN_PREFIX;
+  }
+  function daysApart(a, b) {
+    const ms = Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`);
+    return Number.isNaN(ms) ? Infinity : Math.abs(ms) / 86400000;
+  }
+  function buildIndex(txFiles) {
+    const exact = new Set;
+    const byAmount = new Map;
+    for (const f of Object.values(txFiles || {})) {
+      const label = String(f.label || "").trim().toLowerCase();
+      for (const r of f.rows || []) {
+        const key = txKey(r.date, r.desc, r.amount, f.label);
+        exact.add(key);
+        const bucket = `${label}|${Number(r.amount).toFixed(2)}`;
+        if (!byAmount.has(bucket))
+          byAmount.set(bucket, []);
+        byAmount.get(bucket).push({ date: r.date, desc: r.desc, key });
+      }
+    }
+    return { exact, byAmount };
+  }
+  function addToIndex(index, date, desc, amount, label) {
+    const key = txKey(date, desc, amount, label);
+    index.exact.add(key);
+    const bucket = `${String(label).trim().toLowerCase()}|${Number(amount).toFixed(2)}`;
+    if (!index.byAmount.has(bucket))
+      index.byAmount.set(bucket, []);
+    index.byAmount.get(bucket).push({ date, desc, key });
+    return key;
+  }
+  function findNearDuplicate(item, index, label, incomingKeys, consumed, range) {
+    const lab = String(label || "").trim().toLowerCase();
+    const bucket = index.byAmount.get(`${lab}|${Number(item.amount).toFixed(2)}`);
+    if (!bucket)
+      return null;
+    let best = null, bestGap = Infinity;
+    for (const cand of bucket) {
+      if (consumed.has(cand.key))
+        continue;
+      if (incomingKeys.has(cand.key))
+        continue;
+      if (range && (cand.date < range.min || cand.date > range.max))
+        continue;
+      const gap = daysApart(item.date, cand.date);
+      if (gap > NEAR_DAYS)
+        continue;
+      if (!descsLikelySame(item.desc, cand.desc))
+        continue;
+      if (gap < bestGap) {
+        best = cand;
+        bestGap = gap;
+      }
+    }
+    return best;
+  }
+  function flagItems(items, index, label, range) {
+    const lab = String(label || "").trim().toLowerCase();
+    const incomingKeys = new Set(items.map((it) => txKey(it.date, it.desc, it.amount, lab)));
+    let dupes = 0, nears = 0;
+    for (const it of items) {
+      it.dup = index.exact.has(txKey(it.date, it.desc, it.amount, lab));
+      if (it.dup) {
+        it.include = false;
+        it.autoExcluded = true;
+        dupes++;
+      } else if (it.autoExcluded) {
+        it.include = true;
+        it.autoExcluded = false;
+      }
+    }
+    const consumed = new Set;
+    for (const it of items) {
+      const hit = it.dup ? null : findNearDuplicate(it, index, lab, incomingKeys, consumed, range);
+      if (hit) {
+        consumed.add(hit.key);
+        it.near = hit;
+        nears++;
+        if (!it.nearAuto) {
+          it.include = false;
+          it.nearAuto = true;
+        }
+      } else if (it.near && !it.dup) {
+        it.near = null;
+        if (it.nearAuto) {
+          it.include = true;
+          it.nearAuto = false;
+        }
+      }
+    }
+    return { dupes, nears };
+  }
+  module2.exports = {
+    txKey,
+    buildIndex,
+    addToIndex,
+    findNearDuplicate,
+    flagItems,
+    descsLikelySame,
+    normDesc,
+    NEAR_DAYS,
+    MIN_PREFIX
+  };
+});
+
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
   var { el, parseCsv, parseStatementDate, normalizeAmount } = require_util();
+  var { buildIndex, addToIndex, flagItems } = require_dedupe();
   var DATE_COLS = ["value date", "date", "transaction date", "posting date", "trans date"];
   var DESC_COLS = ["description", "title", "narrative", "details", "transaction description", "reference", "payee", "memo"];
   var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "value"];
@@ -4056,13 +4192,8 @@ var require_import = __commonJS((exports2, module2) => {
       }
       return best;
     }
-    function dedupSet() {
-      const set = new Set;
-      for (const f of Object.values(S.txFiles)) {
-        for (const r of f.rows)
-          set.add(`${r.date}|${r.desc.trim().toLowerCase()}|${r.amount.toFixed(2)}|${f.label.trim().toLowerCase()}`);
-      }
-      return set;
+    function dedupIndex() {
+      return buildIndex(S.txFiles);
     }
     function detectAccountLabel(filename) {
       const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) || filename.match(/^(\d{6,})\D/);
@@ -4105,7 +4236,7 @@ var require_import = __commonJS((exports2, module2) => {
       const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
       if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
         return toast("Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)", true);
-      const seen = dedupSet();
+      const index = dedupIndex();
       const items = [];
       let skipped = 0;
       const label0 = detectAccountLabel(file.name);
@@ -4152,7 +4283,18 @@ var require_import = __commonJS((exports2, module2) => {
         importProgress("set", "Preparing review…", 0.95);
         await new Promise((res) => setTimeout(res, 0));
       }
-      S.pendingImport = { items, label: label0, seen, skipped, filename: file.name };
+      let range = null;
+      for (const it of items) {
+        if (!range)
+          range = { min: it.date, max: it.date };
+        else {
+          if (it.date < range.min)
+            range.min = it.date;
+          if (it.date > range.max)
+            range.max = it.date;
+        }
+      }
+      S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name };
       importShown = IMPORT_PAGE;
       renderImportReview();
       if (showBar)
@@ -4198,25 +4340,14 @@ var require_import = __commonJS((exports2, module2) => {
         renderImportReview();
       };
       const lab = txSegment(p.label || "").trim().toLowerCase();
-      let dupes = 0;
-      for (const it of p.items) {
-        it.dup = p.seen.has(`${it.date}|${it.desc.trim().toLowerCase()}|${it.amount.toFixed(2)}|${lab}`);
-        if (it.dup) {
-          it.include = false;
-          it.autoExcluded = true;
-          dupes++;
-        } else if (it.autoExcluded) {
-          it.include = true;
-          it.autoExcluded = false;
-        }
-      }
+      const { dupes, nears } = flagItems(p.items, p.index, lab, p.range);
       const newOnes = p.items.filter((i) => !i.dup);
       const auto = newOnes.filter((i) => i.cat).length;
       const cur = currentPeriod();
       const curRange = periodRange(cur);
       const inCurrent = (it) => it.date >= curRange.start && it.date <= curRange.end;
       const curCount = p.items.filter(inCurrent).length;
-      $("#impStats").textContent = `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped · ${auto} auto-categorised` + (p.skipped ? ` · ${p.skipped} unparseable` : "");
+      $("#impStats").textContent = `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped` + (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : "") + ` · ${auto} auto-categorised` + (p.skipped ? ` · ${p.skipped} unparseable` : "");
       $("#impLegend").empty();
       $("#impLegend").append(el("span", { class: "imp-legend-swatch" }), el("span", {}, `${curCount} in the current period — ${periodTitle(cur)}`));
       const t = $("#impTable");
@@ -4225,13 +4356,17 @@ var require_import = __commonJS((exports2, module2) => {
       const body = el("tbody", {});
       const visible = p.items.slice(0, importShown);
       for (const it of visible) {
-        const cls = (it.dup ? "imp-dup" : "") + (inCurrent(it) ? " imp-current" : "");
+        const cls = (it.dup ? "imp-dup" : it.near ? "imp-near" : "") + (inCurrent(it) ? " imp-current" : "");
+        const nearWhy = it.near ? `Looks like the already-imported "${it.near.desc}" on ${it.near.date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.` : "";
         body.append(el("tr", { class: cls.trim() }, el("td", {}, it.dup ? el("span", { class: "category-badge badge-dup" }, "dup") : el("input", {
           type: "checkbox",
-          "aria-label": `Import ${it.date} ${it.desc}, ${money(it.amount)}`,
+          "aria-label": `Import ${it.date} ${it.desc}, ${money(it.amount)}${it.near ? ". " + nearWhy : ""}`,
           ...it.include ? { checked: "" } : {},
           onchange: (e) => it.include = e.target.checked
-        })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : deferredCatSelect(it.cat, (v) => {
+        })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc, ...it.near ? [
+          el("span", { class: "category-badge badge-near", title: nearWhy }, "likely dup"),
+          el("div", { class: "imp-near-why" }, nearWhy)
+        ] : []), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : deferredCatSelect(it.cat, (v) => {
           it.cat = v;
           it.manual = true;
         }, `Category for ${it.desc}`)), el("td", {}, it.dup ? "" : el("input", {
@@ -4288,7 +4423,7 @@ var require_import = __commonJS((exports2, module2) => {
           S.txFiles[key].rows.push(...rows);
           for (const e of entries) {
             e.src.include = false;
-            p.seen.add(`${e.src.date}|${e.src.desc.trim().toLowerCase()}|${e.src.amount.toFixed(2)}|${lab}`);
+            addToIndex(p.index, e.src.date, e.src.desc, e.src.amount, lab);
           }
           done += rows.length;
         }
@@ -5243,11 +5378,12 @@ tags: [finance, finance/budget, finance/budget/services]
 
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
-  var { PluginSettingTab, Setting, normalizePath } = require("obsidian");
+  var { PluginSettingTab, Setting, TFile, normalizePath } = require("obsidian");
   var { DEFAULT_SETTINGS } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr } = require_util();
+  var MD_KEYS = new Set(["household", "month_start_day", "country", "currency"]);
 
   class BudgetSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -5324,6 +5460,124 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           }, 800);
         });
       });
+    }
+    mdSettings() {
+      const f = this.app.vault.getAbstractFileByPath(this.plugin.settingsMdPath());
+      if (!(f instanceof TFile))
+        return {};
+      const cache = this.app.metadataCache.getFileCache(f);
+      return cache && cache.frontmatter || {};
+    }
+    getControlValue(key) {
+      if (!MD_KEYS.has(key))
+        return super.getControlValue(key);
+      const md = this.mdSettings();
+      if (key === "household")
+        return md.household ?? "";
+      if (key === "month_start_day")
+        return Number(md.month_start_day ?? 23);
+      if (key === "currency")
+        return md.currency ?? "R";
+      if (key === "country") {
+        const c = (md.country ?? "za").toString().trim().toLowerCase();
+        return PROFILES[c] ? c : "za";
+      }
+      return;
+    }
+    async setControlValue(key, value) {
+      if (!MD_KEYS.has(key)) {
+        if (key === "budgetFolder")
+          value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
+        await super.setControlValue(key, value);
+        if (key === "theme")
+          this.plugin.forEachView((ctl) => ctl.applyTheme());
+        else if (key === "budgetFolder")
+          this.plugin.reloadViews();
+        return;
+      }
+      const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "country" ? String(value) : null;
+      if (raw === null)
+        return;
+      await this.plugin.updateBudgetSettingsMd(key, raw);
+      this.plugin.reloadViews();
+    }
+    getSettingDefinitions() {
+      return [
+        {
+          name: "Budget folder",
+          desc: "Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.",
+          control: { type: "folder", key: "budgetFolder", placeholder: DEFAULT_SETTINGS.budgetFolder }
+        },
+        {
+          name: "Theme",
+          desc: "Follow Obsidian's light/dark mode, or force the Airy Glass dark or light palette.",
+          control: {
+            type: "dropdown",
+            key: "theme",
+            defaultValue: DEFAULT_SETTINGS.theme,
+            options: { auto: "Follow Obsidian", dark: "Always dark", light: "Always light" }
+          }
+        },
+        {
+          name: "Setup wizard",
+          desc: "Re-run the first-run wizard — folder, name, budget period, currency, starter files.",
+          render: (setting) => {
+            setting.addButton((b) => b.setButtonText("Run setup wizard").onClick(() => new OnboardingWizard(this.app, this.plugin).open()));
+          }
+        },
+        {
+          name: "Open on startup",
+          desc: "Open the budget view automatically when Obsidian starts.",
+          control: { type: "toggle", key: "openOnStartup", defaultValue: DEFAULT_SETTINGS.openOnStartup }
+        },
+        {
+          name: "Budget data",
+          desc: "Stored in Settings.md inside the budget folder, so they apply on every device.",
+          render: (setting) => {
+            setting.setHeading();
+          }
+        },
+        {
+          name: "Name / household",
+          desc: "Shown in the dashboard greeting and top bar. Leave blank for none.",
+          control: { type: "text", key: "household", placeholder: "Leave blank for none" }
+        },
+        {
+          name: "Month start day",
+          desc: "Day of the month each financial period begins on (payday). 1–28.",
+          control: {
+            type: "number",
+            key: "month_start_day",
+            defaultValue: 23,
+            min: 1,
+            max: 28,
+            validate: (v) => {
+              const n = parseInt(v, 10);
+              return n >= 1 && n <= 28 ? undefined : "Pick a day between 1 and 28.";
+            }
+          }
+        },
+        {
+          name: "Country",
+          desc: "Drives amount formatting, bank-statement date order and the Tax view's checklist (tailored to your country's tax authority). Existing tax years keep their data — only labels and new-year seeds change.",
+          control: {
+            type: "dropdown",
+            key: "country",
+            defaultValue: "za",
+            options: Object.fromEntries(COUNTRY_ORDER.map((code) => [code, PROFILES[code].label]))
+          }
+        },
+        {
+          name: "Currency symbol",
+          desc: "Shown before every amount, e.g. R.",
+          control: {
+            type: "text",
+            key: "currency",
+            placeholder: "R",
+            validate: (v) => String(v).trim() ? undefined : "Enter a currency symbol."
+          }
+        }
+      ];
     }
   }
   module2.exports = { BudgetSettingTab };
