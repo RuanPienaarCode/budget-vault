@@ -40,6 +40,44 @@ module.exports = function registerBudgets(ctx) {
   function budgetDirty() { const b = $('#budSave'); return budDirty || (!!b && !b.disabled); }
   ctx.registerDirty(budgetDirty);
 
+  /* Totals across the whole draft — budgeted income, budgeted spend, and the
+     actual spend so far. Read off the live draft (not S.budgets) so the strips
+     move as soon as an amount is edited, before the file is saved. */
+  function budgetTotalsStrip() {
+    const draft = budgetDraft();
+    const sum = periodSummary(S.period);
+    let income = 0, budgeted = 0;
+    for (const d of draft) {
+      if (d.type === 'income') income += d.amount || 0;
+      else if (d.type !== 'transfer') budgeted += d.amount || 0;
+    }
+    const allocPct = income > 0 ? Math.round((budgeted / income) * 100) : null;
+    const usedPct = budgeted > 0 ? Math.round((sum.spend / budgeted) * 100) : null;
+    return [
+      { label: 'Total income', value: money(income), grad: true, note: `${money(sum.income)} received so far` },
+      { label: 'Total budgeted', value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : '' },
+      { label: 'Total spent', value: money(sum.spend), over: budgeted > 0 && sum.spend > budgeted,
+        note: usedPct !== null ? `${usedPct}% of budget used` : '' },
+    ];
+  }
+
+  // Same three tiles above and below the table, so the totals are in reach
+  // from either end of a long category list.
+  function renderBudgetTotals() {
+    const tiles = budgetTotalsStrip();
+    for (const id of ['#budTotalsTop', '#budTotalsBottom']) {
+      const host = $(id);
+      if (!host) continue;
+      host.innerHTML = '';
+      for (const t of tiles) {
+        host.append(el('div', { class: 'bud-total' },
+          el('div', { class: 'bud-total-l' }, t.label),
+          el('div', { class: `bud-total-v${t.grad ? ' grad-txt' : ''}${t.over ? ' over' : ''}` }, t.value),
+          t.note ? el('div', { class: 'bud-total-n' }, t.note) : ''));
+      }
+    }
+  }
+
   function renderBudgets() {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     const draft = budgetDraft();
@@ -73,7 +111,7 @@ module.exports = function registerBudgets(ctx) {
         el('td', {}, typeBadge(d.type)),
         el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
           el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
-            'aria-label': `Budget amount for ${d.category}`, onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); } }),
+            'aria-label': `Budget amount for ${d.category}`, onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); renderBudgetTotals(); } }),
           remainingEl)),
         el('td', { class: `num${overActual ? ' text-danger' : ' text-muted'}`, style: 'white-space:nowrap' }, money(actual)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
@@ -92,6 +130,7 @@ module.exports = function registerBudgets(ctx) {
           } }, icoEl(['trash-2', 'trash'])))));
     }
     t.append(body);
+    renderBudgetTotals();
   }
 
   async function saveBudget() {
