@@ -3,6 +3,45 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.26 — 2026-08-01
+
+Compatibility pass for older iPhones and iPads. **Nothing changes on an
+up-to-date device** — every fix here only takes effect on iOS 15, the oldest
+version Obsidian Mobile still supports. Updating is worthwhile only if you use
+the plugin on an older phone or tablet.
+
+### Fixed
+
+- **Cards, badges and tints no longer come out blank on older iPhones.** The
+  colours throughout the app are blended at display time, and that blending was
+  added to Safari after iOS 15. On an older phone the affected backgrounds were
+  simply skipped, so parts of the app lost their shading: the top bar its
+  frosted tint, inline code and table section headers their grey wash, the
+  import review its emerald highlight, the card headers their hairline. Each of
+  these now has a plain-colour stand-in that older phones use instead. Newer
+  devices are untouched and still get the blended colours.
+
+  The current-period marker in the import review never actually broke — the
+  emerald bar down the left of those rows always drew correctly — but the soft
+  tint behind it was missing. That tint is now back.
+
+- **Keyboard focus outlines return on iPads running iOS 15.0–15.3.** The app
+  marks which control has keyboard focus using a rule those specific versions
+  do not recognise, and Safari discards the entire rule when that happens — so
+  on those iPads no control ever showed a focus outline, making the app very
+  hard to navigate with an external keyboard. Those versions now fall back to a
+  simpler outline rule. The trade-off is that on those devices the outline also
+  appears briefly on tap; every other device is unaffected.
+
+### Changed
+
+- **Dropped a CSS property that Obsidian's community plugin review flags.** The
+  hidden-label helper used two properties that do the same job, one modern and
+  one long-established. The modern one is reported as only partially supported
+  regardless of how it is used, which counts against the plugin's review score.
+  It has been removed; the other property was already doing the work, so screen
+  readers and the visible layout both behave exactly as before.
+
 ## 1.0.25 — 2026-07-30
 
 Small navigation and table-readability pass.
