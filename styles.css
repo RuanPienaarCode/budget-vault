@@ -1211,14 +1211,18 @@
    ============================================================ */
 
 /* Visually-hidden label text. Used where a column header has to exist for the
-   control beneath it but would be noise on screen (the import Include column). */
+   control beneath it but would be noise on screen (the import Include column).
+   Deliberately uses the legacy `clip` property only. caniuse marks its modern
+   counterpart "partial" on every engine (because of SVG url() references, not
+   the inset() form we'd want), so the community-plugin linter flags it and
+   docks the score. `overflow: hidden` on the 1px box does the real hiding
+   here; `clip` is belt-and-braces. Do not reintroduce the modern property. */
 .budget-app-root .sr-only {
   position: absolute;
   width: 1px; height: 1px;
   padding: 0; margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
-  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
@@ -1253,10 +1257,14 @@
   max-width: 200px;
 }
 
-/* color-mix() is Safari 16.2+; the plugin supports iOS 14.5. Below that every
-   color-mix declaration is invalid and the property falls back to its initial
-   value — cards lose their surface fill and badges lose their pill entirely.
-   Mirrors the hand-written @supports fallback already used for backdrop-filter. */
+/* color-mix() is Safari 16.2+; Obsidian mobile's floor is iOS 15, so on the
+   oldest supported phones every color-mix declaration is invalid and the
+   property falls back to its initial value — cards lose their surface fill and
+   badges lose their pill entirely.
+   Mirrors the hand-written @supports fallback already used for backdrop-filter.
+   Neutral rgba(127,127,127,·) is used wherever the original mixed against
+   --text-primary/--text-muted: it reads correctly on both themes without
+   needing a per-theme override. */
 @supports not (color: color-mix(in srgb, red, blue)) {
   .budget-app-root { --surface-glass-light: rgba(255, 255, 255, .92); }
   .budget-app-root.bud-dark .card,
@@ -1268,6 +1276,61 @@
   .budget-app-root .badge-transfer,
   .budget-app-root .badge-dup         { background: rgba(127, 127, 127, .14); }
   .budget-app-root .mini              { background: rgba(127, 127, 127, .05); }
+
+  /* Neutral tints that were mixed against the ink colours. */
+  .budget-app-root code                  { background: rgba(127, 127, 127, .10); }
+  .budget-app-root .drawer-link .di      { background: rgba(127, 127, 127, .10); }
+  .budget-app-root .table tbody tr.type-row td { background: rgba(127, 127, 127, .10); }
+  .budget-app-root .upload-area          { background-color: rgba(127, 127, 127, .04); }
+
+  /* Topbar goes opaque rather than tinted-translucent. -webkit-backdrop-filter
+     still resolves on iOS 15, but with no tint behind it the blur alone leaves
+     scrolled content readable through the bar — legibility beats the glass. */
+  .budget-app-root .topbar { background-color: var(--body-bg); }
+
+  .budget-app-root .brand-logo { box-shadow: 0 6px 20px -6px rgba(16, 185, 129, .55); }
+
+  /* Gradients collapse to their solid mid-tone. */
+  .budget-app-root .legend i.legend-dash {
+    background: repeating-linear-gradient(90deg, var(--ink-faint) 0 4px, transparent 4px 8px);
+  }
+  .budget-app-root .card::after {
+    background: linear-gradient(90deg, transparent, rgba(127, 127, 127, .22), transparent);
+  }
+
+  /* Import review. The emerald accent bar on td:first-child carries no
+     color-mix, so the current-period indicator still works here — this only
+     restores the tint behind it. .imp-current.imp-dup deliberately gets no
+     rule of its own: it matches .imp-current and takes the same tint, and the
+     "duplicate" badge is what distinguishes it. */
+  .budget-app-root #impTable tbody tr.imp-current { background: var(--color-primary-light); }
+  .budget-app-root .imp-legend-swatch { background: var(--color-primary-light); }
+}
+
+/* :focus-visible is Safari 15.4+, and an unrecognised pseudo-class invalidates
+   the WHOLE rule — not just the selector — so on iOS 15.0–15.3 every focus ring
+   above disappears entirely. That is an accessibility regression, not a cosmetic
+   one: an iPad-with-keyboard user gets no visible focus indicator at all.
+
+   Scoped with a selector query so modern engines never see it. `@supports
+   selector()` is itself Safari 14.1+, so it evaluates correctly (to false) on
+   the affected versions rather than being skipped. Old engines fall back to
+   plain :focus, which also rings on tap/click — the accepted trade for having
+   a visible indicator at all. Values mirror their :focus-visible counterparts. */
+@supports not selector(:focus-visible) {
+  .budget-app-root .menu-btn:focus,
+  .budget-app-root .header-period-pill .pnav-btn:focus,
+  .budget-app-root .topbar-avatar:focus,
+  .budget-app-root .drawer-close:focus,
+  .budget-app-root .drawer-link:focus,
+  .budget-app-root .btn-ghost:focus,
+  .budget-app-root .btn-gradient:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+  .budget-app-root .upload-area:focus  { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+  .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
+  .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
+  .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
