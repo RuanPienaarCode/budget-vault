@@ -452,6 +452,7 @@ function mountApp(view) {
     if (e.dataTransfer.files[0]) ctx.handleTaxFile(e.dataTransfer.files[0]);
   });
   $('#impCommit').addEventListener('click', ctx.commitImport);
+  $('#impRemap').addEventListener('click', ctx.remapImport);
   const drop = $('#drop');
   drop.addEventListener('click', () => $('#fileInput').click());
   $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleCsvFile(e.target.files[0]); e.target.value = ''; });

@@ -211,9 +211,10 @@ var require_util = __commonJS((exports2, module2) => {
   }
   var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
   function parseStatementDate(raw, dayFirst = true) {
-    const s = (raw ?? "").toString().trim();
+    let s = (raw ?? "").toString().trim();
     if (!s)
       return null;
+    s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z|[+-]\d{2}:?\d{2})?$/i, "").trim();
     let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
     if (m)
       return isoParts(+m[1], +m[2], +m[3]);
@@ -230,7 +231,7 @@ var require_util = __commonJS((exports2, module2) => {
     m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
     if (m)
       return isoParts(+m[1], +m[2], +m[3]);
-    m = s.match(/^(\d{1,2})[ -]([A-Za-z]{3,})[ -](\d{4})$/);
+    m = s.match(/^(\d{1,2})[ -]?([A-Za-z]{3,})[ -]?(\d{4})$/);
     if (m) {
       const mo = MONTHS[m[2].slice(0, 3).toLowerCase()];
       if (mo)
@@ -276,6 +277,133 @@ var require_util = __commonJS((exports2, module2) => {
     const n = Number(s);
     return neg ? -n : n;
   }
+  function reconcileAmounts(rows) {
+    const c = (v) => Math.round(v * 100);
+    const pts = (rows || []).filter((r) => r && r.amount != null && r.balance != null);
+    if (pts.length < 4)
+      return { verified: false, flip: false, order: null, pairs: Math.max(0, pts.length - 1), agreement: 0 };
+    let best = { verified: false, flip: false, order: null, pairs: pts.length - 1, agreement: 0 };
+    for (const order of ["fwd", "rev"]) {
+      for (const sign of [1, -1]) {
+        let agree = 0;
+        for (let i = 1;i < pts.length; i++) {
+          const prev = c(pts[i - 1].balance), bal = c(pts[i].balance);
+          const step = order === "fwd" ? sign * c(pts[i].amount) : -sign * c(pts[i - 1].amount);
+          if (bal - prev === step)
+            agree++;
+        }
+        if (agree > best.agreement)
+          best = { verified: false, flip: sign === -1, order, pairs: pts.length - 1, agreement: agree };
+      }
+    }
+    best.verified = best.agreement >= Math.ceil(best.pairs * 0.8);
+    return best;
+  }
+  function detectHeaderlessColumns(rows, dayFirst = true) {
+    const isDate = (v) => !!parseStatementDate(v, dayFirst);
+    const num = (v) => normalizeAmount(v);
+    const dataStart = (rows || []).findIndex((r) => r.length >= 3 && isDate(r[0]) && r.slice(1).some((c) => num(c) != null));
+    if (dataStart === -1)
+      return null;
+    const width = rows[dataStart].length;
+    const data = rows.slice(dataStart).filter((r) => r.length === width && isDate(r[0]));
+    if (data.length < 2)
+      return null;
+    let firstNum = width;
+    while (firstNum > 1 && data.every((r) => num(r[firstNum - 1]) != null))
+      firstNum--;
+    if (firstNum >= width)
+      return null;
+    let iAmount = width - 1, iBalance = -1;
+    if (width - firstNum >= 2) {
+      const bal = reconcileAmounts(data.map((r) => ({ amount: num(r[width - 2]), balance: num(r[width - 1]) })));
+      if (bal.verified) {
+        iAmount = width - 2;
+        iBalance = width - 1;
+      }
+    }
+    let iDesc = -1;
+    for (let c = iAmount - 1;c >= 1; c--) {
+      const vals = data.map((r) => (r[c] ?? "").toString().trim()).filter(Boolean);
+      if (!vals.length)
+        continue;
+      const text = vals.filter((v) => num(v) == null && !isDate(v)).length;
+      if (text > vals.length / 2) {
+        iDesc = c;
+        break;
+      }
+    }
+    if (iDesc === -1)
+      return null;
+    return { dataStart, iDate: 0, iDesc, iAmount, iBalance };
+  }
+  var DATE_COLS = [
+    "value date",
+    "date",
+    "posting date",
+    "post date",
+    "date posted",
+    "effective date",
+    "transaction date",
+    "trans date",
+    "txn date",
+    "process date",
+    "action date"
+  ];
+  var DESC_COLS = [
+    "description",
+    "title",
+    "narrative",
+    "narration",
+    "details",
+    "detail",
+    "particulars",
+    "transaction description",
+    "statement description",
+    "transaction detail",
+    "reference",
+    "payee",
+    "memo"
+  ];
+  var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "signed amount", "value"];
+  var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
+  var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
+  var BALANCE_COLS = ["balance", "running balance", "closing balance", "account balance", "balance (zar)"];
+  function detectStatementColumns(rows, dayFirst = true) {
+    const headerIdx = (rows || []).findIndex((r) => {
+      const low = r.map((c) => c.trim().toLowerCase());
+      const has = (names) => names.some((n) => low.includes(n));
+      return (has(DATE_COLS) || low.some((c) => c.includes("date"))) && (has(AMOUNT_COLS) || has(DEBIT_COLS) && has(CREDIT_COLS));
+    });
+    if (headerIdx !== -1) {
+      const low = rows[headerIdx].map((c) => c.trim().toLowerCase());
+      const col = (names) => {
+        for (const n of names) {
+          const i = low.indexOf(n);
+          if (i !== -1)
+            return i;
+        }
+        return -1;
+      };
+      let iDate = col(DATE_COLS);
+      if (iDate === -1)
+        iDate = low.findIndex((c) => c.includes("date"));
+      let iDesc = col(DESC_COLS);
+      if (iDesc === -1)
+        iDesc = low.findIndex((c) => c.includes("desc"));
+      let iBalance = col(BALANCE_COLS);
+      if (iBalance === -1)
+        iBalance = low.findIndex((c) => c.includes("balance"));
+      const iAmount = col(AMOUNT_COLS), iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+      if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
+        return null;
+      return { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
+    }
+    const shape = detectHeaderlessColumns(rows, dayFirst);
+    if (!shape)
+      return null;
+    return { ...shape, iDebit: -1, iCredit: -1, iExtra: -1, headerIdx: -1 };
+  }
   function learnPattern(desc) {
     let s = (desc ?? "").toString().trim();
     for (;; ) {
@@ -317,7 +445,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };
 });
 
 // src/shell.js
@@ -672,7 +800,9 @@ var require_shell = __commonJS((exports2, module2) => {
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
-              <p>Columns are matched by header name, so any CSV with a header row of
+              <p>Most banks import as-is — columns are matched by header name, the layout is read
+                from the rows when there's no header, and if neither works you'll be asked which
+                column is which. To build your own, any CSV with a header row of
                 <code>Date,Title,Amount</code> imports fine. In Google Sheets or Excel, make three columns:</p>
               <ul>
                 <li><strong>Date</strong> — <code>2026-07-01</code> or <code>01/07/2026</code></li>
@@ -690,14 +820,33 @@ var require_shell = __commonJS((exports2, module2) => {
             </div>
           </div>
         </div>
+        <div class="card hidden" id="importMap">
+          <div class="card-h" style="align-items:center">
+            <div>
+              <h2>Which column is which?</h2>
+              <div class="sub" id="impMapNote"></div>
+            </div>
+            <div class="row">
+              <button class="btn-ghost" id="impMapCancel">Cancel</button>
+              <button class="btn-gradient" id="impMapApply">Use these columns</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="imp-map-fields" id="impMapFields"></div>
+            <div class="table-responsive"><table class="table imp-map-preview" id="impMapPreview"></table></div>
+            <div class="sub" id="impMapWarn"></div>
+          </div>
+        </div>
         <div class="card hidden" id="importReview">
           <div class="card-h" style="align-items:center">
             <div>
               <h2>Review import</h2>
               <div class="sub" id="impStats"></div>
               <div class="sub imp-legend" id="impLegend"></div>
+              <div class="sub imp-reconcile hidden" id="impReconcile"></div>
             </div>
             <div class="row">
+              <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
               <select id="impAccount" class="form-select form-select-sm"></select>
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
                 <input type="checkbox" id="impRemember" checked> remember new categorisations
@@ -1060,7 +1209,7 @@ var require_locale = __commonJS((exports2, module2) => {
       decimal: ",",
       dayFirst: true,
       stripDescSuffix: " ZA",
-      banks: "Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa",
+      banks: "Discovery, FNB, Capitec, Nedbank",
       importHint: null,
       authority: "SARS",
       taxIntro: "Track a SARS return season here — progress steps, the documents you need (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.",
@@ -4174,18 +4323,13 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, normalizeAmount } = require_util();
+  var { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
-  var DATE_COLS = ["value date", "date", "transaction date", "posting date", "trans date"];
-  var DESC_COLS = ["description", "title", "narrative", "details", "transaction description", "reference", "payee", "memo"];
-  var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "value"];
-  var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
-  var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
     function renderImport() {
       const loc = locale();
-      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — ${loc.banks} — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
+      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
     }
@@ -4208,12 +4352,27 @@ var require_import = __commonJS((exports2, module2) => {
     function dedupIndex() {
       return buildIndex(S.txFiles);
     }
-    function detectAccountLabel(filename) {
+    function detectAccountLabel(filename, rows) {
       const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) || filename.match(/^(\d{6,})\D/);
+      const byNumber = (n) => {
+        const acc = S.accounts.find((a) => a.account_number === n);
+        return acc ? acc.tx_label || acc.name : "";
+      };
       if (m) {
-        const acc = S.accounts.find((a) => a.account_number === m[1]);
-        if (acc)
-          return acc.tx_label || acc.name;
+        const l = byNumber(m[1]);
+        if (l)
+          return l;
+      }
+      for (const r of (rows || []).slice(0, 10)) {
+        const i = r.findIndex((c) => /account\s*number/i.test(c || ""));
+        if (i === -1)
+          continue;
+        const digits = ((r[i + 1] || r[i]).match(/\d{4,}/) || [])[0];
+        if (digits) {
+          const l = byNumber(digits);
+          if (l)
+            return l;
+        }
       }
       return "";
     }
@@ -4222,40 +4381,22 @@ var require_import = __commonJS((exports2, module2) => {
       const rows = parseCsv(text);
       if (!rows.length)
         return toast("Empty CSV", true);
-      let headerIdx = rows.findIndex((r) => {
-        const low2 = r.map((c) => c.trim().toLowerCase());
-        const has = (names) => names.some((n) => low2.includes(n));
-        return (has(DATE_COLS) || low2.some((c) => c.includes("date"))) && (has(AMOUNT_COLS) || has(DEBIT_COLS) && has(CREDIT_COLS));
-      });
-      if (headerIdx === -1)
-        return toast("Could not find a header row with Date + Amount (or Debit/Credit) columns", true);
-      const header = rows[headerIdx].map((c) => c.trim());
-      const low = header.map((c) => c.toLowerCase());
-      const col = (names) => {
-        for (const n of names) {
-          const i = low.indexOf(n);
-          if (i !== -1)
-            return i;
-        }
-        return -1;
-      };
-      let iDate = col(DATE_COLS);
-      if (iDate === -1)
-        iDate = low.findIndex((c) => c.includes("date"));
-      let iDesc = col(DESC_COLS);
-      if (iDesc === -1)
-        iDesc = low.findIndex((c) => c.includes("desc"));
-      const iAmount = col(AMOUNT_COLS);
-      const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
-      if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
-        return toast("Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)", true);
+      const loc = locale();
+      const map = detectStatementColumns(rows, loc.dayFirst);
+      if (!map)
+        return showColumnMapper(rows, file, null);
+      await runImport(rows, map, file);
+    }
+    async function runImport(rows, map, file) {
+      const loc = locale();
+      const { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra } = map;
+      const dataRows = rows.slice(map.dataStart);
       const index = dedupIndex();
       const items = [];
       let skipped = 0;
-      const label0 = detectAccountLabel(file.name);
-      const dataRows = rows.slice(headerIdx + 1);
-      const loc = locale();
+      const label0 = detectAccountLabel(file.name, rows);
       const rules = prepareRules();
+      const ledger = [];
       const showBar = dataRows.length > 1500;
       if (showBar)
         importProgress("start", "Categorising transactions…");
@@ -4264,6 +4405,11 @@ var require_import = __commonJS((exports2, module2) => {
         const r = dataRows[i];
         const rawDate = (r[iDate] || "").trim();
         let desc = (r[iDesc] || "").trim();
+        if (iExtra !== -1 && iExtra !== iDesc) {
+          const extra = (r[iExtra] || "").trim();
+          if (extra && extra !== desc)
+            desc = desc ? `${desc} — ${extra}` : extra;
+        }
         if (loc.stripDescSuffix && desc.endsWith(loc.stripDescSuffix))
           desc = desc.slice(0, -loc.stripDescSuffix.length);
         let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
@@ -4277,14 +4423,12 @@ var require_import = __commonJS((exports2, module2) => {
           if (d != null && d !== 0)
             amount = -Math.abs(d);
         }
-        if (rawDate && desc && amount != null && amount !== 0) {
-          const date = parseStatementDate(rawDate, loc.dayFirst);
-          if (!date) {
-            skipped++;
-          } else {
-            items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
-          }
-        } else if (rawDate || desc) {
+        if (iBalance !== -1 && amount != null)
+          ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
+        const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
+        if (date && desc && amount != null && amount !== 0) {
+          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
+        } else if (date || amount != null) {
           skipped++;
         }
         if (showBar && i % CHUNK === CHUNK - 1) {
@@ -4296,6 +4440,10 @@ var require_import = __commonJS((exports2, module2) => {
         importProgress("set", "Preparing review…", 0.95);
         await new Promise((res) => setTimeout(res, 0));
       }
+      const rec = iBalance !== -1 ? reconcileAmounts(ledger) : null;
+      if (rec && rec.verified && rec.flip && iAmount !== -1)
+        for (const it of items)
+          it.amount = -it.amount;
       let range = null;
       for (const it of items) {
         if (!range)
@@ -4307,11 +4455,89 @@ var require_import = __commonJS((exports2, module2) => {
             range.max = it.date;
         }
       }
-      S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name };
+      S.pendingImport = {
+        items,
+        label: label0,
+        index,
+        range,
+        skipped,
+        filename: file.name,
+        reconcile: rec ? { ...rec, flipped: rec.verified && rec.flip && iAmount !== -1 } : null,
+        rows,
+        map,
+        file
+      };
+      $("#importMap").classList.add("hidden");
       importShown = IMPORT_PAGE;
       renderImportReview();
       if (showBar)
         importProgress("done");
+    }
+    const MAP_FIELDS = [
+      { key: "iDate", label: "Date", required: true, hint: "When the transaction happened" },
+      { key: "iDesc", label: "Description", required: true, hint: "The payee or reference" },
+      { key: "iExtra", label: "Extra detail", required: false, hint: "Optional second text column — added to the description" },
+      { key: "iAmount", label: "Amount", required: false, hint: "One signed column: negative is money out" },
+      { key: "iDebit", label: "Money out", required: false, hint: "Use instead of Amount when out and in are separate columns" },
+      { key: "iCredit", label: "Money in", required: false, hint: "The partner column to Money out" },
+      { key: "iBalance", label: "Balance", required: false, hint: "Optional — lets the amounts be checked against the running balance" }
+    ];
+    function showColumnMapper(rows, file, detected) {
+      const loc = locale();
+      const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
+      if (!width)
+        return toast("Empty CSV", true);
+      const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
+      const header = headerIdx >= 0 ? rows[headerIdx] : null;
+      let start = detected ? detected.dataStart : rows.findIndex((r) => r.length >= 3 && r.some((c) => parseStatementDate(c, loc.dayFirst)) && r.some((c) => normalizeAmount(c) != null));
+      if (start == null || start < 0)
+        start = 0;
+      $("#importReview").classList.add("hidden");
+      $("#importMap").classList.remove("hidden");
+      $("#impMapNote").textContent = detected ? `${file.name} — change any column the importer got wrong, then re-read the file.` : `${file.name} — this export isn't one the importer recognises. Point it at the right columns and it will import like any other.`;
+      $("#impMapWarn").textContent = "";
+      const colLabel = (i) => {
+        const name = header && (header[i] || "").trim();
+        const sample = rows[start] && (rows[start][i] || "").trim() || "";
+        return `${i + 1}${name ? ` — ${name}` : ""}${!name && sample ? ` — e.g. ${sample.slice(0, 22)}` : ""}`;
+      };
+      const fields = $("#impMapFields");
+      fields.empty();
+      const selects = {};
+      for (const f of MAP_FIELDS) {
+        const sel = el("select", { class: "form-select form-select-sm", id: `impMap_${f.key}`, "aria-label": f.label });
+        if (!f.required)
+          sel.append(el("option", { value: "-1" }, "(none)"));
+        for (let i = 0;i < width; i++)
+          sel.append(el("option", { value: String(i) }, colLabel(i)));
+        const cur = detected ? detected[f.key] : -1;
+        sel.value = String(cur != null && cur >= 0 ? cur : f.required ? 0 : -1);
+        selects[f.key] = sel;
+        fields.append(el("label", { class: "imp-map-field" }, el("span", { class: "imp-map-label" }, f.label + (f.required ? "" : " (optional)")), sel, el("span", { class: "imp-map-hint" }, f.hint)));
+      }
+      const prev = $("#impMapPreview");
+      prev.empty();
+      prev.append(el("thead", {}, el("tr", {}, ...Array.from({ length: width }, (_, i) => el("th", { scope: "col" }, colLabel(i))))));
+      prev.append(el("tbody", {}, ...rows.slice(start, start + 5).map((r) => el("tr", {}, ...Array.from({ length: width }, (_, i) => el("td", {}, (r[i] || "").trim()))))));
+      $("#impMapCancel").onclick = () => {
+        $("#importMap").classList.add("hidden");
+        if (S.pendingImport)
+          $("#importReview").classList.remove("hidden");
+      };
+      $("#impMapApply").onclick = async () => {
+        const map = { headerIdx, dataStart: start, iExtra: -1 };
+        for (const f of MAP_FIELDS)
+          map[f.key] = parseInt(selects[f.key].value, 10);
+        if (map.iDate === map.iDesc)
+          return $("#impMapWarn").textContent = "Date and Description are the same column — pick different ones.";
+        if (map.iAmount === -1 && (map.iDebit === -1 || map.iCredit === -1))
+          return $("#impMapWarn").textContent = "Pick an Amount column, or both Money out and Money in.";
+        await runImport(rows, map, file);
+        if (!S.pendingImport || !S.pendingImport.items.length) {
+          $("#importMap").classList.remove("hidden");
+          $("#impMapWarn").textContent = "That mapping produced no transactions — check the Date column especially.";
+        }
+      };
     }
     function importProgress(phase, text, frac) {
       const wrap = $("#importProgress"), bar = $("#ipBar"), pct = $("#ipPct"), lbl = $("#ipText");
@@ -4363,6 +4589,13 @@ var require_import = __commonJS((exports2, module2) => {
       $("#impStats").textContent = `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped` + (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : "") + ` · ${auto} auto-categorised` + (p.skipped ? ` · ${p.skipped} unparseable` : "");
       $("#impLegend").empty();
       $("#impLegend").append(el("span", { class: "imp-legend-swatch" }), el("span", {}, `${curCount} in the current period — ${periodTitle(cur)}`));
+      const rec = p.reconcile;
+      const recEl = $("#impReconcile");
+      recEl.empty();
+      recEl.classList.toggle("hidden", !rec);
+      recEl.classList.toggle("imp-reconcile-warn", !!rec && !rec.verified);
+      if (rec)
+        recEl.textContent = rec.flipped ? "This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below." : rec.verified ? "Amounts check out against this statement’s own balance column." : "Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.";
       const t = $("#impTable");
       t.empty();
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Import")), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
@@ -4454,7 +4687,13 @@ var require_import = __commonJS((exports2, module2) => {
       toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? "" : "s"}` + (newRules ? `, saved ${newRules} new rules` : ""));
       ctx.switchView("transactions");
     }
-    ctx.provide({ handleCsvFile, commitImport, renderImport });
+    function remapImport() {
+      const p = S.pendingImport;
+      if (!p || !p.rows)
+        return toast("Drop a statement first", true);
+      showColumnMapper(p.rows, p.file, p.map);
+    }
+    ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
   };
 });
 
@@ -4856,6 +5095,7 @@ var require_controller = __commonJS((exports2, module2) => {
         ctx.handleTaxFile(e.dataTransfer.files[0]);
     });
     $("#impCommit").addEventListener("click", ctx.commitImport);
+    $("#impRemap").addEventListener("click", ctx.remapImport);
     const drop = $("#drop");
     drop.addEventListener("click", () => $("#fileInput").click());
     $("#fileInput").addEventListener("change", (e) => {

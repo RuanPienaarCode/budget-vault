@@ -1056,6 +1056,23 @@
    "you are about to re-import this" matters more than "this is this month". */
 .budget-app-root #impTable tbody tr.imp-current.imp-near { background: var(--color-warning-light); }
 .budget-app-root .imp-legend { display: inline-flex; align-items: center; gap: 7px; margin-top: 4px; }
+/* The balance-column verdict. Plain muted text when the statement proved
+   itself; warning-coloured when it didn't, because that line is asking the user
+   to check the signs before committing. */
+.budget-app-root .imp-reconcile { margin-top: 4px; max-width: 62ch; }
+/* Manual column mapper. Auto-fits on a phone (one field per row) and spreads
+   into columns on a wider pane. */
+.budget-app-root .imp-map-fields {
+  display: grid; gap: 10px 14px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.budget-app-root .imp-map-field { display: flex; flex-direction: column; gap: 3px; }
+.budget-app-root .imp-map-label { font-size: .82rem; font-weight: 600; }
+.budget-app-root .imp-map-hint { font-size: .74rem; color: var(--text-muted); }
+.budget-app-root .imp-map-preview { font-size: .78rem; }
+.budget-app-root .imp-map-preview td, .budget-app-root .imp-map-preview th { white-space: nowrap; }
+.budget-app-root #impMapWarn { color: var(--color-warning); margin-top: 8px; }
+.budget-app-root .imp-reconcile-warn { color: var(--color-warning); }
 .budget-app-root .imp-legend-swatch {
   width: 22px; height: 10px; border-radius: 3px; flex: none;
   background: color-mix(in srgb, var(--color-primary) 30%, transparent);
