@@ -320,7 +320,8 @@ var require_util = __commonJS((exports2, module2) => {
       if (bal.verified) {
         iAmount = width - 2;
         iBalance = width - 1;
-      }
+      } else if (bal.pairs < 3 && data.some((r) => num(r[width - 2]) !== 0))
+        return null;
     }
     let iDesc = -1;
     for (let c = iAmount - 1;c >= 1; c--) {

@@ -350,6 +350,20 @@ function detectHeaderlessColumns(rows, dayFirst = true) {
     // Only the first reconciles, so the file decides rather than the importer.
     const bal = reconcileAmounts(data.map(r => ({ amount: num(r[width - 2]), balance: num(r[width - 1]) })));
     if (bal.verified) { iAmount = width - 2; iBalance = width - 1; }
+    // Three states, not two: reconciled (above), provably-not-a-balance (a
+    // Debit/Credit pair — fall through and read the last column as the amount),
+    // and NOT ENOUGH FILE TO TELL. reconcileAmounts reports the third as fewer
+    // than three pairs, and it must not collapse into the second: on an
+    // amount+balance export that silently imports the running balance as every
+    // transaction — an expense booked as income, with plausible-looking totals
+    // and nothing to announce it.
+    //
+    // The ambiguity is only real when BOTH columns could be the amount. A
+    // penultimate column that never carries a value (the all-zero Money Out of
+    // a Debit/Credit pair) is not a candidate, so the last column still wins
+    // without proof. Otherwise there is nothing to choose on but a guess, and
+    // null is the honest answer — the caller opens the manual column mapper.
+    else if (bal.pairs < 3 && data.some(r => num(r[width - 2]) !== 0)) return null;
   }
 
   // Description: the rightmost column left of the amount whose values are
