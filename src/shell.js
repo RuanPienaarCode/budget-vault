@@ -4,6 +4,15 @@
    setting). Icons are lucide slots (span[data-ico]) resolved after mount. */
 
 const SHELL_HTML = `
+  <div class="splash-gate hidden" id="splashGate" role="group" aria-labelledby="gateTitle">
+    <div class="splash-inner">
+      <div class="splash-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></div>
+      <h1 class="splash-title" id="gateTitle">Budget Vault</h1>
+      <p class="splash-sub">Welcome back to Budget Vault, your private budget tool.</p>
+      <button type="button" class="btn-gradient splash-btn" id="gateEnter">Enter budget</button>
+    </div>
+  </div>
+
   <div class="drawer-overlay" id="drawerOverlay"></div>
 
   <nav class="app-drawer" id="appDrawer" aria-label="Main menu" inert>
@@ -78,6 +87,9 @@ const SHELL_HTML = `
     </div>
 
     <div class="ml-auto">
+      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" title="Import a bank statement CSV">
+        <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
+      </button>
       <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
     </div>
   </header>
