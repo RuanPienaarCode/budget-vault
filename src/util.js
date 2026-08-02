@@ -107,7 +107,18 @@ function parseMdTable(text) {
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
-    if (!t.startsWith('|') || /^\|[\s:|-]+\|$/.test(t)) continue;
+    /* Stop at the end of the FIRST table. This used to collect every `|` line
+       in the file, which merged a second table into the first — and because
+       every caller does `.slice(1)` to drop the one header row, the second
+       table's HEADER survived as data: a budget category literally named
+       "Category" with type "Type" and amount 0, counted in the totals. It then
+       became permanent, because saveBudget rebuilds the file from parsed state.
+       A blank line ends a table in markdown and Obsidian renders it that way,
+       so stopping here is what makes the parser agree with what the user sees.
+       Anything before the table (frontmatter, a heading, prose) is still
+       skipped — the run only closes once rows have actually started. */
+    if (!t.startsWith('|')) { if (rows.length) break; continue; }
+    if (/^\|[\s:|-]+\|$/.test(t)) continue;
     // Drop the leading pipe; drop the trailing pipe only when it's actually
     // there and unescaped — a hand-edited row with no trailing pipe must not
     // lose its final cell's last character.

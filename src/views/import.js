@@ -218,6 +218,29 @@ module.exports = function registerImport(ctx) {
       const sample = (rows[start] && (rows[start][i] || '').trim()) || '';
       return `${i + 1}${name ? ` — ${name}` : ''}${!name && sample ? ` — e.g. ${sample.slice(0, 22)}` : ''}`;
     };
+    /* Starting picks for the two required fields when nothing was detected.
+       Defaulting both to column 0 guaranteed that the first press of "Use these
+       columns" failed the Date-and-Description-are-the-same guard — a mapper
+       that opens in an invalid state teaches the user the button is broken.
+       These are the same cheap signals the shape detector reads, so where the
+       file is at all conventional the mapper opens on a sane guess; where it
+       isn't, the picks are at least distinct and the user moves two selects. */
+    const sample = rows[start] || [];
+    const looksDate = i => !!parseStatementDate((sample[i] || '').trim(), loc.dayFirst);
+    const looksText = i => {
+      const v = (sample[i] || '').trim();
+      return !!v && normalizeAmount(v) == null && !looksDate(i);
+    };
+    const firstOr = (pred, fallback) => {
+      for (let i = 0; i < width; i++) if (pred(i)) return i;
+      return fallback;
+    };
+    const defDate = firstOr(looksDate, 0);
+    // Never the date column, even when no column reads as free text — two
+    // required fields on one column is the one combination that cannot import.
+    const defDesc = firstOr(i => i !== defDate && looksText(i), defDate === 0 ? 1 : 0);
+    const fallbackFor = key => key === 'iDate' ? defDate : key === 'iDesc' ? defDesc : -1;
+
     const fields = $('#impMapFields'); fields.empty();
     const selects = {};
     for (const f of MAP_FIELDS) {
@@ -225,7 +248,7 @@ module.exports = function registerImport(ctx) {
       if (!f.required) sel.append(el('option', { value: '-1' }, '(none)'));
       for (let i = 0; i < width; i++) sel.append(el('option', { value: String(i) }, colLabel(i)));
       const cur = detected ? detected[f.key] : -1;
-      sel.value = String(cur != null && cur >= 0 ? cur : (f.required ? 0 : -1));
+      sel.value = String(cur != null && cur >= 0 ? cur : fallbackFor(f.key));
       selects[f.key] = sel;
       fields.append(el('label', { class: 'imp-map-field' },
         el('span', { class: 'imp-map-label' }, f.label + (f.required ? '' : ' (optional)')),
@@ -245,6 +268,10 @@ module.exports = function registerImport(ctx) {
       if (S.pendingImport) $('#importReview').classList.remove('hidden');
     };
     $('#impMapApply').onclick = async () => {
+      // Clear first: a warning left over from the previous press outlives the
+      // problem it described, so a successful mapping would still be sitting
+      // under a sentence telling the user it failed.
+      $('#impMapWarn').textContent = '';
       const map = { headerIdx, dataStart: start, iExtra: -1 };
       for (const f of MAP_FIELDS) map[f.key] = parseInt(selects[f.key].value, 10);
       // Refuse the two combinations that can't produce a transaction, and say
