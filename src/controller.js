@@ -248,6 +248,7 @@ function mountApp(view) {
       for (const sec of $$('main > section')) sec.classList.add('hidden');
       $('#view-connect').classList.remove('hidden');
       $('#periodPill').classList.add('hidden');
+      $('#topbarImport').classList.add('hidden');
       $('#connectPathNote').empty();
       $('#connectPathNote').append(
         'Looked in ', el('code', {}, ctx.basePath()),
@@ -258,9 +259,62 @@ function mountApp(view) {
     applyIdentity();
     $('#view-connect').classList.add('hidden');
     $('#periodPill').classList.remove('hidden');
+    $('#topbarImport').classList.remove('hidden');
     switchView(S.view === 'connect' ? 'dashboard' : S.view);
     toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
   }
+
+  /* ------------------------- privacy splash gate -------------------------
+     An opaque cover over the whole pane so balances are never on screen for a
+     shoulder-surfer (or in the OS app-switcher snapshot) until the owner taps
+     "Enter budget". On the FIRST lock the vault has not been read at all, so
+     there are no amounts anywhere in the DOM to be found — connectVault() only
+     runs on unlock. A later re-lock (Obsidian backgrounded) covers the already-
+     rendered view instead: unsaved edits and the current period survive it. */
+  let locked = false;
+  /* The gate clips its own drifting background layers, which makes it a scroll
+     container whose scrollHeight exceeds its height. Plain .focus() then scrolls
+     the splash content up out of sight to "reveal" the button it just focused.
+     preventScroll stops that; the scrollTop reset covers engines that ignore it
+     (the option is Safari 14.1+, and this plugin's floor is iOS 15). */
+  function focusEnter() {
+    const g = $('#splashGate');
+    $('#gateEnter').focus({ preventScroll: true });
+    g.scrollTop = 0;
+  }
+  function lockGate() {
+    if (locked) return;
+    locked = true;
+    closeDrawer();
+    $('#splashGate').classList.remove('hidden');
+    // inert, not just visually covered — otherwise Tab walks through the
+    // hidden table behind the gate and a screen reader reads out the balances.
+    $('.topbar').setAttribute('inert', '');
+    $('.bud-scroll').setAttribute('inert', '');
+    // Making an ancestor inert blurs whatever had focus, so on a re-lock focus
+    // would otherwise land on <body> with nothing to Tab to but the gate.
+    focusEnter();
+  }
+  async function unlockGate() {
+    if (!locked) return;
+    locked = false;
+    $('#splashGate').classList.add('hidden');
+    $('.topbar').removeAttribute('inert');
+    $('.bud-scroll').removeAttribute('inert');
+    // First unlock: this is where the vault is actually read. Later unlocks
+    // land back on the view that was already rendered.
+    if (!S.loaded) return connectVault();
+    const h = $(`#view-${S.view} h1`);
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
+  }
+  $('#gateEnter').addEventListener('click', () => { unlockGate(); });
+  /* Re-lock the moment Obsidian goes to the background, so the numbers are
+     already gone by the time iOS/Android takes its app-switcher screenshot —
+     and so reopening the app asks for the tap again, which is the whole point
+     of the feature. Fires for the window, not for switching Obsidian tabs. */
+  view.registerDomEvent(document, 'visibilitychange', () => {
+    if (document.hidden && plugin.settings.privacyLock) lockGate();
+  });
 
   /* Dirty flags are only set on `change`, which fires on blur — so a field
      being typed into right now counts as neither clean nor dirty. Without this
@@ -322,6 +376,15 @@ function mountApp(view) {
   $('#topbarAvatar').addEventListener('click', () => {
     app.setting.open();
     app.setting.openTabById('budget-app');
+  });
+  // One-tap import from any view: go to Import, then open the file picker in the
+  // same gesture (iOS blocks a picker opened outside the user-gesture task).
+  // A pending review is left alone — the user came back to finish it, not to
+  // throw it away by picking a second file.
+  $('#topbarImport').addEventListener('click', () => {
+    if (!S.loaded) return;
+    switchView('import');
+    if (!S.pendingImport) $('#fileInput').click();
   });
   $('#pluginSettingsLink').addEventListener('click', () => {
     closeDrawer();
@@ -400,7 +463,11 @@ function mountApp(view) {
   });
 
   return {
-    start: async () => { applyTheme(); await connectVault(); },
+    start: async () => {
+      applyTheme();
+      if (plugin.settings.privacyLock) { lockGate(); return; }
+      await connectVault();
+    },
     /* Called from BudgetView.onClose. These three timers are scheduled by hand
        rather than through Obsidian's register* helpers, so nothing unwinds them
        automatically — and a reload timer that fires after contentEl.empty()
@@ -423,6 +490,13 @@ function mountApp(view) {
       await connectVault();
     },
     applyTheme,
+    /* Toggling the setting acts on open views immediately: switching it off
+       lifts a gate the user is currently staring at (rather than stranding
+       them behind it), switching it on covers the numbers right away. */
+    applyPrivacyLock: () => {
+      if (plugin.settings.privacyLock) lockGate();
+      else unlockGate();
+    },
     hasDirty,
   };
 }

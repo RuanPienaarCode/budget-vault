@@ -114,9 +114,17 @@ Then toggle the plugin off/on in Obsidian to pick up the new bundle. `styles.css
 
 Modules communicate through a shared `ctx` object assembled in `controller.js`; each module registers its functions onto it.
 
+## Feedback
+
+Found a bug, or want a feature? Use the feedback form — **Settings → Budget Vault → Send feedback**, or open it directly:
+
+**<https://forms.gle/EVJKCuZxNQ9vJhTz6>**
+
+Nothing from your budget is attached — the button just opens the form in your browser, and you write what you want to share.
+
 ## Privacy
 
-Budget Vault makes **no network requests** — no analytics, no update checks, no external fonts or scripts. Your data is only ever read from and written to your own vault.
+Budget Vault makes **no network requests** — no analytics, no update checks, no external fonts or scripts. Your data is only ever read from and written to your own vault. (The feedback link is the one exception in spirit: tapping it hands a URL to your browser, which then loads the form. The plugin itself still fetches nothing.)
 
 ## License
 

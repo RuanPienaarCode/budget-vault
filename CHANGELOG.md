@@ -3,6 +3,28 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.27 — 2026-08-02
+
+### Added
+
+- **Import a statement from anywhere in the app.** A new import button sits in
+  the top bar, next to your initials. Tap it from any screen and it takes you
+  to the Import page and opens the file picker straight away, so choosing a CSV
+  is one tap instead of opening the menu first. If you already have an import
+  waiting to be reviewed, it just takes you back to that review rather than
+  discarding it.
+
+- **Privacy splash screen.** The budget is now covered by a welcome screen
+  until you tap "Enter budget" — when you open it, and again whenever Obsidian
+  goes to the background. Nothing is read from your vault until you tap, so no
+  balances appear in the app switcher or over your shoulder. It is on by
+  default and can be turned off in **Settings → Budget Vault**.
+
+- **Send feedback.** A button in **Settings → Budget Vault** opens a form in
+  your browser for bug reports and feature requests. Nothing from your budget
+  is attached or sent — the plugin itself still makes no network requests of
+  its own.
+
 ## 1.0.26 — 2026-08-01
 
 Compatibility pass for older iPhones and iPads. **Nothing changes on an

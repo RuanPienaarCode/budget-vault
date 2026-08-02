@@ -8,11 +8,13 @@ var require_constants = __commonJS((exports2, module2) => {
     budgetFolder: "Finances/Budget",
     theme: "auto",
     openOnStartup: false,
-    onboarded: false
+    onboarded: false,
+    privacyLock: true
   };
+  var FEEDBACK_URL = "https://forms.gle/EVJKCuZxNQ9vJhTz6";
   var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, TYPE_ORDER, MONTHS };
+  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, TYPE_ORDER, MONTHS };
 });
 
 // src/util.js
@@ -321,6 +323,15 @@ var require_util = __commonJS((exports2, module2) => {
 // src/shell.js
 var require_shell = __commonJS((exports2, module2) => {
   var SHELL_HTML = `
+  <div class="splash-gate hidden" id="splashGate" role="group" aria-labelledby="gateTitle">
+    <div class="splash-inner">
+      <div class="splash-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></div>
+      <h1 class="splash-title" id="gateTitle">Budget Vault</h1>
+      <p class="splash-sub">Welcome back to Budget Vault, your private budget tool.</p>
+      <button type="button" class="btn-gradient splash-btn" id="gateEnter">Enter budget</button>
+    </div>
+  </div>
+
   <div class="drawer-overlay" id="drawerOverlay"></div>
 
   <nav class="app-drawer" id="appDrawer" aria-label="Main menu" inert>
@@ -395,6 +406,9 @@ var require_shell = __commonJS((exports2, module2) => {
     </div>
 
     <div class="ml-auto">
+      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" title="Import a bank statement CSV">
+        <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
+      </button>
       <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
     </div>
   </header>
@@ -4643,6 +4657,7 @@ var require_controller = __commonJS((exports2, module2) => {
           sec.classList.add("hidden");
         $("#view-connect").classList.remove("hidden");
         $("#periodPill").classList.add("hidden");
+        $("#topbarImport").classList.add("hidden");
         $("#connectPathNote").empty();
         $("#connectPathNote").append("Looked in ", el("code", {}, ctx.basePath()), " but found no Categories/ or Transactions/ inside it. Point the plugin at the Budget folder itself.");
         return;
@@ -4651,9 +4666,48 @@ var require_controller = __commonJS((exports2, module2) => {
       applyIdentity();
       $("#view-connect").classList.add("hidden");
       $("#periodPill").classList.remove("hidden");
+      $("#topbarImport").classList.remove("hidden");
       switchView(S.view === "connect" ? "dashboard" : S.view);
       toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
     }
+    let locked = false;
+    function focusEnter() {
+      const g = $("#splashGate");
+      $("#gateEnter").focus({ preventScroll: true });
+      g.scrollTop = 0;
+    }
+    function lockGate() {
+      if (locked)
+        return;
+      locked = true;
+      closeDrawer();
+      $("#splashGate").classList.remove("hidden");
+      $(".topbar").setAttribute("inert", "");
+      $(".bud-scroll").setAttribute("inert", "");
+      focusEnter();
+    }
+    async function unlockGate() {
+      if (!locked)
+        return;
+      locked = false;
+      $("#splashGate").classList.add("hidden");
+      $(".topbar").removeAttribute("inert");
+      $(".bud-scroll").removeAttribute("inert");
+      if (!S.loaded)
+        return connectVault();
+      const h = $(`#view-${S.view} h1`);
+      if (h) {
+        h.setAttribute("tabindex", "-1");
+        h.focus();
+      }
+    }
+    $("#gateEnter").addEventListener("click", () => {
+      unlockGate();
+    });
+    view.registerDomEvent(document, "visibilitychange", () => {
+      if (document.hidden && plugin.settings.privacyLock)
+        lockGate();
+    });
     let lastInputAt = 0;
     view.registerDomEvent(root, "input", () => {
       lastInputAt = Date.now();
@@ -4706,6 +4760,13 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#topbarAvatar").addEventListener("click", () => {
       app.setting.open();
       app.setting.openTabById("budget-app");
+    });
+    $("#topbarImport").addEventListener("click", () => {
+      if (!S.loaded)
+        return;
+      switchView("import");
+      if (!S.pendingImport)
+        $("#fileInput").click();
     });
     $("#pluginSettingsLink").addEventListener("click", () => {
       closeDrawer();
@@ -4816,6 +4877,10 @@ var require_controller = __commonJS((exports2, module2) => {
     return {
       start: async () => {
         applyTheme();
+        if (plugin.settings.privacyLock) {
+          lockGate();
+          return;
+        }
         await connectVault();
       },
       destroy: () => {
@@ -4833,6 +4898,12 @@ var require_controller = __commonJS((exports2, module2) => {
         await connectVault();
       },
       applyTheme,
+      applyPrivacyLock: () => {
+        if (plugin.settings.privacyLock)
+          lockGate();
+        else
+          unlockGate();
+      },
       hasDirty
     };
   }
@@ -5382,11 +5453,12 @@ tags: [finance, finance/budget, finance/budget/services]
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, TFile, normalizePath } = require("obsidian");
-  var { DEFAULT_SETTINGS } = require_constants();
+  var { DEFAULT_SETTINGS, FEEDBACK_URL } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr } = require_util();
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency"]);
+  var FEEDBACK_DESC = "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.";
 
   class BudgetSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -5411,6 +5483,12 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         this.plugin.settings.openOnStartup = v;
         await this.plugin.saveSettings();
       }));
+      new Setting(containerEl).setName("Privacy splash screen").setDesc('Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.').addToggle((t) => t.setValue(this.plugin.settings.privacyLock).onChange(async (v) => {
+        this.plugin.settings.privacyLock = v;
+        await this.plugin.saveSettings();
+        this.plugin.forEachView((ctl) => ctl.applyPrivacyLock());
+      }));
+      new Setting(containerEl).setName("Send feedback").setDesc(FEEDBACK_DESC).addButton((b) => b.setButtonText("Open feedback form").onClick(() => window.open(FEEDBACK_URL, "_blank")));
       new Setting(containerEl).setName("Budget data").setHeading().setDesc("Stored in Settings.md inside the budget folder, so they apply on every device.");
       const fmSection = containerEl.createDiv();
       this.renderMdSettings(fmSection);
@@ -5494,6 +5572,8 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         await super.setControlValue(key, value);
         if (key === "theme")
           this.plugin.forEachView((ctl) => ctl.applyTheme());
+        else if (key === "privacyLock")
+          this.plugin.forEachView((ctl) => ctl.applyPrivacyLock());
         else if (key === "budgetFolder")
           this.plugin.reloadViews();
         return;
@@ -5532,6 +5612,18 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           name: "Open on startup",
           desc: "Open the budget view automatically when Obsidian starts.",
           control: { type: "toggle", key: "openOnStartup", defaultValue: DEFAULT_SETTINGS.openOnStartup }
+        },
+        {
+          name: "Privacy splash screen",
+          desc: 'Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.',
+          control: { type: "toggle", key: "privacyLock", defaultValue: DEFAULT_SETTINGS.privacyLock }
+        },
+        {
+          name: "Send feedback",
+          desc: FEEDBACK_DESC,
+          render: (setting) => {
+            setting.addButton((b) => b.setButtonText("Open feedback form").onClick(() => window.open(FEEDBACK_URL, "_blank")));
+          }
         },
         {
           name: "Budget data",

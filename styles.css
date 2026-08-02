@@ -403,7 +403,23 @@
 .budget-app-root .topbar-avatar:hover { filter: brightness(1.1); }
 .budget-app-root .topbar-avatar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root.bud-dark .topbar-avatar { color: #05070f; }
-.budget-app-root .topbar .ml-auto { margin-left: auto; display: flex; align-items: center; }
+.budget-app-root .topbar .ml-auto { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+/* Header shortcut to the Import CSV view — same footprint as the avatar so the
+   two sit as a pair, but ghosted so the avatar stays the visual anchor. */
+.budget-app-root .topbar-icon-btn {
+  width: 36px; height: 36px; border-radius: 12px; flex: none;
+  display: grid; place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  padding: 0; cursor: pointer; box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.budget-app-root .topbar-icon-btn .ico svg { width: 18px; height: 18px; }
+.budget-app-root .topbar-icon-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
+.budget-app-root .topbar-icon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* Narrow panes / phones: menu + brand + period pill + avatar can't fit on one
    line, so the pill used to overlap the brand text and push the avatar off the
@@ -1358,3 +1374,114 @@
 .budget-app-root .cat-cell-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .budget-app-root .cat-cell-empty { color: var(--text-light); font-style: italic; }
 .budget-app-root .cat-cell .category-select { width: 100%; }
+
+/* ============================================================
+   PRIVACY SPLASH GATE
+   Opaque cover over the whole pane until "Enter budget" is
+   tapped. Must be fully opaque (not translucent glass like the
+   drawer overlay) — the point is that nothing behind it reads,
+   including in an OS app-switcher snapshot. z-index clears the
+   topbar (200) and the drawer (see APP SHELL above).
+   ============================================================ */
+.budget-app-root .splash-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  /* Opaque base FIRST — the drifting layers below are translucent, so this is
+     the only thing standing between a shoulder-surfer and the balances. */
+  background-color: var(--bg-0);
+  overflow: hidden;                      /* clip the oversized drift layers */
+}
+
+/* Two translucent gradient layers drifting against each other at different
+   speeds, so the pattern never visibly repeats. Both are inset well beyond the
+   edges: the transforms move them by a few percent, and a layer sized to the
+   box exactly would swing a hard edge into view. Animating `transform` only
+   (never background-position or the gradient stops) keeps this on the
+   compositor — it costs nothing on a phone and can't repaint the text above. */
+.budget-app-root .splash-gate::before,
+.budget-app-root .splash-gate::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  will-change: transform;
+}
+.budget-app-root .splash-gate::before {
+  background-image:
+    radial-gradient(38% 42% at 22% 26%, rgba(110,231,183,.30), transparent 62%),
+    radial-gradient(42% 40% at 78% 22%, rgba(16,185,129,.26), transparent 60%);
+  animation: splash-drift-a 26s ease-in-out infinite;
+}
+.budget-app-root .splash-gate::after {
+  background-image:
+    radial-gradient(40% 38% at 68% 74%, rgba(13,148,136,.24), transparent 62%),
+    radial-gradient(34% 34% at 26% 80%, rgba(251,191,36,.16), transparent 62%);
+  animation: splash-drift-b 34s ease-in-out infinite;
+}
+/* Light mode carries the same hues at lower strength — the tints are mixed
+   against white there, so the dark-mode opacities read as muddy wash. */
+.budget-app-root:not(.bud-dark) .splash-gate::before { opacity: .55; }
+.budget-app-root:not(.bud-dark) .splash-gate::after { opacity: .5; }
+
+@keyframes splash-drift-a {
+  0%, 100% { transform: translate3d(-4%, -3%, 0) scale(1.04); }
+  50%      { transform: translate3d(5%, 4%, 0) scale(1.16); }
+}
+@keyframes splash-drift-b {
+  0%, 100% { transform: translate3d(4%, 3%, 0) scale(1.14); }
+  50%      { transform: translate3d(-5%, -4%, 0) scale(1.02); }
+}
+/* Motion is decoration here — the gate works identically frozen. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .splash-gate::before,
+  .budget-app-root .splash-gate::after { animation: none; }
+}
+
+.budget-app-root .splash-inner {
+  position: relative;                    /* above both drift layers */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  max-width: 340px;
+}
+.budget-app-root .splash-logo {
+  width: 76px;
+  height: 76px;
+  border-radius: 26px;
+  margin-bottom: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  box-shadow: 0 18px 44px -18px rgba(16,185,129,.7);
+  color: #fff;
+}
+.budget-app-root .splash-logo .ico svg { width: 40px; height: 40px; }
+.budget-app-root .splash-title {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+  color: var(--text-primary);
+}
+.budget-app-root .splash-sub {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  /* Even two-line break instead of a stranded last word. Safari 17.4+; older
+     engines (iOS 15 floor) just get the default greedy wrap, which is fine. */
+  text-wrap: balance;
+}
+.budget-app-root .splash-btn {
+  margin-top: 1.6rem;
+  padding: 0.7rem 2rem;
+  font-size: 0.95rem;
+}

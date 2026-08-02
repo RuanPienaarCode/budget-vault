@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 const { yamlStr } = require('./util');
@@ -13,6 +13,9 @@ const { yamlStr } = require('./util');
    API binds a control to this.plugin.settings[key] by default, so these four
    route through the getControlValue/setControlValue overrides instead. */
 const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency']);
+
+/* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
+const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
 
 class BudgetSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -65,6 +68,24 @@ class BudgetSettingTab extends PluginSettingTab {
           this.plugin.settings.openOnStartup = v;
           await this.plugin.saveSettings();
         }));
+
+    new Setting(containerEl)
+      .setName('Privacy splash screen')
+      .setDesc('Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.')
+      .addToggle(t => t
+        .setValue(this.plugin.settings.privacyLock)
+        .onChange(async v => {
+          this.plugin.settings.privacyLock = v;
+          await this.plugin.saveSettings();
+          this.plugin.forEachView(ctl => ctl.applyPrivacyLock());
+        }));
+
+    new Setting(containerEl)
+      .setName('Send feedback')
+      .setDesc(FEEDBACK_DESC)
+      .addButton(b => b
+        .setButtonText('Open feedback form')
+        .onClick(() => window.open(FEEDBACK_URL, '_blank')));
 
     new Setting(containerEl).setName('Budget data').setHeading()
       .setDesc('Stored in Settings.md inside the budget folder, so they apply on every device.');
@@ -139,8 +160,8 @@ class BudgetSettingTab extends PluginSettingTab {
      1.13 renders a tab from getSettingDefinitions() and only falls back to
      display() when it returns an empty array, so every older version keeps
      the imperative tab above, untouched and unversion-checked. Both describe
-     the same eight settings — add one here and you must add it there too, or
-     the two versions drift apart for users.
+     the same settings — add one here and you must add it there too, or the
+     two versions drift apart for users.
 
      getSettingDefinitions() runs on every update(), so it stays cheap: no
      vault reads, no awaits. mdSettings() reads the already-parsed frontmatter
@@ -175,6 +196,7 @@ class BudgetSettingTab extends PluginSettingTab {
       if (key === 'budgetFolder') value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
       await super.setControlValue(key, value);
       if (key === 'theme') this.plugin.forEachView(ctl => ctl.applyTheme());
+      else if (key === 'privacyLock') this.plugin.forEachView(ctl => ctl.applyPrivacyLock());
       else if (key === 'budgetFolder') this.plugin.reloadViews();
       return;
     }
@@ -217,6 +239,20 @@ class BudgetSettingTab extends PluginSettingTab {
         name: 'Open on startup',
         desc: 'Open the budget view automatically when Obsidian starts.',
         control: { type: 'toggle', key: 'openOnStartup', defaultValue: DEFAULT_SETTINGS.openOnStartup },
+      },
+      {
+        name: 'Privacy splash screen',
+        desc: 'Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.',
+        control: { type: 'toggle', key: 'privacyLock', defaultValue: DEFAULT_SETTINGS.privacyLock },
+      },
+      {
+        name: 'Send feedback',
+        desc: FEEDBACK_DESC,
+        render: setting => {
+          setting.addButton(b => b
+            .setButtonText('Open feedback form')
+            .onClick(() => window.open(FEEDBACK_URL, '_blank')));
+        },
       },
       {
         name: 'Budget data',
