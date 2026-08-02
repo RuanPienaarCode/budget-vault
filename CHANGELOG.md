@@ -3,6 +3,21 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.29 — 2026-08-02
+
+### Fixed
+
+- **A very short statement could import the running balance as the amount.**
+  On a statement with no header row and only three transactions, the importer
+  had too little to work with to tell which of the two number columns was the
+  amount and which was the running balance — and it picked wrong, silently. A
+  R250 expense imported as R4 750 of income, and nothing on the review screen
+  said so. The importer now recognises when a file is too short to prove which
+  column is which and asks you instead, using the same "which column is which?"
+  screen an unrecognised bank already gets. Longer statements are unaffected —
+  from four transactions up there is enough of a balance trail to settle it
+  automatically, as before.
+
 ## 1.0.28 — 2026-08-02
 
 ### Added

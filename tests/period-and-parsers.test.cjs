@@ -280,6 +280,38 @@ const NEDBANK_CHEQUE = [
   // 2917.04 instead of 5500.00 and put a fictional 10 812 income row in July.
   eq(shape.iAmount, 2, 'the amount wins over the trailing running-balance column');
 }
+/* Two trailing numeric columns are either amount+balance or a Debit/Credit
+   pair, and only the running-balance test can tell them apart. Under four data
+   rows reconcileAmounts refuses to answer (three pairs of agreement is as
+   likely to be coincidence as proof) — and "unprovable" must NOT collapse into
+   "definitely a Debit/Credit pair", which is what reading the last column as
+   the amount would mean. On this shape that silently imports the running
+   BALANCE as every transaction: 4750.00 instead of -250.00, an expense booked
+   as income. Null sends it to the manual column mapper, which is the whole
+   point of having one. */
+const SHORT_HEADERLESS = [
+  'Account 1234',
+  'Statement',
+  '01Jul2026,ACME GROCER,-250.00,4750.00',
+  '02Jul2026,SAMPLE FUEL CO,-600.50,4149.50',
+  '03Jul2026,SALARY CREDIT,5000.00,9149.50',
+].join('\n');
+{
+  const rows = parseCsv(SHORT_HEADERLESS);
+  eq(detectHeaderlessColumns(rows, true), null,
+    'three data rows cannot prove which trailing column is the amount — ask, never guess');
+  eq(detectStatementColumns(rows, true), null,
+    'and the decision function passes that through, so the import view opens the mapper');
+}
+/* The same shape one row longer DOES prove itself, so the guard above must not
+   have cost the ordinary case — this is the negative control for it. */
+{
+  const shape = detectHeaderlessColumns(parseCsv(
+    SHORT_HEADERLESS + '\n04Jul2026,GENERIC CAFE,-120.25,9029.25\n'), true);
+  ok(shape, 'four data rows resolve');
+  eq(shape.iAmount, 2, 'the amount column wins once the balances can prove it');
+  eq(shape.iBalance, 3, 'and the trailing column is recorded as the balance');
+}
 /* Nedbank's credit card is the same headerless preamble, but a different shape:
    TWO leading date columns (posted, transacted) and a single amount at the
    right, with no balance. Signs come from the file — fees negative, payments
