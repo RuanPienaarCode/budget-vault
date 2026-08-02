@@ -302,8 +302,11 @@ function mountApp(view) {
     $('.topbar').removeAttribute('inert');
     $('.bud-scroll').removeAttribute('inert');
     // First unlock: this is where the vault is actually read. Later unlocks
-    // land back on the view that was already rendered.
-    if (!S.loaded) return connectVault();
+    // land back on the view that was already rendered. Either way focus has to
+    // be moved off the gate button that just went away — returning early on the
+    // first unlock left it on <body>, so the very first Tab after opening the
+    // plugin started from the top of Obsidian rather than from the view.
+    if (!S.loaded) await connectVault();
     const h = $(`#view-${S.view} h1`);
     if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
   }

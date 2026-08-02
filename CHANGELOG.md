@@ -3,6 +3,40 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.30 — 2026-08-02
+
+### Fixed
+
+- **A second table in a budget or transactions file was merged into the first.**
+  The file reader collected every table row in a file without noticing where one
+  table ended and the next began, and every reader then dropped just one header
+  row. So if a `Budgets/YYYY-MM.md` or `Transactions/<account>/YYYY-MM.md` file
+  had a second table under it — a note to yourself, something a script wrote —
+  its rows were folded into the real one and its heading row turned into a
+  budget line: a category literally called "Category", counted in your totals.
+  Because the app rewrites these files from what it read, the next save made
+  that line permanent. Files now stop at the end of the first table, which is
+  also where the table visibly ends when you look at the note. Nothing the app
+  writes itself could trigger this, and no existing file in a normal budget
+  folder is affected — but a hand-edited one could be, and it changed your data
+  silently rather than complaining.
+
+- **The "which column is which?" screen opened on a setting it would reject.**
+  Date and Description both started on the first column, so the first press of
+  "Use these columns" always failed with "Date and Description are the same
+  column". It now opens with the two pointed at different columns, picked by
+  reading the file the same way automatic detection does.
+
+- **A warning on that screen could outlive the problem it described.** Correct
+  the mapping after a rejected attempt and the old red sentence stayed on
+  screen. It now clears when you press the button.
+
+- **Opening the plugin left keyboard focus outside the app.** After tapping
+  "Enter budget" for the first time in a session, focus stayed on the page
+  behind rather than moving to the view, so the first Tab started from the top
+  of Obsidian instead of from your budget. Later unlocks already did this
+  correctly; the first one now matches.
+
 ## 1.0.29 — 2026-08-02
 
 ### Fixed

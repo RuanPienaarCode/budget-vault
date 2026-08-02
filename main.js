@@ -114,7 +114,12 @@ var require_util = __commonJS((exports2, module2) => {
     const rows = [];
     for (const line of text.split(/\r?\n/)) {
       const t = line.trim();
-      if (!t.startsWith("|") || /^\|[\s:|-]+\|$/.test(t))
+      if (!t.startsWith("|")) {
+        if (rows.length)
+          break;
+        continue;
+      }
+      if (/^\|[\s:|-]+\|$/.test(t))
         continue;
       let inner = t.slice(1);
       if (endsWithBarePipe(inner))
@@ -4499,9 +4504,24 @@ var require_import = __commonJS((exports2, module2) => {
       $("#impMapWarn").textContent = "";
       const colLabel = (i) => {
         const name = header && (header[i] || "").trim();
-        const sample = rows[start] && (rows[start][i] || "").trim() || "";
-        return `${i + 1}${name ? ` — ${name}` : ""}${!name && sample ? ` — e.g. ${sample.slice(0, 22)}` : ""}`;
+        const sample2 = rows[start] && (rows[start][i] || "").trim() || "";
+        return `${i + 1}${name ? ` — ${name}` : ""}${!name && sample2 ? ` — e.g. ${sample2.slice(0, 22)}` : ""}`;
       };
+      const sample = rows[start] || [];
+      const looksDate = (i) => !!parseStatementDate((sample[i] || "").trim(), loc.dayFirst);
+      const looksText = (i) => {
+        const v = (sample[i] || "").trim();
+        return !!v && normalizeAmount(v) == null && !looksDate(i);
+      };
+      const firstOr = (pred, fallback) => {
+        for (let i = 0;i < width; i++)
+          if (pred(i))
+            return i;
+        return fallback;
+      };
+      const defDate = firstOr(looksDate, 0);
+      const defDesc = firstOr((i) => i !== defDate && looksText(i), defDate === 0 ? 1 : 0);
+      const fallbackFor = (key) => key === "iDate" ? defDate : key === "iDesc" ? defDesc : -1;
       const fields = $("#impMapFields");
       fields.empty();
       const selects = {};
@@ -4512,7 +4532,7 @@ var require_import = __commonJS((exports2, module2) => {
         for (let i = 0;i < width; i++)
           sel.append(el("option", { value: String(i) }, colLabel(i)));
         const cur = detected ? detected[f.key] : -1;
-        sel.value = String(cur != null && cur >= 0 ? cur : f.required ? 0 : -1);
+        sel.value = String(cur != null && cur >= 0 ? cur : fallbackFor(f.key));
         selects[f.key] = sel;
         fields.append(el("label", { class: "imp-map-field" }, el("span", { class: "imp-map-label" }, f.label + (f.required ? "" : " (optional)")), sel, el("span", { class: "imp-map-hint" }, f.hint)));
       }
@@ -4526,6 +4546,7 @@ var require_import = __commonJS((exports2, module2) => {
           $("#importReview").classList.remove("hidden");
       };
       $("#impMapApply").onclick = async () => {
+        $("#impMapWarn").textContent = "";
         const map = { headerIdx, dataStart: start, iExtra: -1 };
         for (const f of MAP_FIELDS)
           map[f.key] = parseInt(selects[f.key].value, 10);
@@ -4934,7 +4955,7 @@ var require_controller = __commonJS((exports2, module2) => {
       $(".topbar").removeAttribute("inert");
       $(".bud-scroll").removeAttribute("inert");
       if (!S.loaded)
-        return connectVault();
+        await connectVault();
       const h = $(`#view-${S.view} h1`);
       if (h) {
         h.setAttribute("tabindex", "-1");

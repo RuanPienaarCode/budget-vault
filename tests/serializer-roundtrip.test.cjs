@@ -159,4 +159,52 @@ ok(/tags:/.test(raw), 'tags frontmatter must survive serialize');
 ok(/account:\s*"FNB Cheque"/.test(raw), 'serializer must (re)write the account key');
 ok(/month:\s*2026-07/.test(raw), 'serializer must (re)write the month key');
 
-console.log(`PASS — serializer round-trip intact (${checks} assertions: escaping, amounts, real serializeTxFile, frontmatter preservation).`);
+/* ---- 5. parseMdTable stops at the END of the first table ----
+   It used to collect every `|` line in the whole file with no notion of where
+   one table ends and the next begins. Every call site does `.slice(1)` — "drop
+   the one header row" — so a SECOND table in a Budgets/ or Transactions/ file
+   was merged into the first and its header row became a data row: a category
+   literally named "Category", type "Type", amount 0, rendering in the budget
+   list and counting toward totals. Worse than cosmetic, because saveBudget
+   rebuilds the file from parsed state, so the phantom becomes real on the next
+   save. A blank line terminates a table in markdown — Obsidian renders it that
+   way — so agreeing with the renderer is also what makes this correct. */
+{
+  const twoTables = [
+    '---', 'period: 2026-08', '---', '',
+    '# Budget — 2026-08', '',
+    'Some prose above the table.', '',
+    '| Category | Type | Amount | Notes |',
+    '|----------|------|-------:|-------|',
+    '| Groceries | expense | 2750.00 | |',
+    '| Medical | expense | 7050.00 | |', '',
+    '## Notes', '',
+    'Prose the user wrote.', '',
+    '| Category | Type | Amount |',
+    '|----------|------|-------:|',
+    '| Clothing | expense | 500.00 |', '',
+  ].join('\n');
+  const rows = parseMdTable(twoTables);
+  eq(rows.length, 3, 'only the first table is returned (header + its two rows)');
+  eq(rows[0][0], 'Category', 'row 0 is still the header the callers slice off');
+  const cats = rows.slice(1).map(r => r[0]);
+  eq(cats, ['Groceries', 'Medical'], 'no phantom row and nothing from the second table');
+  ok(!cats.includes('Clothing'), "the second table's data must not leak in");
+  // The phantom is the whole point: the second table's HEADER became a row.
+  ok(!rows.slice(1).some(r => r[1] === 'Type'), 'a header row must never survive as data');
+}
+{
+  // Negative control for the stop condition: a file with exactly one table must
+  // be completely unaffected, trailing prose and all.
+  const oneTable = [
+    '| Date | Description | Amount |',
+    '|------|-------------|-------:|',
+    '| 2026-07-01 | ACME GROCER | -250.00 |', '',
+    'A closing paragraph.', '',
+  ].join('\n');
+  const rows = parseMdTable(oneTable);
+  eq(rows.length, 2, 'a single-table file still yields header + its one row');
+  eq(rows[1][1], 'ACME GROCER', 'and the row itself is untouched');
+}
+
+console.log(`PASS — serializer round-trip intact (${checks} assertions: escaping, amounts, real serializeTxFile, frontmatter preservation, single-table parse).`);
