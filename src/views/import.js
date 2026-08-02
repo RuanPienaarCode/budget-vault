@@ -6,17 +6,8 @@
    Google Sheets / Excel export works the same as a bank's. Date order for
    ambiguous DD/MM vs MM/DD dates follows the country profile. */
 
-const { el, parseCsv, parseStatementDate, normalizeAmount } = require('../util');
+const { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require('../util');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
-
-/* Header-name aliases, lowercase. Exact match wins in array order; amount can
-   come from a single signed column OR a debit + credit pair (Capitec "Money
-   In"/"Money Out", Nedbank/Absa/Standard Bank Debit/Credit statements). */
-const DATE_COLS = ['value date', 'date', 'transaction date', 'posting date', 'trans date'];
-const DESC_COLS = ['description', 'title', 'narrative', 'details', 'transaction description', 'reference', 'payee', 'memo'];
-const AMOUNT_COLS = ['amount', 'transaction amount', 'amount (zar)', 'value'];
-const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out', 'withdrawal', 'withdrawals', 'paid out'];
-const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
 
 module.exports = function registerImport(ctx) {
   const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
@@ -24,8 +15,10 @@ module.exports = function registerImport(ctx) {
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
     const loc = locale();
+    // "tested with" rather than "works with": other banks are expected to work,
+    // and the review screen reports how much it could verify for each file.
     $('#importSubNote').textContent = loc.banks
-      ? `Bank statement exports — ${loc.banks} — or your own CSV`
+      ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV`
       : 'Bank statement CSV exports — or any CSV with Date / Description / Amount columns';
     if (loc.importHint) $('#importDropHint').textContent = loc.importHint;
   }
@@ -52,15 +45,24 @@ module.exports = function registerImport(ctx) {
   function dedupIndex() {
     return buildIndex(S.txFiles);
   }
-  function detectAccountLabel(filename) {
+  function detectAccountLabel(filename, rows) {
     // Discovery-style "Label_12345_..." or a bare account number ("12345678901.csv",
     // "12345678901 (3).csv" — FNB names exports after the account alone). The bare
     // form needs 6+ digits so a leading year ("2026-07 export.csv") never matches.
     const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) ||
               filename.match(/^(\d{6,})\D/);
-    if (m) {
-      const acc = S.accounts.find(a => a.account_number === m[1]);
-      if (acc) return acc.tx_label || acc.name;
+    const byNumber = n => {
+      const acc = S.accounts.find(a => a.account_number === n);
+      return acc ? (acc.tx_label || acc.name) : '';
+    };
+    if (m) { const l = byNumber(m[1]); if (l) return l; }
+    // Nedbank prints "Account Number :,1041005172" in its preamble — the only
+    // handle left once the file has been renamed on the way out of the browser.
+    for (const r of (rows || []).slice(0, 10)) {
+      const i = r.findIndex(c => /account\s*number/i.test(c || ''));
+      if (i === -1) continue;
+      const digits = ((r[i + 1] || r[i]).match(/\d{4,}/) || [])[0];
+      if (digits) { const l = byNumber(digits); if (l) return l; }
     }
     return '';
   }
@@ -69,34 +71,26 @@ module.exports = function registerImport(ctx) {
     const text = await file.text();
     const rows = parseCsv(text);
     if (!rows.length) return toast('Empty CSV', true);
-    let headerIdx = rows.findIndex(r => {
-      const low = r.map(c => c.trim().toLowerCase());
-      const has = names => names.some(n => low.includes(n));
-      return (has(DATE_COLS) || low.some(c => c.includes('date'))) &&
-             (has(AMOUNT_COLS) || (has(DEBIT_COLS) && has(CREDIT_COLS)));
-    });
-    if (headerIdx === -1) return toast('Could not find a header row with Date + Amount (or Debit/Credit) columns', true);
-    const header = rows[headerIdx].map(c => c.trim());
-    const low = header.map(c => c.toLowerCase());
-    const col = names => { for (const n of names) { const i = low.indexOf(n); if (i !== -1) return i; } return -1; };
-    // Both fall back to a substring match, mirroring the loose test the header
-    // row itself was detected with — otherwise a file headed "Date Posted" or
-    // "Effective Date" passes detection and then fails as "missing columns".
-    let iDate = col(DATE_COLS);
-    if (iDate === -1) iDate = low.findIndex(c => c.includes('date'));
-    let iDesc = col(DESC_COLS);
-    if (iDesc === -1) iDesc = low.findIndex(c => c.includes('desc'));  // e.g. "Transaction Descr."
-    const iAmount = col(AMOUNT_COLS);
-    const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
-    if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1)))
-      return toast('Missing columns — need Date, Title/Description, and Amount (or Debit + Credit)', true);
+    const loc = locale();
+    const map = detectStatementColumns(rows, loc.dayFirst);
+    // Nothing resolved — but the file is readable, so ask instead of refusing.
+    // This is what makes a bank nobody has tested importable at all.
+    if (!map) return showColumnMapper(rows, file, null);
+    await runImport(rows, map, file);
+  }
+
+  /* Parse the rows under a column map (auto-detected or chosen by hand) and put
+     the result on the review screen. Split out from handleCsvFile so the manual
+     mapper re-enters at exactly the same place with exactly the same rules. */
+  async function runImport(rows, map, file) {
+    const loc = locale();
+    const { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra } = map;
+    const dataRows = rows.slice(map.dataStart);
 
     const index = dedupIndex();
     const items = [];
     let skipped = 0;
-    const label0 = detectAccountLabel(file.name);
-    const dataRows = rows.slice(headerIdx + 1);
-    const loc = locale();
+    const label0 = detectAccountLabel(file.name, rows);
 
     /* Auto-categorisation is O(rows × rules); chunk with a progress bar for
        anything sizeable so the UI stays responsive. */
@@ -104,6 +98,10 @@ module.exports = function registerImport(ctx) {
     // against a typical rule set is a few milliseconds, so the bar used to
     // flash for nothing.
     const rules = prepareRules();
+    /* Every row's (amount, balance) pair in file order — including the rows that
+       never become transactions, because an unbroken run of balances is what
+       makes the reconciliation below conclusive. */
+    const ledger = [];
     const showBar = dataRows.length > 1500;
     if (showBar) importProgress('start', 'Categorising transactions…');
     const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
@@ -111,6 +109,13 @@ module.exports = function registerImport(ctx) {
       const r = dataRows[i];
       const rawDate = (r[iDate] || '').trim();
       let desc = (r[iDesc] || '').trim();
+      // A second text column, only ever set by hand in the mapper — statements
+      // that split the counterparty from the reference ("to"/"from" columns)
+      // need both to describe the transaction.
+      if (iExtra !== -1 && iExtra !== iDesc) {
+        const extra = (r[iExtra] || '').trim();
+        if (extra && extra !== desc) desc = desc ? `${desc} — ${extra}` : extra;
+      }
       // Some banks suffix card rows with a country code (Discovery: " ZA") —
       // strip it so descriptions (and therefore dedup keys + categorisation)
       // stay clean. Which suffix, if any, comes from the country profile.
@@ -126,19 +131,33 @@ module.exports = function registerImport(ctx) {
         const d = normalizeAmount(r[iDebit]);
         if (d != null && d !== 0) amount = -Math.abs(d);
       }
-      if (rawDate && desc && amount != null && amount !== 0) {
-        const date = parseStatementDate(rawDate, loc.dayFirst);
-        if (!date) { skipped++; }
-        else {
-          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
-        }
-      } else if (rawDate || desc) { skipped++; }
+      if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
+      const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
+      if (date && desc && amount != null && amount !== 0) {
+        items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
+      } else if (date || amount != null) {
+        // Looked like a transaction and wasn't usable — worth reporting.
+        skipped++;
+      }
+      // Anything else (a preamble line, a blank, a trailing disclaimer) carries
+      // neither a date nor an amount and is ignored silently. Counting those as
+      // "unparseable" made a hand-mapped statement look broken when it wasn't.
       if (showBar && (i % CHUNK === CHUNK - 1)) {
         importProgress('set', null, (i + 1) / dataRows.length * 0.9);
         await new Promise(res => setTimeout(res, 0));
       }
     }
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
+    /* Prove the sign convention against the statement's own balance column.
+       This is what lets a bank nobody has tested import safely: if its single
+       Amount column lists debits as positive, the balances say so and every
+       amount is corrected here. Only a signed Amount column is ever flipped —
+       a Debit/Credit pair is already normalised by name above, so a failure
+       there means something else is off and is reported, not "fixed".
+       A file that doesn't prove itself is imported UNCHANGED and flagged in the
+       review; silent correction on a guess is the one outcome to avoid. */
+    const rec = iBalance !== -1 ? reconcileAmounts(ledger) : null;
+    if (rec && rec.verified && rec.flip && iAmount !== -1) for (const it of items) it.amount = -it.amount;
     /* The file's own date span. The near-duplicate pass treats "this row is no
        longer in the statement" as evidence it settled and was rewritten, so it
        may only reason about vault rows the statement actually covers. */
@@ -147,10 +166,99 @@ module.exports = function registerImport(ctx) {
       if (!range) range = { min: it.date, max: it.date };
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
-    S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name };
+    S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name,
+      reconcile: rec ? { ...rec, flipped: rec.verified && rec.flip && iAmount !== -1 } : null,
+      // Kept so "Columns wrong?" can reopen the mapper on the SAME file without
+      // asking the user to find and drop it again.
+      rows, map, file };
+    $('#importMap').classList.add('hidden');
     importShown = IMPORT_PAGE;   // a fresh file starts at the first page
     renderImportReview();
     if (showBar) importProgress('done');
+  }
+
+  /* ---------------------------------------------------------------- mapper
+     Auto-detection is the fast path and runs first; this is how the user
+     overrides it — either because nothing resolved (an untested bank) or
+     because the review screen showed the wrong column picked. Prefilled with
+     whatever WAS detected, so it's an adjustment rather than a blank form. */
+  const MAP_FIELDS = [
+    { key: 'iDate', label: 'Date', required: true, hint: 'When the transaction happened' },
+    { key: 'iDesc', label: 'Description', required: true, hint: 'The payee or reference' },
+    { key: 'iExtra', label: 'Extra detail', required: false, hint: 'Optional second text column — added to the description' },
+    { key: 'iAmount', label: 'Amount', required: false, hint: 'One signed column: negative is money out' },
+    { key: 'iDebit', label: 'Money out', required: false, hint: 'Use instead of Amount when out and in are separate columns' },
+    { key: 'iCredit', label: 'Money in', required: false, hint: 'The partner column to Money out' },
+    { key: 'iBalance', label: 'Balance', required: false, hint: 'Optional — lets the amounts be checked against the running balance' },
+  ];
+
+  function showColumnMapper(rows, file, detected) {
+    const loc = locale();
+    // Widest row wins: a preamble or a ragged total line must not decide how
+    // many columns the user is offered.
+    const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
+    if (!width) return toast('Empty CSV', true);
+    const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
+    const header = headerIdx >= 0 ? rows[headerIdx] : null;
+    // A row that looks like data is the useful preview; failing that, show the
+    // top of the file so the user can at least see what they're mapping.
+    let start = detected ? detected.dataStart : rows.findIndex(r =>
+      r.length >= 3 && r.some(c => parseStatementDate(c, loc.dayFirst)) && r.some(c => normalizeAmount(c) != null));
+    if (start == null || start < 0) start = 0;
+
+    $('#importReview').classList.add('hidden');
+    $('#importMap').classList.remove('hidden');
+    $('#impMapNote').textContent = detected
+      ? `${file.name} — change any column the importer got wrong, then re-read the file.`
+      : `${file.name} — this export isn't one the importer recognises. Point it at the right columns and it will import like any other.`;
+    $('#impMapWarn').textContent = '';
+
+    const colLabel = i => {
+      const name = header && (header[i] || '').trim();
+      const sample = (rows[start] && (rows[start][i] || '').trim()) || '';
+      return `${i + 1}${name ? ` — ${name}` : ''}${!name && sample ? ` — e.g. ${sample.slice(0, 22)}` : ''}`;
+    };
+    const fields = $('#impMapFields'); fields.empty();
+    const selects = {};
+    for (const f of MAP_FIELDS) {
+      const sel = el('select', { class: 'form-select form-select-sm', id: `impMap_${f.key}`, 'aria-label': f.label });
+      if (!f.required) sel.append(el('option', { value: '-1' }, '(none)'));
+      for (let i = 0; i < width; i++) sel.append(el('option', { value: String(i) }, colLabel(i)));
+      const cur = detected ? detected[f.key] : -1;
+      sel.value = String(cur != null && cur >= 0 ? cur : (f.required ? 0 : -1));
+      selects[f.key] = sel;
+      fields.append(el('label', { class: 'imp-map-field' },
+        el('span', { class: 'imp-map-label' }, f.label + (f.required ? '' : ' (optional)')),
+        sel, el('span', { class: 'imp-map-hint' }, f.hint)));
+    }
+
+    // Preview the rows as they'll actually be read, so a wrong pick is visible
+    // here rather than discovered in the review table.
+    const prev = $('#impMapPreview'); prev.empty();
+    prev.append(el('thead', {}, el('tr', {}, ...Array.from({ length: width }, (_, i) =>
+      el('th', { scope: 'col' }, colLabel(i))))));
+    prev.append(el('tbody', {}, ...rows.slice(start, start + 5).map(r =>
+      el('tr', {}, ...Array.from({ length: width }, (_, i) => el('td', {}, (r[i] || '').trim()))))));
+
+    $('#impMapCancel').onclick = () => {
+      $('#importMap').classList.add('hidden');
+      if (S.pendingImport) $('#importReview').classList.remove('hidden');
+    };
+    $('#impMapApply').onclick = async () => {
+      const map = { headerIdx, dataStart: start, iExtra: -1 };
+      for (const f of MAP_FIELDS) map[f.key] = parseInt(selects[f.key].value, 10);
+      // Refuse the two combinations that can't produce a transaction, and say
+      // which — an empty review table is a far worse answer than a sentence.
+      if (map.iDate === map.iDesc)
+        return ($('#impMapWarn').textContent = 'Date and Description are the same column — pick different ones.');
+      if (map.iAmount === -1 && (map.iDebit === -1 || map.iCredit === -1))
+        return ($('#impMapWarn').textContent = 'Pick an Amount column, or both Money out and Money in.');
+      await runImport(rows, map, file);
+      if (!S.pendingImport || !S.pendingImport.items.length) {
+        $('#importMap').classList.remove('hidden');
+        $('#impMapWarn').textContent = 'That mapping produced no transactions — check the Date column especially.';
+      }
+    };
   }
 
   function importProgress(phase, text, frac) {
@@ -206,6 +314,20 @@ module.exports = function registerImport(ctx) {
     $('#impLegend').append(
       el('span', { class: 'imp-legend-swatch' }),
       el('span', {}, `${curCount} in the current period — ${periodTitle(cur)}`));
+    /* Say out loud whether the file proved its own amounts. A bank this app has
+       never been tested against is perfectly importable — but the user is the
+       one who should decide how much to trust it, and that decision needs the
+       evidence, not silence. */
+    const rec = p.reconcile;
+    const recEl = $('#impReconcile');
+    recEl.empty();
+    recEl.classList.toggle('hidden', !rec);
+    recEl.classList.toggle('imp-reconcile-warn', !!rec && !rec.verified);
+    if (rec) recEl.textContent = rec.flipped
+      ? 'This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below.'
+      : rec.verified
+        ? 'Amounts check out against this statement’s own balance column.'
+        : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
 
     const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
@@ -325,5 +447,14 @@ module.exports = function registerImport(ctx) {
     ctx.switchView('transactions');
   }
 
-  ctx.provide({ handleCsvFile, commitImport, renderImport });
+  /* "Columns wrong?" on the review screen — reopen the mapper against the file
+     already in hand, prefilled with the mapping that produced what's on screen.
+     Nothing is committed yet at this point, so re-reading is free. */
+  function remapImport() {
+    const p = S.pendingImport;
+    if (!p || !p.rows) return toast('Drop a statement first', true);
+    showColumnMapper(p.rows, p.file, p.map);
+  }
+
+  ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
 };

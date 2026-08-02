@@ -127,7 +127,12 @@ const PROFILES = {
     thousands: ' ', decimal: ',',
     dayFirst: true,
     stripDescSuffix: ' ZA',
-    banks: 'Discovery, FNB, Capitec, Nedbank, Standard Bank, Absa',
+    // Only banks whose real exports have actually been imported end to end.
+    // Others very likely work — the importer reads columns by name and falls
+    // back to reading the layout by shape — but naming one here reads as a
+    // promise, and a statement that imports with the wrong sign is worse than
+    // one that doesn't import at all.
+    banks: 'Discovery, FNB, Capitec, Nedbank',
     importHint: null,   // keep the static Discovery-filename hint in the shell
     authority: 'SARS',
     taxIntro: 'Track a SARS return season here — progress steps, the documents you need (IRP5, IT3(b), medical certificate, …) and the files themselves, stored in the vault.',

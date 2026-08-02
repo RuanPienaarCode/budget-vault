@@ -353,7 +353,9 @@ const SHELL_HTML = `
             <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
-              <p>Columns are matched by header name, so any CSV with a header row of
+              <p>Most banks import as-is — columns are matched by header name, the layout is read
+                from the rows when there's no header, and if neither works you'll be asked which
+                column is which. To build your own, any CSV with a header row of
                 <code>Date,Title,Amount</code> imports fine. In Google Sheets or Excel, make three columns:</p>
               <ul>
                 <li><strong>Date</strong> — <code>2026-07-01</code> or <code>01/07/2026</code></li>
@@ -371,14 +373,33 @@ const SHELL_HTML = `
             </div>
           </div>
         </div>
+        <div class="card hidden" id="importMap">
+          <div class="card-h" style="align-items:center">
+            <div>
+              <h2>Which column is which?</h2>
+              <div class="sub" id="impMapNote"></div>
+            </div>
+            <div class="row">
+              <button class="btn-ghost" id="impMapCancel">Cancel</button>
+              <button class="btn-gradient" id="impMapApply">Use these columns</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="imp-map-fields" id="impMapFields"></div>
+            <div class="table-responsive"><table class="table imp-map-preview" id="impMapPreview"></table></div>
+            <div class="sub" id="impMapWarn"></div>
+          </div>
+        </div>
         <div class="card hidden" id="importReview">
           <div class="card-h" style="align-items:center">
             <div>
               <h2>Review import</h2>
               <div class="sub" id="impStats"></div>
               <div class="sub imp-legend" id="impLegend"></div>
+              <div class="sub imp-reconcile hidden" id="impReconcile"></div>
             </div>
             <div class="row">
+              <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
               <select id="impAccount" class="form-select form-select-sm"></select>
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
                 <input type="checkbox" id="impRemember" checked> remember new categorisations

@@ -72,8 +72,22 @@ At this time the importer works with **basic CSV bank statements** — a plain C
 |------|--------|
 | Discovery Bank | single signed Amount column (filenames auto-select the account) |
 | FNB | single signed Amount column (filenames auto-select the account) |
+| Capitec | separate Money In / Money Out columns, dated by Posting Date |
+| Nedbank | cheque and credit card — no header row at all, so the layout is read from the shape of the rows |
 
-More banks will be added over time. Columns are matched by **header name**, not position, so exports from other banks may well work as-is — but they haven't been verified yet. If your bank isn't listed (or its export doesn't import cleanly), you can always build your own transactions CSV — see below.
+Those are the banks whose real exports have been imported end to end. **Other banks are expected to work too** — nothing is hardcoded per bank. The importer tries three things in order:
+
+1. **Match columns by header name** — `Date`, `Description`/`Narrative`/`Particulars`, `Amount`, or a `Debit`/`Credit` (`Money Out`/`Money In`) pair, wherever the header row sits in the file.
+2. **Read the layout by shape** when there's no header row at all (Nedbank): a leading date column, the amount at the right, the description between them, and a trailing running-balance column recognised and ignored.
+3. **Ask you** — if neither resolves, the import screen shows the file's first rows and lets you say which column is the date, the description, the amount (or money out / money in), and optionally a balance. So a bank nobody has tested still imports.
+
+You can also open that mapper yourself with **Columns wrong?** on the review screen, if auto-detection picked the wrong column.
+
+### Amounts are checked, not assumed
+
+Guessing a bank's *column names* is safe — guess wrong and the file is rejected, visibly. Guessing its *sign convention* is not: a bank that lists money out as a positive number would import every expense as income, with plausible-looking totals and nothing to warn you.
+
+So where a statement carries a running-balance column, the importer checks the amounts against it — successive balances must differ by exactly the amount between them, and only one sign convention and row order can reproduce that. If the file reads the other way round, the signs are corrected and the review screen says so. If it can't be verified, the amounts are imported **unchanged** and the review screen tells you to spot-check the signs. Nothing is ever silently "corrected" on a guess. If your bank isn't listed (or its export doesn't import cleanly), you can always build your own transactions CSV — see below.
 
 Amount cells tolerate real-world quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives, trailing minus, and `Cr`/`Dr` markers. Duplicate rows are detected against your existing history and skipped automatically, so re-importing an overlapping statement is safe.
 

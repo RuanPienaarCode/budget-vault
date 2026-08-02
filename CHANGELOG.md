@@ -3,6 +3,53 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.0.28 — 2026-08-02
+
+### Added
+
+- **Nedbank statements now import — both the cheque account and the credit
+  card.** Nedbank exports with no header row at all — just a short account
+  preamble and then the rows — so the importer rejected the file outright. It
+  now reads the layout from the shape of the rows instead: the date leads, the
+  amount sits at the right, and the description is between them. The two
+  statements aren't the same shape, and both are handled: the cheque account's
+  trailing running-balance column is recognised and left out, and the credit
+  card's second date column is stepped past rather than mistaken for the
+  description. Dates written without separators (`23Jul2026`) are understood
+  too.
+
+- **Any bank can now be imported, even one the app has never seen.** If a
+  statement isn't recognised automatically, the import screen now shows you the
+  file's first rows and asks which column is the date, the description and the
+  amount (or money out / money in, plus an optional balance). Previously an
+  unrecognised export was simply refused. A second text column can be mapped as
+  "extra detail" for statements that split the payee from the reference.
+
+- **"Columns wrong?" on the review screen.** Auto-detection still runs first and
+  usually gets it right, but you can now correct it — the mapper opens
+  prefilled with what was detected, against the file you already dropped.
+
+- **Amounts are checked against the statement's own balance column.** Where a
+  statement carries a running balance, the importer verifies that the amounts
+  actually reproduce it. If a bank lists money out as a positive number, that
+  check catches it and the signs are corrected — otherwise every expense would
+  have imported as income. If the amounts can't be verified, they are imported
+  unchanged and the review screen asks you to spot-check the signs. Nothing is
+  ever silently corrected on a guess.
+
+### Fixed
+
+- **Capitec month-end rows landed in the wrong month.** Where a statement
+  carries both a posting date and a transaction date, the posting date now wins
+  — it is the one the balance column follows. Capitec timestamps February's
+  interest just after midnight on 1 March, which previously filed it under
+  March.
+
+- **Dates with a time on them** (`2026-07-23 20:50`) were parsed by the
+  JavaScript engine rather than by the plugin, which reads them differently on
+  iPhone than on desktop. They are now parsed explicitly, like every other date
+  format.
+
 ## 1.0.27 — 2026-08-02
 
 ### Added
