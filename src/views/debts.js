@@ -232,9 +232,10 @@ module.exports = function registerDebts(ctx) {
     }
     if (unlinked.length) {
       const off = unlinked.reduce((s, d) => s + committed(d), 0);
+      const one = unlinked.length === 1;
       note.append(el('div', { class: 'text-muted', style: 'margin-top:4px' },
-        `${unlinked.length} debt${unlinked.length === 1 ? '' : 's'} (${money(off)} a month) ` +
-        'have no category linked, so their payments are not tracked above.'));
+        `${unlinked.length} debt${one ? '' : 's'} (${money(off)} a month) ` +
+        `${one ? 'has' : 'have'} no category linked, so ${one ? 'its' : 'their'} payments are not tracked above.`));
     }
     wrap.append(note);
   }

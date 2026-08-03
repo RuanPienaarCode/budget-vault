@@ -49,6 +49,27 @@ Finances/Budget/
 
 Ordinary markdown tables and frontmatter. Open them in any editor, diff them in git, keep them forever.
 
+### Debts.md
+
+Columns are read by **position**, not by header name, so keep all twelve in this order — a table missing one silently shifts every later value into the wrong field:
+
+| Column | Meaning |
+|---|---|
+| Name | What the debt is. Need not be unique. |
+| Lender | Who it is owed to. |
+| Type | `credit card`, `personal loan`, `vehicle`, `home loan`, `student`, `store account`, `overdraft`, `other`. Free text is kept as-is. |
+| Balance | What is still owed today. |
+| Original | What it started at — drives the "paid off" bar. Leave blank to reuse Balance. |
+| Rate | Annual interest rate as a percentage, e.g. `22.25`. Compounded monthly. |
+| Payment | The contracted monthly instalment. |
+| Extra | Anything you pay on top of it every month. |
+| Start date | When it opened, `YYYY-MM-DD`. |
+| Category | Budget category whose transactions pay this debt. Blank means untracked. |
+| Status | `active` or `paid`. |
+| Notes | Anything else. |
+
+The plugin rewrites the whole table on save, so a file created through **New debt** always has the right shape. This matters only if you write one by hand.
+
 ## CSV import
 
 Any statement with Date / Description / Amount columns works. Discovery Bank, FNB, Capitec and Nedbank exports have been imported end to end, but nothing is hardcoded per bank — columns are matched by header, then by layout shape for headerless files, and you can map them by hand if neither resolves.
