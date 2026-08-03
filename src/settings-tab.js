@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 const { yamlStr } = require('./util');
@@ -16,6 +16,7 @@ const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency'])
 
 /* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
 const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
+const SUPPORT_DESC = 'Budget Vault is free and always will be. If you\'d like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.';
 
 class BudgetSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -86,6 +87,13 @@ class BudgetSettingTab extends PluginSettingTab {
       .addButton(b => b
         .setButtonText('Open feedback form')
         .onClick(() => window.open(FEEDBACK_URL, '_blank')));
+
+    new Setting(containerEl)
+      .setName('Support Budget Vault')
+      .setDesc(SUPPORT_DESC)
+      .addButton(b => b
+        .setButtonText('Send a thank you')
+        .onClick(() => window.open(SUPPORT_URL, '_blank')));
 
     new Setting(containerEl).setName('Budget data').setHeading()
       .setDesc('Stored in Settings.md inside the budget folder, so they apply on every device.');
@@ -252,6 +260,15 @@ class BudgetSettingTab extends PluginSettingTab {
           setting.addButton(b => b
             .setButtonText('Open feedback form')
             .onClick(() => window.open(FEEDBACK_URL, '_blank')));
+        },
+      },
+      {
+        name: 'Support Budget Vault',
+        desc: SUPPORT_DESC,
+        render: setting => {
+          setting.addButton(b => b
+            .setButtonText('Send a thank you')
+            .onClick(() => window.open(SUPPORT_URL, '_blank')));
         },
       },
       {

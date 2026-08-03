@@ -15,7 +15,11 @@ const DEFAULT_SETTINGS = {
    system browser on click; the plugin itself never touches the network. */
 const FEEDBACK_URL = 'https://forms.gle/EVJKCuZxNQ9vJhTz6';
 
+/* Optional donation link, mirroring manifest.json's fundingUrl. Same deal as
+   the feedback form: handed to the system browser, never fetched in-plugin. */
+const SUPPORT_URL = 'https://paypal.me/ruanpienaar86';
+
 const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, TYPE_ORDER, MONTHS };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS };
