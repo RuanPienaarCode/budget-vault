@@ -4969,6 +4969,7 @@ var require_loans = __commonJS((exports2, module2) => {
     const P = () => loanProfileFor(S.settings.country);
     const home = { price: 1500000, depositPct: 10, rate: null, years: 20 };
     const car = { price: 350000, depositPct: 10, rate: null, months: 60, balloonPct: 0, insurance: false };
+    const syncs = [];
     const INSURANCE_RATE = 0.0035;
     const insuranceEstimate = (price) => Math.max(450, Math.round(price * INSURANCE_RATE));
     function numField(label, hint, value, attrs, commit) {
@@ -4980,10 +4981,22 @@ var require_loans = __commonJS((exports2, module2) => {
         ...attrs
       });
       input.addEventListener("input", () => commit(input.value));
-      const wrap = el("label", { class: "loan-field" }, el("span", { class: "lf-l" }, label), input);
-      if (hint)
-        wrap.append(el("span", { class: "lf-h" }, hint));
-      return wrap;
+      const hintEl = el("span", { class: "lf-h" }, hint || "");
+      const wrap = el("label", { class: "loan-field" }, el("span", { class: "lf-l" }, label), input, hintEl);
+      return { wrap, input, hintEl };
+    }
+    function rateField(state, recalc) {
+      const f = numField("Interest rate (% a year)", P().rateNote, state.rate ?? P().defaultRate, { min: "0", max: "40", step: "0.25" }, (v) => {
+        state.rate = Math.max(0, parseFloat(v) || 0);
+        recalc();
+      });
+      syncs.push(() => {
+        const p = P();
+        f.hintEl.textContent = p.rateNote;
+        if (state.rate === null)
+          f.input.value = String(p.defaultRate);
+      });
+      return f.wrap;
     }
     function rangeField(labelFor, attrs, value, commit) {
       const lab = el("span", { class: "lf-l" });
@@ -4996,6 +5009,7 @@ var require_loans = __commonJS((exports2, module2) => {
         commit(Number(input.value));
       });
       sync();
+      syncs.push(sync);
       return { wrap: el("label", { class: "loan-field" }, lab, input), sync };
     }
     function selectField(label, options, value, commit) {
@@ -5032,17 +5046,14 @@ var require_loans = __commonJS((exports2, module2) => {
         home.price = Math.max(0, parseFloat(v) || 0);
         homeDepositSync();
         recalcHome();
-      }));
+      }).wrap);
       const dep = rangeField((pct) => `Deposit — ${pct}% (${money(home.price * pct / 100, 0)})`, { min: "0", max: "50", step: "1" }, home.depositPct, (pct) => {
         home.depositPct = pct;
         recalcHome();
       });
       homeDepositSync = dep.sync;
       form.append(dep.wrap);
-      form.append(numField("Interest rate (% a year)", P().rateNote, home.rate, { min: "0", max: "40", step: "0.25" }, (v) => {
-        home.rate = Math.max(0, parseFloat(v) || 0);
-        recalcHome();
-      }));
+      form.append(rateField(home, recalcHome));
       const term = rangeField((y) => `Loan term — ${y} years`, { min: "5", max: "30", step: "1" }, home.years, (y) => {
         home.years = y;
         recalcHome();
@@ -5055,7 +5066,7 @@ var require_loans = __commonJS((exports2, module2) => {
       const p = P();
       const deposit = home.price * home.depositPct / 100;
       const loan = Math.max(0, home.price - deposit);
-      const t = totalsFor(loan, home.rate, home.years * 12);
+      const t = totalsFor(loan, home.rate ?? p.defaultRate, home.years * 12);
       const duty = p.transferDuty(home.price);
       const bond = p.bondCost(loan);
       const transfer = p.transferCost(home.price);
@@ -5078,7 +5089,7 @@ var require_loans = __commonJS((exports2, module2) => {
         costs.empty();
         costs.append(el("div", { class: "loan-out" }, row("Transfer duty", money(duty, 0)), row("Bond registration (est.)", money(bond, 0)), row("Transfer costs (est.)", money(transfer, 0)), row("Initiation fee", money(init, 0)), el("div", { class: "lo-sep" }), row("Total once-off costs", money(onceOff, 0), "lo-big")));
       }
-      amortTable($("#loanHomeAmort"), byYear(amortise(loan, home.rate, home.years * 12, t.payment)), "Year");
+      amortTable($("#loanHomeAmort"), byYear(amortise(loan, home.rate ?? p.defaultRate, home.years * 12, t.payment)), "Year");
     }
     let carBuilt = false;
     let carDepositSync = null;
@@ -5102,17 +5113,14 @@ var require_loans = __commonJS((exports2, module2) => {
         carDepositSync();
         carBalloonSync();
         recalcCar();
-      }));
+      }).wrap);
       const dep = rangeField((pct) => `Deposit — ${pct}% (${money(car.price * pct / 100, 0)})`, { min: "0", max: "50", step: "1" }, car.depositPct, (pct) => {
         car.depositPct = pct;
         recalcCar();
       });
       carDepositSync = dep.sync;
       form.append(dep.wrap);
-      form.append(numField("Interest rate (% a year)", P().rateNote, car.rate, { min: "0", max: "40", step: "0.25" }, (v) => {
-        car.rate = Math.max(0, parseFloat(v) || 0);
-        recalcCar();
-      }));
+      form.append(rateField(car, recalcCar));
       form.append(selectField("Loan term", TERMS, car.months, (v) => {
         car.months = Number(v);
         recalcCar();
@@ -5135,7 +5143,7 @@ var require_loans = __commonJS((exports2, module2) => {
       const deposit = car.price * car.depositPct / 100;
       const finance = Math.max(0, car.price - deposit);
       const balloon = car.price * car.balloonPct / 100;
-      const t = totalsFor(finance, car.rate, car.months, balloon);
+      const t = totalsFor(finance, car.rate ?? p.defaultRate, car.months, balloon);
       const init = p.vehicleInitiationFee(finance);
       const service = p.serviceFee;
       const serviceTotal = service * car.months;
@@ -5168,7 +5176,7 @@ var require_loans = __commonJS((exports2, module2) => {
         fees.empty();
         fees.append(el("div", { class: "loan-out" }, row("Initiation fee (once-off)", money(init, 0)), row("Monthly service fee", money(service, 0)), el("div", { class: "lo-sep" }), row("Total service fees over the term", money(serviceTotal, 0), "lo-big")));
       }
-      amortTable($("#loanCarAmort"), byYear(amortise(finance, car.rate, car.months, t.payment, balloon)), "Year");
+      amortTable($("#loanCarAmort"), byYear(amortise(finance, car.rate ?? p.defaultRate, car.months, t.payment, balloon)), "Year");
     }
     function showTab(which) {
       const isHome = which === "home";
@@ -5185,15 +5193,13 @@ var require_loans = __commonJS((exports2, module2) => {
     $("#loanTabCar").addEventListener("click", () => showTab("car"));
     function renderLoans() {
       const p = P();
-      if (home.rate === null)
-        home.rate = p.defaultRate;
-      if (car.rate === null)
-        car.rate = p.defaultRate;
       $("#loansSubNote").textContent = p.hasBuyingCosts ? "Nothing here is saved — change anything and the numbers follow. Costs and fees follow South African rules." : "Nothing here is saved — change anything and the numbers follow. Purchase taxes and lender fees are not modelled for your country.";
       if (!homeBuilt)
         buildHome();
       if (!carBuilt)
         buildCar();
+      for (const sync of syncs)
+        sync();
       recalcHome();
       recalcCar();
     }
