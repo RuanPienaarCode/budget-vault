@@ -18,6 +18,7 @@ const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
 const registerAccounts = require('./views/accounts');
 const registerSavings = require('./views/savings');
+const registerDebts = require('./views/debts');
 const registerOwed = require('./views/owed');
 const registerServices = require('./views/services');
 const registerTax = require('./views/tax');
@@ -54,6 +55,8 @@ function mountApp(view) {
     budgetMeta: {},
     txFiles: {},               // 'label/YYYY-MM' -> {label, month, rows, dirty}
     rules: [],                 // {pattern, category}
+    debts: [],                 // {name, lender, type, balance, original, rate, payment, extra, start, category, status, notes}
+    debtsDirty: false,
     owed: [],                  // {person, amount, description, due, status}
     owedDirty: false,
     services: [],              // {name, provider, amount, cycle, next, category, active, notes}
@@ -134,6 +137,7 @@ function mountApp(view) {
   registerBudgets(ctx);
   registerAccounts(ctx);
   registerSavings(ctx);
+  registerDebts(ctx);
   registerOwed(ctx);
   registerServices(ctx);
   registerTax(ctx);
@@ -160,7 +164,8 @@ function mountApp(view) {
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
-       savings: ctx.renderSavings, accounts: ctx.renderAccounts, owed: ctx.renderOwed, services: ctx.renderServices,
+       savings: ctx.renderSavings, accounts: ctx.renderAccounts, debts: ctx.renderDebts, owed: ctx.renderOwed,
+       services: ctx.renderServices,
        tax: ctx.renderTax, import: ctx.renderImport, connect: () => {} })[S.view]();
   }
   /* ---------------------- drawer + theme (app shell) --------------------- */
@@ -228,7 +233,7 @@ function mountApp(view) {
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
     await ctx.loadVault();
-    for (const id of ['#budSave', '#owedSave', '#svcSave', '#taxSave']) {
+    for (const id of ['#budSave', '#debtSave', '#owedSave', '#svcSave', '#taxSave']) {
       const b = $(id);
       if (b) b.disabled = true;
     }
@@ -434,6 +439,12 @@ function mountApp(view) {
   $('#budAddCat').addEventListener('click', ctx.addNewCategory);
   $('#acctAdd').addEventListener('click', ctx.addAccount);
   $('#savAdd').addEventListener('click', ctx.addAccount);
+  $('#debtSave').addEventListener('click', ctx.saveDebts);
+  $('#debtAdd').addEventListener('click', ctx.addDebt);
+  // The planner's extra/method are a what-if, not saved state — recompute the
+  // plan panels only, never the table the reader may be mid-edit in.
+  $('#debtExtra').addEventListener('input', ctx.replan);
+  $('#debtStrategy').addEventListener('change', ctx.replan);
   $('#owedSave').addEventListener('click', ctx.saveOwed);
   $('#owedAdd').addEventListener('click', ctx.addOwed);
   $('#svcSave').addEventListener('click', ctx.saveServices);

@@ -928,6 +928,76 @@
 .budget-app-root .goal-h .gv b { color: var(--text-primary); font-weight: 700; }
 .budget-app-root .goal-pct { font-size: 12px; color: var(--ink-faint); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
+/* Debt view: the three-way payoff comparison, the attack order list, and the
+   in-row "paid off" bar. No color-mix() or :has() here — the engine floor for
+   this plugin is iOS 15 WebKit, not whatever minAppVersion implies. */
+.budget-app-root .debt-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 780px) { .budget-app-root .debt-plans { grid-template-columns: 1fr; } }
+.budget-app-root .debt-plan {
+  border: 1px solid var(--border-color); border-radius: var(--radius); padding: 16px 18px;
+  background: var(--surface); box-shadow: var(--shadow-sm);
+}
+.budget-app-root .debt-plan.is-chosen { border-color: var(--color-primary); box-shadow: var(--shadow-md); }
+.budget-app-root .debt-plan .dp-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.budget-app-root .debt-plan .dp-tag {
+  font-size: 10px; letter-spacing: .8px; text-transform: uppercase; font-weight: 700;
+  color: var(--color-primary); background: var(--color-primary-light);
+  border-radius: 999px; padding: 2px 8px;
+}
+.budget-app-root .debt-plan .dp-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+.budget-app-root .debt-plan .dp-date { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 12px; }
+.budget-app-root .debt-plan .dp-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.budget-app-root .debt-plan .dp-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12.5px; color: var(--text-muted); margin-top: 12px;
+  border-top: 1px solid var(--line-soft); padding-top: 10px;
+}
+.budget-app-root .debt-plan .dp-row b { color: var(--text-primary); }
+.budget-app-root .debt-plan .dp-save { font-size: 12px; font-weight: 600; color: var(--color-success); margin-top: 8px; }
+
+.budget-app-root .debt-order { list-style: none; margin: 0; padding: 0; counter-reset: dbt; }
+.budget-app-root .debt-order li {
+  counter-increment: dbt; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px;
+}
+.budget-app-root .debt-order li:last-child { border-bottom: 0; }
+.budget-app-root .debt-order li::before {
+  content: counter(dbt); flex: none; width: 22px; height: 22px; border-radius: 999px;
+  background: var(--color-primary-light); color: var(--color-primary);
+  font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+.budget-app-root .debt-order .do-n { font-weight: 600; }
+.budget-app-root .debt-order .do-m { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.budget-app-root .debt-order .do-d { margin-left: auto; color: var(--ink-faint); font-size: 12px; }
+
+.budget-app-root .debt-dti { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 12.5px; }
+.budget-app-root .debt-prog { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.budget-app-root .debt-prog .cat-bar { min-width: 70px; flex: 1; }
+.budget-app-root .debt-settled td { opacity: 0.55; }
+
+/* Loan calculators: a responsive grid of small forms, each with its own
+   results panel. Same iOS-15 discipline as the Debt view above. */
+.budget-app-root .mt-4 { margin-top: 1.5rem; }
+.budget-app-root .loan-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+@media (max-width: 900px) { .budget-app-root .loan-grid { grid-template-columns: 1fr; } }
+.budget-app-root .loan-form { display: grid; gap: 12px; }
+.budget-app-root .loan-field { display: grid; gap: 4px; }
+.budget-app-root .loan-field .lf-l { font-size: 12.5px; color: var(--text-muted); font-weight: 600; }
+.budget-app-root .loan-field .lf-h { font-size: 11.5px; color: var(--ink-faint); }
+.budget-app-root .loan-out {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft);
+}
+.budget-app-root .loan-out .lo-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 6px 0; font-size: 13px;
+}
+.budget-app-root .loan-out .lo-l { color: var(--text-muted); }
+.budget-app-root .loan-out .lo-v { font-variant-numeric: tabular-nums; font-weight: 700; }
+.budget-app-root .loan-out .lo-big { font-size: 19px; letter-spacing: -0.02em; }
+.budget-app-root .loan-out .lo-note {
+  margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-muted);
+}
+
 .budget-app-root .svc-cyc { font-size: 11px; color: var(--ink-faint); }
 .budget-app-root .svc-inactive td { opacity: 0.5; }
 

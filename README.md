@@ -42,6 +42,7 @@ Finances/Budget/
 │   └── <Account>/YYYY-MM.md
 ├── Data/Categorisation Rules.csv
 ├── Tax/
+├── Debts.md
 ├── Owed Money.md
 └── Services.md
 ```

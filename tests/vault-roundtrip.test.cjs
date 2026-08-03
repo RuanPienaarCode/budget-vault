@@ -42,6 +42,8 @@ const FILES = {
 
   [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status |\n|---|---:|---|---|---|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding |\n| Léa | 40.00 | multi<br>line | | paid |\n',
 
+  [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n',
+
   [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: assessed\ndeadline_standard: "2026-10-20"\nassessment_ref: "ITA34: 2026/0031"\nassessment_result: -1250.00\nassessment_income: 480000\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | banks \\| investments |\n| File ITR12 | todo |  |  |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | uploaded | irp5.pdf | |\n| IT3(b) | Bank \\| A | needed | | multi<br>line |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n| 4201 | Local interest | Bank B | 12000.00 |\n',
@@ -69,6 +71,10 @@ const FILES = {
   eq(S.txFiles[txKey].rows.length, 4, 'all four rows load');
   eq(S.owed.length, 2, 'both owed rows load');
   eq(S.services.length, 2, 'both services load');
+  eq(S.debts.length, 2, 'both debts load');
+  eq(S.debts[1].balance, 1234.56, 'a decimal-comma debt balance must be READ, not truncated to 1');
+  eq(S.debts[0].original, 12000, 'the original amount loads for the paid-off bar');
+  eq(S.debts[1].status, 'paid', 'a settled debt keeps its status');
   eq(S.tax['2026'].steps.length, 2, 'both tax steps load');
   eq(S.tax['2026'].docs.length, 2, 'both tax docs load');
   eq(S.tax['2026'].figures.length, 2, 'both tax figures load');
@@ -82,16 +88,18 @@ const FILES = {
   require('../src/views/budgets')(ctx);
   require('../src/views/accounts')(ctx);
   require('../src/views/savings')(ctx);
+  require('../src/views/debts')(ctx);
   require('../src/views/owed')(ctx);
   require('../src/views/services')(ctx);
   require('../src/views/tax')(ctx);
 
-  for (const name of ['serializeTxFile', 'serializeOwed', 'serializeServices', 'serializeTax']) {
+  for (const name of ['serializeTxFile', 'serializeDebts', 'serializeOwed', 'serializeServices', 'serializeTax']) {
     ok(typeof ctx[name] === 'function', `${name} must be published on ctx`);
   }
 
   const rewritten = { ...FILES };
   rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`] = ctx.serializeTxFile(S.txFiles[txKey]);
+  rewritten[`${B}/Debts.md`] = ctx.serializeDebts();
   rewritten[`${B}/Owed Money.md`] = ctx.serializeOwed();
   rewritten[`${B}/Services.md`] = ctx.serializeServices();
   ctx.S.taxYear = '2026';
@@ -106,6 +114,7 @@ const FILES = {
     'every transaction field must survive serialize → load unchanged');
   eq(S2.owed, S.owed, 'owed rows must survive the round-trip');
   eq(S2.services, S.services, 'services rows must survive the round-trip');
+  eq(S2.debts, S.debts, 'debt rows must survive the round-trip');
 
   const t1 = S.tax['2026'], t2 = S2.tax['2026'];
   for (const k of ['taxpayer_type', 'assessment', 'deadline_standard', 'deadline_provisional',
@@ -121,6 +130,8 @@ const FILES = {
     'a key the model does not carry (aliases) must survive the write-back');
   ok(/aliases:\s*\[debts\]/.test(rewritten[`${B}/Owed Money.md`]),
     'owed frontmatter must be preserved verbatim');
+  ok(/aliases:\s*\[liabilities\]/.test(rewritten[`${B}/Debts.md`]),
+    'debts frontmatter must be preserved verbatim');
 
   /* ---------------- the non-canonical cell is written back verbatim ------- */
   ok(rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`].includes('1 234,56'),
