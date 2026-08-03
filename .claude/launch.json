@@ -4,8 +4,14 @@
     {
       "name": "budget-preview",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8931", "--directory", "/Users/Ruan/Github/budget-vault"],
+      "runtimeArgs": ["-m", "http.server", "--directory", "/Users/Ruan/Github/budget-vault", "8931"],
       "port": 8931
+    },
+    {
+      "name": "budget-preview-repo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "--directory", "/Users/Ruan/Github/budget-vault", "8932"],
+      "port": 8932
     }
   ]
 }
