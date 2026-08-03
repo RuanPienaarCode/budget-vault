@@ -129,6 +129,33 @@ module.exports = function registerLoad(ctx) {
       });
     }
 
+    S.debts = []; S.debtsDirty = false;
+    const debtTxt = await readFile('Debts.md');
+    S.debtsFm = (debtTxt && parseFrontmatter(debtTxt).raw) || 'kind: debts';
+    if (debtTxt) for (const c of parseMdTable(debtTxt).slice(1)) {
+      if (!c[0]) continue;
+      // Money columns go through parseNum so a hand-edited "1 234,56" is read
+      // rather than silently truncated to 1 — same reasoning as account
+      // balances above. Unlike those there is no *Raw write-back here: every
+      // figure in this table is arithmetic input (the payoff maths cannot run
+      // on a string), so a rejected cell falls back to 0 and is rewritten
+      // canonically rather than being preserved verbatim.
+      const num = (v, min = 0) => Math.max(min, parseNum(v || '0').value || 0);
+      const balance = num(c[3]);
+      S.debts.push({
+        name: unescMd(c[0]), lender: unescMd(c[1] || ''), type: unescMd(c[2] || 'other'),
+        balance,
+        // Absent on a file written before this column existed, and on a debt
+        // added without one — fall back to the balance so the "paid off" bar
+        // reads 0% rather than dividing by zero.
+        original: c[4] !== undefined && c[4] !== '' ? num(c[4]) : balance,
+        rate: num(c[5]), payment: num(c[6]), extra: num(c[7]),
+        start: (c[8] || '').trim(), category: unescMd(c[9] || ''),
+        status: (c[10] || 'active').trim().toLowerCase() === 'paid' ? 'paid' : 'active',
+        notes: unescMd(c[11] || ''),
+      });
+    }
+
     S.services = []; S.servicesDirty = false;
     const svcTxt = await readFile('Services.md');
     S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';

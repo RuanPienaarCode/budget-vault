@@ -498,6 +498,9 @@ var require_shell = __commonJS((exports2, module2) => {
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
     </button>
+    <button class="drawer-link" data-view="debts">
+      <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
+    </button>
     <button class="drawer-link" data-view="owed">
       <span class="di"><span class="ico" data-ico="users"></span></span>Owed Money
     </button>
@@ -750,6 +753,53 @@ var require_shell = __commonJS((exports2, module2) => {
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
+      </section>
+
+      <section id="view-debts" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Debt</h1>
+          <div class="sub-note">Balances, what the interest costs, and how fast you can be free of it · saved to <code>Debts.md</code></div>
+        </div>
+
+        <div class="mini-grid mini-kpis-4 mb-4" id="debtKpis"></div>
+
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Payoff plan</h2><div class="sub">Same debts, three ways of attacking them</div></div>
+            <div class="row">
+              <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px" for="debtExtra">
+                Extra per month
+                <input type="number" step="1" min="0" id="debtExtra" class="form-control form-control-sm" value="0" style="width:110px">
+              </label>
+              <select id="debtStrategy" class="form-select form-select-sm" aria-label="Payoff method">
+                <option value="avalanche">Avalanche — highest rate first</option>
+                <option value="snowball">Snowball — smallest balance first</option>
+              </select>
+            </div>
+          </div>
+          <div class="body-pad" id="debtPlan"></div>
+          <div class="body-pad" style="padding-top:0" id="debtOrder"></div>
+        </div>
+
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Payments this period</h2><div class="sub">Read from your transactions, matched by category</div></div>
+          </div>
+          <div class="body-pad" id="debtPayments"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Debts</h2><div class="sub">Edit a balance, rate or payment and every figure above follows</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="debtAdd"><span class="ico" data-ico="plus"></span> New debt</button>
+              <button class="btn-gradient" id="debtSave" disabled>Save changes</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table table-hover" id="debtTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-owed" class="hidden">
@@ -2011,6 +2061,31 @@ var require_load = __commonJS((exports2, module2) => {
             status: (c[4] || "outstanding").trim().toLowerCase() === "paid" ? "paid" : "outstanding"
           });
         }
+      S.debts = [];
+      S.debtsDirty = false;
+      const debtTxt = await readFile("Debts.md");
+      S.debtsFm = debtTxt && parseFrontmatter(debtTxt).raw || "kind: debts";
+      if (debtTxt)
+        for (const c of parseMdTable(debtTxt).slice(1)) {
+          if (!c[0])
+            continue;
+          const num = (v, min = 0) => Math.max(min, parseNum(v || "0").value || 0);
+          const balance = num(c[3]);
+          S.debts.push({
+            name: unescMd(c[0]),
+            lender: unescMd(c[1] || ""),
+            type: unescMd(c[2] || "other"),
+            balance,
+            original: c[4] !== undefined && c[4] !== "" ? num(c[4]) : balance,
+            rate: num(c[5]),
+            payment: num(c[6]),
+            extra: num(c[7]),
+            start: (c[8] || "").trim(),
+            category: unescMd(c[9] || ""),
+            status: (c[10] || "active").trim().toLowerCase() === "paid" ? "paid" : "active",
+            notes: unescMd(c[11] || "")
+          });
+        }
       S.services = [];
       S.servicesDirty = false;
       const svcTxt = await readFile("Services.md");
@@ -3182,6 +3257,421 @@ var require_savings = __commonJS((exports2, module2) => {
       }
     }
     ctx.provide({ renderSavings });
+  };
+});
+
+// src/debt-math.js
+var require_debt_math = __commonJS((exports2, module2) => {
+  var EPS = 0.005;
+  var MAX_MONTHS = 600;
+  var monthlyRate = (rate) => (Number(rate) || 0) / 100 / 12;
+  function amortise(balance, rate, payment, maxMonths = MAX_MONTHS) {
+    let b = Number(balance) || 0;
+    const r = monthlyRate(rate);
+    const pay = Number(payment) || 0;
+    if (b <= EPS)
+      return { months: 0, interest: 0, settled: true };
+    if (pay <= 0)
+      return { months: maxMonths, interest: 0, settled: false };
+    let interest = 0, m = 0;
+    while (b > EPS && m < maxMonths) {
+      m++;
+      const i = b * r;
+      b += i;
+      interest += i;
+      b -= Math.min(pay, b);
+    }
+    return { months: m, interest, settled: b <= EPS };
+  }
+  var monthlyInterest = (balance, rate) => Math.max(0, Number(balance) || 0) * monthlyRate(rate);
+  function priorityOrder(debts, strategy) {
+    const open = debts.filter((d) => d.balance > EPS);
+    if (strategy === "snowball") {
+      return open.sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
+    }
+    return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || a.name.localeCompare(b.name));
+  }
+  function simulate(debts, { extra = 0, strategy = "avalanche", maxMonths = MAX_MONTHS } = {}) {
+    const list = (debts || []).filter((d) => (Number(d.balance) || 0) > EPS).map((d) => ({
+      name: d.name,
+      balance: Number(d.balance) || 0,
+      rate: Number(d.rate) || 0,
+      payment: Math.max(0, (Number(d.payment) || 0) + (Number(d.extra) || 0))
+    }));
+    if (!list.length)
+      return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [] };
+    const roll = strategy !== "minimum";
+    const pool = roll ? Math.max(0, Number(extra) || 0) : 0;
+    const payoff = Object.create(null);
+    let interest = 0, m = 0;
+    while (m < maxMonths && list.some((d) => d.balance > EPS)) {
+      m++;
+      let free = pool;
+      for (const d of list) {
+        if (d.balance <= EPS) {
+          if (roll)
+            free += d.payment;
+          continue;
+        }
+        const i = d.balance * monthlyRate(d.rate);
+        d.balance += i;
+        interest += i;
+        const paid = Math.min(d.payment, d.balance);
+        d.balance -= paid;
+        if (roll)
+          free += d.payment - paid;
+        if (d.balance <= EPS) {
+          d.balance = 0;
+          payoff[d.name] = m;
+        }
+      }
+      if (roll && free > EPS) {
+        for (const d of priorityOrder(list, strategy)) {
+          if (free <= EPS)
+            break;
+          const paid = Math.min(free, d.balance);
+          d.balance -= paid;
+          free -= paid;
+          if (d.balance <= EPS) {
+            d.balance = 0;
+            payoff[d.name] = m;
+          }
+        }
+      }
+    }
+    const stalled = list.filter((d) => d.balance > EPS).map((d) => d.name);
+    return { months: m, interest, payoff, settled: !stalled.length, stalled };
+  }
+  function addMonths(n, from = new Date) {
+    const d = new Date(from.getFullYear(), from.getMonth() + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  function humanMonths(n) {
+    if (!Number.isFinite(n) || n <= 0)
+      return "—";
+    if (n < 12)
+      return `${n} month${n === 1 ? "" : "s"}`;
+    const y = Math.floor(n / 12), r = n % 12;
+    return r ? `${y} yr ${r} mo` : `${y} year${y === 1 ? "" : "s"}`;
+  }
+  module2.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, MAX_MONTHS, EPS };
+});
+
+// src/views/debts.js
+var require_debts = __commonJS((exports2, module2) => {
+  var { el, keepScroll, escMd, icoEl } = require_util();
+  var { askFields } = require_modal();
+  var { MONTHS } = require_constants();
+  var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require_debt_math();
+  var DEBT_TYPES = ["credit card", "personal loan", "vehicle", "home loan", "student", "store account", "overdraft", "other"];
+  module2.exports = function registerDebts(ctx) {
+    const { S, $, app, money, toast, writeFile, txInPeriod, periodSummary } = ctx;
+    const mark = () => {
+      S.debtsDirty = true;
+      $("#debtSave").disabled = false;
+    };
+    ctx.registerDirty(() => S.debtsDirty);
+    const active = () => S.debts.filter((d) => d.status !== "paid");
+    const committed = (d) => (d.payment || 0) + (d.extra || 0);
+    const planExtra = () => Math.max(0, parseFloat($("#debtExtra").value) || 0);
+    const planStrategy = () => $("#debtStrategy").value === "snowball" ? "snowball" : "avalanche";
+    function monthLabel(ym) {
+      const [y, m] = ym.split("-").map(Number);
+      return `${MONTHS[m - 1]} ${y}`;
+    }
+    function renderDebtKpis() {
+      const list = active();
+      const total = list.reduce((s, d) => s + d.balance, 0);
+      const perMonth = list.reduce((s, d) => s + committed(d), 0);
+      const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
+      const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
+      const kpis = $("#debtKpis");
+      kpis.empty();
+      const tile = (l, v, cls, sub) => {
+        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
+        if (sub)
+          t.append(el("div", { class: "s" }, sub));
+        kpis.append(t);
+      };
+      tile("Total debt", money(total), total > 0 ? "text-danger" : "text-success", `${list.length} active · ${S.debts.length} tracked`);
+      tile("Paying per month", money(perMonth), "", perMonth ? `${money(perMonth * 12, 0)} a year` : "nothing budgeted");
+      tile("Interest this month", money(interest), interest > 0 ? "text-warning" : "", perMonth > 0 ? `${Math.round(interest / perMonth * 100)}% of your payments` : "");
+      tile("Debt-free", plan.settled && plan.months ? monthLabel(addMonths(plan.months)) : total > 0 ? "never" : "—", plan.settled && plan.months ? "grad-txt" : total > 0 ? "text-danger" : "", plan.settled && plan.months ? humanMonths(plan.months) : total > 0 ? "payments too low" : "no debt tracked");
+    }
+    function renderDebtPlan() {
+      const list = active();
+      const wrap = $("#debtPlan");
+      wrap.empty();
+      const order = $("#debtOrder");
+      order.empty();
+      if (!list.length) {
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Add a debt below and this becomes a payoff plan — how long each method takes, and what it saves."));
+        return;
+      }
+      const extra = planExtra();
+      const chosen = planStrategy();
+      const base = simulate(list, { strategy: "minimum" });
+      const runs = [
+        { key: "minimum", label: "Minimum only", note: "Contracted payments, nothing extra", res: base },
+        { key: "snowball", label: "Snowball", note: "Smallest balance first", res: simulate(list, { extra, strategy: "snowball" }) },
+        { key: "avalanche", label: "Avalanche", note: "Highest rate first", res: simulate(list, { extra, strategy: "avalanche" }) }
+      ];
+      const grid = el("div", { class: "debt-plans" });
+      for (const r of runs) {
+        const saved = base.settled && r.res.settled ? base.interest - r.res.interest : 0;
+        const sooner = base.settled && r.res.settled ? base.months - r.res.months : 0;
+        const card = el("div", { class: `debt-plan${r.key === chosen ? " is-chosen" : ""}` }, el("div", { class: "dp-h" }, el("b", {}, r.label), r.key === chosen ? el("span", { class: "dp-tag" }, "selected") : ""), el("div", { class: "dp-note" }, r.note), el("div", { class: "dp-date num" }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : "never"), el("div", { class: "dp-sub" }, r.res.settled && r.res.months ? humanMonths(r.res.months) : "payments never clear the interest"), el("div", { class: "dp-row" }, el("span", {}, "Interest"), el("b", { class: "num" }, r.res.settled ? money(r.res.interest, 0) : "—")));
+        if (r.key !== "minimum" && saved > 1) {
+          card.append(el("div", { class: "dp-save num" }, `Saves ${money(saved, 0)}${sooner > 0 ? ` · ${humanMonths(sooner)} sooner` : ""}`));
+        }
+        grid.append(card);
+      }
+      wrap.append(grid);
+      if (!base.settled) {
+        wrap.append(el("p", { class: "text-danger", style: "margin:14px 0 0;font-size:12.5px" }, `On the contracted payments alone, ${base.stalled.join(", ")} never clears — the interest is at or above the payment. ` + "Raise the payment or add extra above."));
+      }
+      const plan = simulate(list, { extra, strategy: chosen });
+      const seq = priorityOrder(list.map((d) => ({ ...d })), chosen);
+      order.append(el("div", { class: "sub", style: "margin-bottom:10px" }, `Put every spare rand at these in order${extra ? ` — ${money(extra, 0)} extra a month` : ""}. ` + "As each one closes, its payment rolls into the next."));
+      const ol = el("ol", { class: "debt-order" });
+      for (const d of seq) {
+        const at = plan.payoff[d.name];
+        ol.append(el("li", {}, el("span", { class: "do-n" }, d.name), el("span", { class: "do-m num" }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`), el("span", { class: "do-d" }, at ? `clear ${monthLabel(addMonths(at))}` : "not clearing")));
+      }
+      order.append(ol);
+    }
+    function renderDebtPayments() {
+      const wrap = $("#debtPayments");
+      wrap.empty();
+      const list = active();
+      if (!list.length)
+        return;
+      const tx = txInPeriod(S.period).filter((t) => !t.excluded);
+      const linked = list.filter((d) => d.category);
+      if (!linked.length) {
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Set a category on a debt below and its real payments show up here, read straight from your transactions."));
+        return;
+      }
+      const byCat = Object.create(null);
+      for (const d of linked)
+        (byCat[d.category] ??= []).push(d);
+      const rows = el("div", { class: "goals" });
+      let plannedAll = 0, paidAll = 0;
+      for (const cat of Object.keys(byCat).sort()) {
+        const group = byCat[cat];
+        const paid = tx.filter((t) => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+        const planned = group.reduce((s, d) => s + committed(d), 0);
+        plannedAll += planned;
+        paidAll += paid;
+        const pct = planned > 0 ? Math.min(100, paid / planned * 100) : paid > 0 ? 100 : 0;
+        const short = planned - paid;
+        rows.append(el("div", {}, el("div", { class: "goal-h" }, el("div", { class: "gn" }, cat, el("span", { class: "text-muted", style: "font-weight:400" }, ` · ${group.map((d) => d.name).join(", ")}`)), el("div", { class: "gv" }, el("b", {}, money(paid)), " / ", money(planned))), el("div", { class: "cat-bar" }, el("i", { class: `cat-bar-fill${paid >= planned && planned > 0 ? "" : " bg-warning"}`, style: `width:${pct}%` })), el("div", { class: "goal-pct" }, planned <= 0 ? "No payment budgeted against this category" : short > 0.5 ? `${money(short)} short this period` : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ""}`)));
+      }
+      wrap.append(rows);
+      const income = periodSummary(S.period).income;
+      const note = el("div", { class: "debt-dti" });
+      if (income > 0) {
+        const ratio = plannedAll / income * 100;
+        note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), " of this period’s income goes to debt payments", el("span", { class: "text-muted" }, ratio > 36 ? " — lenders treat above 36% as stretched." : "."));
+      } else {
+        note.append(el("span", { class: "text-muted" }, "No income recorded this period, so there is no ratio to show yet."));
+      }
+      note.append(el("div", { class: "text-muted", style: "margin-top:4px" }, `${money(paidAll)} paid of ${money(plannedAll)} planned this period.`));
+      wrap.append(note);
+    }
+    function renderDebts(focusName) {
+      renderDebtKpis();
+      renderDebtPlan();
+      renderDebtPayments();
+      const t = $("#debtTable");
+      keepScroll(t, () => {
+        t.empty();
+        t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Debt"), el("th", { scope: "col", class: "num" }, "Balance"), el("th", { scope: "col", class: "num" }, "Rate %"), el("th", { scope: "col", class: "num" }, "Payment"), el("th", { scope: "col", class: "num" }, "Extra"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Paid off"), el("th", { scope: "col" }, "Clear by"), el("th", { scope: "col", class: "num" }, "Interest left"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        for (const d of S.debts) {
+          let refreshRow = function() {
+            const paidOff = d.original > 0 ? Math.min(100, Math.max(0, (d.original - d.balance) / d.original * 100)) : 0;
+            barFill.style.width = `${paidOff}%`;
+            payoffCell.empty();
+            payoffCell.append(d.original > 0 ? el("div", { class: "debt-prog" }, el("div", { class: "cat-bar" }, barFill), el("span", { class: "num" }, `${Math.round(paidOff)}%`)) : el("span", { class: "text-muted" }, "—"));
+            const a = amortise(d.balance, d.rate, committed(d));
+            clearCell.empty();
+            interestCell.empty();
+            if (d.status === "paid") {
+              clearCell.append(el("span", { class: "text-success" }, "settled"));
+              interestCell.append(el("span", { class: "text-muted" }, "—"));
+            } else if (!a.settled) {
+              clearCell.append(el("span", { class: "text-danger" }, committed(d) > 0 ? "never" : "no payment"));
+              interestCell.append(el("span", { class: "text-danger num" }, `+${money(monthlyInterest(d.balance, d.rate), 0)}/mo`));
+            } else {
+              clearCell.append(el("span", {}, monthLabel(addMonths(a.months))), el("div", { class: "text-muted", style: "font-size:11.5px" }, humanMonths(a.months)));
+              interestCell.append(money(a.interest, 0));
+            }
+          };
+          const payoffCell = el("td", { class: "num" });
+          const clearCell = el("td", {});
+          const interestCell = el("td", { class: "num" });
+          const barFill = el("i", { class: "cat-bar-fill" });
+          const paidPill = d.status === "paid";
+          const pill = el("button", {
+            class: `status-pill status-${paidPill ? "paid" : "outstanding"}`,
+            "aria-label": `${d.name}: ${paidPill ? "Settled" : "Active"} — click to change`
+          }, icoEl(paidPill ? ["circle-check", "check-circle"] : ["hourglass"]), paidPill ? "Settled" : "Active");
+          pill.addEventListener("click", () => {
+            d.status = paidPill ? "active" : "paid";
+            mark();
+            renderDebts(d.name);
+          });
+          const refreshAll = () => {
+            mark();
+            refreshRow();
+            renderDebtKpis();
+            renderDebtPlan();
+          };
+          body.append(el("tr", { class: paidPill ? "debt-settled" : "" }, el("td", {}, el("div", { style: "font-weight:600" }, d.name), el("div", { class: "text-muted", style: "font-size:11.5px" }, [d.lender, d.type].filter(Boolean).join(" · ") || "—")), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            class: "form-control form-control-sm",
+            value: d.balance || "",
+            style: "width:120px",
+            "aria-label": `Balance owed on ${d.name}`,
+            onchange: (e) => {
+              d.balance = Math.max(0, parseFloat(e.target.value) || 0);
+              refreshAll();
+            }
+          })), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            class: "form-control form-control-sm",
+            value: d.rate || "",
+            style: "width:84px",
+            "aria-label": `Annual interest rate on ${d.name}`,
+            onchange: (e) => {
+              d.rate = Math.max(0, parseFloat(e.target.value) || 0);
+              refreshAll();
+            }
+          })), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            class: "form-control form-control-sm",
+            value: d.payment || "",
+            style: "width:110px",
+            "aria-label": `Monthly payment on ${d.name}`,
+            onchange: (e) => {
+              d.payment = Math.max(0, parseFloat(e.target.value) || 0);
+              refreshAll();
+            }
+          })), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            class: "form-control form-control-sm",
+            value: d.extra || "",
+            style: "width:100px",
+            "aria-label": `Extra paid each month on ${d.name}`,
+            onchange: (e) => {
+              d.extra = Math.max(0, parseFloat(e.target.value) || 0);
+              refreshAll();
+            }
+          })), el("td", {}, el("select", {
+            class: "form-select form-select-sm",
+            "aria-label": `Budget category for ${d.name}`,
+            onchange: (e) => {
+              d.category = e.target.value;
+              mark();
+              renderDebtPayments();
+            }
+          }, el("option", { value: "", ...d.category ? {} : { selected: "" } }, "— none —"), ...d.category && !S.categories.some((c) => c.name === d.category) ? [el("option", { value: d.category, selected: "" }, `${d.category} (missing)`)] : [], ...S.categories.map((c) => el("option", { value: c.name, ...c.name === d.category ? { selected: "" } : {} }, c.name)))), payoffCell, clearCell, interestCell, el("td", {}, pill), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove ${d.name}`,
+            onclick: () => {
+              S.debts.splice(S.debts.indexOf(d), 1);
+              mark();
+              renderDebts();
+            }
+          }, "✕"))));
+          refreshRow();
+        }
+        if (!S.debts.length) {
+          body.append(el("tr", {}, el("td", { colspan: "11", class: "text-muted" }, "No debts tracked. Add one above — you only need the balance, the rate and what you pay each month.")));
+        }
+        t.append(body);
+      });
+      if (focusName) {
+        const i = S.debts.findIndex((d) => d.name === focusName);
+        const pill = t.querySelectorAll(".status-pill")[i];
+        if (pill)
+          pill.focus();
+      }
+    }
+    function serializeDebts() {
+      const lines = [
+        "---",
+        ...(S.debtsFm || "kind: debts").split(`
+`),
+        "---",
+        "",
+        "# Debts",
+        "",
+        "Money the household owes. `rate` is the annual interest rate as a percentage,",
+        "`payment` the contracted monthly amount and `extra` anything paid on top of it.",
+        "`status` is `active` or `paid`.",
+        "",
+        "| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |",
+        "|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|"
+      ];
+      for (const d of S.debts) {
+        lines.push(`| ${escMd(d.name)} | ${escMd(d.lender)} | ${escMd(d.type)} | ${d.balance.toFixed(2)} | ` + `${d.original.toFixed(2)} | ${d.rate.toFixed(2)} | ${d.payment.toFixed(2)} | ${d.extra.toFixed(2)} | ` + `${escMd(d.start)} | ${escMd(d.category)} | ${d.status} | ${escMd(d.notes)} |`);
+      }
+      lines.push("");
+      return lines.join(`
+`);
+    }
+    async function saveDebts() {
+      await writeFile("Debts.md", serializeDebts());
+      S.debtsDirty = false;
+      $("#debtSave").disabled = true;
+      toast("Saved Debts.md");
+    }
+    async function addDebt() {
+      const r = await askFields(app, "New debt", [
+        { key: "name", label: "What is it?", type: "text" },
+        { key: "lender", label: "Lender", type: "text" },
+        { key: "type", label: "Kind of debt", type: "select", value: "credit card", options: DEBT_TYPES },
+        { key: "balance", label: "Balance still owed", type: "number", value: "0" },
+        { key: "rate", label: "Interest rate (% a year)", type: "number", value: "0" },
+        { key: "payment", label: "Monthly payment", type: "number", value: "0" },
+        { key: "category", label: "Budget category (links its transactions)", type: "select", options: ["", ...S.categories.map((c) => c.name)], value: "" }
+      ]);
+      if (!r || !r.name.trim())
+        return;
+      const num = (v) => parseFloat(String(v ?? "").replace(",", "."));
+      const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
+      if ([balance, rate, payment].some(isNaN))
+        return toast("Balance, rate and payment must be numbers", true);
+      const today = new Date;
+      S.debts.push({
+        name: r.name.trim(),
+        lender: (r.lender || "").trim(),
+        type: r.type || "other",
+        balance: Math.max(0, balance),
+        original: Math.max(0, balance),
+        rate: Math.max(0, rate),
+        payment: Math.max(0, payment),
+        extra: 0,
+        start: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+        category: (r.category || "").trim(),
+        status: "active",
+        notes: ""
+      });
+      S.debtsDirty = true;
+      $("#debtSave").disabled = false;
+      renderDebts();
+    }
+    function replan() {
+      renderDebtKpis();
+      renderDebtPlan();
+    }
+    ctx.provide({ renderDebts, saveDebts, addDebt, serializeDebts, replan, DEBT_TYPES });
   };
 });
 
@@ -4736,6 +5226,7 @@ var require_controller = __commonJS((exports2, module2) => {
   var registerBudgets = require_budgets();
   var registerAccounts = require_accounts();
   var registerSavings = require_savings();
+  var registerDebts = require_debts();
   var registerOwed = require_owed();
   var registerServices = require_services();
   var registerTax = require_tax();
@@ -4762,6 +5253,8 @@ var require_controller = __commonJS((exports2, module2) => {
       budgetMeta: {},
       txFiles: {},
       rules: [],
+      debts: [],
+      debtsDirty: false,
       owed: [],
       owedDirty: false,
       services: [],
@@ -4813,6 +5306,7 @@ var require_controller = __commonJS((exports2, module2) => {
     registerBudgets(ctx);
     registerAccounts(ctx);
     registerSavings(ctx);
+    registerDebts(ctx);
     registerOwed(ctx);
     registerServices(ctx);
     registerTax(ctx);
@@ -4846,6 +5340,7 @@ var require_controller = __commonJS((exports2, module2) => {
         budgets: ctx.renderBudgets,
         savings: ctx.renderSavings,
         accounts: ctx.renderAccounts,
+        debts: ctx.renderDebts,
         owed: ctx.renderOwed,
         services: ctx.renderServices,
         tax: ctx.renderTax,
@@ -4898,7 +5393,7 @@ var require_controller = __commonJS((exports2, module2) => {
       S.pendingImport = null;
       $("#importReview").classList.add("hidden");
       await ctx.loadVault();
-      for (const id of ["#budSave", "#owedSave", "#svcSave", "#taxSave"]) {
+      for (const id of ["#budSave", "#debtSave", "#owedSave", "#svcSave", "#taxSave"]) {
         const b = $(id);
         if (b)
           b.disabled = true;
@@ -5088,6 +5583,10 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#budAddCat").addEventListener("click", ctx.addNewCategory);
     $("#acctAdd").addEventListener("click", ctx.addAccount);
     $("#savAdd").addEventListener("click", ctx.addAccount);
+    $("#debtSave").addEventListener("click", ctx.saveDebts);
+    $("#debtAdd").addEventListener("click", ctx.addDebt);
+    $("#debtExtra").addEventListener("input", ctx.replan);
+    $("#debtStrategy").addEventListener("change", ctx.replan);
     $("#owedSave").addEventListener("click", ctx.saveOwed);
     $("#owedAdd").addEventListener("click", ctx.addOwed);
     $("#svcSave").addEventListener("click", ctx.saveServices);
@@ -5682,6 +6181,20 @@ tags: [finance, finance/budget, finance/budget/owed-money]
 
 ` + `| Person | Amount | Description | Due date | Status |
 |--------|-------:|-------------|----------|--------|
+`);
+          await this.writeIfAbsent(normalizePath(`${folder}/Debts.md`), `---
+kind: debts
+tags: [finance, finance/budget, finance/budget/debts]
+---
+
+# Debts
+
+` + `Money the household owes. \`rate\` is the annual interest rate as a percentage,
+` + `\`payment\` the contracted monthly amount and \`extra\` anything paid on top of it.
+` + `\`status\` is \`active\` or \`paid\`.
+
+` + `| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |
+` + `|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|
 `);
           await this.writeIfAbsent(normalizePath(`${folder}/Services.md`), `---
 kind: services

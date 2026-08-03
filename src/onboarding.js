@@ -427,6 +427,13 @@ class OnboardingWizard extends Modal {
           `---\nkind: owed\ntags: [finance, finance/budget, finance/budget/owed-money]\n---\n\n# Owed Money\n\n` +
           `Money owed to the household. \`status\` is \`outstanding\` or \`paid\`.\n\n` +
           `| Person | Amount | Description | Due date | Status |\n|--------|-------:|-------------|----------|--------|\n`);
+        await this.writeIfAbsent(normalizePath(`${folder}/Debts.md`),
+          `---\nkind: debts\ntags: [finance, finance/budget, finance/budget/debts]\n---\n\n# Debts\n\n` +
+          `Money the household owes. \`rate\` is the annual interest rate as a percentage,\n` +
+          `\`payment\` the contracted monthly amount and \`extra\` anything paid on top of it.\n` +
+          `\`status\` is \`active\` or \`paid\`.\n\n` +
+          `| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n` +
+          `|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|\n`);
         await this.writeIfAbsent(normalizePath(`${folder}/Services.md`),
           `---\nkind: services\ntags: [finance, finance/budget, finance/budget/services]\n---\n\n# Services & Subscriptions\n\n` +
           `Recurring services and subscriptions. \`cycle\` is \`monthly\` or \`annual\`.\n\n` +

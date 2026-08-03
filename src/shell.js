@@ -44,6 +44,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
     </button>
+    <button class="drawer-link" data-view="debts">
+      <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
+    </button>
     <button class="drawer-link" data-view="owed">
       <span class="di"><span class="ico" data-ico="users"></span></span>Owed Money
     </button>
@@ -296,6 +299,53 @@ const SHELL_HTML = `
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
+      </section>
+
+      <section id="view-debts" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Debt</h1>
+          <div class="sub-note">Balances, what the interest costs, and how fast you can be free of it · saved to <code>Debts.md</code></div>
+        </div>
+
+        <div class="mini-grid mini-kpis-4 mb-4" id="debtKpis"></div>
+
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Payoff plan</h2><div class="sub">Same debts, three ways of attacking them</div></div>
+            <div class="row">
+              <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px" for="debtExtra">
+                Extra per month
+                <input type="number" step="1" min="0" id="debtExtra" class="form-control form-control-sm" value="0" style="width:110px">
+              </label>
+              <select id="debtStrategy" class="form-select form-select-sm" aria-label="Payoff method">
+                <option value="avalanche">Avalanche — highest rate first</option>
+                <option value="snowball">Snowball — smallest balance first</option>
+              </select>
+            </div>
+          </div>
+          <div class="body-pad" id="debtPlan"></div>
+          <div class="body-pad" style="padding-top:0" id="debtOrder"></div>
+        </div>
+
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Payments this period</h2><div class="sub">Read from your transactions, matched by category</div></div>
+          </div>
+          <div class="body-pad" id="debtPayments"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Debts</h2><div class="sub">Edit a balance, rate or payment and every figure above follows</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="debtAdd"><span class="ico" data-ico="plus"></span> New debt</button>
+              <button class="btn-gradient" id="debtSave" disabled>Save changes</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table table-hover" id="debtTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-owed" class="hidden">

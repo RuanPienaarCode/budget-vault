@@ -1,0 +1,381 @@
+'use strict';
+/* Debt — balances, interest cost, a payoff-strategy planner, and the link from
+   each debt to the transactions actually paying it. Saved to Debts.md.
+
+   The arithmetic lives in ../debt-math (pure, separately tested); this file is
+   presentation and editing only. */
+
+const { el, keepScroll, escMd, icoEl } = require('../util');
+const { askFields } = require('../modal');
+const { MONTHS } = require('../constants');
+const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require('../debt-math');
+
+/* Debt kinds, in the order a household usually meets them. Stored verbatim in
+   the Type column; an unknown value from a hand-edited file is kept as-is
+   rather than coerced, the same way Services keeps a non-ISO billing date. */
+const DEBT_TYPES = ['credit card', 'personal loan', 'vehicle', 'home loan', 'student', 'store account', 'overdraft', 'other'];
+
+module.exports = function registerDebts(ctx) {
+  const { S, $, app, money, toast, writeFile, txInPeriod, periodSummary } = ctx;
+
+  const mark = () => { S.debtsDirty = true; $('#debtSave').disabled = false; };
+  ctx.registerDirty(() => S.debtsDirty);
+
+  const active = () => S.debts.filter(d => d.status !== 'paid');
+  const committed = d => (d.payment || 0) + (d.extra || 0);
+
+  /* The planner's two inputs live in the DOM rather than in S: they are a
+     what-if, not household data, and persisting them would put a number in
+     Debts.md that no file on disk is the source of truth for. */
+  const planExtra = () => Math.max(0, parseFloat($('#debtExtra').value) || 0);
+  const planStrategy = () => ($('#debtStrategy').value === 'snowball' ? 'snowball' : 'avalanche');
+
+  /* "Aug 2029" from the 'YYYY-MM' debt-math returns. */
+  function monthLabel(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    return `${MONTHS[m - 1]} ${y}`;
+  }
+
+  /* ------------------------------- KPIs --------------------------------- */
+  /* Split out so an edited balance can refresh the totals without rebuilding
+     the row being typed into — on a phone `change` fires on blur, so a full
+     rebuild lands between the tap leaving a field and the one arriving at the
+     next, and the arriving tap hits whatever now occupies those pixels. */
+  function renderDebtKpis() {
+    const list = active();
+    const total = list.reduce((s, d) => s + d.balance, 0);
+    const perMonth = list.reduce((s, d) => s + committed(d), 0);
+    const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
+    const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
+
+    const kpis = $('#debtKpis'); kpis.empty();
+    const tile = (l, v, cls, sub) => {
+      const t = el('div', { class: 'mini' }, el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v));
+      if (sub) t.append(el('div', { class: 's' }, sub));
+      kpis.append(t);
+    };
+    tile('Total debt', money(total), total > 0 ? 'text-danger' : 'text-success',
+      `${list.length} active · ${S.debts.length} tracked`);
+    tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
+    // The single most actionable number here: what this month costs before a
+    // cent of principal moves.
+    tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
+      perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
+    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months)) : (total > 0 ? 'never' : '—'),
+      plan.settled && plan.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
+      plan.settled && plan.months ? humanMonths(plan.months) : (total > 0 ? 'payments too low' : 'no debt tracked'));
+  }
+
+  /* ------------------------------ the plan -------------------------------
+     Three runs side by side. "Minimum only" is the do-nothing baseline the
+     other two are measured against — without it, "you'd pay R48k interest"
+     is a number with nothing to compare to, and the whole card is just a
+     bill. */
+  function renderDebtPlan() {
+    const list = active();
+    const wrap = $('#debtPlan'); wrap.empty();
+    const order = $('#debtOrder'); order.empty();
+
+    if (!list.length) {
+      wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
+        'Add a debt below and this becomes a payoff plan — how long each method takes, and what it saves.'));
+      return;
+    }
+
+    const extra = planExtra();
+    const chosen = planStrategy();
+    const base = simulate(list, { strategy: 'minimum' });
+    const runs = [
+      { key: 'minimum', label: 'Minimum only', note: 'Contracted payments, nothing extra', res: base },
+      { key: 'snowball', label: 'Snowball', note: 'Smallest balance first', res: simulate(list, { extra, strategy: 'snowball' }) },
+      { key: 'avalanche', label: 'Avalanche', note: 'Highest rate first', res: simulate(list, { extra, strategy: 'avalanche' }) },
+    ];
+
+    const grid = el('div', { class: 'debt-plans' });
+    for (const r of runs) {
+      const saved = base.settled && r.res.settled ? base.interest - r.res.interest : 0;
+      const sooner = base.settled && r.res.settled ? base.months - r.res.months : 0;
+      const card = el('div', { class: `debt-plan${r.key === chosen ? ' is-chosen' : ''}` },
+        el('div', { class: 'dp-h' }, el('b', {}, r.label),
+          r.key === chosen ? el('span', { class: 'dp-tag' }, 'selected') : ''),
+        el('div', { class: 'dp-note' }, r.note),
+        el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : 'never'),
+        el('div', { class: 'dp-sub' }, r.res.settled && r.res.months ? humanMonths(r.res.months) : 'payments never clear the interest'),
+        el('div', { class: 'dp-row' }, el('span', {}, 'Interest'),
+          el('b', { class: 'num' }, r.res.settled ? money(r.res.interest, 0) : '—')));
+      if (r.key !== 'minimum' && saved > 1) {
+        card.append(el('div', { class: 'dp-save num' },
+          `Saves ${money(saved, 0)}${sooner > 0 ? ` · ${humanMonths(sooner)} sooner` : ''}`));
+      }
+      grid.append(card);
+    }
+    wrap.append(grid);
+
+    if (!base.settled) {
+      wrap.append(el('p', { class: 'text-danger', style: 'margin:14px 0 0;font-size:12.5px' },
+        `On the contracted payments alone, ${base.stalled.join(', ')} never clears — the interest is at or above the payment. ` +
+        'Raise the payment or add extra above.'));
+    }
+
+    /* Attack order for the selected method. Snowball and avalanche only differ
+       in this list, so showing it is what makes the choice concrete. */
+    const plan = simulate(list, { extra, strategy: chosen });
+    const seq = priorityOrder(list.map(d => ({ ...d })), chosen);
+    order.append(el('div', { class: 'sub', style: 'margin-bottom:10px' },
+      `Put every spare rand at these in order${extra ? ` — ${money(extra, 0)} extra a month` : ''}. ` +
+      'As each one closes, its payment rolls into the next.'));
+    const ol = el('ol', { class: 'debt-order' });
+    for (const d of seq) {
+      const at = plan.payoff[d.name];
+      ol.append(el('li', {},
+        el('span', { class: 'do-n' }, d.name),
+        el('span', { class: 'do-m num' }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`),
+        el('span', { class: 'do-d' }, at ? `clear ${monthLabel(addMonths(at))}` : 'not clearing')));
+    }
+    order.append(ol);
+  }
+
+  /* --------------------- payments seen in transactions -------------------
+     A debt with a category linked reads its own payments straight out of the
+     period's transactions, so "what I said I'd pay" and "what actually left
+     the account" sit next to each other. Without this the page is a wish
+     list. */
+  function renderDebtPayments() {
+    const wrap = $('#debtPayments'); wrap.empty();
+    const list = active();
+    if (!list.length) return;
+
+    const tx = txInPeriod(S.period).filter(t => !t.excluded);
+    const linked = list.filter(d => d.category);
+    if (!linked.length) {
+      wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
+        'Set a category on a debt below and its real payments show up here, read straight from your transactions.'));
+      return;
+    }
+
+    /* Grouped BY CATEGORY, not per debt. Households routinely file every
+       instalment under one "Debt Repayments" category, and matching per debt
+       would then credit the same transactions to each of them — three debts
+       sharing a category would each report the full amount and the totals
+       would triple. One row per category is the finest split the transaction
+       data actually supports. */
+    const byCat = Object.create(null);   // null-proto: a "__proto__" category can't crash the view
+    for (const d of linked) (byCat[d.category] ??= []).push(d);
+
+    const rows = el('div', { class: 'goals' });
+    let plannedAll = 0, paidAll = 0;
+    for (const cat of Object.keys(byCat).sort()) {
+      const group = byCat[cat];
+      // Money out only: a refund or a drawdown on the same category is not a
+      // payment toward the balance, and counting it would flatter the row.
+      const paid = tx.filter(t => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+      const planned = group.reduce((s, d) => s + committed(d), 0);
+      plannedAll += planned; paidAll += paid;
+      const pct = planned > 0 ? Math.min(100, (paid / planned) * 100) : (paid > 0 ? 100 : 0);
+      const short = planned - paid;
+      rows.append(el('div', {},
+        el('div', { class: 'goal-h' },
+          el('div', { class: 'gn' }, cat,
+            el('span', { class: 'text-muted', style: 'font-weight:400' }, ` · ${group.map(d => d.name).join(', ')}`)),
+          el('div', { class: 'gv' }, el('b', {}, money(paid)), ' / ', money(planned))),
+        el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${paid >= planned && planned > 0 ? '' : ' bg-warning'}`, style: `width:${pct}%` })),
+        el('div', { class: 'goal-pct' },
+          planned <= 0 ? 'No payment budgeted against this category'
+            : short > 0.5 ? `${money(short)} short this period`
+              : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ''}`)));
+    }
+    wrap.append(rows);
+
+    /* Debt-to-income for the period. Uses the same income figure the dashboard
+       does, so the two pages can never disagree. */
+    const income = periodSummary(S.period).income;
+    const note = el('div', { class: 'debt-dti' });
+    if (income > 0) {
+      const ratio = (plannedAll / income) * 100;
+      note.append(el('b', { class: `num ${ratio > 36 ? 'text-danger' : ratio > 20 ? 'text-warning' : 'text-success'}` }, `${ratio.toFixed(1)}%`),
+        ' of this period’s income goes to debt payments',
+        el('span', { class: 'text-muted' }, ratio > 36 ? ' — lenders treat above 36% as stretched.' : '.'));
+    } else {
+      note.append(el('span', { class: 'text-muted' }, 'No income recorded this period, so there is no ratio to show yet.'));
+    }
+    note.append(el('div', { class: 'text-muted', style: 'margin-top:4px' },
+      `${money(paidAll)} paid of ${money(plannedAll)} planned this period.`));
+    wrap.append(note);
+  }
+
+  /* ------------------------------ the table ------------------------------
+     focusName: after a rebuild, put focus back on that row's status pill. */
+  function renderDebts(focusName) {
+    renderDebtKpis();
+    renderDebtPlan();
+    renderDebtPayments();
+
+    const t = $('#debtTable');
+    keepScroll(t, () => {
+      t.empty();
+      t.append(el('thead', {}, el('tr', {},
+        el('th', { scope: 'col' }, 'Debt'),
+        el('th', { scope: 'col', class: 'num' }, 'Balance'),
+        el('th', { scope: 'col', class: 'num' }, 'Rate %'),
+        el('th', { scope: 'col', class: 'num' }, 'Payment'),
+        el('th', { scope: 'col', class: 'num' }, 'Extra'),
+        el('th', { scope: 'col' }, 'Category'),
+        el('th', { scope: 'col' }, 'Paid off'),
+        el('th', { scope: 'col' }, 'Clear by'),
+        el('th', { scope: 'col', class: 'num' }, 'Interest left'),
+        el('th', { scope: 'col' }, 'Status'),
+        el('th', { scope: 'col' }, ''))));
+      const body = el('tbody', {});
+
+      for (const d of S.debts) {
+        // Derived cells are updated in place by refreshRow() so editing an
+        // amount never rebuilds the row the field lives in (see renderDebtKpis).
+        const payoffCell = el('td', { class: 'num' });
+        const clearCell = el('td', {});
+        const interestCell = el('td', { class: 'num' });
+        const barFill = el('i', { class: 'cat-bar-fill' });
+
+        function refreshRow() {
+          const paidOff = d.original > 0 ? Math.min(100, Math.max(0, ((d.original - d.balance) / d.original) * 100)) : 0;
+          barFill.style.width = `${paidOff}%`;
+          payoffCell.empty();
+          payoffCell.append(d.original > 0
+            ? el('div', { class: 'debt-prog' }, el('div', { class: 'cat-bar' }, barFill),
+              el('span', { class: 'num' }, `${Math.round(paidOff)}%`))
+            : el('span', { class: 'text-muted' }, '—'));
+
+          const a = amortise(d.balance, d.rate, committed(d));
+          clearCell.empty(); interestCell.empty();
+          if (d.status === 'paid') {
+            clearCell.append(el('span', { class: 'text-success' }, 'settled'));
+            interestCell.append(el('span', { class: 'text-muted' }, '—'));
+          } else if (!a.settled) {
+            // The payment never clears the interest — the one case a payoff
+            // date would be a lie rather than an estimate.
+            clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'never' : 'no payment'));
+            interestCell.append(el('span', { class: 'text-danger num' }, `+${money(monthlyInterest(d.balance, d.rate), 0)}/mo`));
+          } else {
+            clearCell.append(el('span', {}, monthLabel(addMonths(a.months))),
+              el('div', { class: 'text-muted', style: 'font-size:11.5px' }, humanMonths(a.months)));
+            interestCell.append(money(a.interest, 0));
+          }
+        }
+
+        const paidPill = d.status === 'paid';
+        const pill = el('button', { class: `status-pill status-${paidPill ? 'paid' : 'outstanding'}`,
+          'aria-label': `${d.name}: ${paidPill ? 'Settled' : 'Active'} — click to change` },
+          icoEl(paidPill ? ['circle-check', 'check-circle'] : ['hourglass']), paidPill ? 'Settled' : 'Active');
+        pill.addEventListener('click', () => { d.status = paidPill ? 'active' : 'paid'; mark(); renderDebts(d.name); });
+
+        // A settled debt leaves the totals and the plan but stays on the page —
+        // the history is the encouraging part.
+        const refreshAll = () => { mark(); refreshRow(); renderDebtKpis(); renderDebtPlan(); };
+
+        body.append(el('tr', { class: paidPill ? 'debt-settled' : '' },
+          el('td', {}, el('div', { style: 'font-weight:600' }, d.name),
+            el('div', { class: 'text-muted', style: 'font-size:11.5px' },
+              [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.balance || '',
+            style: 'width:120px', 'aria-label': `Balance owed on ${d.name}`,
+            onchange: e => { d.balance = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.rate || '',
+            style: 'width:84px', 'aria-label': `Annual interest rate on ${d.name}`,
+            onchange: e => { d.rate = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.payment || '',
+            style: 'width:110px', 'aria-label': `Monthly payment on ${d.name}`,
+            onchange: e => { d.payment = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.extra || '',
+            style: 'width:100px', 'aria-label': `Extra paid each month on ${d.name}`,
+            onchange: e => { d.extra = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+          // A category that no longer exists in Categories/ (renamed, or a
+          // hand-edited Debts.md) still gets an option of its own. Without it
+          // the select falls back to "— none —" and shows a link that IS on
+          // disk as absent — the reader then "fixes" it and loses the value.
+          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Budget category for ${d.name}`,
+            onchange: e => { d.category = e.target.value; mark(); renderDebtPayments(); } },
+            el('option', { value: '', ...(d.category ? {} : { selected: '' }) }, '— none —'),
+            ...(d.category && !S.categories.some(c => c.name === d.category)
+              ? [el('option', { value: d.category, selected: '' }, `${d.category} (missing)`)] : []),
+            ...S.categories.map(c => el('option', { value: c.name, ...(c.name === d.category ? { selected: '' } : {}) }, c.name)))),
+          payoffCell, clearCell, interestCell,
+          el('td', {}, pill),
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${d.name}`,
+            onclick: () => { S.debts.splice(S.debts.indexOf(d), 1); mark(); renderDebts(); } }, '✕'))));
+
+        refreshRow();
+      }
+
+      if (!S.debts.length) {
+        body.append(el('tr', {}, el('td', { colspan: '11', class: 'text-muted' },
+          'No debts tracked. Add one above — you only need the balance, the rate and what you pay each month.')));
+      }
+      t.append(body);
+    });
+
+    // Cycling a status is the main keyboard interaction here; rebuilding the
+    // table drops focus to <body>, which ejects the reader to the top of the
+    // page on every click. Same fix as Owed Money.
+    if (focusName) {
+      const i = S.debts.findIndex(d => d.name === focusName);
+      const pill = t.querySelectorAll('.status-pill')[i];
+      if (pill) pill.focus();
+    }
+  }
+
+  /* ------------------------------ persistence ---------------------------- */
+  function serializeDebts() {
+    const lines = ['---', ...(S.debtsFm || 'kind: debts').split('\n'), '---', '', '# Debts', '',
+      'Money the household owes. `rate` is the annual interest rate as a percentage,',
+      '`payment` the contracted monthly amount and `extra` anything paid on top of it.',
+      '`status` is `active` or `paid`.', '',
+      '| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |',
+      '|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|'];
+    for (const d of S.debts) {
+      lines.push(`| ${escMd(d.name)} | ${escMd(d.lender)} | ${escMd(d.type)} | ${d.balance.toFixed(2)} | ` +
+        `${d.original.toFixed(2)} | ${d.rate.toFixed(2)} | ${d.payment.toFixed(2)} | ${d.extra.toFixed(2)} | ` +
+        `${escMd(d.start)} | ${escMd(d.category)} | ${d.status} | ${escMd(d.notes)} |`);
+    }
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  async function saveDebts() {
+    await writeFile('Debts.md', serializeDebts());
+    S.debtsDirty = false; $('#debtSave').disabled = true;
+    toast('Saved Debts.md');
+  }
+
+  async function addDebt() {
+    const r = await askFields(app, 'New debt', [
+      { key: 'name', label: 'What is it?', type: 'text' },
+      { key: 'lender', label: 'Lender', type: 'text' },
+      { key: 'type', label: 'Kind of debt', type: 'select', value: 'credit card', options: DEBT_TYPES },
+      { key: 'balance', label: 'Balance still owed', type: 'number', value: '0' },
+      { key: 'rate', label: 'Interest rate (% a year)', type: 'number', value: '0' },
+      { key: 'payment', label: 'Monthly payment', type: 'number', value: '0' },
+      { key: 'category', label: 'Budget category (links its transactions)', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
+    ]);
+    if (!r || !r.name.trim()) return;
+    const num = v => parseFloat(String(v ?? '').replace(',', '.'));
+    const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
+    if ([balance, rate, payment].some(isNaN)) return toast('Balance, rate and payment must be numbers', true);
+    const today = new Date();
+    S.debts.push({
+      name: r.name.trim(), lender: (r.lender || '').trim(), type: r.type || 'other',
+      balance: Math.max(0, balance),
+      // Seeded from the balance so the "paid off" bar has a baseline from day
+      // one; edit it in Debts.md to the real original amount for a true figure.
+      original: Math.max(0, balance),
+      rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
+      start: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+      category: (r.category || '').trim(), status: 'active', notes: '',
+    });
+    S.debtsDirty = true; $('#debtSave').disabled = false; renderDebts();
+  }
+
+  // The three planner controls all recompute the same two panels.
+  function replan() { renderDebtKpis(); renderDebtPlan(); }
+
+  // serializeDebts is published so the vault round-trip test drives the real one.
+  ctx.provide({ renderDebts, saveDebts, addDebt, serializeDebts, replan, DEBT_TYPES });
+};
