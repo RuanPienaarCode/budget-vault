@@ -3286,18 +3286,20 @@ var require_debt_math = __commonJS((exports2, module2) => {
   var monthlyInterest = (balance, rate) => Math.max(0, Number(balance) || 0) * monthlyRate(rate);
   function priorityOrder(debts, strategy) {
     const open = debts.filter((d) => d.balance > EPS);
+    const tie = (a, b) => a.name.localeCompare(b.name) || (a.key ?? 0) - (b.key ?? 0);
     if (strategy === "snowball") {
-      return open.sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
+      return open.sort((a, b) => a.balance - b.balance || tie(a, b));
     }
-    return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || a.name.localeCompare(b.name));
+    return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || tie(a, b));
   }
   function simulate(debts, { extra = 0, strategy = "avalanche", maxMonths = MAX_MONTHS } = {}) {
-    const list = (debts || []).filter((d) => (Number(d.balance) || 0) > EPS).map((d) => ({
+    const list = (debts || []).map((d, idx) => ({
+      key: d.key ?? idx,
       name: d.name,
       balance: Number(d.balance) || 0,
       rate: Number(d.rate) || 0,
       payment: Math.max(0, (Number(d.payment) || 0) + (Number(d.extra) || 0))
-    }));
+    })).filter((d) => d.balance > EPS);
     if (!list.length)
       return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [] };
     const roll = strategy !== "minimum";
@@ -3322,7 +3324,7 @@ var require_debt_math = __commonJS((exports2, module2) => {
           free += d.payment - paid;
         if (d.balance <= EPS) {
           d.balance = 0;
-          payoff[d.name] = m;
+          payoff[d.key] = m;
         }
       }
       if (roll && free > EPS) {
@@ -3334,7 +3336,7 @@ var require_debt_math = __commonJS((exports2, module2) => {
           free -= paid;
           if (d.balance <= EPS) {
             d.balance = 0;
-            payoff[d.name] = m;
+            payoff[d.key] = m;
           }
         }
       }
@@ -3371,7 +3373,7 @@ var require_debts = __commonJS((exports2, module2) => {
       $("#debtSave").disabled = false;
     };
     ctx.registerDirty(() => S.debtsDirty);
-    const active = () => S.debts.filter((d) => d.status !== "paid");
+    const active = () => S.debts.filter((d) => d.status !== "paid").map((d, i) => ({ ...d, key: i }));
     const committed = (d) => (d.payment || 0) + (d.extra || 0);
     const planExtra = () => Math.max(0, parseFloat($("#debtExtra").value) || 0);
     const planStrategy = () => $("#debtStrategy").value === "snowball" ? "snowball" : "avalanche";
@@ -3423,6 +3425,8 @@ var require_debts = __commonJS((exports2, module2) => {
         const card = el("div", { class: `debt-plan${r.key === chosen ? " is-chosen" : ""}` }, el("div", { class: "dp-h" }, el("b", {}, r.label), r.key === chosen ? el("span", { class: "dp-tag" }, "selected") : ""), el("div", { class: "dp-note" }, r.note), el("div", { class: "dp-date num" }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : "never"), el("div", { class: "dp-sub" }, r.res.settled && r.res.months ? humanMonths(r.res.months) : "payments never clear the interest"), el("div", { class: "dp-row" }, el("span", {}, "Interest"), el("b", { class: "num" }, r.res.settled ? money(r.res.interest, 0) : "—")));
         if (r.key !== "minimum" && saved > 1) {
           card.append(el("div", { class: "dp-save num" }, `Saves ${money(saved, 0)}${sooner > 0 ? ` · ${humanMonths(sooner)} sooner` : ""}`));
+          if (extra > 0)
+            card.append(el("div", { class: "dp-src" }, `includes your ${money(extra, 0)}/mo extra`));
         }
         grid.append(card);
       }
@@ -3430,12 +3434,12 @@ var require_debts = __commonJS((exports2, module2) => {
       if (!base.settled) {
         wrap.append(el("p", { class: "text-danger", style: "margin:14px 0 0;font-size:12.5px" }, `On the contracted payments alone, ${base.stalled.join(", ")} never clears — the interest is at or above the payment. ` + "Raise the payment or add extra above."));
       }
-      const plan = simulate(list, { extra, strategy: chosen });
+      const plan = runs.find((r) => r.key === chosen).res;
       const seq = priorityOrder(list.map((d) => ({ ...d })), chosen);
       order.append(el("div", { class: "sub", style: "margin-bottom:10px" }, `Put every spare rand at these in order${extra ? ` — ${money(extra, 0)} extra a month` : ""}. ` + "As each one closes, its payment rolls into the next."));
       const ol = el("ol", { class: "debt-order" });
       for (const d of seq) {
-        const at = plan.payoff[d.name];
+        const at = plan.payoff[d.key];
         ol.append(el("li", {}, el("span", { class: "do-n" }, d.name), el("span", { class: "do-m num" }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`), el("span", { class: "do-d" }, at ? `clear ${monthLabel(addMonths(at))}` : "not clearing")));
       }
       order.append(ol);
@@ -3448,38 +3452,46 @@ var require_debts = __commonJS((exports2, module2) => {
         return;
       const tx = txInPeriod(S.period).filter((t) => !t.excluded);
       const linked = list.filter((d) => d.category);
+      const unlinked = list.filter((d) => !d.category);
+      const committedAll = list.reduce((s, d) => s + committed(d), 0);
+      let linkedPlanned = 0, linkedPaid = 0;
       if (!linked.length) {
         wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Set a category on a debt below and its real payments show up here, read straight from your transactions."));
-        return;
+      } else {
+        const byCat = Object.create(null);
+        for (const d of linked)
+          (byCat[d.category] ??= []).push(d);
+        const rows = el("div", { class: "goals" });
+        for (const cat of Object.keys(byCat).sort()) {
+          const group = byCat[cat];
+          const paid = tx.filter((t) => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+          const planned = group.reduce((s, d) => s + committed(d), 0);
+          linkedPlanned += planned;
+          linkedPaid += paid;
+          const pct = planned > 0 ? Math.min(100, paid / planned * 100) : paid > 0 ? 100 : 0;
+          const short = planned - paid;
+          rows.append(el("div", {}, el("div", { class: "goal-h" }, el("div", { class: "gn" }, cat, el("span", { class: "text-muted", style: "font-weight:400" }, ` · ${group.map((d) => d.name).join(", ")}`)), el("div", { class: "gv" }, el("b", {}, money(paid)), " / ", money(planned))), el("div", { class: "cat-bar" }, el("i", { class: `cat-bar-fill${paid >= planned && planned > 0 ? "" : " bg-warning"}`, style: `width:${pct}%` })), el("div", { class: "goal-pct" }, planned <= 0 ? "No payment budgeted against this category" : short > 0.5 ? `${money(short)} short this period` : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ""}`)));
+        }
+        wrap.append(rows);
       }
-      const byCat = Object.create(null);
-      for (const d of linked)
-        (byCat[d.category] ??= []).push(d);
-      const rows = el("div", { class: "goals" });
-      let plannedAll = 0, paidAll = 0;
-      for (const cat of Object.keys(byCat).sort()) {
-        const group = byCat[cat];
-        const paid = tx.filter((t) => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
-        const planned = group.reduce((s, d) => s + committed(d), 0);
-        plannedAll += planned;
-        paidAll += paid;
-        const pct = planned > 0 ? Math.min(100, paid / planned * 100) : paid > 0 ? 100 : 0;
-        const short = planned - paid;
-        rows.append(el("div", {}, el("div", { class: "goal-h" }, el("div", { class: "gn" }, cat, el("span", { class: "text-muted", style: "font-weight:400" }, ` · ${group.map((d) => d.name).join(", ")}`)), el("div", { class: "gv" }, el("b", {}, money(paid)), " / ", money(planned))), el("div", { class: "cat-bar" }, el("i", { class: `cat-bar-fill${paid >= planned && planned > 0 ? "" : " bg-warning"}`, style: `width:${pct}%` })), el("div", { class: "goal-pct" }, planned <= 0 ? "No payment budgeted against this category" : short > 0.5 ? `${money(short)} short this period` : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ""}`)));
-      }
-      wrap.append(rows);
       const income = periodSummary(S.period).income;
       const note = el("div", { class: "debt-dti" });
       if (income > 0) {
-        const ratio = plannedAll / income * 100;
-        note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), " of this period’s income goes to debt payments", el("span", { class: "text-muted" }, ratio > 36 ? " — lenders treat above 36% as stretched." : "."));
+        const ratio = committedAll / income * 100;
+        note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), ` of this period’s income goes to debt payments — ${money(committedAll)} across ` + `${list.length} debt${list.length === 1 ? "" : "s"}`, el("span", { class: "text-muted" }, ratio > 36 ? ". Lenders treat above 36% as stretched." : "."));
       } else {
-        note.append(el("span", { class: "text-muted" }, "No income recorded this period, so there is no ratio to show yet."));
+        note.append(el("span", { class: "text-muted" }, `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? "" : "s"}. ` + "No income recorded this period, so there is no ratio to show yet."));
       }
-      note.append(el("div", { class: "text-muted", style: "margin-top:4px" }, `${money(paidAll)} paid of ${money(plannedAll)} planned this period.`));
+      if (linked.length) {
+        note.append(el("div", { class: "text-muted", style: "margin-top:4px" }, `${money(linkedPaid)} paid of the ${money(linkedPlanned)} you track by category this period.`));
+      }
+      if (unlinked.length) {
+        const off = unlinked.reduce((s, d) => s + committed(d), 0);
+        note.append(el("div", { class: "text-muted", style: "margin-top:4px" }, `${unlinked.length} debt${unlinked.length === 1 ? "" : "s"} (${money(off)} a month) ` + "have no category linked, so their payments are not tracked above."));
+      }
       wrap.append(note);
     }
-    function renderDebts(focusName) {
+    function renderDebts(focusRow) {
       renderDebtKpis();
       renderDebtPlan();
       renderDebtPayments();
@@ -3518,15 +3530,17 @@ var require_debts = __commonJS((exports2, module2) => {
             "aria-label": `${d.name}: ${paidPill ? "Settled" : "Active"} — click to change`
           }, icoEl(paidPill ? ["circle-check", "check-circle"] : ["hourglass"]), paidPill ? "Settled" : "Active");
           pill.addEventListener("click", () => {
+            const row = S.debts.indexOf(d);
             d.status = paidPill ? "active" : "paid";
             mark();
-            renderDebts(d.name);
+            renderDebts(row);
           });
           const refreshAll = () => {
             mark();
             refreshRow();
             renderDebtKpis();
             renderDebtPlan();
+            renderDebtPayments();
           };
           body.append(el("tr", { class: paidPill ? "debt-settled" : "" }, el("td", {}, el("div", { style: "font-weight:600" }, d.name), el("div", { class: "text-muted", style: "font-size:11.5px" }, [d.lender, d.type].filter(Boolean).join(" · ") || "—")), el("td", { class: "num" }, el("input", {
             type: "number",
@@ -3596,9 +3610,8 @@ var require_debts = __commonJS((exports2, module2) => {
         }
         t.append(body);
       });
-      if (focusName) {
-        const i = S.debts.findIndex((d) => d.name === focusName);
-        const pill = t.querySelectorAll(".status-pill")[i];
+      if (focusRow !== undefined && focusRow >= 0) {
+        const pill = t.querySelectorAll(".status-pill")[focusRow];
         if (pill)
           pill.focus();
       }
@@ -3644,13 +3657,14 @@ var require_debts = __commonJS((exports2, module2) => {
       ]);
       if (!r || !r.name.trim())
         return;
+      const name = r.name.trim();
       const num = (v) => parseFloat(String(v ?? "").replace(",", "."));
       const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
       if ([balance, rate, payment].some(isNaN))
         return toast("Balance, rate and payment must be numbers", true);
       const today = new Date;
       S.debts.push({
-        name: r.name.trim(),
+        name,
         lender: (r.lender || "").trim(),
         type: r.type || "other",
         balance: Math.max(0, balance),

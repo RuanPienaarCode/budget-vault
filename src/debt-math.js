@@ -49,13 +49,16 @@ const monthlyInterest = (balance, rate) => Math.max(0, Number(balance) || 0) * m
      avalanche — highest rate first (mathematically cheapest)
      snowball  — smallest balance first (closes accounts soonest)
    Recomputed every month against live balances, so snowball re-targets as
-   accounts close. Ties break on name so a run is reproducible. */
+   accounts close. Ties break on name and then on key, so a run is reproducible
+   even when two debts share a name — which households do have ("Credit card"
+   twice, one per bank). */
 function priorityOrder(debts, strategy) {
   const open = debts.filter(d => d.balance > EPS);
+  const tie = (a, b) => a.name.localeCompare(b.name) || ((a.key ?? 0) - (b.key ?? 0));
   if (strategy === 'snowball') {
-    return open.sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
+    return open.sort((a, b) => a.balance - b.balance || tie(a, b));
   }
-  return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || a.name.localeCompare(b.name));
+  return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || tie(a, b));
 }
 
 /* Run every debt forward together under one strategy.
@@ -66,18 +69,26 @@ function priorityOrder(debts, strategy) {
    which is the entire point of both methods and the reason their debt-free
    date beats the baseline even when `extra` is 0.
 
-   Returns { months, interest, payoff: {name: month}, settled, stalled }. */
+   `payoff` is keyed by each debt's `key` — its own if it carries one, otherwise
+   its position in the INPUT array. Keying by name looks tidier and is wrong:
+   two debts called "Credit card" would share one entry, so the second one's
+   payoff month would overwrite the first's and both rows would show the same
+   clear date. Mapping before filtering keeps those positions stable even when a
+   settled debt drops out.
+
+   Returns { months, interest, payoff: {key: month}, settled, stalled }. */
 function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MONTHS } = {}) {
   const list = (debts || [])
-    .filter(d => (Number(d.balance) || 0) > EPS)
-    .map(d => ({
+    .map((d, idx) => ({
+      key: d.key ?? idx,
       name: d.name,
       balance: Number(d.balance) || 0,
       rate: Number(d.rate) || 0,
       // A debt's own standing extra is part of its committed payment under
       // every strategy — it is money already being paid, not a what-if.
       payment: Math.max(0, (Number(d.payment) || 0) + (Number(d.extra) || 0)),
-    }));
+    }))
+    .filter(d => d.balance > EPS);
   if (!list.length) return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [] };
 
   const roll = strategy !== 'minimum';
@@ -98,14 +109,14 @@ function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MO
       // A debt closing mid-month spills the unused remainder of THIS month's
       // payment, not just next month's — dropping it would overstate the plan.
       if (roll) free += d.payment - paid;
-      if (d.balance <= EPS) { d.balance = 0; payoff[d.name] = m; }
+      if (d.balance <= EPS) { d.balance = 0; payoff[d.key] = m; }
     }
     if (roll && free > EPS) {
       for (const d of priorityOrder(list, strategy)) {
         if (free <= EPS) break;
         const paid = Math.min(free, d.balance);
         d.balance -= paid; free -= paid;
-        if (d.balance <= EPS) { d.balance = 0; payoff[d.name] = m; }
+        if (d.balance <= EPS) { d.balance = 0; payoff[d.key] = m; }
       }
     }
   }
