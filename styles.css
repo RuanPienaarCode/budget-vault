@@ -954,6 +954,7 @@
 }
 .budget-app-root .debt-plan .dp-row b { color: var(--text-primary); }
 .budget-app-root .debt-plan .dp-save { font-size: 12px; font-weight: 600; color: var(--color-success); margin-top: 8px; }
+.budget-app-root .debt-plan .dp-src { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
 
 .budget-app-root .debt-order { list-style: none; margin: 0; padding: 0; counter-reset: dbt; }
 .budget-app-root .debt-order li {

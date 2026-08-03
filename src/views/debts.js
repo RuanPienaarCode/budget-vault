@@ -21,7 +21,12 @@ module.exports = function registerDebts(ctx) {
   const mark = () => { S.debtsDirty = true; $('#debtSave').disabled = false; };
   ctx.registerDirty(() => S.debtsDirty);
 
-  const active = () => S.debts.filter(d => d.status !== 'paid');
+  /* Copies, each stamped with a stable `key`, because two debts can share a
+     name — "Credit card" once per bank is the normal case, not an edge one —
+     and debt-math keys its payoff months by `key` for exactly that reason.
+     Read-only everywhere it is used, so copying costs nothing and stops a view
+     helper from writing through to the model by accident. */
+  const active = () => S.debts.filter(d => d.status !== 'paid').map((d, i) => ({ ...d, key: i }));
   const committed = d => (d.payment || 0) + (d.extra || 0);
 
   /* The planner's two inputs live in the DOM rather than in S: they are a
@@ -106,6 +111,11 @@ module.exports = function registerDebts(ctx) {
       if (r.key !== 'minimum' && saved > 1) {
         card.append(el('div', { class: 'dp-save num' },
           `Saves ${money(saved, 0)}${sooner > 0 ? ` · ${humanMonths(sooner)} sooner` : ''}`));
+        /* Say whose money that is. The run includes the reader's own extra
+           while the baseline does not, so crediting the METHOD for the whole
+           saving overstates what picking snowball or avalanche actually buys
+           — and the green number is the line people read. */
+        if (extra > 0) card.append(el('div', { class: 'dp-src' }, `includes your ${money(extra, 0)}/mo extra`));
       }
       grid.append(card);
     }
@@ -118,15 +128,19 @@ module.exports = function registerDebts(ctx) {
     }
 
     /* Attack order for the selected method. Snowball and avalanche only differ
-       in this list, so showing it is what makes the choice concrete. */
-    const plan = simulate(list, { extra, strategy: chosen });
+       in this list, so showing it is what makes the choice concrete.
+
+       The chosen run is reused from `runs` above rather than simulated again —
+       planStrategy() only ever returns one of those two keys, so the extra run
+       was computing a result already sitting in the array. */
+    const plan = runs.find(r => r.key === chosen).res;
     const seq = priorityOrder(list.map(d => ({ ...d })), chosen);
     order.append(el('div', { class: 'sub', style: 'margin-bottom:10px' },
       `Put every spare rand at these in order${extra ? ` — ${money(extra, 0)} extra a month` : ''}. ` +
       'As each one closes, its payment rolls into the next.'));
     const ol = el('ol', { class: 'debt-order' });
     for (const d of seq) {
-      const at = plan.payoff[d.name];
+      const at = plan.payoff[d.key];
       ol.append(el('li', {},
         el('span', { class: 'do-n' }, d.name),
         el('span', { class: 'do-m num' }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`),
@@ -147,65 +161,89 @@ module.exports = function registerDebts(ctx) {
 
     const tx = txInPeriod(S.period).filter(t => !t.excluded);
     const linked = list.filter(d => d.category);
+    const unlinked = list.filter(d => !d.category);
+
+    /* Every active debt, categorised or not. The ratio below is about what the
+       household actually owes each month, so it must not depend on which debts
+       happen to be linked to a category: summing only the LINKED ones meant
+       unlinking one category moved the ratio from 14.6% to 2.6% without a cent
+       changing hands, and always in the direction that looks safer. */
+    const committedAll = list.reduce((s, d) => s + committed(d), 0);
+
+    let linkedPlanned = 0, linkedPaid = 0;
     if (!linked.length) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         'Set a category on a debt below and its real payments show up here, read straight from your transactions.'));
-      return;
-    }
+    } else {
+      /* Grouped BY CATEGORY, not per debt. Households routinely file every
+         instalment under one "Debt Repayments" category, and matching per debt
+         would then credit the same transactions to each of them — three debts
+         sharing a category would each report the full amount and the totals
+         would triple. One row per category is the finest split the transaction
+         data actually supports. */
+      const byCat = Object.create(null);   // null-proto: a "__proto__" category can't crash the view
+      for (const d of linked) (byCat[d.category] ??= []).push(d);
 
-    /* Grouped BY CATEGORY, not per debt. Households routinely file every
-       instalment under one "Debt Repayments" category, and matching per debt
-       would then credit the same transactions to each of them — three debts
-       sharing a category would each report the full amount and the totals
-       would triple. One row per category is the finest split the transaction
-       data actually supports. */
-    const byCat = Object.create(null);   // null-proto: a "__proto__" category can't crash the view
-    for (const d of linked) (byCat[d.category] ??= []).push(d);
-
-    const rows = el('div', { class: 'goals' });
-    let plannedAll = 0, paidAll = 0;
-    for (const cat of Object.keys(byCat).sort()) {
-      const group = byCat[cat];
-      // Money out only: a refund or a drawdown on the same category is not a
-      // payment toward the balance, and counting it would flatter the row.
-      const paid = tx.filter(t => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
-      const planned = group.reduce((s, d) => s + committed(d), 0);
-      plannedAll += planned; paidAll += paid;
-      const pct = planned > 0 ? Math.min(100, (paid / planned) * 100) : (paid > 0 ? 100 : 0);
-      const short = planned - paid;
-      rows.append(el('div', {},
-        el('div', { class: 'goal-h' },
-          el('div', { class: 'gn' }, cat,
-            el('span', { class: 'text-muted', style: 'font-weight:400' }, ` · ${group.map(d => d.name).join(', ')}`)),
-          el('div', { class: 'gv' }, el('b', {}, money(paid)), ' / ', money(planned))),
-        el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${paid >= planned && planned > 0 ? '' : ' bg-warning'}`, style: `width:${pct}%` })),
-        el('div', { class: 'goal-pct' },
-          planned <= 0 ? 'No payment budgeted against this category'
-            : short > 0.5 ? `${money(short)} short this period`
-              : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ''}`)));
+      const rows = el('div', { class: 'goals' });
+      for (const cat of Object.keys(byCat).sort()) {
+        const group = byCat[cat];
+        // Money out only: a refund or a drawdown on the same category is not a
+        // payment toward the balance, and counting it would flatter the row.
+        const paid = tx.filter(t => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+        const planned = group.reduce((s, d) => s + committed(d), 0);
+        linkedPlanned += planned; linkedPaid += paid;
+        const pct = planned > 0 ? Math.min(100, (paid / planned) * 100) : (paid > 0 ? 100 : 0);
+        const short = planned - paid;
+        rows.append(el('div', {},
+          el('div', { class: 'goal-h' },
+            el('div', { class: 'gn' }, cat,
+              el('span', { class: 'text-muted', style: 'font-weight:400' }, ` · ${group.map(d => d.name).join(', ')}`)),
+            el('div', { class: 'gv' }, el('b', {}, money(paid)), ' / ', money(planned))),
+          el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${paid >= planned && planned > 0 ? '' : ' bg-warning'}`, style: `width:${pct}%` })),
+          el('div', { class: 'goal-pct' },
+            planned <= 0 ? 'No payment budgeted against this category'
+              : short > 0.5 ? `${money(short)} short this period`
+                : `Paid in full${paid - planned > 0.5 ? ` · ${money(paid - planned)} extra` : ''}`)));
+      }
+      wrap.append(rows);
     }
-    wrap.append(rows);
 
     /* Debt-to-income for the period. Uses the same income figure the dashboard
        does, so the two pages can never disagree. */
     const income = periodSummary(S.period).income;
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {
-      const ratio = (plannedAll / income) * 100;
+      const ratio = (committedAll / income) * 100;
       note.append(el('b', { class: `num ${ratio > 36 ? 'text-danger' : ratio > 20 ? 'text-warning' : 'text-success'}` }, `${ratio.toFixed(1)}%`),
-        ' of this period’s income goes to debt payments',
-        el('span', { class: 'text-muted' }, ratio > 36 ? ' — lenders treat above 36% as stretched.' : '.'));
+        ` of this period’s income goes to debt payments — ${money(committedAll)} across ` +
+        `${list.length} debt${list.length === 1 ? '' : 's'}`,
+        el('span', { class: 'text-muted' }, ratio > 36 ? '. Lenders treat above 36% as stretched.' : '.'));
     } else {
-      note.append(el('span', { class: 'text-muted' }, 'No income recorded this period, so there is no ratio to show yet.'));
+      note.append(el('span', { class: 'text-muted' },
+        `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? '' : 's'}. ` +
+        'No income recorded this period, so there is no ratio to show yet.'));
     }
-    note.append(el('div', { class: 'text-muted', style: 'margin-top:4px' },
-      `${money(paidAll)} paid of ${money(plannedAll)} planned this period.`));
+    /* The reconciliation line stays scoped to what is actually traceable —
+       mixing an all-debts "planned" with a linked-only "paid" is what produced
+       "R6,300 paid of R1,150 planned", a card claiming a 5× overpayment. */
+    if (linked.length) {
+      note.append(el('div', { class: 'text-muted', style: 'margin-top:4px' },
+        `${money(linkedPaid)} paid of the ${money(linkedPlanned)} you track by category this period.`));
+    }
+    if (unlinked.length) {
+      const off = unlinked.reduce((s, d) => s + committed(d), 0);
+      note.append(el('div', { class: 'text-muted', style: 'margin-top:4px' },
+        `${unlinked.length} debt${unlinked.length === 1 ? '' : 's'} (${money(off)} a month) ` +
+        'have no category linked, so their payments are not tracked above.'));
+    }
     wrap.append(note);
   }
 
   /* ------------------------------ the table ------------------------------
-     focusName: after a rebuild, put focus back on that row's status pill. */
-  function renderDebts(focusName) {
+     focusRow: index into S.debts whose status pill should get focus back after
+     the rebuild. An index rather than a name — two debts can share one, and
+     looking the row up by name put focus on the wrong pill. */
+  function renderDebts(focusRow) {
     renderDebtKpis();
     renderDebtPlan();
     renderDebtPayments();
@@ -265,11 +303,20 @@ module.exports = function registerDebts(ctx) {
         const pill = el('button', { class: `status-pill status-${paidPill ? 'paid' : 'outstanding'}`,
           'aria-label': `${d.name}: ${paidPill ? 'Settled' : 'Active'} — click to change` },
           icoEl(paidPill ? ['circle-check', 'check-circle'] : ['hourglass']), paidPill ? 'Settled' : 'Active');
-        pill.addEventListener('click', () => { d.status = paidPill ? 'active' : 'paid'; mark(); renderDebts(d.name); });
+        pill.addEventListener('click', () => {
+          const row = S.debts.indexOf(d);
+          d.status = paidPill ? 'active' : 'paid';
+          mark(); renderDebts(row);
+        });
 
         // A settled debt leaves the totals and the plan but stays on the page —
         // the history is the encouraging part.
-        const refreshAll = () => { mark(); refreshRow(); renderDebtKpis(); renderDebtPlan(); };
+        /* renderDebtPayments is in here because a payment or extra edit changes
+           what that panel calls "planned". Leaving it out put two contradictory
+           figures on screen at once — the KPI read R9,550 while the panel below
+           still read R6,550. It holds no inputs, so re-rendering it cannot eat
+           a tap the way rebuilding this row would. */
+        const refreshAll = () => { mark(); refreshRow(); renderDebtKpis(); renderDebtPlan(); renderDebtPayments(); };
 
         body.append(el('tr', { class: paidPill ? 'debt-settled' : '' },
           el('td', {}, el('div', { style: 'font-weight:600' }, d.name),
@@ -315,9 +362,8 @@ module.exports = function registerDebts(ctx) {
     // Cycling a status is the main keyboard interaction here; rebuilding the
     // table drops focus to <body>, which ejects the reader to the top of the
     // page on every click. Same fix as Owed Money.
-    if (focusName) {
-      const i = S.debts.findIndex(d => d.name === focusName);
-      const pill = t.querySelectorAll('.status-pill')[i];
+    if (focusRow !== undefined && focusRow >= 0) {
+      const pill = t.querySelectorAll('.status-pill')[focusRow];
       if (pill) pill.focus();
     }
   }
@@ -356,12 +402,17 @@ module.exports = function registerDebts(ctx) {
       { key: 'category', label: 'Budget category (links its transactions)', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
     ]);
     if (!r || !r.name.trim()) return;
+    /* Deliberately NOT unique. Two debts called "Credit card", one per bank, is
+       the normal case — debt-math keys its payoff months by a positional `key`
+       and focus restores by row index, so nothing downstream needs the name to
+       be distinct. */
+    const name = r.name.trim();
     const num = v => parseFloat(String(v ?? '').replace(',', '.'));
     const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
     if ([balance, rate, payment].some(isNaN)) return toast('Balance, rate and payment must be numbers', true);
     const today = new Date();
     S.debts.push({
-      name: r.name.trim(), lender: (r.lender || '').trim(), type: r.type || 'other',
+      name, lender: (r.lender || '').trim(), type: r.type || 'other',
       balance: Math.max(0, balance),
       // Seeded from the balance so the "paid off" bar has a baseline from day
       // one; edit it in Debts.md to the real original amount for a true figure.

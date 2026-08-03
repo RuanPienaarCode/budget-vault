@@ -90,7 +90,27 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   const sim = simulate(solo, { strategy: 'minimum' });
   eq(sim.months, direct.months, 'one debt on its own must agree with amortise()');
   near(sim.interest, direct.interest, 0.01, 'and so must its interest');
-  eq(sim.payoff.Only, direct.months, 'the payoff month is recorded');
+  eq(sim.payoff[0], direct.months, 'the payoff month is recorded against the debt\'s key');
+}
+
+/* ---- 6b. two debts sharing a name keep separate payoff months ----
+   "Credit card" once per bank is an ordinary household, not an edge case. The
+   payoff map used to be keyed by name, so the second one silently overwrote
+   the first and the attack-order list showed both clearing on the same date —
+   the later one, so the reader was told the small card takes as long as the
+   big one. */
+{
+  const twins = [
+    { name: 'Credit card', balance: 2000, rate: 20, payment: 500, extra: 0 },
+    { name: 'Credit card', balance: 40000, rate: 20, payment: 900, extra: 0 },
+  ];
+  const sim = simulate(twins, { strategy: 'minimum' });
+  eq(Object.keys(sim.payoff).length, 2, 'both same-named debts get their own payoff entry');
+  ok(sim.payoff[0] < sim.payoff[1], 'the small one clears first, and says so');
+
+  // A caller supplying its own keys (the view does) must have them honoured.
+  const keyed = simulate(twins.map((d, i) => ({ ...d, key: `d${i}` })), { strategy: 'minimum' });
+  eq(Object.keys(keyed.payoff).sort(), ['d0', 'd1'], 'caller-supplied keys are used verbatim');
 }
 
 /* ---- 7. rollover is what makes snowball/avalanche beat the baseline ----
