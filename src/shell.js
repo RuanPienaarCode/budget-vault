@@ -57,6 +57,9 @@ const SHELL_HTML = `
     <div class="drawer-divider"></div>
 
     <div class="drawer-section-label">Tools</div>
+    <button class="drawer-link" data-view="loans">
+      <span class="di"><span class="ico" data-ico="calculator"></span></span>Loan Calculators
+    </button>
     <button class="drawer-link" data-view="import">
       <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span>Import CSV
     </button>
@@ -384,6 +387,76 @@ const SHELL_HTML = `
           </div>
           <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table table-hover" id="svcTable"></table></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-loans" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Loan Calculators</h1>
+          <div class="sub-note" id="loansSubNote"></div>
+        </div>
+
+        <div class="loan-tabs" id="loanTabs" role="group" aria-label="Choose a calculator">
+          <button type="button" class="loan-tab is-on" id="loanTabHome" aria-pressed="true">
+            <span class="ico" data-ico="house|home"></span> Home loan
+          </button>
+          <button type="button" class="loan-tab" id="loanTabCar" aria-pressed="false">
+            <span class="ico" data-ico="car"></span> Vehicle finance
+          </button>
+        </div>
+
+        <div id="loanHome">
+          <div class="loan-grid mb-4">
+            <div class="card">
+              <div class="card-h"><div><h2>Loan details</h2><div class="sub">What you are buying and how you are paying for it</div></div></div>
+              <div class="body-pad" id="loanHomeForm"></div>
+            </div>
+            <div class="card">
+              <div class="card-h"><div><h2>Monthly repayment</h2><div class="sub">And what the loan costs over its life</div></div></div>
+              <div class="body-pad" id="loanHomeOut"></div>
+            </div>
+          </div>
+
+          <div class="card mb-4" id="loanHomeCostsCard">
+            <div class="card-h"><div><h2>Once-off buying costs</h2><div class="sub" id="loanHomeCostsSub"></div></div></div>
+            <div class="body-pad" id="loanHomeCosts"></div>
+          </div>
+
+          <div class="card">
+            <div class="body-pad body-pad-tight">
+              <details class="loan-amort">
+                <summary>Year-by-year amortisation</summary>
+                <div class="table-responsive"><table class="table" id="loanHomeAmort"></table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div id="loanCar" class="hidden">
+          <div class="loan-grid mb-4">
+            <div class="card">
+              <div class="card-h"><div><h2>Vehicle finance details</h2><div class="sub">Price, deposit, term and any balloon</div></div></div>
+              <div class="body-pad" id="loanCarForm"></div>
+            </div>
+            <div class="card">
+              <div class="card-h"><div><h2>Monthly repayment</h2><div class="sub">Instalment, fees and the total cost of the car</div></div></div>
+              <div class="body-pad" id="loanCarOut"></div>
+            </div>
+          </div>
+
+          <div class="card mb-4" id="loanCarFeesCard">
+            <div class="card-h"><div><h2>Finance fees</h2><div class="sub" id="loanCarFeesSub"></div></div></div>
+            <div class="body-pad" id="loanCarFees"></div>
+          </div>
+
+          <div class="card">
+            <div class="body-pad body-pad-tight">
+              <details class="loan-amort">
+                <summary>Year-by-year amortisation</summary>
+                <div class="table-responsive"><table class="table" id="loanCarAmort"></table></div>
+              </details>
+            </div>
           </div>
         </div>
       </section>

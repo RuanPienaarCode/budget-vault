@@ -22,6 +22,7 @@ const registerDebts = require('./views/debts');
 const registerOwed = require('./views/owed');
 const registerServices = require('./views/services');
 const registerTax = require('./views/tax');
+const registerLoans = require('./views/loans');
 const registerImport = require('./views/import');
 
 function mountApp(view) {
@@ -141,6 +142,7 @@ function mountApp(view) {
   registerOwed(ctx);
   registerServices(ctx);
   registerTax(ctx);
+  registerLoans(ctx);
   registerImport(ctx);
 
   /* ---------------------------- view switching --------------------------- */
@@ -166,7 +168,7 @@ function mountApp(view) {
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
-       tax: ctx.renderTax, import: ctx.renderImport, connect: () => {} })[S.view]();
+       tax: ctx.renderTax, loans: ctx.renderLoans, import: ctx.renderImport, connect: () => {} })[S.view]();
   }
   /* ---------------------- drawer + theme (app shell) --------------------- */
   function openDrawer() {

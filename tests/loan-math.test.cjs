@@ -12,7 +12,7 @@
      node tests/loans.test.cjs      # exits non-zero on any failure */
 
 const assert = require('assert');
-const L = require('../src/loans');
+const L = require('../src/loan-math');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.strictEqual(a, b, m); checks++; };
