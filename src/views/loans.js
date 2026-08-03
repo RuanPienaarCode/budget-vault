@@ -54,9 +54,26 @@ module.exports = function registerLoans(ctx) {
       value: String(value), ...attrs,
     });
     input.addEventListener('input', () => commit(input.value));
-    const wrap = el('label', { class: 'loan-field' }, el('span', { class: 'lf-l' }, label), input);
-    if (hint) wrap.append(el('span', { class: 'lf-h' }, hint));
-    return wrap;
+    const hintEl = el('span', { class: 'lf-h' }, hint || '');
+    const wrap = el('label', { class: 'loan-field' }, el('span', { class: 'lf-l' }, label), input, hintEl);
+    return { wrap, input, hintEl };
+  }
+
+  /* The rate field, for both calculators. Kept together because the two share
+     the "untouched fields follow the country default" behaviour, and because
+     the hint under it is profile text that changes with the country. */
+  function rateField(state, recalc) {
+    const f = numField('Interest rate (% a year)', P().rateNote, state.rate ?? P().defaultRate,
+      { min: '0', max: '40', step: '0.25' },
+      v => { state.rate = Math.max(0, parseFloat(v) || 0); recalc(); });
+    // Re-read the profile on every render: switching country has to move both
+    // the hint and — while the reader has not overridden it — the rate itself.
+    syncs.push(() => {
+      const p = P();
+      f.hintEl.textContent = p.rateNote;
+      if (state.rate === null) f.input.value = String(p.defaultRate);
+    });
+    return f.wrap;
   }
 
   /* Range + a readout that IS the label, so a screen reader announces the
@@ -127,7 +144,7 @@ module.exports = function registerLoans(ctx) {
     const form = el('div', { class: 'loan-form' });
 
     form.append(numField('Purchase price', null, home.price, { min: '0', step: '10000' },
-      v => { home.price = Math.max(0, parseFloat(v) || 0); homeDepositSync(); recalcHome(); }));
+      v => { home.price = Math.max(0, parseFloat(v) || 0); homeDepositSync(); recalcHome(); }).wrap);
 
     const dep = rangeField(
       pct => `Deposit — ${pct}% (${money(home.price * pct / 100, 0)})`,
@@ -136,8 +153,7 @@ module.exports = function registerLoans(ctx) {
     homeDepositSync = dep.sync;
     form.append(dep.wrap);
 
-    form.append(numField('Interest rate (% a year)', P().rateNote, home.rate, { min: '0', max: '40', step: '0.25' },
-      v => { home.rate = Math.max(0, parseFloat(v) || 0); recalcHome(); }));
+    form.append(rateField(home, recalcHome));
 
     const term = rangeField(
       y => `Loan term — ${y} years`,
@@ -153,7 +169,7 @@ module.exports = function registerLoans(ctx) {
     const p = P();
     const deposit = home.price * home.depositPct / 100;
     const loan = Math.max(0, home.price - deposit);
-    const t = totalsFor(loan, home.rate, home.years * 12);
+    const t = totalsFor(loan, home.rate ?? p.defaultRate, home.years * 12);
 
     const duty = p.transferDuty(home.price);
     const bond = p.bondCost(loan);
@@ -188,7 +204,7 @@ module.exports = function registerLoans(ctx) {
     }
 
     amortTable($('#loanHomeAmort'),
-      byYear(amortise(loan, home.rate, home.years * 12, t.payment)), 'Year');
+      byYear(amortise(loan, home.rate ?? p.defaultRate, home.years * 12, t.payment)), 'Year');
   }
 
   /* --------------------------- vehicle finance ---------------------------- */
@@ -206,7 +222,7 @@ module.exports = function registerLoans(ctx) {
     const form = el('div', { class: 'loan-form' });
 
     form.append(numField('Vehicle price', null, car.price, { min: '0', step: '5000' },
-      v => { car.price = Math.max(0, parseFloat(v) || 0); carDepositSync(); carBalloonSync(); recalcCar(); }));
+      v => { car.price = Math.max(0, parseFloat(v) || 0); carDepositSync(); carBalloonSync(); recalcCar(); }).wrap);
 
     const dep = rangeField(
       pct => `Deposit — ${pct}% (${money(car.price * pct / 100, 0)})`,
@@ -215,8 +231,7 @@ module.exports = function registerLoans(ctx) {
     carDepositSync = dep.sync;
     form.append(dep.wrap);
 
-    form.append(numField('Interest rate (% a year)', P().rateNote, car.rate, { min: '0', max: '40', step: '0.25' },
-      v => { car.rate = Math.max(0, parseFloat(v) || 0); recalcCar(); }));
+    form.append(rateField(car, recalcCar));
 
     form.append(selectField('Loan term', TERMS, car.months,
       v => { car.months = Number(v); recalcCar(); }));
@@ -244,7 +259,7 @@ module.exports = function registerLoans(ctx) {
     const deposit = car.price * car.depositPct / 100;
     const finance = Math.max(0, car.price - deposit);
     const balloon = car.price * car.balloonPct / 100;
-    const t = totalsFor(finance, car.rate, car.months, balloon);
+    const t = totalsFor(finance, car.rate ?? p.defaultRate, car.months, balloon);
 
     const init = p.vehicleInitiationFee(finance);
     const service = p.serviceFee;
@@ -292,7 +307,7 @@ module.exports = function registerLoans(ctx) {
     }
 
     amortTable($('#loanCarAmort'),
-      byYear(amortise(finance, car.rate, car.months, t.payment, balloon)), 'Year');
+      byYear(amortise(finance, car.rate ?? p.defaultRate, car.months, t.payment, balloon)), 'Year');
   }
 
   /* -------------------------------- tabs ---------------------------------- */
@@ -314,11 +329,6 @@ module.exports = function registerLoans(ctx) {
 
   function renderLoans() {
     const p = P();
-    // Country defaults land on first render, not at mount — the vault (and with
-    // it Settings.md `country`) has not been read when the register chain runs.
-    if (home.rate === null) home.rate = p.defaultRate;
-    if (car.rate === null) car.rate = p.defaultRate;
-
     $('#loansSubNote').textContent = p.hasBuyingCosts
       ? 'Nothing here is saved — change anything and the numbers follow. Costs and fees follow South African rules.'
       : 'Nothing here is saved — change anything and the numbers follow. Purchase taxes and lender fees are not modelled for your country.';
@@ -329,6 +339,10 @@ module.exports = function registerLoans(ctx) {
     // them holds a focusable control.
     if (!homeBuilt) buildHome();
     if (!carBuilt) buildCar();
+    // Refresh what the forms cache from the profile — the money inside every
+    // slider readout, and the rate hint. Without this, changing country left
+    // "Deposit — 10% (¥ 150,000)" sitting above a rand-denominated result.
+    for (const sync of syncs) sync();
     recalcHome();
     recalcCar();
   }
