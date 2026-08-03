@@ -12,9 +12,10 @@ var require_constants = __commonJS((exports2, module2) => {
     privacyLock: true
   };
   var FEEDBACK_URL = "https://forms.gle/EVJKCuZxNQ9vJhTz6";
+  var SUPPORT_URL = "https://paypal.me/ruanpienaar86";
   var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, TYPE_ORDER, MONTHS };
+  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS };
 });
 
 // src/util.js
@@ -5715,12 +5716,13 @@ tags: [finance, finance/budget, finance/budget/services]
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, TFile, normalizePath } = require("obsidian");
-  var { DEFAULT_SETTINGS, FEEDBACK_URL } = require_constants();
+  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr } = require_util();
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency"]);
   var FEEDBACK_DESC = "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.";
+  var SUPPORT_DESC = "Budget Vault is free and always will be. If you'd like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.";
 
   class BudgetSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -5751,6 +5753,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         this.plugin.forEachView((ctl) => ctl.applyPrivacyLock());
       }));
       new Setting(containerEl).setName("Send feedback").setDesc(FEEDBACK_DESC).addButton((b) => b.setButtonText("Open feedback form").onClick(() => window.open(FEEDBACK_URL, "_blank")));
+      new Setting(containerEl).setName("Support Budget Vault").setDesc(SUPPORT_DESC).addButton((b) => b.setButtonText("Send a thank you").onClick(() => window.open(SUPPORT_URL, "_blank")));
       new Setting(containerEl).setName("Budget data").setHeading().setDesc("Stored in Settings.md inside the budget folder, so they apply on every device.");
       const fmSection = containerEl.createDiv();
       this.renderMdSettings(fmSection);
@@ -5885,6 +5888,13 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           desc: FEEDBACK_DESC,
           render: (setting) => {
             setting.addButton((b) => b.setButtonText("Open feedback form").onClick(() => window.open(FEEDBACK_URL, "_blank")));
+          }
+        },
+        {
+          name: "Support Budget Vault",
+          desc: SUPPORT_DESC,
+          render: (setting) => {
+            setting.addButton((b) => b.setButtonText("Send a thank you").onClick(() => window.open(SUPPORT_URL, "_blank")));
           }
         },
         {
