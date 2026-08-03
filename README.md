@@ -1,145 +1,79 @@
 # Budget Vault
 
-> A personal budget dashboard that lives inside your Obsidian vault — every account, budget and transaction stored as plain markdown you own.
-
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.4.0-7c3aed)
+![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.0-7c3aed)
 ![Mobile ready](https://img.shields.io/badge/mobile-iOS%20%26%20Android-blue)
 
-No accounts. No cloud service. No telemetry. Budget Vault reads and writes ordinary markdown files in a folder of your vault, so your financial data syncs however your vault syncs, stays readable without the plugin, and never leaves your devices.
+Most budgeting apps ask you to upload your bank statements and trust someone else's server with them. Budget Vault doesn't.
 
-## Why budget on your own data?
+Every account, budget and transaction is a plain markdown file in your own vault, on your own devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours. The plugin makes zero network requests, so your financial history can't be uploaded, analysed or sold.
 
-Most budgeting apps ask you to hand your bank statements to someone else's server and trust them with it. Budget Vault flips that:
+Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your budget follows you to every device — synced by a service you chose, not one we picked.
 
-- **You own your data.** Every account, budget and transaction is a plain markdown file sitting in *your* vault, on *your* devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours.
-- **Nobody else sees it.** The plugin makes zero network requests. Your financial history is never uploaded, analysed, or monetised — it can't be, because it never leaves your vault.
-- **Access it anywhere with your own cloud.** Put your vault in iCloud Drive (or use Obsidian Sync, Dropbox, Syncthing…) and your budget follows you to every device — synced by a cloud *you* control, encrypted with *your* account, invisible to us.
-- **Use it through the Obsidian app.** The free [Obsidian](https://obsidian.md) app on desktop, iPhone and Android is the only thing you need. Open your vault, tap the wallet icon, and your budget is there.
+## What it does
 
-> **📱 Phone tip:** if your vault lives in iCloud Drive, mark it as downloaded on your phone (Files app → long-press the vault folder → *Download Now*, or simply open the vault in Obsidian once and let it finish syncing). A locally-downloaded vault means the budget opens instantly instead of waiting on iCloud to fetch files.
+- **Dashboard** — spending trend, budget vs actual
+- **Transactions** — search, filter and edit your full history
+- **Budgets** — per category, per period, with live "left / over" feedback
+- **CSV import** — drop a bank statement, review, commit
+- **Auto-categorisation** — rules learned from your corrections
+- **Savings, accounts, owed money, subscriptions, tax** — a screen each
+- Payday-aligned periods, and full support on iOS and Android
 
-## Features
+## Install
 
-- **Dashboard** — spending trend across recent periods, budget vs actual at a glance
-- **Transactions** — browse, search, filter and edit your full history, stored one markdown file per account per month
-- **Budgets** — set amounts per category per period, with live "left / over" feedback as you type; categories are grouped into sections (income, expense, debt, services, insurance, giving, savings, investment, luxuries, transfer) and can be added or deleted right from the table
-- **Payday-aligned periods** — months can start on your payday (e.g. the 25th) instead of the 1st
-- **CSV import** — drop a bank statement export, review with automatic categorisation and duplicate detection, commit
-- **Auto-categorisation rules** — pattern → category rules learned from your corrections, stored in a plain CSV
-- **Savings & investments, accounts, owed money, subscriptions** — dedicated screens for each
-- **Tax season tracking** — a per-year checklist with document uploads stored alongside it in the vault, plus a Figures table that records the amounts off each certificate and checks them against your country's thresholds and your final assessment
-- **Desktop and mobile** — no Node or Electron APIs; works on Obsidian for iOS and Android
+1. Copy `manifest.json`, `main.js` and `styles.css` into `<your vault>/.obsidian/plugins/budget-app/`
+2. Settings → Community plugins → turn off Restricted mode → enable Budget Vault
+3. Open it from the wallet icon
 
-## Installation
+A setup wizard runs on first launch. On mobile, repeat step 2 once — Restricted mode is per-device.
 
-Budget Vault is not (yet) in the community plugin store, so installation is manual:
+## Where your data lives
 
-1. Download this repository and copy `manifest.json`, `main.js` and `styles.css` into `<your vault>/.obsidian/plugins/budget-app/` (create the folder)
-2. In Obsidian: **Settings → Community plugins** → turn off Restricted mode → enable **Budget Vault**
-3. A setup wizard opens on first run — pick a budget folder, currency and period style, and it scaffolds starter categories and your first account (with its current balance, if you know it) for you — add more accounts anytime from **Accounts** or **Savings & Investments** → New account
-4. Open the app from the wallet icon in the ribbon
-
-Obsidian will warn that this is third-party code — that's expected for a manual install. On mobile, repeat step 2 once (Restricted mode is per-device); the plugin files arrive via your normal vault sync.
-
-## How your data is stored
-
-Everything lives in one vault folder you choose (default `Finances/Budget`):
+One folder you choose, default `Finances/Budget`:
 
 ```
 Finances/Budget/
-├── Settings.md              currency, month start day, household name
-├── Categories/              one file per category (type, colour)
-├── Accounts/                one file per account
-├── Budgets/                 one file per period (YYYY-MM.md)
+├── Settings.md
+├── Categories/          one file per category
+├── Accounts/            one file per account
+├── Budgets/             one file per period (YYYY-MM.md)
 ├── Transactions/
-│   └── <Account>/
-│       └── YYYY-MM.md       markdown table of that month's transactions
-├── Data/
-│   └── Categorisation Rules.csv
-├── Tax/                     one file + document folder per tax year
+│   └── <Account>/YYYY-MM.md
+├── Data/Categorisation Rules.csv
+├── Tax/
 ├── Owed Money.md
 └── Services.md
 ```
 
-It's all ordinary markdown tables and frontmatter — readable and editable without the plugin, diffable in git, portable forever.
+Ordinary markdown tables and frontmatter. Open them in any editor, diff them in git, keep them forever.
 
 ## CSV import
 
-At this time the importer works with **basic CSV bank statements** — a plain CSV with Date / Description / Amount columns — and has been tested against real exports from these banks:
+Any statement with Date / Description / Amount columns works. Discovery Bank, FNB, Capitec and Nedbank exports have been imported end to end, but nothing is hardcoded per bank — columns are matched by header, then by layout shape for headerless files, and you can map them by hand if neither resolves.
 
-| Bank | Format |
-|------|--------|
-| Discovery Bank | single signed Amount column (filenames auto-select the account) |
-| FNB | single signed Amount column (filenames auto-select the account) |
-| Capitec | separate Money In / Money Out columns, dated by Posting Date |
-| Nedbank | cheque and credit card — no header row at all, so the layout is read from the shape of the rows |
+Sign conventions are verified, not guessed: where a statement carries a running balance, the amounts are checked against it, so a bank that lists money out as a positive number can't quietly import every expense as income. If it can't be verified, the review screen says so.
 
-Those are the banks whose real exports have been imported end to end. **Other banks are expected to work too** — nothing is hardcoded per bank. The importer tries three things in order:
-
-1. **Match columns by header name** — `Date`, `Description`/`Narrative`/`Particulars`, `Amount`, or a `Debit`/`Credit` (`Money Out`/`Money In`) pair, wherever the header row sits in the file.
-2. **Read the layout by shape** when there's no header row at all (Nedbank): a leading date column, the amount at the right, the description between them, and a trailing running-balance column recognised and ignored.
-3. **Ask you** — if neither resolves, the import screen shows the file's first rows and lets you say which column is the date, the description, the amount (or money out / money in), and optionally a balance. So a bank nobody has tested still imports.
-
-You can also open that mapper yourself with **Columns wrong?** on the review screen, if auto-detection picked the wrong column.
-
-### Amounts are checked, not assumed
-
-Guessing a bank's *column names* is safe — guess wrong and the file is rejected, visibly. Guessing its *sign convention* is not: a bank that lists money out as a positive number would import every expense as income, with plausible-looking totals and nothing to warn you.
-
-So where a statement carries a running-balance column, the importer checks the amounts against it — successive balances must differ by exactly the amount between them, and only one sign convention and row order can reproduce that. If the file reads the other way round, the signs are corrected and the review screen says so. If it can't be verified, the amounts are imported **unchanged** and the review screen tells you to spot-check the signs. Nothing is ever silently "corrected" on a guess. If your bank isn't listed (or its export doesn't import cleanly), you can always build your own transactions CSV — see below.
-
-Amount cells tolerate real-world quirks: `R 1 234.56`, decimal commas (`1 234,56`), parenthesised negatives, trailing minus, and `Cr`/`Dr` markers. Duplicate rows are detected against your existing history and skipped automatically, so re-importing an overlapping statement is safe.
-
-### Importing your own data
-
-If your bank isn't supported yet, export or retype your statement into a Google Sheets or Excel file with this header row:
-
-| Date | Title | Amount |
-|------|-------|--------|
-| 2026-07-01 | Woolworths | -249.99 |
-| 2026-07-02 | Salary | 25000 |
-
-- **Date** — `YYYY-MM-DD` or `DD/MM/YYYY`
-- **Title** — the transaction description
-- **Amount** — negative for money out, positive for money in
-
-Export as CSV (Sheets: *File → Download → .csv* · Excel: *File → Save As → CSV UTF-8*) and drop it on the Import screen. `Description` also works instead of `Title`, and separate `Debit`/`Credit` columns instead of `Amount`.
-
-> **Note:** deleting an imported transaction doesn't leave a tombstone — if you re-import a statement containing it, it comes back and must be deleted again.
+No supported bank? Build your own CSV with `Date`, `Title` and `Amount` columns — negative for money out.
 
 ## Development
 
-Source lives in `src/` as small vanilla-JS modules — no framework, no dependencies. `main.js` at the repo root is the build output; never edit it by hand.
+`src/` holds small vanilla-JS modules — no framework, no dependencies. `main.js` is build output; never edit it by hand.
 
 ```bash
-./build.sh   # bundles src/ into main.js (bun, falls back to npx esbuild)
+./build.sh
 ```
 
-Then toggle the plugin off/on in Obsidian to pick up the new bundle. `styles.css` isn't bundled — Obsidian reads it directly, so styling changes only need the toggle.
-
-| Area | Where |
-|------|-------|
-| Plugin entry, commands, settings | `src/main.js`, `src/settings-tab.js` |
-| App shell, view switching | `src/shell.js`, `src/controller.js` |
-| Vault I/O and parsing | `src/io.js`, `src/util.js`, `src/load.js` |
-| Country profiles (currency format, tax checklists, banks) | `src/locale.js` |
-| One module per screen | `src/views/*.js` |
-
-Modules communicate through a shared `ctx` object assembled in `controller.js`; each module registers its functions onto it.
+Then toggle the plugin off and on.
 
 ## Feedback
 
-Found a bug, or want a feature? Use the feedback form — **Settings → Budget Vault → Send feedback**, or open it directly:
+Settings → Budget Vault → Send feedback, or [open the form](https://forms.gle/EVJKCuZxNQ9vJhTz6). Nothing from your budget is attached — the button just opens the form in your browser.
 
-**<https://forms.gle/EVJKCuZxNQ9vJhTz6>**
+## Support Budget Vault
 
-Nothing from your budget is attached — the button just opens the form in your browser, and you write what you want to share.
-
-## Privacy
-
-Budget Vault makes **no network requests** — no analytics, no update checks, no external fonts or scripts. Your data is only ever read from and written to your own vault. (The feedback link is the one exception in spirit: tapping it hands a URL to your browser, which then loads the form. The plugin itself still fetches nothing.)
+Budget Vault is free and always will be. If it's useful to you and you'd like to say thanks, you can send something via [PayPal](https://paypal.me/ruanpienaar86) — entirely optional, and nothing in the plugin changes either way.
 
 ## License
 
-[MIT](LICENSE) © Ruan Pienaar
+MIT © Ruan Pienaar
