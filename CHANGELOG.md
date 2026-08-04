@@ -3,6 +3,41 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.1.0 — 2026-08-03
+
+Two new pages. The version moves to 1.1.0 rather than another 1.0.x because
+this adds features rather than fixing them. 1.0.31 was prepared but never
+released; the support link it carried ships here instead.
+
+### Added
+
+- **Debt.** Every debt the household owes, what the interest is costing this
+  month before a cent of principal moves, and a payoff plan. Three runs sit
+  side by side — minimum payments, snowball (smallest balance first), avalanche
+  (highest rate first) — with a debt-free date for each and what the method
+  saves against doing nothing. Set a budget category on a debt and the page
+  reads its real payments out of your transactions, so what you meant to pay
+  and what actually left the account sit next to each other. Saved to
+  `Debts.md`, which is a plain markdown table you can edit by hand.
+
+- **Loan Calculators.** A scratchpad for a purchase you have not made yet, so
+  nothing here is saved. *Home loan*: price, deposit, rate and term, plus what
+  buying actually costs on the day — SARS transfer duty, bond registration,
+  transfer costs and the initiation fee — and the cash you need upfront.
+  *Vehicle finance*: the same shape with a term in months, an optional balloon,
+  and the service fees and rough insurance that turn an instalment into what
+  the car costs a month. Both show a year-by-year amortisation.
+
+  The deposit takes an amount or a percentage, whichever you know. Transfer
+  duty is exact arithmetic on the SARS 2025/26 table; the conveyancing figures
+  are interpolated from the guideline tariff and will differ from your
+  attorney's quote. Outside South Africa the repayment maths still works and
+  the local-cost cards drop away.
+
+- **An optional support link in settings**, for anyone who wants to fund the
+  work. Off unless you go looking for it; the plugin still never touches the
+  network.
+
 ## 1.0.30 — 2026-08-02
 
 ### Fixed
