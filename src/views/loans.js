@@ -28,8 +28,14 @@ module.exports = function registerLoans(ctx) {
      a rate typed here would be silently reset on the next view switch, and
      with it always on, switching country would leave the previous country's
      default sitting under the new country's costs. */
-  const home = { price: 1500000, depositPct: 10, rate: null, years: 20 };
-  const car = { price: 350000, depositPct: 10, rate: null, months: 60, balloonPct: 0, insurance: false };
+  /* `deposit` is the amount and the one the maths reads; `depositPct` is the
+     proportion it was last set at, remembered so that changing the price moves
+     the deposit with it instead of stranding a figure from the old price.
+     Deriving the amount from the percentage alone was not enough — a slider
+     stepping in whole percent cannot express "the R200 000 I actually have",
+     which is the number people know. */
+  const home = { price: 1500000, deposit: 150000, depositPct: 10, rate: null, years: 20 };
+  const car = { price: 350000, deposit: 35000, depositPct: 10, rate: null, months: 60, balloonPct: 0, insurance: false };
 
   /* Range readouts quote money, so they go stale when the currency changes —
      they are only rebuilt when their own slider moves. renderLoans() calls
@@ -65,7 +71,15 @@ module.exports = function registerLoans(ctx) {
   function rateField(state, recalc) {
     const f = numField('Interest rate (% a year)', P().rateNote, state.rate ?? P().defaultRate,
       { min: '0', max: '40', step: '0.25' },
-      v => { state.rate = Math.max(0, parseFloat(v) || 0); recalc(); });
+      // An emptied field means "I have not decided", not "0%". Reading a
+      // cleared box as a zero-interest loan produced a cheerful, completely
+      // wrong instalment mid-edit; back to null puts it on the country
+      // default until a real number arrives.
+      v => {
+        const raw = String(v).trim();
+        state.rate = raw === '' ? null : Math.max(0, parseFloat(raw) || 0);
+        recalc();
+      });
     // Re-read the profile on every render: switching country has to move both
     // the hint and — while the reader has not overridden it — the rate itself.
     syncs.push(() => {
@@ -74,6 +88,54 @@ module.exports = function registerLoans(ctx) {
       if (state.rate === null) f.input.value = String(p.defaultRate);
     });
     return f.wrap;
+  }
+
+  /* Deposit: an amount and a percentage that drive each other, because people
+     arrive with one or the other ("I have R200 000" / "I want to put down
+     20%") and converting between them by hand is exactly the work this page
+     exists to save. The slider spans the full 0–100%: capping it at 50% made
+     a paid-off house, an inheritance or a downsize impossible to model, and
+     those are the cases worth modelling.
+
+     `deposit` is the truth; the two controls are views onto it. Whichever one
+     is being typed into is left alone — writing a rounded value back into the
+     field under the cursor would fight the reader mid-keystroke. */
+  function depositField(state, recalc) {
+    const lab = el('span', { class: 'lf-l' });
+    const amt = el('input', {
+      type: 'number', inputmode: 'decimal', class: 'form-control form-control-sm',
+      min: '0', step: '5000', 'aria-label': 'Deposit amount',
+    });
+    const slider = el('input', {
+      type: 'range', class: 'loan-range', min: '0', max: '100', step: '1',
+      'aria-label': 'Deposit as a percentage of the price',
+    });
+
+    const pct = () => (state.price > 0 ? (state.deposit / state.price) * 100 : state.depositPct);
+    // One decimal only when there is one to show: "13.3%" earns its place,
+    // "10.0%" does not.
+    const show = () => {
+      const v = pct();
+      lab.textContent = `Deposit — ${Math.round(v * 10) % 10 ? v.toFixed(1) : Math.round(v)}%`;
+      if (document.activeElement !== slider) slider.value = String(Math.min(100, Math.round(v)));
+      if (document.activeElement !== amt) amt.value = String(Math.round(state.deposit));
+    };
+
+    amt.addEventListener('input', () => {
+      const v = parseFloat(amt.value);
+      state.deposit = Math.min(Math.max(0, Number.isFinite(v) ? v : 0), state.price);
+      if (state.price > 0) state.depositPct = pct();
+      show(); recalc();
+    });
+    slider.addEventListener('input', () => {
+      state.depositPct = Number(slider.value);
+      state.deposit = state.price * state.depositPct / 100;
+      show(); recalc();
+    });
+
+    show();
+    syncs.push(show);
+    return { wrap: el('label', { class: 'loan-field' }, lab, amt, slider), sync: show };
   }
 
   /* Range + a readout that IS the label, so a screen reader announces the
@@ -123,6 +185,12 @@ module.exports = function registerLoans(ctx) {
       el('th', { scope: 'col', class: 'num' }, 'Capital'),
       el('th', { scope: 'col', class: 'num' }, 'Closing'))));
     const body = el('tbody', {});
+    // Nothing borrowed, nothing to schedule. Without this the table drew a
+    // full run of "R 0" rows, which reads as broken rather than as empty.
+    if (!rows.length) {
+      body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' },
+        'Enter a price and a deposit below the price to see the schedule.')));
+    }
     for (const y of rows) {
       body.append(el('tr', {},
         el('td', {}, String(y.year)),
@@ -143,13 +211,16 @@ module.exports = function registerLoans(ctx) {
     box.empty();
     const form = el('div', { class: 'loan-form' });
 
+    // Changing the price carries the deposit with it at the same proportion,
+    // rather than leaving an amount that belonged to the old price.
     form.append(numField('Purchase price', null, home.price, { min: '0', step: '10000' },
-      v => { home.price = Math.max(0, parseFloat(v) || 0); homeDepositSync(); recalcHome(); }).wrap);
+      v => {
+        home.price = Math.max(0, parseFloat(v) || 0);
+        home.deposit = Math.min(home.price * home.depositPct / 100, home.price);
+        homeDepositSync(); recalcHome();
+      }).wrap);
 
-    const dep = rangeField(
-      pct => `Deposit — ${pct}% (${money(home.price * pct / 100, 0)})`,
-      { min: '0', max: '50', step: '1' }, home.depositPct,
-      pct => { home.depositPct = pct; recalcHome(); });
+    const dep = depositField(home, recalcHome);
     homeDepositSync = dep.sync;
     form.append(dep.wrap);
 
@@ -167,9 +238,10 @@ module.exports = function registerLoans(ctx) {
 
   function recalcHome() {
     const p = P();
-    const deposit = home.price * home.depositPct / 100;
+    const deposit = Math.min(home.deposit, home.price);
     const loan = Math.max(0, home.price - deposit);
-    const t = totalsFor(loan, home.rate ?? p.defaultRate, home.years * 12);
+    const rate = home.rate ?? p.defaultRate;
+    const t = totalsFor(loan, rate, home.years * 12);
 
     const duty = p.transferDuty(home.price);
     const bond = p.bondCost(loan);
@@ -204,7 +276,7 @@ module.exports = function registerLoans(ctx) {
     }
 
     amortTable($('#loanHomeAmort'),
-      byYear(amortise(loan, home.rate ?? p.defaultRate, home.years * 12, t.payment)), 'Year');
+      loan > 0 ? byYear(amortise(loan, rate, home.years * 12, t.payment)) : [], 'Year');
   }
 
   /* --------------------------- vehicle finance ---------------------------- */
@@ -222,12 +294,13 @@ module.exports = function registerLoans(ctx) {
     const form = el('div', { class: 'loan-form' });
 
     form.append(numField('Vehicle price', null, car.price, { min: '0', step: '5000' },
-      v => { car.price = Math.max(0, parseFloat(v) || 0); carDepositSync(); carBalloonSync(); recalcCar(); }).wrap);
+      v => {
+        car.price = Math.max(0, parseFloat(v) || 0);
+        car.deposit = Math.min(car.price * car.depositPct / 100, car.price);
+        carDepositSync(); carBalloonSync(); recalcCar();
+      }).wrap);
 
-    const dep = rangeField(
-      pct => `Deposit — ${pct}% (${money(car.price * pct / 100, 0)})`,
-      { min: '0', max: '50', step: '1' }, car.depositPct,
-      pct => { car.depositPct = pct; recalcCar(); });
+    const dep = depositField(car, recalcCar);
     carDepositSync = dep.sync;
     form.append(dep.wrap);
 
@@ -237,8 +310,8 @@ module.exports = function registerLoans(ctx) {
       v => { car.months = Number(v); recalcCar(); }));
 
     /* A balloon is a percentage of the VEHICLE PRICE, which is how dealers
-       quote it. Capped at 40%, below the 50% deposit cap, so it can never
-       exceed what is actually being financed. */
+       quote it — so it is not automatically smaller than the financed amount.
+       recalcCar() clamps it; see the note there. */
     const bal = rangeField(
       pct => `Balloon / residual — ${pct}% (${money(car.price * pct / 100, 0)})`,
       { min: '0', max: '40', step: '5' }, car.balloonPct,
@@ -256,10 +329,15 @@ module.exports = function registerLoans(ctx) {
 
   function recalcCar() {
     const p = P();
-    const deposit = car.price * car.depositPct / 100;
+    const deposit = Math.min(car.deposit, car.price);
     const finance = Math.max(0, car.price - deposit);
-    const balloon = car.price * car.balloonPct / 100;
-    const t = totalsFor(finance, car.rate ?? p.defaultRate, car.months, balloon);
+    // The balloon is a percentage of the PRICE, so a large deposit can leave
+    // less financed than the balloon asks for. It used to be impossible when
+    // the deposit stopped at 50%; now that it reaches 100% the clamp has to
+    // be real, or the page would promise a residual bigger than the loan.
+    const balloon = Math.min(car.price * car.balloonPct / 100, finance);
+    const rate = car.rate ?? p.defaultRate;
+    const t = totalsFor(finance, rate, car.months, balloon);
 
     const init = p.vehicleInitiationFee(finance);
     const service = p.serviceFee;
@@ -285,9 +363,11 @@ module.exports = function registerLoans(ctx) {
         'refinance it, or trade the car in and hope it is worth more than the balloon. That is why ' +
         'the total interest above rises as you raise it.'));
     }
-    block.append(el('div', { class: 'lo-sep' }),
-      row('Deposit', money(deposit, 0)),
-      row('Initiation fee', money(init, 0)));
+    block.append(el('div', { class: 'lo-sep' }), row('Deposit', money(deposit, 0)));
+    // Gated like the service-fee rows either side of it. A country with no fee
+    // profile was showing "Initiation fee — R 0", which reads as a quoted fee
+    // of nothing rather than as "not modelled here".
+    if (init > 0) block.append(row('Initiation fee', money(init, 0)));
     if (serviceTotal > 0) block.append(row('Service fees over the term', money(serviceTotal, 0)));
     // The deposit belongs in this total: it is money spent on the car, and it
     // is listed three rows up. Leaving it out understates the true cost.
@@ -307,7 +387,7 @@ module.exports = function registerLoans(ctx) {
     }
 
     amortTable($('#loanCarAmort'),
-      byYear(amortise(finance, car.rate ?? p.defaultRate, car.months, t.payment, balloon)), 'Year');
+      finance > 0 ? byYear(amortise(finance, rate, car.months, t.payment, balloon)) : [], 'Year');
   }
 
   /* -------------------------------- tabs ---------------------------------- */
