@@ -209,13 +209,25 @@ module.exports = function registerDebts(ctx) {
     }
 
     /* Debt-to-income for the period. Uses the same income figure the dashboard
-       does, so the two pages can never disagree. */
-    const income = periodSummary(S.period).income;
+       does, so the two pages can never disagree.
+
+       A ratio is scale-invariant, so this can be fixed from either side — but
+       this page is monthly throughout (a debt's payment is a monthly
+       instalment, and the fallback line below says so), which makes income the
+       one figure that doesn't match. Scaling it UP to a month leaves every
+       other number on the page alone; scaling the payments DOWN would make the
+       ratio disagree with the table directly above it. Left unscaled, a
+       fortnightly household at a healthy 20% was shown ~43% in red, under a
+       threshold that only means anything monthly. */
+    const iv = ctx.intervalDays();
+    const rawIncome = periodSummary(S.period).income;
+    const income = iv ? rawIncome * (365.25 / 12) / iv : rawIncome;
+    const scaleNote = iv ? ' monthly income, scaled from this period’s,' : ' income';
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {
       const ratio = (committedAll / income) * 100;
       note.append(el('b', { class: `num ${ratio > 36 ? 'text-danger' : ratio > 20 ? 'text-warning' : 'text-success'}` }, `${ratio.toFixed(1)}%`),
-        ` of this period’s income goes to debt payments — ${money(committedAll)} across ` +
+        ` of your${scaleNote} goes to debt payments — ${money(committedAll)} across ` +
         `${list.length} debt${list.length === 1 ? '' : 's'}`,
         el('span', { class: 'text-muted' }, ratio > 36 ? '. Lenders treat above 36% as stretched.' : '.'));
     } else {
