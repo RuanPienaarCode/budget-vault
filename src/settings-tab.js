@@ -3,7 +3,7 @@
    day and currency live in Settings.md inside the budget folder (so they sync
    to every device with the vault) — the tab edits that file in place. */
 
-const { PluginSettingTab, Setting, TFile, normalizePath } = require('obsidian');
+const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
 const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
@@ -101,6 +101,15 @@ class BudgetSettingTab extends PluginSettingTab {
     const fmSection = containerEl.createDiv();
     this.renderMdSettings(fmSection);
   }
+  /* Obsidian calls this when the tab closes. The three text fields below debounce
+     their Settings.md write by 800ms, so closing the tab mid-keystroke otherwise
+     left a write + reloadViews() to fire against a tab that no longer exists —
+     the same teardown discipline the view controller applies in destroy(). */
+  hide() {
+    clearTimeout(this._hhTimer);
+    clearTimeout(this._msdTimer);
+    clearTimeout(this._curTimer);
+  }
   async renderMdSettings(containerEl) {
     const md = await this.plugin.readBudgetSettingsMd();
 
@@ -112,7 +121,11 @@ class BudgetSettingTab extends PluginSettingTab {
         t.onChange(v => {
           clearTimeout(this._hhTimer);
           this._hhTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd('household', `"${v.trim().replace(/"/g, '')}"`);
+            // yamlStr, same as the currency field below and the declarative tab
+            // above: the hand-rolled quoting this replaced DELETED embedded
+            // quotes rather than escaping them, so 'Ruan "The General"' saved
+            // as 'Ruan The General'.
+            await this.plugin.updateBudgetSettingsMd('household', yamlStr(v.trim()));
             this.plugin.reloadViews();
           }, 800);
         });
@@ -128,7 +141,12 @@ class BudgetSettingTab extends PluginSettingTab {
           clearTimeout(this._msdTimer);
           this._msdTimer = setTimeout(async () => {
             const n = parseInt(v, 10);
-            if (!n || n < 1 || n > 28) return;
+            // Say so. A bare return left the rejected value sitting in the field
+            // looking saved, and the period silently kept its old start day.
+            if (!n || n < 1 || n > 28) {
+              new Notice(`Budget: "${v}" is not a valid month start day — enter a number from 1 to 28.`, 6000);
+              return;
+            }
             await this.plugin.updateBudgetSettingsMd('month_start_day', String(n));
             this.plugin.reloadViews();
           }, 800);
