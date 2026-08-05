@@ -163,6 +163,32 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
     { start: '2026-08-17', end: '2026-08-26' }, 'a ten-day cycle just works');
 }
 
+/* ---- a remembered period name must match the shape settings can address ---- */
+{
+  // S.period survives a reload, but the period LENGTH can change underneath it.
+  // Without this check a monthly user who switches to a 14-day cycle keeps
+  // seeing 31-day windows and every nav click returns another month name, so
+  // they can never reach a period of the length they just chose.
+  const fortnight = intervalCtx(14, '2026-08-07');
+  ok(!fortnight.periodKeyValid('2026-08'), 'a month name is unusable on a 14-day cycle');
+  ok(fortnight.periodKeyValid('2026-08-07'), 'a date name is what that cycle addresses');
+
+  const monthly = intervalCtx(0, '');
+  ok(!monthly.periodKeyValid('2026-08-07'), 'a date name is unusable on a payday month');
+  ok(monthly.periodKeyValid('2026-08'), 'a month name is what that addresses');
+
+  // The shapes really are not interchangeable — this is the damage the guard
+  // prevents, pinned so nobody "simplifies" the check away.
+  eq(fortnight.periodRange('2026-08').end, '2026-08-22',
+    'a month name on a 14-day cycle yields a 31-day window — never 14 days');
+  ok(!/^\d{4}-\d{2}-\d{2}$/.test(fortnight.shiftPeriod('2026-08', 1)),
+    'and navigating from it lands on another month name, stranding the user');
+
+  ok(!monthly.periodKeyValid(''), 'an empty name is not addressable');
+  ok(!monthly.periodKeyValid(undefined), 'nor is a missing one');
+  ok(!monthly.periodKeyValid('2026-8'), 'nor a nearly-right one');
+}
+
 /* ---- fortnightly transactions land in exactly one period ---- */
 {
   const rows = [
