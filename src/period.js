@@ -4,6 +4,7 @@
    before it in the named month. */
 
 const { MONTHS } = require('./constants');
+const { safeSeg } = require('./util');
 
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
@@ -62,9 +63,35 @@ module.exports = function registerPeriod(ctx) {
   }
 
   /* ---------------------------- calculations ---------------------------- */
+  /* The account file behind a transaction-folder label. The two are usually the
+     same string, but need not be: `tx_label` points an account at a folder of
+     another name, and safeSeg() strips filesystem-illegal characters on the way
+     to disk. Same three-way match as txSegment() in load.js, run the other way
+     round. Returns null for a folder with no account file — an orphan whose
+     rows stay in the budget, since nothing says otherwise. */
+  function accountForLabel(label) {
+    const want = safeSeg(label);
+    return S.accounts.find(a =>
+      a.tx_label === label || a.name === label || safeSeg(a.name) === want) || null;
+  }
+  /* Labels belonging to `budget: false` accounts. Resolved per call rather than
+     cached because periodSummary runs six times over for the dashboard trend
+     and an account can be toggled between any two of them. */
+  function nonBudgetLabels() {
+    const out = new Set();
+    for (const f of Object.values(S.txFiles)) {
+      const a = accountForLabel(f.label);
+      if (a && !a.in_budget) out.add(f.label);
+    }
+    return out;
+  }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
   function periodSummary(p) {
-    const tx = txInPeriod(p).filter(t => !t.excluded);
+    // Excluded rows are the user's per-row veto; the non-budget set is the
+    // per-account one. Both drop out of income/spend here and nowhere else —
+    // Transactions still lists every row, so nothing goes invisible.
+    const skip = nonBudgetLabels();
+    const tx = txInPeriod(p).filter(t => !t.excluded && !skip.has(t.label));
     let income = 0, spend = 0, uncategorised = 0;
     const byCat = {};
     for (const t of tx) {
@@ -87,6 +114,6 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, txInPeriod,
-    catType, periodSummary, budgetTotals,
+    catType, periodSummary, budgetTotals, accountForLabel, nonBudgetLabels,
   });
 };

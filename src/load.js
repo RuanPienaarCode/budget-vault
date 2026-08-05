@@ -58,6 +58,13 @@ module.exports = function registerLoad(ctx) {
         // exactly as amountRaw does for transaction cells.
         ...(bal => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || '0')),
         balance_updated: fm.balance_updated || '',
+        // `budget: false` opts an account out of the household budget totals —
+        // an investment or tax-free wrapper whose interest is not income and
+        // whose debit orders are not spending. Absent means IN, so no existing
+        // vault's Dashboard figures move on upgrade. The money still leaving
+        // the cheque account is budgeted as normal; only the arriving leg here
+        // is suppressed, which is what stops it being counted twice.
+        in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()),
         credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
         goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
         target_date: fm.target_date || '',

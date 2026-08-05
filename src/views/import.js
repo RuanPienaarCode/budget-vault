@@ -10,7 +10,7 @@ const { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumn
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
+  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -355,6 +355,17 @@ module.exports = function registerImport(ctx) {
       : rec.verified
         ? 'Amounts check out against this statement’s own balance column.'
         : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
+
+    /* Say where these rows are going to land BEFORE they land. An account
+       flagged `budget: false` still imports and still shows in Transactions,
+       but never reaches the Dashboard's income/spend — which looks like a
+       broken import to anyone who doesn't know the flag is set. */
+    const target = accountForLabel(p.label || '');
+    const nbEl = $('#impNonBudget');
+    const nonBudget = !!target && !target.in_budget;
+    nbEl.classList.toggle('hidden', !nonBudget);
+    if (nonBudget) nbEl.textContent =
+      `${target.name} is excluded from the budget — these rows will import and show in Transactions, but won’t count toward income or spending totals.`;
 
     const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},

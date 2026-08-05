@@ -438,6 +438,39 @@ var require_util = __commonJS((exports2, module2) => {
       s = `'${s}`;
     return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   }
+  var INERT_SUPPORTED = typeof HTMLElement !== "undefined" && "inert" in HTMLElement.prototype;
+  var FOCUSABLE_SEL = "a[href],button,input,select,textarea,summary,[tabindex]";
+  function setInert(elm, on) {
+    if (!elm)
+      return;
+    if (on)
+      elm.setAttribute("inert", "");
+    else
+      elm.removeAttribute("inert");
+    if (INERT_SUPPORTED)
+      return;
+    if (on) {
+      elm.setAttribute("aria-hidden", "true");
+      for (const f of elm.querySelectorAll(FOCUSABLE_SEL)) {
+        if (!f.hasAttribute("data-bud-ti"))
+          f.setAttribute("data-bud-ti", f.getAttribute("tabindex") ?? "");
+        f.setAttribute("tabindex", "-1");
+      }
+      if (elm.contains(document.activeElement) && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+    } else {
+      elm.removeAttribute("aria-hidden");
+      for (const f of elm.querySelectorAll("[data-bud-ti]")) {
+        const prev = f.getAttribute("data-bud-ti");
+        if (prev === "")
+          f.removeAttribute("tabindex");
+        else
+          f.setAttribute("tabindex", prev);
+        f.removeAttribute("data-bud-ti");
+      }
+    }
+  }
   function collapsePath(p) {
     const out = [];
     for (const seg of (p || "").split("/")) {
@@ -452,7 +485,7 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert };
 });
 
 // src/shell.js
@@ -750,8 +783,9 @@ var require_shell = __commonJS((exports2, module2) => {
       <section id="view-accounts" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Accounts</h1>
-          <div class="sub-note">Click a balance to update it — the account's markdown file is rewritten.</div>
+          <div class="sub-note">Click a balance to update it, or a name to see that account's transactions — the account's markdown file is rewritten.</div>
         </div>
+        <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
         <div class="row mb-4" style="justify-content:flex-end">
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
@@ -974,6 +1008,7 @@ var require_shell = __commonJS((exports2, module2) => {
               <div class="sub" id="impStats"></div>
               <div class="sub imp-legend" id="impLegend"></div>
               <div class="sub imp-reconcile hidden" id="impReconcile"></div>
+              <div class="sub imp-nonbudget hidden" id="impNonBudget"></div>
             </div>
             <div class="row">
               <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
@@ -1892,6 +1927,7 @@ var require_io = __commonJS((exports2, module2) => {
 // src/period.js
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
+  var { safeSeg } = require_util();
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function periodRange(p) {
@@ -1969,11 +2005,25 @@ var require_period = __commonJS((exports2, module2) => {
       out.sort((a, b) => a.date.localeCompare(b.date) || a.desc.localeCompare(b.desc));
       return out;
     }
+    function accountForLabel(label) {
+      const want = safeSeg(label);
+      return S.accounts.find((a) => a.tx_label === label || a.name === label || safeSeg(a.name) === want) || null;
+    }
+    function nonBudgetLabels() {
+      const out = new Set;
+      for (const f of Object.values(S.txFiles)) {
+        const a = accountForLabel(f.label);
+        if (a && !a.in_budget)
+          out.add(f.label);
+      }
+      return out;
+    }
     function catType(name) {
       return S.categories.find((c) => c.name === name)?.type || null;
     }
     function periodSummary(p) {
-      const tx = txInPeriod(p).filter((t) => !t.excluded);
+      const skip = nonBudgetLabels();
+      const tx = txInPeriod(p).filter((t) => !t.excluded && !skip.has(t.label));
       let income = 0, spend = 0, uncategorised = 0;
       const byCat = {};
       for (const t of tx) {
@@ -2006,7 +2056,9 @@ var require_period = __commonJS((exports2, module2) => {
       txInPeriod,
       catType,
       periodSummary,
-      budgetTotals
+      budgetTotals,
+      accountForLabel,
+      nonBudgetLabels
     });
   };
 });
@@ -2053,6 +2105,7 @@ var require_load = __commonJS((exports2, module2) => {
           tx_label: fm.tx_label || "",
           ...((bal) => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || "0")),
           balance_updated: fm.balance_updated || "",
+          in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? "").trim()),
           credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
           goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
           target_date: fm.target_date || "",
@@ -3097,10 +3150,25 @@ var require_budgets = __commonJS((exports2, module2) => {
 
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
-  var { el, patchFrontmatter, safeSeg, yamlStr } = require_util();
+  var { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require_util();
   var { askFields } = require_modal();
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var STALE_DAYS = 30;
   module2.exports = function registerAccounts(ctx) {
-    const { S, $, app, money, toast, writeFile, ensureFolder, relPath } = ctx;
+    const {
+      S,
+      $,
+      app,
+      money,
+      toast,
+      writeFile,
+      ensureFolder,
+      relPath,
+      fileAt,
+      txInPeriod,
+      accountForLabel,
+      periodMonthName
+    } = ctx;
     const ACCT_GROUPS = [
       ["Bank accounts", ["checking", "credit_card", "cash"]],
       ["Savings", ["savings"]],
@@ -3117,13 +3185,367 @@ var require_accounts = __commonJS((exports2, module2) => {
       other: "Other"
     };
     const ACCT_TYPE_OPTIONS = ACCT_TYPES.map((v) => ({ value: v, label: ACCT_TYPE_LABELS[v] }));
+    const FM_WRITERS = {
+      type: (a) => a.type,
+      institution: (a) => a.institution ? yamlStr(a.institution) : null,
+      account_number: (a) => a.account_number ? yamlStr(a.account_number) : null,
+      tx_label: (a) => a.tx_label ? yamlStr(a.tx_label) : null,
+      credit_limit: (a) => a.credit_limit ? a.credit_limit.toFixed(2) : null,
+      goal_amount: (a) => a.goal_amount ? a.goal_amount.toFixed(2) : null,
+      target_date: (a) => a.target_date || null,
+      monthly_contribution: (a) => a.monthly_contribution ? a.monthly_contribution.toFixed(2) : null,
+      total_invested: (a) => a.total_invested ? a.total_invested.toFixed(2) : null,
+      starting_amount: (a) => a.starting_amount ? a.starting_amount.toFixed(2) : null,
+      inception_date: (a) => a.inception_date || null
+    };
+    const EDITABLE_KEYS = Object.keys(FM_WRITERS);
     function parseAmount(v) {
       const s = String(v ?? "").trim();
       if (!s)
         return null;
       return parseFloat(s.replace(",", ".").replace(/[^\d.-]/g, ""));
     }
+    function todayIso() {
+      const d = new Date;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    function daysSince(iso) {
+      if (!ISO_DATE.test(iso || ""))
+        return null;
+      const then = new Date(`${iso}T00:00:00`);
+      if (isNaN(then.getTime()))
+        return null;
+      const today = new Date;
+      today.setHours(0, 0, 0, 0);
+      return Math.round((today.getTime() - then.getTime()) / 86400000);
+    }
+    function accountIndex() {
+      const idx = new Map;
+      for (const f of Object.values(S.txFiles)) {
+        const a = accountForLabel(f.label);
+        if (!a)
+          continue;
+        let e = idx.get(a);
+        if (!e) {
+          e = { rows: [], labels: new Set };
+          idx.set(a, e);
+        }
+        e.labels.add(f.label);
+        for (const r of f.rows)
+          e.rows.push(r);
+      }
+      return idx;
+    }
+    function reconcile(a, rows) {
+      if (!rows || !rows.length)
+        return { state: "no-tx" };
+      if (!ISO_DATE.test(a.balance_updated || ""))
+        return { state: "no-date" };
+      const today = todayIso();
+      const since = [], ahead = [];
+      for (const r of rows) {
+        if (r.date <= a.balance_updated)
+          continue;
+        (r.date > today ? ahead : since).push(r);
+      }
+      const delta = since.reduce((s, r) => s + r.amount, 0);
+      if (!since.length) {
+        return ahead.length ? { state: "pending", ahead: ahead.length } : { state: "clean" };
+      }
+      return { state: "drift", count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
+    }
+    function periodActivity(labels) {
+      let inAmt = 0, outAmt = 0, count = 0;
+      for (const t of txInPeriod(S.period)) {
+        if (!labels.has(t.label))
+          continue;
+        count++;
+        if (t.amount >= 0)
+          inAmt += t.amount;
+        else
+          outAmt += -t.amount;
+      }
+      return { inAmt, outAmt, count };
+    }
+    function openTransactions(label) {
+      ctx.switchView("transactions");
+      const sel = $("#txAccount");
+      if ([...sel.options].some((o) => o.value === label))
+        sel.value = label;
+      $("#txCategory").value = "";
+      $("#txSearch").value = "";
+      ctx.renderTransactions();
+    }
+    async function openAccountFile(a) {
+      const f = fileAt(`Accounts/${a.name}.md`);
+      if (!f)
+        return toast(`Accounts/${a.name}.md not found`, true);
+      await app.workspace.getLeaf("tab").openFile(f);
+    }
+    async function editBalance(a) {
+      const r = await askFields(app, `Update balance — ${a.name}`, [
+        { key: "balance", label: "New balance", type: "number", value: a.balance.toFixed(2) }
+      ]);
+      if (!r)
+        return;
+      const num = parseAmount(r.balance);
+      if (num === null || isNaN(num))
+        return toast("Not a number", true);
+      a.balance = num;
+      a.balanceRaw = null;
+      a.balance_updated = todayIso();
+      await saveAccount(a);
+      renderAccounts();
+      toast(`${a.name} balance updated`);
+    }
+    async function acceptImplied(a, implied) {
+      a.balance = implied;
+      a.balanceRaw = null;
+      a.balance_updated = todayIso();
+      await saveAccount(a);
+      renderAccounts();
+      toast(`${a.name} reconciled to ${money(implied)}`);
+    }
+    async function editAccount(a) {
+      const r = await askFields(app, `Edit account — ${a.name}`, [
+        { key: "type", label: "Type", type: "select", options: ACCT_TYPE_OPTIONS, value: a.type },
+        { key: "institution", label: "Institution", type: "text", value: a.institution },
+        {
+          key: "account_number",
+          label: "Account number",
+          type: "text",
+          value: a.account_number,
+          desc: "Used to match a downloaded statement to this account on import."
+        },
+        {
+          key: "tx_label",
+          label: "Transactions folder",
+          type: "text",
+          value: a.tx_label,
+          desc: `Leave blank to use “${a.name}”. Set it only when the folder under Transactions/ has a different name.`
+        },
+        {
+          key: "budget",
+          label: "Counts toward the budget",
+          type: "select",
+          value: a.in_budget ? "yes" : "no",
+          options: [
+            { value: "yes", label: "Yes — normal spending account" },
+            { value: "no", label: "No — investment or savings wrapper" }
+          ]
+        },
+        {
+          key: "credit_limit",
+          label: "Credit limit",
+          type: "number",
+          value: a.credit_limit != null ? String(a.credit_limit) : "",
+          desc: "Shows a utilisation bar on credit cards."
+        },
+        {
+          key: "goal_amount",
+          label: "Savings goal",
+          type: "number",
+          value: a.goal_amount != null ? String(a.goal_amount) : ""
+        },
+        { key: "target_date", label: "Goal target date", type: "date", value: a.target_date },
+        {
+          key: "monthly_contribution",
+          label: "Monthly contribution",
+          type: "number",
+          value: a.monthly_contribution != null ? String(a.monthly_contribution) : ""
+        },
+        {
+          key: "total_invested",
+          label: "Total invested",
+          type: "number",
+          value: a.total_invested != null ? String(a.total_invested) : "",
+          desc: "What you have put in, so growth can be shown against it."
+        },
+        {
+          key: "starting_amount",
+          label: "Starting amount",
+          type: "number",
+          value: a.starting_amount != null ? String(a.starting_amount) : ""
+        },
+        { key: "inception_date", label: "Opened on", type: "date", value: a.inception_date }
+      ]);
+      if (!r)
+        return;
+      if (!ACCT_TYPES.includes(r.type))
+        return toast("Invalid type", true);
+      const nums = {};
+      for (const k of ["credit_limit", "goal_amount", "monthly_contribution", "total_invested", "starting_amount"]) {
+        const n = parseAmount(r[k]);
+        if (n !== null && isNaN(n))
+          return toast(`${k.replace(/_/g, " ")} is not a number`, true);
+        nums[k] = n;
+      }
+      a.type = r.type;
+      a.institution = (r.institution || "").trim();
+      a.account_number = (r.account_number || "").trim();
+      a.tx_label = (r.tx_label || "").trim();
+      a.in_budget = r.budget !== "no";
+      Object.assign(a, nums);
+      a.target_date = (r.target_date || "").trim();
+      a.inception_date = (r.inception_date || "").trim();
+      await saveAccount(a, EDITABLE_KEYS);
+      ctx.render();
+      toast(`${a.name} updated`);
+    }
+    async function toggleBudget(a) {
+      a.in_budget = !a.in_budget;
+      await saveAccount(a);
+      renderAccounts();
+      toast(a.in_budget ? `${a.name} counts toward the budget again` : `${a.name} no longer counts toward budget totals`);
+    }
+    function badge(text, cls) {
+      return el("span", { class: `acct-badge${cls ? " " + cls : ""}` }, text);
+    }
+    function utilisationOf(a) {
+      if (a.type !== "credit_card" || !a.credit_limit || a.credit_limit <= 0)
+        return null;
+      const used = Math.max(0, -a.balance);
+      const pct = used / a.credit_limit * 100;
+      const over = used > a.credit_limit;
+      return { used, pct, over, near: !over && pct >= 85, available: a.credit_limit - used };
+    }
+    function utilisation(a) {
+      const u = utilisationOf(a);
+      if (!u)
+        return null;
+      const { used, pct, over, near, available } = u;
+      return el("div", { class: "acct-util" }, el("div", { class: "acct-util-top" }, el("span", {}, "Credit used"), el("span", { class: "num" }, `${money(used, 0)} of ${money(a.credit_limit, 0)}`)), el("div", { class: "cat-bar" }, el("i", {
+        class: `cat-bar-fill${over ? " bg-danger" : near ? " bg-warning" : ""}`,
+        style: `width:${Math.min(100, pct).toFixed(1)}%`
+      })), el("div", { class: `acct-util-sub${over ? " text-danger" : near ? " text-warning" : ""}` }, over ? `Over limit by ${money(-available, 0)}` : `${Math.round(pct)}% used · ${money(available, 0)} available`));
+    }
+    function renderKpis() {
+      const wrap = $("#acctKpis");
+      if (!wrap)
+        return;
+      wrap.empty();
+      let assets = 0, liabilities = 0;
+      for (const a of S.accounts) {
+        if (a.balance >= 0)
+          assets += a.balance;
+        else
+          liabilities += -a.balance;
+      }
+      const idx = accountIndex();
+      const attention = S.accounts.filter((a) => {
+        const e = idx.get(a);
+        if (!e)
+          return true;
+        const d = daysSince(a.balance_updated);
+        if (d === null || d > STALE_DAYS)
+          return true;
+        return reconcile(a, e.rows).state === "drift";
+      }).length;
+      const tile = (l, v, cls, sub) => {
+        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
+        if (sub)
+          t.append(el("div", { class: "s" }, sub));
+        wrap.append(t);
+      };
+      tile("Assets", money(assets), "text-success");
+      tile("Liabilities", money(liabilities), liabilities > 0 ? "text-danger" : "");
+      tile("Net worth", money(assets - liabilities), assets - liabilities >= 0 ? "grad-txt" : "text-danger");
+      tile("Needs attention", String(attention), attention > 0 ? "text-warning" : "", attention > 0 ? "unverified or drifting balances" : "every balance checks out");
+    }
+    function accountTile(a, entry) {
+      const labels = entry ? entry.labels : new Set;
+      const rows = entry ? entry.rows : [];
+      const card = el("div", { class: "mini" });
+      const primary = [...labels][0];
+      if (primary) {
+        const nameBtn = el("button", {
+          type: "button",
+          class: "l acct-name-btn",
+          "aria-label": `Show ${a.name} transactions`
+        }, a.name);
+        nameBtn.addEventListener("click", () => openTransactions(primary));
+        card.append(nameBtn);
+      } else {
+        card.append(el("div", { class: "l" }, a.name));
+      }
+      const v = el("button", {
+        type: "button",
+        class: `v num${a.balance < 0 ? " text-danger" : ""}`,
+        "aria-label": `Balance for ${a.name}, ${money(a.balance)} — click to update`
+      }, money(a.balance));
+      v.addEventListener("click", () => editBalance(a));
+      card.append(v);
+      const util = utilisation(a);
+      card.append(el("div", { class: "s" }, [a.type.replace("_", " "), a.institution].filter(Boolean).join(" · "), !util && a.credit_limit ? ` · limit ${money(a.credit_limit, 0)}` : "", a.monthly_contribution ? ` · ${money(a.monthly_contribution, 0)}/m` : ""));
+      if (util)
+        card.append(util);
+      const days = daysSince(a.balance_updated);
+      const badges = el("div", { class: "acct-badges" });
+      if (!a.in_budget)
+        badges.append(badge("not in budget", "muted"));
+      if (!rows.length)
+        badges.append(badge("no transactions", "warn"));
+      if (a.balance_updated && days === null)
+        badges.append(badge(`as of ${a.balance_updated}`, "muted"));
+      else if (days === null)
+        badges.append(badge("never confirmed", "warn"));
+      else if (days > STALE_DAYS)
+        badges.append(badge(`unconfirmed ${days} days`, "warn"));
+      if (badges.childElementCount)
+        card.append(badges);
+      const act = periodActivity(labels);
+      if (act.count) {
+        card.append(el("div", { class: "acct-act" }, el("span", { class: "text-success" }, `+${money(act.inAmt, 0)}`), " in · ", el("span", { class: "text-danger" }, `-${money(act.outAmt, 0)}`), " out · ", `${act.count} ${act.count === 1 ? "transaction" : "transactions"} in ${periodMonthName(S.period)}`));
+      }
+      const rec = reconcile(a, rows);
+      const pending = (n) => n ? ` · ${n} dated ahead, not counted yet` : "";
+      if (rec.state === "drift") {
+        const line = el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt" }, `${rec.count} ${rec.count === 1 ? "transaction" : "transactions"} since · implies `, el("b", { class: "num" }, money(rec.implied)), pending(rec.ahead)));
+        const btn = el("button", {
+          type: "button",
+          class: "acct-recon-btn",
+          "aria-label": `Set ${a.name} balance to ${money(rec.implied)}`
+        }, icoEl(["check"]), "Use this");
+        btn.addEventListener("click", () => acceptImplied(a, rec.implied));
+        line.append(btn);
+        card.append(line);
+      } else if (rec.state === "clean") {
+        card.append(el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt text-success" }, "Matches your transactions")));
+      } else if (rec.state === "pending") {
+        card.append(el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt text-muted" }, `Up to date · ${rec.ahead} ${rec.ahead === 1 ? "transaction" : "transactions"} dated ahead`)));
+      } else if (rec.state === "no-date" && rows.length) {
+        card.append(el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt text-muted" }, "Set a balance date to check this against your transactions")));
+      }
+      const foot = el("div", { class: "acct-foot" });
+      const updated = a.balance_updated ? `updated ${a.balance_updated}` : "no balance date";
+      foot.append(el("span", { class: "s2" }, updated));
+      const acts = el("span", { class: "acct-foot-acts" });
+      const budgetBtn = el("button", {
+        type: "button",
+        class: "acct-link",
+        "aria-label": a.in_budget ? `Stop counting ${a.name} toward budget totals` : `Count ${a.name} toward budget totals again`
+      }, a.in_budget ? "Exclude from budget" : "Include in budget");
+      budgetBtn.addEventListener("click", () => toggleBudget(a));
+      const editBtn = el("button", {
+        type: "button",
+        class: "acct-link",
+        "aria-label": `Edit ${a.name}`
+      }, "Edit");
+      editBtn.addEventListener("click", () => editAccount(a));
+      const openBtn = el("button", {
+        type: "button",
+        class: "acct-link",
+        "aria-label": `Open the ${a.name} note`
+      }, "Open note");
+      openBtn.addEventListener("click", () => openAccountFile(a));
+      acts.append(editBtn, budgetBtn, openBtn);
+      foot.append(acts);
+      card.append(foot);
+      return card;
+    }
     function renderAccounts() {
+      renderKpis();
+      const idx = accountIndex();
       const wrap = $("#acctSections");
       wrap.empty();
       for (const [title, types] of ACCT_GROUPS) {
@@ -3132,44 +3554,31 @@ var require_accounts = __commonJS((exports2, module2) => {
           continue;
         const grid = el("div", { class: "mini-grid" });
         const total = accounts.reduce((a, b) => a + b.balance, 0);
-        for (const a of accounts) {
-          const v = el("button", { type: "button", class: `v num${a.balance < 0 ? " text-danger" : ""}`, "aria-label": `Balance for ${a.name}, ${money(a.balance)} — click to update` }, money(a.balance));
-          v.addEventListener("click", async () => {
-            const r = await askFields(app, `Update balance — ${a.name}`, [
-              { key: "balance", label: "New balance", type: "number", value: a.balance.toFixed(2) }
-            ]);
-            if (!r)
-              return;
-            const num = parseAmount(r.balance);
-            if (num === null || isNaN(num))
-              return toast("Not a number", true);
-            a.balance = num;
-            a.balanceRaw = null;
-            a.balance_updated = new Date().toISOString().slice(0, 10);
-            await saveAccount(a);
-            renderAccounts();
-            toast(`${a.name} balance updated`);
-          });
-          grid.append(el("div", { class: "mini" }, el("div", { class: "l" }, a.name), v, el("div", { class: "s" }, [a.type.replace("_", " "), a.institution].filter(Boolean).join(" · "), a.credit_limit ? ` · limit ${money(a.credit_limit, 0)}` : "", a.monthly_contribution ? ` · ${money(a.monthly_contribution, 0)}/m` : ""), el("div", { class: "s2" }, a.balance_updated ? `updated ${a.balance_updated}` : "")));
-        }
+        for (const a of accounts)
+          grid.append(accountTile(a, idx.get(a)));
         wrap.append(el("div", { class: "card mb-4" }, el("div", { class: "card-h" }, el("div", {}, el("h2", {}, title), el("div", { class: "sub" }, `${accounts.length} accounts`)), el("div", { class: "legend" }, el("span", {}, el("b", { class: "num", style: "font-size:15px;color:var(--text-primary)" }, money(total))))), el("div", { class: "body-pad" }, grid)));
       }
       if (!S.accounts.length) {
         wrap.append(el("div", { class: "card" }, el("div", { class: "body-pad" }, el("p", { class: "text-muted", style: "margin:0" }, "No accounts yet. Use “New account” above to add a bank account, savings pot or investment."))));
       }
     }
-    async function saveAccount(a) {
+    async function saveAccount(a, keys = []) {
       if (a.fmRaw) {
-        const fm = patchFrontmatter(a.fmRaw, {
+        const updates = {
           balance: a.balanceRaw != null ? a.balanceRaw : a.balance.toFixed(2),
-          balance_updated: a.balance_updated || null
-        });
+          balance_updated: a.balance_updated || null,
+          budget: a.in_budget ? null : "false"
+        };
+        for (const k of keys)
+          updates[k] = FM_WRITERS[k](a);
+        const fm = patchFrontmatter(a.fmRaw, updates);
         await writeFile(`Accounts/${a.name}.md`, `---
 ${fm}
 ---` + (a.body || `
 
 # ${a.name}
 `));
+        a.fmRaw = fm;
         return;
       }
       const lines = ["---", `type: ${a.type}`];
@@ -3180,6 +3589,8 @@ ${fm}
       lines.push(`balance: ${a.balance.toFixed(2)}`);
       if (a.balance_updated)
         lines.push(`balance_updated: ${a.balance_updated}`);
+      if (!a.in_budget)
+        lines.push("budget: false");
       if (a.credit_limit)
         lines.push(`credit_limit: ${a.credit_limit.toFixed(2)}`);
       if (a.goal_amount)
@@ -3204,6 +3615,8 @@ ${fm}
 
 # ${a.name}
 `));
+      a.fmRaw = lines.slice(1, -1).join(`
+`);
     }
     async function addAccount() {
       const r = await askFields(app, "New account", [
@@ -3222,6 +3635,17 @@ ${fm}
           label: "Total invested (optional)",
           type: "number",
           desc: "What you have put in, so growth can be shown against it."
+        },
+        {
+          key: "budget",
+          label: "Counts toward the budget",
+          type: "select",
+          value: "yes",
+          options: [
+            { value: "yes", label: "Yes — normal spending account" },
+            { value: "no", label: "No — investment or savings wrapper" }
+          ],
+          desc: "Choose No for an account whose interest is not household income and whose contributions are not household spending. Its transactions still import and show in Transactions."
         }
       ]);
       if (!r)
@@ -3245,7 +3669,8 @@ ${fm}
         account_number: "",
         tx_label: "",
         balance,
-        balance_updated: new Date().toISOString().slice(0, 10),
+        balance_updated: todayIso(),
+        in_budget: r.budget !== "no",
         credit_limit: null,
         goal_amount: goal,
         target_date: "",
@@ -3268,7 +3693,16 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
       ctx.render();
       toast(`Created Accounts/${name}.md`);
     }
-    ctx.provide({ renderAccounts, saveAccount, addAccount });
+    ctx.provide({
+      renderAccounts,
+      saveAccount,
+      addAccount,
+      editAccount,
+      accountIndex,
+      accountReconcile: reconcile,
+      accountUtilisation: utilisationOf,
+      ACCOUNT_FM_KEYS: EDITABLE_KEYS
+    });
   };
 });
 
@@ -5388,7 +5822,7 @@ var require_import = __commonJS((exports2, module2) => {
   var { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
-    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment } = ctx;
+    const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
     function renderImport() {
       const loc = locale();
       $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
@@ -5674,6 +6108,12 @@ var require_import = __commonJS((exports2, module2) => {
       recEl.classList.toggle("imp-reconcile-warn", !!rec && !rec.verified);
       if (rec)
         recEl.textContent = rec.flipped ? "This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below." : rec.verified ? "Amounts check out against this statement’s own balance column." : "Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.";
+      const target = accountForLabel(p.label || "");
+      const nbEl = $("#impNonBudget");
+      const nonBudget = !!target && !target.in_budget;
+      nbEl.classList.toggle("hidden", !nonBudget);
+      if (nonBudget)
+        nbEl.textContent = `${target.name} is excluded from the budget — these rows will import and show in Transactions, but won’t count toward income or spending totals.`;
       const t = $("#impTable");
       t.empty();
       t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Import")), el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Excl."))));
@@ -5778,7 +6218,7 @@ var require_import = __commonJS((exports2, module2) => {
 // src/controller.js
 var require_controller = __commonJS((exports2, module2) => {
   var { Notice } = require("obsidian");
-  var { el, setIco } = require_util();
+  var { el, setIco, setInert } = require_util();
   var { SHELL_HTML } = require_shell();
   var { confirmModal } = require_modal();
   var { localeFor } = require_locale();
@@ -5915,11 +6355,13 @@ var require_controller = __commonJS((exports2, module2) => {
         import: ctx.renderImport,
         connect: () => {}
       })[S.view]();
+      if (locked)
+        setInert($(".bud-scroll"), true);
     }
     function openDrawer() {
       const d = $("#appDrawer");
       d.classList.add("open");
-      d.removeAttribute("inert");
+      setInert(d, false);
       $("#drawerOverlay").classList.add("open");
       $("#menuBtn").setAttribute("aria-expanded", "true");
       $("#drawerClose").focus();
@@ -5928,7 +6370,7 @@ var require_controller = __commonJS((exports2, module2) => {
       const d = $("#appDrawer");
       const wasOpen = d.classList.contains("open");
       d.classList.remove("open");
-      d.setAttribute("inert", "");
+      setInert(d, true);
       $("#drawerOverlay").classList.remove("open");
       $("#menuBtn").setAttribute("aria-expanded", "false");
       if (wasOpen)
@@ -6007,8 +6449,8 @@ var require_controller = __commonJS((exports2, module2) => {
       locked = true;
       closeDrawer();
       $("#splashGate").classList.remove("hidden");
-      $(".topbar").setAttribute("inert", "");
-      $(".bud-scroll").setAttribute("inert", "");
+      setInert($(".topbar"), true);
+      setInert($(".bud-scroll"), true);
       focusEnter();
     }
     async function unlockGate() {
@@ -6016,8 +6458,8 @@ var require_controller = __commonJS((exports2, module2) => {
         return;
       locked = false;
       $("#splashGate").classList.add("hidden");
-      $(".topbar").removeAttribute("inert");
-      $(".bud-scroll").removeAttribute("inert");
+      setInert($(".topbar"), false);
+      setInert($(".bud-scroll"), false);
       if (!S.loaded)
         await connectVault();
       const h = $(`#view-${S.view} h1`);
@@ -6796,7 +7238,7 @@ tags: [finance, finance/budget, finance/budget/services]
 
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
-  var { PluginSettingTab, Setting, TFile, normalizePath } = require("obsidian");
+  var { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require("obsidian");
   var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
@@ -6839,6 +7281,11 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const fmSection = containerEl.createDiv();
       this.renderMdSettings(fmSection);
     }
+    hide() {
+      clearTimeout(this._hhTimer);
+      clearTimeout(this._msdTimer);
+      clearTimeout(this._curTimer);
+    }
     async renderMdSettings(containerEl) {
       const md = await this.plugin.readBudgetSettingsMd();
       new Setting(containerEl).setName("Name / household").setDesc("Shown in the dashboard greeting and top bar. Leave blank for none.").addText((t) => {
@@ -6846,7 +7293,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         t.onChange((v) => {
           clearTimeout(this._hhTimer);
           this._hhTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd("household", `"${v.trim().replace(/"/g, "")}"`);
+            await this.plugin.updateBudgetSettingsMd("household", yamlStr(v.trim()));
             this.plugin.reloadViews();
           }, 800);
         });
@@ -6858,8 +7305,10 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           clearTimeout(this._msdTimer);
           this._msdTimer = setTimeout(async () => {
             const n = parseInt(v, 10);
-            if (!n || n < 1 || n > 28)
+            if (!n || n < 1 || n > 28) {
+              new Notice(`Budget: "${v}" is not a valid month start day — enter a number from 1 to 28.`, 6000);
               return;
+            }
             await this.plugin.updateBudgetSettingsMd("month_start_day", String(n));
             this.plugin.reloadViews();
           }, 800);
