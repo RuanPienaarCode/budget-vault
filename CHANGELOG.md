@@ -3,6 +3,54 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.5 — 2026-08-05
+
+### Fixed
+
+- **Closing the setup wizard on its very first screen no longer hides it
+  forever.** Tapping outside the wizard, or pressing Escape before you had read
+  it, counted as "no thanks" and the wizard never opened again — which on a
+  fresh install left you with an empty plugin and no visible way to set it up.
+  Closing it on the welcome screen now simply asks again next time. Closing it
+  partway through is still taken as a real answer, and the message that appears
+  now points at **Settings → Budget Vault → Run setup wizard**, not only at the
+  command palette.
+- **Choosing a country in the wizard now updates the currency you can see.**
+  The country sets the currency, but the currency control was drawn before that
+  happened, so picking, say, the United Kingdom left "R" on screen while "£"
+  was what actually got saved. The two now always agree, and they share one
+  step instead of asking the same question twice in a row.
+- **The privacy splash no longer greets you with "Welcome back" the first time
+  you ever open the plugin.**
+
+### Changed
+
+- **Every step of the setup wizard now has a name, not just a number.**
+  "Step 3 of 7" told you how far along you were but not what you were being
+  asked.
+- **The wizard explains how budget periods are named.** If you are paid on the
+  25th, the period running 25 August to 24 September is called *September* —
+  the whole app works that way, and nothing said so. The payday step now works
+  it out using the day you actually entered, and the pay-cycle step shows the
+  date your current period started. The 1–28 limit on paydays is explained too,
+  along with what to do if you are paid on the last day of the month.
+- **The wizard checks your answers in the window, next to the fields.**
+  Problems used to appear as a small message in the corner of the screen, away
+  from the step it was about, easy to miss on a phone and sometimes behind the
+  wizard itself.
+- **The category step is grouped by kind, with colour previews and
+  Select all / Select none.** Twenty ticked boxes in one flat list was a wall.
+- **The "found an existing budget" message is now a note on the next step
+  rather than a screen of its own,** and it is honest about what connecting
+  does and doesn't change: your categories, accounts and transactions are left
+  alone, but the settings in `Settings.md` are rewritten.
+- **The last step says what to do next** — set your category amounts on the
+  Budgets page, then import your bank's CSV — and warns you that the budget
+  opens behind the tap-to-enter privacy screen, so that is no longer a
+  surprise the moment setup ends.
+- **Cancel moved away from Back and Next** in the wizard, where it was one
+  mis-tap from leaving setup.
+
 ## 1.3.4 — 2026-08-05
 
 ### Fixed
