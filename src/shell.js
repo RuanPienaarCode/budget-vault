@@ -8,7 +8,7 @@ const SHELL_HTML = `
     <div class="splash-inner">
       <div class="splash-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></div>
       <h1 class="splash-title" id="gateTitle">Budget Vault</h1>
-      <p class="splash-sub">Welcome back to Budget Vault, your private budget tool.</p>
+      <p class="splash-sub">Your private budget, kept safely inside your vault.</p>
       <button type="button" class="btn-gradient splash-btn" id="gateEnter">Enter budget</button>
     </div>
   </div>
