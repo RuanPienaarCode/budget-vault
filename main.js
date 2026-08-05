@@ -493,7 +493,11 @@ var require_util = __commonJS((exports2, module2) => {
       return 0;
     return n;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero };
+  function isoDayNumber(iso) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  }
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber };
 });
 
 // src/shell.js
@@ -1935,14 +1939,10 @@ var require_io = __commonJS((exports2, module2) => {
 // src/period.js
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
-  var { safeSeg, periodDaysOrZero } = require_util();
+  var { safeSeg, periodDaysOrZero, isoDayNumber: dayNum } = require_util();
   var MONTH_KEY = /^\d{4}-\d{2}$/;
   var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   var DAY = 86400000;
-  function dayNum(iso) {
-    const [y, m, d] = iso.split("-").map(Number);
-    return Math.round(Date.UTC(y, m - 1, d) / DAY);
-  }
   function isoFromDayNum(n) {
     const d = new Date(n * DAY);
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
@@ -4049,11 +4049,14 @@ var require_debts = __commonJS((exports2, module2) => {
         }
         wrap.append(rows);
       }
-      const income = periodSummary(S.period).income;
+      const iv = ctx.intervalDays();
+      const rawIncome = periodSummary(S.period).income;
+      const income = iv ? rawIncome * (365.25 / 12) / iv : rawIncome;
+      const scaleNote = iv ? " monthly income, scaled from this period’s," : " income";
       const note = el("div", { class: "debt-dti" });
       if (income > 0) {
         const ratio = committedAll / income * 100;
-        note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), ` of this period’s income goes to debt payments — ${money(committedAll)} across ` + `${list.length} debt${list.length === 1 ? "" : "s"}`, el("span", { class: "text-muted" }, ratio > 36 ? ". Lenders treat above 36% as stretched." : "."));
+        note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), ` of your${scaleNote} goes to debt payments — ${money(committedAll)} across ` + `${list.length} debt${list.length === 1 ? "" : "s"}`, el("span", { class: "text-muted" }, ratio > 36 ? ". Lenders treat above 36% as stretched." : "."));
       } else {
         note.append(el("span", { class: "text-muted" }, `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? "" : "s"}. ` + "No income recorded this period, so there is no ratio to show yet."));
       }
@@ -7310,8 +7313,18 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
-  var { yamlStr } = require_util();
-  var MD_KEYS = new Set(["household", "month_start_day", "country", "currency"]);
+  var { yamlStr, periodDaysOrZero, isoDayNumber } = require_util();
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
+  var PERIOD_PRESETS = { 0: "Monthly (payday month)", 7: "Every week", 14: "Every 2 weeks", 28: "Every 4 weeks" };
+  function periodLengthOptions(current) {
+    const o = { ...PERIOD_PRESETS };
+    if (current && !o[current])
+      o[current] = `Every ${current} days (set in Settings.md)`;
+    return o;
+  }
+  var PERIOD_LENGTH_DESC = "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.";
+  var PERIOD_ANCHOR_DESC = "When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.";
   var FEEDBACK_DESC = "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.";
   var SUPPORT_DESC = "Budget Vault is free and always will be. If you'd like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.";
 
@@ -7382,6 +7395,38 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           }, 800);
         });
       });
+      new Setting(containerEl).setName("Period length").setDesc(PERIOD_LENGTH_DESC).addDropdown((d) => {
+        const cur = periodDaysOrZero(md.period_days);
+        for (const [days, label] of Object.entries(periodLengthOptions(cur)))
+          d.addOption(days, label);
+        d.setValue(String(cur));
+        d.onChange(async (v) => {
+          const n = periodDaysOrZero(v);
+          await this.plugin.updateBudgetSettingsMd("period_days", String(n));
+          if (n && !ISO_DATE.test((md.period_anchor ?? "").toString().trim())) {
+            new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
+          }
+          this.plugin.reloadViews();
+          this.display();
+        });
+      });
+      new Setting(containerEl).setName("Last payday").setDesc(PERIOD_ANCHOR_DESC).addText((t) => {
+        t.inputEl.type = "date";
+        t.setValue((md.period_anchor ?? "").toString().trim());
+        t.onChange((v) => {
+          clearTimeout(this._anchorTimer);
+          this._anchorTimer = setTimeout(async () => {
+            const next = v.trim();
+            if (next && !ISO_DATE.test(next)) {
+              new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
+              return;
+            }
+            await this.warnIfAnchorReslices(md, next);
+            await this.plugin.updateBudgetSettingsMd("period_anchor", next);
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
       new Setting(containerEl).setName("Country").setDesc("Drives amount formatting, bank-statement date order and the Tax view's checklist (tailored to your country's tax authority). Existing tax years keep their data — only labels and new-year seeds change.").addDropdown((d) => {
         for (const code of COUNTRY_ORDER)
           d.addOption(code, PROFILES[code].label);
@@ -7412,6 +7457,22 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const cache = this.app.metadataCache.getFileCache(f);
       return cache && cache.frontmatter || {};
     }
+    datedBudgetCount() {
+      const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+      return this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
+    }
+    async warnIfAnchorReslices(md, next) {
+      const days = periodDaysOrZero(md.period_days);
+      const prev = (md.period_anchor ?? "").toString().trim();
+      if (!days || !ISO_DATE.test(prev) || !ISO_DATE.test(next))
+        return;
+      if ((isoDayNumber(next) - isoDayNumber(prev)) % days === 0)
+        return;
+      const n = this.datedBudgetCount();
+      if (!n)
+        return;
+      new Notice(`Budget: this shifts every period boundary. ${n} budget ${n === 1 ? "file" : "files"} ` + `named by date will stop matching — they stay in your vault, and setting this date ` + `back to ${prev} brings them straight back.`, 12000);
+    }
     getControlValue(key) {
       if (!MD_KEYS.has(key))
         return super.getControlValue(key);
@@ -7420,6 +7481,10 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         return md.household ?? "";
       if (key === "month_start_day")
         return Number(md.month_start_day ?? 23);
+      if (key === "period_days")
+        return String(periodDaysOrZero(md.period_days));
+      if (key === "period_anchor")
+        return (md.period_anchor ?? "").toString().trim();
       if (key === "currency")
         return md.currency ?? "R";
       if (key === "country") {
@@ -7441,7 +7506,13 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           this.plugin.reloadViews();
         return;
       }
-      const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "country" ? String(value) : null;
+      if (key === "period_anchor") {
+        const next = String(value).trim();
+        if (next && !ISO_DATE.test(next))
+          return;
+        await this.warnIfAnchorReslices(this.mdSettings(), next);
+      }
+      const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "period_days" ? String(periodDaysOrZero(value)) : key === "period_anchor" ? String(value).trim() : key === "country" ? String(value) : null;
       if (raw === null)
         return;
       await this.plugin.updateBudgetSettingsMd(key, raw);
@@ -7519,6 +7590,29 @@ var require_settings_tab = __commonJS((exports2, module2) => {
             validate: (v) => {
               const n = parseInt(v, 10);
               return n >= 1 && n <= 28 ? undefined : "Pick a day between 1 and 28.";
+            }
+          }
+        },
+        {
+          name: "Period length",
+          desc: PERIOD_LENGTH_DESC,
+          control: {
+            type: "dropdown",
+            key: "period_days",
+            defaultValue: "0",
+            options: periodLengthOptions(periodDaysOrZero(this.mdSettings().period_days))
+          }
+        },
+        {
+          name: "Last payday",
+          desc: PERIOD_ANCHOR_DESC,
+          control: {
+            type: "text",
+            key: "period_anchor",
+            placeholder: "YYYY-MM-DD",
+            validate: (v) => {
+              const s = String(v).trim();
+              return !s || ISO_DATE.test(s) ? undefined : "Use YYYY-MM-DD, e.g. 2026-08-07.";
             }
           }
         },

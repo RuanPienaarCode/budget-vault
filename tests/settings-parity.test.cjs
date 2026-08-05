@@ -58,7 +58,9 @@ ok(impNames.size >= 8, `expected at least 8 settings, found ${impNames.size}`);
 const mdKeys = new Set(
   [...src.matchAll(/const MD_KEYS = new Set\(\[([^\]]*)\]\)/g)]
     .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])));
-eq([...mdKeys].sort(), ['country', 'currency', 'household', 'month_start_day'], 'MD_KEYS holds the four Settings.md keys');
+eq([...mdKeys].sort(),
+  ['country', 'currency', 'household', 'month_start_day', 'period_anchor', 'period_days'],
+  'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');
 const defaultsBlock = defaults.match(/const DEFAULT_SETTINGS = \{([\s\S]*?)\n\};/);

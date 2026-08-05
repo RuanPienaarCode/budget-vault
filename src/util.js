@@ -589,4 +589,15 @@ function periodDaysOrZero(v) {
   return n;
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero };
+/* Whole days since the epoch, in UTC. Local-time date maths drifts by a day
+   across a DST boundary, which would silently lengthen or shorten a period
+   twice a year. Shared so the settings tab measures an anchor shift with the
+   same arithmetic period.js derives the periods themselves with — if the two
+   ever disagreed, the tab would warn about a move that changed nothing, or
+   stay silent through one that moved every boundary. */
+function isoDayNumber(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber };

@@ -20,7 +20,7 @@
    a whole number of intervals actually moves a boundary. */
 
 const { MONTHS } = require('./constants');
-const { safeSeg, periodDaysOrZero } = require('./util');
+const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum } = require('./util');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -42,10 +42,6 @@ const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
    year, which is exactly the kind of failure that shows up as "my totals moved"
    with no error to point at. */
 const DAY = 86400000;
-function dayNum(iso) {
-  const [y, m, d] = iso.split('-').map(Number);
-  return Math.round(Date.UTC(y, m - 1, d) / DAY);
-}
 function isoFromDayNum(n) {
   const d = new Date(n * DAY);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;

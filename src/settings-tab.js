@@ -7,14 +7,32 @@ const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obs
 const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
-const { yamlStr } = require('./util');
+const { yamlStr, periodDaysOrZero, isoDayNumber } = require('./util');
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
    API binds a control to this.plugin.settings[key] by default, so these four
    route through the getControlValue/setControlValue overrides instead. */
-const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency']);
+const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 'period_days', 'period_anchor']);
+
+/* The pay cycles offered as presets, keyed by the length that gets stored. The
+   stored value is a plain day count so it needs no translating — see the header
+   of period.js — but the labels do the talking, because nobody thinks of
+   themselves as being paid "every 14 days". */
+const PERIOD_PRESETS = { 0: 'Monthly (payday month)', 7: 'Every week', 14: 'Every 2 weeks', 28: 'Every 4 weeks' };
+/* A length set by hand in Settings.md that isn't one of the presets must still
+   appear, and appear truthfully. Snapping it to the nearest preset would edit
+   the user's file behind their back the moment they opened settings. */
+function periodLengthOptions(current) {
+  const o = { ...PERIOD_PRESETS };
+  if (current && !o[current]) o[current] = `Every ${current} days (set in Settings.md)`;
+  return o;
+}
 
 /* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
+const PERIOD_LENGTH_DESC = 'How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.';
+const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
 const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
 const SUPPORT_DESC = 'Budget Vault is free and always will be. If you\'d like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.';
 
@@ -154,6 +172,45 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Period length')
+      .setDesc(PERIOD_LENGTH_DESC)
+      .addDropdown(d => {
+        const cur = periodDaysOrZero(md.period_days);
+        for (const [days, label] of Object.entries(periodLengthOptions(cur))) d.addOption(days, label);
+        d.setValue(String(cur));
+        d.onChange(async v => {
+          const n = periodDaysOrZero(v);
+          await this.plugin.updateBudgetSettingsMd('period_days', String(n));
+          if (n && !ISO_DATE.test((md.period_anchor ?? '').toString().trim())) {
+            new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
+          }
+          this.plugin.reloadViews();
+          this.display();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Last payday')
+      .setDesc(PERIOD_ANCHOR_DESC)
+      .addText(t => {
+        t.inputEl.type = 'date';
+        t.setValue((md.period_anchor ?? '').toString().trim());
+        t.onChange(v => {
+          clearTimeout(this._anchorTimer);
+          this._anchorTimer = setTimeout(async () => {
+            const next = v.trim();
+            if (next && !ISO_DATE.test(next)) {
+              new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
+              return;
+            }
+            await this.warnIfAnchorReslices(md, next);
+            await this.plugin.updateBudgetSettingsMd('period_anchor', next);
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
+
+    new Setting(containerEl)
       .setName('Country')
       .setDesc('Drives amount formatting, bank-statement date order and the Tax view\'s checklist (tailored to your country\'s tax authority). Existing tax years keep their data — only labels and new-year seeds change.')
       .addDropdown(d => {
@@ -200,6 +257,35 @@ class BudgetSettingTab extends PluginSettingTab {
     return (cache && cache.frontmatter) || {};
   }
 
+  /* Budget files named by date — the ones an anchor move can strand. Counted
+     off getMarkdownFiles rather than walking the folder so no TFolder import
+     is needed, and so a Budgets/ folder that doesn't exist yet reads as zero
+     instead of throwing. */
+  datedBudgetCount() {
+    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    return this.app.vault.getMarkdownFiles()
+      .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
+  }
+
+  /* ADR 0001: an anchor is meaningful only modulo the period length, so moving
+     it by a whole number of cycles describes the same periods and must stay
+     silent — warning there would train the user to ignore the warning that
+     matters. An off-cycle move genuinely re-slices every boundary, and then the
+     honest thing is to say how much it touched and how to undo it. Nothing is
+     deleted either way, so this is information, not a refusal. */
+  async warnIfAnchorReslices(md, next) {
+    const days = periodDaysOrZero(md.period_days);
+    const prev = (md.period_anchor ?? '').toString().trim();
+    if (!days || !ISO_DATE.test(prev) || !ISO_DATE.test(next)) return;
+    if ((isoDayNumber(next) - isoDayNumber(prev)) % days === 0) return;
+    const n = this.datedBudgetCount();
+    if (!n) return;
+    new Notice(
+      `Budget: this shifts every period boundary. ${n} budget ${n === 1 ? 'file' : 'files'} ` +
+      `named by date will stop matching — they stay in your vault, and setting this date ` +
+      `back to ${prev} brings them straight back.`, 12000);
+  }
+
   /* Obsidian's own warning for a missing binding points here: override these
      two for non-standard storage. Only ever called by 1.13+, so the super
      calls are safe despite the 1.4.0 minAppVersion. */
@@ -208,6 +294,10 @@ class BudgetSettingTab extends PluginSettingTab {
     const md = this.mdSettings();
     if (key === 'household') return md.household ?? '';
     if (key === 'month_start_day') return Number(md.month_start_day ?? 23);
+    // Dropdown values are strings; the banded number keeps the control honest
+    // about what the app is running rather than what the file happens to say.
+    if (key === 'period_days') return String(periodDaysOrZero(md.period_days));
+    if (key === 'period_anchor') return (md.period_anchor ?? '').toString().trim();
     if (key === 'currency') return md.currency ?? 'R';
     if (key === 'country') {
       const c = (md.country ?? 'za').toString().trim().toLowerCase();
@@ -228,8 +318,17 @@ class BudgetSettingTab extends PluginSettingTab {
     }
     // yamlStr escapes embedded quotes, so unlike display()'s hand-rolled
     // quoting a household name containing a " survives instead of losing it.
+    // The anchor's warning has to fire BEFORE the write, while the previous
+    // value is still readable — afterwards there is nothing to compare against.
+    if (key === 'period_anchor') {
+      const next = String(value).trim();
+      if (next && !ISO_DATE.test(next)) return;
+      await this.warnIfAnchorReslices(this.mdSettings(), next);
+    }
     const raw = key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'month_start_day' ? String(parseInt(value, 10))
+      : key === 'period_days' ? String(periodDaysOrZero(value))
+      : key === 'period_anchor' ? String(value).trim()
       : key === 'country' ? String(value)
       : null;
     if (raw === null) return;
@@ -307,6 +406,25 @@ class BudgetSettingTab extends PluginSettingTab {
           validate: v => {
             const n = parseInt(v, 10);
             return n >= 1 && n <= 28 ? undefined : 'Pick a day between 1 and 28.';
+          },
+        },
+      },
+      {
+        name: 'Period length',
+        desc: PERIOD_LENGTH_DESC,
+        control: {
+          type: 'dropdown', key: 'period_days', defaultValue: '0',
+          options: periodLengthOptions(periodDaysOrZero(this.mdSettings().period_days)),
+        },
+      },
+      {
+        name: 'Last payday',
+        desc: PERIOD_ANCHOR_DESC,
+        control: {
+          type: 'text', key: 'period_anchor', placeholder: 'YYYY-MM-DD',
+          validate: v => {
+            const s = String(v).trim();
+            return !s || ISO_DATE.test(s) ? undefined : 'Use YYYY-MM-DD, e.g. 2026-08-07.';
           },
         },
       },
