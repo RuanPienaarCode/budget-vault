@@ -88,6 +88,16 @@ No supported bank? Build your own CSV with `Date`, `Title` and `Amount` columns 
 
 Then toggle the plugin off and on.
 
+### Design notes
+
+The budget period is the one piece of the app whose behaviour isn't obvious from the code alone —
+it has two naming shapes, a pay-cycle phase, and its own income arithmetic:
+
+- [How a period is decided — shape, phase and income](docs/period-shape-phase-and-income.html) — diagrams
+  of the whole flow, plus what is deliberately left unguarded
+- [ADR 0001](docs/adr/0001-periods-are-derived-not-materialised.md) — periods are derived, not materialised
+- [ADR 0002](docs/adr/0002-the-pay-cycle-is-a-number-not-a-name.md) — the pay cycle is a number, not a name
+
 ## Feedback
 
 Settings → Budget Vault → Send feedback, or [open the form](https://forms.gle/EVJKCuZxNQ9vJhTz6). Nothing from your budget is attached — the button just opens the form in your browser.
