@@ -225,9 +225,14 @@ module.exports = function registerDebts(ctx) {
        monthly salary lands in one period out of four, and scaling left three
        weeks with no ratio at all and made the fourth read 4.35 paycheques. */
     const iv = ctx.intervalDays();
-    const { income, periods: nPeriods } = ctx.monthlyIncome(S.period);
-    // Not `window` — that shadows the browser global inside this whole function.
-    const avgWindow = nPeriods === 1 ? 'this period' : `the last ${nPeriods} periods`;
+    const { income, periods: nPeriods, complete } = ctx.monthlyIncome(S.period);
+    /* Not `window` — that shadows the browser global inside this whole function.
+       "complete" distinguishes a settled average from the one case that still
+       leans on a period in progress (a vault with no finished history yet), so
+       the line doesn't present a part-week figure as a months-long average. */
+    const avgWindow = !complete ? 'this period so far'
+      : nPeriods === 1 ? 'the last complete period'
+      : `the last ${nPeriods} complete periods`;
     const scaleNote = iv ? ` monthly income, averaged over ${avgWindow},` : ' income';
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {

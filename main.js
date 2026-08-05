@@ -2125,7 +2125,7 @@ var require_period = __commonJS((exports2, module2) => {
     const MONTH_DAYS = 365.25 / 12;
     function averagingPeriods(iv) {
       const lo = Math.max(1, Math.ceil(2 * MONTH_DAYS / iv));
-      const hi = Math.max(lo, Math.ceil(4 * MONTH_DAYS / iv));
+      const hi = Math.max(lo, Math.floor(4 * MONTH_DAYS / iv));
       let best = lo, bestErr = Infinity;
       for (let n = lo;n <= hi; n++) {
         const months = n * iv / MONTH_DAYS;
@@ -2140,17 +2140,24 @@ var require_period = __commonJS((exports2, module2) => {
     function monthlyIncome(p) {
       const iv = intervalDays();
       if (!iv)
-        return { income: periodSummary(p).income, periods: 1 };
+        return { income: periodSummary(p).income, periods: 1, complete: true };
       const need = averagingPeriods(iv);
-      const sums = [];
-      for (let i = need - 1;i >= 0; i--)
-        sums.push(periodSummary(shiftPeriod(p, -i)));
-      let from = 0;
-      while (from < sums.length - 1 && sums[from].count === 0)
-        from++;
-      const used = sums.slice(from);
+      function windowEndingBefore(back) {
+        const sums = [];
+        for (let i = need - 1 + back;i >= back; i--)
+          sums.push(periodSummary(shiftPeriod(p, -i)));
+        let from = 0;
+        while (from < sums.length - 1 && sums[from].count === 0)
+          from++;
+        return sums.slice(from);
+      }
+      const running = p === currentPeriod();
+      let used = windowEndingBefore(running ? 1 : 0);
+      const complete = !running || used.some((s) => s.count > 0);
+      if (!complete)
+        used = windowEndingBefore(0);
       const total = used.reduce((s, x) => s + x.income, 0);
-      return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length };
+      return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length, complete };
     }
     function budgetTotals(p) {
       const budget = S.budgets[p] || [];
@@ -4164,8 +4171,8 @@ var require_debts = __commonJS((exports2, module2) => {
         wrap.append(rows);
       }
       const iv = ctx.intervalDays();
-      const { income, periods: nPeriods } = ctx.monthlyIncome(S.period);
-      const avgWindow = nPeriods === 1 ? "this period" : `the last ${nPeriods} periods`;
+      const { income, periods: nPeriods, complete } = ctx.monthlyIncome(S.period);
+      const avgWindow = !complete ? "this period so far" : nPeriods === 1 ? "the last complete period" : `the last ${nPeriods} complete periods`;
       const scaleNote = iv ? ` monthly income, averaged over ${avgWindow},` : " income";
       const note = el("div", { class: "debt-dti" });
       if (income > 0) {

@@ -339,8 +339,101 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   // The payday month is untouched: the period already IS a month.
   const month = periodCtx(23, txFiles);
   month.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
-  eq(month.monthlyIncome('2026-02'), { income: month.periodSummary('2026-02').income, periods: 1 },
+  eq(month.monthlyIncome('2026-02'), { income: month.periodSummary('2026-02').income, periods: 1, complete: true },
     'a payday month reports its own income untouched');
+}
+
+/* ---- a period still running is never averaged in ----
+   It is a PARTIAL period: whatever has landed so far divided by a whole
+   cycle's worth of days, so it reads low early and climbs through the week.
+   Feeding that to debt-to-income put a red 36%+ ratio on the strength of the
+   day of the week alone. These derive every period from currentPeriod()
+   rather than hardcoding a date, so they don't rot with the calendar. */
+{
+  const SALARY = 26000;
+  const mkWeekly = rowsFor => {
+    const ctx = intervalCtx(7, '2026-01-02', {});
+    const files = {};
+    for (const { date, cat, amount } of rowsFor(ctx)) {
+      const m = date.slice(0, 7);
+      files[`FNB/${m}`] = files[`FNB/${m}`] || { label: 'FNB', month: m, dirty: false, rows: [] };
+      files[`FNB/${m}`].rows.push({ date, desc: 'x', cat, amount, excluded: false, note: '' });
+    }
+    ctx.S.txFiles = files;
+    ctx.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
+    return ctx;
+  };
+  // A steady weekly wage in every COMPLETED period, and nothing yet in the one
+  // still running — the shape of any ordinary week before payday lands.
+  const settled = mkWeekly(ctx => {
+    const now = ctx.currentPeriod();
+    const rows = [];
+    for (let i = 1; i <= 14; i++) rows.push({ date: ctx.periodRange(ctx.shiftPeriod(now, -i)).start, cat: 'Salary', amount: SALARY / 4.348 });
+    return rows;
+  });
+  const nowP = settled.currentPeriod();
+  const got = settled.monthlyIncome(nowP);
+  ok(Math.abs(got.income - SALARY) / SALARY < 0.02,
+    `the running period is excluded, so a steady wage reads ${Math.round(got.income)} — the real ~${SALARY}, not dragged toward zero by an empty part-week`);
+  ok(got.complete, 'and it reports a complete window, because finished periods were available');
+  eq(got.income, settled.monthlyIncome(settled.shiftPeriod(nowP, -1)).income,
+    'standing in the running period gives the same figure as standing in the last finished one — no day-of-week wobble');
+
+  // The regression itself: had the running period counted, an empty part-week
+  // would have pulled the average down by roughly one period in thirteen.
+  const withRunning = (() => {
+    const need = 13, iv = 7;
+    let total = 0;
+    for (let i = 0; i < need; i++) total += settled.periodSummary(settled.shiftPeriod(nowP, -i)).income;
+    return total / (need * iv) * (365.25 / 12);
+  })();
+  ok(withRunning < got.income * 0.95,
+    `including it would have understated the same wage as ${Math.round(withRunning)} — the bias this guards`);
+
+  // A vault whose ONLY income is in the period still running must still show a
+  // figure rather than "no income recorded", but must not call it settled.
+  const fresh = mkWeekly(ctx => [{ date: ctx.periodRange(ctx.currentPeriod()).start, cat: 'Salary', amount: 5000 }]);
+  const young = fresh.monthlyIncome(fresh.currentPeriod());
+  ok(young.income > 0, 'a vault with no completed history still reports the income it does have');
+  ok(!young.complete, 'and flags the window as incomplete so the page can say "this period so far"');
+
+  // A period in the PAST is already finished — it keeps the whole window.
+  ok(settled.monthlyIncome(settled.shiftPeriod(nowP, -3)).complete,
+    'a past period is complete, so the window ends at itself rather than one earlier');
+}
+
+/* ---- the averaging window stays inside its own two-to-four-month band ---- */
+{
+  const MONTH_DAYS = 365.25 / 12;
+  /* averagingPeriods isn't exported, so the window length is read back off the
+     `periods` it returns. That only equals the chosen count when nothing gets
+     trimmed — so every period in the window carries a transaction. An empty
+     vault trims down to 1 and would make this assert nothing at all. */
+  const seeded = iv => {
+    const ctx = intervalCtx(iv, '2026-01-02', {});
+    const p = ctx.shiftPeriod(ctx.currentPeriod(), -60);
+    const files = {};
+    for (let i = 0; i <= 30; i++) {
+      const date = ctx.periodRange(ctx.shiftPeriod(p, -i)).start;
+      const m = date.slice(0, 7);
+      files[`FNB/${m}`] = files[`FNB/${m}`] || { label: 'FNB', month: m, dirty: false, rows: [] };
+      files[`FNB/${m}`].rows.push({ date, desc: 'x', cat: 'Salary', amount: 100, excluded: false, note: '' });
+    }
+    ctx.S.txFiles = files;
+    ctx.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
+    return ctx.monthlyIncome(p).periods;
+  };
+  // Every cycle length the settings will accept (util.js bands it 7..31).
+  for (let iv = 7; iv <= 31; iv++) {
+    const n = seeded(iv);
+    const months = (n * iv) / MONTH_DAYS;
+    ok(months >= 2 && months <= 4,
+      `a ${iv}-day cycle averages ${n} periods = ${months.toFixed(2)} months — inside the stated two-to-four band`);
+  }
+  // The specific case that escaped it: hi rounded UP, so fortnightly reached
+  // for 9 periods (126 days, 4.14 months) — past its own ceiling.
+  ok(seeded(14) <= 8, `a fortnightly cycle takes ${seeded(14)} periods, not the 9 that overran four months`);
+  eq(seeded(7), 13, 'and thirteen weeks is still chosen for a weekly cycle — 2.99 months, three paydays every time');
 }
 
 /* ---- fortnightly transactions land in exactly one period ---- */
