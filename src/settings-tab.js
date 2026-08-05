@@ -263,14 +263,39 @@ class BudgetSettingTab extends PluginSettingTab {
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
 
+  /* Date-named budgets the INCOMING cycle length can't address. A length change
+     redraws the set of real period starts: every start of a 14-day cycle is
+     also a start of a 7-day one, so 14 → 7 strands nothing, but 7 → 14 leaves
+     half of them sitting between the new boundaries. Same phase rule period.js
+     validates a remembered period against — if the two ever disagreed, this
+     would promise a file was reachable that the app then refused to open. */
+  offPhaseBudgetCount(days) {
+    const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
+    if (!days || !ISO_DATE.test(anchor)) return 0;
+    const a = isoDayNumber(anchor);
+    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    return this.app.vault.getMarkdownFiles().filter(f =>
+      f.path.startsWith(base) && ISO_DATE.test(f.basename) &&
+      (isoDayNumber(f.basename) - a) % days !== 0).length;
+  }
+
   /* Changing the period length is where the surprise is manufactured, so it is
      where the reassurance belongs — the Budgets page carries the same message
      again, because most people don't read a settings notice carefully. Only
-     fires when the shape actually changes and there are budgets to strand;
-     switching 14 → 7 leaves date-named files addressable, so it says nothing. */
+     fires when files are genuinely stranded. Cycle → cycle used to say nothing
+     at all on the reasoning that date-named files stay addressable; that only
+     holds when the new length divides the old, so it went silent through
+     exactly the 7 → 14 case that strands every second fortnight. */
+  /* Split from the Notice purely so it can be tested: how many budget files a
+     switch from `before` to `after` puts out of reach. */
+  strandedBudgetCount(before, after) {
+    if (!before && after) return this.monthBudgetCount();
+    if (before && !after) return this.datedBudgetCount();
+    if (before && after) return this.offPhaseBudgetCount(after);
+    return 0;                                       // both monthly — nothing moves
+  }
   noticeBudgetsKept(before, after) {
-    if (!before === !after) return;                 // both monthly, or both a cycle
-    const n = before ? this.datedBudgetCount() : this.monthBudgetCount();
+    const n = this.strandedBudgetCount(before, after);
     if (!n) return;
     new Notice(
       `Budget: your ${n} existing budget ${n === 1 ? 'file stays' : 'files stay'} in the vault. ` +

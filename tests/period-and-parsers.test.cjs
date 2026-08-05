@@ -189,6 +189,137 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   ok(!monthly.periodKeyValid('2026-8'), 'nor a nearly-right one');
 }
 
+/* ---- a remembered period must also be ON PHASE, not merely date-shaped ---- */
+{
+  /* The damage this prevents: on a 7-day cycle anchored 2026-08-07 the user is
+     sitting on 2026-08-14, then switches to 14 days. Every YYYY-MM-DD passes a
+     shape check, so the old name survived — but 08-14 is no longer a period
+     START, and its window straddled the two real periods either side of it.
+     Prev/next then walked that off-phase track forever (only "jump to current"
+     escaped), and a budget saved there wrote a file no later period could
+     address — and one the Budgets page did NOT list as stranded, because it
+     passed this very check. */
+  const fortnight = intervalCtx(14, '2026-08-07');
+  ok(fortnight.periodKeyValid('2026-08-07'), 'the anchor itself is a period start');
+  ok(fortnight.periodKeyValid('2026-08-21'), 'so is a whole cycle after it');
+  ok(fortnight.periodKeyValid('2026-07-24'), 'and a whole cycle BEFORE it');
+  ok(!fortnight.periodKeyValid('2026-08-14'),
+    'a weekly start left over from a 7-day cycle is NOT addressable at 14 days');
+  ok(!fortnight.periodKeyValid('2026-08-08'), 'nor is any other off-phase date');
+
+  // Proof the off-phase name really did describe a window nothing else agrees
+  // with — pinned so the check can't be softened back to a shape test.
+  eq(fortnight.periodRange('2026-08-14'), { start: '2026-08-14', end: '2026-08-27' },
+    'the off-phase window straddles the real periods 08-07…08-20 and 08-21…09-03');
+
+  // 14 → 7 strands nothing: every fortnightly start is also a weekly one.
+  const week = intervalCtx(7, '2026-08-07');
+  ok(week.periodKeyValid('2026-08-14') && week.periodKeyValid('2026-08-21'),
+    'shortening the cycle to a divisor keeps every old start addressable');
+
+  // An off-cycle ANCHOR move re-slices every boundary, so yesterday's start is
+  // off-phase too — the same failure by a different route.
+  const moved = intervalCtx(14, '2026-08-10');
+  ok(!moved.periodKeyValid('2026-08-07'),
+    'after a 3-day anchor move the old period start is no longer a start');
+
+  // A filename the regex admits but the calendar does not. Date.UTC would roll
+  // 2026-13-45 forward to a date the name never said.
+  ok(!fortnight.periodKeyValid('2026-13-45'), 'a date-shaped non-date is not addressable');
+
+  // currentPeriod is the recovery path the loader falls back to, so it must
+  // itself always pass — for every cycle length, not just the tested one.
+  for (const days of [7, 10, 14, 28, 31]) {
+    const c = intervalCtx(days, '2026-08-07');
+    ok(c.periodKeyValid(c.currentPeriod()), `currentPeriod is on phase at ${days} days`);
+  }
+}
+
+/* ---- an unusable anchor can never produce a period named NaN ---- */
+{
+  // intervalDays() used to test the anchor for TRUTHINESS only, so a state not
+  // built by the loader came back with periods literally called 'NaN-NaN-NaN'.
+  for (const bad of ['not-a-date', '7 Aug 2026', '2026-8-7', '2026-13-45', '2026-02-30', 42, {}]) {
+    const p = intervalCtx(14, bad);
+    eq(p.intervalDays(), 0, `an anchor of ${JSON.stringify(bad)} leaves the cycle inert`);
+    ok(/^\d{4}-\d{2}$/.test(p.currentPeriod()),
+      `and falls back to a payday month, never a NaN name (${JSON.stringify(bad)})`);
+  }
+  // The regex admits 2026-13-45; only the round-trip catches it.
+  eq(intervalCtx(14, '2026-13-45').periodRange('2026-08'),
+    { start: '2026-07-23', end: '2026-08-22' }, 'a rolled-over anchor date is rejected, not silently rolled');
+}
+
+/* ---- a monthly salary reads the same in every week of the month ---- */
+{
+  /* The Debt page quotes instalments monthly and judges them against the 36%
+     lenders use, so it needs a MONTHLY income figure whatever the period
+     length is. Scaling one period up by the number of periods in a month is
+     right only when income lands every period: on a weekly cycle a monthly
+     salary arrives in one week out of four, so three weeks showed no ratio at
+     all and the fourth multiplied a single paycheque by 4.35. */
+  const SALARY = 30000;
+  const rows = {};                                     // 'YYYY-MM' -> rows
+  const push = (date, desc, cat, amount) => {
+    const m = date.slice(0, 7);
+    (rows[m] = rows[m] || []).push({ date, desc, cat, amount, excluded: false, note: '' });
+  };
+  for (const m of ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04']) {
+    push(`${m}-25`, 'Salary', 'Salary', SALARY);
+    // Spend in every week, so no period reads as "no data" and gets trimmed.
+    for (const d of ['02', '09', '16', '23', '30']) {
+      if (m === '2026-02' && d === '30') continue;
+      push(`${m}-${d}`, 'Groceries', '', -500);
+    }
+  }
+  const txFiles = {};
+  for (const m of Object.keys(rows)) txFiles[`FNB/${m}`] = { label: 'FNB', month: m, dirty: false, rows: rows[m] };
+
+  const weekly = intervalCtx(7, '2026-01-02', txFiles);
+  weekly.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
+
+  // Eight consecutive weeks spanning two paydays — the worst case for a figure
+  // derived from one period at a time.
+  const weeks = [];
+  for (let i = 0; i < 8; i++) weeks.push(weekly.shiftPeriod('2026-04-03', -i));
+  const got = weeks.map(p => weekly.monthlyIncome(p).income);
+
+  for (const [i, v] of got.entries()) {
+    ok(Math.abs(v - SALARY) / SALARY < 0.1,
+      `week ${i} back from 2026-04-03 reports ${Math.round(v)} — within 10% of the real ${SALARY}/month`);
+  }
+  ok(Math.max(...got) / Math.min(...got) < 1.1,
+    'and the figure barely moves week to week — no payday-week spike, no empty-week collapse');
+
+  // What it replaced, pinned so the regression is recognisable: the raw period
+  // income is either nothing or a full paycheque, and neither is a month.
+  const raw = weeks.map(p => weekly.periodSummary(p).income);
+  ok(raw.includes(0) && raw.includes(SALARY),
+    'the single-period figure this replaced swung between 0 and a whole salary');
+
+  eq(weekly.monthlyIncome('2026-04-03').periods, 13,
+    'a weekly cycle averages over 13 periods — 91 days is 2.99 months, so it catches three paydays every time');
+
+  // A vault whose data starts three weeks ago must not be divided by three
+  // months of silence it was never around for.
+  const young = intervalCtx(7, '2026-01-02', {
+    'FNB/2026-01': { label: 'FNB', month: '2026-01', dirty: false, rows: [
+      { date: '2026-01-09', desc: 'Salary', cat: 'Salary', amount: 10000, excluded: false, note: '' },
+    ] },
+  });
+  young.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
+  eq(young.monthlyIncome('2026-01-09').periods, 1,
+    'periods with no data at all are trimmed off the back of the window');
+  ok(Math.abs(young.monthlyIncome('2026-01-09').income - 10000 * (365.25 / 12) / 7) < 1,
+    'so the only week on record is scaled up, exactly as before — not averaged into nothing');
+
+  // The payday month is untouched: the period already IS a month.
+  const month = periodCtx(23, txFiles);
+  month.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
+  eq(month.monthlyIncome('2026-02'), { income: month.periodSummary('2026-02').income, periods: 1 },
+    'a payday month reports its own income untouched');
+}
+
 /* ---- fortnightly transactions land in exactly one period ---- */
 {
   const rows = [

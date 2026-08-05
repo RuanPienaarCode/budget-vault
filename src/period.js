@@ -50,18 +50,32 @@ function isoFromDayNum(n) {
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
 
+  /* The anchor as a day number, or null if it isn't a real calendar date.
+     Presence alone was not enough: the loader's shape check admits 2026-13-45,
+     which Date.UTC rolls forward to a date the file never named, and a state
+     built without the loader at all can hold anything — which surfaced as a
+     period literally called 'NaN-NaN-NaN'. Round-tripping the day number back
+     to ISO is the cheapest check that catches both, because only a real date
+     survives it unchanged. */
+  function anchorDay() {
+    const a = S.settings.period_anchor;
+    if (typeof a !== 'string' || !DATE_KEY.test(a)) return null;
+    const n = dayNum(a);
+    return Number.isFinite(n) && isoFromDayNum(n) === a ? n : null;
+  }
   /* 0 for a payday month, otherwise the cycle length in days. The loader has
      already banded the stored value, so this re-check only matters for a state
-     built without it — but a cycle with no anchor has nothing to count from,
-     and that pairing must resolve to the payday month wherever it arises. */
+     built without it — but a cycle with no usable anchor has nothing to count
+     from, and that pairing must resolve to the payday month wherever it
+     arises. */
   function intervalDays() {
-    return S.settings.period_anchor ? periodDaysOrZero(S.settings.period_days) : 0;
+    return anchorDay() === null ? 0 : periodDaysOrZero(S.settings.period_days);
   }
   /* The first period start on or before `day`, given the anchor's phase. A real
      floor, not a truncation — dates BEFORE the anchor must round down too, or
      every period earlier than the anchor lands one period late. */
   function periodStartOnOrBefore(day, iv) {
-    const a = dayNum(S.settings.period_anchor);
+    const a = anchorDay();
     return a + Math.floor((day - a) / iv) * iv;
   }
 
@@ -75,7 +89,23 @@ module.exports = function registerPeriod(ctx) {
      that is back on payday months. Checked on load, where the switch lands. */
   function periodKeyValid(p) {
     if (typeof p !== 'string') return false;
-    return intervalDays() ? DATE_KEY.test(p) : MONTH_KEY.test(p);
+    const iv = intervalDays();
+    if (!iv) return MONTH_KEY.test(p);
+    /* Shape alone is not enough for an interval period. Every YYYY-MM-DD passes
+       the regex, but only the dates a whole number of cycles from the anchor
+       are period STARTS — and both a length change and an off-cycle anchor move
+       redraw that set. Switching 7 → 14 leaves half the old starts sitting
+       BETWEEN the new boundaries, and each one still looked addressable here:
+       the remembered period kept its old phase, so its window straddled two
+       real periods, prev/next walked that off-phase track forever (only "jump
+       to current" escaped it), and any budget saved meanwhile wrote a file no
+       later period could ever address. Round-tripping p as well rejects a
+       filename like 2026-13-45, which the regex accepts and Date.UTC would
+       silently roll into a date the name doesn't say. */
+    if (!DATE_KEY.test(p)) return false;
+    const d = dayNum(p);
+    if (!Number.isFinite(d) || isoFromDayNum(d) !== p) return false;
+    return (d - anchorDay()) % iv === 0;
   }
 
   function periodRange(p) {
@@ -205,6 +235,56 @@ module.exports = function registerPeriod(ctx) {
     }
     return { income, spend, uncategorised, byCat, count: tx.length };
   }
+  /* A monthly income figure, for the one page that has to talk in months no
+     matter what the period length is (Debt — an instalment is quoted monthly,
+     and the 36% threshold only means anything against a month).
+
+     Scaling a SINGLE period up by the number of periods in a month is right
+     only when income lands every period, which is the fortnightly case it was
+     written for. On a weekly cycle a monthly salary arrives in one period out
+     of four: the three empty ones showed no ratio at all, and the fourth
+     multiplied one paycheque by 4.35. So the window is widened to at least
+     three months and the whole thing averaged — the same salary now reads the
+     same in every week of the month.
+
+     Leading periods with NO transactions are dropped rather than counted as
+     zero-income months: a vault whose data starts three weeks ago must not be
+     divided by three months of silence it was never around for. A gap INSIDE
+     the window still counts, because there the silence is real.
+
+     The payday month returns its own income untouched — the period already IS
+     a month, and averaging would only blur it. */
+  const MONTH_DAYS = 365.25 / 12;
+  /* How many periods to average over: whichever count between two and four
+     months lands CLOSEST to a whole number of months. Length matters more than
+     it looks. A window a ragged 3.22 months long catches three monthly paydays
+     in some weeks and four in others, which puts a 33% step into a number that
+     should barely move; thirteen weeks is 2.99 months and catches three every
+     time. Where income arrives every period the choice is moot, so this costs
+     those cycles nothing. */
+  function averagingPeriods(iv) {
+    const lo = Math.max(1, Math.ceil((2 * MONTH_DAYS) / iv));
+    const hi = Math.max(lo, Math.ceil((4 * MONTH_DAYS) / iv));
+    let best = lo, bestErr = Infinity;
+    for (let n = lo; n <= hi; n++) {
+      const months = (n * iv) / MONTH_DAYS;
+      const err = Math.abs(months - Math.round(months));
+      if (err < bestErr) { best = n; bestErr = err; }
+    }
+    return best;
+  }
+  function monthlyIncome(p) {
+    const iv = intervalDays();
+    if (!iv) return { income: periodSummary(p).income, periods: 1 };
+    const need = averagingPeriods(iv);
+    const sums = [];
+    for (let i = need - 1; i >= 0; i--) sums.push(periodSummary(shiftPeriod(p, -i)));
+    let from = 0;
+    while (from < sums.length - 1 && sums[from].count === 0) from++;
+    const used = sums.slice(from);
+    const total = used.reduce((s, x) => s + x.income, 0);
+    return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length };
+  }
   function budgetTotals(p) {
     const budget = S.budgets[p] || [];
     return {
@@ -215,7 +295,7 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel,
-    txInPeriod, catType, periodSummary, budgetTotals, accountForLabel, nonBudgetLabels,
+    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, nonBudgetLabels,
     intervalDays, periodKeyValid,
   });
 };

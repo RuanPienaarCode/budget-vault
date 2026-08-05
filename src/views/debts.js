@@ -16,7 +16,7 @@ const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMont
 const DEBT_TYPES = ['credit card', 'personal loan', 'vehicle', 'home loan', 'student', 'store account', 'overdraft', 'other'];
 
 module.exports = function registerDebts(ctx) {
-  const { S, $, app, money, toast, writeFile, txInPeriod, periodSummary } = ctx;
+  const { S, $, app, money, toast, writeFile, txInPeriod } = ctx;
 
   const mark = () => { S.debtsDirty = true; $('#debtSave').disabled = false; };
   ctx.registerDirty(() => S.debtsDirty);
@@ -218,11 +218,17 @@ module.exports = function registerDebts(ctx) {
        other number on the page alone; scaling the payments DOWN would make the
        ratio disagree with the table directly above it. Left unscaled, a
        fortnightly household at a healthy 20% was shown ~43% in red, under a
-       threshold that only means anything monthly. */
+       threshold that only means anything monthly.
+
+       monthlyIncome() owns that conversion, and averages over a window of a
+       few months rather than scaling one period up — on a weekly cycle a
+       monthly salary lands in one period out of four, and scaling left three
+       weeks with no ratio at all and made the fourth read 4.35 paycheques. */
     const iv = ctx.intervalDays();
-    const rawIncome = periodSummary(S.period).income;
-    const income = iv ? rawIncome * (365.25 / 12) / iv : rawIncome;
-    const scaleNote = iv ? ' monthly income, scaled from this period’s,' : ' income';
+    const { income, periods: nPeriods } = ctx.monthlyIncome(S.period);
+    // Not `window` — that shadows the browser global inside this whole function.
+    const avgWindow = nPeriods === 1 ? 'this period' : `the last ${nPeriods} periods`;
+    const scaleNote = iv ? ` monthly income, averaged over ${avgWindow},` : ' income';
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {
       const ratio = (committedAll / income) * 100;
@@ -233,7 +239,7 @@ module.exports = function registerDebts(ctx) {
     } else {
       note.append(el('span', { class: 'text-muted' },
         `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? '' : 's'}. ` +
-        'No income recorded this period, so there is no ratio to show yet.'));
+        `No income recorded in ${iv ? avgWindow : 'this period'}, so there is no ratio to show yet.`));
     }
     /* The reconciliation line stays scoped to what is actually traceable —
        mixing an all-debts "planned" with a linked-only "paid" is what produced
