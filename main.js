@@ -13,9 +13,10 @@ var require_constants = __commonJS((exports2, module2) => {
   };
   var FEEDBACK_URL = "https://forms.gle/EVJKCuZxNQ9vJhTz6";
   var SUPPORT_URL = "https://paypal.me/ruanpienaar86";
+  var PERIOD_PRESETS = { 0: "Monthly (payday month)", 7: "Every week", 14: "Every 2 weeks", 28: "Every 4 weeks" };
   var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS };
+  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS };
 });
 
 // src/util.js
@@ -6823,6 +6824,9 @@ var require_view = __commonJS((exports2, module2) => {
 var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
   var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
+  var { PERIOD_PRESETS } = require_constants();
+  var { isoDayNumber, periodDaysOrZero } = require_util();
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   var STARTER_CATEGORIES = [
     { name: "Salary", type: "income", color: "#22c55e" },
     { name: "Other income", type: "income", color: "#4ade80" },
@@ -6871,6 +6875,14 @@ var require_onboarding = __commonJS((exports2, module2) => {
     }
     return `${y}-${String(m).padStart(2, "0")}`;
   }
+  function currentPeriodForCycle(days, anchor) {
+    const now = new Date;
+    const today = isoDayNumber(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+    const a = isoDayNumber(anchor);
+    const start = a + Math.floor((today - a) / days) * days;
+    const d = new Date(start * 86400000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
   var safeFileName = (s) => s.replace(/[\\/:*?"<>|]/g, "-").trim();
 
   class OnboardingWizard extends Modal {
@@ -6886,6 +6898,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
         country: "za",
         periodMode: "payday",
         payday: 25,
+        periodDays: 14,
+        periodAnchor: "",
         currency: "R",
         customCurrency: "",
         cats: new Set(STARTER_CATEGORIES.map((c) => c.name)),
@@ -6948,6 +6962,16 @@ var require_onboarding = __commonJS((exports2, module2) => {
           return;
         }
       }
+      if (step === "period" && this.data.periodMode === "cycle") {
+        if (!ISO_DATE.test(this.data.periodAnchor)) {
+          new Notice("Enter the date you were last paid — the pay cycle is counted from it.");
+          return;
+        }
+        if (!periodDaysOrZero(this.data.periodDays)) {
+          new Notice("Pick how often you are paid.");
+          return;
+        }
+      }
       if (step === "currency" && this.data.currency === "__custom__" && !this.data.customCurrency.trim()) {
         new Notice("Enter a currency symbol.");
         return;
@@ -6973,6 +6997,13 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (day >= 1 && day <= 28) {
         this.data.payday = day;
         this.data.periodMode = day === 1 ? "calendar" : "payday";
+      }
+      const cycleDays = periodDaysOrZero(fm.period_days);
+      const cycleAnchor = (fm.period_anchor || "").toString().trim();
+      if (cycleDays && ISO_DATE.test(cycleAnchor)) {
+        this.data.periodMode = "cycle";
+        this.data.periodDays = cycleDays;
+        this.data.periodAnchor = cycleAnchor;
       }
       if (fm.country && PROFILES[fm.country.toString().trim().toLowerCase()]) {
         this.data.country = fm.country.toString().trim().toLowerCase();
@@ -7041,7 +7072,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       });
     }
     render_period(c) {
-      new Setting(c).setName("Budget month").setDesc("Calendar runs 1st → end of month. Payday runs from your payday to the day before the next one.").addDropdown((d) => d.addOption("calendar", "Calendar month (1st to end of month)").addOption("payday", "Payday to payday").setValue(this.data.periodMode).onChange((v) => {
+      new Setting(c).setName("Budget period").setDesc("How long each budget period runs. Calendar and payday periods are both a month long; a pay cycle is a fixed number of days, for being paid fortnightly or weekly.").addDropdown((d) => d.addOption("calendar", "Calendar month (1st to end of month)").addOption("payday", "Payday to payday (monthly)").addOption("cycle", "A pay cycle (fortnightly, weekly…)").setValue(this.data.periodMode).onChange((v) => {
         this.data.periodMode = v;
         this.renderStep();
       }));
@@ -7051,6 +7082,25 @@ var require_onboarding = __commonJS((exports2, module2) => {
           t.setValue(String(this.data.payday));
           t.onChange((v) => {
             this.data.payday = v;
+          });
+        });
+      }
+      if (this.data.periodMode === "cycle") {
+        new Setting(c).setName("How often are you paid?").addDropdown((d) => {
+          for (const [days, label] of Object.entries(PERIOD_PRESETS)) {
+            if (Number(days))
+              d.addOption(days, label);
+          }
+          d.setValue(String(this.data.periodDays));
+          d.onChange((v) => {
+            this.data.periodDays = Number(v);
+          });
+        });
+        new Setting(c).setName("When were you last paid?").setDesc("Any recent payday will do — only where it falls within the cycle matters, so an earlier or later one gives the same periods.").addText((t) => {
+          t.inputEl.type = "date";
+          t.setValue(this.data.periodAnchor);
+          t.onChange((v) => {
+            this.data.periodAnchor = v.trim();
           });
         });
       }
@@ -7118,7 +7168,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
         ["Folder", this.data.folder],
         ["Name", this.data.name.trim() || "—"],
         ["Country", localeFor(this.data.country).label],
-        ["Budget month", day === 1 ? "Calendar month" : `Payday to payday (day ${day})`],
+        ["Budget period", this.data.periodMode === "cycle" ? `${PERIOD_PRESETS[this.cycleDays()]}, from ${this.data.periodAnchor}` : day === 1 ? "Calendar month" : `Payday to payday (day ${day})`],
         ["Currency", this.currencySymbol()]
       ];
       if (this.mode === "create") {
@@ -7140,6 +7190,16 @@ var require_onboarding = __commonJS((exports2, module2) => {
     }
     monthStartDay() {
       return this.data.periodMode === "calendar" ? 1 : Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
+    }
+    cycleDays() {
+      return this.data.periodMode === "cycle" && ISO_DATE.test(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
+    }
+    cycleAnchor() {
+      return this.cycleDays() ? this.data.periodAnchor : "";
+    }
+    firstPeriod() {
+      const d = this.cycleDays();
+      return d ? currentPeriodForCycle(d, this.cycleAnchor()) : currentPeriodFor(this.monthStartDay());
     }
     currencySymbol() {
       return (this.data.currency === "__custom__" ? this.data.customCurrency.trim() : this.data.currency) || "R";
@@ -7177,6 +7237,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
         if (this.mode === "connect") {
           await p.saveSettings();
           await p.updateBudgetSettingsMd("month_start_day", String(day));
+          await p.updateBudgetSettingsMd("period_days", String(this.cycleDays()));
+          await p.updateBudgetSettingsMd("period_anchor", this.cycleAnchor());
           await p.updateBudgetSettingsMd("currency", `"${cur.replace(/"/g, "")}"`);
           await p.updateBudgetSettingsMd("country", this.data.country);
           if (name)
@@ -7187,7 +7249,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
           }
           await this.writeIfAbsent(normalizePath(`${folder}/Settings.md`), `---
 month_start_day: ${day}
-currency: "${cur.replace(/"/g, "")}"
+` + (this.cycleDays() ? `period_days: ${this.cycleDays()}
+period_anchor: ${this.cycleAnchor()}
+` : "") + `currency: "${cur.replace(/"/g, "")}"
 country: ${this.data.country}
 ` + (name ? `household: "${name.replace(/"/g, "")}"
 ` : "") + `tags: [finance, finance/budget, vault-meta]
@@ -7196,7 +7260,9 @@ country: ${this.data.country}
 # Budget Settings
 
 ` + `- **month_start_day** — the financial period starts on this day of the month.
-` + `- **currency** — symbol shown before every amount in the Budget Vault plugin.
+` + (this.cycleDays() ? `- **period_days** — periods run this many days instead of a month. Remove it to go back to monthly.
+` + `- **period_anchor** — a payday every period is counted from. Only where it falls within the cycle matters.
+` : "") + `- **currency** — symbol shown before every amount in the Budget Vault plugin.
 ` + `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).
 ` + `- **household** — name shown in the dashboard greeting.
 
@@ -7240,7 +7306,7 @@ Transactions are stored under \`Transactions/${safe}/\` as monthly files.
 `);
             await this.ensureFolder(normalizePath(`${folder}/Transactions/${safe}`));
           }
-          const period = currentPeriodFor(day);
+          const period = this.firstPeriod();
           await this.writeIfAbsent(normalizePath(`${folder}/Budgets/${period}.md`), `---
 period: ${period}
 tags: [finance, finance/budget, finance/budget/budgets]
@@ -7310,13 +7376,12 @@ tags: [finance, finance/budget, finance/budget/services]
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require("obsidian");
-  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require_constants();
+  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr, periodDaysOrZero, isoDayNumber } = require_util();
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
-  var PERIOD_PRESETS = { 0: "Monthly (payday month)", 7: "Every week", 14: "Every 2 weeks", 28: "Every 4 weeks" };
   function periodLengthOptions(current) {
     const o = { ...PERIOD_PRESETS };
     if (current && !o[current])
