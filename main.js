@@ -485,7 +485,15 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return out.join("/");
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert };
+  var MIN_PERIOD_DAYS = 7;
+  var MAX_PERIOD_DAYS = 31;
+  function periodDaysOrZero(v) {
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS)
+      return 0;
+    return n;
+  }
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero };
 });
 
 // src/shell.js
@@ -1927,9 +1935,7 @@ var require_io = __commonJS((exports2, module2) => {
 // src/period.js
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
-  var { safeSeg } = require_util();
-  var MIN_INTERVAL = 7;
-  var MAX_INTERVAL = 31;
+  var { safeSeg, periodDaysOrZero } = require_util();
   var MONTH_KEY = /^\d{4}-\d{2}$/;
   var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   var DAY = 86400000;
@@ -1944,10 +1950,7 @@ var require_period = __commonJS((exports2, module2) => {
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function intervalDays() {
-      const n = parseInt(S.settings.period_days, 10);
-      if (!n || n < MIN_INTERVAL || n > MAX_INTERVAL)
-        return 0;
-      return S.settings.period_anchor ? n : 0;
+      return S.settings.period_anchor ? periodDaysOrZero(S.settings.period_days) : 0;
     }
     function periodStartOnOrBefore(day, iv) {
       const a = dayNum(S.settings.period_anchor);
@@ -2128,7 +2131,7 @@ var require_period = __commonJS((exports2, module2) => {
 var require_load = __commonJS((exports2, module2) => {
   var { TFile } = require("obsidian");
   var { TYPE_ORDER } = require_constants();
-  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require_util();
+  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero } = require_util();
   module2.exports = function registerLoad(ctx) {
     const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
     async function loadVault() {
@@ -2141,7 +2144,7 @@ var require_load = __commonJS((exports2, module2) => {
         }
         const anchor = (fm.period_anchor || "").toString().trim();
         const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
-        S.settings.period_days = anchorOk ? parseInt(fm.period_days, 10) || 0 : 0;
+        S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
         S.settings.period_anchor = anchorOk ? anchor : "";
         if (fm.currency)
           S.settings.currency = fm.currency;

@@ -20,7 +20,7 @@
    a whole number of intervals actually moves a boundary. */
 
 const { MONTHS } = require('./constants');
-const { safeSeg } = require('./util');
+const { safeSeg, periodDaysOrZero } = require('./util');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -30,8 +30,9 @@ const { safeSeg } = require('./util');
    when a cycle is added, and lets someone paid every ten days simply work.
 
    Absent or zero means the payday month, so a vault that has never heard of
-   this setting behaves exactly as it always did. */
-const MIN_INTERVAL = 7, MAX_INTERVAL = 31;
+   this setting behaves exactly as it always did. The band the value must fall
+   in is enforced by periodDaysOrZero in util.js, which the loader applies on
+   the way in so the stored setting and the running one can never disagree. */
 
 const MONTH_KEY = /^\d{4}-\d{2}$/;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -53,15 +54,12 @@ function isoFromDayNum(n) {
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
 
-  /* 0 for a payday month, otherwise the cycle length in days. Clamped the same
-     way month_start_day is, so a hand-edited Settings.md can't produce a
-     one-day period or a 400-day one. Anything outside the band is treated as
-     unset rather than coerced — a nonsense value should fall back to the
-     behaviour the user already had, not to a number nobody chose. */
+  /* 0 for a payday month, otherwise the cycle length in days. The loader has
+     already banded the stored value, so this re-check only matters for a state
+     built without it — but a cycle with no anchor has nothing to count from,
+     and that pairing must resolve to the payday month wherever it arises. */
   function intervalDays() {
-    const n = parseInt(S.settings.period_days, 10);
-    if (!n || n < MIN_INTERVAL || n > MAX_INTERVAL) return 0;
-    return S.settings.period_anchor ? n : 0;
+    return S.settings.period_anchor ? periodDaysOrZero(S.settings.period_days) : 0;
   }
   /* The first period start on or before `day`, given the anchor's phase. A real
      floor, not a truncation — dates BEFORE the anchor must round down too, or

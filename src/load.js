@@ -3,7 +3,7 @@
 
 const { TFile } = require('obsidian');
 const { TYPE_ORDER } = require('./constants');
-const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require('./util');
+const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero } = require('./util');
 
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
@@ -26,7 +26,7 @@ module.exports = function registerLoad(ctx) {
          period.js clamps the length itself. */
       const anchor = (fm.period_anchor || '').toString().trim();
       const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
-      S.settings.period_days = anchorOk ? (parseInt(fm.period_days, 10) || 0) : 0;
+      S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
       S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown

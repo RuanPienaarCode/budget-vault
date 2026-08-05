@@ -56,6 +56,25 @@ const FILES = {
 
   eq(S.settings.currency, 'R', 'quoted currency must lose its quotes on load');
   eq(S.settings.household, 'Jane & John', 'household must load');
+  eq(S.settings.period_days, 0, 'a Settings.md with no period keys means the payday month');
+  eq(S.settings.period_anchor, '', 'and carries no anchor');
+
+  /* The stored setting and the running one must never disagree. The loader
+     bands the value on the way in, so a settings control can read
+     S.settings.period_days and describe the cycle the app is ACTUALLY running
+     — rather than reporting a 400-day cycle at a vault quietly on months. */
+  for (const [fm, days, anchor, why] of [
+    ['period_days: 14\nperiod_anchor: 2026-08-07', 14, '2026-08-07', 'a valid pair loads as given'],
+    ['period_days: 400\nperiod_anchor: 2026-08-07', 0, '2026-08-07', 'an out-of-band length is stored as 0, not coerced to 31'],
+    ['period_days: 3\nperiod_anchor: 2026-08-07', 0, '2026-08-07', 'a length below the floor is stored as 0'],
+    ['period_days: banana\nperiod_anchor: 2026-08-07', 0, '2026-08-07', 'a non-numeric length is stored as 0'],
+    ['period_days: 14', 0, '', 'a length with no anchor drops BOTH — nothing to count from'],
+    ['period_days: 14\nperiod_anchor: 7 Aug 2026', 0, '', 'a non-ISO anchor drops both'],
+  ]) {
+    const s = await loadInto(makeCtx({ ...FILES,
+      [`${B}/Settings.md`]: `---\nmonth_start_day: 23\ncurrency: "R"\ncountry: za\n${fm}\n---\n` }));
+    eq([s.settings.period_days, s.settings.period_anchor], [days, anchor], why);
+  }
   eq(S.categories.length, 2, 'both categories must load');
   ok(S.categories.some(c => c.name === 'Kids/School'), 'frontmatter name beats the sanitised filename');
 
