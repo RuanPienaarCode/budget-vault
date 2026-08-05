@@ -3,6 +3,28 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.3 — 2026-08-05
+
+### Fixed
+
+- **Your debt-to-income figure no longer climbs just because the week is
+  young.** If you are paid on a cycle rather than monthly, the Debt page works
+  out a monthly income by averaging recent periods — and it was counting the
+  period you are currently in, which has only had part of its days. Before your
+  pay landed, that part-period pulled the average down, and because the figure
+  is a ratio, a lower income showed as a *higher* percentage. The number crept
+  up through the week and dropped again on payday, and on a weekly cycle it
+  could sit around 8% too high — enough to put a healthy household in red
+  against the 36% mark on nothing more than the day of the week. Only finished
+  periods are averaged now, so the figure holds steady. If you have just set
+  the vault up and have no finished periods yet, it still shows what it can and
+  now says it is going on this period so far.
+
+- **The income average now keeps to the window it was meant to use.** It aims
+  to cover two to four months. On a two-week cycle it was reaching for about
+  4.1 months — just past its own limit. Harmless in practice, because pay lands
+  every period on that cycle, but it was luck rather than intent.
+
 ## 1.3.2 — 2026-08-05
 
 ### Fixed

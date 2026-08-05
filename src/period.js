@@ -259,10 +259,19 @@ module.exports = function registerPeriod(ctx) {
      in some weeks and four in others, which puts a 33% step into a number that
      should barely move; thirteen weeks is 2.99 months and catches three every
      time. Where income arrives every period the choice is moot, so this costs
-     those cycles nothing. */
+     those cycles nothing.
+
+     The two roundings go OPPOSITE ways on purpose, because both bounds have to
+     stay inside the band rather than merely near it: lo rounds UP to the first
+     count at or above two months, hi rounds DOWN to the last one at or below
+     four. Rounding hi up instead let the search consider a window longer than
+     its own stated ceiling — a fortnightly cycle picked 9 periods, 126 days,
+     4.14 months — which is only harmless because income lands every period on
+     that cycle. Nothing in the search knew that; it was luck, not design.
+     Math.max keeps hi ≥ lo for the long end of the band, where floor can bite. */
   function averagingPeriods(iv) {
     const lo = Math.max(1, Math.ceil((2 * MONTH_DAYS) / iv));
-    const hi = Math.max(lo, Math.ceil((4 * MONTH_DAYS) / iv));
+    const hi = Math.max(lo, Math.floor((4 * MONTH_DAYS) / iv));
     let best = lo, bestErr = Infinity;
     for (let n = lo; n <= hi; n++) {
       const months = (n * iv) / MONTH_DAYS;
@@ -273,15 +282,42 @@ module.exports = function registerPeriod(ctx) {
   }
   function monthlyIncome(p) {
     const iv = intervalDays();
-    if (!iv) return { income: periodSummary(p).income, periods: 1 };
+    if (!iv) return { income: periodSummary(p).income, periods: 1, complete: true };
     const need = averagingPeriods(iv);
-    const sums = [];
-    for (let i = need - 1; i >= 0; i--) sums.push(periodSummary(shiftPeriod(p, -i)));
-    let from = 0;
-    while (from < sums.length - 1 && sums[from].count === 0) from++;
-    const used = sums.slice(from);
+    /* `need` periods ending `back` periods before p, with leading empties
+       trimmed off the far end. */
+    function windowEndingBefore(back) {
+      const sums = [];
+      for (let i = need - 1 + back; i >= back; i--) sums.push(periodSummary(shiftPeriod(p, -i)));
+      let from = 0;
+      while (from < sums.length - 1 && sums[from].count === 0) from++;
+      return sums.slice(from);
+    }
+    /* A period still RUNNING is a partial one: whatever has landed so far is
+       divided by a whole cycle's worth of days, so the figure reads low early
+       in the period and climbs as the days pass. That matters here more than
+       it would anywhere else, because this feeds debt-to-income against a 36%
+       threshold — and a low income is a HIGH ratio, shown in red, on the
+       strength of nothing but which day of the week it is. On a weekly cycle
+       the empty first days of a 13-week window cost about 8%.
+
+       Trailing periods can't be trimmed the way leading ones are: a gap in the
+       MIDDLE of the window is real silence and has to count, and an empty
+       trailing period is indistinguishable from one by transaction count
+       alone. So the running period is dropped outright and the window ends at
+       the last COMPLETE one. A p in the past is already complete — it keeps
+       the whole window, ending at itself. */
+    const running = p === currentPeriod();
+    let used = windowEndingBefore(running ? 1 : 0);
+    /* Unless dropping it leaves nothing to average: a vault set up this week
+       has no completed history, and would otherwise report no income at all
+       while the user is looking straight at the salary they just imported. A
+       partial figure beats a blank ratio — but say which one it is, so the
+       page can label it honestly rather than implying a settled average. */
+    const complete = !running || used.some(s => s.count > 0);
+    if (!complete) used = windowEndingBefore(0);
     const total = used.reduce((s, x) => s + x.income, 0);
-    return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length };
+    return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length, complete };
   }
   function budgetTotals(p) {
     const budget = S.budgets[p] || [];
