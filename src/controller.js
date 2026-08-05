@@ -4,7 +4,7 @@
    drawer, theme, dirty tracking, vault-change watcher and event wiring. */
 
 const { Notice } = require('obsidian');
-const { el, setIco } = require('./util');
+const { el, setIco, setInert } = require('./util');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
@@ -169,12 +169,17 @@ function mountApp(view) {
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
        tax: ctx.renderTax, loans: ctx.renderLoans, import: ctx.renderImport, connect: () => {} })[S.view]();
+    /* A vault change can re-render underneath a locked gate. Real `inert` covers
+       whatever the subtree happens to contain at any moment, but the old-engine
+       fallback stamps tabindex on the nodes it can see — so freshly built rows
+       would be tabbable behind the gate. Re-assert; it's idempotent. */
+    if (locked) setInert($('.bud-scroll'), true);
   }
   /* ---------------------- drawer + theme (app shell) --------------------- */
   function openDrawer() {
     const d = $('#appDrawer');
     d.classList.add('open');
-    d.removeAttribute('inert');                 // re-enter the tab / AT order
+    setInert(d, false);                         // re-enter the tab / AT order
     $('#drawerOverlay').classList.add('open');
     $('#menuBtn').setAttribute('aria-expanded', 'true');
     $('#drawerClose').focus();                  // move focus into the drawer
@@ -183,7 +188,7 @@ function mountApp(view) {
     const d = $('#appDrawer');
     const wasOpen = d.classList.contains('open');
     d.classList.remove('open');
-    d.setAttribute('inert', '');                // leave the tab / AT order
+    setInert(d, true);                          // leave the tab / AT order
     $('#drawerOverlay').classList.remove('open');
     $('#menuBtn').setAttribute('aria-expanded', 'false');
     if (wasOpen) $('#menuBtn').focus();         // restore focus only on a real close
@@ -296,8 +301,10 @@ function mountApp(view) {
     $('#splashGate').classList.remove('hidden');
     // inert, not just visually covered — otherwise Tab walks through the
     // hidden table behind the gate and a screen reader reads out the balances.
-    $('.topbar').setAttribute('inert', '');
-    $('.bud-scroll').setAttribute('inert', '');
+    // setInert, not the bare attribute: `inert` is Safari 15.5+ and this
+    // plugin's floor is iOS 15.0, where the attribute is inert itself.
+    setInert($('.topbar'), true);
+    setInert($('.bud-scroll'), true);
     // Making an ancestor inert blurs whatever had focus, so on a re-lock focus
     // would otherwise land on <body> with nothing to Tab to but the gate.
     focusEnter();
@@ -306,8 +313,8 @@ function mountApp(view) {
     if (!locked) return;
     locked = false;
     $('#splashGate').classList.add('hidden');
-    $('.topbar').removeAttribute('inert');
-    $('.bud-scroll').removeAttribute('inert');
+    setInert($('.topbar'), false);
+    setInert($('.bud-scroll'), false);
     // First unlock: this is where the vault is actually read. Later unlocks
     // land back on the view that was already rendered. Either way focus has to
     // be moved off the gate button that just went away — returning early on the

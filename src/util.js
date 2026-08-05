@@ -522,6 +522,46 @@ function csvCell(v) {
   return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/* ---- inert, with a floor-safe fallback --------------------------------
+   `inert` is the whole mechanism behind two features: the closed drawer
+   leaving the tab order, and the privacy gate making the covered app
+   unreachable. It is Safari 15.5+, and this plugin's floor is iOS 15.0 — on
+   15.0-15.4 the attribute parses and does NOTHING, so Tab walks straight
+   into the balances behind a gate whose entire purpose is that it can't.
+
+   Same discipline as the @supports fallbacks in styles.css: feature-detect,
+   and on the old engines reproduce the behaviour by hand — tabindex="-1" on
+   every focusable descendant (remembering what was there so it can be put
+   back) plus aria-hidden for the screen-reader half. */
+const INERT_SUPPORTED = typeof HTMLElement !== 'undefined' && 'inert' in HTMLElement.prototype;
+const FOCUSABLE_SEL = 'a[href],button,input,select,textarea,summary,[tabindex]';
+function setInert(elm, on) {
+  if (!elm) return;
+  if (on) elm.setAttribute('inert', ''); else elm.removeAttribute('inert');
+  if (INERT_SUPPORTED) return;
+  if (on) {
+    elm.setAttribute('aria-hidden', 'true');
+    for (const f of elm.querySelectorAll(FOCUSABLE_SEL)) {
+      // Store the previous tabindex ('' meaning "had none") so a nested call
+      // or a re-lock can't overwrite the original with the -1 it just set.
+      if (!f.hasAttribute('data-bud-ti')) f.setAttribute('data-bud-ti', f.getAttribute('tabindex') ?? '');
+      f.setAttribute('tabindex', '-1');
+    }
+    // Real `inert` blurs whatever it swallows; tabindex="-1" does not, so an
+    // already-focused field would stay focused (and typable) behind the gate.
+    if (elm.contains(document.activeElement) && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
+  } else {
+    elm.removeAttribute('aria-hidden');
+    for (const f of elm.querySelectorAll('[data-bud-ti]')) {
+      const prev = f.getAttribute('data-bud-ti');
+      if (prev === '') f.removeAttribute('tabindex'); else f.setAttribute('tabindex', prev);
+      f.removeAttribute('data-bud-ti');
+    }
+  }
+}
+
 /* Collapse '.' and '..' segments in a '/'-path; returns null if it escapes the
    root (more '..' than depth). Used to verify a write stays inside the folder. */
 function collapsePath(p) {
@@ -534,4 +574,4 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert };
