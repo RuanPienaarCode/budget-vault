@@ -3,6 +3,24 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.2 — 2026-08-05
+
+### Fixed
+
+- **A last-payday date that isn't a real date now falls back cleanly instead of
+  quietly counting from somewhere else.** Only reachable by editing
+  `Settings.md` by hand, but the two halves of the app disagreed about it: the
+  file reader accepted anything shaped like a date, so `2026-13-45` was stored
+  as a live two-week cycle, while the period maths refused to run it. The
+  result was a settings screen showing a pay cycle the app wasn't using. One
+  test now decides what counts as a date, and the file reader, the period
+  maths, both settings screens and the setup wizard all use it.
+
+- **A budget file named for a month that doesn't exist is no longer opened.**
+  `Budgets/2026-13.md` was treated as a real period: it produced a normal
+  31-day window you could page through, titled "undefined 2026". Month names
+  must now be 01 to 12.
+
 ## 1.3.1 — 2026-08-05
 
 ### Fixed
