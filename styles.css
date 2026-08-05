@@ -1605,6 +1605,7 @@
   .budget-app-root .topbar-avatar:focus,
   .budget-app-root .drawer-close:focus,
   .budget-app-root .drawer-link:focus,
+  .budget-app-root .topbar-icon-btn:focus,
   .budget-app-root .btn-ghost:focus,
   .budget-app-root .btn-gradient:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
