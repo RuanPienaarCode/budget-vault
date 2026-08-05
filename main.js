@@ -1930,6 +1930,7 @@ var require_period = __commonJS((exports2, module2) => {
   var { safeSeg } = require_util();
   var MIN_INTERVAL = 7;
   var MAX_INTERVAL = 31;
+  var MONTH_KEY = /^\d{4}-\d{2}$/;
   var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   var DAY = 86400000;
   function dayNum(iso) {
@@ -1951,6 +1952,11 @@ var require_period = __commonJS((exports2, module2) => {
     function periodStartOnOrBefore(day, iv) {
       const a = dayNum(S.settings.period_anchor);
       return a + Math.floor((day - a) / iv) * iv;
+    }
+    function periodKeyValid(p) {
+      if (typeof p !== "string")
+        return false;
+      return intervalDays() ? DATE_KEY.test(p) : MONTH_KEY.test(p);
     }
     function periodRange(p) {
       const iv = intervalDays();
@@ -2112,7 +2118,8 @@ var require_period = __commonJS((exports2, module2) => {
       budgetTotals,
       accountForLabel,
       nonBudgetLabels,
-      intervalDays
+      intervalDays,
+      periodKeyValid
     });
   };
 });
@@ -2123,7 +2130,7 @@ var require_load = __commonJS((exports2, module2) => {
   var { TYPE_ORDER } = require_constants();
   var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require_util();
   module2.exports = function registerLoad(ctx) {
-    const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod } = ctx;
+    const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
     async function loadVault() {
       const settingsTxt = await readFile("Settings.md");
       if (settingsTxt) {
@@ -2356,7 +2363,7 @@ var require_load = __commonJS((exports2, module2) => {
       if (!S.taxYear || !S.tax[S.taxYear])
         S.taxYear = Object.keys(S.tax).sort().pop() || null;
       S.taxOrphanYears = subfoldersIn("Tax").map((f) => f.name).filter((n) => /^\d{4}$/.test(n) && !S.tax[n]).sort();
-      if (!S.period)
+      if (!S.period || !periodKeyValid(S.period))
         S.period = currentPeriod();
     }
     function txSegment(label) {

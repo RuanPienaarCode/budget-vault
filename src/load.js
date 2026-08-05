@@ -6,7 +6,7 @@ const { TYPE_ORDER } = require('./constants');
 const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg } = require('./util');
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod } = ctx;
+  const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
 
   async function loadVault() {
     const settingsTxt = await readFile('Settings.md');
@@ -261,7 +261,10 @@ module.exports = function registerLoad(ctx) {
     S.taxOrphanYears = subfoldersIn('Tax')
       .map(f => f.name).filter(n => /^\d{4}$/.test(n) && !S.tax[n]).sort();
 
-    if (!S.period) S.period = currentPeriod();
+    // The remembered period must still be one the current settings can address.
+    // Changing the period length reaches this line via main.js's reload, and the
+    // old name would otherwise survive it in a shape nothing can read.
+    if (!S.period || !periodKeyValid(S.period)) S.period = currentPeriod();
   }
 
   /* Resolve an account label to the exact folder segment to key by AND write

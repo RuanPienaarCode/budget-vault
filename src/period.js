@@ -71,6 +71,19 @@ module.exports = function registerPeriod(ctx) {
     return a + Math.floor((day - a) / iv) * iv;
   }
 
+  /* Can the current settings address a period of this name? S.period is
+     remembered across a reload, but the period LENGTH can change underneath it,
+     and the two shapes are not interchangeable. Left unchecked, a month name
+     under a 14-day cycle falls through every reader's interval branch and comes
+     back as a 31-day window that navigates to another month name — so a user who
+     switches to a fortnightly cycle keeps seeing month-long periods, with no way
+     to reach their own. The reverse leaks a date-named budget file into a vault
+     that is back on payday months. Checked on load, where the switch lands. */
+  function periodKeyValid(p) {
+    if (typeof p !== 'string') return false;
+    return intervalDays() ? DATE_KEY.test(p) : MONTH_KEY.test(p);
+  }
+
   function periodRange(p) {
     const iv = intervalDays();
     if (iv && DATE_KEY.test(p)) {
@@ -209,6 +222,6 @@ module.exports = function registerPeriod(ctx) {
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel,
     txInPeriod, catType, periodSummary, budgetTotals, accountForLabel, nonBudgetLabels,
-    intervalDays,
+    intervalDays, periodKeyValid,
   });
 };
