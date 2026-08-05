@@ -3,6 +3,20 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.4 — 2026-08-05
+
+### Fixed
+
+- **The Import button in the header now shows a focus ring on older iPhones and
+  iPads.** If you move through the app with a keyboard rather than taps, every
+  button draws a ring when it takes focus so you can see where you are. That
+  ring is drawn with a rule older Safari doesn't understand, and the app keeps
+  a plain-focus copy of every one of them for those devices — but the header
+  Import button was added without its copy, so on iOS 15.0 to 15.3 it was the
+  one control you could tab to and not see. It has been missing since 1.0.27.
+  A test now checks the two lists against each other, so a button can't be
+  added to one and forgotten in the other again.
+
 ## 1.3.3 — 2026-08-05
 
 ### Fixed
