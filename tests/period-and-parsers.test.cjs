@@ -78,15 +78,15 @@ function periodCtx(monthStartDay, txFiles = {}) {
 }
 
 /* ---- interval periods (fortnightly and friends) ---- */
-function intervalCtx(period_type, period_anchor, txFiles = {}) {
-  const ctx = makeCtx({}, { settings: { month_start_day: 23, period_type, period_anchor } });
+function intervalCtx(period_days, period_anchor, txFiles = {}) {
+  const ctx = makeCtx({}, { settings: { month_start_day: 23, period_days, period_anchor } });
   ctx.S.txFiles = txFiles;
   require('../src/period')(ctx);
   return ctx;
 }
 {
   const { periodRange, shiftPeriod, currentPeriod, periodMonthName, periodShortLabel } =
-    intervalCtx('fortnightly', '2026-08-07');
+    intervalCtx(14, '2026-08-07');
 
   eq(periodRange('2026-08-07'), { start: '2026-08-07', end: '2026-08-20' },
     'a fortnight is 14 days INCLUSIVE — the 7th through the 20th, not the 21st');
@@ -106,14 +106,14 @@ function intervalCtx(period_type, period_anchor, txFiles = {}) {
   eq(periodShortLabel('2026-08-07'), '7 Aug', 'the trend axis labels an interval period by its start day');
 
   // Anchors a whole number of intervals apart describe the SAME periods.
-  const far = intervalCtx('fortnightly', '2027-03-05');   // 2026-08-07 + 15 fortnights
+  const far = intervalCtx(14, '2027-03-05');   // 2026-08-07 + 15 fortnights
   eq(far.periodRange('2026-08-07'), { start: '2026-08-07', end: '2026-08-20' },
     'an anchor shifted by whole intervals is the same anchor');
   eq(far.currentPeriod(), currentPeriod(),
     'so it picks the same current period too — the anchor is meaningful only modulo the interval');
 
   // An anchor shifted by a NON-multiple genuinely moves every boundary.
-  const off = intervalCtx('fortnightly', '2026-08-08');
+  const off = intervalCtx(14, '2026-08-08');
   ok(off.currentPeriod() !== currentPeriod(),
     'a one-day anchor shift re-slices the periods — this is the destructive case the UI must warn about');
 
@@ -123,20 +123,44 @@ function intervalCtx(period_type, period_anchor, txFiles = {}) {
   eq(shiftPeriod(shiftPeriod(cur, -3), 3), cur, 'shifting away and back is lossless');
 
   // Other intervals ride the same maths.
-  eq(intervalCtx('weekly', '2026-08-07').periodRange('2026-08-07'),
+  eq(intervalCtx(7, '2026-08-07').periodRange('2026-08-07'),
     { start: '2026-08-07', end: '2026-08-13' }, 'weekly is 7 days inclusive');
-  eq(intervalCtx('four_weekly', '2026-08-07').periodRange('2026-08-07'),
+  eq(intervalCtx(28, '2026-08-07').periodRange('2026-08-07'),
     { start: '2026-08-07', end: '2026-09-03' }, 'four-weekly is 28 days inclusive');
 }
 
-/* ---- an interval type is inert without a usable anchor ---- */
+/* ---- an interval cycle is inert without a usable anchor or a sane length ---- */
 {
-  // The loader refuses to set an interval type without a valid anchor, but the
-  // period module must not produce garbage if one ever reaches it.
-  const { periodRange, currentPeriod } = intervalCtx('monthly', '');
-  eq(periodRange('2026-08'), { start: '2026-07-23', end: '2026-08-22' },
-    'monthly periods are untouched by the interval code path');
-  ok(/^\d{4}-\d{2}$/.test(currentPeriod()), 'and still name themselves YYYY-MM');
+  // The loader drops both keys together, but the period module must not produce
+  // garbage if a bad pair ever reaches it. Storing the cycle as a NUMBER means a
+  // hand-edited Settings.md can express far more nonsense than a named type
+  // could, so every rejected value must fall back to the payday month the user
+  // already had — never to some number nobody chose.
+  const monthly = p => {
+    eq(p.periodRange('2026-08'), { start: '2026-07-23', end: '2026-08-22' },
+      'monthly periods are untouched by the interval code path');
+    ok(/^\d{4}-\d{2}$/.test(p.currentPeriod()), 'and still name themselves YYYY-MM');
+  };
+  monthly(intervalCtx(0, ''));                 // nothing set at all
+  monthly(intervalCtx(14, ''));                // a cycle with no anchor to count from
+  monthly(intervalCtx(0, '2026-08-07'));       // an anchor with no cycle
+  monthly(intervalCtx(1, '2026-08-07'));       // below the floor — daily periods are absurd
+  monthly(intervalCtx(6, '2026-08-07'));       // just below the floor
+  monthly(intervalCtx(32, '2026-08-07'));      // just above the ceiling
+  monthly(intervalCtx(400, '2026-08-07'));     // far above it
+  monthly(intervalCtx(-14, '2026-08-07'));     // negative — would run periods backwards
+  monthly(intervalCtx('banana', '2026-08-07'));// not a number at all
+
+  // The band's edges themselves must WORK, or the clamp is off by one.
+  eq(intervalCtx(7, '2026-08-07').periodRange('2026-08-07'),
+    { start: '2026-08-07', end: '2026-08-13' }, 'the shortest allowed cycle is 7 days');
+  eq(intervalCtx(31, '2026-08-07').periodRange('2026-08-07'),
+    { start: '2026-08-07', end: '2026-09-06' }, 'the longest allowed cycle is 31 days');
+
+  // An unusual but real cycle: paid every ten days. The whole reason the setting
+  // is a number rather than a list of names we chose.
+  eq(intervalCtx(10, '2026-08-07').periodRange('2026-08-17'),
+    { start: '2026-08-17', end: '2026-08-26' }, 'a ten-day cycle just works');
 }
 
 /* ---- fortnightly transactions land in exactly one period ---- */
@@ -150,7 +174,7 @@ function intervalCtx(period_type, period_anchor, txFiles = {}) {
   // All four rows sit in ONE calendar-month file while spanning THREE periods —
   // transaction storage stays monthly no matter what the period type is.
   const txFiles = { 'FNB/2026-08': { label: 'FNB', month: '2026-08', dirty: false, rows } };
-  const { txInPeriod } = intervalCtx('fortnightly', '2026-08-07', txFiles);
+  const { txInPeriod } = intervalCtx(14, '2026-08-07', txFiles);
 
   eq(txInPeriod('2026-08-07').map(t => t.desc), ['the boundary itself', 'last day of the fortnight'],
     'the start day belongs to the fortnight it opens; the day before does not');

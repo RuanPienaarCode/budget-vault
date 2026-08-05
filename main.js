@@ -1928,7 +1928,8 @@ var require_io = __commonJS((exports2, module2) => {
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
   var { safeSeg } = require_util();
-  var INTERVALS = { weekly: 7, fortnightly: 14, four_weekly: 28 };
+  var MIN_INTERVAL = 7;
+  var MAX_INTERVAL = 31;
   var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   var DAY = 86400000;
   function dayNum(iso) {
@@ -1942,7 +1943,10 @@ var require_period = __commonJS((exports2, module2) => {
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function intervalDays() {
-      return INTERVALS[S.settings.period_type] || 0;
+      const n = parseInt(S.settings.period_days, 10);
+      if (!n || n < MIN_INTERVAL || n > MAX_INTERVAL)
+        return 0;
+      return S.settings.period_anchor ? n : 0;
     }
     function periodStartOnOrBefore(day, iv) {
       const a = dayNum(S.settings.period_anchor);
@@ -2128,10 +2132,9 @@ var require_load = __commonJS((exports2, module2) => {
           const n = parseInt(fm.month_start_day, 10) || 23;
           S.settings.month_start_day = Math.min(28, Math.max(1, n));
         }
-        const type = (fm.period_type || "monthly").toString().trim().toLowerCase();
         const anchor = (fm.period_anchor || "").toString().trim();
         const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
-        S.settings.period_type = type !== "monthly" && anchorOk ? type : "monthly";
+        S.settings.period_days = anchorOk ? parseInt(fm.period_days, 10) || 0 : 0;
         S.settings.period_anchor = anchorOk ? anchor : "";
         if (fm.currency)
           S.settings.currency = fm.currency;
@@ -3141,7 +3144,7 @@ var require_budgets = __commonJS((exports2, module2) => {
         return d + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th");
       };
       const iv = ctx.intervalDays();
-      const rangeNote = iv ? "With `period_type: " + S.settings.period_type + "`, this period runs for " + iv + " days from " + periodRange(S.period).start + ", derived from `period_anchor: " + S.settings.period_anchor + "`." : n === 1 ? "With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month." : "With `month_start_day: " + n + "`, this period runs from the " + ordinal(n) + " of the previous month to the " + ordinal(n - 1) + " of this month.";
+      const rangeNote = iv ? "With `period_days: " + iv + "`, this period runs for " + iv + " days from " + periodRange(S.period).start + ", counted from `period_anchor: " + S.settings.period_anchor + "`." : n === 1 ? "With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month." : "With `month_start_day: " + n + "`, this period runs from the " + ordinal(n) + " of the previous month to the " + ordinal(n - 1) + " of this month.";
       const lines = [
         "---",
         fm,
@@ -6307,7 +6310,7 @@ var require_controller = __commonJS((exports2, module2) => {
     const $$ = (s) => root.querySelectorAll(s);
     const S = {
       loaded: false,
-      settings: { month_start_day: 23, currency: "R", country: "za", period_type: "monthly", period_anchor: "" },
+      settings: { month_start_day: 23, currency: "R", country: "za", period_days: 0, period_anchor: "" },
       categories: [],
       accounts: [],
       budgets: {},

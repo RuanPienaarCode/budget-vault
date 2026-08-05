@@ -49,7 +49,7 @@ function mountApp(view) {
   /* ------------------------------- state -------------------------------- */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', period_type: 'monthly', period_anchor: '' },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', period_days: 0, period_anchor: '' },
     categories: [],            // {name, type, color}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]

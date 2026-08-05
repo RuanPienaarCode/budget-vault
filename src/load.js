@@ -18,14 +18,15 @@ module.exports = function registerLoad(ctx) {
         const n = parseInt(fm.month_start_day, 10) || 23;
         S.settings.month_start_day = Math.min(28, Math.max(1, n));
       }
-      /* Pay cycle. An unknown or absent type is a payday month, so a vault that
-         has never heard of this setting behaves exactly as it always did. An
-         interval type without an anchor has no way to place a boundary, so it
-         falls back to monthly rather than deriving periods from a missing date. */
-      const type = (fm.period_type || 'monthly').toString().trim().toLowerCase();
+      /* Pay cycle, as its own length in days — see the header of period.js for
+         why it isn't a named type. Absent means the payday month, so a vault
+         that has never heard of this setting behaves exactly as it always did.
+         A cycle without an anchor has no way to place a boundary, so both are
+         dropped together rather than deriving periods from a missing date;
+         period.js clamps the length itself. */
       const anchor = (fm.period_anchor || '').toString().trim();
       const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
-      S.settings.period_type = (type !== 'monthly' && anchorOk) ? type : 'monthly';
+      S.settings.period_days = anchorOk ? (parseInt(fm.period_days, 10) || 0) : 0;
       S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
