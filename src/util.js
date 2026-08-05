@@ -600,4 +600,21 @@ function isoDayNumber(iso) {
   return Math.round(Date.UTC(y, m - 1, d) / 86400000);
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber };
+/* A real calendar date in YYYY-MM-DD, not merely something date-SHAPED. The
+   shape regex admits 2026-13-45 and 2026-02-30, which Date.UTC rolls forward
+   without complaint — so a pay cycle anchored on one ran from a day its own
+   Settings.md never named. Shared because the loader, the period maths and
+   both settings tabs must agree on which anchors are usable: if the loader
+   accepted one that period.js then refused, the tab would sit there offering a
+   cycle the app is not running. */
+const ISO_DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+function isRealIsoDate(s) {
+  if (typeof s !== 'string' || !ISO_DATE_SHAPE.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const t = Date.UTC(y, m - 1, d);
+  if (!Number.isFinite(t)) return false;
+  const back = new Date(t);
+  return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
+}
+
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };

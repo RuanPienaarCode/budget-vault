@@ -20,7 +20,7 @@
    a whole number of intervals actually moves a boundary. */
 
 const { MONTHS } = require('./constants');
-const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum } = require('./util');
+const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum, isRealIsoDate } = require('./util');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -34,7 +34,10 @@ const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum } = require('./util');
    in is enforced by periodDaysOrZero in util.js, which the loader applies on
    the way in so the stored setting and the running one can never disagree. */
 
-const MONTH_KEY = /^\d{4}-\d{2}$/;
+/* Month 01–12, not any two digits: '2026-13' is date-SHAPED but not a month,
+   and Date's rollover turned it into a real 31-day window titled "undefined
+   2026" that the arrows would happily walk into. */
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 /* Whole-day arithmetic in UTC. Local-time date maths would drift by a day
@@ -58,10 +61,7 @@ module.exports = function registerPeriod(ctx) {
      to ISO is the cheapest check that catches both, because only a real date
      survives it unchanged. */
   function anchorDay() {
-    const a = S.settings.period_anchor;
-    if (typeof a !== 'string' || !DATE_KEY.test(a)) return null;
-    const n = dayNum(a);
-    return Number.isFinite(n) && isoFromDayNum(n) === a ? n : null;
+    return isRealIsoDate(S.settings.period_anchor) ? dayNum(S.settings.period_anchor) : null;
   }
   /* 0 for a payday month, otherwise the cycle length in days. The loader has
      already banded the stored value, so this re-check only matters for a state
@@ -102,10 +102,8 @@ module.exports = function registerPeriod(ctx) {
        later period could ever address. Round-tripping p as well rejects a
        filename like 2026-13-45, which the regex accepts and Date.UTC would
        silently roll into a date the name doesn't say. */
-    if (!DATE_KEY.test(p)) return false;
-    const d = dayNum(p);
-    if (!Number.isFinite(d) || isoFromDayNum(d) !== p) return false;
-    return (d - anchorDay()) % iv === 0;
+    if (!isRealIsoDate(p)) return false;
+    return (dayNum(p) - anchorDay()) % iv === 0;
   }
 
   function periodRange(p) {

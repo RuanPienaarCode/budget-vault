@@ -7,8 +7,11 @@ const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obs
 const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
-const { yamlStr, periodDaysOrZero, isoDayNumber } = require('./util');
+const { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require('./util');
 
+/* Date-SHAPED, used only to recognise budget filenames. An anchor the user
+   types or a file stores must be a real calendar date, so those go through
+   isRealIsoDate — 2026-13-45 is shaped like a date and is not one. */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
@@ -176,7 +179,7 @@ class BudgetSettingTab extends PluginSettingTab {
         d.onChange(async v => {
           const n = periodDaysOrZero(v);
           await this.plugin.updateBudgetSettingsMd('period_days', String(n));
-          if (n && !ISO_DATE.test((md.period_anchor ?? '').toString().trim())) {
+          if (n && !isRealIsoDate((md.period_anchor ?? '').toString().trim())) {
             new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
           }
           this.noticeBudgetsKept(periodDaysOrZero(md.period_days), n);
@@ -195,7 +198,7 @@ class BudgetSettingTab extends PluginSettingTab {
           clearTimeout(this._anchorTimer);
           this._anchorTimer = setTimeout(async () => {
             const next = v.trim();
-            if (next && !ISO_DATE.test(next)) {
+            if (next && !isRealIsoDate(next)) {
               new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
               return;
             }
@@ -271,7 +274,7 @@ class BudgetSettingTab extends PluginSettingTab {
      would promise a file was reachable that the app then refused to open. */
   offPhaseBudgetCount(days) {
     const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
-    if (!days || !ISO_DATE.test(anchor)) return 0;
+    if (!days || !isRealIsoDate(anchor)) return 0;
     const a = isoDayNumber(anchor);
     const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
     return this.app.vault.getMarkdownFiles().filter(f =>
@@ -316,7 +319,7 @@ class BudgetSettingTab extends PluginSettingTab {
   async warnIfAnchorReslices(md, next) {
     const days = periodDaysOrZero(md.period_days);
     const prev = (md.period_anchor ?? '').toString().trim();
-    if (!days || !ISO_DATE.test(prev) || !ISO_DATE.test(next)) return;
+    if (!days || !isRealIsoDate(prev) || !isRealIsoDate(next)) return;
     if ((isoDayNumber(next) - isoDayNumber(prev)) % days === 0) return;
     const n = this.datedBudgetCount();
     if (!n) return;
@@ -362,7 +365,7 @@ class BudgetSettingTab extends PluginSettingTab {
     // value is still readable — afterwards there is nothing to compare against.
     if (key === 'period_anchor') {
       const next = String(value).trim();
-      if (next && !ISO_DATE.test(next)) return;
+      if (next && !isRealIsoDate(next)) return;
       await this.warnIfAnchorReslices(this.mdSettings(), next);
     }
     if (key === 'period_days') {
@@ -467,7 +470,7 @@ class BudgetSettingTab extends PluginSettingTab {
           type: 'text', key: 'period_anchor', placeholder: 'YYYY-MM-DD',
           validate: v => {
             const s = String(v).trim();
-            return !s || ISO_DATE.test(s) ? undefined : 'Use YYYY-MM-DD, e.g. 2026-08-07.';
+            return !s || isRealIsoDate(s) ? undefined : 'Use a real date as YYYY-MM-DD, e.g. 2026-08-07.';
           },
         },
       },

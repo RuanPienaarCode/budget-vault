@@ -187,6 +187,29 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   ok(!monthly.periodKeyValid(''), 'an empty name is not addressable');
   ok(!monthly.periodKeyValid(undefined), 'nor is a missing one');
   ok(!monthly.periodKeyValid('2026-8'), 'nor a nearly-right one');
+
+  /* A month name must name a real month. '2026-13' is month-SHAPED, and Date's
+     rollover turned it into a perfectly navigable 31-day window whose title
+     read "undefined 2026" — MONTH_FULL has no thirteenth entry. */
+  ok(!monthly.periodKeyValid('2026-13'), 'there is no thirteenth month');
+  ok(!monthly.periodKeyValid('2026-00'), 'nor a zeroth one');
+  ok(monthly.periodKeyValid('2026-01') && monthly.periodKeyValid('2026-12'),
+    'while January and December are exactly as addressable as before');
+}
+
+/* ---- isRealIsoDate: date-SHAPED is not the same as a date ---- */
+{
+  const { isRealIsoDate } = require('../src/util');
+  for (const good of ['2026-08-07', '2024-02-29', '2026-01-01', '2026-12-31']) {
+    ok(isRealIsoDate(good), `${good} is a real date`);
+  }
+  for (const bad of ['2026-13-45', '2026-02-30', '2026-00-10', '2026-01-32', '2025-02-29',
+    '7 Aug 2026', '2026-8-7', '2026-08', '', null, undefined, 20260807]) {
+    ok(!isRealIsoDate(bad), `${JSON.stringify(bad)} is not`);
+  }
+  // Date.UTC maps years 0–99 onto 1900–1999, so a two-digit year silently
+  // becomes a different century. The round-trip catches that too.
+  ok(!isRealIsoDate('0050-01-01'), 'a year Date would relocate to the 1900s is rejected');
 }
 
 /* ---- a remembered period must also be ON PHASE, not merely date-shaped ---- */

@@ -3,7 +3,7 @@
 
 const { TFile } = require('obsidian');
 const { TYPE_ORDER } = require('./constants');
-const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero } = require('./util');
+const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero, isRealIsoDate } = require('./util');
 
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
@@ -24,8 +24,12 @@ module.exports = function registerLoad(ctx) {
          A cycle without an anchor has no way to place a boundary, so both are
          dropped together rather than deriving periods from a missing date;
          period.js clamps the length itself. */
+      /* A real date, not merely a date-SHAPED string — the same test period.js
+         gates the cycle on. A shape check accepted 2026-13-45 and stored the
+         pair, while period.js refused it and ran payday months, so the settings
+         screen sat there showing a cycle the app was not running. */
       const anchor = (fm.period_anchor || '').toString().trim();
-      const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
+      const anchorOk = isRealIsoDate(anchor);
       S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
       S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;

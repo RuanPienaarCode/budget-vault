@@ -70,6 +70,13 @@ const FILES = {
     ['period_days: banana\nperiod_anchor: 2026-08-07', 0, '2026-08-07', 'a non-numeric length is stored as 0'],
     ['period_days: 14', 0, '', 'a length with no anchor drops BOTH — nothing to count from'],
     ['period_days: 14\nperiod_anchor: 7 Aug 2026', 0, '', 'a non-ISO anchor drops both'],
+    /* Date-SHAPED is not the same as a date. Date.UTC rolls 2026-13-45 forward
+       to 2027-02-14 without complaint, so a shape check stored the pair and the
+       app ran a cycle counted from a day Settings.md never named — and once
+       period.js started refusing it, the settings screen went on offering a
+       cycle that was not running. Both halves reject it now. */
+    ['period_days: 14\nperiod_anchor: 2026-13-45', 0, '', 'a date-shaped non-date drops both'],
+    ['period_days: 14\nperiod_anchor: 2026-02-30', 0, '', 'as does a day that month never had'],
   ]) {
     const s = await loadInto(makeCtx({ ...FILES,
       [`${B}/Settings.md`]: `---\nmonth_start_day: 23\ncurrency: "R"\ncountry: za\n${fm}\n---\n` }));
