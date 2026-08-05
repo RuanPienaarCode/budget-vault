@@ -1,7 +1,7 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minAppVersion": "1.8.0",
   "description": "Your budget, stored as plain files on your own devices. No account, no server, no telemetry — nothing ever leaves your vault.",
   "author": "Ruan Pienaar",

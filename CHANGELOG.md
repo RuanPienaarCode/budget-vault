@@ -3,6 +3,21 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.2.1 — 2026-08-05
+
+### Added
+
+- **The setup wizard can now set up a pay cycle.** 1.2.0 added fortnightly and
+  weekly periods but only offered them in Settings, so anyone going through the
+  wizard was set up monthly with no sign the option existed. The budget-period
+  step now offers a third choice — a pay cycle — and asks how often you're paid
+  and when you were last paid. The first budget file it creates is named for
+  the right period, so a new fortnightly vault opens on a real period instead
+  of an empty page.
+
+  Re-running the wizard against a vault that already uses a pay cycle now shows
+  that cycle rather than presenting it as monthly and writing that back.
+
 ## 1.2.0 — 2026-08-05
 
 Budget periods no longer have to be monthly. Requested in

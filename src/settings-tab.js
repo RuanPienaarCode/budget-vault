@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 const { yamlStr, periodDaysOrZero, isoDayNumber } = require('./util');
@@ -16,11 +16,6 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
    route through the getControlValue/setControlValue overrides instead. */
 const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 'period_days', 'period_anchor']);
 
-/* The pay cycles offered as presets, keyed by the length that gets stored. The
-   stored value is a plain day count so it needs no translating — see the header
-   of period.js — but the labels do the talking, because nobody thinks of
-   themselves as being paid "every 14 days". */
-const PERIOD_PRESETS = { 0: 'Monthly (payday month)', 7: 'Every week', 14: 'Every 2 weeks', 28: 'Every 4 weeks' };
 /* A length set by hand in Settings.md that isn't one of the presets must still
    appear, and appear truthfully. Snapping it to the nearest preset would edit
    the user's file behind their back the moment they opened settings. */
