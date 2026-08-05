@@ -574,4 +574,19 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert };
+/* A period length in days, or 0 for the payday month. Lives here rather than in
+   period.js because the LOADER has to agree with it: if the loader stored what
+   the file said and period.js decided separately what was usable, a settings
+   control reading the raw value would report a cycle the app isn't running.
+   Out-of-band values become 0, never the nearest legal number — falling back to
+   the payday month the user already had is honest, whereas coercing 400 to 31
+   would silently invent a cycle nobody chose. The band is wide enough for every
+   real payroll rhythm and narrow enough to exclude a one-day period. */
+const MIN_PERIOD_DAYS = 7, MAX_PERIOD_DAYS = 31;
+function periodDaysOrZero(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS) return 0;
+  return n;
+}
+
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero };
