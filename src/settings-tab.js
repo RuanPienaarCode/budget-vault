@@ -179,6 +179,7 @@ class BudgetSettingTab extends PluginSettingTab {
           if (n && !ISO_DATE.test((md.period_anchor ?? '').toString().trim())) {
             new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
           }
+          this.noticeBudgetsKept(periodDaysOrZero(md.period_days), n);
           this.plugin.reloadViews();
           this.display();
         });
@@ -262,6 +263,25 @@ class BudgetSettingTab extends PluginSettingTab {
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
 
+  /* Changing the period length is where the surprise is manufactured, so it is
+     where the reassurance belongs — the Budgets page carries the same message
+     again, because most people don't read a settings notice carefully. Only
+     fires when the shape actually changes and there are budgets to strand;
+     switching 14 → 7 leaves date-named files addressable, so it says nothing. */
+  noticeBudgetsKept(before, after) {
+    if (!before === !after) return;                 // both monthly, or both a cycle
+    const n = before ? this.datedBudgetCount() : this.monthBudgetCount();
+    if (!n) return;
+    new Notice(
+      `Budget: your ${n} existing budget ${n === 1 ? 'file stays' : 'files stay'} in the vault. ` +
+      `They can't be shown at this period length, and they come straight back if you change it back.`, 10000);
+  }
+  monthBudgetCount() {
+    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    return this.app.vault.getMarkdownFiles()
+      .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
+  }
+
   /* ADR 0001: an anchor is meaningful only modulo the period length, so moving
      it by a whole number of cycles describes the same periods and must stay
      silent — warning there would train the user to ignore the warning that
@@ -319,6 +339,9 @@ class BudgetSettingTab extends PluginSettingTab {
       const next = String(value).trim();
       if (next && !ISO_DATE.test(next)) return;
       await this.warnIfAnchorReslices(this.mdSettings(), next);
+    }
+    if (key === 'period_days') {
+      this.noticeBudgetsKept(periodDaysOrZero(this.mdSettings().period_days), periodDaysOrZero(value));
     }
     const raw = key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'month_start_day' ? String(parseInt(value, 10))

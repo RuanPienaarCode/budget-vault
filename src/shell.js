@@ -180,6 +180,7 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title">Budget</h1>
           <div class="sub-note" id="budPeriodLabel"></div>
         </div>
+        <div id="budShapeNote" class="bud-shape-note hidden"></div>
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div>

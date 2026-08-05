@@ -3,6 +3,25 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.0 — 2026-08-05
+
+### Added
+
+- **Changing the period length no longer looks like losing your budget.**
+  Switching between a payday month and a pay cycle leaves your existing budget
+  files untouched in the vault, but they can't be shown at the other length —
+  so every category came back with an amount of zero and nothing said why. The
+  Budgets page now explains it: how many files are waiting, which one is the
+  most recent, and that they return the moment you change the length back. The
+  settings screen says the same thing at the moment you switch, since that's
+  where the surprise is made.
+
+  There's also a one-tap way to bring the categories and notes across from your
+  last budget. It deliberately does **not** bring the amounts: halving a monthly
+  figure is right for groceries and wrong for rent, and nothing on screen would
+  tell you which line had been guessed at. The tedious part is carried; the
+  judgement is left to you.
+
 ## 1.2.1 — 2026-08-05
 
 ### Added

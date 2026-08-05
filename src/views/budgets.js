@@ -6,7 +6,74 @@ const { el, escMd, icoEl, patchFrontmatter } = require('../util');
 const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
+  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
+
+  /* Budgets saved under the OTHER period-name shape — what a vault accumulates
+     when someone switches between a payday month and a pay cycle. They are not
+     deleted and they are not lost; they simply cannot be addressed while the
+     other length is active, and they come back on switching back. Nothing in
+     the app said so, which is how a switch reads as "my budget was wiped": the
+     categories all reappear from S.categories, but every amount is zero. */
+  function otherShapeBudgets() {
+    return Object.keys(S.budgets)
+      .filter(k => !periodKeyValid(k) && (S.budgets[k] || []).length)
+      .sort();
+  }
+  /* The note only earns its place when this period is genuinely unbudgeted AND
+     there is something on the other side to explain. Shown otherwise it would
+     be noise on every fresh period, and people stop reading a banner that is
+     always there. */
+  function renderShapeNote() {
+    const box = $('#budShapeNote');
+    box.empty();
+    const others = otherShapeBudgets();
+    const thisOne = S.budgets[S.period] || [];
+    if (thisOne.length || !others.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    const newest = others[others.length - 1];
+    const n = others.length;
+    box.append(el('div', { class: 'bud-shape-note-t' }, 'Your other budgets are still here'));
+    box.append(el('p', {},
+      `${n} budget ${n === 1 ? 'file is' : 'files are'} saved under a different period length — ` +
+      `the most recent is Budgets/${newest}.md. They stay in your vault, and they come back ` +
+      `as soon as you set the period length back. Amounts start blank here because this period ` +
+      `isn't the same length as those were.`));
+    box.append(el('button', {
+      class: 'btn btn-ghost', type: 'button',
+      onclick: () => bringOverFrom(newest),
+    }, `Bring over the categories and notes from ${newest}`));
+  }
+  /* Carries structure, never amounts — kept pure and separate from the button
+     so the promise in that last clause is actually testable. Halving a monthly
+     figure is right for groceries and wrong for rent, and nothing on screen
+     would say which line had been guessed at, so the tedious part is carried
+     and the judgement is asked for. Mutates `draft`, returns the count. */
+  function carryStructure(src, draft) {
+    let brought = 0;
+    for (const r of src) {
+      const d = draft.find(x => x.category === r.category);
+      if (d) {
+        // Never overwrite something already set for THIS period.
+        if (!d.inFile && !d.amount && !(d.notes && d.notes.trim()) && r.notes) {
+          d.notes = r.notes; d.inFile = true; brought++;
+        }
+      } else {
+        draft.push({ ...r, amount: 0, amountRaw: null, inFile: true });
+        brought++;
+      }
+    }
+    return brought;
+  }
+  function bringOverFrom(key) {
+    const src = S.budgets[key] || [];
+    if (!src.length) return toast('That budget is empty', true);
+    const brought = carryStructure(src, budgetDraft());
+    if (brought) { budDirty = true; $('#budSave').disabled = false; }
+    renderBudgets();
+    toast(brought
+      ? `Brought over ${brought} ${brought === 1 ? 'category' : 'categories'} — set the amounts for this period`
+      : 'Every category from that budget is already here');
+  }
 
   let budDraft = null, budDraftPeriod = null;
   /* This page's dirty state used to live only in the DOM, read back off
@@ -87,6 +154,7 @@ module.exports = function registerBudgets(ctx) {
 
   function renderBudgets() {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+    renderShapeNote();
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
     const t = $('#budTable'); t.empty();
@@ -207,5 +275,6 @@ module.exports = function registerBudgets(ctx) {
     renderBudgets();
   }
 
-  ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
+  ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty,
+    otherShapeBudgets, carryStructure });
 };

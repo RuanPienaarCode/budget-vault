@@ -680,6 +680,7 @@ var require_shell = __commonJS((exports2, module2) => {
           <h1 class="financial-period-banner-title">Budget</h1>
           <div class="sub-note" id="budPeriodLabel"></div>
         </div>
+        <div id="budShapeNote" class="bud-shape-note hidden"></div>
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div>
@@ -2995,7 +2996,59 @@ var require_budgets = __commonJS((exports2, module2) => {
   var { el, escMd, icoEl, patchFrontmatter } = require_util();
   var { TYPE_ORDER } = require_constants();
   module2.exports = function registerBudgets(ctx) {
-    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
+    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
+    function otherShapeBudgets() {
+      return Object.keys(S.budgets).filter((k) => !periodKeyValid(k) && (S.budgets[k] || []).length).sort();
+    }
+    function renderShapeNote() {
+      const box = $("#budShapeNote");
+      box.empty();
+      const others = otherShapeBudgets();
+      const thisOne = S.budgets[S.period] || [];
+      if (thisOne.length || !others.length) {
+        box.classList.add("hidden");
+        return;
+      }
+      box.classList.remove("hidden");
+      const newest = others[others.length - 1];
+      const n = others.length;
+      box.append(el("div", { class: "bud-shape-note-t" }, "Your other budgets are still here"));
+      box.append(el("p", {}, `${n} budget ${n === 1 ? "file is" : "files are"} saved under a different period length — ` + `the most recent is Budgets/${newest}.md. They stay in your vault, and they come back ` + `as soon as you set the period length back. Amounts start blank here because this period ` + `isn't the same length as those were.`));
+      box.append(el("button", {
+        class: "btn btn-ghost",
+        type: "button",
+        onclick: () => bringOverFrom(newest)
+      }, `Bring over the categories and notes from ${newest}`));
+    }
+    function carryStructure(src, draft) {
+      let brought = 0;
+      for (const r of src) {
+        const d = draft.find((x) => x.category === r.category);
+        if (d) {
+          if (!d.inFile && !d.amount && !(d.notes && d.notes.trim()) && r.notes) {
+            d.notes = r.notes;
+            d.inFile = true;
+            brought++;
+          }
+        } else {
+          draft.push({ ...r, amount: 0, amountRaw: null, inFile: true });
+          brought++;
+        }
+      }
+      return brought;
+    }
+    function bringOverFrom(key) {
+      const src = S.budgets[key] || [];
+      if (!src.length)
+        return toast("That budget is empty", true);
+      const brought = carryStructure(src, budgetDraft());
+      if (brought) {
+        budDirty = true;
+        $("#budSave").disabled = false;
+      }
+      renderBudgets();
+      toast(brought ? `Brought over ${brought} ${brought === 1 ? "category" : "categories"} — set the amounts for this period` : "Every category from that budget is already here");
+    }
     let budDraft = null, budDraftPeriod = null;
     let budDirty = false;
     function budgetDraft() {
@@ -3066,6 +3119,7 @@ var require_budgets = __commonJS((exports2, module2) => {
     }
     function renderBudgets() {
       $("#budPeriodLabel").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+      renderShapeNote();
       const draft = budgetDraft();
       const sum = periodSummary(S.period);
       const t = $("#budTable");
@@ -3213,7 +3267,16 @@ var require_budgets = __commonJS((exports2, module2) => {
       budgetDraft().push({ category: cat.name, type: cat.type, amount: 0, notes: "", inFile: false });
       renderBudgets();
     }
-    ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty });
+    ctx.provide({
+      renderBudgets,
+      saveBudget,
+      copyPreviousBudget,
+      addNewCategory,
+      invalidateBudgetDraft,
+      budgetDirty,
+      otherShapeBudgets,
+      carryStructure
+    });
   };
 });
 
@@ -7471,6 +7534,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           if (n && !ISO_DATE.test((md.period_anchor ?? "").toString().trim())) {
             new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
           }
+          this.noticeBudgetsKept(periodDaysOrZero(md.period_days), n);
           this.plugin.reloadViews();
           this.display();
         });
@@ -7526,6 +7590,18 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
       return this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
     }
+    noticeBudgetsKept(before, after) {
+      if (!before === !after)
+        return;
+      const n = before ? this.datedBudgetCount() : this.monthBudgetCount();
+      if (!n)
+        return;
+      new Notice(`Budget: your ${n} existing budget ${n === 1 ? "file stays" : "files stay"} in the vault. ` + `They can't be shown at this period length, and they come straight back if you change it back.`, 1e4);
+    }
+    monthBudgetCount() {
+      const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+      return this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
+    }
     async warnIfAnchorReslices(md, next) {
       const days = periodDaysOrZero(md.period_days);
       const prev = (md.period_anchor ?? "").toString().trim();
@@ -7576,6 +7652,9 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         if (next && !ISO_DATE.test(next))
           return;
         await this.warnIfAnchorReslices(this.mdSettings(), next);
+      }
+      if (key === "period_days") {
+        this.noticeBudgetsKept(periodDaysOrZero(this.mdSettings().period_days), periodDaysOrZero(value));
       }
       const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "period_days" ? String(periodDaysOrZero(value)) : key === "period_anchor" ? String(value).trim() : key === "country" ? String(value) : null;
       if (raw === null)
