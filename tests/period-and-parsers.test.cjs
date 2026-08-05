@@ -77,6 +77,93 @@ function periodCtx(monthStartDay, txFiles = {}) {
     'start day 28 lands inside February in every year — this is why the loader clamps to 28');
 }
 
+/* ---- interval periods (fortnightly and friends) ---- */
+function intervalCtx(period_type, period_anchor, txFiles = {}) {
+  const ctx = makeCtx({}, { settings: { month_start_day: 23, period_type, period_anchor } });
+  ctx.S.txFiles = txFiles;
+  require('../src/period')(ctx);
+  return ctx;
+}
+{
+  const { periodRange, shiftPeriod, currentPeriod, periodMonthName, periodShortLabel } =
+    intervalCtx('fortnightly', '2026-08-07');
+
+  eq(periodRange('2026-08-07'), { start: '2026-08-07', end: '2026-08-20' },
+    'a fortnight is 14 days INCLUSIVE — the 7th through the 20th, not the 21st');
+  eq(shiftPeriod('2026-08-07', 1), '2026-08-21', 'the next fortnight opens the day after this one closes');
+  eq(shiftPeriod('2026-08-07', -1), '2026-07-24', 'and shifting back crosses the month boundary cleanly');
+  eq(shiftPeriod('2026-08-07', 26), '2027-08-06',
+    '26 fortnights is 364 days, so a year later lands one day EARLIER — the cycle drifts against the calendar');
+
+  // The bug this guards: a truncating divide rounds toward zero, so any date
+  // before the anchor would land one period late.
+  eq(periodRange(shiftPeriod('2026-08-07', -30)).start, '2025-06-13',
+    'periods far BEFORE the anchor derive correctly (30 fortnights = 420 days back)');
+
+  eq(periodMonthName('2026-08-07'), 'August 2026', 'a fortnight inside one month reports that month');
+  eq(periodMonthName('2026-07-24'), 'Jul – Aug 2026', 'one spanning two months reports both');
+  eq(periodMonthName('2025-12-25'), 'Dec 2025 – Jan 2026', 'and one spanning a year-end carries both years');
+  eq(periodShortLabel('2026-08-07'), '7 Aug', 'the trend axis labels an interval period by its start day');
+
+  // Anchors a whole number of intervals apart describe the SAME periods.
+  const far = intervalCtx('fortnightly', '2027-03-05');   // 2026-08-07 + 15 fortnights
+  eq(far.periodRange('2026-08-07'), { start: '2026-08-07', end: '2026-08-20' },
+    'an anchor shifted by whole intervals is the same anchor');
+  eq(far.currentPeriod(), currentPeriod(),
+    'so it picks the same current period too — the anchor is meaningful only modulo the interval');
+
+  // An anchor shifted by a NON-multiple genuinely moves every boundary.
+  const off = intervalCtx('fortnightly', '2026-08-08');
+  ok(off.currentPeriod() !== currentPeriod(),
+    'a one-day anchor shift re-slices the periods — this is the destructive case the UI must warn about');
+
+  // currentPeriod must land on a real period start, always.
+  const cur = currentPeriod();
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(cur), 'the current interval period is named by date');
+  eq(shiftPeriod(shiftPeriod(cur, -3), 3), cur, 'shifting away and back is lossless');
+
+  // Other intervals ride the same maths.
+  eq(intervalCtx('weekly', '2026-08-07').periodRange('2026-08-07'),
+    { start: '2026-08-07', end: '2026-08-13' }, 'weekly is 7 days inclusive');
+  eq(intervalCtx('four_weekly', '2026-08-07').periodRange('2026-08-07'),
+    { start: '2026-08-07', end: '2026-09-03' }, 'four-weekly is 28 days inclusive');
+}
+
+/* ---- an interval type is inert without a usable anchor ---- */
+{
+  // The loader refuses to set an interval type without a valid anchor, but the
+  // period module must not produce garbage if one ever reaches it.
+  const { periodRange, currentPeriod } = intervalCtx('monthly', '');
+  eq(periodRange('2026-08'), { start: '2026-07-23', end: '2026-08-22' },
+    'monthly periods are untouched by the interval code path');
+  ok(/^\d{4}-\d{2}$/.test(currentPeriod()), 'and still name themselves YYYY-MM');
+}
+
+/* ---- fortnightly transactions land in exactly one period ---- */
+{
+  const rows = [
+    { date: '2026-08-06', desc: 'day before the fortnight', cat: '', amount: -10, excluded: false, note: '' },
+    { date: '2026-08-07', desc: 'the boundary itself', cat: '', amount: -20, excluded: false, note: '' },
+    { date: '2026-08-20', desc: 'last day of the fortnight', cat: '', amount: -30, excluded: false, note: '' },
+    { date: '2026-08-21', desc: 'first day of the next', cat: '', amount: -40, excluded: false, note: '' },
+  ];
+  // All four rows sit in ONE calendar-month file while spanning THREE periods —
+  // transaction storage stays monthly no matter what the period type is.
+  const txFiles = { 'FNB/2026-08': { label: 'FNB', month: '2026-08', dirty: false, rows } };
+  const { txInPeriod } = intervalCtx('fortnightly', '2026-08-07', txFiles);
+
+  eq(txInPeriod('2026-08-07').map(t => t.desc), ['the boundary itself', 'last day of the fortnight'],
+    'the start day belongs to the fortnight it opens; the day before does not');
+  eq(txInPeriod('2026-07-24').map(t => t.desc), ['day before the fortnight'],
+    'the previous fortnight claims the day before');
+  eq(txInPeriod('2026-08-21').map(t => t.desc), ['first day of the next'],
+    'and the following fortnight claims the next boundary');
+
+  const all = ['2026-07-24', '2026-08-07', '2026-08-21'].flatMap(p => txInPeriod(p).map(t => t.desc));
+  eq(all.length, new Set(all).size, 'no transaction may appear in two fortnights');
+  eq(all.length, rows.length, 'and none may fall through the gap between them');
+}
+
 /* ---- boundary dates land in exactly one period ---- */
 {
   const rows = [

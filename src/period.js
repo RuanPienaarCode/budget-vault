@@ -1,15 +1,68 @@
 'use strict';
-/* Financial-period (payday month) math + per-period summaries. A period
-   'YYYY-MM' runs from month_start_day of the previous month to the day
-   before it in the named month. */
+/* Financial-period math + per-period summaries.
+
+   A period has a NAME its files are addressed by and BOUNDARIES deciding which
+   transactions fall inside it, and the two are deliberately separate — see
+   CONTEXT.md and docs/adr/0001. Two shapes of name exist:
+
+     'YYYY-MM'     a payday month, running from month_start_day of the previous
+                   month to the day before it in the named month. The name is
+                   stable no matter what month_start_day is, so retuning the
+                   boundary day re-slices the window without orphaning a file.
+
+     'YYYY-MM-DD'  an interval period (fortnightly and friends), named for the
+                   day it starts on. Derived from period_anchor — one known
+                   payday — plus a fixed interval. Nothing is materialised.
+
+   The anchor is meaningful only MODULO the interval: two anchors a whole number
+   of intervals apart describe the same set of periods, so all maths below runs
+   off the anchor's phase rather than its literal value. Only a shift that isn't
+   a whole number of intervals actually moves a boundary. */
 
 const { MONTHS } = require('./constants');
 const { safeSeg } = require('./util');
 
+/* Interval period types, in days. Anything not listed here — including the
+   absent/unset case — is a payday month. weekly and four_weekly cost nothing to
+   carry and work if hand-typed into Settings.md; only monthly and fortnightly
+   are offered in the UI. */
+const INTERVALS = { weekly: 7, fortnightly: 14, four_weekly: 28 };
+
+const MONTH_KEY = /^\d{4}-\d{2}$/;
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/* Whole-day arithmetic in UTC. Local-time date maths would drift by a day
+   across a DST boundary — a period would silently gain or lose a day twice a
+   year, which is exactly the kind of failure that shows up as "my totals moved"
+   with no error to point at. */
+const DAY = 86400000;
+function dayNum(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / DAY);
+}
+function isoFromDayNum(n) {
+  const d = new Date(n * DAY);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
 
+  /* 0 for a payday month, otherwise the interval in days. */
+  function intervalDays() { return INTERVALS[S.settings.period_type] || 0; }
+  /* The first period start on or before `day`, given the anchor's phase. A real
+     floor, not a truncation — dates BEFORE the anchor must round down too, or
+     every period earlier than the anchor lands one period late. */
+  function periodStartOnOrBefore(day, iv) {
+    const a = dayNum(S.settings.period_anchor);
+    return a + Math.floor((day - a) / iv) * iv;
+  }
+
   function periodRange(p) {
+    const iv = intervalDays();
+    if (iv && DATE_KEY.test(p)) {
+      return { start: p, end: isoFromDayNum(dayNum(p) + iv - 1) };
+    }
     const [y, m] = p.split('-').map(Number);
     const n = S.settings.month_start_day;
     if (n === 1) {
@@ -22,6 +75,11 @@ module.exports = function registerPeriod(ctx) {
   }
   function currentPeriod() {
     const now = new Date();
+    const iv = intervalDays();
+    if (iv) {
+      const today = dayNum(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
+      return isoFromDayNum(periodStartOnOrBefore(today, iv));
+    }
     let y = now.getFullYear(), m = now.getMonth() + 1;
     if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {
       m += 1; if (m > 12) { m = 1; y += 1; }
@@ -29,6 +87,8 @@ module.exports = function registerPeriod(ctx) {
     return `${y}-${String(m).padStart(2, '0')}`;
   }
   function shiftPeriod(p, delta) {
+    const iv = intervalDays();
+    if (iv && DATE_KEY.test(p)) return isoFromDayNum(dayNum(p) + delta * iv);
     let [y, m] = p.split('-').map(Number);
     m += delta;
     while (m > 12) { m -= 12; y += 1; }
@@ -41,8 +101,29 @@ module.exports = function registerPeriod(ctx) {
   const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   function periodMonthName(p) {
+    const iv = intervalDays();
+    if (iv && DATE_KEY.test(p)) {
+      /* An interval period has no month it is "named after", so it reports the
+         month(s) it spans instead — no new vocabulary for the user to learn,
+         and periodTitle right beside it still carries the exact dates. */
+      const { start, end } = periodRange(p);
+      const [sy, sm] = start.split('-').map(Number);
+      const [ey, em] = end.split('-').map(Number);
+      if (sy === ey && sm === em) return `${MONTH_FULL[sm - 1]} ${sy}`;
+      if (sy === ey) return `${MONTHS[sm - 1]} – ${MONTHS[em - 1]} ${ey}`;
+      return `${MONTHS[sm - 1]} ${sy} – ${MONTHS[em - 1]} ${ey}`;
+    }
     const [y, m] = p.split('-').map(Number);
     return `${MONTH_FULL[m - 1]} ${y}`;
+  }
+  /* Axis-sized label for the dashboard trend, which used to slice the key
+     apart itself and would read a 'YYYY-MM-DD' key as a nonsense month. */
+  function periodShortLabel(p) {
+    if (intervalDays() && DATE_KEY.test(p)) {
+      const [, m, d] = p.split('-').map(Number);
+      return `${d} ${MONTHS[m - 1]}`;
+    }
+    return `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`;
   }
   function periodTitle(p) {
     const { start, end } = periodRange(p);
@@ -113,7 +194,8 @@ module.exports = function registerPeriod(ctx) {
   }
 
   ctx.provide({
-    periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, txInPeriod,
-    catType, periodSummary, budgetTotals, accountForLabel, nonBudgetLabels,
+    periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel,
+    txInPeriod, catType, periodSummary, budgetTotals, accountForLabel, nonBudgetLabels,
+    intervalDays,
   });
 };

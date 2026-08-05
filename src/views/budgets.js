@@ -6,7 +6,7 @@ const { el, escMd, icoEl, patchFrontmatter } = require('../util');
 const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
+  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
 
   let budDraft = null, budDraftPeriod = null;
   /* This page's dirty state used to live only in the DOM, read back off
@@ -148,17 +148,21 @@ module.exports = function registerBudgets(ctx) {
     const draft = budgetDraft().filter(d => d.category && (d.inFile || d.amount || (d.notes && d.notes.trim())));
     for (const d of draft) d.inFile = true;
     S.budgets[S.period] = draft.map(d => ({ ...d }));
-    const [y, m] = S.period.split('-');
     const n = S.settings.month_start_day;
     const meta = S.budgetMeta[S.period];
     const fm = patchFrontmatter((meta && meta.raw) || '', { period: S.period });
     // Correct English ordinal for any day (1st, 2nd, 3rd, 21st, 22nd, 23rd, …) —
     // the old hardcoded "rd"/"nd" only read right for the default day 23.
     const ordinal = d => { const v = d % 100; return d + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
-    const rangeNote = n === 1
-      ? 'With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month.'
-      : 'With `month_start_day: ' + n + '`, this period runs from the ' + ordinal(n) +
-        ' of the previous month to the ' + ordinal(n - 1) + ' of this month.';
+    const iv = ctx.intervalDays();
+    const rangeNote = iv
+      ? 'With `period_type: ' + S.settings.period_type + '`, this period runs for ' + iv +
+        ' days from ' + periodRange(S.period).start + ', derived from `period_anchor: ' +
+        S.settings.period_anchor + '`.'
+      : n === 1
+        ? 'With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month.'
+        : 'With `month_start_day: ' + n + '`, this period runs from the ' + ordinal(n) +
+          ' of the previous month to the ' + ordinal(n - 1) + ' of this month.';
     const lines = ['---', fm, '---', '', `# Budget — ${S.period}`, '',
       rangeNote, '',
       '| Category | Type | Amount | Notes |', '|----------|------|-------:|-------|'];
@@ -168,7 +172,9 @@ module.exports = function registerBudgets(ctx) {
       lines.push(`| ${escMd(d.category)} | ${d.type} | ${amt} | ${escMd(d.notes)} |`);
     }
     lines.push('');
-    await writeFile(`Budgets/${y}-${m}.md`, lines.join('\n'));
+    // The period name IS the filename, for both shapes — no reassembling it
+    // from parts, which is what limited this to 'YYYY-MM'.
+    await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
     budDirty = false;
     $('#budSave').disabled = true;
     toast(`Budget saved to Budgets/${S.period}.md`);

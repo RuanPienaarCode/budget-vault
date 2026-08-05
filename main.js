@@ -1928,9 +1928,31 @@ var require_io = __commonJS((exports2, module2) => {
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
   var { safeSeg } = require_util();
+  var INTERVALS = { weekly: 7, fortnightly: 14, four_weekly: 28 };
+  var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+  var DAY = 86400000;
+  function dayNum(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / DAY);
+  }
+  function isoFromDayNum(n) {
+    const d = new Date(n * DAY);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
+    function intervalDays() {
+      return INTERVALS[S.settings.period_type] || 0;
+    }
+    function periodStartOnOrBefore(day, iv) {
+      const a = dayNum(S.settings.period_anchor);
+      return a + Math.floor((day - a) / iv) * iv;
+    }
     function periodRange(p) {
+      const iv = intervalDays();
+      if (iv && DATE_KEY.test(p)) {
+        return { start: p, end: isoFromDayNum(dayNum(p) + iv - 1) };
+      }
       const [y, m] = p.split("-").map(Number);
       const n = S.settings.month_start_day;
       if (n === 1) {
@@ -1943,6 +1965,11 @@ var require_period = __commonJS((exports2, module2) => {
     }
     function currentPeriod() {
       const now = new Date;
+      const iv = intervalDays();
+      if (iv) {
+        const today = dayNum(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+        return isoFromDayNum(periodStartOnOrBefore(today, iv));
+      }
       let y = now.getFullYear(), m = now.getMonth() + 1;
       if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {
         m += 1;
@@ -1954,6 +1981,9 @@ var require_period = __commonJS((exports2, module2) => {
       return `${y}-${String(m).padStart(2, "0")}`;
     }
     function shiftPeriod(p, delta) {
+      const iv = intervalDays();
+      if (iv && DATE_KEY.test(p))
+        return isoFromDayNum(dayNum(p) + delta * iv);
       let [y, m] = p.split("-").map(Number);
       m += delta;
       while (m > 12) {
@@ -1981,8 +2011,26 @@ var require_period = __commonJS((exports2, module2) => {
       "December"
     ];
     function periodMonthName(p) {
+      const iv = intervalDays();
+      if (iv && DATE_KEY.test(p)) {
+        const { start, end } = periodRange(p);
+        const [sy, sm] = start.split("-").map(Number);
+        const [ey, em] = end.split("-").map(Number);
+        if (sy === ey && sm === em)
+          return `${MONTH_FULL[sm - 1]} ${sy}`;
+        if (sy === ey)
+          return `${MONTHS[sm - 1]} – ${MONTHS[em - 1]} ${ey}`;
+        return `${MONTHS[sm - 1]} ${sy} – ${MONTHS[em - 1]} ${ey}`;
+      }
       const [y, m] = p.split("-").map(Number);
       return `${MONTH_FULL[m - 1]} ${y}`;
+    }
+    function periodShortLabel(p) {
+      if (intervalDays() && DATE_KEY.test(p)) {
+        const [, m, d] = p.split("-").map(Number);
+        return `${d} ${MONTHS[m - 1]}`;
+      }
+      return `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`;
     }
     function periodTitle(p) {
       const { start, end } = periodRange(p);
@@ -2053,12 +2101,14 @@ var require_period = __commonJS((exports2, module2) => {
       shiftPeriod,
       periodTitle,
       periodMonthName,
+      periodShortLabel,
       txInPeriod,
       catType,
       periodSummary,
       budgetTotals,
       accountForLabel,
-      nonBudgetLabels
+      nonBudgetLabels,
+      intervalDays
     });
   };
 });
@@ -2078,6 +2128,11 @@ var require_load = __commonJS((exports2, module2) => {
           const n = parseInt(fm.month_start_day, 10) || 23;
           S.settings.month_start_day = Math.min(28, Math.max(1, n));
         }
+        const type = (fm.period_type || "monthly").toString().trim().toLowerCase();
+        const anchor = (fm.period_anchor || "").toString().trim();
+        const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
+        S.settings.period_type = type !== "monthly" && anchorOk ? type : "monthly";
+        S.settings.period_anchor = anchorOk ? anchor : "";
         if (fm.currency)
           S.settings.currency = fm.currency;
         S.settings.country = (fm.country || "za").toString().trim().toLowerCase();
@@ -2120,7 +2175,7 @@ var require_load = __commonJS((exports2, module2) => {
       S.accounts.sort((a, b) => a.name.localeCompare(b.name));
       S.budgets = {};
       S.budgetMeta = {};
-      for (const { file: f, text } of await read(mdFilesIn("Budgets").filter((f2) => /^\d{4}-\d{2}$/.test(f2.basename)))) {
+      for (const { file: f, text } of await read(mdFilesIn("Budgets").filter((f2) => /^\d{4}-\d{2}(-\d{2})?$/.test(f2.basename)))) {
         const period = f.basename;
         const { raw } = parseFrontmatter(text);
         S.budgetMeta[period] = { raw };
@@ -2531,9 +2586,9 @@ Budget category of type **${type}**.
 // src/views/dashboard.js
 var require_dashboard = __commonJS((exports2, module2) => {
   var { el } = require_util();
-  var { TYPE_ORDER, MONTHS } = require_constants();
+  var { TYPE_ORDER } = require_constants();
   module2.exports = function registerDashboard(ctx) {
-    const { S, $, root, money, periodSummary, budgetTotals, periodTitle, periodMonthName, shiftPeriod, catType } = ctx;
+    const { S, $, root, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, shiftPeriod, catType } = ctx;
     function renderDashboard() {
       const sum = periodSummary(S.period);
       const bud = budgetTotals(S.period);
@@ -2606,7 +2661,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
         p,
         spent: periodSummary(p).spend,
         budget: budgetTotals(p).spend,
-        label: `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`
+        label: periodShortLabel(p)
       }));
       const W = 1000, H = 300, padL = 24, padR = 24, padT = 24, padB = 40;
       const max = Math.max(1, ...data.flatMap((d) => [d.spent, d.budget])) * 1.12;
@@ -2926,7 +2981,7 @@ var require_budgets = __commonJS((exports2, module2) => {
   var { el, escMd, icoEl, patchFrontmatter } = require_util();
   var { TYPE_ORDER } = require_constants();
   module2.exports = function registerBudgets(ctx) {
-    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
+    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, promptCreateCategory, promptDeleteCategory } = ctx;
     let budDraft = null, budDraftPeriod = null;
     let budDirty = false;
     function budgetDraft() {
@@ -3078,7 +3133,6 @@ var require_budgets = __commonJS((exports2, module2) => {
       for (const d of draft)
         d.inFile = true;
       S.budgets[S.period] = draft.map((d) => ({ ...d }));
-      const [y, m] = S.period.split("-");
       const n = S.settings.month_start_day;
       const meta = S.budgetMeta[S.period];
       const fm = patchFrontmatter(meta && meta.raw || "", { period: S.period });
@@ -3086,7 +3140,8 @@ var require_budgets = __commonJS((exports2, module2) => {
         const v = d % 100;
         return d + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th");
       };
-      const rangeNote = n === 1 ? "With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month." : "With `month_start_day: " + n + "`, this period runs from the " + ordinal(n) + " of the previous month to the " + ordinal(n - 1) + " of this month.";
+      const iv = ctx.intervalDays();
+      const rangeNote = iv ? "With `period_type: " + S.settings.period_type + "`, this period runs for " + iv + " days from " + periodRange(S.period).start + ", derived from `period_anchor: " + S.settings.period_anchor + "`." : n === 1 ? "With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month." : "With `month_start_day: " + n + "`, this period runs from the " + ordinal(n) + " of the previous month to the " + ordinal(n - 1) + " of this month.";
       const lines = [
         "---",
         fm,
@@ -3105,7 +3160,7 @@ var require_budgets = __commonJS((exports2, module2) => {
         lines.push(`| ${escMd(d.category)} | ${d.type} | ${amt} | ${escMd(d.notes)} |`);
       }
       lines.push("");
-      await writeFile(`Budgets/${y}-${m}.md`, lines.join(`
+      await writeFile(`Budgets/${S.period}.md`, lines.join(`
 `));
       budDirty = false;
       $("#budSave").disabled = true;
@@ -6252,7 +6307,7 @@ var require_controller = __commonJS((exports2, module2) => {
     const $$ = (s) => root.querySelectorAll(s);
     const S = {
       loaded: false,
-      settings: { month_start_day: 23, currency: "R", country: "za" },
+      settings: { month_start_day: 23, currency: "R", country: "za", period_type: "monthly", period_anchor: "" },
       categories: [],
       accounts: [],
       budgets: {},

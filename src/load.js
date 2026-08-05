@@ -18,6 +18,15 @@ module.exports = function registerLoad(ctx) {
         const n = parseInt(fm.month_start_day, 10) || 23;
         S.settings.month_start_day = Math.min(28, Math.max(1, n));
       }
+      /* Pay cycle. An unknown or absent type is a payday month, so a vault that
+         has never heard of this setting behaves exactly as it always did. An
+         interval type without an anchor has no way to place a boundary, so it
+         falls back to monthly rather than deriving periods from a missing date. */
+      const type = (fm.period_type || 'monthly').toString().trim().toLowerCase();
+      const anchor = (fm.period_anchor || '').toString().trim();
+      const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
+      S.settings.period_type = (type !== 'monthly' && anchorOk) ? type : 'monthly';
+      S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
       // values, so a hand-edited Settings.md can't break the app.
@@ -80,7 +89,11 @@ module.exports = function registerLoad(ctx) {
 
     S.budgets = {};
     S.budgetMeta = {};
-    for (const { file: f, text } of await read(mdFilesIn('Budgets').filter(f => /^\d{4}-\d{2}$/.test(f.basename)))) {
+    /* Both period-name shapes load side by side. A vault that has switched
+       between monthly and interval periods keeps both sets of files, and the
+       one the active period type can't address simply never gets asked for —
+       nothing is deleted, so switching back finds them where they were. */
+    for (const { file: f, text } of await read(mdFilesIn('Budgets').filter(f => /^\d{4}-\d{2}(-\d{2})?$/.test(f.basename)))) {
       const period = f.basename;
       const { raw } = parseFrontmatter(text);
       S.budgetMeta[period] = { raw };   // verbatim frontmatter for lossless write-back
