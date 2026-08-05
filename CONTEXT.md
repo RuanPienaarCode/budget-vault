@@ -21,9 +21,18 @@ rather than the 1st, so the window lines up with when the household is paid.
 Named after the calendar month it ends in.
 _Avoid_: financial month, custom month
 
-**Period type**:
-The rhythm periods repeat on — monthly, or a fixed interval of days.
-_Avoid_: frequency, period length, cadence
+**Pay cycle**:
+The household's own rhythm of being paid, which a period length is chosen to
+match. Deliberately never named in the plugin's vocabulary — "fortnightly" is
+idiomatic in some of the countries the plugin ships to and foreign in others,
+and "bi-weekly" means both every two weeks and twice a week. A period is
+described by its length in days instead, which reads the same everywhere.
+_Avoid_: pay frequency, pay period, payroll cycle
+
+**Period length**:
+How long a period runs, counted in days. Its absence means the payday month,
+whose length the calendar decides rather than the household.
+_Avoid_: period type, frequency, cadence, fortnightly, bi-weekly
 
 **Anchor**:
 A known start date of one period, from which every other period of an

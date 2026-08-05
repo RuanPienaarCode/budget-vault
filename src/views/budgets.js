@@ -156,8 +156,8 @@ module.exports = function registerBudgets(ctx) {
     const ordinal = d => { const v = d % 100; return d + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
     const iv = ctx.intervalDays();
     const rangeNote = iv
-      ? 'With `period_type: ' + S.settings.period_type + '`, this period runs for ' + iv +
-        ' days from ' + periodRange(S.period).start + ', derived from `period_anchor: ' +
+      ? 'With `period_days: ' + iv + '`, this period runs for ' + iv + ' days from ' +
+        periodRange(S.period).start + ', counted from `period_anchor: ' +
         S.settings.period_anchor + '`.'
       : n === 1
         ? 'With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month.'

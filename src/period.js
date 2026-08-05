@@ -10,9 +10,9 @@
                    stable no matter what month_start_day is, so retuning the
                    boundary day re-slices the window without orphaning a file.
 
-     'YYYY-MM-DD'  an interval period (fortnightly and friends), named for the
-                   day it starts on. Derived from period_anchor — one known
-                   payday — plus a fixed interval. Nothing is materialised.
+     'YYYY-MM-DD'  an interval period (every two weeks, and friends), named for
+                   the day it starts on. Derived from period_anchor — one known
+                   payday — plus period_days. Nothing is materialised.
 
    The anchor is meaningful only MODULO the interval: two anchors a whole number
    of intervals apart describe the same set of periods, so all maths below runs
@@ -22,11 +22,16 @@
 const { MONTHS } = require('./constants');
 const { safeSeg } = require('./util');
 
-/* Interval period types, in days. Anything not listed here — including the
-   absent/unset case — is a payday month. weekly and four_weekly cost nothing to
-   carry and work if hand-typed into Settings.md; only monthly and fortnightly
-   are offered in the UI. */
-const INTERVALS = { weekly: 7, fortnightly: 14, four_weekly: 28 };
+/* The pay cycle is stored as its own length in days rather than a named type.
+   A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
+   and foreign in us/ca, "biweekly" is idiomatic there and genuinely ambiguous
+   (every two weeks, or twice a week?) — and locale.js has no vocabulary layer
+   to swap it per country. A number reads the same everywhere, needs no new word
+   when a cycle is added, and lets someone paid every ten days simply work.
+
+   Absent or zero means the payday month, so a vault that has never heard of
+   this setting behaves exactly as it always did. */
+const MIN_INTERVAL = 7, MAX_INTERVAL = 31;
 
 const MONTH_KEY = /^\d{4}-\d{2}$/;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -48,8 +53,16 @@ function isoFromDayNum(n) {
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
 
-  /* 0 for a payday month, otherwise the interval in days. */
-  function intervalDays() { return INTERVALS[S.settings.period_type] || 0; }
+  /* 0 for a payday month, otherwise the cycle length in days. Clamped the same
+     way month_start_day is, so a hand-edited Settings.md can't produce a
+     one-day period or a 400-day one. Anything outside the band is treated as
+     unset rather than coerced — a nonsense value should fall back to the
+     behaviour the user already had, not to a number nobody chose. */
+  function intervalDays() {
+    const n = parseInt(S.settings.period_days, 10);
+    if (!n || n < MIN_INTERVAL || n > MAX_INTERVAL) return 0;
+    return S.settings.period_anchor ? n : 0;
+  }
   /* The first period start on or before `day`, given the anchor's phase. A real
      floor, not a truncation — dates BEFORE the anchor must round down too, or
      every period earlier than the anchor lands one period late. */
