@@ -3,6 +3,41 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.1 — 2026-08-05
+
+### Fixed
+
+- **Changing your pay cycle length no longer strands you between periods.**
+  Going from weekly to every-two-weeks (or every-two-weeks to every-four) left
+  the app sitting on a date that was no longer the start of a period. The dates
+  it showed straddled two real periods, and the back and forward arrows walked
+  that wrong track forever — only "jump to current period" brought you back.
+  A budget saved while it was wrong went into a file no later period could
+  open, and the Budgets page didn't count it among the ones waiting for you.
+  Period names are now checked against your actual pay cycle rather than just
+  their shape, so changing the length puts you on a real period straight away.
+  Moving your last-payday date by a few days had the same effect, and is fixed
+  by the same change.
+
+- **The "your budgets are still here" message now appears when you switch
+  between two pay cycle lengths.** It only spoke up when you moved to or from a
+  payday month, so the one case that quietly puts half your budget files out of
+  reach — weekly to every-two-weeks — said nothing at all.
+
+- **A pay cycle whose last-payday date isn't a real date now falls back to the
+  payday month** instead of producing a period with no name.
+
+### Changed
+
+- **Debt-to-income now reads the same in every week of the month.** On a weekly
+  cycle a monthly salary lands in one week out of four, so three weeks showed
+  no ratio at all and the fourth multiplied a single paycheque by 4.35. The
+  income figure is now averaged over a window of a few months — thirteen weeks
+  for a weekly cycle, chosen so it catches the same number of paydays every
+  time — and the percentage stays put. A vault with only a week of history is
+  still scaled up rather than averaged into nothing, and a payday month is
+  untouched: the period is already a month.
+
 ## 1.3.0 — 2026-08-05
 
 ### Added
