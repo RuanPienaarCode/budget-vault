@@ -2,10 +2,10 @@
 /* Dashboard — hero card, spending-trend SVG, budget-vs-actual table. */
 
 const { el } = require('../util');
-const { TYPE_ORDER, MONTHS } = require('../constants');
+const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, root, money, periodSummary, budgetTotals, periodTitle, periodMonthName, shiftPeriod, catType } = ctx;
+  const { S, $, root, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, shiftPeriod, catType } = ctx;
 
   function renderDashboard() {
     const sum = periodSummary(S.period);
@@ -102,7 +102,7 @@ module.exports = function registerDashboard(ctx) {
     const periods = []; for (let i = 5; i >= 0; i--) periods.push(shiftPeriod(S.period, -i));
     const data = periods.map(p => ({
       p, spent: periodSummary(p).spend, budget: budgetTotals(p).spend,
-      label: `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`,
+      label: periodShortLabel(p),
     }));
     const W = 1000, H = 300, padL = 24, padR = 24, padT = 24, padB = 40;
     const max = Math.max(1, ...data.flatMap(d => [d.spent, d.budget])) * 1.12;
