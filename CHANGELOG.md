@@ -3,6 +3,78 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.2.0 — 2026-08-05
+
+Budget periods no longer have to be monthly. Requested in
+[#1](https://github.com/RuanPienaarCode/budget-vault/issues/1).
+
+### Added
+
+- **A pay cycle that isn't a month.** Budget periods can now run on a fixed
+  number of days instead of a payday month, so a fortnightly or weekly pay
+  cycle gets budget windows that line up with it. Two settings: **Period
+  length** — monthly, every week, every 2 weeks, every 4 weeks — and **Last
+  payday**, one recent payday everything else is counted from. Any recent one
+  will do; only where it falls within the cycle matters, so an earlier or later
+  payday gives the same result.
+
+  Monthly bills land in whichever period they fall in rather than being spread
+  across several. That lumpiness is the point: the question a payday-aligned
+  budget answers is whether this pay covers what's due before the next one.
+
+  Nothing changes for anyone who leaves the period length on monthly, which is
+  the default and what every existing vault already has. Switching between the
+  two leaves both sets of budget files in place — the ones the other length
+  can't address simply wait, and come back if you switch back.
+
+- **Accounts that sit outside the budget.** `budget: false` in an account's
+  frontmatter takes it out of the household income and spend totals — an
+  investment or tax-free wrapper whose interest isn't income and whose debit
+  orders aren't spending. Absent means in, so no existing vault's figures move.
+  Only the arriving leg is suppressed; the money leaving your cheque account is
+  still budgeted, which is what stops a transfer being counted twice.
+  Transactions keeps listing every row, so nothing goes invisible.
+
+- **An Accounts page that makes a balance trustworthy, not just displayed.** A
+  KPI row, a reconciliation line comparing the last confirmed balance against
+  what the transaction history implies, a staleness badge when nobody has
+  confirmed a balance in too long, credit-card utilisation, and the account
+  name as a drill-through to that account's transactions. The edit form
+  validates every field before assigning any of them, so a rejected value can't
+  leave a half-applied account on disk.
+
+### Fixed
+
+- **The privacy gate was reachable by keyboard on older iPhones.** The gate and
+  the closed drawer both rely on `inert`, which is Safari 15.5+ while this
+  plugin supports iOS 15.0. On 15.0–15.4 the attribute parsed and did nothing,
+  so Tab walked into the balances behind a gate whose entire purpose is that it
+  can't. The behaviour is now reproduced by hand where the attribute is absent.
+
+- **Bar and meter fills had never animated.** Every call site built the element
+  at its final width before appending it, so the first style resolution held
+  the end value and the declared transition had no state to run from. They now
+  animate from a keyframe that takes its target from the element's own computed
+  width — nothing for a hidden pane to starve, and the width stays authoritative
+  if the animation is skipped.
+
+- **Checkboxes were 15×15 with no padding** — the most-tapped control in the
+  app, one per row on a phone, under the 24px WCAG 2.5.8 minimum already
+  applied to the row buttons.
+
+- A household name containing a quote lost it rather than escaping it. An
+  out-of-range month start day now says so instead of silently keeping the old
+  one. Focus rings moved onto a per-theme token — the hardcoded literal was a
+  green from a superseded palette — and the reduced-motion block gained the four
+  selectors it was missing.
+
+- **Debt-to-income no longer overstates itself on a non-monthly cycle.** The
+  ratio divided monthly debt payments by a single period's income while showing
+  a monthly threshold, so a fortnightly household paying 20% of its income to
+  debt was shown 43.5% in red and told lenders treat that as stretched. Income
+  is now scaled to a monthly equivalent, and the label says so, so the figure
+  can be checked rather than merely believed. Monthly budgets are unaffected.
+
 ## 1.1.0 — 2026-08-03
 
 Two new pages. The version moves to 1.1.0 rather than another 1.0.x because
