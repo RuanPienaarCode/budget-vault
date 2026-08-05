@@ -498,7 +498,18 @@ var require_util = __commonJS((exports2, module2) => {
     const [y, m, d] = String(iso).split("-").map(Number);
     return Math.round(Date.UTC(y, m - 1, d) / 86400000);
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber };
+  var ISO_DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+  function isRealIsoDate(s) {
+    if (typeof s !== "string" || !ISO_DATE_SHAPE.test(s))
+      return false;
+    const [y, m, d] = s.split("-").map(Number);
+    const t = Date.UTC(y, m - 1, d);
+    if (!Number.isFinite(t))
+      return false;
+    const back = new Date(t);
+    return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
+  }
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -1941,8 +1952,8 @@ var require_io = __commonJS((exports2, module2) => {
 // src/period.js
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
-  var { safeSeg, periodDaysOrZero, isoDayNumber: dayNum } = require_util();
-  var MONTH_KEY = /^\d{4}-\d{2}$/;
+  var { safeSeg, periodDaysOrZero, isoDayNumber: dayNum, isRealIsoDate } = require_util();
+  var MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
   var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
   var DAY = 86400000;
   function isoFromDayNum(n) {
@@ -1952,11 +1963,7 @@ var require_period = __commonJS((exports2, module2) => {
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function anchorDay() {
-      const a = S.settings.period_anchor;
-      if (typeof a !== "string" || !DATE_KEY.test(a))
-        return null;
-      const n = dayNum(a);
-      return Number.isFinite(n) && isoFromDayNum(n) === a ? n : null;
+      return isRealIsoDate(S.settings.period_anchor) ? dayNum(S.settings.period_anchor) : null;
     }
     function intervalDays() {
       return anchorDay() === null ? 0 : periodDaysOrZero(S.settings.period_days);
@@ -1971,12 +1978,9 @@ var require_period = __commonJS((exports2, module2) => {
       const iv = intervalDays();
       if (!iv)
         return MONTH_KEY.test(p);
-      if (!DATE_KEY.test(p))
+      if (!isRealIsoDate(p))
         return false;
-      const d = dayNum(p);
-      if (!Number.isFinite(d) || isoFromDayNum(d) !== p)
-        return false;
-      return (d - anchorDay()) % iv === 0;
+      return (dayNum(p) - anchorDay()) % iv === 0;
     }
     function periodRange(p) {
       const iv = intervalDays();
@@ -2179,7 +2183,7 @@ var require_period = __commonJS((exports2, module2) => {
 var require_load = __commonJS((exports2, module2) => {
   var { TFile } = require("obsidian");
   var { TYPE_ORDER } = require_constants();
-  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero } = require_util();
+  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero, isRealIsoDate } = require_util();
   module2.exports = function registerLoad(ctx) {
     const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
     async function loadVault() {
@@ -2191,7 +2195,7 @@ var require_load = __commonJS((exports2, module2) => {
           S.settings.month_start_day = Math.min(28, Math.max(1, n));
         }
         const anchor = (fm.period_anchor || "").toString().trim();
-        const anchorOk = /^\d{4}-\d{2}-\d{2}$/.test(anchor);
+        const anchorOk = isRealIsoDate(anchor);
         S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
         S.settings.period_anchor = anchorOk ? anchor : "";
         if (fm.currency)
@@ -6934,8 +6938,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
   var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
   var { PERIOD_PRESETS } = require_constants();
-  var { isoDayNumber, periodDaysOrZero } = require_util();
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require_util();
   var STARTER_CATEGORIES = [
     { name: "Salary", type: "income", color: "#22c55e" },
     { name: "Other income", type: "income", color: "#4ade80" },
@@ -7072,7 +7075,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
         }
       }
       if (step === "period" && this.data.periodMode === "cycle") {
-        if (!ISO_DATE.test(this.data.periodAnchor)) {
+        if (!isRealIsoDate(this.data.periodAnchor)) {
           new Notice("Enter the date you were last paid — the pay cycle is counted from it.");
           return;
         }
@@ -7109,7 +7112,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       }
       const cycleDays = periodDaysOrZero(fm.period_days);
       const cycleAnchor = (fm.period_anchor || "").toString().trim();
-      if (cycleDays && ISO_DATE.test(cycleAnchor)) {
+      if (cycleDays && isRealIsoDate(cycleAnchor)) {
         this.data.periodMode = "cycle";
         this.data.periodDays = cycleDays;
         this.data.periodAnchor = cycleAnchor;
@@ -7301,7 +7304,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       return this.data.periodMode === "calendar" ? 1 : Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
     }
     cycleDays() {
-      return this.data.periodMode === "cycle" && ISO_DATE.test(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
+      return this.data.periodMode === "cycle" && isRealIsoDate(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
     }
     cycleAnchor() {
       return this.cycleDays() ? this.data.periodAnchor : "";
@@ -7488,7 +7491,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
-  var { yamlStr, periodDaysOrZero, isoDayNumber } = require_util();
+  var { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require_util();
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
   function periodLengthOptions(current) {
@@ -7577,7 +7580,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         d.onChange(async (v) => {
           const n = periodDaysOrZero(v);
           await this.plugin.updateBudgetSettingsMd("period_days", String(n));
-          if (n && !ISO_DATE.test((md.period_anchor ?? "").toString().trim())) {
+          if (n && !isRealIsoDate((md.period_anchor ?? "").toString().trim())) {
             new Notice('Budget: set "Last payday" below so periods know where to start — until then they stay monthly.', 8000);
           }
           this.noticeBudgetsKept(periodDaysOrZero(md.period_days), n);
@@ -7592,7 +7595,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           clearTimeout(this._anchorTimer);
           this._anchorTimer = setTimeout(async () => {
             const next = v.trim();
-            if (next && !ISO_DATE.test(next)) {
+            if (next && !isRealIsoDate(next)) {
               new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
               return;
             }
@@ -7638,7 +7641,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
     }
     offPhaseBudgetCount(days) {
       const anchor = (this.mdSettings().period_anchor ?? "").toString().trim();
-      if (!days || !ISO_DATE.test(anchor))
+      if (!days || !isRealIsoDate(anchor))
         return 0;
       const a = isoDayNumber(anchor);
       const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
@@ -7666,7 +7669,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
     async warnIfAnchorReslices(md, next) {
       const days = periodDaysOrZero(md.period_days);
       const prev = (md.period_anchor ?? "").toString().trim();
-      if (!days || !ISO_DATE.test(prev) || !ISO_DATE.test(next))
+      if (!days || !isRealIsoDate(prev) || !isRealIsoDate(next))
         return;
       if ((isoDayNumber(next) - isoDayNumber(prev)) % days === 0)
         return;
@@ -7710,7 +7713,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       }
       if (key === "period_anchor") {
         const next = String(value).trim();
-        if (next && !ISO_DATE.test(next))
+        if (next && !isRealIsoDate(next))
           return;
         await this.warnIfAnchorReslices(this.mdSettings(), next);
       }
@@ -7817,7 +7820,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
             placeholder: "YYYY-MM-DD",
             validate: (v) => {
               const s = String(v).trim();
-              return !s || ISO_DATE.test(s) ? undefined : "Use YYYY-MM-DD, e.g. 2026-08-07.";
+              return !s || isRealIsoDate(s) ? undefined : "Use a real date as YYYY-MM-DD, e.g. 2026-08-07.";
             }
           }
         },

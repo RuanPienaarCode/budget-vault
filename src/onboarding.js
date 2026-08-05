@@ -8,9 +8,8 @@
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
 const { PERIOD_PRESETS } = require('./constants');
-const { isoDayNumber, periodDaysOrZero } = require('./util');
+const { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require('./util');
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
    user unticks what they don't want; more can be added in-app afterwards. */
@@ -155,7 +154,7 @@ class OnboardingWizard extends Modal {
       // A cycle with no anchor has nothing to count from — the loader would
       // drop both keys and quietly hand back monthly periods, which is a
       // confusing thing to discover after finishing a wizard that asked.
-      if (!ISO_DATE.test(this.data.periodAnchor)) {
+      if (!isRealIsoDate(this.data.periodAnchor)) {
         new Notice('Enter the date you were last paid — the pay cycle is counted from it.'); return;
       }
       if (!periodDaysOrZero(this.data.periodDays)) {
@@ -188,7 +187,7 @@ class OnboardingWizard extends Modal {
     // write that back.
     const cycleDays = periodDaysOrZero(fm.period_days);
     const cycleAnchor = (fm.period_anchor || '').toString().trim();
-    if (cycleDays && ISO_DATE.test(cycleAnchor)) {
+    if (cycleDays && isRealIsoDate(cycleAnchor)) {
       this.data.periodMode = 'cycle';
       this.data.periodDays = cycleDays;
       this.data.periodAnchor = cycleAnchor;
@@ -422,7 +421,7 @@ class OnboardingWizard extends Modal {
      are written together or not at all, mirroring the loader, which drops both
      when either is unusable. */
   cycleDays() {
-    return this.data.periodMode === 'cycle' && ISO_DATE.test(this.data.periodAnchor)
+    return this.data.periodMode === 'cycle' && isRealIsoDate(this.data.periodAnchor)
       ? periodDaysOrZero(this.data.periodDays) : 0;
   }
   cycleAnchor() { return this.cycleDays() ? this.data.periodAnchor : ''; }
