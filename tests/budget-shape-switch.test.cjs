@@ -66,6 +66,59 @@ const MONTHLY_BUDGET = [
     'an empty budget on the other side is not worth a banner');
   eq(budgetsCtx(0, '', { '2026-08': MONTHLY_BUDGET }).otherShapeBudgets(), [],
     'and neither is a vault that has never switched');
+
+  /* A switch between two CYCLE lengths strands files too, and this was the
+     silent case: 7 → 14 leaves every second weekly budget sitting between the
+     new boundaries. They are date-named either way, so a shape check called
+     them addressable and the page said nothing at all. */
+  const shortened = budgetsCtx(14, '2026-08-07', {
+    '2026-07-24': MONTHLY_BUDGET, '2026-07-31': MONTHLY_BUDGET,
+    '2026-08-07': [], '2026-08-14': MONTHLY_BUDGET,
+  });
+  eq(shortened.otherShapeBudgets(), ['2026-07-31', '2026-08-14'],
+    'weekly budgets left off-phase by a switch to 14 days are named as stranded');
+  eq(budgetsCtx(7, '2026-08-07', {
+    '2026-07-24': MONTHLY_BUDGET, '2026-08-14': MONTHLY_BUDGET,
+  }).otherShapeBudgets(), [],
+  'while going the other way strands nothing — every fortnightly start is also a weekly one');
+}
+
+/* ---- the settings tab counts the same files the Budgets page names ---- */
+{
+  /* noticeBudgetsKept used to return early whenever both lengths were cycles,
+     on the reasoning that date-named files stay addressable. That only holds
+     when the new length divides the old, so it went silent through exactly the
+     7 → 14 case above. Counted here off the same phase rule period.js
+     validates against — if the two ever disagreed, the notice would promise a
+     file was reachable that the app then refused to open. */
+  const { BudgetSettingTab } = require('../src/settings-tab');
+
+  function tabWith(budgetBasenames, period_anchor = '2026-08-07') {
+    const tab = Object.create(BudgetSettingTab.prototype);
+    tab.plugin = { settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' };
+    tab.app = {
+      vault: {
+        getMarkdownFiles: () => budgetBasenames.map(b => new (require('./helpers/harness.cjs').TFile)(`Budget/Budgets/${b}.md`)),
+        getAbstractFileByPath: () => null,
+      },
+      metadataCache: { getFileCache: () => null },
+    };
+    tab.mdSettings = () => ({ period_anchor });
+    return tab;
+  }
+
+  const mixed = tabWith(['2026-07', '2026-08', '2026-07-24', '2026-07-31', '2026-08-07', '2026-08-14']);
+  eq(mixed.strandedBudgetCount(0, 14), 2, 'monthly → cycle strands the month-named files');
+  eq(mixed.strandedBudgetCount(14, 0), 4, 'cycle → monthly strands the date-named ones');
+  eq(mixed.strandedBudgetCount(7, 14), 2,
+    '7 → 14 strands the two off-phase weeks — the case that used to pass in silence');
+  eq(mixed.strandedBudgetCount(14, 7), 0, 'and 14 → 7 strands nothing, so it still says nothing');
+  eq(mixed.strandedBudgetCount(0, 0), 0, 'a no-op change says nothing');
+
+  eq(tabWith(['2026-07', '2026-08']).strandedBudgetCount(7, 14), 0,
+    'month-named files are not counted against a cycle → cycle switch — they were already out of reach');
+  eq(tabWith(['2026-08-07'], 'not-a-date').strandedBudgetCount(7, 14), 0,
+    'and with no usable anchor there is no phase to measure, so it stays quiet rather than guessing');
 }
 
 /* ---- carrying structure never carries an amount ---- */

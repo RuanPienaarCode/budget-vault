@@ -1951,17 +1951,32 @@ var require_period = __commonJS((exports2, module2) => {
   }
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
+    function anchorDay() {
+      const a = S.settings.period_anchor;
+      if (typeof a !== "string" || !DATE_KEY.test(a))
+        return null;
+      const n = dayNum(a);
+      return Number.isFinite(n) && isoFromDayNum(n) === a ? n : null;
+    }
     function intervalDays() {
-      return S.settings.period_anchor ? periodDaysOrZero(S.settings.period_days) : 0;
+      return anchorDay() === null ? 0 : periodDaysOrZero(S.settings.period_days);
     }
     function periodStartOnOrBefore(day, iv) {
-      const a = dayNum(S.settings.period_anchor);
+      const a = anchorDay();
       return a + Math.floor((day - a) / iv) * iv;
     }
     function periodKeyValid(p) {
       if (typeof p !== "string")
         return false;
-      return intervalDays() ? DATE_KEY.test(p) : MONTH_KEY.test(p);
+      const iv = intervalDays();
+      if (!iv)
+        return MONTH_KEY.test(p);
+      if (!DATE_KEY.test(p))
+        return false;
+      const d = dayNum(p);
+      if (!Number.isFinite(d) || isoFromDayNum(d) !== p)
+        return false;
+      return (d - anchorDay()) % iv === 0;
     }
     function periodRange(p) {
       const iv = intervalDays();
@@ -2103,6 +2118,36 @@ var require_period = __commonJS((exports2, module2) => {
       }
       return { income, spend, uncategorised, byCat, count: tx.length };
     }
+    const MONTH_DAYS = 365.25 / 12;
+    function averagingPeriods(iv) {
+      const lo = Math.max(1, Math.ceil(2 * MONTH_DAYS / iv));
+      const hi = Math.max(lo, Math.ceil(4 * MONTH_DAYS / iv));
+      let best = lo, bestErr = Infinity;
+      for (let n = lo;n <= hi; n++) {
+        const months = n * iv / MONTH_DAYS;
+        const err = Math.abs(months - Math.round(months));
+        if (err < bestErr) {
+          best = n;
+          bestErr = err;
+        }
+      }
+      return best;
+    }
+    function monthlyIncome(p) {
+      const iv = intervalDays();
+      if (!iv)
+        return { income: periodSummary(p).income, periods: 1 };
+      const need = averagingPeriods(iv);
+      const sums = [];
+      for (let i = need - 1;i >= 0; i--)
+        sums.push(periodSummary(shiftPeriod(p, -i)));
+      let from = 0;
+      while (from < sums.length - 1 && sums[from].count === 0)
+        from++;
+      const used = sums.slice(from);
+      const total = used.reduce((s, x) => s + x.income, 0);
+      return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length };
+    }
     function budgetTotals(p) {
       const budget = S.budgets[p] || [];
       return {
@@ -2120,6 +2165,7 @@ var require_period = __commonJS((exports2, module2) => {
       txInPeriod,
       catType,
       periodSummary,
+      monthlyIncome,
       budgetTotals,
       accountForLabel,
       nonBudgetLabels,
@@ -4006,7 +4052,7 @@ var require_debts = __commonJS((exports2, module2) => {
   var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require_debt_math();
   var DEBT_TYPES = ["credit card", "personal loan", "vehicle", "home loan", "student", "store account", "overdraft", "other"];
   module2.exports = function registerDebts(ctx) {
-    const { S, $, app, money, toast, writeFile, txInPeriod, periodSummary } = ctx;
+    const { S, $, app, money, toast, writeFile, txInPeriod } = ctx;
     const mark = () => {
       S.debtsDirty = true;
       $("#debtSave").disabled = false;
@@ -4114,15 +4160,15 @@ var require_debts = __commonJS((exports2, module2) => {
         wrap.append(rows);
       }
       const iv = ctx.intervalDays();
-      const rawIncome = periodSummary(S.period).income;
-      const income = iv ? rawIncome * (365.25 / 12) / iv : rawIncome;
-      const scaleNote = iv ? " monthly income, scaled from this period’s," : " income";
+      const { income, periods: nPeriods } = ctx.monthlyIncome(S.period);
+      const avgWindow = nPeriods === 1 ? "this period" : `the last ${nPeriods} periods`;
+      const scaleNote = iv ? ` monthly income, averaged over ${avgWindow},` : " income";
       const note = el("div", { class: "debt-dti" });
       if (income > 0) {
         const ratio = committedAll / income * 100;
         note.append(el("b", { class: `num ${ratio > 36 ? "text-danger" : ratio > 20 ? "text-warning" : "text-success"}` }, `${ratio.toFixed(1)}%`), ` of your${scaleNote} goes to debt payments — ${money(committedAll)} across ` + `${list.length} debt${list.length === 1 ? "" : "s"}`, el("span", { class: "text-muted" }, ratio > 36 ? ". Lenders treat above 36% as stretched." : "."));
       } else {
-        note.append(el("span", { class: "text-muted" }, `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? "" : "s"}. ` + "No income recorded this period, so there is no ratio to show yet."));
+        note.append(el("span", { class: "text-muted" }, `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? "" : "s"}. ` + `No income recorded in ${iv ? avgWindow : "this period"}, so there is no ratio to show yet.`));
       }
       if (linked.length) {
         note.append(el("div", { class: "text-muted", style: "margin-top:4px" }, `${money(linkedPaid)} paid of the ${money(linkedPlanned)} you track by category this period.`));
@@ -7590,10 +7636,25 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
       return this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
     }
+    offPhaseBudgetCount(days) {
+      const anchor = (this.mdSettings().period_anchor ?? "").toString().trim();
+      if (!days || !ISO_DATE.test(anchor))
+        return 0;
+      const a = isoDayNumber(anchor);
+      const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+      return this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(base) && ISO_DATE.test(f.basename) && (isoDayNumber(f.basename) - a) % days !== 0).length;
+    }
+    strandedBudgetCount(before, after) {
+      if (!before && after)
+        return this.monthBudgetCount();
+      if (before && !after)
+        return this.datedBudgetCount();
+      if (before && after)
+        return this.offPhaseBudgetCount(after);
+      return 0;
+    }
     noticeBudgetsKept(before, after) {
-      if (!before === !after)
-        return;
-      const n = before ? this.datedBudgetCount() : this.monthBudgetCount();
+      const n = this.strandedBudgetCount(before, after);
       if (!n)
         return;
       new Notice(`Budget: your ${n} existing budget ${n === 1 ? "file stays" : "files stay"} in the vault. ` + `They can't be shown at this period length, and they come straight back if you change it back.`, 1e4);
