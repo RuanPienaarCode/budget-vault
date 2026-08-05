@@ -296,8 +296,9 @@ const SHELL_HTML = `
       <section id="view-accounts" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Accounts</h1>
-          <div class="sub-note">Click a balance to update it — the account's markdown file is rewritten.</div>
+          <div class="sub-note">Click a balance to update it, or a name to see that account's transactions — the account's markdown file is rewritten.</div>
         </div>
+        <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
         <div class="row mb-4" style="justify-content:flex-end">
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
@@ -520,6 +521,7 @@ const SHELL_HTML = `
               <div class="sub" id="impStats"></div>
               <div class="sub imp-legend" id="impLegend"></div>
               <div class="sub imp-reconcile hidden" id="impReconcile"></div>
+              <div class="sub imp-nonbudget hidden" id="impNonBudget"></div>
             </div>
             <div class="row">
               <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
