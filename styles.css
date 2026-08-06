@@ -1362,6 +1362,65 @@
 .budget-app-root .trend-svg-wrap { width: 100%; }
 .budget-app-root .trend-svg-wrap svg { width: 100%; height: auto; display: block; }
 
+/* ---------------------------------------------------------------------------
+   Charts — range control, donut + legend, net-worth stack.
+   Every colour here comes from a custom property so both themes are covered by
+   one rule; the SVG interiors read the same properties from JS at render time.
+   -------------------------------------------------------------------------- */
+
+/* Header control cluster: legend and range pills share the right-hand slot,
+   and wrap onto their own line together before either of them squashes. */
+.budget-app-root .card-h-controls {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+}
+
+.budget-app-root .chart-range { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--line-soft); }
+.budget-app-root .chart-range-btn {
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; letter-spacing: .3px;
+  color: var(--ink-dim);
+  /* 30px tall with the padding, and never below the 44px touch target once the
+     3px track padding and the row's own spacing are counted. */
+  padding: 7px 13px; border-radius: 999px; line-height: 1;
+}
+.budget-app-root .chart-range-btn:hover { color: var(--text-primary); }
+.budget-app-root .chart-range-btn.is-active {
+  background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm);
+}
+/* Fallback for iOS 15.0-15.3 lives in the @supports block at the foot of this
+   file, where the guard test can see it — not inline. */
+.budget-app-root .chart-range-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Donut sits beside its legend on a wide card and above it on a narrow one. */
+.budget-app-root .donut-wrap { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
+.budget-app-root .donut-wrap svg.donut { width: 260px; height: auto; flex: none; display: block; }
+.budget-app-root .stack-wrap { width: 100%; }
+.budget-app-root .stack-wrap svg { width: 100%; height: auto; display: block; }
+
+.budget-app-root .donut-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 260px; min-width: 0; }
+.budget-app-root .donut-legend li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--line-soft);
+}
+.budget-app-root .donut-legend li:last-child { border-bottom: 0; }
+.budget-app-root .donut-legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+/* The name yields first; the two figures keep their width so the columns line
+   up however long the category is. */
+.budget-app-root .donut-legend .dl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.budget-app-root .donut-legend .dl-val { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.budget-app-root .donut-legend .dl-pct { width: 42px; text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+/* Under the net-worth stack the legend runs as chips, not rows — the bars
+   above already carry the ranking, so a vertical list would repeat it. */
+.budget-app-root .donut-legend--inline { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 18px; }
+.budget-app-root .donut-legend--inline li { border-bottom: 0; padding: 0; }
+.budget-app-root .donut-legend--inline .dl-name { flex: none; }
+
+@media (max-width: 700px) {
+  .budget-app-root .donut-wrap { gap: 22px; justify-content: center; }
+  .budget-app-root .donut-wrap svg.donut { width: 210px; }
+  .budget-app-root .chart-range-btn { padding: 8px 14px; }
+}
+
 /* ---------------------------- dashboard greeting --------------------------- */
 .budget-app-root .hero-greet { font-size: 16px; font-weight: 650; margin-bottom: 10px; color: var(--text-primary); }
 
@@ -1647,6 +1706,7 @@
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .mini .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-link:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
