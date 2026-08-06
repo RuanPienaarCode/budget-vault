@@ -125,15 +125,28 @@ const SHELL_HTML = `
           <div class="card-h">
             <div>
               <h2>Spending Trend</h2>
-              <div class="sub">Spent vs budget · last 6 periods</div>
+              <div class="sub" id="trendSub">Spent vs budget</div>
             </div>
-            <div class="legend">
-              <span><i style="background:var(--color-success)"></i>Spent</span>
-              <span><i style="background:var(--color-danger)"></i>Over budget</span>
-              <span><i class="legend-dash"></i>Budget</span>
+            <div class="card-h-controls">
+              <div class="legend">
+                <span><i style="background:var(--color-success)"></i>Spent</span>
+                <span><i style="background:var(--color-danger)"></i>Over budget</span>
+                <span><i style="background:var(--color-info)"></i>Income</span>
+                <span><i class="legend-dash"></i>Budget</span>
+              </div>
+              <div id="trendRange"></div>
             </div>
           </div>
           <div class="body-pad"><div class="trend-svg-wrap" id="trendChart"></div></div>
+        </div>
+        <div class="card mb-4" id="dashSplitCard">
+          <div class="card-h">
+            <div>
+              <h2>Where it went</h2>
+              <div class="sub" id="dashSplitSub"></div>
+            </div>
+          </div>
+          <div class="body-pad"><div class="donut-wrap" id="dashSplit"></div></div>
         </div>
         <div class="card mb-4">
           <div class="card-h">
@@ -282,6 +295,15 @@ const SHELL_HTML = `
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
+        <div class="card mb-4" id="savingsWorthCard">
+          <div class="card-h">
+            <div>
+              <h2>What net worth is made of</h2>
+              <div class="sub" id="savingsWorthSub"></div>
+            </div>
+          </div>
+          <div class="body-pad"><div class="stack-wrap" id="savingsWorth"></div></div>
+        </div>
         <div class="card mb-4" id="savingsGoalsCard">
           <div class="card-h" style="align-items:center">
             <div><h2>Goals</h2><div class="sub">Progress toward each target</div></div>
@@ -326,9 +348,11 @@ const SHELL_HTML = `
                 <option value="avalanche">Avalanche — highest rate first</option>
                 <option value="snowball">Snowball — smallest balance first</option>
               </select>
+              <select id="debtRange" class="form-select form-select-sm" aria-label="Payoff chart range"></select>
             </div>
           </div>
-          <div class="body-pad" id="debtPlan"></div>
+          <div class="body-pad"><div class="trend-svg-wrap" id="debtCurve"></div></div>
+          <div class="body-pad" style="padding-top:0" id="debtPlan"></div>
           <div class="body-pad" style="padding-top:0" id="debtOrder"></div>
         </div>
 
@@ -472,10 +496,13 @@ const SHELL_HTML = `
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
-              <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
+              <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
               <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
-            <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <!-- Tab- and semicolon-separated exports are read too (the delimiter
+                 is sniffed from the file), and banks hand those out as .txt and
+                 .tsv as often as .csv — so the picker must offer them. -->
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
               <p>Most banks import as-is — columns are matched by header name, the layout is read
