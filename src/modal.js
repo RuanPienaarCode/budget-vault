@@ -241,11 +241,15 @@ function askSplit(app, opts) {
    not needed. Resolves true only if the user clicks the remove button.
 
    The preview is the feature, not a courtesy wrapper around it. This is a bulk
-   delete against a file the user owns and can hand-edit, so "trust me, 853 of
+   delete against a file the user owns and can hand-edit, so "trust me, 832 of
    these do nothing" is not something the plugin gets to assert — it has to
    show its work, name the surviving rule that covers each deletion, and let
    the user close the box without doing anything. Deleting nothing is a
    perfectly good outcome here.
+
+   The preview is still not the whole safety story: nobody audits eight hundred
+   lines in a dialog. cleanupRules() writes the pre-delete set beside the live
+   file before touching it, so agreeing here is recoverable.
 
    Every deletion is listed, not a sample: a truncated list would mean the one
    rule the user cared about is the one they could not see. */

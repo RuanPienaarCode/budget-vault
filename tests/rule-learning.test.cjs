@@ -10,7 +10,7 @@
    the only thing keeping it finite is what it REFUSES to add. It refuses two
    things: a pattern it already holds, and a pattern the existing rules already
    resolve to the same category. The second is the load-bearing one — measured
-   against a real 1,342-rule vault, 853 rules (64%) were already answered by a
+   against a real 1,342-rule vault, 832 rules (62%) were already answered by a
    shorter rule pointing at the same category, i.e. they could never have
    changed an import's outcome.
 

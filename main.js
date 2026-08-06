@@ -2887,12 +2887,15 @@ Budget category of type **${type}**.
       }
       return added;
     }
-    function writeRulesCsv() {
-      const body = S.rules.length ? S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
+    function rulesCsv(rules) {
+      const body = rules.length ? rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
 `) + `
 ` : "";
-      return writeFile("Data/Categorisation Rules.csv", `pattern,category
-` + body);
+      return `pattern,category
+` + body;
+    }
+    function writeRulesCsv() {
+      return writeFile("Data/Categorisation Rules.csv", rulesCsv(S.rules));
     }
     async function cleanupRules() {
       const descs = [];
@@ -2908,10 +2911,21 @@ Budget category of type **${type}**.
       const report = analyseRules(S.rules, descs);
       if (!await askRulesCleanup(app, report))
         return 0;
+      const d = new Date;
+      const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const backup = `Data/Categorisation Rules.pre-tidy-${stamp}.csv`;
+      if (!fileAt(backup)) {
+        try {
+          await writeFile(backup, rulesCsv(S.rules));
+        } catch (err) {
+          toast(`Could not write the backup — nothing was deleted. ${err && err.message ? err.message : err}`, true);
+          return 0;
+        }
+      }
       const drop = new Set(report.remove.map((r) => r.index));
       S.rules = S.rules.filter((_, i) => !drop.has(i));
       await writeRulesCsv();
-      toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? "rule" : "rules"} — ${S.rules.length} left`);
+      toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? "rule" : "rules"} — ${S.rules.length} left. Previous set saved to ${backup.split("/").pop()}`);
       return drop.size;
     }
     ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules, cleanupRules });
