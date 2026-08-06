@@ -9,7 +9,9 @@ var require_constants = __commonJS((exports2, module2) => {
     theme: "auto",
     openOnStartup: false,
     onboarded: false,
-    privacyLock: true
+    privacyLock: true,
+    chartTrendRange: "6m",
+    chartDebtRange: "5y"
   };
   var FEEDBACK_URL = "https://forms.gle/EVJKCuZxNQ9vJhTz6";
   var SUPPORT_URL = "https://paypal.me/ruanpienaar86";
@@ -179,7 +181,7 @@ var require_util = __commonJS((exports2, module2) => {
     return out.join(`
 `);
   }
-  function parseCsv(text) {
+  function parseDelimited(text, delim) {
     const rows = [];
     let row = [], field = "", inQ = false;
     for (let i = 0;i < text.length; i++) {
@@ -195,7 +197,7 @@ var require_util = __commonJS((exports2, module2) => {
           field += ch;
       } else if (ch === '"')
         inQ = true;
-      else if (ch === ",") {
+      else if (ch === delim) {
         row.push(field);
         field = "";
       } else if (ch === `
@@ -216,6 +218,62 @@ var require_util = __commonJS((exports2, module2) => {
       rows.push(row);
     }
     return rows;
+  }
+  var parseCsv = (text) => parseDelimited(text, ",");
+  var DELIMS = [",", ";", "\t", "|"];
+  function sniffDelimiter(text) {
+    const sample = text.slice(0, 65536);
+    let best = ",", bestScore = 0;
+    for (const d of DELIMS) {
+      const counts = parseDelimited(sample, d).map((r) => r.length).filter((n) => n > 1);
+      if (!counts.length)
+        continue;
+      const freq = new Map;
+      for (const n of counts)
+        freq.set(n, (freq.get(n) || 0) + 1);
+      let mode = 0, agree = 0;
+      for (const [n, c] of freq)
+        if (c > agree) {
+          mode = n;
+          agree = c;
+        }
+      const score = agree * (mode - 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = d;
+      }
+    }
+    return best;
+  }
+  var parseStatement = (text) => parseDelimited(text, sniffDelimiter(text));
+  function decodeStatement(bytes) {
+    const b = bytes;
+    if (b.length >= 2 && b[0] === 255 && b[1] === 254)
+      return new TextDecoder("utf-16le").decode(b.subarray(2));
+    if (b.length >= 2 && b[0] === 254 && b[1] === 255)
+      return new TextDecoder("utf-16be").decode(b.subarray(2));
+    if (b.length >= 3 && b[0] === 239 && b[1] === 187 && b[2] === 191)
+      return new TextDecoder("utf-8").decode(b.subarray(3));
+    const head = b.subarray(0, 256);
+    let evenNul = 0, oddNul = 0;
+    for (let i = 0;i < head.length; i++)
+      if (head[i] === 0) {
+        if (i % 2)
+          oddNul++;
+        else
+          evenNul++;
+      }
+    if (head.length >= 8) {
+      if (oddNul > head.length / 4 && evenNul === 0)
+        return new TextDecoder("utf-16le").decode(b);
+      if (evenNul > head.length / 4 && oddNul === 0)
+        return new TextDecoder("utf-16be").decode(b);
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(b);
+    } catch (e) {
+      return new TextDecoder("windows-1252").decode(b);
+    }
   }
   function isoParts(y, mo, d) {
     if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31)
@@ -433,6 +491,26 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return s.length >= 4 ? s : (desc ?? "").toString().trim();
   }
+  function prepareRules(rules) {
+    return (rules || []).map((r) => ({ p: (r.pattern ?? "").trim().toLowerCase(), category: r.category })).filter((r) => r.p);
+  }
+  function matchRule(desc, rules) {
+    const d = (desc ?? "").toString().trim().toLowerCase();
+    let best = null, bestLen = 0;
+    for (const r of rules) {
+      if (r.p === d)
+        return r;
+      if (r.p.length > bestLen && d.includes(r.p)) {
+        best = r;
+        bestLen = r.p.length;
+      }
+    }
+    return best;
+  }
+  function autoCategorise(desc, rules) {
+    const r = matchRule(desc, rules);
+    return r ? r.category : "";
+  }
   var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   function safeSeg(s) {
     const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
@@ -515,7 +593,7 @@ var require_util = __commonJS((exports2, module2) => {
     const back = new Date(t);
     return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -642,15 +720,28 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="card-h">
             <div>
               <h2>Spending Trend</h2>
-              <div class="sub">Spent vs budget · last 6 periods</div>
+              <div class="sub" id="trendSub">Spent vs budget</div>
             </div>
-            <div class="legend">
-              <span><i style="background:var(--color-success)"></i>Spent</span>
-              <span><i style="background:var(--color-danger)"></i>Over budget</span>
-              <span><i class="legend-dash"></i>Budget</span>
+            <div class="card-h-controls">
+              <div class="legend">
+                <span><i style="background:var(--color-success)"></i>Spent</span>
+                <span><i style="background:var(--color-danger)"></i>Over budget</span>
+                <span><i style="background:var(--color-info)"></i>Income</span>
+                <span><i class="legend-dash"></i>Budget</span>
+              </div>
+              <div id="trendRange"></div>
             </div>
           </div>
           <div class="body-pad"><div class="trend-svg-wrap" id="trendChart"></div></div>
+        </div>
+        <div class="card mb-4" id="dashSplitCard">
+          <div class="card-h">
+            <div>
+              <h2>Where it went</h2>
+              <div class="sub" id="dashSplitSub"></div>
+            </div>
+          </div>
+          <div class="body-pad"><div class="donut-wrap" id="dashSplit"></div></div>
         </div>
         <div class="card mb-4">
           <div class="card-h">
@@ -799,6 +890,15 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
+        <div class="card mb-4" id="savingsWorthCard">
+          <div class="card-h">
+            <div>
+              <h2>What net worth is made of</h2>
+              <div class="sub" id="savingsWorthSub"></div>
+            </div>
+          </div>
+          <div class="body-pad"><div class="stack-wrap" id="savingsWorth"></div></div>
+        </div>
         <div class="card mb-4" id="savingsGoalsCard">
           <div class="card-h" style="align-items:center">
             <div><h2>Goals</h2><div class="sub">Progress toward each target</div></div>
@@ -843,9 +943,11 @@ var require_shell = __commonJS((exports2, module2) => {
                 <option value="avalanche">Avalanche — highest rate first</option>
                 <option value="snowball">Snowball — smallest balance first</option>
               </select>
+              <select id="debtRange" class="form-select form-select-sm" aria-label="Payoff chart range"></select>
             </div>
           </div>
-          <div class="body-pad" id="debtPlan"></div>
+          <div class="body-pad"><div class="trend-svg-wrap" id="debtCurve"></div></div>
+          <div class="body-pad" style="padding-top:0" id="debtPlan"></div>
           <div class="body-pad" style="padding-top:0" id="debtOrder"></div>
         </div>
 
@@ -989,10 +1091,13 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
-              <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
+              <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
               <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
-            <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <!-- Tab- and semicolon-separated exports are read too (the delimiter
+                 is sniffed from the file), and banks hand those out as .txt and
+                 .tsv as often as .csv — so the picker must offer them. -->
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
               <p>Most banks import as-is — columns are matched by header name, the layout is read
@@ -1288,7 +1393,49 @@ var require_modal = __commonJS((exports2, module2) => {
   function askSplit(app, opts) {
     return new Promise((res) => new SplitModal(app, opts, res).open());
   }
-  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };
+
+  class RulesCleanupModal extends Modal {
+    constructor(app, report, resolve) {
+      super(app);
+      this.report = report;
+      this.resolve = resolve;
+      this.answer = false;
+    }
+    onOpen() {
+      const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
+      this.titleEl.setText("Tidy categorisation rules");
+      const c = this.contentEl;
+      if (!remove.length) {
+        c.append(el("p", { class: "budget-tidy-lead" }, total === 0 ? "There are no categorisation rules yet. They get written as you categorise imported transactions." : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
+        new Setting(c).addButton((b) => b.setButtonText("Close").setCta().onClick(() => this.close()));
+        return;
+      }
+      c.append(el("p", { class: "budget-tidy-lead" }, `${remove.length} of ${total} rules can go, leaving ${kept}. ` + `Every one was removed and re-checked against all ${checked} transaction descriptions ` + "in your vault: each still came out with exactly the category it has now. " + "Each rule below is a longer version of one that stays, so future statements " + "match it the same way too."));
+      const list = el("div", { class: "budget-tidy-list" });
+      for (const r of redundant) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern" }, r.pattern), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · already covered by “${r.coveredBy}”`)));
+      }
+      for (const r of blank) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern budget-tidy-empty" }, "(blank pattern)"), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · matches nothing, already ignored on import`)));
+      }
+      c.append(list);
+      if (dormant.length) {
+        c.append(el("p", { class: "budget-tidy-hint" }, `${dormant.length} other ${dormant.length === 1 ? "rule matches" : "rules match"} nothing in your history yet. ` + "Those are being kept — a rule with no transactions behind it may simply be waiting " + "for one, and this cannot tell that apart from a rule you have finished with."));
+      }
+      new Setting(c).addButton((b) => b.setButtonText("Cancel").onClick(() => this.close())).addButton((b) => b.setButtonText(`Remove ${remove.length} ${remove.length === 1 ? "rule" : "rules"}`).setWarning().onClick(() => {
+        this.answer = true;
+        this.close();
+      }));
+    }
+    onClose() {
+      this.contentEl.empty();
+      this.resolve(this.answer);
+    }
+  }
+  function askRulesCleanup(app, report) {
+    return new Promise((res) => new RulesCleanupModal(app, report, res).open());
+  }
+  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
 });
 
 // src/locale.js
@@ -2446,11 +2593,92 @@ var require_load = __commonJS((exports2, module2) => {
   };
 });
 
+// src/rule-cleanup.js
+var require_rule_cleanup = __commonJS((exports2, module2) => {
+  var { matchRule, autoCategorise } = require_util();
+  function analyseRules(rules, descriptions) {
+    const all = rules || [];
+    const prepared = [];
+    const blank = [];
+    all.forEach((r, i) => {
+      const p = (r.pattern ?? "").toString().trim().toLowerCase();
+      if (p)
+        prepared.push({ p, category: r.category, i });
+      else
+        blank.push({ index: i, pattern: r.pattern ?? "", category: r.category, reason: "blank" });
+    });
+    const seen = new Set;
+    const descs = [];
+    for (const d of descriptions || []) {
+      const k = (d ?? "").toString().trim().toLowerCase();
+      if (!k || seen.has(k))
+        continue;
+      seen.add(k);
+      descs.push(k);
+    }
+    const base = descs.map((d) => autoCategorise(d, prepared));
+    const touches = prepared.map((r) => {
+      const hits = [];
+      descs.forEach((d, di) => {
+        if (d === r.p || d.includes(r.p))
+          hits.push(di);
+      });
+      return hits;
+    });
+    const order = prepared.map((_, pi) => pi).sort((a, b) => prepared[b].p.length - prepared[a].p.length || a - b);
+    const working = prepared.slice();
+    const redundant = [];
+    const dormant = [];
+    for (const pi of order) {
+      const rule = prepared[pi];
+      const hits = touches[pi];
+      if (!hits.length) {
+        dormant.push({ index: rule.i, pattern: all[rule.i].pattern, category: rule.category });
+        continue;
+      }
+      const at = working.indexOf(rule);
+      if (at === -1)
+        continue;
+      working.splice(at, 1);
+      if (!hits.every((di) => autoCategorise(descs[di], working) === base[di])) {
+        working.splice(at, 0, rule);
+        continue;
+      }
+      const cover = matchRule(descs[hits[0]], working);
+      if (!cover || !rule.p.includes(cover.p)) {
+        working.splice(at, 0, rule);
+        continue;
+      }
+      redundant.push({
+        index: rule.i,
+        pattern: all[rule.i].pattern,
+        category: rule.category,
+        coveredBy: cover ? cover.p : "",
+        hits: hits.length
+      });
+    }
+    redundant.sort((a, b) => a.index - b.index);
+    dormant.sort((a, b) => a.index - b.index);
+    const remove = [...blank, ...redundant].sort((a, b) => a.index - b.index);
+    return {
+      remove,
+      redundant,
+      dormant,
+      blank,
+      kept: all.length - remove.length,
+      checked: descs.length,
+      total: all.length
+    };
+  }
+  module2.exports = { analyseRules };
+});
+
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter, learnPattern, safeSeg, yamlStr, csvCell } = require_util();
+  var { el, parseFrontmatter, learnPattern, prepareRules, autoCategorise, safeSeg, yamlStr, csvCell } = require_util();
   var { TYPE_ORDER } = require_constants();
-  var { askFields, confirmModal } = require_modal();
+  var { askFields, confirmModal, askRulesCleanup } = require_modal();
+  var { analyseRules } = require_rule_cleanup();
   module2.exports = function registerCategories(ctx) {
     const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
     let catsVersion = 1;
@@ -2635,6 +2863,7 @@ Budget category of type **${type}**.
     }
     async function learnRules(pairs) {
       const have = new Set(S.rules.map((r) => r.pattern.trim().toLowerCase()));
+      const matcher = prepareRules(S.rules);
       let added = 0;
       for (const { desc, cat } of pairs) {
         if (!cat)
@@ -2643,21 +2872,202 @@ Budget category of type **${type}**.
         const key = pattern.trim().toLowerCase();
         if (!key || have.has(key))
           continue;
+        if (autoCategorise(pattern, matcher) === cat) {
+          have.add(key);
+          continue;
+        }
         S.rules.push({ pattern, category: cat });
+        matcher.push({ p: key, category: cat });
         have.add(key);
         added++;
       }
       if (added) {
         S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" }));
-        const csv = `pattern,category
-` + S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
-`) + `
-`;
-        await writeFile("Data/Categorisation Rules.csv", csv);
+        await writeRulesCsv();
       }
       return added;
     }
-    ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules });
+    function writeRulesCsv() {
+      const body = S.rules.length ? S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
+`) + `
+` : "";
+      return writeFile("Data/Categorisation Rules.csv", `pattern,category
+` + body);
+    }
+    async function cleanupRules() {
+      const descs = [];
+      for (const f of Object.values(S.txFiles || {})) {
+        for (const row of f.rows || [])
+          if (row.desc)
+            descs.push(row.desc);
+      }
+      if (!S.rules.length && !descs.length) {
+        toast("No budget data loaded yet.", true);
+        return 0;
+      }
+      const report = analyseRules(S.rules, descs);
+      if (!await askRulesCleanup(app, report))
+        return 0;
+      const drop = new Set(report.remove.map((r) => r.index));
+      S.rules = S.rules.filter((_, i) => !drop.has(i));
+      await writeRulesCsv();
+      toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? "rule" : "rules"} — ${S.rules.length} left`);
+      return drop.size;
+    }
+    ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules, cleanupRules });
+  };
+});
+
+// src/chart.js
+var require_chart = __commonJS((exports2, module2) => {
+  var { el } = require_util();
+  var NS = "http://www.w3.org/2000/svg";
+  function themeColors(root) {
+    const css = getComputedStyle(root);
+    const v = (name, fallback) => (css.getPropertyValue(name) || "").trim() || fallback;
+    return {
+      success: v("--color-success", "#22c55e"),
+      danger: v("--color-danger", "#f43f5e"),
+      warning: v("--color-warning", "#f59e0b"),
+      info: v("--color-info", "#0ea5e9"),
+      accent: v("--color-accent", "#0d9488"),
+      primary: v("--color-primary", "#065f46"),
+      investment: v("--color-investment", "#6f42c1"),
+      muted: v("--ink-faint", "#5f6779"),
+      hole: root.classList.contains("bud-dark") ? "#0a0f1e" : "#ffffff"
+    };
+  }
+  function createChart({ w, h, label, cls }) {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", label);
+    if (cls)
+      svg.setAttribute("class", cls);
+    svg.style.color = "var(--text-primary)";
+    const add = (tag, attrs = {}, parent = svg) => {
+      const n = document.createElementNS(NS, tag);
+      for (const [k, val] of Object.entries(attrs)) {
+        if (val !== null && val !== undefined)
+          n.setAttribute(k, val);
+      }
+      parent.append(n);
+      return n;
+    };
+    return { svg, add };
+  }
+  function scales({ w, h, padL = 24, padR = 24, padT = 24, padB = 40, count, max, min = 0 }) {
+    const innerW = w - padL - padR;
+    const innerH = h - padT - padB;
+    const span = max - min || 1;
+    const slots = Math.max(1, count);
+    return {
+      padL,
+      padR,
+      padT,
+      padB,
+      innerW,
+      innerH,
+      count,
+      x: (i) => count <= 1 ? padL + innerW / 2 : padL + i * (innerW / (count - 1)),
+      band: (i) => padL + (i + 0.5) * (innerW / slots),
+      bandWidth: innerW / slots,
+      y: (v) => padT + (1 - (v - min) / span) * innerH,
+      baseline: padT + innerH
+    };
+  }
+  function gridlines(add, s, w, rows = 4) {
+    for (let g = 1;g < rows; g++) {
+      const gy = s.padT + g * (s.innerH / rows);
+      add("line", {
+        x1: s.padL,
+        x2: w - s.padR,
+        y1: gy,
+        y2: gy,
+        stroke: "currentColor",
+        "stroke-opacity": "0.06"
+      });
+    }
+  }
+  function axisLabels(add, s, labels, h, { maxLabels = 8, band = false } = {}) {
+    const n = labels.length;
+    const stride = Math.max(1, Math.ceil(n / maxLabels));
+    labels.forEach((text, i) => {
+      const last = i === n - 1;
+      if (!last && (i % stride !== 0 || n - 1 - i < stride / 2))
+        return;
+      add("text", {
+        x: band ? s.band(i) : s.x(i),
+        y: h - 12,
+        "text-anchor": i === 0 && !band ? "start" : last && !band ? "end" : "middle",
+        "font-size": "13",
+        fill: "currentColor",
+        "fill-opacity": "0.45",
+        "font-family": "inherit"
+      }).textContent = text;
+    });
+  }
+  var linePath = (pts) => "M" + pts.map((p) => `${p[0]},${p[1]}`).join(" L ");
+  var areaPath = (pts, baseline) => linePath(pts) + ` L ${pts[pts.length - 1][0]},${baseline} L ${pts[0][0]},${baseline} Z`;
+  function areaGradient(add, id, color, opacity = 0.22) {
+    const defs = add("defs", {});
+    const grad = add("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    add("stop", { offset: "0%", "stop-color": color, "stop-opacity": String(opacity) }, grad);
+    add("stop", { offset: "100%", "stop-color": color, "stop-opacity": "0" }, grad);
+    return `url(#${id})`;
+  }
+  function arcPath(cx, cy, rOut, rIn, a0, a1) {
+    const end = Math.min(a1, a0 + Math.PI * 2 - 0.0001);
+    const p = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const large = end - a0 > Math.PI ? 1 : 0;
+    const [x0, y0] = p(rOut, a0), [x1, y1] = p(rOut, end);
+    const [x2, y2] = p(rIn, end), [x3, y3] = p(rIn, a0);
+    return `M ${x0} ${y0} A ${rOut} ${rOut} 0 ${large} 1 ${x1} ${y1} ` + `L ${x2} ${y2} A ${rIn} ${rIn} 0 ${large} 0 ${x3} ${y3} Z`;
+  }
+  function tip(add, node, text) {
+    add("title", {}, node).textContent = text;
+  }
+  var RANGES = [
+    { key: "3m", label: "3M", months: 3, historical: true },
+    { key: "6m", label: "6M", months: 6, historical: true },
+    { key: "1y", label: "1Y", months: 12, historical: true },
+    { key: "5y", label: "5Y", months: 60, historical: false },
+    { key: "10y", label: "10Y", months: 120, historical: false }
+  ];
+  var historicalRanges = () => RANGES.filter((r) => r.historical);
+  var rangeFor = (key) => RANGES.find((r) => r.key === key);
+  function rangePills({ ranges, value, onPick, label }) {
+    const wrap = el("div", { class: "chart-range", role: "group", "aria-label": label });
+    for (const r of ranges) {
+      const active = r.key === value;
+      wrap.append(el("button", {
+        type: "button",
+        class: `chart-range-btn${active ? " is-active" : ""}`,
+        "aria-pressed": active ? "true" : "false",
+        onclick: () => {
+          if (!active)
+            onPick(r.key);
+        }
+      }, r.label));
+    }
+    return wrap;
+  }
+  module2.exports = {
+    NS,
+    themeColors,
+    createChart,
+    scales,
+    gridlines,
+    axisLabels,
+    linePath,
+    areaPath,
+    areaGradient,
+    arcPath,
+    tip,
+    RANGES,
+    historicalRanges,
+    rangeFor,
+    rangePills
   };
 });
 
@@ -2665,8 +3075,23 @@ Budget category of type **${type}**.
 var require_dashboard = __commonJS((exports2, module2) => {
   var { el } = require_util();
   var { TYPE_ORDER } = require_constants();
+  var {
+    themeColors,
+    createChart,
+    scales,
+    gridlines,
+    axisLabels,
+    linePath,
+    areaPath,
+    areaGradient,
+    arcPath,
+    tip,
+    historicalRanges,
+    rangeFor,
+    rangePills
+  } = require_chart();
   module2.exports = function registerDashboard(ctx) {
-    const { S, $, root, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, shiftPeriod, catType } = ctx;
+    const { S, $, root, plugin, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
     function renderDashboard() {
       const sum = periodSummary(S.period);
       const bud = budgetTotals(S.period);
@@ -2691,6 +3116,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const greeting = hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
       hero.append(el("div", { class: "hero-grid" }, el("div", {}, S.settings.household ? el("div", { class: "hero-greet" }, `${greeting}, ${S.settings.household}`) : "", el("div", { class: "hero-lbl" }, heroNegative ? "Overspent this period" : "Remaining this period"), heroNum, el("div", { class: "hero-sub" }, el("b", {}, money(sum.spend)), " spent of ", el("b", {}, money(bud.spend)), " budgeted"), meter), statCol));
       renderTrend();
+      renderSplit();
       const t = $("#dashBudget");
       t.empty();
       $("#dashBudgetSub").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -2729,52 +3155,78 @@ var require_dashboard = __commonJS((exports2, module2) => {
         body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No budget or transactions in this period yet.")));
       t.append(body);
     }
+    function periodsForMonths(months) {
+      const days = Number(S.settings.period_days) || 0;
+      if (!days)
+        return months;
+      return Math.max(2, Math.round(months * 30.44 / days));
+    }
+    function earliestDataMonth() {
+      let min = null;
+      for (const f of Object.values(S.txFiles)) {
+        if (!f.rows || !f.rows.length)
+          continue;
+        if (min === null || f.month < min)
+          min = f.month;
+      }
+      return min;
+    }
+    function trendPeriods(want) {
+      const earliest = earliestDataMonth();
+      const out = [];
+      for (let i = 0;i < want; i++) {
+        const p = shiftPeriod(S.period, -i);
+        if (earliest && i > 0 && periodRange(p).end.slice(0, 7) < earliest)
+          break;
+        out.push(p);
+      }
+      return out.reverse();
+    }
+    const trendRange = () => rangeFor(plugin.settings.chartTrendRange) || rangeFor("6m");
     function renderTrend() {
       const wrap = $("#trendChart");
       wrap.empty();
-      const periods = [];
-      for (let i = 5;i >= 0; i--)
-        periods.push(shiftPeriod(S.period, -i));
-      const data = periods.map((p) => ({
-        p,
-        spent: periodSummary(p).spend,
-        budget: budgetTotals(p).spend,
-        label: periodShortLabel(p)
-      }));
-      const W = 1000, H = 300, padL = 24, padR = 24, padT = 24, padB = 40;
-      const max = Math.max(1, ...data.flatMap((d) => [d.spent, d.budget])) * 1.12;
-      const x = (i) => padL + i * ((W - padL - padR) / (data.length - 1));
-      const y = (v) => padT + (1 - v / max) * (H - padT - padB);
-      const over = (d) => d.budget > 0 && d.spent > d.budget;
-      const css = getComputedStyle(root);
-      const cSuccess = css.getPropertyValue("--color-success").trim() || "#22c55e";
-      const cDanger = css.getPropertyValue("--color-danger").trim() || "#f43f5e";
-      const NS = "http://www.w3.org/2000/svg";
-      const svg = document.createElementNS(NS, "svg");
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-      svg.setAttribute("role", "img");
-      svg.setAttribute("aria-label", "Spent vs budget over the last 6 periods");
-      const add = (tag, attrs, parent = svg) => {
-        const n = document.createElementNS(NS, tag);
-        for (const [k, v] of Object.entries(attrs))
-          n.setAttribute(k, v);
-        parent.append(n);
-        return n;
-      };
-      const defs = add("defs", {});
-      const grad = add("linearGradient", { id: "spentArea", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-      add("stop", { offset: "0%", "stop-color": cSuccess, "stop-opacity": "0.22" }, grad);
-      add("stop", { offset: "100%", "stop-color": cSuccess, "stop-opacity": "0" }, grad);
-      for (let g = 1;g <= 3; g++) {
-        const gy = padT + g * ((H - padT - padB) / 4);
-        add("line", { x1: padL, x2: W - padR, y1: gy, y2: gy, stroke: "currentColor", "stroke-opacity": "0.06" });
-      }
-      add("path", {
-        d: "M" + data.map((d, i) => `${x(i)},${y(d.spent)}`).join(" L ") + ` L ${x(data.length - 1)},${H - padB} L ${x(0)},${H - padB} Z`,
-        fill: "url(#spentArea)"
+      const range = trendRange();
+      const want = periodsForMonths(range.months);
+      const periods = trendPeriods(want);
+      const data = periods.map((p) => {
+        const sum = periodSummary(p);
+        return { p, spent: sum.spend, income: sum.income, budget: budgetTotals(p).spend, label: periodShortLabel(p) };
       });
+      const pills = $("#trendRange");
+      pills.empty();
+      pills.append(rangePills({
+        ranges: historicalRanges(),
+        value: range.key,
+        label: "Spending trend range",
+        onPick: async (key) => {
+          plugin.settings.chartTrendRange = key;
+          await plugin.saveSettings();
+          renderTrend();
+        }
+      }));
+      const clamped = periods.length < want;
+      $("#trendSub").textContent = `Spent vs budget · ${periods.length} period${periods.length === 1 ? "" : "s"}` + (clamped ? ` · all the history imported so far` : "");
+      if (data.length < 2) {
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Import a second period of transactions and the trend line starts here."));
+        return;
+      }
+      const W = 1000, H = 300;
+      const c = themeColors(root);
+      const max = Math.max(1, ...data.flatMap((d) => [d.spent, d.budget, d.income])) * 1.12;
+      const s = scales({ w: W, h: H, count: data.length, max });
+      const over = (d) => d.budget > 0 && d.spent > d.budget;
+      const { svg, add } = createChart({
+        w: W,
+        h: H,
+        label: `Spent, budgeted and income over the last ${data.length} periods`
+      });
+      const fill = areaGradient(add, "trendSpentArea", c.success);
+      gridlines(add, s, W);
+      const spentPts = data.map((d, i) => [s.x(i), s.y(d.spent)]);
+      add("path", { d: areaPath(spentPts, s.baseline), fill });
       add("polyline", {
-        points: data.map((d, i) => `${x(i)},${y(d.budget)}`).join(" "),
+        points: data.map((d, i) => `${s.x(i)},${s.y(d.budget)}`).join(" "),
         fill: "none",
         stroke: "currentColor",
         "stroke-opacity": "0.28",
@@ -2782,42 +3234,124 @@ var require_dashboard = __commonJS((exports2, module2) => {
         "stroke-dasharray": "5 6",
         "stroke-linecap": "round"
       });
+      add("path", {
+        d: linePath(data.map((d, i) => [s.x(i), s.y(d.income)])),
+        fill: "none",
+        stroke: c.info,
+        "stroke-opacity": "0.85",
+        "stroke-width": "2",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round"
+      });
       for (let i = 1;i < data.length; i++) {
         add("line", {
-          x1: x(i - 1),
-          y1: y(data[i - 1].spent),
-          x2: x(i),
-          y2: y(data[i].spent),
-          stroke: over(data[i - 1]) || over(data[i]) ? cDanger : cSuccess,
+          x1: s.x(i - 1),
+          y1: s.y(data[i - 1].spent),
+          x2: s.x(i),
+          y2: s.y(data[i].spent),
+          stroke: over(data[i - 1]) || over(data[i]) ? c.danger : c.success,
           "stroke-width": "2.5",
           "stroke-linecap": "round"
         });
       }
-      const holeCss = root.classList.contains("bud-dark") ? "#0a0f1e" : "#ffffff";
+      const dots = data.length <= 12;
       data.forEach((d, i) => {
-        const dot = add("circle", {
-          cx: x(i),
-          cy: y(d.spent),
+        const node = dots ? add("circle", {
+          cx: s.x(i),
+          cy: s.y(d.spent),
           r: "5",
-          fill: holeCss,
-          stroke: over(d) ? cDanger : cSuccess,
+          fill: c.hole,
+          stroke: over(d) ? c.danger : c.success,
           "stroke-width": "2.5"
+        }) : add("rect", {
+          x: s.x(i) - s.innerW / (data.length * 2),
+          y: s.padT,
+          width: s.innerW / data.length,
+          height: s.innerH,
+          fill: "transparent"
         });
-        add("title", {}, dot).textContent = `${d.label}: ${money(d.spent)} spent · ${money(d.budget)} budgeted`;
-        add("text", {
-          x: x(i),
-          y: H - 12,
-          "text-anchor": "middle",
-          "font-size": "13",
-          fill: "currentColor",
-          "fill-opacity": "0.45",
-          "font-family": "inherit"
-        }).textContent = d.label;
+        tip(add, node, `${d.label}: ${money(d.spent)} spent · ${money(d.budget)} budgeted · ${money(d.income)} in`);
       });
-      svg.style.color = "var(--text-primary)";
+      axisLabels(add, s, data.map((d) => d.label), H);
       wrap.append(svg);
     }
-    ctx.provide({ renderDashboard, renderTrend });
+    const SPLIT_SLICES = 8;
+    function catColor(name) {
+      return S.categories.find((c) => c.name === name)?.color || "#888";
+    }
+    function renderSplit() {
+      const wrap = $("#dashSplit");
+      wrap.empty();
+      const sum = periodSummary(S.period);
+      const spend = [];
+      for (const [cat, amt] of Object.entries(sum.byCat)) {
+        const type = catType(cat);
+        if (!cat || type === "income" || type === "transfer")
+          continue;
+        if (amt >= 0)
+          continue;
+        spend.push({ cat, amount: -amt, color: catColor(cat) });
+      }
+      spend.sort((a2, b) => b.amount - a2.amount);
+      const total = spend.reduce((t, x) => t + x.amount, 0);
+      $("#dashSplitSub").textContent = total > 0 ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? "y" : "ies"} · ${periodMonthName(S.period)}` : periodMonthName(S.period);
+      if (!total) {
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Nothing categorised as spending in this period yet."));
+        return;
+      }
+      const shown = spend.slice(0, SPLIT_SLICES);
+      const rest = spend.slice(SPLIT_SLICES);
+      if (rest.length) {
+        shown.push({
+          cat: `Other (${rest.length})`,
+          amount: rest.reduce((t, x) => t + x.amount, 0),
+          color: themeColors(root).muted
+        });
+      }
+      const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
+      const { svg, add } = createChart({
+        w: W,
+        h: H,
+        cls: "donut",
+        label: `Spending split for ${periodMonthName(S.period)}: ` + shown.map((x) => `${x.cat} ${Math.round(x.amount / total * 100)}%`).join(", ")
+      });
+      let a = -Math.PI / 2;
+      for (const x of shown) {
+        const sweep = x.amount / total * Math.PI * 2;
+        const seg = add("path", {
+          d: arcPath(cx, cy, rOut, rIn, a, a + sweep),
+          fill: x.color,
+          stroke: themeColors(root).hole,
+          "stroke-width": "2"
+        });
+        tip(add, seg, `${x.cat}: ${money(x.amount)} · ${Math.round(x.amount / total * 100)}%`);
+        a += sweep;
+      }
+      add("text", {
+        x: cx,
+        y: cy - 6,
+        "text-anchor": "middle",
+        "font-size": "13",
+        fill: "currentColor",
+        "fill-opacity": "0.5",
+        "font-family": "inherit"
+      }).textContent = "Total spent";
+      add("text", {
+        x: cx,
+        y: cy + 22,
+        "text-anchor": "middle",
+        "font-size": "26",
+        "font-weight": "700",
+        fill: "currentColor",
+        "font-family": "inherit"
+      }).textContent = money(total, 0);
+      const legend = el("ul", { class: "donut-legend" });
+      for (const x of shown) {
+        legend.append(el("li", {}, el("i", { style: `background:${x.color}` }), el("span", { class: "dl-name" }, x.cat), el("span", { class: "dl-val num" }, money(x.amount, 0)), el("span", { class: "dl-pct num" }, `${Math.round(x.amount / total * 100)}%`)));
+      }
+      wrap.append(svg, legend);
+    }
+    ctx.provide({ renderDashboard, renderTrend, renderSplit });
   };
 });
 
@@ -3904,8 +4438,9 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
 // src/views/savings.js
 var require_savings = __commonJS((exports2, module2) => {
   var { el } = require_util();
+  var { themeColors, createChart, tip } = require_chart();
   module2.exports = function registerSavings(ctx) {
-    const { S, $, money } = ctx;
+    const { S, $, root, money } = ctx;
     function renderSavings() {
       const savings = S.accounts.filter((a) => a.type === "savings");
       const investments = S.accounts.filter((a) => a.type === "investment");
@@ -3920,6 +4455,7 @@ var require_savings = __commonJS((exports2, module2) => {
       tile("Savings", money(totalSavings));
       tile("Investments", money(totalInvest));
       tile("Credit debt", money(creditDebt), "text-danger");
+      renderWorth();
       const withGoals = S.accounts.filter((a) => a.goal_amount);
       const goalsWrap = $("#savingsGoals");
       goalsWrap.empty();
@@ -3958,7 +4494,113 @@ var require_savings = __commonJS((exports2, module2) => {
         wrap.append(el("div", { class: "card mb-4" }, el("div", { class: "card-h" }, el("div", {}, el("h2", {}, title), el("div", { class: "sub" }, `${list.length} accounts`)), el("div", { class: "legend" }, el("span", {}, el("b", { class: "num", style: "font-size:15px;color:var(--text-primary)" }, money(total))))), el("div", { class: "body-pad" }, grid)));
       }
     }
-    ctx.provide({ renderSavings });
+    const WORTH_TYPES = [
+      ["investment", "Investments", "--color-investment", "#6f42c1"],
+      ["savings", "Savings", "--color-success", "#22c55e"],
+      ["checking", "Cheque", "--color-info", "#0ea5e9"],
+      ["cash", "Cash", "--color-accent", "#0d9488"],
+      ["credit_card", "Credit cards", "--color-danger", "#f43f5e"],
+      ["other", "Other", "--ink-faint", "#5f6779"]
+    ];
+    function renderWorth() {
+      const wrap = $("#savingsWorth");
+      wrap.empty();
+      const css = getComputedStyle(root);
+      const c = themeColors(root);
+      const assets = [], debts = [];
+      for (const [type, label, varName, fallback] of WORTH_TYPES) {
+        const color = (css.getPropertyValue(varName) || "").trim() || fallback;
+        const inType = S.accounts.filter((a) => a.type === type);
+        const pos = inType.reduce((t, a) => t + Math.max(0, a.balance), 0);
+        const neg = inType.reduce((t, a) => t + Math.min(0, a.balance), 0);
+        if (pos > 0)
+          assets.push({ label, amount: pos, color });
+        if (neg < 0)
+          debts.push({ label, amount: -neg, color });
+      }
+      const totalAssets = assets.reduce((t, x) => t + x.amount, 0);
+      const totalDebts = debts.reduce((t, x) => t + x.amount, 0);
+      const net = totalAssets - totalDebts;
+      $("#savingsWorthSub").textContent = "Across your accounts · the Debt page is tracked separately";
+      if (!totalAssets && !totalDebts) {
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Add a balance to any account and the split appears here."));
+        return;
+      }
+      const W = 1000, H = 210, padL = 8, padR = 8, barH = 46;
+      const scale = Math.max(totalAssets, totalDebts, 1);
+      const innerW = W - padL - padR;
+      const { svg, add } = createChart({
+        w: W,
+        h: H,
+        label: `Net worth ${money(net)}: assets ${money(totalAssets)} against debts ${money(totalDebts)}`
+      });
+      const row = (y, segs, total, heading) => {
+        add("text", {
+          x: padL,
+          y: y - 10,
+          "font-size": "13",
+          "font-weight": "600",
+          fill: "currentColor",
+          "fill-opacity": "0.55",
+          "font-family": "inherit"
+        }).textContent = heading;
+        add("text", {
+          x: W - padR,
+          y: y - 10,
+          "text-anchor": "end",
+          "font-size": "13",
+          "font-weight": "700",
+          fill: "currentColor",
+          "fill-opacity": "0.8",
+          "font-family": "inherit"
+        }).textContent = money(total, 0);
+        add("rect", {
+          x: padL,
+          y,
+          width: innerW,
+          height: barH,
+          rx: 10,
+          fill: "currentColor",
+          "fill-opacity": "0.05"
+        });
+        if (!total)
+          return;
+        let x = padL;
+        for (const seg of segs) {
+          const w = seg.amount / scale * innerW;
+          const node = add("rect", {
+            x,
+            y,
+            width: Math.max(2, w),
+            height: barH,
+            fill: seg.color,
+            rx: w > 20 ? 10 : 2
+          });
+          tip(add, node, `${seg.label}: ${money(seg.amount)} · ${Math.round(seg.amount / total * 100)}% of ${heading.toLowerCase()}`);
+          if (w > 96) {
+            add("text", {
+              x: x + w / 2,
+              y: y + barH / 2 + 5,
+              "text-anchor": "middle",
+              "font-size": "13",
+              "font-weight": "600",
+              fill: c.hole,
+              "font-family": "inherit"
+            }).textContent = seg.label;
+          }
+          x += w;
+        }
+      };
+      row(34, assets, totalAssets, "What you own");
+      row(132, debts, totalDebts, "What you owe");
+      wrap.append(svg);
+      const legend = el("ul", { class: "donut-legend donut-legend--inline" });
+      for (const seg of [...assets, ...debts.map((d) => ({ ...d, label: `${d.label} (owed)` }))]) {
+        legend.append(el("li", {}, el("i", { style: `background:${seg.color}` }), el("span", { class: "dl-name" }, seg.label), el("span", { class: "dl-val num" }, money(seg.amount, 0))));
+      }
+      wrap.append(legend);
+    }
+    ctx.provide({ renderSavings, renderWorth });
   };
 });
 
@@ -4003,10 +4645,12 @@ var require_debt_math = __commonJS((exports2, module2) => {
       payment: Math.max(0, (Number(d.payment) || 0) + (Number(d.extra) || 0))
     })).filter((d) => d.balance > EPS);
     if (!list.length)
-      return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [] };
+      return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [], series: [0] };
     const roll = strategy !== "minimum";
     const pool = roll ? Math.max(0, Number(extra) || 0) : 0;
     const payoff = Object.create(null);
+    const owed = () => list.reduce((t, d) => t + d.balance, 0);
+    const series = [owed()];
     let interest = 0, m = 0;
     while (m < maxMonths && list.some((d) => d.balance > EPS)) {
       m++;
@@ -4042,9 +4686,10 @@ var require_debt_math = __commonJS((exports2, module2) => {
           }
         }
       }
+      series.push(owed());
     }
     const stalled = list.filter((d) => d.balance > EPS).map((d) => d.name);
-    return { months: m, interest, payoff, settled: !stalled.length, stalled };
+    return { months: m, interest, payoff, settled: !stalled.length, stalled, series };
   }
   function addMonths(n, from = new Date) {
     const d = new Date(from.getFullYear(), from.getMonth() + n, 1);
@@ -4067,9 +4712,22 @@ var require_debts = __commonJS((exports2, module2) => {
   var { askFields } = require_modal();
   var { MONTHS } = require_constants();
   var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require_debt_math();
+  var {
+    themeColors,
+    createChart,
+    scales,
+    gridlines,
+    axisLabels,
+    linePath,
+    areaPath,
+    areaGradient,
+    tip,
+    RANGES,
+    rangeFor
+  } = require_chart();
   var DEBT_TYPES = ["credit card", "personal loan", "vehicle", "home loan", "student", "store account", "overdraft", "other"];
   module2.exports = function registerDebts(ctx) {
-    const { S, $, app, money, toast, writeFile, txInPeriod } = ctx;
+    const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod } = ctx;
     const mark = () => {
       S.debtsDirty = true;
       $("#debtSave").disabled = false;
@@ -4109,6 +4767,7 @@ var require_debts = __commonJS((exports2, module2) => {
       const order = $("#debtOrder");
       order.empty();
       if (!list.length) {
+        $("#debtCurve").empty();
         wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Add a debt below and this becomes a payoff plan — how long each method takes, and what it saves."));
         return;
       }
@@ -4133,6 +4792,7 @@ var require_debts = __commonJS((exports2, module2) => {
         grid.append(card);
       }
       wrap.append(grid);
+      renderDebtCurve(runs);
       if (!base.settled) {
         wrap.append(el("p", { class: "text-danger", style: "margin:14px 0 0;font-size:12.5px" }, `On the contracted payments alone, ${base.stalled.join(", ")} never clears — the interest is at or above the payment. ` + "Raise the payment or add extra above."));
       }
@@ -4386,6 +5046,75 @@ var require_debts = __commonJS((exports2, module2) => {
       S.debtsDirty = true;
       $("#debtSave").disabled = false;
       renderDebts();
+    }
+    const PLAN_LINES = [
+      { key: "minimum", label: "Minimum only", dash: "5 6" },
+      { key: "snowball", label: "Snowball" },
+      { key: "avalanche", label: "Avalanche" }
+    ];
+    const debtRange = () => rangeFor(plugin.settings.chartDebtRange) || rangeFor("5y");
+    function syncRangeSelect() {
+      const sel = $("#debtRange");
+      if (sel.options.length !== RANGES.length) {
+        sel.empty();
+        for (const r of RANGES)
+          sel.append(el("option", { value: r.key }, `${r.label} view`));
+      }
+      sel.value = debtRange().key;
+    }
+    function renderDebtCurve(runs) {
+      const wrap = $("#debtCurve");
+      wrap.empty();
+      syncRangeSelect();
+      const months = debtRange().months;
+      const chosen = planStrategy();
+      const c = themeColors(root);
+      const colorFor = (key) => key === "minimum" ? c.muted : key === chosen ? c.success : c.info;
+      const lines = PLAN_LINES.map((l) => ({ ...l, series: (runs.find((r) => r.key === l.key) || {}).res?.series || [] })).filter((l) => l.series.length > 1);
+      if (!lines.length)
+        return;
+      const longest = Math.max(...lines.map((l) => l.series.length - 1));
+      const span = Math.max(2, Math.min(months, longest));
+      const W = 1000, H = 260;
+      const at = (series, m) => series[Math.min(m, series.length - 1)] ?? 0;
+      const max = Math.max(1, ...lines.map((l) => l.series[0])) * 1.08;
+      const s = scales({ w: W, h: H, count: span + 1, max, padB: 34 });
+      const { svg, add } = createChart({
+        w: W,
+        h: H,
+        label: `Total owed over the next ${humanMonths(span)} under each payoff plan`
+      });
+      const fill = areaGradient(add, "debtCurveArea", colorFor(chosen), 0.18);
+      gridlines(add, s, W);
+      const pts = (l) => Array.from({ length: span + 1 }, (_, m) => [s.x(m), s.y(at(l.series, m))]);
+      const sel = lines.find((l) => l.key === chosen);
+      if (sel)
+        add("path", { d: areaPath(pts(sel), s.baseline), fill });
+      for (const l of lines) {
+        add("path", {
+          d: linePath(pts(l)),
+          fill: "none",
+          stroke: colorFor(l.key),
+          "stroke-opacity": l.key === chosen ? "1" : "0.7",
+          "stroke-width": l.key === chosen ? "2.75" : "1.75",
+          "stroke-dasharray": l.dash || null,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        });
+      }
+      const step = Math.max(1, Math.ceil(span / 24));
+      for (let m = 0;m <= span; m += step) {
+        const hit = add("rect", {
+          x: s.x(m) - s.innerW / (span * 2),
+          y: s.padT,
+          width: s.innerW / span,
+          height: s.innerH,
+          fill: "transparent"
+        });
+        tip(add, hit, `${monthLabel(addMonths(m))} — ` + lines.map((l) => `${l.label} ${money(at(l.series, m), 0)}`).join(" · "));
+      }
+      axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthLabel(addMonths(m))), H);
+      wrap.append(svg);
     }
     function replan() {
       renderDebtKpis();
@@ -6017,31 +6746,15 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
+  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
     function renderImport() {
       const loc = locale();
-      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
+      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement exports — or any CSV / TSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
-    }
-    function prepareRules() {
-      return S.rules.map((r) => ({ p: r.pattern.trim().toLowerCase(), category: r.category })).filter((r) => r.p);
-    }
-    function autoCategorise(desc, rules) {
-      const d = desc.trim().toLowerCase();
-      let best = "", bestLen = 0;
-      for (const r of rules) {
-        if (r.p === d)
-          return r.category;
-        if (r.p.length > bestLen && d.includes(r.p)) {
-          best = r.category;
-          bestLen = r.p.length;
-        }
-      }
-      return best;
     }
     function dedupIndex() {
       return buildIndex(S.txFiles);
@@ -6070,11 +6783,11 @@ var require_import = __commonJS((exports2, module2) => {
       }
       return "";
     }
-    async function handleCsvFile(file) {
-      const text = await file.text();
-      const rows = parseCsv(text);
+    async function handleStatementFile(file) {
+      const text = decodeStatement(new Uint8Array(await file.arrayBuffer()));
+      const rows = parseStatement(text);
       if (!rows.length)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const loc = locale();
       const map = detectStatementColumns(rows, loc.dayFirst);
       if (!map)
@@ -6089,7 +6802,7 @@ var require_import = __commonJS((exports2, module2) => {
       const items = [];
       let skipped = 0;
       const label0 = detectAccountLabel(file.name, rows);
-      const rules = prepareRules();
+      const rules = prepareRules(S.rules);
       const ledger = [];
       const showBar = dataRows.length > 1500;
       if (showBar)
@@ -6180,7 +6893,7 @@ var require_import = __commonJS((exports2, module2) => {
       const loc = locale();
       const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
       if (!width)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
       const header = headerIdx >= 0 ? rows[headerIdx] : null;
       let start = detected ? detected.dataStart : rows.findIndex((r) => r.length >= 3 && r.some((c) => parseStatementDate(c, loc.dayFirst)) && r.some((c) => normalizeAmount(c) != null));
@@ -6409,7 +7122,7 @@ var require_import = __commonJS((exports2, module2) => {
         return toast("Drop a statement first", true);
       showColumnMapper(p.rows, p.file, p.map);
     }
-    ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
+    ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport });
   };
 });
 
@@ -6588,8 +7301,15 @@ var require_controller = __commonJS((exports2, module2) => {
       const pref = plugin.settings.theme;
       const dark = pref === "dark" || pref === "auto" && document.body.classList.contains("theme-dark");
       root.classList.toggle("bud-dark", dark);
-      if (S.loaded && S.view === "dashboard")
+      if (!S.loaded)
+        return;
+      if (S.view === "dashboard") {
         ctx.renderTrend();
+        ctx.renderSplit();
+      } else if (S.view === "savings")
+        ctx.renderWorth();
+      else if (S.view === "debts")
+        ctx.replan();
     }
     ctx.registerDirty(() => Object.values(S.txFiles).some((f) => f.dirty));
     ctx.registerDirty(() => !!S.pendingImport);
@@ -6795,6 +7515,11 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#debtAdd").addEventListener("click", ctx.addDebt);
     $("#debtExtra").addEventListener("input", ctx.replan);
     $("#debtStrategy").addEventListener("change", ctx.replan);
+    $("#debtRange").addEventListener("change", async (e) => {
+      plugin.settings.chartDebtRange = e.target.value;
+      await plugin.saveSettings();
+      ctx.replan();
+    });
     $("#owedSave").addEventListener("click", ctx.saveOwed);
     $("#owedAdd").addEventListener("click", ctx.addOwed);
     $("#svcSave").addEventListener("click", ctx.saveServices);
@@ -6830,7 +7555,7 @@ var require_controller = __commonJS((exports2, module2) => {
     drop.addEventListener("click", () => $("#fileInput").click());
     $("#fileInput").addEventListener("change", (e) => {
       if (e.target.files[0])
-        ctx.handleCsvFile(e.target.files[0]);
+        ctx.handleStatementFile(e.target.files[0]);
       e.target.value = "";
     });
     drop.addEventListener("dragover", (e) => {
@@ -6842,7 +7567,7 @@ var require_controller = __commonJS((exports2, module2) => {
       e.preventDefault();
       drop.classList.remove("dragover");
       if (e.dataTransfer.files[0])
-        ctx.handleCsvFile(e.dataTransfer.files[0]);
+        ctx.handleStatementFile(e.dataTransfer.files[0]);
     });
     return {
       start: async () => {
@@ -6874,6 +7599,7 @@ var require_controller = __commonJS((exports2, module2) => {
         else
           unlockGate();
       },
+      cleanupRules: () => ctx.cleanupRules(),
       hasDirty
     };
   }
@@ -7973,7 +8699,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
 });
 
 // src/main.js
-var { Plugin, TFile, TFolder, normalizePath } = require("obsidian");
+var { Plugin, TFile, TFolder, Notice, normalizePath } = require("obsidian");
 var { VIEW_TYPE, DEFAULT_SETTINGS } = require_constants();
 var { parseFrontmatter } = require_util();
 var { BudgetView } = require_view();
@@ -7988,6 +8714,21 @@ class BudgetPlugin extends Plugin {
     this.addRibbonIcon("wallet", "Open budget", () => this.activateView());
     this.addCommand({ id: "open-budget", name: "Open budget", callback: () => this.activateView() });
     this.addCommand({ id: "setup-wizard", name: "Set up budget (onboarding wizard)", callback: () => new OnboardingWizard(this.app, this).open() });
+    this.addCommand({
+      id: "tidy-categorisation-rules",
+      name: "Tidy categorisation rules",
+      callback: () => {
+        let ran = false;
+        this.forEachView((ctl) => {
+          if (!ran) {
+            ran = true;
+            ctl.cleanupRules();
+          }
+        });
+        if (!ran)
+          new Notice("Budget: open the budget first, then run this again.", 5000);
+      }
+    });
     this.addSettingTab(new BudgetSettingTab(this.app, this));
     if (this.settings.openOnStartup) {
       this.app.workspace.onLayoutReady(() => {

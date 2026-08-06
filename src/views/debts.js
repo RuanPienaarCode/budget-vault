@@ -9,6 +9,10 @@ const { el, keepScroll, escMd, icoEl } = require('../util');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require('../debt-math');
+const {
+  themeColors, createChart, scales, gridlines, axisLabels,
+  linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
+} = require('../chart');
 
 /* Debt kinds, in the order a household usually meets them. Stored verbatim in
    the Type column; an unknown value from a hand-edited file is kept as-is
@@ -16,7 +20,7 @@ const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMont
 const DEBT_TYPES = ['credit card', 'personal loan', 'vehicle', 'home loan', 'student', 'store account', 'overdraft', 'other'];
 
 module.exports = function registerDebts(ctx) {
-  const { S, $, app, money, toast, writeFile, txInPeriod } = ctx;
+  const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod } = ctx;
 
   const mark = () => { S.debtsDirty = true; $('#debtSave').disabled = false; };
   ctx.registerDirty(() => S.debtsDirty);
@@ -82,6 +86,7 @@ module.exports = function registerDebts(ctx) {
     const order = $('#debtOrder'); order.empty();
 
     if (!list.length) {
+      $('#debtCurve').empty();
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         'Add a debt below and this becomes a payoff plan — how long each method takes, and what it saves.'));
       return;
@@ -120,6 +125,7 @@ module.exports = function registerDebts(ctx) {
       grid.append(card);
     }
     wrap.append(grid);
+    renderDebtCurve(runs);
 
     if (!base.settled) {
       wrap.append(el('p', { class: 'text-danger', style: 'margin:14px 0 0;font-size:12.5px' },
@@ -449,6 +455,102 @@ module.exports = function registerDebts(ctx) {
   }
 
   // The three planner controls all recompute the same two panels.
+  /* --------------------------- payoff curve -----------------------------
+     Total owed, month by month, under all three plans at once. The three
+     summary cards below already give each plan's debt-free DATE; what a date
+     cannot show is the SHAPE — that the minimum-only line barely bends for
+     years while the rollover lines fall away from it, and how far apart they
+     have drifted by the time the first one lands on zero.
+
+     Every line is the `series` the same simulate() call produced for the card
+     beside it, so the curve and the date can never tell different stories.
+
+     Unlike the spending trend this range is projected forward out of the
+     repayment schedule rather than read back out of imported history, so the
+     long options are honest here: a 10-year home loan genuinely has 120 months
+     of computed points behind it. */
+  const PLAN_LINES = [
+    { key: 'minimum', label: 'Minimum only', dash: '5 6' },
+    { key: 'snowball', label: 'Snowball' },
+    { key: 'avalanche', label: 'Avalanche' },
+  ];
+
+  const debtRange = () => rangeFor(plugin.settings.chartDebtRange) || rangeFor('5y');
+
+  function syncRangeSelect() {
+    const sel = $('#debtRange');
+    if (sel.options.length !== RANGES.length) {
+      sel.empty();
+      for (const r of RANGES) sel.append(el('option', { value: r.key }, `${r.label} view`));
+    }
+    sel.value = debtRange().key;
+  }
+
+  function renderDebtCurve(runs) {
+    const wrap = $('#debtCurve'); wrap.empty();
+    syncRangeSelect();
+
+    const months = debtRange().months;
+    const chosen = planStrategy();
+    const c = themeColors(root);
+    const colorFor = key => (key === 'minimum' ? c.muted : key === chosen ? c.success : c.info);
+
+    const lines = PLAN_LINES
+      .map(l => ({ ...l, series: (runs.find(r => r.key === l.key) || {}).res?.series || [] }))
+      .filter(l => l.series.length > 1);
+    if (!lines.length) return;
+
+    /* Clip to the range, but never past the point every plan has cleared —
+       trailing flat zero is dead width that squeezes the part worth reading. */
+    const longest = Math.max(...lines.map(l => l.series.length - 1));
+    const span = Math.max(2, Math.min(months, longest));
+
+    const W = 1000, H = 260;
+    const at = (series, m) => series[Math.min(m, series.length - 1)] ?? 0;
+    const max = Math.max(1, ...lines.map(l => l.series[0])) * 1.08;
+    const s = scales({ w: W, h: H, count: span + 1, max, padB: 34 });
+    const { svg, add } = createChart({
+      w: W, h: H,
+      label: `Total owed over the next ${humanMonths(span)} under each payoff plan`,
+    });
+
+    const fill = areaGradient(add, 'debtCurveArea', colorFor(chosen), 0.18);
+    gridlines(add, s, W);
+
+    const pts = l => Array.from({ length: span + 1 }, (_, m) => [s.x(m), s.y(at(l.series, m))]);
+
+    // The selected plan gets the fill, so the eye lands on the one in force.
+    const sel = lines.find(l => l.key === chosen);
+    if (sel) add('path', { d: areaPath(pts(sel), s.baseline), fill });
+
+    for (const l of lines) {
+      add('path', {
+        d: linePath(pts(l)),
+        fill: 'none', stroke: colorFor(l.key),
+        'stroke-opacity': l.key === chosen ? '1' : '0.7',
+        'stroke-width': l.key === chosen ? '2.75' : '1.75',
+        'stroke-dasharray': l.dash || null,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      });
+    }
+
+    /* A year's worth of months is 12 hit strips; ten years is 120, which is
+       both useless to aim at and 120 nodes to build. Sample to at most 24. */
+    const step = Math.max(1, Math.ceil(span / 24));
+    for (let m = 0; m <= span; m += step) {
+      const hit = add('rect', {
+        x: s.x(m) - s.innerW / (span * 2), y: s.padT,
+        width: s.innerW / span, height: s.innerH, fill: 'transparent',
+      });
+      tip(add, hit, `${monthLabel(addMonths(m))} — ` +
+        lines.map(l => `${l.label} ${money(at(l.series, m), 0)}`).join(' · '));
+    }
+
+    axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthLabel(addMonths(m))), H);
+
+    wrap.append(svg);
+  }
+
   function replan() { renderDebtKpis(); renderDebtPlan(); }
 
   // serializeDebts is published so the vault round-trip test drives the real one.

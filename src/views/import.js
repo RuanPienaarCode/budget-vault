@@ -1,12 +1,18 @@
 'use strict';
-/* CSV import — bank statement exports (the banks named in the country
-   profile) or any CSV with Date/Title/Amount headers: parse, auto-categorise
-   via Data/Categorisation Rules.csv, dedupe against existing transactions,
-   review, commit. Columns are matched by header name, so a hand-built
-   Google Sheets / Excel export works the same as a bank's. Date order for
-   ambiguous DD/MM vs MM/DD dates follows the country profile. */
+/* Statement import — bank statement exports (the banks named in the country
+   profile) or any delimited text with Date/Title/Amount headers: parse,
+   auto-categorise via Data/Categorisation Rules.csv, dedupe against existing
+   transactions, review, commit. Columns are matched by header name, so a
+   hand-built Google Sheets / Excel export works the same as a bank's. Date
+   order for ambiguous DD/MM vs MM/DD dates follows the country profile.
 
-const { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require('../util');
+   Comma, semicolon, tab and pipe files all import: the delimiter is sniffed
+   from the file, and the character encoding is read off its bytes rather than
+   assumed to be UTF-8. Both live in util.js so they are testable on their own,
+   and both are deliberately confined to FOREIGN files — the app's own CSVs are
+   read by parseCsv, which is comma-only. */
+
+const { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require('../util');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 
 module.exports = function registerImport(ctx) {
@@ -19,29 +25,10 @@ module.exports = function registerImport(ctx) {
     // and the review screen reports how much it could verify for each file.
     $('#importSubNote').textContent = loc.banks
       ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV`
-      : 'Bank statement CSV exports — or any CSV with Date / Description / Amount columns';
+      : 'Bank statement exports — or any CSV / TSV with Date / Description / Amount columns';
     if (loc.importHint) $('#importDropHint').textContent = loc.importHint;
   }
 
-  /* Normalise the rule list ONCE per import, not once per row. Rules grow
-     monotonically (learnRules adds one per new merchant every import), so the
-     inner-loop lowercasing was rows × rules: measured 51ms at 1,200 rows and
-     2,000 rules on desktop, several hundred on a phone. The length test comes
-     before includes() for the same reason — it's the cheaper comparison. */
-  function prepareRules() {
-    return S.rules
-      .map(r => ({ p: r.pattern.trim().toLowerCase(), category: r.category }))
-      .filter(r => r.p);
-  }
-  function autoCategorise(desc, rules) {
-    const d = desc.trim().toLowerCase();
-    let best = '', bestLen = 0;
-    for (const r of rules) {
-      if (r.p === d) return r.category;
-      if (r.p.length > bestLen && d.includes(r.p)) { best = r.category; bestLen = r.p.length; }
-    }
-    return best;
-  }
   function dedupIndex() {
     return buildIndex(S.txFiles);
   }
@@ -67,10 +54,13 @@ module.exports = function registerImport(ctx) {
     return '';
   }
 
-  async function handleCsvFile(file) {
-    const text = await file.text();
-    const rows = parseCsv(text);
-    if (!rows.length) return toast('Empty CSV', true);
+  async function handleStatementFile(file) {
+    // Bytes, not file.text() — the encoding is read off the bytes rather than
+    // assumed to be UTF-8, and the delimiter off the decoded text rather than
+    // assumed to be a comma. See decodeStatement / sniffDelimiter in util.js.
+    const text = decodeStatement(new Uint8Array(await file.arrayBuffer()));
+    const rows = parseStatement(text);
+    if (!rows.length) return toast('Empty statement file', true);
     const loc = locale();
     const map = detectStatementColumns(rows, loc.dayFirst);
     // Nothing resolved — but the file is readable, so ask instead of refusing.
@@ -80,8 +70,9 @@ module.exports = function registerImport(ctx) {
   }
 
   /* Parse the rows under a column map (auto-detected or chosen by hand) and put
-     the result on the review screen. Split out from handleCsvFile so the manual
-     mapper re-enters at exactly the same place with exactly the same rules. */
+     the result on the review screen. Split out from handleStatementFile so the
+     manual mapper re-enters at exactly the same place with exactly the same
+     rules. */
   async function runImport(rows, map, file) {
     const loc = locale();
     const { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra } = map;
@@ -97,7 +88,7 @@ module.exports = function registerImport(ctx) {
     // Threshold sized to where the work is actually perceptible: 400 rows
     // against a typical rule set is a few milliseconds, so the bar used to
     // flash for nothing.
-    const rules = prepareRules();
+    const rules = prepareRules(S.rules);
     /* Every row's (amount, balance) pair in file order — including the rows that
        never become transactions, because an unbroken run of balances is what
        makes the reconciliation below conclusive. */
@@ -197,7 +188,7 @@ module.exports = function registerImport(ctx) {
     // Widest row wins: a preamble or a ragged total line must not decide how
     // many columns the user is offered.
     const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
-    if (!width) return toast('Empty CSV', true);
+    if (!width) return toast('Empty statement file', true);
     const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
     const header = headerIdx >= 0 ? rows[headerIdx] : null;
     // A row that looks like data is the useful preview; failing that, show the
@@ -494,5 +485,5 @@ module.exports = function registerImport(ctx) {
     showColumnMapper(p.rows, p.file, p.map);
   }
 
-  ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
+  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport });
 };

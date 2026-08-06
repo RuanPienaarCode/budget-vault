@@ -212,7 +212,15 @@ function mountApp(view) {
     const pref = plugin.settings.theme;
     const dark = pref === 'dark' || (pref === 'auto' && document.body.classList.contains('theme-dark'));
     root.classList.toggle('bud-dark', dark);
-    if (S.loaded && S.view === 'dashboard') ctx.renderTrend();
+    /* Every chart bakes the resolved palette into SVG attributes at render
+       time — SVG has no way to say "this fill is var(--color-success)" — so a
+       theme flip leaves them painted in the outgoing theme until they are
+       rebuilt. Only the charts on the view actually being looked at: the rest
+       redraw on their own when switched to. */
+    if (!S.loaded) return;
+    if (S.view === 'dashboard') { ctx.renderTrend(); ctx.renderSplit(); }
+    else if (S.view === 'savings') ctx.renderWorth();
+    else if (S.view === 'debts') ctx.replan();
   }
 
   /* --------------------------- dirty tracking ----------------------------
@@ -454,6 +462,13 @@ function mountApp(view) {
   // plan panels only, never the table the reader may be mid-edit in.
   $('#debtExtra').addEventListener('input', ctx.replan);
   $('#debtStrategy').addEventListener('change', ctx.replan);
+  // The chart range IS saved state — unlike the two above it says nothing
+  // about the household, only about how this reader likes to look at it.
+  $('#debtRange').addEventListener('change', async e => {
+    plugin.settings.chartDebtRange = e.target.value;
+    await plugin.saveSettings();
+    ctx.replan();
+  });
   $('#owedSave').addEventListener('click', ctx.saveOwed);
   $('#owedAdd').addEventListener('click', ctx.addOwed);
   $('#svcSave').addEventListener('click', ctx.saveServices);
@@ -478,12 +493,12 @@ function mountApp(view) {
   $('#impRemap').addEventListener('click', ctx.remapImport);
   const drop = $('#drop');
   drop.addEventListener('click', () => $('#fileInput').click());
-  $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleCsvFile(e.target.files[0]); e.target.value = ''; });
+  $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleStatementFile(e.target.files[0]); e.target.value = ''; });
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
   drop.addEventListener('drop', e => {
     e.preventDefault(); drop.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) ctx.handleCsvFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files[0]) ctx.handleStatementFile(e.dataTransfer.files[0]);
   });
 
   return {
@@ -521,6 +536,11 @@ function mountApp(view) {
       if (plugin.settings.privacyLock) lockGate();
       else unlockGate();
     },
+    /* Housekeeping, reached from the command palette rather than a page: it is
+       run once in a while and deliberately, and a button for it would sit on
+       one of these screens forever explaining itself to users who never need
+       it. Reads the loaded state, so it needs a view that has connected. */
+    cleanupRules: () => ctx.cleanupRules(),
     hasDirty,
   };
 }
