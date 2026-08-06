@@ -3,6 +3,49 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.4.0 — 2026-08-06
+
+### Added
+
+- **Charts on the pages that already held the numbers.** A spend trend and a
+  category-split donut on the dashboard, a net-worth stack on savings, and a
+  payoff curve on debts with a range you pick once and it remembers. Drawn as
+  plain inline SVG — no charting library, because one would outweigh the whole
+  plugin to draw four static pictures on a phone. Colours are read from the
+  theme at draw time, so they follow a light/dark switch instead of staying
+  painted in the theme you left.
+
+- **A "Tidy categorisation rules" command.** Every merchant you categorise
+  writes a rule, so the rules file only ever grew — and most of what
+  accumulated was a longer version of a rule that already gave the same
+  answer. On a real 1,342-rule vault, 832 of them could never have changed an
+  import's outcome. The command finds those and shows you the full list, with
+  the rule that covers each one, before anything is deleted.
+
+  It does not guess from the look of a pattern. Each candidate is removed and
+  every transaction description in your vault is re-categorised; the removal
+  is only offered if every single answer comes out identical. Rules that match
+  nothing yet are kept and told to you separately — a rule with no
+  transactions behind it may just be waiting for one.
+
+### Changed
+
+- **Statements that aren't comma-separated UTF-8 now import.** A semicolon- or
+  tab-delimited export used to arrive as one unreadable column, and a
+  windows-1252 or UTF-16 export imported merchant names full of replacement
+  characters — which then became a permanent rule matching a name your bank
+  will never send again. Both the separator and the encoding are now read from
+  the file instead of assumed.
+
+- **Categorising a merchant no longer writes a rule that changes nothing.** If
+  your existing rules already put that description in that category, no rule
+  is added. The rules file settles instead of growing with your history.
+
+### Fixed
+
+- Import matching no longer walks a rules list padded with entries that could
+  not affect the result — the same work, over a list that stops growing.
+
 ## 1.3.6 — 2026-08-05
 
 ### Changed
