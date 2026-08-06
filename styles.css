@@ -1408,6 +1408,27 @@
 .budget-split-foot.is-off { color: var(--text-error, #e5534b); }
 .budget-split-foot.is-balanced { color: var(--text-success, #2e9b64); }
 .budget-split-hint { margin-top: 6px; font-size: 12px; line-height: 1.45; opacity: .65; }
+
+/* Rules cleanup preview. The list is the point of the dialog, so it gets the
+   height: capped and scrolled rather than truncated, because a "…and 812 more"
+   would hide the one rule the reader wanted to check. */
+.budget-tidy-lead { font-size: 13.5px; line-height: 1.5; margin: 0 0 12px; }
+.budget-tidy-list {
+  max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--background-modifier-border, rgba(128,128,128,.25));
+  border-radius: 6px; padding: 4px 0;
+}
+.budget-tidy-row { padding: 6px 10px; }
+.budget-tidy-row + .budget-tidy-row {
+  border-top: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
+}
+.budget-tidy-pattern { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.budget-tidy-empty { font-style: italic; opacity: .7; font-weight: 500; }
+.budget-tidy-why { font-size: 12px; opacity: .68; margin-top: 1px; overflow-wrap: anywhere; }
+.budget-tidy-hint { margin-top: 10px; font-size: 12px; line-height: 1.45; opacity: .65; }
+@media (max-width: 480px) {
+  .budget-tidy-list { max-height: 40vh; }
+}
 @media (max-width: 480px) {
   .budget-split-part { flex-wrap: wrap; }
   .budget-split-cat, .budget-split-note { flex: 1 1 100%; }

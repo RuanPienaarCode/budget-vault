@@ -489,6 +489,26 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return s.length >= 4 ? s : (desc ?? "").toString().trim();
   }
+  function prepareRules(rules) {
+    return (rules || []).map((r) => ({ p: (r.pattern ?? "").trim().toLowerCase(), category: r.category })).filter((r) => r.p);
+  }
+  function matchRule(desc, rules) {
+    const d = (desc ?? "").toString().trim().toLowerCase();
+    let best = null, bestLen = 0;
+    for (const r of rules) {
+      if (r.p === d)
+        return r;
+      if (r.p.length > bestLen && d.includes(r.p)) {
+        best = r;
+        bestLen = r.p.length;
+      }
+    }
+    return best;
+  }
+  function autoCategorise(desc, rules) {
+    const r = matchRule(desc, rules);
+    return r ? r.category : "";
+  }
   var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   function safeSeg(s) {
     const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
@@ -571,7 +591,7 @@ var require_util = __commonJS((exports2, module2) => {
     const back = new Date(t);
     return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -1347,7 +1367,49 @@ var require_modal = __commonJS((exports2, module2) => {
   function askSplit(app, opts) {
     return new Promise((res) => new SplitModal(app, opts, res).open());
   }
-  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };
+
+  class RulesCleanupModal extends Modal {
+    constructor(app, report, resolve) {
+      super(app);
+      this.report = report;
+      this.resolve = resolve;
+      this.answer = false;
+    }
+    onOpen() {
+      const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
+      this.titleEl.setText("Tidy categorisation rules");
+      const c = this.contentEl;
+      if (!remove.length) {
+        c.append(el("p", { class: "budget-tidy-lead" }, total === 0 ? "There are no categorisation rules yet. They get written as you categorise imported transactions." : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
+        new Setting(c).addButton((b) => b.setButtonText("Close").setCta().onClick(() => this.close()));
+        return;
+      }
+      c.append(el("p", { class: "budget-tidy-lead" }, `${remove.length} of ${total} rules can go, leaving ${kept}. ` + `Every one was removed and re-checked against all ${checked} transaction descriptions ` + "in your vault: each still came out with exactly the category it has now. " + "Each rule below is a longer version of one that stays, so future statements " + "match it the same way too."));
+      const list = el("div", { class: "budget-tidy-list" });
+      for (const r of redundant) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern" }, r.pattern), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · already covered by “${r.coveredBy}”`)));
+      }
+      for (const r of blank) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern budget-tidy-empty" }, "(blank pattern)"), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · matches nothing, already ignored on import`)));
+      }
+      c.append(list);
+      if (dormant.length) {
+        c.append(el("p", { class: "budget-tidy-hint" }, `${dormant.length} other ${dormant.length === 1 ? "rule matches" : "rules match"} nothing in your history yet. ` + "Those are being kept — a rule with no transactions behind it may simply be waiting " + "for one, and this cannot tell that apart from a rule you have finished with."));
+      }
+      new Setting(c).addButton((b) => b.setButtonText("Cancel").onClick(() => this.close())).addButton((b) => b.setButtonText(`Remove ${remove.length} ${remove.length === 1 ? "rule" : "rules"}`).setWarning().onClick(() => {
+        this.answer = true;
+        this.close();
+      }));
+    }
+    onClose() {
+      this.contentEl.empty();
+      this.resolve(this.answer);
+    }
+  }
+  function askRulesCleanup(app, report) {
+    return new Promise((res) => new RulesCleanupModal(app, report, res).open());
+  }
+  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
 });
 
 // src/locale.js
@@ -2505,11 +2567,92 @@ var require_load = __commonJS((exports2, module2) => {
   };
 });
 
+// src/rule-cleanup.js
+var require_rule_cleanup = __commonJS((exports2, module2) => {
+  var { matchRule, autoCategorise } = require_util();
+  function analyseRules(rules, descriptions) {
+    const all = rules || [];
+    const prepared = [];
+    const blank = [];
+    all.forEach((r, i) => {
+      const p = (r.pattern ?? "").toString().trim().toLowerCase();
+      if (p)
+        prepared.push({ p, category: r.category, i });
+      else
+        blank.push({ index: i, pattern: r.pattern ?? "", category: r.category, reason: "blank" });
+    });
+    const seen = new Set;
+    const descs = [];
+    for (const d of descriptions || []) {
+      const k = (d ?? "").toString().trim().toLowerCase();
+      if (!k || seen.has(k))
+        continue;
+      seen.add(k);
+      descs.push(k);
+    }
+    const base = descs.map((d) => autoCategorise(d, prepared));
+    const touches = prepared.map((r) => {
+      const hits = [];
+      descs.forEach((d, di) => {
+        if (d === r.p || d.includes(r.p))
+          hits.push(di);
+      });
+      return hits;
+    });
+    const order = prepared.map((_, pi) => pi).sort((a, b) => prepared[b].p.length - prepared[a].p.length || a - b);
+    const working = prepared.slice();
+    const redundant = [];
+    const dormant = [];
+    for (const pi of order) {
+      const rule = prepared[pi];
+      const hits = touches[pi];
+      if (!hits.length) {
+        dormant.push({ index: rule.i, pattern: all[rule.i].pattern, category: rule.category });
+        continue;
+      }
+      const at = working.indexOf(rule);
+      if (at === -1)
+        continue;
+      working.splice(at, 1);
+      if (!hits.every((di) => autoCategorise(descs[di], working) === base[di])) {
+        working.splice(at, 0, rule);
+        continue;
+      }
+      const cover = matchRule(descs[hits[0]], working);
+      if (!cover || !rule.p.includes(cover.p)) {
+        working.splice(at, 0, rule);
+        continue;
+      }
+      redundant.push({
+        index: rule.i,
+        pattern: all[rule.i].pattern,
+        category: rule.category,
+        coveredBy: cover ? cover.p : "",
+        hits: hits.length
+      });
+    }
+    redundant.sort((a, b) => a.index - b.index);
+    dormant.sort((a, b) => a.index - b.index);
+    const remove = [...blank, ...redundant].sort((a, b) => a.index - b.index);
+    return {
+      remove,
+      redundant,
+      dormant,
+      blank,
+      kept: all.length - remove.length,
+      checked: descs.length,
+      total: all.length
+    };
+  }
+  module2.exports = { analyseRules };
+});
+
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter, learnPattern, safeSeg, yamlStr, csvCell } = require_util();
+  var { el, parseFrontmatter, learnPattern, prepareRules, autoCategorise, safeSeg, yamlStr, csvCell } = require_util();
   var { TYPE_ORDER } = require_constants();
-  var { askFields, confirmModal } = require_modal();
+  var { askFields, confirmModal, askRulesCleanup } = require_modal();
+  var { analyseRules } = require_rule_cleanup();
   module2.exports = function registerCategories(ctx) {
     const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
     let catsVersion = 1;
@@ -2694,6 +2837,7 @@ Budget category of type **${type}**.
     }
     async function learnRules(pairs) {
       const have = new Set(S.rules.map((r) => r.pattern.trim().toLowerCase()));
+      const matcher = prepareRules(S.rules);
       let added = 0;
       for (const { desc, cat } of pairs) {
         if (!cat)
@@ -2702,21 +2846,49 @@ Budget category of type **${type}**.
         const key = pattern.trim().toLowerCase();
         if (!key || have.has(key))
           continue;
+        if (autoCategorise(pattern, matcher) === cat) {
+          have.add(key);
+          continue;
+        }
         S.rules.push({ pattern, category: cat });
+        matcher.push({ p: key, category: cat });
         have.add(key);
         added++;
       }
       if (added) {
         S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: "base" }));
-        const csv = `pattern,category
-` + S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
-`) + `
-`;
-        await writeFile("Data/Categorisation Rules.csv", csv);
+        await writeRulesCsv();
       }
       return added;
     }
-    ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules });
+    function writeRulesCsv() {
+      const body = S.rules.length ? S.rules.map((r) => [r.pattern, r.category].map(csvCell).join(",")).join(`
+`) + `
+` : "";
+      return writeFile("Data/Categorisation Rules.csv", `pattern,category
+` + body);
+    }
+    async function cleanupRules() {
+      const descs = [];
+      for (const f of Object.values(S.txFiles || {})) {
+        for (const row of f.rows || [])
+          if (row.desc)
+            descs.push(row.desc);
+      }
+      if (!S.rules.length && !descs.length) {
+        toast("No budget data loaded yet.", true);
+        return 0;
+      }
+      const report = analyseRules(S.rules, descs);
+      if (!await askRulesCleanup(app, report))
+        return 0;
+      const drop = new Set(report.remove.map((r) => r.index));
+      S.rules = S.rules.filter((_, i) => !drop.has(i));
+      await writeRulesCsv();
+      toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? "rule" : "rules"} — ${S.rules.length} left`);
+      return drop.size;
+    }
+    ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules, cleanupRules });
   };
 });
 
@@ -6076,7 +6248,7 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
+  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
@@ -6085,22 +6257,6 @@ var require_import = __commonJS((exports2, module2) => {
       $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement exports — or any CSV / TSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
-    }
-    function prepareRules() {
-      return S.rules.map((r) => ({ p: r.pattern.trim().toLowerCase(), category: r.category })).filter((r) => r.p);
-    }
-    function autoCategorise(desc, rules) {
-      const d = desc.trim().toLowerCase();
-      let best = "", bestLen = 0;
-      for (const r of rules) {
-        if (r.p === d)
-          return r.category;
-        if (r.p.length > bestLen && d.includes(r.p)) {
-          best = r.category;
-          bestLen = r.p.length;
-        }
-      }
-      return best;
     }
     function dedupIndex() {
       return buildIndex(S.txFiles);
@@ -6148,7 +6304,7 @@ var require_import = __commonJS((exports2, module2) => {
       const items = [];
       let skipped = 0;
       const label0 = detectAccountLabel(file.name, rows);
-      const rules = prepareRules();
+      const rules = prepareRules(S.rules);
       const ledger = [];
       const showBar = dataRows.length > 1500;
       if (showBar)
@@ -6933,6 +7089,7 @@ var require_controller = __commonJS((exports2, module2) => {
         else
           unlockGate();
       },
+      cleanupRules: () => ctx.cleanupRules(),
       hasDirty
     };
   }
@@ -8032,7 +8189,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
 });
 
 // src/main.js
-var { Plugin, TFile, TFolder, normalizePath } = require("obsidian");
+var { Plugin, TFile, TFolder, Notice, normalizePath } = require("obsidian");
 var { VIEW_TYPE, DEFAULT_SETTINGS } = require_constants();
 var { parseFrontmatter } = require_util();
 var { BudgetView } = require_view();
@@ -8047,6 +8204,21 @@ class BudgetPlugin extends Plugin {
     this.addRibbonIcon("wallet", "Open budget", () => this.activateView());
     this.addCommand({ id: "open-budget", name: "Open budget", callback: () => this.activateView() });
     this.addCommand({ id: "setup-wizard", name: "Set up budget (onboarding wizard)", callback: () => new OnboardingWizard(this.app, this).open() });
+    this.addCommand({
+      id: "tidy-categorisation-rules",
+      name: "Tidy categorisation rules",
+      callback: () => {
+        let ran = false;
+        this.forEachView((ctl) => {
+          if (!ran) {
+            ran = true;
+            ctl.cleanupRules();
+          }
+        });
+        if (!ran)
+          new Notice("Budget: open the budget first, then run this again.", 5000);
+      }
+    });
     this.addSettingTab(new BudgetSettingTab(this.app, this));
     if (this.settings.openOnStartup) {
       this.app.workspace.onLayoutReady(() => {

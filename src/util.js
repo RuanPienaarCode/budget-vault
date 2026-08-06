@@ -544,6 +544,42 @@ function learnPattern(desc) {
   return s.length >= 4 ? s : (desc ?? '').toString().trim();
 }
 
+/* Normalise the rule list ONCE per pass, not once per row. Rules grow with the
+   history, so lowercasing inside the match loop was rows × rules: measured
+   51ms at 1,200 rows and 2,000 rules on desktop, several hundred on a phone. */
+function prepareRules(rules) {
+  return (rules || [])
+    .map(r => ({ p: (r.pattern ?? '').trim().toLowerCase(), category: r.category }))
+    .filter(r => r.p);
+}
+
+/* Resolve a description against prepared rules and return the WINNING rule.
+   An exact pattern wins outright; otherwise the longest matching substring
+   wins, so a specific rule beats the general one it contains. The length test
+   comes before includes() because it is the cheaper comparison.
+
+   Ties are settled by rule order, which is why learnRules must not add a rule
+   the existing set already answers the same way (categories.js) and why
+   rule-cleanup.js restores a rejected candidate to its original slot.
+
+   Returning the rule rather than the category is what lets the cleanup preview
+   name the rule that covers a redundant one instead of merely asserting that
+   one exists. */
+function matchRule(desc, rules) {
+  const d = (desc ?? '').toString().trim().toLowerCase();
+  let best = null, bestLen = 0;
+  for (const r of rules) {
+    if (r.p === d) return r;
+    if (r.p.length > bestLen && d.includes(r.p)) { best = r; bestLen = r.p.length; }
+  }
+  return best;
+}
+
+function autoCategorise(desc, rules) {
+  const r = matchRule(desc, rules);
+  return r ? r.category : '';
+}
+
 /* Sanitise a string for safe use as a single path segment (folder/file name):
    strip path separators and filesystem-illegal characters, and neutralise
    "../" traversal attempts (dot runs, leading dots).
@@ -691,4 +727,4 @@ function isRealIsoDate(s) {
   return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };

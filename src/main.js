@@ -9,7 +9,7 @@
    them with bun into the single main.js that Obsidian loads.
    ============================================================================ */
 
-const { Plugin, TFile, TFolder, normalizePath } = require('obsidian');
+const { Plugin, TFile, TFolder, Notice, normalizePath } = require('obsidian');
 const { VIEW_TYPE, DEFAULT_SETTINGS } = require('./constants');
 const { parseFrontmatter } = require('./util');
 const { BudgetView } = require('./view');
@@ -24,6 +24,18 @@ class BudgetPlugin extends Plugin {
     this.addRibbonIcon('wallet', 'Open budget', () => this.activateView());
     this.addCommand({ id: 'open-budget', name: 'Open budget', callback: () => this.activateView() });
     this.addCommand({ id: 'setup-wizard', name: 'Set up budget (onboarding wizard)', callback: () => new OnboardingWizard(this.app, this).open() });
+    this.addCommand({
+      id: 'tidy-categorisation-rules',
+      name: 'Tidy categorisation rules',
+      callback: () => {
+        // Needs the vault already read into memory — the cleanup is decided by
+        // replaying real transaction descriptions, which only an open (and
+        // unlocked) view has. Nothing is written without the preview's OK.
+        let ran = false;
+        this.forEachView(ctl => { if (!ran) { ran = true; ctl.cleanupRules(); } });
+        if (!ran) new Notice('Budget: open the budget first, then run this again.', 5000);
+      },
+    });
     this.addSettingTab(new BudgetSettingTab(this.app, this));
     if (this.settings.openOnStartup) {
       this.app.workspace.onLayoutReady(() => {
