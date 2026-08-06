@@ -97,6 +97,21 @@ function analyseRules(rules, descriptions) {
     // Name the rule that now answers for it, so the preview can say why this
     // one is safe to lose rather than just asserting that it is.
     const cover = matchRule(descs[hits[0]], working);
+    /* Only ever delete the MORE SPECIFIC of the two. Passing the replay proves
+       a removal is safe for the transactions already in the vault; it does not
+       prove it for next month's statement. A rule whose cover is a substring of
+       it can only ever have matched descriptions the cover also matches, so
+       that one stays safe forever. The reverse — deleting a broad rule because
+       history happens to contain only a longer variant of it — is safe today
+       and a surprise later, and this file is not worth a surprise.
+
+       An identical pattern satisfies this too: a duplicate can only ever lose
+       to the copy that outranks it, in every future statement as much as this
+       one, so exactly one of each set survives. */
+    if (!cover || !rule.p.includes(cover.p)) {
+      working.splice(at, 0, rule);
+      continue;
+    }
     redundant.push({
       index: rule.i,
       pattern: all[rule.i].pattern,

@@ -273,9 +273,10 @@ class RulesCleanupModal extends Modal {
 
     c.append(el('p', { class: 'budget-tidy-lead' },
       `${remove.length} of ${total} rules can go, leaving ${kept}. `
-      + `Checked against every one of the ${checked} transaction descriptions in your vault: `
-      + 'each rule below was removed and every description it matched still came out with '
-      + 'the same category. Nothing you see anywhere in the app changes.'));
+      + `Every one was removed and re-checked against all ${checked} transaction descriptions `
+      + 'in your vault: each still came out with exactly the category it has now. '
+      + 'Each rule below is a longer version of one that stays, so future statements '
+      + 'match it the same way too.'));
 
     const list = el('div', { class: 'budget-tidy-list' });
     for (const r of redundant) {

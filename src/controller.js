@@ -521,6 +521,11 @@ function mountApp(view) {
       if (plugin.settings.privacyLock) lockGate();
       else unlockGate();
     },
+    /* Housekeeping, reached from the command palette rather than a page: it is
+       run once in a while and deliberately, and a button for it would sit on
+       one of these screens forever explaining itself to users who never need
+       it. Reads the loaded state, so it needs a view that has connected. */
+    cleanupRules: () => ctx.cleanupRules(),
     hasDirty,
   };
 }
