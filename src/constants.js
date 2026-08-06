@@ -27,7 +27,20 @@ const SUPPORT_URL = 'https://paypal.me/ruanpienaar86';
    because nobody thinks of themselves as being paid "every 14 days". */
 const PERIOD_PRESETS = { 0: 'Monthly (payday month)', 7: 'Every week', 14: 'Every 2 weeks', 28: 'Every 4 weeks' };
 
+/* A length set by hand in Settings.md that isn't one of the presets must still
+   appear, and appear truthfully. Snapping it to the nearest preset would edit
+   the user's file behind their back the moment they opened settings — or, in
+   the wizard's case, the moment they re-ran it against an existing vault.
+   Lives here rather than in settings-tab.js because the setup wizard offers
+   the same list, and settings-tab.js already requires onboarding.js — the same
+   require-cycle reason PERIOD_PRESETS itself sits here. */
+function periodLengthOptions(current) {
+  const o = { ...PERIOD_PRESETS };
+  if (current && !o[current]) o[current] = `Every ${current} days (set in Settings.md)`;
+  return o;
+}
+
 const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, periodLengthOptions };

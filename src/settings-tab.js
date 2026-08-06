@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, periodLengthOptions } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 const { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require('./util');
@@ -19,16 +19,8 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
    route through the getControlValue/setControlValue overrides instead. */
 const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 'period_days', 'period_anchor']);
 
-/* A length set by hand in Settings.md that isn't one of the presets must still
-   appear, and appear truthfully. Snapping it to the nearest preset would edit
-   the user's file behind their back the moment they opened settings. */
-function periodLengthOptions(current) {
-  const o = { ...PERIOD_PRESETS };
-  if (current && !o[current]) o[current] = `Every ${current} days (set in Settings.md)`;
-  return o;
-}
-
 /* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
+const MONTH_START_DESC = 'Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.';
 const PERIOD_LENGTH_DESC = 'How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.';
 const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
 const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
@@ -149,7 +141,7 @@ class BudgetSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Month start day')
-      .setDesc('Day of the month each financial period begins on (payday). 1–28.')
+      .setDesc(MONTH_START_DESC)
       .addText(t => {
         t.inputEl.type = 'number';
         t.setValue(String(md.month_start_day ?? 23));
@@ -446,7 +438,7 @@ class BudgetSettingTab extends PluginSettingTab {
       },
       {
         name: 'Month start day',
-        desc: 'Day of the month each financial period begins on (payday). 1–28.',
+        desc: MONTH_START_DESC,
         control: {
           type: 'number', key: 'month_start_day', defaultValue: 23, min: 1, max: 28,
           validate: v => {

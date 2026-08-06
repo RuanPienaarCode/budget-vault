@@ -45,33 +45,44 @@ function wiz(data) {
     'a fortnightly option must exist — this is the whole point of issue #1');
 }
 
-/* ---- a cycle is only ever half-written if BOTH halves are usable ---- */
+/* ---- a cycle is only ever half-written if BOTH halves are usable ----
+   The wizard holds SHAPE (periodDays, 0 = payday month) and PHASE (payday /
+   periodAnchor) as the two independent keys Settings.md stores, not as a
+   three-way calendar|payday|cycle mode. "Monthly" IS periodDays 0, so the
+   stale-field hazard the old mode check guarded is now unrepresentable. */
 {
-  eq(wiz({ periodMode: 'cycle', periodDays: 14, periodAnchor: '2026-08-07' }).cycleDays(), 14,
+  eq(wiz({ periodDays: 14, periodAnchor: '2026-08-07' }).cycleDays(), 14,
     'a complete cycle reports its length');
-  eq(wiz({ periodMode: 'cycle', periodDays: 14, periodAnchor: '' }).cycleDays(), 0,
+  eq(wiz({ periodDays: 14, periodAnchor: '' }).cycleDays(), 0,
     'a cycle with no anchor reports 0 — the loader would drop it anyway');
-  eq(wiz({ periodMode: 'cycle', periodDays: 14, periodAnchor: '7 Aug 2026' }).cycleDays(), 0,
+  eq(wiz({ periodDays: 14, periodAnchor: '7 Aug 2026' }).cycleDays(), 0,
     'a non-ISO anchor reports 0');
-  eq(wiz({ periodMode: 'cycle', periodDays: 400, periodAnchor: '2026-08-07' }).cycleDays(), 0,
+  eq(wiz({ periodDays: 400, periodAnchor: '2026-08-07' }).cycleDays(), 0,
     'an out-of-band length reports 0 rather than being coerced');
-  eq(wiz({ periodMode: 'payday', payday: 25, periodDays: 14, periodAnchor: '2026-08-07' }).cycleDays(), 0,
-    'choosing payday-to-payday ignores cycle fields left behind by a back-step');
-  eq(wiz({ periodMode: 'cycle', periodDays: 14, periodAnchor: '2026-08-07' }).cycleAnchor(), '2026-08-07',
+  eq(wiz({ periodDays: 0, payday: 25, periodAnchor: '2026-08-07' }).cycleDays(), 0,
+    'choosing monthly ignores an anchor left behind by a back-step');
+  eq(wiz({ periodDays: 14, periodAnchor: '2026-08-07' }).cycleAnchor(), '2026-08-07',
     'the anchor rides with the length');
-  eq(wiz({ periodMode: 'calendar', periodDays: 14, periodAnchor: '2026-08-07' }).cycleAnchor(), '',
+  eq(wiz({ periodDays: 0, periodAnchor: '2026-08-07' }).cycleAnchor(), '',
     'and is withheld when the length is');
+
+  /* Calendar month and payday month are ONE shape at two phases, which is the
+     whole reason the mode went away. Both must still land on the month shape. */
+  eq(wiz({ periodDays: 0, payday: 1 }).monthStartDay(), 1, 'day 1 is the calendar month');
+  eq(wiz({ periodDays: 0, payday: 25 }).monthStartDay(), 25, 'and any other day is a payday month');
+  eq(wiz({ periodDays: 14, periodAnchor: '2026-08-07', payday: 25 }).monthStartDay(), 25,
+    'month_start_day is still written under an interval, so turning the interval off lands somewhere sensible');
 }
 
 /* ---- the seeded budget file is named in the shape the app will look for ---- */
 {
-  const c = wiz({ periodMode: 'cycle', periodDays: 14, periodAnchor: '2026-08-07' }).firstPeriod();
+  const c = wiz({ periodDays: 14, periodAnchor: '2026-08-07' }).firstPeriod();
   ok(/^\d{4}-\d{2}-\d{2}$/.test(c), `a cycle seeds a DATE-named budget file, got "${c}"`);
 
-  const m = wiz({ periodMode: 'payday', payday: 25 }).firstPeriod();
+  const m = wiz({ periodDays: 0, payday: 25 }).firstPeriod();
   ok(/^\d{4}-\d{2}$/.test(m), `a payday month seeds a MONTH-named budget file, got "${m}"`);
 
-  const cal = wiz({ periodMode: 'calendar' }).firstPeriod();
+  const cal = wiz({ periodDays: 0, payday: 1 }).firstPeriod();
   ok(/^\d{4}-\d{2}$/.test(cal), `a calendar month does too, got "${cal}"`);
 
   // The seeded name must be a real period start, not merely date-shaped: the
@@ -102,13 +113,13 @@ function wiz(data) {
   };
 
   for (const [data, days, anchor, why] of [
-    [{ periodMode: 'cycle', periodDays: 14, periodAnchor: '2026-08-07' }, 14, '2026-08-07',
+    [{ periodDays: 14, periodAnchor: '2026-08-07' }, 14, '2026-08-07',
       'a fortnightly wizard run survives the round trip to disk and back'],
-    [{ periodMode: 'cycle', periodDays: 7, periodAnchor: '2026-08-07' }, 7, '2026-08-07',
+    [{ periodDays: 7, periodAnchor: '2026-08-07' }, 7, '2026-08-07',
       'so does a weekly one'],
-    [{ periodMode: 'payday', payday: 25 }, 0, '',
+    [{ periodDays: 0, payday: 25 }, 0, '',
       'a payday month writes no cycle keys and loads as monthly'],
-    [{ periodMode: 'calendar' }, 0, '',
+    [{ periodDays: 0, payday: 1 }, 0, '',
       'nor does a calendar month'],
   ]) {
     const w = wiz(data);

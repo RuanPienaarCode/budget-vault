@@ -3,6 +3,35 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.3.6 — 2026-08-05
+
+### Changed
+
+- **The setup wizard no longer offers "Calendar month" and "Payday to payday"
+  as if they were different things.** They were the same setting: a calendar
+  month is simply a budget month that starts on the 1st, and both options ran
+  the same code and wrote the same file. Worse, neither name appeared anywhere
+  in **Settings → Budget Vault**, which has only ever had a *month start day*
+  and a *period length* — so the wizard and the settings screen were teaching
+  two different ideas of one setting. The wizard now asks the same two
+  questions the settings screen does, in the same order: **how often are you
+  paid**, then either **which day your budget month starts** (with "choose 1
+  for an ordinary calendar month" said plainly) or **when you were last paid**.
+  Nothing about how periods are stored or calculated has changed, so existing
+  budgets are completely unaffected.
+- **"Month start day" in settings now mentions that 1 gives you an ordinary
+  calendar month.**
+
+### Fixed
+
+- **Re-running the setup wizard on a budget with an unusual pay cycle no longer
+  shows you the wrong one.** If `period_days` in your `Settings.md` was set by
+  hand to something outside the offered list — every 10 days, say — the
+  wizard's dropdown had no such option and fell back to displaying "Every
+  week". Your real setting was kept and written back correctly, but what you
+  saw was wrong. Both the wizard and the settings screen now list the value you
+  actually have.
+
 ## 1.3.5 — 2026-08-05
 
 ### Fixed
