@@ -227,7 +227,7 @@ module.exports = function registerCategories(ctx) {
   /* One serializer for the rules file, so learning and tidying can never write
      it two different ways. */
   function writeRulesCsv() {
-    const body = S.rules.map(r => [r.pattern, r.category].map(csvCell).join('\n')).length
+    const body = S.rules.length
       ? S.rules.map(r => [r.pattern, r.category].map(csvCell).join(',')).join('\n') + '\n'
       : '';
     return writeFile('Data/Categorisation Rules.csv', 'pattern,category\n' + body);
@@ -258,5 +258,5 @@ module.exports = function registerCategories(ctx) {
     return drop.size;
   }
 
-  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules });
+  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules, cleanupRules });
 };
