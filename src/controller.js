@@ -212,7 +212,15 @@ function mountApp(view) {
     const pref = plugin.settings.theme;
     const dark = pref === 'dark' || (pref === 'auto' && document.body.classList.contains('theme-dark'));
     root.classList.toggle('bud-dark', dark);
-    if (S.loaded && S.view === 'dashboard') ctx.renderTrend();
+    /* Every chart bakes the resolved palette into SVG attributes at render
+       time — SVG has no way to say "this fill is var(--color-success)" — so a
+       theme flip leaves them painted in the outgoing theme until they are
+       rebuilt. Only the charts on the view actually being looked at: the rest
+       redraw on their own when switched to. */
+    if (!S.loaded) return;
+    if (S.view === 'dashboard') { ctx.renderTrend(); ctx.renderSplit(); }
+    else if (S.view === 'savings') ctx.renderWorth();
+    else if (S.view === 'debts') ctx.replan();
   }
 
   /* --------------------------- dirty tracking ----------------------------
@@ -454,6 +462,13 @@ function mountApp(view) {
   // plan panels only, never the table the reader may be mid-edit in.
   $('#debtExtra').addEventListener('input', ctx.replan);
   $('#debtStrategy').addEventListener('change', ctx.replan);
+  // The chart range IS saved state — unlike the two above it says nothing
+  // about the household, only about how this reader likes to look at it.
+  $('#debtRange').addEventListener('change', async e => {
+    plugin.settings.chartDebtRange = e.target.value;
+    await plugin.saveSettings();
+    ctx.replan();
+  });
   $('#owedSave').addEventListener('click', ctx.saveOwed);
   $('#owedAdd').addEventListener('click', ctx.addOwed);
   $('#svcSave').addEventListener('click', ctx.saveServices);
