@@ -9,6 +9,13 @@ const DEFAULT_SETTINGS = {
   openOnStartup: false,
   onboarded: false,       // first-run wizard shown (or an existing budget was detected)
   privacyLock: true,      // splash gate: nothing loads or paints until "Enter budget" is tapped
+  /* Chart time ranges (keys from RANGES in chart.js). Plugin data rather than
+     Settings.md: these are display state, and Settings.md is the user's own
+     hand-editable file — UI preferences do not belong in it. Two keys rather
+     than one because the two charts mean different things by a range (history
+     behind you vs a schedule ahead of you) and want different defaults. */
+  chartTrendRange: '6m',
+  chartDebtRange: '5y',
 };
 
 /* Public feedback form — bug reports and feature requests. Opened in the

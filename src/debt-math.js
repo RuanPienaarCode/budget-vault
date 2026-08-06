@@ -76,7 +76,14 @@ function priorityOrder(debts, strategy) {
    clear date. Mapping before filtering keeps those positions stable even when a
    settled debt drops out.
 
-   Returns { months, interest, payoff: {key: month}, settled, stalled }. */
+   `series` is the total still owed at the END of each month, with `series[0]`
+   the opening balance before a cent is paid — so it always has months + 1
+   entries and can be plotted straight against a month axis. Recorded inside
+   this loop rather than by a second pass on purpose: a payoff CURVE drawn from
+   its own re-implementation would be free to disagree with the payoff DATE
+   printed beside it, and the reader would have no way to tell which one lied.
+
+   Returns { months, interest, payoff: {key: month}, settled, stalled, series }. */
 function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MONTHS } = {}) {
   const list = (debts || [])
     .map((d, idx) => ({
@@ -89,11 +96,13 @@ function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MO
       payment: Math.max(0, (Number(d.payment) || 0) + (Number(d.extra) || 0)),
     }))
     .filter(d => d.balance > EPS);
-  if (!list.length) return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [] };
+  if (!list.length) return { months: 0, interest: 0, payoff: {}, settled: true, stalled: [], series: [0] };
 
   const roll = strategy !== 'minimum';
   const pool = roll ? Math.max(0, Number(extra) || 0) : 0;
   const payoff = Object.create(null);
+  const owed = () => list.reduce((t, d) => t + d.balance, 0);
+  const series = [owed()];
   let interest = 0, m = 0;
 
   while (m < maxMonths && list.some(d => d.balance > EPS)) {
@@ -119,10 +128,11 @@ function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MO
         if (d.balance <= EPS) { d.balance = 0; payoff[d.key] = m; }
       }
     }
+    series.push(owed());
   }
 
   const stalled = list.filter(d => d.balance > EPS).map(d => d.name);
-  return { months: m, interest, payoff, settled: !stalled.length, stalled };
+  return { months: m, interest, payoff, settled: !stalled.length, stalled, series };
 }
 
 /* 'YYYY-MM' n months after `from` (a Date, default today). Day-of-month is
