@@ -7,7 +7,7 @@
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
-const { PERIOD_PRESETS, TYPE_ORDER, MONTHS } = require('./constants');
+const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require('./constants');
 const { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require('./util');
 
 
@@ -119,9 +119,14 @@ class OnboardingWizard extends Modal {
       folder: plugin.settings.budgetFolder || 'Finances/Budget',
       name: '',
       country: 'za',
-      periodMode: 'payday',         // 'calendar' | 'payday' | 'cycle'
-      payday: 25,
-      periodDays: 14,               // used only when periodMode === 'cycle'
+      /* Shape and phase, exactly as Settings.md stores them — NOT a three-way
+         "calendar | payday | cycle" mode. A calendar month is not a third kind
+         of period; it is a payday month whose start day happens to be the 1st,
+         and modelling it as its own mode meant the wizard offered two options
+         that ran the same code and produced the same file, while the settings
+         tab (which exposes these two keys directly) offered neither. */
+      periodDays: 0,                // 0 = payday month; 7/14/28… = an interval
+      payday: 25,                   // month_start_day, used when periodDays is 0
       periodAnchor: '',             // blank on purpose — see render_period
       currency: 'R',
       customCurrency: '',
@@ -205,20 +210,16 @@ class OnboardingWizard extends Modal {
       this.mode = this.detectExisting(folder) ? 'connect' : 'create';
       if (this.mode === 'connect' && !wasConnect) await this.prefillFromSettingsMd();
     }
-    if (step === 'period' && this.data.periodMode === 'payday') {
-      const d = Number(this.data.payday);
-      if (!Number.isInteger(d) || d < 1 || d > 28) {
-        this.fail('Payday must be a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.'); return;
-      }
-    }
-    if (step === 'period' && this.data.periodMode === 'cycle') {
-      // A cycle with no anchor has nothing to count from — the loader would
-      // drop both keys and quietly hand back monthly periods, which is a
-      // confusing thing to discover after finishing a wizard that asked.
+    if (step === 'period') {
       if (!periodDaysOrZero(this.data.periodDays)) {
-        this.fail('Pick how often you are paid.'); return;
-      }
-      if (!isRealIsoDate(this.data.periodAnchor)) {
+        const d = Number(this.data.payday);
+        if (!Number.isInteger(d) || d < 1 || d > 28) {
+          this.fail('The month start day must be from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.'); return;
+        }
+      } else if (!isRealIsoDate(this.data.periodAnchor)) {
+        // An interval with no anchor has nothing to count from — the loader
+        // drops both keys and quietly hands back monthly periods, which is a
+        // confusing thing to discover after finishing a wizard that asked.
         this.fail('Enter the date you were last paid — every pay cycle is counted from it, so without it the budget falls back to monthly periods.'); return;
       }
     }
@@ -240,16 +241,15 @@ class OnboardingWizard extends Modal {
     if (!f) return;
     const { parseFrontmatter } = require('./util');
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
+    // Shape and phase read independently, the same way Settings.md stores them.
+    // They no longer compete: a fortnightly vault keeps its cycle AND its month
+    // start day, where the old mode-based read had to pick one and could
+    // present a fortnightly vault as monthly, then write that back.
     const day = parseInt(fm.month_start_day, 10);
-    if (day >= 1 && day <= 28) { this.data.payday = day; this.data.periodMode = day === 1 ? 'calendar' : 'payday'; }
-    // A cycle already configured beats the month-start-day reading above — the
-    // two coexist in Settings.md, and re-running the wizard against a
-    // fortnightly vault must not silently present it as monthly and then
-    // write that back.
+    if (day >= 1 && day <= 28) this.data.payday = day;
     const cycleDays = periodDaysOrZero(fm.period_days);
     const cycleAnchor = (fm.period_anchor || '').toString().trim();
     if (cycleDays && isRealIsoDate(cycleAnchor)) {
-      this.data.periodMode = 'cycle';
       this.data.periodDays = cycleDays;
       this.data.periodAnchor = cycleAnchor;
     }
@@ -371,24 +371,30 @@ class OnboardingWizard extends Modal {
     }
   }
 
+  /* Two questions, because Settings.md holds two keys. "How often" picks the
+     SHAPE (a month named YYYY-MM, or an interval named by its start date);
+     the follow-up picks the PHASE (which day of the month, or which payday to
+     count from). A calendar month falls out of the first question answered
+     "monthly" and the second answered "the 1st" — it is not a third shape. */
   render_period(c) {
+    const days = periodDaysOrZero(this.data.periodDays);
     new Setting(c)
-      .setName('Budget period')
-      .setDesc('How long each budget period runs. Calendar and payday periods are both a month long; a pay cycle is a fixed number of days, for being paid fortnightly or weekly.')
-      .addDropdown(d => d
-        .addOption('calendar', 'Calendar month (1st to end of month)')
-        .addOption('payday', 'Payday to payday (monthly)')
-        .addOption('cycle', 'A pay cycle (fortnightly, weekly…)')
-        .setValue(this.data.periodMode)
-        .onChange(v => { this.data.periodMode = v; this.renderStep(); }));
-    if (this.data.periodMode === 'calendar') {
-      c.createDiv({ cls: 'budget-onb-hint', text: `Each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.` });
-    }
-    if (this.data.periodMode === 'payday') {
-      /* A payday period is named after the month it ENDS in — paid on the 25th,
-         the period 25 Aug – 24 Sep is "September". That is the convention the
-         whole app uses, and nobody derives it from a number field labelled
-         "Payday", so show it worked out with the day they actually chose. */
+      .setName('How often are you paid?')
+      .setDesc('Monthly periods are named by month and start on the day you choose below. The others line up with a pay cycle instead, counted from your last payday.')
+      .addDropdown(d => {
+        // periodLengthOptions, not PERIOD_PRESETS: re-running the wizard over a
+        // vault whose Settings.md was hand-set to, say, 10 days must SHOW that
+        // rather than silently display "Every week" over a value it kept.
+        for (const [v, label] of Object.entries(periodLengthOptions(days))) d.addOption(v, label);
+        d.setValue(String(days));
+        d.onChange(v => { this.data.periodDays = periodDaysOrZero(v); this.renderStep(); });
+      });
+    if (!days) {
+      /* A payday month is named after the month it ENDS in — start on the 25th
+         and 25 Aug – 24 Sep is "September". That is the convention the whole
+         app uses, and nobody derives it from a number field, so show it worked
+         out with the day they actually chose. Day 1 is the calendar month, and
+         says so rather than describing a period ending on "the 0th". */
       const hint = document.createElement('div');
       hint.className = 'budget-onb-hint';
       const paint = () => {
@@ -398,12 +404,12 @@ class OnboardingWizard extends Modal {
           return;
         }
         hint.textContent = d === 1
-          ? `Same as a calendar month: each period runs from the 1st to the end of the month. Right now you are in ${monthLabel(currentPeriodFor(1))}.`
+          ? `An ordinary calendar month: each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.`
           : `Each period runs from the ${ordinal(d)} to the ${ordinal(d - 1)} of the next month, and is named after the month it ends in. Right now you are in ${monthLabel(currentPeriodFor(d))}.`;
       };
       new Setting(c)
-        .setName('Payday')
-        .setDesc('The day of the month you get paid (1–28).')
+        .setName('Which day does your budget month start?')
+        .setDesc('Usually your payday. Choose 1 for an ordinary calendar month. (1–28)')
         .addText(t => {
           t.inputEl.type = 'number';
           t.inputEl.min = '1';
@@ -416,26 +422,16 @@ class OnboardingWizard extends Modal {
       c.appendChild(hint);
       paint();
     }
-    if (this.data.periodMode === 'cycle') {
+    if (days) {
       const hint = document.createElement('div');
       hint.className = 'budget-onb-hint';
       const paint = () => {
-        const days = periodDaysOrZero(this.data.periodDays);
-        if (!days || !isRealIsoDate(this.data.periodAnchor)) {
-          hint.textContent = 'Pick how often you are paid and when you were last paid, and the periods are worked out from there.';
+        if (!isRealIsoDate(this.data.periodAnchor)) {
+          hint.textContent = 'Enter the date you were last paid and the periods are worked out from there.';
           return;
         }
         hint.textContent = `Counting from there, the period you are in right now started on ${currentPeriodForCycle(days, this.data.periodAnchor)}. Budget files are named by that start date.`;
       };
-      new Setting(c)
-        .setName('How often are you paid?')
-        .addDropdown(d => {
-          for (const [days, label] of Object.entries(PERIOD_PRESETS)) {
-            if (Number(days)) d.addOption(days, label);   // 'monthly' is the other two modes
-          }
-          d.setValue(String(this.data.periodDays));
-          d.onChange(v => { this.data.periodDays = Number(v); paint(); });
-        });
       /* Deliberately blank rather than pre-filled with today or the most recent
          Friday. Nobody re-examines a date the app already filled in, so a
          confident wrong guess buys one less tap and costs a budget window
@@ -533,13 +529,14 @@ class OnboardingWizard extends Modal {
 
   render_finish(c) {
     const day = this.monthStartDay();
+    const cd = this.cycleDays();
     const rows = [
       ['Folder', this.data.folder],
       ['Name', this.data.name.trim() || '—'],
       ['Country', localeFor(this.data.country).label],
-      ['Budget period', this.data.periodMode === 'cycle'
-        ? `${PERIOD_PRESETS[this.cycleDays()]}, from ${this.data.periodAnchor}`
-        : day === 1 ? 'Calendar month' : `Payday to payday (day ${day})`],
+      ['Budget period', cd
+        ? `${PERIOD_PRESETS[cd] || `Every ${cd} days`}, counted from ${this.data.periodAnchor}`
+        : day === 1 ? 'Monthly (calendar month)' : `Monthly, starting on the ${ordinal(day)}`],
       ['Currency', this.currencySymbol()],
     ];
     if (this.mode === 'create') {
@@ -570,15 +567,19 @@ class OnboardingWizard extends Modal {
   }
 
   /* -------------------------------- apply --------------------------------- */
+  /* Always the phase of the month shape — including when an interval is chosen,
+     where month_start_day is still written so that turning the interval off
+     later lands on a sensible month rather than the 1st by accident. */
   monthStartDay() {
-    return this.data.periodMode === 'calendar' ? 1 : Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
+    return Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
   }
-  /* 0 unless a pay cycle was chosen AND has an anchor to count from. Both keys
+  /* 0 unless an interval was chosen AND has an anchor to count from. Both keys
      are written together or not at all, mirroring the loader, which drops both
-     when either is unusable. */
+     when either is unusable. Choosing "monthly" sets periodDays to 0, so a
+     stale anchor left by a back-step can no longer resurrect a cycle — that
+     used to need an explicit mode check here. */
   cycleDays() {
-    return this.data.periodMode === 'cycle' && isRealIsoDate(this.data.periodAnchor)
-      ? periodDaysOrZero(this.data.periodDays) : 0;
+    return isRealIsoDate(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
   }
   cycleAnchor() { return this.cycleDays() ? this.data.periodAnchor : ''; }
   /* The period the seeded budget file is named for — a date for a cycle, a

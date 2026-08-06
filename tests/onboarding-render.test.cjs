@@ -237,7 +237,7 @@ const open = (app, plugin) => { const w = new OnboardingWizard(app, plugin); w.o
 
   // Payday out of band.
   w.stepIdx = w.steps().indexOf('period'); w.renderStep();
-  w.data.periodMode = 'payday'; w.data.payday = '31';
+  w.data.periodDays = 0; w.data.payday = '31';
   await w.next();
   eq(w.stepIdx, w.steps().indexOf('period'), 'an out-of-band payday does not advance');
   const err = textOf(w.contentEl, 'budget-onb-error');
@@ -246,14 +246,14 @@ const open = (app, plugin) => { const w = new OnboardingWizard(app, plugin); w.o
   eq(NOTICES.length, 0, 'still no corner Notices anywhere in validation');
 
   // A cycle with no anchor is the silent-monthly trap — it must be caught.
-  w.data.periodMode = 'cycle'; w.data.periodDays = 14; w.data.periodAnchor = '';
+  w.data.periodDays = 14; w.data.periodAnchor = '';
   await w.next();
   eq(w.stepIdx, w.steps().indexOf('period'), 'a cycle with no anchor does not advance');
   ok(/monthly/i.test(textOf(w.contentEl, 'budget-onb-error')),
     'and the message names the consequence, not just the missing field');
 
   /* ---- 4: the payday step shows the convention worked out ---- */
-  w.data.periodMode = 'payday'; w.data.payday = 25;
+  w.data.periodDays = 0; w.data.payday = 25;
   w.renderStep();
   const hint = textOf(w.contentEl, 'budget-onb-hint');
   ok(hint.includes('25th') && hint.includes('24th'),
@@ -266,7 +266,43 @@ const open = (app, plugin) => { const w = new OnboardingWizard(app, plugin); w.o
   // a period running from the 1st to the 0th.
   w.data.payday = 1; w.renderStep();
   ok(/calendar month/i.test(textOf(w.contentEl, 'budget-onb-hint')),
-    'payday 1 is explained as a calendar month, not as "the 1st to the 0th"');
+    'day 1 is explained as a calendar month, not as "the 1st to the 0th"');
+
+  /* The period step asks TWO questions — shape then phase — mirroring the two
+     keys Settings.md holds. It must NOT re-grow a calendar|payday|cycle mode:
+     a calendar month is a monthly period starting on the 1st, and offering it
+     as its own option gave two controls that ran identical code and wrote an
+     identical file, while the settings tab offered neither. */
+  {
+    const shape = () => all(w.contentEl, e => e.tagName === 'SELECT')[0];
+    const fields = () => all(w.contentEl, e => e.tagName === 'INPUT');
+
+    w.data.periodDays = 0; w.renderStep();
+    eq(all(w.contentEl, e => e.tagName === 'SELECT').length, 1,
+      'one shape control on the period step, not a mode picker plus a length picker');
+    eq(shape()._options.map(o => o[0]), ['0', '7', '14', '28'],
+      'and its options are the storage-level lengths, monthly first');
+    eq(fields().map(i => i.attrs.type || i.type), ['number'],
+      'monthly asks for a day of the month');
+    ok(/start/i.test(textOf(w.contentEl, 'setting-item-name')),
+      'named for what it is — the day the budget month starts, not "Payday"');
+
+    shape()._onChange('14');
+    eq(w.data.periodDays, 14, 'switching the shape stores the day count');
+    eq(fields().map(i => i.attrs.type || i.type), ['date'],
+      'and the follow-up becomes a date, not a day-of-month');
+
+    shape()._onChange('0');
+    eq(w.data.periodDays, 0, '"Monthly" is periodDays 0 — the same key, not a separate mode');
+
+    // A length hand-set in Settings.md must survive a re-run of the wizard AND
+    // be shown truthfully, rather than displaying a preset over a kept value.
+    w.data.periodDays = 10; w.renderStep();
+    ok(shape()._options.some(o => o[0] === '10'),
+      'an out-of-preset length from Settings.md appears in the list');
+    eq(shape().value, '10', 'and is the selected option, not a preset shown over it');
+  }
+  w.data.periodDays = 0; w.data.payday = 25;
 
   /* ---- 5: country changes update the currency control, not just the value -- */
   w.stepIdx = w.steps().indexOf('country'); w.renderStep();
@@ -369,7 +405,7 @@ async function runApply() {
   const w = open(app, p);
   w.data.folder = 'Money/Budget';
   w.data.name = 'Alex';
-  w.data.periodMode = 'payday';
+  w.data.periodDays = 0;
   w.data.payday = 25;
   w.data.acctName = 'Cheque account';
   w.data.acctBalance = '1234.50';

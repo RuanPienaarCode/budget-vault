@@ -14,9 +14,15 @@ var require_constants = __commonJS((exports2, module2) => {
   var FEEDBACK_URL = "https://forms.gle/EVJKCuZxNQ9vJhTz6";
   var SUPPORT_URL = "https://paypal.me/ruanpienaar86";
   var PERIOD_PRESETS = { 0: "Monthly (payday month)", 7: "Every week", 14: "Every 2 weeks", 28: "Every 4 weeks" };
+  function periodLengthOptions(current) {
+    const o = { ...PERIOD_PRESETS };
+    if (current && !o[current])
+      o[current] = `Every ${current} days (set in Settings.md)`;
+    return o;
+  }
   var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS };
+  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, periodLengthOptions };
 });
 
 // src/util.js
@@ -6944,7 +6950,7 @@ var require_view = __commonJS((exports2, module2) => {
 var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
   var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
-  var { PERIOD_PRESETS, TYPE_ORDER, MONTHS } = require_constants();
+  var { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require_constants();
   var { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require_util();
   var STARTER_CATEGORIES = [
     { name: "Salary", type: "income", color: "#22c55e" },
@@ -7045,9 +7051,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
         folder: plugin.settings.budgetFolder || "Finances/Budget",
         name: "",
         country: "za",
-        periodMode: "payday",
+        periodDays: 0,
         payday: 25,
-        periodDays: 14,
         periodAnchor: "",
         currency: "R",
         customCurrency: "",
@@ -7117,19 +7122,14 @@ var require_onboarding = __commonJS((exports2, module2) => {
         if (this.mode === "connect" && !wasConnect)
           await this.prefillFromSettingsMd();
       }
-      if (step === "period" && this.data.periodMode === "payday") {
-        const d = Number(this.data.payday);
-        if (!Number.isInteger(d) || d < 1 || d > 28) {
-          this.fail("Payday must be a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.");
-          return;
-        }
-      }
-      if (step === "period" && this.data.periodMode === "cycle") {
+      if (step === "period") {
         if (!periodDaysOrZero(this.data.periodDays)) {
-          this.fail("Pick how often you are paid.");
-          return;
-        }
-        if (!isRealIsoDate(this.data.periodAnchor)) {
+          const d = Number(this.data.payday);
+          if (!Number.isInteger(d) || d < 1 || d > 28) {
+            this.fail("The month start day must be from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.");
+            return;
+          }
+        } else if (!isRealIsoDate(this.data.periodAnchor)) {
           this.fail("Enter the date you were last paid — every pay cycle is counted from it, so without it the budget falls back to monthly periods.");
           return;
         }
@@ -7156,14 +7156,11 @@ var require_onboarding = __commonJS((exports2, module2) => {
       const { parseFrontmatter } = require_util();
       const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
       const day = parseInt(fm.month_start_day, 10);
-      if (day >= 1 && day <= 28) {
+      if (day >= 1 && day <= 28)
         this.data.payday = day;
-        this.data.periodMode = day === 1 ? "calendar" : "payday";
-      }
       const cycleDays = periodDaysOrZero(fm.period_days);
       const cycleAnchor = (fm.period_anchor || "").toString().trim();
       if (cycleDays && isRealIsoDate(cycleAnchor)) {
-        this.data.periodMode = "cycle";
         this.data.periodDays = cycleDays;
         this.data.periodAnchor = cycleAnchor;
       }
@@ -7272,14 +7269,17 @@ var require_onboarding = __commonJS((exports2, module2) => {
       }
     }
     render_period(c) {
-      new Setting(c).setName("Budget period").setDesc("How long each budget period runs. Calendar and payday periods are both a month long; a pay cycle is a fixed number of days, for being paid fortnightly or weekly.").addDropdown((d) => d.addOption("calendar", "Calendar month (1st to end of month)").addOption("payday", "Payday to payday (monthly)").addOption("cycle", "A pay cycle (fortnightly, weekly…)").setValue(this.data.periodMode).onChange((v) => {
-        this.data.periodMode = v;
-        this.renderStep();
-      }));
-      if (this.data.periodMode === "calendar") {
-        c.createDiv({ cls: "budget-onb-hint", text: `Each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.` });
-      }
-      if (this.data.periodMode === "payday") {
+      const days = periodDaysOrZero(this.data.periodDays);
+      new Setting(c).setName("How often are you paid?").setDesc("Monthly periods are named by month and start on the day you choose below. The others line up with a pay cycle instead, counted from your last payday.").addDropdown((d) => {
+        for (const [v, label] of Object.entries(periodLengthOptions(days)))
+          d.addOption(v, label);
+        d.setValue(String(days));
+        d.onChange((v) => {
+          this.data.periodDays = periodDaysOrZero(v);
+          this.renderStep();
+        });
+      });
+      if (!days) {
         const hint = document.createElement("div");
         hint.className = "budget-onb-hint";
         const paint = () => {
@@ -7288,9 +7288,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
             hint.textContent = "Pick a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.";
             return;
           }
-          hint.textContent = d === 1 ? `Same as a calendar month: each period runs from the 1st to the end of the month. Right now you are in ${monthLabel(currentPeriodFor(1))}.` : `Each period runs from the ${ordinal(d)} to the ${ordinal(d - 1)} of the next month, and is named after the month it ends in. Right now you are in ${monthLabel(currentPeriodFor(d))}.`;
+          hint.textContent = d === 1 ? `An ordinary calendar month: each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.` : `Each period runs from the ${ordinal(d)} to the ${ordinal(d - 1)} of the next month, and is named after the month it ends in. Right now you are in ${monthLabel(currentPeriodFor(d))}.`;
         };
-        new Setting(c).setName("Payday").setDesc("The day of the month you get paid (1–28).").addText((t) => {
+        new Setting(c).setName("Which day does your budget month start?").setDesc("Usually your payday. Choose 1 for an ordinary calendar month. (1–28)").addText((t) => {
           t.inputEl.type = "number";
           t.inputEl.min = "1";
           t.inputEl.max = "28";
@@ -7305,28 +7305,16 @@ var require_onboarding = __commonJS((exports2, module2) => {
         c.appendChild(hint);
         paint();
       }
-      if (this.data.periodMode === "cycle") {
+      if (days) {
         const hint = document.createElement("div");
         hint.className = "budget-onb-hint";
         const paint = () => {
-          const days = periodDaysOrZero(this.data.periodDays);
-          if (!days || !isRealIsoDate(this.data.periodAnchor)) {
-            hint.textContent = "Pick how often you are paid and when you were last paid, and the periods are worked out from there.";
+          if (!isRealIsoDate(this.data.periodAnchor)) {
+            hint.textContent = "Enter the date you were last paid and the periods are worked out from there.";
             return;
           }
           hint.textContent = `Counting from there, the period you are in right now started on ${currentPeriodForCycle(days, this.data.periodAnchor)}. Budget files are named by that start date.`;
         };
-        new Setting(c).setName("How often are you paid?").addDropdown((d) => {
-          for (const [days, label] of Object.entries(PERIOD_PRESETS)) {
-            if (Number(days))
-              d.addOption(days, label);
-          }
-          d.setValue(String(this.data.periodDays));
-          d.onChange((v) => {
-            this.data.periodDays = Number(v);
-            paint();
-          });
-        });
         new Setting(c).setName("When were you last paid?").setDesc("Any recent payday will do — only where it falls within the cycle matters, so an earlier or later one gives the same periods.").addText((t) => {
           t.inputEl.type = "date";
           t.setValue(this.data.periodAnchor);
@@ -7410,11 +7398,12 @@ var require_onboarding = __commonJS((exports2, module2) => {
     }
     render_finish(c) {
       const day = this.monthStartDay();
+      const cd = this.cycleDays();
       const rows = [
         ["Folder", this.data.folder],
         ["Name", this.data.name.trim() || "—"],
         ["Country", localeFor(this.data.country).label],
-        ["Budget period", this.data.periodMode === "cycle" ? `${PERIOD_PRESETS[this.cycleDays()]}, from ${this.data.periodAnchor}` : day === 1 ? "Calendar month" : `Payday to payday (day ${day})`],
+        ["Budget period", cd ? `${PERIOD_PRESETS[cd] || `Every ${cd} days`}, counted from ${this.data.periodAnchor}` : day === 1 ? "Monthly (calendar month)" : `Monthly, starting on the ${ordinal(day)}`],
         ["Currency", this.currencySymbol()]
       ];
       if (this.mode === "create") {
@@ -7439,10 +7428,10 @@ var require_onboarding = __commonJS((exports2, module2) => {
       c.createDiv({ cls: "budget-onb-hint", text: "Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen." });
     }
     monthStartDay() {
-      return this.data.periodMode === "calendar" ? 1 : Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
+      return Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
     }
     cycleDays() {
-      return this.data.periodMode === "cycle" && isRealIsoDate(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
+      return isRealIsoDate(this.data.periodAnchor) ? periodDaysOrZero(this.data.periodDays) : 0;
     }
     cycleAnchor() {
       return this.cycleDays() ? this.data.periodAnchor : "";
@@ -7626,18 +7615,13 @@ tags: [finance, finance/budget, finance/budget/services]
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require("obsidian");
-  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PERIOD_PRESETS } = require_constants();
+  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, periodLengthOptions } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require_util();
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
-  function periodLengthOptions(current) {
-    const o = { ...PERIOD_PRESETS };
-    if (current && !o[current])
-      o[current] = `Every ${current} days (set in Settings.md)`;
-    return o;
-  }
+  var MONTH_START_DESC = "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.";
   var PERIOD_LENGTH_DESC = "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.";
   var PERIOD_ANCHOR_DESC = "When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.";
   var FEEDBACK_DESC = "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.";
@@ -7694,7 +7678,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           }, 800);
         });
       });
-      new Setting(containerEl).setName("Month start day").setDesc("Day of the month each financial period begins on (payday). 1–28.").addText((t) => {
+      new Setting(containerEl).setName("Month start day").setDesc(MONTH_START_DESC).addText((t) => {
         t.inputEl.type = "number";
         t.setValue(String(md.month_start_day ?? 23));
         t.onChange((v) => {
@@ -7926,7 +7910,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         },
         {
           name: "Month start day",
-          desc: "Day of the month each financial period begins on (payday). 1–28.",
+          desc: MONTH_START_DESC,
           control: {
             type: "number",
             key: "month_start_day",
