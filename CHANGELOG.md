@@ -3,6 +3,22 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.4.1 — 2026-08-06
+
+### Fixed
+
+- **"Tidy categorisation rules" now leaves a way back.** The command can
+  delete most of your rules file in one click — 832 of 1,342 on the vault it
+  was built against — and until now the only thing in front of that was the
+  preview. The preview still lists every removal, but nobody reads eight
+  hundred lines in a dialog, so the rules as they were are now saved to
+  `Data/Categorisation Rules.pre-tidy-<date>.csv` before anything is deleted.
+  If that file cannot be written, nothing is deleted at all.
+
+  Tidying twice in one day keeps the *first* backup rather than replacing it:
+  the earlier file is the one that predates both deletes, and it is the copy
+  worth having.
+
 ## 1.4.0 — 2026-08-06
 
 ### Added
