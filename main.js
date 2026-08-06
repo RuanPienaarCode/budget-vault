@@ -179,7 +179,7 @@ var require_util = __commonJS((exports2, module2) => {
     return out.join(`
 `);
   }
-  function parseCsv(text) {
+  function parseDelimited(text, delim) {
     const rows = [];
     let row = [], field = "", inQ = false;
     for (let i = 0;i < text.length; i++) {
@@ -195,7 +195,7 @@ var require_util = __commonJS((exports2, module2) => {
           field += ch;
       } else if (ch === '"')
         inQ = true;
-      else if (ch === ",") {
+      else if (ch === delim) {
         row.push(field);
         field = "";
       } else if (ch === `
@@ -216,6 +216,62 @@ var require_util = __commonJS((exports2, module2) => {
       rows.push(row);
     }
     return rows;
+  }
+  var parseCsv = (text) => parseDelimited(text, ",");
+  var DELIMS = [",", ";", "\t", "|"];
+  function sniffDelimiter(text) {
+    const sample = text.slice(0, 65536);
+    let best = ",", bestScore = 0;
+    for (const d of DELIMS) {
+      const counts = parseDelimited(sample, d).map((r) => r.length).filter((n) => n > 1);
+      if (!counts.length)
+        continue;
+      const freq = new Map;
+      for (const n of counts)
+        freq.set(n, (freq.get(n) || 0) + 1);
+      let mode = 0, agree = 0;
+      for (const [n, c] of freq)
+        if (c > agree) {
+          mode = n;
+          agree = c;
+        }
+      const score = agree * (mode - 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = d;
+      }
+    }
+    return best;
+  }
+  var parseStatement = (text) => parseDelimited(text, sniffDelimiter(text));
+  function decodeStatement(bytes) {
+    const b = bytes;
+    if (b.length >= 2 && b[0] === 255 && b[1] === 254)
+      return new TextDecoder("utf-16le").decode(b.subarray(2));
+    if (b.length >= 2 && b[0] === 254 && b[1] === 255)
+      return new TextDecoder("utf-16be").decode(b.subarray(2));
+    if (b.length >= 3 && b[0] === 239 && b[1] === 187 && b[2] === 191)
+      return new TextDecoder("utf-8").decode(b.subarray(3));
+    const head = b.subarray(0, 256);
+    let evenNul = 0, oddNul = 0;
+    for (let i = 0;i < head.length; i++)
+      if (head[i] === 0) {
+        if (i % 2)
+          oddNul++;
+        else
+          evenNul++;
+      }
+    if (head.length >= 8) {
+      if (oddNul > head.length / 4 && evenNul === 0)
+        return new TextDecoder("utf-16le").decode(b);
+      if (evenNul > head.length / 4 && oddNul === 0)
+        return new TextDecoder("utf-16be").decode(b);
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(b);
+    } catch (e) {
+      return new TextDecoder("windows-1252").decode(b);
+    }
   }
   function isoParts(y, mo, d) {
     if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31)
@@ -433,6 +489,26 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return s.length >= 4 ? s : (desc ?? "").toString().trim();
   }
+  function prepareRules(rules) {
+    return (rules || []).map((r) => ({ p: (r.pattern ?? "").trim().toLowerCase(), category: r.category })).filter((r) => r.p);
+  }
+  function matchRule(desc, rules) {
+    const d = (desc ?? "").toString().trim().toLowerCase();
+    let best = null, bestLen = 0;
+    for (const r of rules) {
+      if (r.p === d)
+        return r;
+      if (r.p.length > bestLen && d.includes(r.p)) {
+        best = r;
+        bestLen = r.p.length;
+      }
+    }
+    return best;
+  }
+  function autoCategorise(desc, rules) {
+    const r = matchRule(desc, rules);
+    return r ? r.category : "";
+  }
   var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   function safeSeg(s) {
     const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
@@ -515,7 +591,7 @@ var require_util = __commonJS((exports2, module2) => {
     const back = new Date(t);
     return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -989,10 +1065,13 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
-              <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
+              <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
               <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
-            <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <!-- Tab- and semicolon-separated exports are read too (the delimiter
+                 is sniffed from the file), and banks hand those out as .txt and
+                 .tsv as often as .csv — so the picker must offer them. -->
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
               <p>Most banks import as-is — columns are matched by header name, the layout is read
@@ -1288,7 +1367,49 @@ var require_modal = __commonJS((exports2, module2) => {
   function askSplit(app, opts) {
     return new Promise((res) => new SplitModal(app, opts, res).open());
   }
-  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };
+
+  class RulesCleanupModal extends Modal {
+    constructor(app, report, resolve) {
+      super(app);
+      this.report = report;
+      this.resolve = resolve;
+      this.answer = false;
+    }
+    onOpen() {
+      const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
+      this.titleEl.setText("Tidy categorisation rules");
+      const c = this.contentEl;
+      if (!remove.length) {
+        c.append(el("p", { class: "budget-tidy-lead" }, total === 0 ? "There are no categorisation rules yet. They get written as you categorise imported transactions." : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
+        new Setting(c).addButton((b) => b.setButtonText("Close").setCta().onClick(() => this.close()));
+        return;
+      }
+      c.append(el("p", { class: "budget-tidy-lead" }, `${remove.length} of ${total} rules can go, leaving ${kept}. ` + `Checked against every one of the ${checked} transaction descriptions in your vault: ` + "each rule below was removed and every description it matched still came out with " + "the same category. Nothing you see anywhere in the app changes."));
+      const list = el("div", { class: "budget-tidy-list" });
+      for (const r of redundant) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern" }, r.pattern), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · already covered by “${r.coveredBy}”`)));
+      }
+      for (const r of blank) {
+        list.append(el("div", { class: "budget-tidy-row" }, el("div", { class: "budget-tidy-pattern budget-tidy-empty" }, "(blank pattern)"), el("div", { class: "budget-tidy-why" }, `→ ${r.category || "(no category)"} · matches nothing, already ignored on import`)));
+      }
+      c.append(list);
+      if (dormant.length) {
+        c.append(el("p", { class: "budget-tidy-hint" }, `${dormant.length} other ${dormant.length === 1 ? "rule matches" : "rules match"} nothing in your history yet. ` + "Those are being kept — a rule with no transactions behind it may simply be waiting " + "for one, and this cannot tell that apart from a rule you have finished with."));
+      }
+      new Setting(c).addButton((b) => b.setButtonText("Cancel").onClick(() => this.close())).addButton((b) => b.setButtonText(`Remove ${remove.length} ${remove.length === 1 ? "rule" : "rules"}`).setWarning().onClick(() => {
+        this.answer = true;
+        this.close();
+      }));
+    }
+    onClose() {
+      this.contentEl.empty();
+      this.resolve(this.answer);
+    }
+  }
+  function askRulesCleanup(app, report) {
+    return new Promise((res) => new RulesCleanupModal(app, report, res).open());
+  }
+  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
 });
 
 // src/locale.js
@@ -2448,7 +2569,7 @@ var require_load = __commonJS((exports2, module2) => {
 
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter, learnPattern, safeSeg, yamlStr, csvCell } = require_util();
+  var { el, parseFrontmatter, learnPattern, prepareRules, autoCategorise, safeSeg, yamlStr, csvCell } = require_util();
   var { TYPE_ORDER } = require_constants();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerCategories(ctx) {
@@ -2635,6 +2756,7 @@ Budget category of type **${type}**.
     }
     async function learnRules(pairs) {
       const have = new Set(S.rules.map((r) => r.pattern.trim().toLowerCase()));
+      const matcher = prepareRules(S.rules);
       let added = 0;
       for (const { desc, cat } of pairs) {
         if (!cat)
@@ -2643,7 +2765,12 @@ Budget category of type **${type}**.
         const key = pattern.trim().toLowerCase();
         if (!key || have.has(key))
           continue;
+        if (autoCategorise(pattern, matcher) === cat) {
+          have.add(key);
+          continue;
+        }
         S.rules.push({ pattern, category: cat });
+        matcher.push({ p: key, category: cat });
         have.add(key);
         added++;
       }
@@ -6017,31 +6144,15 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
+  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
     function renderImport() {
       const loc = locale();
-      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
+      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement exports — or any CSV / TSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
-    }
-    function prepareRules() {
-      return S.rules.map((r) => ({ p: r.pattern.trim().toLowerCase(), category: r.category })).filter((r) => r.p);
-    }
-    function autoCategorise(desc, rules) {
-      const d = desc.trim().toLowerCase();
-      let best = "", bestLen = 0;
-      for (const r of rules) {
-        if (r.p === d)
-          return r.category;
-        if (r.p.length > bestLen && d.includes(r.p)) {
-          best = r.category;
-          bestLen = r.p.length;
-        }
-      }
-      return best;
     }
     function dedupIndex() {
       return buildIndex(S.txFiles);
@@ -6070,11 +6181,11 @@ var require_import = __commonJS((exports2, module2) => {
       }
       return "";
     }
-    async function handleCsvFile(file) {
-      const text = await file.text();
-      const rows = parseCsv(text);
+    async function handleStatementFile(file) {
+      const text = decodeStatement(new Uint8Array(await file.arrayBuffer()));
+      const rows = parseStatement(text);
       if (!rows.length)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const loc = locale();
       const map = detectStatementColumns(rows, loc.dayFirst);
       if (!map)
@@ -6089,7 +6200,7 @@ var require_import = __commonJS((exports2, module2) => {
       const items = [];
       let skipped = 0;
       const label0 = detectAccountLabel(file.name, rows);
-      const rules = prepareRules();
+      const rules = prepareRules(S.rules);
       const ledger = [];
       const showBar = dataRows.length > 1500;
       if (showBar)
@@ -6180,7 +6291,7 @@ var require_import = __commonJS((exports2, module2) => {
       const loc = locale();
       const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
       if (!width)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
       const header = headerIdx >= 0 ? rows[headerIdx] : null;
       let start = detected ? detected.dataStart : rows.findIndex((r) => r.length >= 3 && r.some((c) => parseStatementDate(c, loc.dayFirst)) && r.some((c) => normalizeAmount(c) != null));
@@ -6409,7 +6520,7 @@ var require_import = __commonJS((exports2, module2) => {
         return toast("Drop a statement first", true);
       showColumnMapper(p.rows, p.file, p.map);
     }
-    ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
+    ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport });
   };
 });
 
@@ -6830,7 +6941,7 @@ var require_controller = __commonJS((exports2, module2) => {
     drop.addEventListener("click", () => $("#fileInput").click());
     $("#fileInput").addEventListener("change", (e) => {
       if (e.target.files[0])
-        ctx.handleCsvFile(e.target.files[0]);
+        ctx.handleStatementFile(e.target.files[0]);
       e.target.value = "";
     });
     drop.addEventListener("dragover", (e) => {
@@ -6842,7 +6953,7 @@ var require_controller = __commonJS((exports2, module2) => {
       e.preventDefault();
       drop.classList.remove("dragover");
       if (e.dataTransfer.files[0])
-        ctx.handleCsvFile(e.dataTransfer.files[0]);
+        ctx.handleStatementFile(e.dataTransfer.files[0]);
     });
     return {
       start: async () => {

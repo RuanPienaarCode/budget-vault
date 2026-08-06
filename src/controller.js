@@ -478,12 +478,12 @@ function mountApp(view) {
   $('#impRemap').addEventListener('click', ctx.remapImport);
   const drop = $('#drop');
   drop.addEventListener('click', () => $('#fileInput').click());
-  $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleCsvFile(e.target.files[0]); e.target.value = ''; });
+  $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleStatementFile(e.target.files[0]); e.target.value = ''; });
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
   drop.addEventListener('drop', e => {
     e.preventDefault(); drop.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) ctx.handleCsvFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files[0]) ctx.handleStatementFile(e.dataTransfer.files[0]);
   });
 
   return {

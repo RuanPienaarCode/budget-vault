@@ -234,4 +234,86 @@ function askSplit(app, opts) {
   return new Promise(res => new SplitModal(app, opts, res).open());
 }
 
-module.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit };
+/* Rules cleanup preview — show exactly which rules a tidy would delete, and
+   why each one is safe, BEFORE anything is written.
+
+   `opts`: the report from rule-cleanup.js analyseRules(), plus { money } is
+   not needed. Resolves true only if the user clicks the remove button.
+
+   The preview is the feature, not a courtesy wrapper around it. This is a bulk
+   delete against a file the user owns and can hand-edit, so "trust me, 853 of
+   these do nothing" is not something the plugin gets to assert — it has to
+   show its work, name the surviving rule that covers each deletion, and let
+   the user close the box without doing anything. Deleting nothing is a
+   perfectly good outcome here.
+
+   Every deletion is listed, not a sample: a truncated list would mean the one
+   rule the user cared about is the one they could not see. */
+class RulesCleanupModal extends Modal {
+  constructor(app, report, resolve) {
+    super(app);
+    this.report = report;
+    this.resolve = resolve;
+    this.answer = false;
+  }
+
+  onOpen() {
+    const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
+    this.titleEl.setText('Tidy categorisation rules');
+    const c = this.contentEl;
+
+    if (!remove.length) {
+      c.append(el('p', { class: 'budget-tidy-lead' },
+        total === 0
+          ? 'There are no categorisation rules yet. They get written as you categorise imported transactions.'
+          : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
+      new Setting(c).addButton(b => b.setButtonText('Close').setCta().onClick(() => this.close()));
+      return;
+    }
+
+    c.append(el('p', { class: 'budget-tidy-lead' },
+      `${remove.length} of ${total} rules can go, leaving ${kept}. `
+      + `Checked against every one of the ${checked} transaction descriptions in your vault: `
+      + 'each rule below was removed and every description it matched still came out with '
+      + 'the same category. Nothing you see anywhere in the app changes.'));
+
+    const list = el('div', { class: 'budget-tidy-list' });
+    for (const r of redundant) {
+      list.append(el('div', { class: 'budget-tidy-row' },
+        el('div', { class: 'budget-tidy-pattern' }, r.pattern),
+        el('div', { class: 'budget-tidy-why' },
+          `→ ${r.category || '(no category)'} · already covered by “${r.coveredBy}”`)));
+    }
+    for (const r of blank) {
+      list.append(el('div', { class: 'budget-tidy-row' },
+        el('div', { class: 'budget-tidy-pattern budget-tidy-empty' }, '(blank pattern)'),
+        el('div', { class: 'budget-tidy-why' },
+          `→ ${r.category || '(no category)'} · matches nothing, already ignored on import`)));
+    }
+    c.append(list);
+
+    // Dormant rules are the ones this cannot vouch for, so they are named as
+    // kept rather than quietly folded into the count.
+    if (dormant.length) {
+      c.append(el('p', { class: 'budget-tidy-hint' },
+        `${dormant.length} other ${dormant.length === 1 ? 'rule matches' : 'rules match'} nothing in your history yet. `
+        + 'Those are being kept — a rule with no transactions behind it may simply be waiting '
+        + 'for one, and this cannot tell that apart from a rule you have finished with.'));
+    }
+
+    new Setting(c)
+      .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
+      .addButton(b => b
+        .setButtonText(`Remove ${remove.length} ${remove.length === 1 ? 'rule' : 'rules'}`)
+        .setWarning()
+        .onClick(() => { this.answer = true; this.close(); }));
+  }
+
+  onClose() { this.contentEl.empty(); this.resolve(this.answer); }
+}
+
+function askRulesCleanup(app, report) {
+  return new Promise(res => new RulesCleanupModal(app, report, res).open());
+}
+
+module.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
