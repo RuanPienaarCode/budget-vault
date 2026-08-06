@@ -179,7 +179,7 @@ var require_util = __commonJS((exports2, module2) => {
     return out.join(`
 `);
   }
-  function parseCsv(text) {
+  function parseDelimited(text, delim) {
     const rows = [];
     let row = [], field = "", inQ = false;
     for (let i = 0;i < text.length; i++) {
@@ -195,7 +195,7 @@ var require_util = __commonJS((exports2, module2) => {
           field += ch;
       } else if (ch === '"')
         inQ = true;
-      else if (ch === ",") {
+      else if (ch === delim) {
         row.push(field);
         field = "";
       } else if (ch === `
@@ -216,6 +216,62 @@ var require_util = __commonJS((exports2, module2) => {
       rows.push(row);
     }
     return rows;
+  }
+  var parseCsv = (text) => parseDelimited(text, ",");
+  var DELIMS = [",", ";", "\t", "|"];
+  function sniffDelimiter(text) {
+    const sample = text.slice(0, 65536);
+    let best = ",", bestScore = 0;
+    for (const d of DELIMS) {
+      const counts = parseDelimited(sample, d).map((r) => r.length).filter((n) => n > 1);
+      if (!counts.length)
+        continue;
+      const freq = new Map;
+      for (const n of counts)
+        freq.set(n, (freq.get(n) || 0) + 1);
+      let mode = 0, agree = 0;
+      for (const [n, c] of freq)
+        if (c > agree) {
+          mode = n;
+          agree = c;
+        }
+      const score = agree * (mode - 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = d;
+      }
+    }
+    return best;
+  }
+  var parseStatement = (text) => parseDelimited(text, sniffDelimiter(text));
+  function decodeStatement(bytes) {
+    const b = bytes;
+    if (b.length >= 2 && b[0] === 255 && b[1] === 254)
+      return new TextDecoder("utf-16le").decode(b.subarray(2));
+    if (b.length >= 2 && b[0] === 254 && b[1] === 255)
+      return new TextDecoder("utf-16be").decode(b.subarray(2));
+    if (b.length >= 3 && b[0] === 239 && b[1] === 187 && b[2] === 191)
+      return new TextDecoder("utf-8").decode(b.subarray(3));
+    const head = b.subarray(0, 256);
+    let evenNul = 0, oddNul = 0;
+    for (let i = 0;i < head.length; i++)
+      if (head[i] === 0) {
+        if (i % 2)
+          oddNul++;
+        else
+          evenNul++;
+      }
+    if (head.length >= 8) {
+      if (oddNul > head.length / 4 && evenNul === 0)
+        return new TextDecoder("utf-16le").decode(b);
+      if (evenNul > head.length / 4 && oddNul === 0)
+        return new TextDecoder("utf-16be").decode(b);
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(b);
+    } catch (e) {
+      return new TextDecoder("windows-1252").decode(b);
+    }
   }
   function isoParts(y, mo, d) {
     if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31)
@@ -515,7 +571,7 @@ var require_util = __commonJS((exports2, module2) => {
     const back = new Date(t);
     return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -989,10 +1045,13 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
-              <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
+              <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
               <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
-            <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <!-- Tab- and semicolon-separated exports are read too (the delimiter
+                 is sniffed from the file), and banks hand those out as .txt and
+                 .tsv as often as .csv — so the picker must offer them. -->
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
               <p>Most banks import as-is — columns are matched by header name, the layout is read
@@ -6017,13 +6076,13 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseCsv, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
+  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
     function renderImport() {
       const loc = locale();
-      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement CSV exports — or any CSV with Date / Description / Amount columns";
+      $("#importSubNote").textContent = loc.banks ? `Bank statement exports — tested with ${loc.banks}, other banks usually work too — or your own CSV` : "Bank statement exports — or any CSV / TSV with Date / Description / Amount columns";
       if (loc.importHint)
         $("#importDropHint").textContent = loc.importHint;
     }
@@ -6070,11 +6129,11 @@ var require_import = __commonJS((exports2, module2) => {
       }
       return "";
     }
-    async function handleCsvFile(file) {
-      const text = await file.text();
-      const rows = parseCsv(text);
+    async function handleStatementFile(file) {
+      const text = decodeStatement(new Uint8Array(await file.arrayBuffer()));
+      const rows = parseStatement(text);
       if (!rows.length)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const loc = locale();
       const map = detectStatementColumns(rows, loc.dayFirst);
       if (!map)
@@ -6180,7 +6239,7 @@ var require_import = __commonJS((exports2, module2) => {
       const loc = locale();
       const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
       if (!width)
-        return toast("Empty CSV", true);
+        return toast("Empty statement file", true);
       const headerIdx = detected && detected.headerIdx >= 0 ? detected.headerIdx : -1;
       const header = headerIdx >= 0 ? rows[headerIdx] : null;
       let start = detected ? detected.dataStart : rows.findIndex((r) => r.length >= 3 && r.some((c) => parseStatementDate(c, loc.dayFirst)) && r.some((c) => normalizeAmount(c) != null));
@@ -6409,7 +6468,7 @@ var require_import = __commonJS((exports2, module2) => {
         return toast("Drop a statement first", true);
       showColumnMapper(p.rows, p.file, p.map);
     }
-    ctx.provide({ handleCsvFile, commitImport, renderImport, remapImport });
+    ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport });
   };
 });
 
@@ -6830,7 +6889,7 @@ var require_controller = __commonJS((exports2, module2) => {
     drop.addEventListener("click", () => $("#fileInput").click());
     $("#fileInput").addEventListener("change", (e) => {
       if (e.target.files[0])
-        ctx.handleCsvFile(e.target.files[0]);
+        ctx.handleStatementFile(e.target.files[0]);
       e.target.value = "";
     });
     drop.addEventListener("dragover", (e) => {
@@ -6842,7 +6901,7 @@ var require_controller = __commonJS((exports2, module2) => {
       e.preventDefault();
       drop.classList.remove("dragover");
       if (e.dataTransfer.files[0])
-        ctx.handleCsvFile(e.dataTransfer.files[0]);
+        ctx.handleStatementFile(e.dataTransfer.files[0]);
     });
     return {
       start: async () => {
