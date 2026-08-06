@@ -5,7 +5,7 @@
    grows. Most of what accumulates is a longer pattern sitting on top of a
    shorter one that already gives the same answer: it wins the match (longest
    wins) and returns the category the shorter rule would have returned anyway.
-   Measured on a real 1,342-rule vault, 64% of the file was that.
+   Measured on a real 1,342-rule vault, 62% of the file was that.
 
    "Redundant" here is NOT a heuristic about pattern shapes. Guessing from the
    rule file alone is unsound — two patterns of equal length, or patterns that

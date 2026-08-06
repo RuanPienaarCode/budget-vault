@@ -197,7 +197,7 @@ module.exports = function registerCategories(ctx) {
      comparison on every row of every future import, and — because the rules
      file is the user's own markdown-adjacent CSV, not plugin state — it would
      put a line in front of them that explains nothing. Measured on a real
-     1,342-rule vault: 853 of them (64%) were already answered by a shorter
+     1,342-rule vault: 832 of them (62%) were already answered by a shorter
      rule pointing at the same category, so this is the difference between a
      file that stabilises and one that grows with the history forever. */
   async function learnRules(pairs) {
@@ -224,13 +224,19 @@ module.exports = function registerCategories(ctx) {
     return added;
   }
 
-  /* One serializer for the rules file, so learning and tidying can never write
-     it two different ways. */
-  function writeRulesCsv() {
-    const body = S.rules.length
-      ? S.rules.map(r => [r.pattern, r.category].map(csvCell).join(',')).join('\n') + '\n'
+  /* One serializer for the rules file, so learning, tidying and the pre-tidy
+     backup can never write it three different ways. Takes the rules rather
+     than reading S.rules, so the backup can serialize the set as it was
+     BEFORE the delete without a second copy of this. */
+  function rulesCsv(rules) {
+    const body = rules.length
+      ? rules.map(r => [r.pattern, r.category].map(csvCell).join(',')).join('\n') + '\n'
       : '';
-    return writeFile('Data/Categorisation Rules.csv', 'pattern,category\n' + body);
+    return 'pattern,category\n' + body;
+  }
+
+  function writeRulesCsv() {
+    return writeFile('Data/Categorisation Rules.csv', rulesCsv(S.rules));
   }
 
   /* Remove the rules that have stopped earning their place — see
@@ -239,7 +245,14 @@ module.exports = function registerCategories(ctx) {
 
      Nothing is written until the preview comes back true. A bulk delete on a
      file the user owns is exactly the wrong place for the plugin to act first
-     and report afterwards. */
+     and report afterwards.
+
+     And the preview is not enough on its own. A confirmed run routinely drops
+     the majority of the file — 832 of 1,342 on the vault this was built
+     against — and no one can meaningfully audit eight hundred lines in a
+     dialog. So the pre-delete set is written beside the live file first, and
+     the delete is abandoned if that write fails: a tidy that cannot leave a
+     way back does not happen. */
   async function cleanupRules() {
     const descs = [];
     for (const f of Object.values(S.txFiles || {})) {
@@ -251,10 +264,31 @@ module.exports = function registerCategories(ctx) {
     }
     const report = analyseRules(S.rules, descs);
     if (!await askRulesCleanup(app, report)) return 0;
+
+    /* LOCAL calendar date, not toISOString(): that is UTC, and at 01:00 in
+       Johannesburg it names the backup after yesterday — which reads as an
+       older file than it is at exactly the moment someone is looking for the
+       newest one. */
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const backup = `Data/Categorisation Rules.pre-tidy-${stamp}.csv`;
+    /* Tidy twice in one day and the second run must NOT overwrite the first:
+       the earlier file is the more complete snapshot — it predates both
+       deletes — and rewriting it would trade the only full copy for a partial
+       one. First backup of the day wins; later runs keep it. */
+    if (!fileAt(backup)) {
+      try {
+        await writeFile(backup, rulesCsv(S.rules));
+      } catch (err) {
+        toast(`Could not write the backup — nothing was deleted. ${err && err.message ? err.message : err}`, true);
+        return 0;
+      }
+    }
+
     const drop = new Set(report.remove.map(r => r.index));
     S.rules = S.rules.filter((_, i) => !drop.has(i));
     await writeRulesCsv();
-    toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? 'rule' : 'rules'} — ${S.rules.length} left`);
+    toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? 'rule' : 'rules'} — ${S.rules.length} left. Previous set saved to ${backup.split('/').pop()}`);
     return drop.size;
   }
 
