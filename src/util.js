@@ -181,7 +181,7 @@ function patchFrontmatter(raw, updates) {
   }
   return out.join('\n');
 }
-function parseCsv(text) {
+function parseDelimited(text, delim) {
   const rows = []; let row = [], field = '', inQ = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
@@ -189,7 +189,7 @@ function parseCsv(text) {
       if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
       else field += ch;
     } else if (ch === '"') inQ = true;
-    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === delim) { row.push(field); field = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
       row.push(field); field = '';
@@ -199,6 +199,79 @@ function parseCsv(text) {
   }
   if (field !== '' || row.length) { row.push(field); rows.push(row); }
   return rows;
+}
+/* Comma-delimited, always. This is the app's OWN files — Data/Categorisation
+   Rules.csv, written by csvCell — where the delimiter is known and sniffing it
+   would be a way to corrupt a rule whose pattern happens to contain a
+   semicolon. Foreign statements go through parseStatement instead. */
+const parseCsv = text => parseDelimited(text, ',');
+
+/* Which character separates the fields of a statement we did not write?
+   Comma is the SA/US/UK default, but a bank exporting for a comma-decimal
+   locale writes semicolons ("1.234,56;GROCER;01/02/2026"), and "export to
+   text" paths hand out tabs. Guessing wrong doesn't fail loudly — it yields
+   one giant field per row, which reaches detectStatementColumns as an
+   unrecognisable file and sends the user to the manual mapper with nothing
+   useful to map.
+
+   Scored by how many delimiters land inside a CONSISTENT block of rows, not
+   by raw frequency: on a semicolon file the commas are decimal separators and
+   are genuinely numerous, but they produce a ragged field count while the
+   semicolons produce a square one. `agree * (mode - 1)` is the number of
+   separators participating in that square block, which reads both signals as
+   one number. Comma is tested first and ties are kept, so an ordinary CSV can
+   never be talked out of being an ordinary CSV. */
+const DELIMS = [',', ';', '\t', '|'];
+function sniffDelimiter(text) {
+  const sample = text.slice(0, 65536);
+  let best = ',', bestScore = 0;
+  for (const d of DELIMS) {
+    const counts = parseDelimited(sample, d).map(r => r.length).filter(n => n > 1);
+    if (!counts.length) continue;
+    // Modal field count, and how many rows agree with it.
+    const freq = new Map();
+    for (const n of counts) freq.set(n, (freq.get(n) || 0) + 1);
+    let mode = 0, agree = 0;
+    for (const [n, c] of freq) if (c > agree) { mode = n; agree = c; }
+    const score = agree * (mode - 1);
+    if (score > bestScore) { bestScore = score; best = d; }
+  }
+  return best;
+}
+/* Parse a foreign statement: sniff the delimiter, then read it. */
+const parseStatement = text => parseDelimited(text, sniffDelimiter(text));
+
+/* Decode a dropped statement's bytes to text.
+
+   `file.text()` decodes as UTF-8 unconditionally. A statement exported from a
+   Windows banking portal is often windows-1252 (or UTF-16 with a BOM), and
+   decoding those as UTF-8 doesn't throw — it yields replacement characters
+   inside merchant names, which then flow into the dedup key and into learned
+   categorisation rules. That is a silent wrong answer, so the encoding is
+   established from the bytes here rather than assumed.
+
+   Pure and byte-in/string-out so it can be tested without a File. */
+function decodeStatement(bytes) {
+  const b = bytes;
+  if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+  if (b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+  if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+  /* BOM-less UTF-16. Worth detecting explicitly because it is the one case the
+     fatal-UTF-8 probe below CANNOT catch: NUL is valid UTF-8, so ASCII text in
+     UTF-16 decodes "successfully" into a string with a NUL between every
+     letter — which parses, imports, and looks like a merchant name with gaps.
+     ASCII in UTF-16LE puts its NUL in the odd byte, UTF-16BE in the even one. */
+  const head = b.subarray(0, 256);
+  let evenNul = 0, oddNul = 0;
+  for (let i = 0; i < head.length; i++) if (head[i] === 0) { if (i % 2) oddNul++; else evenNul++; }
+  if (head.length >= 8) {
+    if (oddNul > head.length / 4 && evenNul === 0) return new TextDecoder('utf-16le').decode(b);
+    if (evenNul > head.length / 4 && oddNul === 0) return new TextDecoder('utf-16be').decode(b);
+  }
+  // Well-formed UTF-8 wins; anything that isn't is read as windows-1252, which
+  // maps every byte to something and so can never itself fail.
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+  catch (e) { return new TextDecoder('windows-1252').decode(b); }
 }
 
 /* Parse a bank-statement date cell to a canonical 'YYYY-MM-DD' string, or null
@@ -470,6 +543,42 @@ function learnPattern(desc) {
   return s.length >= 4 ? s : (desc ?? '').toString().trim();
 }
 
+/* Normalise the rule list ONCE per pass, not once per row. Rules grow with the
+   history, so lowercasing inside the match loop was rows × rules: measured
+   51ms at 1,200 rows and 2,000 rules on desktop, several hundred on a phone. */
+function prepareRules(rules) {
+  return (rules || [])
+    .map(r => ({ p: (r.pattern ?? '').trim().toLowerCase(), category: r.category }))
+    .filter(r => r.p);
+}
+
+/* Resolve a description against prepared rules and return the WINNING rule.
+   An exact pattern wins outright; otherwise the longest matching substring
+   wins, so a specific rule beats the general one it contains. The length test
+   comes before includes() because it is the cheaper comparison.
+
+   Ties are settled by rule order, which is why learnRules must not add a rule
+   the existing set already answers the same way (categories.js) and why
+   rule-cleanup.js restores a rejected candidate to its original slot.
+
+   Returning the rule rather than the category is what lets the cleanup preview
+   name the rule that covers a redundant one instead of merely asserting that
+   one exists. */
+function matchRule(desc, rules) {
+  const d = (desc ?? '').toString().trim().toLowerCase();
+  let best = null, bestLen = 0;
+  for (const r of rules) {
+    if (r.p === d) return r;
+    if (r.p.length > bestLen && d.includes(r.p)) { best = r; bestLen = r.p.length; }
+  }
+  return best;
+}
+
+function autoCategorise(desc, rules) {
+  const r = matchRule(desc, rules);
+  return r ? r.category : '';
+}
+
 /* Sanitise a string for safe use as a single path segment (folder/file name):
    strip path separators and filesystem-illegal characters, and neutralise
    "../" traversal attempts (dot runs, leading dots).
@@ -617,4 +726,4 @@ function isRealIsoDate(s) {
   return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };

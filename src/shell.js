@@ -472,10 +472,13 @@ const SHELL_HTML = `
           <div class="body-pad" style="padding-top:34px">
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
-              <span class="ua-line">Drop a bank statement CSV here, or click to choose a file.</span>
+              <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
               <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
             </button>
-            <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+            <!-- Tab- and semicolon-separated exports are read too (the delimiter
+                 is sniffed from the file), and banks hand those out as .txt and
+                 .tsv as often as .csv — so the picker must offer them. -->
+            <input type="file" id="fileInput" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" class="hidden">
             <details class="import-help">
               <summary>Not one of the supported banks? Build your own CSV</summary>
               <p>Most banks import as-is — columns are matched by header name, the layout is read
