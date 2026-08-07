@@ -67,8 +67,8 @@ module.exports = {
   'settings.palette.desc': 'Watter kleure die begroting in geteken word. Elke palet het sy eie ligte en donker weergawe, dus is dit onafhanklik van die Tema-instelling hierbo.',
 
   'settings.wizard.name': 'Opstelassistent',
-  'settings.wizard.desc': 'Hardloop die eerste-keer-assistent weer — vouer, naam, begrotingstydperk, geldeenheid, beginlêers.',
-  'settings.wizard.button': 'Hardloop opstelassistent',
+  'settings.wizard.desc': 'Voer die eerste-keer-assistent weer uit — vouer, naam, begrotingstydperk, geldeenheid, beginlêers.',
+  'settings.wizard.button': 'Voer opstelassistent uit',
 
   'settings.startup.name': 'Maak oop met begin',
   'settings.startup.desc': 'Maak die begrotingsaansig outomaties oop wanneer Obsidian begin.',
@@ -81,7 +81,7 @@ module.exports = {
   'settings.feedback.button': 'Maak terugvoervorm oop',
 
   'settings.support.name': 'Ondersteun Budget Vault',
-  'settings.support.desc': 'Budget Vault is gratis en sal altyd wees. As jy dankie wil sê, maak dit PayPal in jou blaaier oop — heeltemal opsioneel, en niks in die inprop verander so of so nie.',
+  'settings.support.desc': 'Budget Vault is gratis en sal altyd gratis wees. As jy dankie wil sê, maak dit PayPal in jou blaaier oop — heeltemal opsioneel, en niks in die inprop verander so of so nie.',
   'settings.support.button': 'Stuur \'n dankie',
 
   'settings.data.name': 'Begrotingsdata',
@@ -132,7 +132,7 @@ module.exports = {
   'wiz.letsGo': 'Kom ons gaan!',
   'wiz.connectBtn': 'Koppel begroting',
   'wiz.createBtn': 'Skep my begroting',
-  'wiz.skipped': 'Opstelling oorgeslaan — jy kan dit weer hardloop vanaf Instellings → Budget Vault → Hardloop opstelassistent, of die bevelpalet.',
+  'wiz.skipped': 'Opstelling oorgeslaan — jy kan dit weer uitvoer vanaf Instellings → Budget Vault → Voer opstelassistent uit, of die bevelpalet.',
 
   'wiz.step.folder': 'Waar jou begroting bly',
   'wiz.step.name': 'Wat moet ons jou noem?',
@@ -160,7 +160,7 @@ module.exports = {
   'wiz.welcome.app1': 'Stel jou begroting — gee elke kategorie \'n bedrag om na te mik',
   'wiz.welcome.app2': 'Voer jou bank se CSV in — transaksies sorteer hulself soos jy dit leer',
   'wiz.welcome.app3': 'Voeg enige tyd nuwe kategorieë by — jou begroting groei saam met jou',
-  'wiz.welcome.app4': 'Kyk terug soos jy gaan — die paneelbord wys presies waarheen die geld is',
+  'wiz.welcome.app4': 'Kyk terug soos jy gaan — die paneelbord wys presies waarheen die geld gegaan het',
   'wiz.welcome.close': 'Omtrent twee minute se opstelling. Jy kan enigiets daarvan later verander. Gereed?',
 
   /* ---- folder ---- */
@@ -186,7 +186,7 @@ module.exports = {
   'wiz.currency.customPlaceholder': 'bv. CHF',
 
   /* Currency NAMES for the wizard dropdown; the stored value is the symbol. */
-  'wiz.ccy.rand': 'R — Suid-Afrikaanse rand',
+  'wiz.ccy.rand': 'R — Suid-Afrikaanse Rand',
   'wiz.ccy.dollar': '$ — Dollar',
   'wiz.ccy.euro': '€ — Euro',
   'wiz.ccy.pound': '£ — Pond',
@@ -209,14 +209,14 @@ module.exports = {
   'wiz.cats.intro': 'Begin met \'n stel begrotingskategorieë — ontmerk enige wat jy nie wil hê nie. Jy kan hulle later byvoeg, hernoem of herkleur, dus is niks hier finaal nie.',
   'wiz.cats.selected': '{count} van {total} gekies',
   'wiz.cats.selectAll': 'Kies almal',
-  'wiz.cats.selectNone': 'Kies geen',
+  'wiz.cats.selectNone': 'Kies niks',
 
   'wiz.type.income': 'Inkomste',
   'wiz.type.expense': 'Daaglikse uitgawes',
   'wiz.type.debt': 'Skuldafbetalings',
   'wiz.type.services': 'Dienste en intekeninge',
   'wiz.type.insurance': 'Versekering',
-  'wiz.type.giving': 'Gee',
+  'wiz.type.giving': 'Gawes',
   'wiz.type.savings': 'Spaargeld',
   'wiz.type.investment': 'Beleggings',
   'wiz.type.luxuries': 'Lekker-om-te-hê',
@@ -269,7 +269,7 @@ module.exports = {
   'bud.shape.title': 'Jou ander begrotings is steeds hier',
   'bud.shape.body': {
     one: '{count} begrotingslêer is onder \'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
-    other: '{count} begrotingslêers is onder \'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
+    other: '{count} begrotingslêers is onder \'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie ander nie.',
   },
   'bud.shape.bring': 'Bring die kategorieë en notas van {newest} oor',
   'bud.shape.empty': 'Daardie begroting is leeg',
@@ -320,7 +320,10 @@ module.exports = {
   'tx.allAccounts': 'Alle rekeninge',
   'tx.allCategories': 'Alle kategorieë',
   'tx.uncategorised': 'Ongekategoriseer',
-  'tx.count.window': '{shown} van {total} rye',
+  'tx.count.window': {
+    one: '{shown} van {total} ry',
+    other: '{shown} van {total} rye',
+  },
   'tx.count.all': { one: '{count} ry', other: '{count} rye' },
 
   'tx.col.date': 'Datum',
@@ -339,9 +342,12 @@ module.exports = {
   'tx.title.split': 'Verdeel in kategorieë',
 
   'tx.none': 'Geen transaksies pas nie.',
-  'tx.showMore': 'Wys nog {n} van die {remaining} wat oorbly',
+  'tx.showMore': {
+    one: 'Wys {n} meer van {remaining} wat oorbly',
+    other: 'Wys {n} meer van {remaining} wat oorbly',
+  },
 
-  'tx.split.zero': "\'n Reël met \'n nulbedrag het niks om te verdeel nie",
+  'tx.split.zero': '\'n Reël met \'n nulbedrag het niks om te verdeel nie',
   'tx.split.excluded': 'Hierdie reël is reeds uitgesluit — ontmerk dit eers',
   'tx.split.marker': 'Verdeel in {n}',
   'tx.split.done': 'Verdeel in {n} — gaan na, en stoor dan die veranderinge',
@@ -412,7 +418,7 @@ module.exports = {
   'acct.field.number': 'Rekeningnommer',
   'acct.field.numberDesc': 'Word gebruik om \'n afgelaaide staat met hierdie rekening te pas wanneer jy invoer.',
   'acct.field.folder': 'Transaksievouer',
-  'acct.field.folderDesc': 'Los leeg om “{name}” te gebruik. Stel dit net wanneer die vouer onder Transactions/ \'n ander naam het.',
+  'acct.field.folderDesc': 'Los leeg om "{name}" te gebruik. Stel dit net wanneer die vouer onder Transactions/ \'n ander naam het.',
   'acct.field.counts': 'Tel by die begroting',
   'acct.counts.yes': 'Ja — gewone bestedingsrekening',
   'acct.counts.no': 'Nee — belegging of spaarhouer',
@@ -463,7 +469,10 @@ module.exports = {
   'acct.act.count': { one: '{count} transaksie in {month}', other: '{count} transaksies in {month}' },
 
   'acct.recon.since': { one: '{count} transaksie sedertdien · impliseer ', other: '{count} transaksies sedertdien · impliseer ' },
-  'acct.recon.pending': ' · {count} met \'n toekomstige datum, nog nie getel nie',
+  'acct.recon.pending': {
+    one: ' · {count} vorentoe gedateer, nog nie getel nie',
+    other: ' · {count} vorentoe gedateer, nog nie getel nie',
+  },
   'acct.recon.useThis': 'Gebruik hierdie',
   'acct.aria.useThis': 'Stel {name} se saldo op {amount}',
   'acct.recon.matches': 'Stem ooreen met jou transaksies',
@@ -480,7 +489,7 @@ module.exports = {
   'acct.btn.edit': 'Wysig',
   'acct.aria.openNote': 'Maak {name} se nota oop',
   'acct.btn.openNote': 'Maak nota oop',
-  'acct.empty': 'Nog geen rekeninge nie. Gebruik “Nuwe rekening” hierbo om \'n bankrekening, spaarpot of belegging by te voeg.',
+  'acct.empty': 'Nog geen rekeninge nie. Gebruik "Nuwe rekening" hierbo om \'n bankrekening, spaarpot of belegging by te voeg.',
 
 
   /* ===================== shell chrome + Dashboard page ==================== */
@@ -530,14 +539,20 @@ module.exports = {
   'dash.pos.netWorthSub': '{owned} besit · {owed} verskuldig',
   'dash.pos.netWorthSay': 'Netto waarde {net} — {owned} besit teenoor {owed} verskuldig. Maak Spaargeld en Beleggings oop.',
   'dash.pos.debt': 'Skuld',
-  'dash.pos.debtSplit': '{accounts} rekeninge · {debts} skuldbladsy',
+  'dash.pos.debtSplit': '{accounts} op rekeninge · {debts} op die skuldbladsy',
   'dash.pos.debtActive': { one: '{count} aktief', other: '{count} aktief' },
   'dash.pos.debtNone': 'niks verskuldig nie',
   'dash.pos.debtSay': 'Skuld {amount} verskuldig. Maak die Skuld-bladsy oop.',
   'dash.pos.debtSayNone': 'Geen skuld verskuldig nie. Maak die Skuld-bladsy oop.',
   'dash.pos.owed': 'Aan jou verskuldig',
-  'dash.pos.owedOpen': '{count} uitstaande',
-  'dash.pos.owedOldest': ' · oudste al {days} dae uitstaande',
+  'dash.pos.owedOpen': {
+    one: '{count} uitstaande',
+    other: '{count} uitstaande',
+  },
+  'dash.pos.owedOldest': {
+    one: ' · oudste {days} dag uit',
+    other: ' · oudste {days} dae uit',
+  },
   'dash.pos.owedRecovered': '{amount} verhaal',
   'dash.pos.owedNone': 'niks uitgeleen nie',
   'dash.pos.owedSay': {
@@ -549,11 +564,14 @@ module.exports = {
   'dash.pos.savingsSub': '{savings} spaargeld · {invested} belê',
   'dash.pos.savingsSay': '{amount} in spaargeld en beleggings. Maak Spaargeld en Beleggings oop.',
 
-  'dash.overlap': '{accounts} kredietkaartrekeninge en {debts} kaartskulde word gevolg — as enige kaart in albei is, word dit hierbo dubbel getel.',
+  'dash.overlap': 'Kredietkaartrekeninge gevolg: {accounts} · kaartskulde gevolg: {debts} — as enige kaart in albei is, word dit hierbo dubbel getel.',
   'dash.overlap.btn': 'Gaan skuld na',
   'dash.overlap.aria': 'Gaan gevolgde skulde op die Skuld-bladsy na',
   'dash.stale.noDate': 'nie een van hulle dra \'n datum nie',
-  'dash.stale.oldest': 'die oudste {days} dae gelede',
+  'dash.stale.oldest': {
+    one: 'die oudste {days} dag gelede',
+    other: 'die oudste {days} dae gelede',
+  },
   'dash.stale.all': { one: 'Bereken uit \'n saldo wat niemand onlangs bevestig het nie', other: 'Bereken uit {count} saldo\'s wat niemand onlangs bevestig het nie' },
   'dash.stale.some': 'Bereken uit {stale} van {total} saldo\'s wat niemand onlangs bevestig het nie',
   'dash.stale.line': '{line} — {age}.',
@@ -564,7 +582,10 @@ module.exports = {
   'dash.trend.sub': { one: 'Bestee teenoor begroot · {count} tydperk', other: 'Bestee teenoor begroot · {count} tydperke' },
   'dash.trend.clamped': ' · al die geskiedenis wat tot dusver ingevoer is',
   'dash.trend.empty': 'Voer \'n tweede tydperk se transaksies in, dan begin die tendenslyn hier.',
-  'dash.trend.aria': 'Bestee, begroot en inkomste oor die laaste {count} tydperke',
+  'dash.trend.aria': {
+    one: 'Bestee, begroot en inkomste oor die laaste {count} tydperk',
+    other: 'Bestee, begroot en inkomste oor die laaste {count} tydperke',
+  },
 
   'dash.split.uncatNote': ' · {amount} ongekategoriseer, nie gewys nie',
   'dash.split.onlyUncat': '{amount} het hierdie tydperk uitgegaan, maar niks daarvan is nog gekategoriseer nie — stel kategorieë in Transaksies, dan verskyn die verdeling hier.',

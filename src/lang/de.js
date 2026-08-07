@@ -89,8 +89,8 @@ module.exports = {
   'settings.data.desc': 'In Settings.md im Budget-Ordner gespeichert, damit sie auf jedem Gerät gelten.',
 
   'settings.household.name': 'Name / Haushalt',
-  'settings.household.desc': 'Wird in der Begrüßung der Übersicht und in der Kopfzeile angezeigt. Für keinen leer lassen.',
-  'settings.household.placeholder': 'Für keinen leer lassen',
+  'settings.household.desc': 'Wird in der Begrüßung der Übersicht und in der Kopfzeile angezeigt. Leer lassen, wenn nichts angezeigt werden soll.',
+  'settings.household.placeholder': 'Leer lassen für keinen Namen',
 
   'settings.monthStart.name': 'Monatsbeginn',
   'settings.monthStart.desc': 'Tag des Monats, an dem jeder Finanzzeitraum beginnt — üblicherweise dein Zahltag. Wähle 1 für einen gewöhnlichen Kalendermonat. 1–28.',
@@ -321,7 +321,10 @@ module.exports = {
   'tx.allAccounts': 'Alle Konten',
   'tx.allCategories': 'Alle Kategorien',
   'tx.uncategorised': 'Ohne Kategorie',
-  'tx.count.window': '{shown} von {total} Zeilen',
+  'tx.count.window': {
+    one: '{shown} von {total} Zeile',
+    other: '{shown} von {total} Zeilen',
+  },
   'tx.count.all': { one: '{count} Zeile', other: '{count} Zeilen' },
 
   'tx.col.date': 'Datum',
@@ -340,7 +343,10 @@ module.exports = {
   'tx.title.split': 'Auf Kategorien aufteilen',
 
   'tx.none': 'Keine Transaktionen passen.',
-  'tx.showMore': '{n} weitere von {remaining} verbleibenden anzeigen',
+  'tx.showMore': {
+    one: '{n} weitere von {remaining} verbleibenden Zeile anzeigen',
+    other: '{n} weitere von {remaining} verbleibenden Zeilen anzeigen',
+  },
 
   'tx.split.zero': 'Eine Zeile mit dem Betrag 0 hat nichts aufzuteilen',
   'tx.split.excluded': 'Diese Zeile ist bereits ausgeschlossen — hake sie zuerst ab',
@@ -464,7 +470,10 @@ module.exports = {
   'acct.act.count': { one: '{count} Transaktion im {month}', other: '{count} Transaktionen im {month}' },
 
   'acct.recon.since': { one: '{count} Transaktion seitdem · ergibt ', other: '{count} Transaktionen seitdem · ergibt ' },
-  'acct.recon.pending': ' · {count} in der Zukunft datiert, noch nicht gezählt',
+  'acct.recon.pending': {
+    one: ' · {count} in der Zukunft datiert, noch nicht gezählt',
+    other: ' · {count} in der Zukunft datiert, noch nicht gezählt',
+  },
   'acct.recon.useThis': 'Übernehmen',
   'acct.aria.useThis': 'Kontostand von {name} auf {amount} setzen',
   'acct.recon.matches': 'Passt zu deinen Transaktionen',
@@ -531,14 +540,20 @@ module.exports = {
   'dash.pos.netWorthSub': '{owned} Besitz · {owed} Schulden',
   'dash.pos.netWorthSay': 'Nettovermögen {net} — {owned} Besitz gegen {owed} Schulden. Sparen und Anlagen öffnen.',
   'dash.pos.debt': 'Schulden',
-  'dash.pos.debtSplit': '{accounts} Konten · {debts} Schulden-Seite',
+  'dash.pos.debtSplit': '{accounts} auf Konten · {debts} auf der Schulden-Seite',
   'dash.pos.debtActive': { one: '{count} aktiv', other: '{count} aktiv' },
   'dash.pos.debtNone': 'nichts geschuldet',
   'dash.pos.debtSay': 'Schulden {amount}. Die Schulden-Seite öffnen.',
   'dash.pos.debtSayNone': 'Keine Schulden. Die Schulden-Seite öffnen.',
   'dash.pos.owed': 'Dir geschuldet',
-  'dash.pos.owedOpen': '{count} offen',
-  'dash.pos.owedOldest': ' · ältestes seit {days} Tagen',
+  'dash.pos.owedOpen': {
+    one: '{count} offen',
+    other: '{count} offen',
+  },
+  'dash.pos.owedOldest': {
+    one: ' · ältestes seit {days} Tag',
+    other: ' · ältestes seit {days} Tagen',
+  },
   'dash.pos.owedRecovered': '{amount} zurückerhalten',
   'dash.pos.owedNone': 'nichts verliehen',
   'dash.pos.owedSay': {
@@ -550,11 +565,14 @@ module.exports = {
   'dash.pos.savingsSub': '{savings} gespart · {invested} angelegt',
   'dash.pos.savingsSay': '{amount} in Sparen und Anlagen. Sparen und Anlagen öffnen.',
 
-  'dash.overlap': '{accounts} Kreditkartenkonten und {debts} Kartenschulden werden geführt — steht eine Karte in beiden, ist sie oben doppelt gezählt.',
+  'dash.overlap': 'Erfasste Kreditkartenkonten: {accounts} · erfasste Kartenschulden: {debts} — steht eine Karte in beiden, ist sie oben doppelt gezählt.',
   'dash.overlap.btn': 'Schulden prüfen',
   'dash.overlap.aria': 'Geführte Schulden auf der Schulden-Seite prüfen',
   'dash.stale.noDate': 'keiner davon trägt ein Datum',
-  'dash.stale.oldest': 'der älteste vor {days} Tagen',
+  'dash.stale.oldest': {
+    one: 'der älteste vor {days} Tag',
+    other: 'der älteste vor {days} Tagen',
+  },
   'dash.stale.all': { one: 'Gebildet aus einem Kontostand, den niemand kürzlich bestätigt hat', other: 'Gebildet aus {count} Kontoständen, die niemand kürzlich bestätigt hat' },
   'dash.stale.some': 'Gebildet aus {stale} von {total} Kontoständen, die niemand kürzlich bestätigt hat',
   'dash.stale.line': '{line} — {age}.',
@@ -565,7 +583,10 @@ module.exports = {
   'dash.trend.sub': { one: 'Ausgegeben vs. Budget · {count} Zeitraum', other: 'Ausgegeben vs. Budget · {count} Zeiträume' },
   'dash.trend.clamped': ' · die gesamte bisher importierte Historie',
   'dash.trend.empty': 'Importiere einen zweiten Zeitraum an Transaktionen, dann beginnt hier die Trendlinie.',
-  'dash.trend.aria': 'Ausgegeben, budgetiert und Einnahmen über die letzten {count} Zeiträume',
+  'dash.trend.aria': {
+    one: 'Ausgegeben, budgetiert und Einnahmen über den letzten {count} Zeitraum',
+    other: 'Ausgegeben, budgetiert und Einnahmen über die letzten {count} Zeiträume',
+  },
 
   'dash.split.uncatNote': ' · {amount} ohne Kategorie, nicht gezeigt',
   'dash.split.onlyUncat': '{amount} sind in diesem Zeitraum abgeflossen, davon ist aber noch nichts kategorisiert — setze Kategorien unter Transaktionen, dann erscheint die Aufteilung hier.',

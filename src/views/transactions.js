@@ -109,7 +109,7 @@ module.exports = function registerTransactions(ctx) {
     if (shownFor !== renderToken) { shown = PAGE; shownFor = renderToken; }
     const visible = list.slice(0, shown);
     $('#txCount').textContent = total > visible.length
-      ? i18n.t('tx.count.window', { shown: visible.length, total })
+      ? i18n.t('tx.count.window', { shown: visible.length, total, count: total })
       : i18n.t('tx.count.all', { count: total });
     list = visible;
     const t = $('#txTable'); t.empty();
@@ -144,7 +144,7 @@ module.exports = function registerTransactions(ctx) {
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
       const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
-        i18n.t('tx.showMore', { n: Math.min(PAGE, total - list.length), remaining: total - list.length }));
+        i18n.t('tx.showMore', { n: Math.min(PAGE, total - list.length), remaining: total - list.length, count: total - list.length }));
       more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
       body.append(el('tr', {}, el('td', { colspan: '8', style: 'padding:0' }, more)));
     }

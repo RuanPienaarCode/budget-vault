@@ -331,7 +331,10 @@ module.exports = {
   'tx.allAccounts': 'All accounts',
   'tx.allCategories': 'All categories',
   'tx.uncategorised': 'Uncategorised',
-  'tx.count.window': '{shown} of {total} rows',
+  'tx.count.window': {
+    one: '{shown} of {total} row',
+    other: '{shown} of {total} rows',
+  },
   'tx.count.all': { one: '{count} row', other: '{count} rows' },
 
   'tx.col.date': 'Date',
@@ -350,7 +353,10 @@ module.exports = {
   'tx.title.split': 'Split into categories',
 
   'tx.none': 'No transactions match.',
-  'tx.showMore': 'Show {n} more of {remaining} remaining',
+  'tx.showMore': {
+    one: 'Show {n} more of {remaining} remaining',
+    other: 'Show {n} more of {remaining} remaining',
+  },
 
   'tx.split.zero': 'A zero-amount line has nothing to split',
   'tx.split.excluded': 'This line is already excluded — untick it first',
@@ -423,7 +429,7 @@ module.exports = {
   'acct.field.number': 'Account number',
   'acct.field.numberDesc': 'Used to match a downloaded statement to this account on import.',
   'acct.field.folder': 'Transactions folder',
-  'acct.field.folderDesc': 'Leave blank to use “{name}”. Set it only when the folder under Transactions/ has a different name.',
+  'acct.field.folderDesc': 'Leave blank to use "{name}". Set it only when the folder under Transactions/ has a different name.',
   'acct.field.counts': 'Counts toward the budget',
   'acct.counts.yes': 'Yes — normal spending account',
   'acct.counts.no': 'No — investment or savings wrapper',
@@ -474,7 +480,10 @@ module.exports = {
   'acct.act.count': { one: '{count} transaction in {month}', other: '{count} transactions in {month}' },
 
   'acct.recon.since': { one: '{count} transaction since · implies ', other: '{count} transactions since · implies ' },
-  'acct.recon.pending': ' · {count} dated ahead, not counted yet',
+  'acct.recon.pending': {
+    one: ' · {count} dated ahead, not counted yet',
+    other: ' · {count} dated ahead, not counted yet',
+  },
   'acct.recon.useThis': 'Use this',
   'acct.aria.useThis': 'Set {name} balance to {amount}',
   'acct.recon.matches': 'Matches your transactions',
@@ -491,7 +500,7 @@ module.exports = {
   'acct.btn.edit': 'Edit',
   'acct.aria.openNote': 'Open the {name} note',
   'acct.btn.openNote': 'Open note',
-  'acct.empty': 'No accounts yet. Use “New account” above to add a bank account, savings pot or investment.',
+  'acct.empty': 'No accounts yet. Use "New account" above to add a bank account, savings pot or investment.',
 
 
   /* ===================== shell chrome + Dashboard page ==================== */
@@ -541,14 +550,20 @@ module.exports = {
   'dash.pos.netWorthSub': '{owned} owned · {owed} owed',
   'dash.pos.netWorthSay': 'Net worth {net} — {owned} owned against {owed} owed. Open Savings and Investments.',
   'dash.pos.debt': 'Debt',
-  'dash.pos.debtSplit': '{accounts} accounts · {debts} debt page',
+  'dash.pos.debtSplit': '{accounts} on accounts · {debts} on the debt page',
   'dash.pos.debtActive': { one: '{count} active', other: '{count} active' },
   'dash.pos.debtNone': 'nothing owed',
   'dash.pos.debtSay': 'Debt {amount} owed. Open the Debt page.',
   'dash.pos.debtSayNone': 'No debt owed. Open the Debt page.',
   'dash.pos.owed': 'Owed to you',
-  'dash.pos.owedOpen': '{count} outstanding',
-  'dash.pos.owedOldest': ' · oldest out {days} days',
+  'dash.pos.owedOpen': {
+    one: '{count} outstanding',
+    other: '{count} outstanding',
+  },
+  'dash.pos.owedOldest': {
+    one: ' · oldest out {days} day',
+    other: ' · oldest out {days} days',
+  },
   'dash.pos.owedRecovered': '{amount} recovered',
   'dash.pos.owedNone': 'nothing lent out',
   'dash.pos.owedSay': {
@@ -560,11 +575,14 @@ module.exports = {
   'dash.pos.savingsSub': '{savings} savings · {invested} invested',
   'dash.pos.savingsSay': '{amount} in savings and investments. Open Savings and Investments.',
 
-  'dash.overlap': '{accounts} credit-card accounts and {debts} card debts are tracked — if any card is in both, it is counted twice above.',
+  'dash.overlap': 'Credit-card accounts tracked: {accounts} · card debts tracked: {debts} — if any card is in both, it is counted twice above.',
   'dash.overlap.btn': 'Review debts',
   'dash.overlap.aria': 'Review tracked debts on the Debt page',
   'dash.stale.noDate': 'none of them carry a date',
-  'dash.stale.oldest': 'the oldest {days} days ago',
+  'dash.stale.oldest': {
+    one: 'the oldest {days} day ago',
+    other: 'the oldest {days} days ago',
+  },
   'dash.stale.all': { one: 'Built from a balance nobody has confirmed recently', other: 'Built from {count} balances nobody has confirmed recently' },
   'dash.stale.some': 'Built from {stale} of {total} balances nobody has confirmed recently',
   'dash.stale.line': '{line} — {age}.',
@@ -575,7 +593,10 @@ module.exports = {
   'dash.trend.sub': { one: 'Spent vs budget · {count} period', other: 'Spent vs budget · {count} periods' },
   'dash.trend.clamped': ' · all the history imported so far',
   'dash.trend.empty': 'Import a second period of transactions and the trend line starts here.',
-  'dash.trend.aria': 'Spent, budgeted and income over the last {count} periods',
+  'dash.trend.aria': {
+    one: 'Spent, budgeted and income over the last {count} period',
+    other: 'Spent, budgeted and income over the last {count} periods',
+  },
 
   'dash.split.uncatNote': ' · {amount} uncategorised, not shown',
   'dash.split.onlyUncat': '{amount} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.',
