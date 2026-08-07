@@ -265,4 +265,51 @@ module.exports = {
   'wiz.done.connected': '已连接到你的预算文件夹。',
   'wiz.done.created': '预算文件夹已创建 — 欢迎！',
   'wiz.failed': '设置失败: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': '你的其他预算都还在',
+  'bud.shape.body': {
+    other: '有 {count} 个预算文件保存在另一种周期长度下 — 最新的是 Budgets/{newest}.md。它们仍保留在你的仓库中，只要把周期长度改回去就会重新出现。这里的金额从空白开始，因为本周期与那些周期的长度不同。',
+  },
+  'bud.shape.bring': '从 {newest} 带入分类和备注',
+  'bud.shape.empty': '那份预算是空的',
+  'bud.shape.brought': {
+    other: '已带入 {count} 个分类 — 请为本周期填上金额',
+  },
+  'bud.shape.allHere': '那份预算中的分类都已经在这里了',
+
+  'bud.total.income': '收入合计',
+  'bud.total.incomeNote': '目前已收到 {amount}',
+  'bud.total.budgeted': '预算合计',
+  'bud.total.budgetedNote': '占预算收入的 {pct}%',
+  'bud.total.over': '超出预算',
+  'bud.total.overNote': '预算超过了收入',
+  'bud.total.left': '待分配',
+  'bud.total.leftNote': '尚未分配的收入',
+  'bud.total.spent': '支出合计',
+  'bud.total.spentNote': '已用预算的 {pct}%',
+
+  'bud.col.category': '分类',
+  'bud.col.type': '类型',
+  'bud.col.amount': '金额',
+  'bud.col.actual': '实际已发生',
+  'bud.col.notes': '备注',
+
+  'bud.remaining.over': '超出 {amount}',
+  'bud.remaining.left': '剩余 {amount}',
+
+  'bud.aria.amount': '{category} 的预算金额',
+  'bud.aria.notes': '{category} 的备注',
+  'bud.aria.clear': '清除 {category} 的预算',
+  'bud.title.clear': '把这个分类从本周期的文件中移除',
+  'bud.aria.delete': '删除分类 {category}',
+  'bud.title.delete': '在所有位置删除这个分类',
+
+  'bud.saved': '预算已保存到 Budgets/{period}.md',
+  'bud.copy.none': '找不到上一周期的预算',
+  'bud.copy.done': {
+    other: '已从上一周期复制 {count} 个分类',
+  },
+  'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
+
 };

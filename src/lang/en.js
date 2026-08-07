@@ -272,4 +272,56 @@ module.exports = {
   'wiz.done.connected': 'Connected to your budget folder.',
   'wiz.done.created': 'Budget folder created — welcome!',
   'wiz.failed': 'Setup failed: {error}',
+
+  /* ============================== Budget page ============================= */
+  /* NOT here: the markdown Budgets/<period>.md is written with. That is vault
+     file content, not interface copy — same rule the wizard follows. */
+
+  'bud.shape.title': 'Your other budgets are still here',
+  'bud.shape.body': {
+    one: '{count} budget file is saved under a different period length — it is Budgets/{newest}.md. It stays in your vault, and it comes back as soon as you set the period length back. Amounts start blank here because this period isn\'t the same length as that one was.',
+    other: '{count} budget files are saved under a different period length — the most recent is Budgets/{newest}.md. They stay in your vault, and they come back as soon as you set the period length back. Amounts start blank here because this period isn\'t the same length as those were.',
+  },
+  'bud.shape.bring': 'Bring over the categories and notes from {newest}',
+  'bud.shape.empty': 'That budget is empty',
+  'bud.shape.brought': {
+    one: 'Brought over {count} category — set the amount for this period',
+    other: 'Brought over {count} categories — set the amounts for this period',
+  },
+  'bud.shape.allHere': 'Every category from that budget is already here',
+
+  'bud.total.income': 'Total income',
+  'bud.total.incomeNote': '{amount} received so far',
+  'bud.total.budgeted': 'Total budgeted',
+  'bud.total.budgetedNote': '{pct}% of budgeted income',
+  'bud.total.over': 'Over-budgeted',
+  'bud.total.overNote': 'budgeted beyond income',
+  'bud.total.left': 'Left to budget',
+  'bud.total.leftNote': 'income not yet allocated',
+  'bud.total.spent': 'Total spent',
+  'bud.total.spentNote': '{pct}% of budget used',
+
+  'bud.col.category': 'Category',
+  'bud.col.type': 'Type',
+  'bud.col.amount': 'Amount',
+  'bud.col.actual': 'Actual so far',
+  'bud.col.notes': 'Notes',
+
+  'bud.remaining.over': '{amount} over',
+  'bud.remaining.left': '{amount} left',
+
+  'bud.aria.amount': 'Budget amount for {category}',
+  'bud.aria.notes': 'Notes for {category}',
+  'bud.aria.clear': 'Clear budget for {category}',
+  'bud.title.clear': 'Clear this category from the period file',
+  'bud.aria.delete': 'Delete category {category}',
+  'bud.title.delete': 'Delete this category everywhere',
+
+  'bud.saved': 'Budget saved to Budgets/{period}.md',
+  'bud.copy.none': 'No budget found for the previous period',
+  'bud.copy.done': {
+    one: 'Copied {count} category from the previous period',
+    other: 'Copied {count} categories from the previous period',
+  },
+  'bud.copy.nothing': 'Nothing to copy — every category already has a value',
 };

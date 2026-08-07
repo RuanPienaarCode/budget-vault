@@ -264,4 +264,54 @@ module.exports = {
   'wiz.done.connected': 'Mit deinem Budget-Ordner verbunden.',
   'wiz.done.created': 'Budget-Ordner angelegt — willkommen!',
   'wiz.failed': 'Einrichtung fehlgeschlagen: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Deine anderen Budgets sind noch da',
+  'bud.shape.body': {
+    one: '{count} Budgetdatei ist unter einer anderen Zeitraumlänge gespeichert — es ist Budgets/{newest}.md. Sie bleibt in deinem Vault und ist wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jener.',
+    other: '{count} Budgetdateien sind unter einer anderen Zeitraumlänge gespeichert — die neueste ist Budgets/{newest}.md. Sie bleiben in deinem Vault und sind wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jene.',
+  },
+  'bud.shape.bring': 'Kategorien und Notizen aus {newest} übernehmen',
+  'bud.shape.empty': 'Dieses Budget ist leer',
+  'bud.shape.brought': {
+    one: '{count} Kategorie übernommen — setze den Betrag für diesen Zeitraum',
+    other: '{count} Kategorien übernommen — setze die Beträge für diesen Zeitraum',
+  },
+  'bud.shape.allHere': 'Jede Kategorie aus diesem Budget ist bereits hier',
+
+  'bud.total.income': 'Einnahmen gesamt',
+  'bud.total.incomeNote': '{amount} bisher erhalten',
+  'bud.total.budgeted': 'Budgetiert gesamt',
+  'bud.total.budgetedNote': '{pct}% der budgetierten Einnahmen',
+  'bud.total.over': 'Überbudgetiert',
+  'bud.total.overNote': 'mehr budgetiert als eingenommen',
+  'bud.total.left': 'Noch zu budgetieren',
+  'bud.total.leftNote': 'Einnahmen noch nicht zugeteilt',
+  'bud.total.spent': 'Ausgegeben gesamt',
+  'bud.total.spentNote': '{pct}% des Budgets verbraucht',
+
+  'bud.col.category': 'Kategorie',
+  'bud.col.type': 'Art',
+  'bud.col.amount': 'Betrag',
+  'bud.col.actual': 'Tatsächlich bisher',
+  'bud.col.notes': 'Notizen',
+
+  'bud.remaining.over': '{amount} darüber',
+  'bud.remaining.left': '{amount} übrig',
+
+  'bud.aria.amount': 'Budgetbetrag für {category}',
+  'bud.aria.notes': 'Notizen zu {category}',
+  'bud.aria.clear': 'Budget für {category} leeren',
+  'bud.title.clear': 'Diese Kategorie aus der Zeitraumdatei entfernen',
+  'bud.aria.delete': 'Kategorie {category} löschen',
+  'bud.title.delete': 'Diese Kategorie überall löschen',
+
+  'bud.saved': 'Budget gespeichert unter Budgets/{period}.md',
+  'bud.copy.none': 'Kein Budget für den vorherigen Zeitraum gefunden',
+  'bud.copy.done': {
+    one: '{count} Kategorie aus dem vorherigen Zeitraum kopiert',
+    other: '{count} Kategorien aus dem vorherigen Zeitraum kopiert',
+  },
+  'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
+
 };

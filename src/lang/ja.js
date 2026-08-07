@@ -265,4 +265,51 @@ module.exports = {
   'wiz.done.connected': '予算フォルダに接続しました。',
   'wiz.done.created': '予算フォルダを作成しました — ようこそ！',
   'wiz.failed': 'セットアップに失敗しました: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': '他の予算はそのまま残っています',
+  'bud.shape.body': {
+    other: '別の期間の長さで保存された予算ファイルが {count} 件あります — 最新のものは Budgets/{newest}.md です。保管庫にはそのまま残っており、期間の長さを元に戻せばまた表示されます。この期間はそれらとは長さが違うため、金額は空の状態から始まります。',
+  },
+  'bud.shape.bring': '{newest} からカテゴリとメモを引き継ぐ',
+  'bud.shape.empty': 'その予算は空です',
+  'bud.shape.brought': {
+    other: 'カテゴリを {count} 件引き継ぎました — この期間の金額を設定してください',
+  },
+  'bud.shape.allHere': 'その予算のカテゴリはすべてすでにここにあります',
+
+  'bud.total.income': '収入合計',
+  'bud.total.incomeNote': 'これまでに {amount} を受け取りました',
+  'bud.total.budgeted': '予算合計',
+  'bud.total.budgetedNote': '予算収入の {pct}%',
+  'bud.total.over': '予算超過',
+  'bud.total.overNote': '収入を超えて予算を組んでいます',
+  'bud.total.left': '未配分',
+  'bud.total.leftNote': 'まだ配分していない収入',
+  'bud.total.spent': '支出合計',
+  'bud.total.spentNote': '予算の {pct}% を使用',
+
+  'bud.col.category': 'カテゴリ',
+  'bud.col.type': '種類',
+  'bud.col.amount': '金額',
+  'bud.col.actual': '実績',
+  'bud.col.notes': 'メモ',
+
+  'bud.remaining.over': '{amount} 超過',
+  'bud.remaining.left': '残り {amount}',
+
+  'bud.aria.amount': '{category} の予算額',
+  'bud.aria.notes': '{category} のメモ',
+  'bud.aria.clear': '{category} の予算を消去',
+  'bud.title.clear': 'この期間のファイルからこのカテゴリを外す',
+  'bud.aria.delete': 'カテゴリ {category} を削除',
+  'bud.title.delete': 'このカテゴリをすべての場所から削除',
+
+  'bud.saved': '予算を Budgets/{period}.md に保存しました',
+  'bud.copy.none': '前の期間の予算が見つかりません',
+  'bud.copy.done': {
+    other: '前の期間から {count} 件のカテゴリをコピーしました',
+  },
+  'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
+
 };

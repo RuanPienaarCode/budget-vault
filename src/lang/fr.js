@@ -269,4 +269,54 @@ module.exports = {
   'wiz.done.connected': 'Connecté à votre dossier de budget.',
   'wiz.done.created': 'Dossier de budget créé — bienvenue !',
   'wiz.failed': 'Échec de la configuration : {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Vos autres budgets sont toujours là',
+  'bud.shape.body': {
+    one: '{count} fichier de budget est enregistré sous une autre durée de période — il s\'agit de Budgets/{newest}.md. Il reste dans votre coffre et revient dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n\'a pas la même durée que celle-là.',
+    other: '{count} fichiers de budget sont enregistrés sous une autre durée de période — le plus récent est Budgets/{newest}.md. Ils restent dans votre coffre et reviennent dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n\'a pas la même durée que celles-là.',
+  },
+  'bud.shape.bring': 'Reprendre les catégories et les notes de {newest}',
+  'bud.shape.empty': 'Ce budget est vide',
+  'bud.shape.brought': {
+    one: '{count} catégorie reprise — indiquez le montant pour cette période',
+    other: '{count} catégories reprises — indiquez les montants pour cette période',
+  },
+  'bud.shape.allHere': 'Toutes les catégories de ce budget sont déjà ici',
+
+  'bud.total.income': 'Revenus totaux',
+  'bud.total.incomeNote': '{amount} reçu jusqu\'ici',
+  'bud.total.budgeted': 'Total budgété',
+  'bud.total.budgetedNote': '{pct}% des revenus budgétés',
+  'bud.total.over': 'Sur-budgété',
+  'bud.total.overNote': 'budgété au-delà des revenus',
+  'bud.total.left': 'Reste à budgéter',
+  'bud.total.leftNote': 'revenus pas encore affectés',
+  'bud.total.spent': 'Total dépensé',
+  'bud.total.spentNote': '{pct}% du budget utilisé',
+
+  'bud.col.category': 'Catégorie',
+  'bud.col.type': 'Type',
+  'bud.col.amount': 'Montant',
+  'bud.col.actual': 'Réel à ce jour',
+  'bud.col.notes': 'Notes',
+
+  'bud.remaining.over': '{amount} de dépassement',
+  'bud.remaining.left': '{amount} restant',
+
+  'bud.aria.amount': 'Montant budgété pour {category}',
+  'bud.aria.notes': 'Notes de {category}',
+  'bud.aria.clear': 'Vider le budget de {category}',
+  'bud.title.clear': 'Retirer cette catégorie du fichier de la période',
+  'bud.aria.delete': 'Supprimer la catégorie {category}',
+  'bud.title.delete': 'Supprimer cette catégorie partout',
+
+  'bud.saved': 'Budget enregistré dans Budgets/{period}.md',
+  'bud.copy.none': 'Aucun budget trouvé pour la période précédente',
+  'bud.copy.done': {
+    one: '{count} catégorie copiée depuis la période précédente',
+    other: '{count} catégories copiées depuis la période précédente',
+  },
+  'bud.copy.nothing': 'Rien à copier — chaque catégorie a déjà une valeur',
+
 };

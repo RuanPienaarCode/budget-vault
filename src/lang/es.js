@@ -265,4 +265,54 @@ module.exports = {
   'wiz.done.connected': 'Conectado a tu carpeta de presupuesto.',
   'wiz.done.created': 'Carpeta de presupuesto creada — ¡bienvenido!',
   'wiz.failed': 'La configuración falló: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Tus otros presupuestos siguen aquí',
+  'bud.shape.body': {
+    one: '{count} archivo de presupuesto está guardado con otra duración de periodo — es Budgets/{newest}.md. Permanece en tu bóveda y vuelve en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquel.',
+    other: '{count} archivos de presupuesto están guardados con otra duración de periodo — el más reciente es Budgets/{newest}.md. Permanecen en tu bóveda y vuelven en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquellos.',
+  },
+  'bud.shape.bring': 'Traer las categorías y notas de {newest}',
+  'bud.shape.empty': 'Ese presupuesto está vacío',
+  'bud.shape.brought': {
+    one: 'Se trajo {count} categoría — pon el importe para este periodo',
+    other: 'Se trajeron {count} categorías — pon los importes para este periodo',
+  },
+  'bud.shape.allHere': 'Todas las categorías de ese presupuesto ya están aquí',
+
+  'bud.total.income': 'Ingresos totales',
+  'bud.total.incomeNote': '{amount} recibido hasta ahora',
+  'bud.total.budgeted': 'Total presupuestado',
+  'bud.total.budgetedNote': '{pct}% de los ingresos presupuestados',
+  'bud.total.over': 'Presupuestado de más',
+  'bud.total.overNote': 'presupuestado por encima de los ingresos',
+  'bud.total.left': 'Por presupuestar',
+  'bud.total.leftNote': 'ingresos aún sin asignar',
+  'bud.total.spent': 'Total gastado',
+  'bud.total.spentNote': '{pct}% del presupuesto usado',
+
+  'bud.col.category': 'Categoría',
+  'bud.col.type': 'Tipo',
+  'bud.col.amount': 'Importe',
+  'bud.col.actual': 'Real hasta ahora',
+  'bud.col.notes': 'Notas',
+
+  'bud.remaining.over': '{amount} de más',
+  'bud.remaining.left': '{amount} restante',
+
+  'bud.aria.amount': 'Importe presupuestado para {category}',
+  'bud.aria.notes': 'Notas de {category}',
+  'bud.aria.clear': 'Vaciar el presupuesto de {category}',
+  'bud.title.clear': 'Quitar esta categoría del archivo del periodo',
+  'bud.aria.delete': 'Eliminar la categoría {category}',
+  'bud.title.delete': 'Eliminar esta categoría en todas partes',
+
+  'bud.saved': 'Presupuesto guardado en Budgets/{period}.md',
+  'bud.copy.none': 'No se encontró presupuesto del periodo anterior',
+  'bud.copy.done': {
+    one: 'Copiada {count} categoría del periodo anterior',
+    other: 'Copiadas {count} categorías del periodo anterior',
+  },
+  'bud.copy.nothing': 'Nada que copiar — todas las categorías ya tienen un valor',
+
 };
