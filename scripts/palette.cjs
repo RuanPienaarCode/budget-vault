@@ -59,6 +59,45 @@ function alpha(hex, a) {
   return `rgba(${rgb(hex).join(',')},${a})`;
 }
 
+/* Just the channels, for a token a stylesheet completes itself:
+   `rgba(var(--glow-primary-rgb), .15)`. Substitution happens before the value
+   is parsed, so this is plain CSS on every engine back to Safari 9 — no
+   color-mix(), nothing the iOS 15 floor lacks. */
+function rgbTriple(hex) {
+  return rgb(hex).join(',');
+}
+
+/* The ambient glow colours — the radial washes behind the app and the splash
+   gate, and the two brand-logo shadows.
+
+   MODE-INVARIANT, and derived from the palette's DARK seeds even in light mode.
+   That looks wrong until you check what shipped: the hand-written glow is
+   painted in the dark palette's emerald, mint and gold under BOTH themes, and
+   always has been. It works because a saturated colour designed to read on
+   black is exactly what survives being laid over a light page at 13% — the
+   light-mode brand colours are too dark and turn the wash muddy.
+
+   Emitted once, into the light block only. That block's selector matches the
+   root whether or not it also carries .bud-dark, so a property set there
+   applies in both modes — the same trick the base stylesheet already uses for
+   the fourteen tokens it defines once.
+
+   Deriving these rather than authoring them per palette is what makes Vault
+   Green come out unchanged: its dark seeds ARE the values the glow was written
+   with, so the generator reproduces the shipped wash exactly while every other
+   palette gets its own. */
+function glowTokens(preset) {
+  return {
+    '--glow-accent-rgb': rgbTriple(preset.dark.accent),
+    '--glow-primary-rgb': rgbTriple(preset.dark.primary),
+    '--glow-gold-rgb': rgbTriple(preset.dark.gold),
+    /* The one glow taken from the LIGHT seeds. The splash gate's lower wash
+       used the light-mode accent where its upper wash used the dark one —
+       a deliberate depth cue, kept rather than flattened. */
+    '--glow-deep-rgb': rgbTriple(preset.light.accent),
+  };
+}
+
 /* --------------------------- the derivation ----------------------------- */
 
 /* Alphas that differ between the two modes. Lifted verbatim from the shipped
@@ -139,4 +178,4 @@ function derive(seeds, mode, overrides = {}) {
   return out;
 }
 
-module.exports = { rgb, luminance, contrast, alpha, derive, SEEDS, MODE };
+module.exports = { rgb, luminance, contrast, alpha, rgbTriple, glowTokens, derive, SEEDS, MODE };

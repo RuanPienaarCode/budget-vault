@@ -18,6 +18,7 @@ var require_constants = __commonJS((exports2, module2) => {
     openOnStartup: false,
     onboarded: false,
     privacyLock: true,
+    exportFolder: "Exports",
     chartTrendRange: "6m",
     chartDebtRange: "5y"
   };
@@ -2076,6 +2077,25 @@ var require_io = __commonJS((exports2, module2) => {
       }
       return path;
     }
+    function guardedVaultPath(rel) {
+      const collapsed = collapsePath(normalizePath(String(rel || "")));
+      if (!collapsed)
+        throw new Error(`Refused write outside the vault: ${rel}`);
+      return collapsed;
+    }
+    async function writeVaultFile(rel, content) {
+      const path = guardedVaultPath(rel);
+      stampWrite();
+      const f = vault.getFileByPath(path);
+      if (f) {
+        await vault.modify(f, content);
+      } else {
+        await ensureFolder(path.split("/").slice(0, -1).join("/"));
+        await vault.create(path, content);
+      }
+      stampWrite();
+      return path;
+    }
     async function writeFile(rel, content) {
       const path = guardedPath(rel);
       stampWrite();
@@ -2120,6 +2140,7 @@ var require_io = __commonJS((exports2, module2) => {
       relPath,
       readFile,
       writeFile,
+      writeVaultFile,
       writeBinary,
       fileAt,
       mdFilesIn,
@@ -3626,7 +3647,8 @@ var require_dashboard = __commonJS((exports2, module2) => {
 var require_exporter = __commonJS((exports2, module2) => {
   var EXPORT_DIR = "Exports";
   function safeName(s) {
-    return String(s ?? "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim() || "export";
+    const cleaned = String(s ?? "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim();
+    return /^\.+$/.test(cleaned) ? "export" : cleaned || "export";
   }
   function amountCell(row, cell) {
     const v = row.amountRaw != null ? row.amountRaw : Number(row.amount || 0).toFixed(2);
@@ -3712,13 +3734,15 @@ var require_exporter = __commonJS((exports2, module2) => {
 `) + `
 `;
   }
-  function exportPaths(range) {
-    const base = `${EXPORT_DIR}/Transactions ${safeName(range)}`;
+  function exportPaths(range, folder) {
+    const dir = String(folder || EXPORT_DIR).split("/").filter((seg) => seg.trim() && !/^\.+$/.test(seg.trim())).map(safeName).join("/") || EXPORT_DIR;
+    const base = `${dir}/Transactions ${safeName(range)}`;
     return {
+      dir,
       txCsv: `${base}.csv`,
       txMd: `${base}.md`,
-      catCsv: `${EXPORT_DIR}/Categories.csv`,
-      catMd: `${EXPORT_DIR}/Categories.md`
+      catCsv: `${dir}/Categories.csv`,
+      catMd: `${dir}/Categories.md`
     };
   }
   module2.exports = {
@@ -3740,7 +3764,7 @@ var require_transactions = __commonJS((exports2, module2) => {
   var { askFields, askSplit } = require_modal();
   var { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require_exporter();
   module2.exports = function registerTransactions(ctx) {
-    const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
+    const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
     const PAGE = 100;
     let shown = PAGE, shownFor = null;
@@ -3987,18 +4011,32 @@ var require_transactions = __commonJS((exports2, module2) => {
       const { rows, range, filters } = filteredRows();
       if (!rows.length)
         return toast("Nothing to export — no rows match the current filters", true);
-      const paths = exportPaths(range);
+      const answer = await askFields(app, "Export transactions", [{
+        key: "folder",
+        label: "Save to folder",
+        desc: `Vault folder for the export. ${rows.length} row${rows.length === 1 ? "" : "s"} (${range}) plus ${S.categories.length} categories, as CSV and markdown.`,
+        value: plugin.settings.exportFolder || "Exports",
+        placeholder: "Exports"
+      }]);
+      if (!answer)
+        return;
+      const paths = exportPaths(range, answer.folder);
       const generated = new Date().toISOString().slice(0, 16).replace("T", " ");
+      let written;
       try {
-        await writeFile(paths.txCsv, transactionsCsv(rows, csvCell));
-        await writeFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
-        await writeFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
-        await writeFile(paths.catMd, categoriesMarkdown(S.categories, generated));
+        written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, csvCell));
+        await writeVaultFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
+        await writeVaultFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+        await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
       } catch (e) {
         console.error("Budget: export failed", e);
-        return toast("Could not write the export — check the folder is writable", true);
+        return toast("Could not write the export — check the folder name", true);
       }
-      toast(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} and ${S.categories.length} categories to ${paths.txCsv.split("/")[0]}/`);
+      if (plugin.settings.exportFolder !== paths.dir) {
+        plugin.settings.exportFolder = paths.dir;
+        await plugin.saveSettings();
+      }
+      toast(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} and ${S.categories.length} categories to ${written.split("/").slice(0, -1).join("/")}/`);
     }
     ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
   };
