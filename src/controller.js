@@ -8,6 +8,7 @@ const { el, setIco, setInert } = require('./util');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
+const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const registerIo = require('./io');
 const registerPeriod = require('./period');
@@ -212,6 +213,23 @@ function mountApp(view) {
     const pref = plugin.settings.theme;
     const dark = pref === 'dark' || (pref === 'auto' && document.body.classList.contains('theme-dark'));
     root.classList.toggle('bud-dark', dark);
+    /* Palette is a second, orthogonal axis: which colours, independent of which
+       mode. Every previous bud-palette-* class comes off first — toggling only
+       the new one would leave two palettes on the root, and the winner would be
+       whichever the stylesheet happened to define last rather than the one that
+       was chosen.
+
+       An unknown id (a palette retired between versions, or a hand-edited
+       data.json) falls back to the default rather than leaving the root with no
+       palette class at all: the base blocks in src/styles.css would still paint
+       it Vault Green, so it would LOOK fine while the setting silently did
+       nothing — the kind of mismatch that gets reported as "the theme picker is
+       broken" long after the release that caused it. */
+    for (const c of [...root.classList]) {
+      if (c.startsWith('bud-palette-')) root.classList.remove(c);
+    }
+    const id = PALETTE_PRESETS[plugin.settings.palette] ? plugin.settings.palette : DEFAULT_PALETTE;
+    root.classList.add(`bud-palette-${id}`);
     /* Every chart bakes the resolved palette into SVG attributes at render
        time — SVG has no way to say "this fill is var(--color-success)" — so a
        theme flip leaves them painted in the outgoing theme until they are
@@ -359,18 +377,35 @@ function mountApp(view) {
   }
 
   /* Reload when budget files change on disk (sync, manual edits) — but never
-     while there are unsaved edits in the view, and not for our own writes. */
+     while there are unsaved edits in the view, and not for our own writes.
+
+     "Never while dirty" means DEFER, not discard. Obsidian emits nothing
+     further for a change it has already delivered, so every bare `return` on
+     this path is permanent: the file changed, we declined to read it, and
+     nothing will ever ask again. The view then sits on stale data until
+     someone happens to hit Reload by hand. That was already understood for the
+     mid-edit case, which has always rescheduled — but the dirty case dropped,
+     and it is the one that lasts. `hasDirty()` covers an abandoned import
+     review (S.pendingImport) and any unsaved draft, which can stay true for
+     the rest of the session.
+
+     Backing off rather than polling at a fixed interval for the same reason:
+     the wait can be very long, and a 1.5s timer that never converges runs for
+     as long as the app is open. Doubling to a half-minute ceiling costs
+     nothing and still picks the change up promptly once the view goes clean. */
+  const RELOAD_RETRY_MAX = 30000;
   let reloadTimer = null;
   function scheduleReload(delay) {
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(async () => {
-      // Re-check at fire time: an edit (or another of our own writes) may have
-      // landed during the debounce — don't clobber it.
+      /* Another of OUR writes landed during the debounce. This one really is
+         discarded rather than deferred: it is our own echo, the state already
+         matches disk, and retrying would reload the vault and pop the toast
+         after every single save. */
       if (Date.now() - ctx.lastWriteAt() < 2000) return;
-      if (hasDirty()) return;
+      // Unsaved work in the view — come back for this change later.
+      if (hasDirty()) return scheduleReload(Math.min(delay * 2, RELOAD_RETRY_MAX));
       // Mid-edit: come back later rather than dropping the change on the floor.
-      // Returning here would strand the view on stale data indefinitely, since
-      // no further event will be emitted for a change already delivered.
       if (isEditing()) return scheduleReload(1500);
       await connectVault();
       if (S.loaded) toast('Reloaded — files changed in the vault');
@@ -381,7 +416,8 @@ function mountApp(view) {
     const bp = ctx.basePath();
     if (path !== bp && !path.startsWith(bp + '/')) return;
     if (Date.now() - ctx.lastWriteAt() < 2000) return;
-    if (hasDirty()) return;
+    /* No hasDirty() gate here — scheduleReload owns that decision now, so the
+       change is remembered and retried instead of being dropped at the door. */
     scheduleReload(800);
   };
   view.registerEvent(vault.on('modify', onFsChange));
