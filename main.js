@@ -294,7 +294,7 @@ var require_shell = __commonJS((exports2, module2) => {
       <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Menu</div>
+    <div class="drawer-section-label">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
       <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
     </button>
@@ -303,9 +303,6 @@ var require_shell = __commonJS((exports2, module2) => {
     </button>
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
-    </button>
-    <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -328,6 +325,9 @@ var require_shell = __commonJS((exports2, module2) => {
     </button>
     <button class="drawer-link" data-view="services">
       <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+    </button>
+    <button class="drawer-link" data-view="tax">
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -396,8 +396,7 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero" id="heroCard"></div>
-        <div class="kpi-caveat mb-4" id="dashStale"></div>
+        <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -435,6 +434,25 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="dashBudget"></table></div>
           </div>
+        </div>
+        <!-- Position, not flow. Everything above this band moves when the period
+             changes; nothing in it does, which is why the subtitle says so — a
+             card that ignores the control above it reads as broken otherwise.
+
+             Deliberately NOT wrapped in a .card. Its tiles are .mini cards with
+             borders of their own, and every other mini-grid in the app (Savings,
+             Accounts, Debt, Owed, Assets, Services) sits bare on the page
+             background for exactly that reason. The heading it does need comes
+             from .section-h, which carries the card header's type scale without
+             the card's chrome or its 44px gutters. -->
+        <div class="mb-4" id="dashPositionCard">
+          <div class="section-h">
+            <h2>Where you stand</h2>
+            <div class="sub" id="dashPositionSub"></div>
+          </div>
+          <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
+          <div class="kpi-caveat" id="dashPositionNote"></div>
+          <div class="kpi-caveat" id="dashStale"></div>
         </div>
       </section>
 
@@ -2928,6 +2946,92 @@ var require_reconcile = __commonJS((exports2, module2) => {
   module2.exports = { STALE_DAYS, daysSince, isStale, reconcile, stalenessSummary };
 });
 
+// src/worth.js
+var require_worth = __commonJS((exports2, module2) => {
+  function activeDebts(debts) {
+    return (debts || []).filter((d) => d && d.status !== "paid");
+  }
+  function assetTotal(assets) {
+    return (assets || []).reduce((t, a) => t + Math.max(0, a.value || 0), 0);
+  }
+  function worth(accounts, debts, assets) {
+    const list = accounts || [];
+    const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
+    const ownedAssets = assetTotal(assets);
+    const owned = ownedAccounts + ownedAssets;
+    const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
+    const active = activeDebts(debts);
+    const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
+    const liabilities = fromAccounts + fromDebts;
+    return {
+      assets: owned,
+      ownedAccounts,
+      ownedAssets,
+      liabilities,
+      fromAccounts,
+      fromDebts,
+      net: owned - liabilities,
+      active
+    };
+  }
+  function cardOverlap(accounts, debts) {
+    const cardAccounts = (accounts || []).filter((a) => a.type === "credit_card" && (a.balance || 0) < 0);
+    const cardDebts = activeDebts(debts).filter((d) => /credit\s*card/i.test(d.type || ""));
+    return cardAccounts.length && cardDebts.length ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length } : null;
+  }
+  function debtsByType(debts) {
+    const byType = new Map;
+    for (const d of activeDebts(debts)) {
+      if (!(d.balance > 0))
+        continue;
+      const k = (d.type || "").trim() || "other";
+      byType.set(k, (byType.get(k) || 0) + d.balance);
+    }
+    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  }
+  function assetsByType(assets) {
+    const byType = new Map;
+    for (const a of assets || []) {
+      if (!(a.value > 0))
+        continue;
+      const k = (a.type || "").trim() || "other";
+      byType.set(k, (byType.get(k) || 0) + a.value);
+    }
+    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  }
+  module2.exports = { worth, activeDebts, assetTotal, cardOverlap, debtsByType, assetsByType };
+});
+
+// src/owed-math.js
+var require_owed_math = __commonJS((exports2, module2) => {
+  var { daysSince } = require_reconcile();
+  function outstandingOf(o) {
+    return Math.max(0, (o.amount || 0) - (o.repaid || 0));
+  }
+  function isSettled(o) {
+    return o.status === "paid" || outstandingOf(o) === 0;
+  }
+  function owedSummary(owed, today) {
+    const list = owed || [];
+    let outstanding = 0, recovered = 0, open = 0, oldestDays = null;
+    for (const o of list) {
+      const settled = isSettled(o);
+      if (settled) {
+        recovered += o.repaid > 0 ? Math.min(o.repaid, o.amount || 0) : o.amount || 0;
+        continue;
+      }
+      open++;
+      outstanding += outstandingOf(o);
+      recovered += Math.min(o.repaid || 0, o.amount || 0);
+      const age = daysSince(o.lent, today);
+      if (age !== null && (oldestDays === null || age > oldestDays))
+        oldestDays = age;
+    }
+    return { outstanding, recovered, open, entries: list.length, oldestDays };
+  }
+  module2.exports = { outstandingOf, isSettled, owedSummary };
+});
+
 // src/chart.js
 var require_chart = __commonJS((exports2, module2) => {
   var { el } = require_dom();
@@ -3141,6 +3245,8 @@ var require_dashboard = __commonJS((exports2, module2) => {
   var { safeSeg } = require_vault_path();
   var { TYPE_ORDER } = require_constants();
   var { stalenessSummary } = require_reconcile();
+  var { worth, cardOverlap } = require_worth();
+  var { owedSummary } = require_owed_math();
   var {
     themeColors,
     createChart,
@@ -3180,10 +3286,88 @@ var require_dashboard = __commonJS((exports2, module2) => {
     const guardedSplit = () => guard("#dashSplit", "spending split", renderSplit);
     function renderDashboard() {
       guard("#heroCard", "summary", renderHero);
-      guard("#dashStale", "balance staleness", renderStale);
       guardedTrend();
       guardedSplit();
       guard("#dashBudget", "budget table", renderBudgetTable);
+      guard("#dashPositionKpis", "position summary", renderPosition);
+      guard("#dashPositionNote", "double-count note", renderOverlapNote);
+      guard("#dashStale", "balance staleness", renderStale);
+    }
+    const balanceOf = (type) => S.accounts.filter((a) => a.type === type).reduce((t, a) => t + (a.balance || 0), 0);
+    function posTile(grid, { label, value, cls, sub, view, say }) {
+      const btn = el("button", {
+        type: "button",
+        class: `v num ${cls || ""}`,
+        "aria-label": say,
+        onclick: () => ctx.switchView(view)
+      }, value);
+      const t = el("div", { class: "mini" }, el("div", { class: "l" }, label), btn);
+      if (sub)
+        t.append(el("div", { class: "s" }, sub));
+      grid.append(t);
+      return t;
+    }
+    function renderPosition() {
+      const grid = $("#dashPositionKpis");
+      grid.empty();
+      const card = $("#dashPositionCard");
+      const w = worth(S.accounts, S.debts, S.assets);
+      const owed = owedSummary(S.owed);
+      const savings = balanceOf("savings");
+      const invest = balanceOf("investment");
+      const hasLedger = w.assets > 0 || w.liabilities > 0 || owed.entries > 0 || savings > 0 || invest > 0;
+      const hasCaveat = stalenessSummary(S.accounts).stale > 0;
+      if (card)
+        card.classList.toggle("hidden", !hasLedger && !hasCaveat);
+      $("#dashPositionSub").textContent = hasLedger ? "As things stand today — these do not move with the period above" : "";
+      if (!hasLedger)
+        return;
+      posTile(grid, {
+        label: "Net worth",
+        value: money(w.net, 0),
+        cls: w.net >= 0 ? "grad-txt" : "text-danger",
+        sub: `${money(w.assets, 0)} owned · ${money(w.liabilities, 0)} owed`,
+        view: "savings",
+        say: `Net worth ${money(w.net)} — ${money(w.assets)} owned against ${money(w.liabilities)} owed. Open Savings and Investments.`
+      });
+      posTile(grid, {
+        label: "Debt",
+        value: money(-w.liabilities, 0),
+        cls: w.liabilities > 0 ? "text-danger" : "",
+        sub: w.fromDebts && w.fromAccounts ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page` : w.liabilities > 0 ? `${w.active.length} active` : "nothing owed",
+        view: "debts",
+        say: w.liabilities > 0 ? `Debt ${money(w.liabilities)} owed. Open the Debt page.` : "No debt owed. Open the Debt page."
+      });
+      posTile(grid, {
+        label: "Owed to you",
+        value: money(owed.outstanding, 0),
+        cls: owed.outstanding > 0 ? "text-warning" : "",
+        sub: owed.outstanding > 0 ? `${owed.open} outstanding${owed.oldestDays !== null ? ` · oldest out ${owed.oldestDays} days` : ""}` : owed.entries ? `${money(owed.recovered, 0)} recovered` : "nothing lent out",
+        view: "owed",
+        say: owed.outstanding > 0 ? `${money(owed.outstanding)} owed to you across ${owed.open} ${owed.open === 1 ? "entry" : "entries"}. Open Owed Money.` : "Nothing outstanding. Open Owed Money."
+      });
+      posTile(grid, {
+        label: "Savings & investments",
+        value: money(savings + invest, 0),
+        sub: `${money(savings, 0)} savings · ${money(invest, 0)} invested`,
+        view: "savings",
+        say: `${money(savings + invest)} in savings and investments. Open Savings and Investments.`
+      });
+    }
+    function renderOverlapNote() {
+      const wrap = $("#dashPositionNote");
+      wrap.empty();
+      const o = cardOverlap(S.accounts, S.debts);
+      if (!o)
+        return;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${o.cardAccounts} credit-card ${o.cardAccounts === 1 ? "account" : "accounts"} and ` + `${o.cardDebts} card ${o.cardDebts === 1 ? "debt" : "debts"} are tracked — if any card is in both, it is counted twice above.`));
+      const btn = el("button", {
+        type: "button",
+        class: "kpi-caveat-btn",
+        "aria-label": "Review tracked debts on the Debt page"
+      }, "Review debts");
+      btn.addEventListener("click", () => ctx.switchView("debts"));
+      wrap.append(btn);
     }
     function renderStale() {
       const wrap = $("#dashStale");
@@ -3191,8 +3375,10 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const s = stalenessSummary(S.accounts);
       if (!s.stale)
         return;
-      const age = s.oldestDays === null ? "none carry a date" : `the oldest ${s.oldestDays} days ago`;
-      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${s.stale} of ${s.total} account balances unconfirmed — ${age}.`));
+      const age = s.oldestDays === null ? "none of them carry a date" : `the oldest ${s.oldestDays} days ago`;
+      const all = s.stale === s.total;
+      const line = all ? `Built from ${s.total === 1 ? "a balance" : `${s.total} balances`} nobody has confirmed recently` : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${line} — ${age}.`));
       const btn = el("button", {
         type: "button",
         class: "kpi-caveat-btn",
@@ -4814,62 +5000,6 @@ var require_savings_math = __commonJS((exports2, module2) => {
   module2.exports = { splitFlows, accountFlows, contributionRate };
 });
 
-// src/worth.js
-var require_worth = __commonJS((exports2, module2) => {
-  function activeDebts(debts) {
-    return (debts || []).filter((d) => d && d.status !== "paid");
-  }
-  function assetTotal(assets) {
-    return (assets || []).reduce((t, a) => t + Math.max(0, a.value || 0), 0);
-  }
-  function worth(accounts, debts, assets) {
-    const list = accounts || [];
-    const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
-    const ownedAssets = assetTotal(assets);
-    const owned = ownedAccounts + ownedAssets;
-    const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
-    const active = activeDebts(debts);
-    const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
-    const liabilities = fromAccounts + fromDebts;
-    return {
-      assets: owned,
-      ownedAccounts,
-      ownedAssets,
-      liabilities,
-      fromAccounts,
-      fromDebts,
-      net: owned - liabilities,
-      active
-    };
-  }
-  function cardOverlap(accounts, debts) {
-    const cardAccounts = (accounts || []).filter((a) => a.type === "credit_card" && (a.balance || 0) < 0);
-    const cardDebts = activeDebts(debts).filter((d) => /credit\s*card/i.test(d.type || ""));
-    return cardAccounts.length && cardDebts.length ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length } : null;
-  }
-  function debtsByType(debts) {
-    const byType = new Map;
-    for (const d of activeDebts(debts)) {
-      if (!(d.balance > 0))
-        continue;
-      const k = (d.type || "").trim() || "other";
-      byType.set(k, (byType.get(k) || 0) + d.balance);
-    }
-    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
-  }
-  function assetsByType(assets) {
-    const byType = new Map;
-    for (const a of assets || []) {
-      if (!(a.value > 0))
-        continue;
-      const k = (a.type || "").trim() || "other";
-      byType.set(k, (byType.get(k) || 0) + a.value);
-    }
-    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
-  }
-  module2.exports = { worth, activeDebts, assetTotal, cardOverlap, debtsByType, assetsByType };
-});
-
 // src/views/savings.js
 var require_savings = __commonJS((exports2, module2) => {
   var { el, kpiTiles, icoEl } = require_dom();
@@ -5194,7 +5324,7 @@ var require_assets = __commonJS((exports2, module2) => {
     }
     function renderAssetKpis() {
       const total = assetTotal(S.assets);
-      const biggest = S.assets.reduce((b, a) => a.value > (b?.value || 0) ? a : b, null);
+      const biggest = S.assets.length ? S.assets.reduce((b, a) => a.value > b.value ? a : b) : null;
       const unvalued = S.assets.filter(isUnvalued).length;
       const tile = kpiTiles($("#assetKpis"));
       tile("Total value", money(total), total > 0 ? "text-success" : "");
@@ -5210,7 +5340,8 @@ var require_assets = __commonJS((exports2, module2) => {
         return;
       const all = stale.length === S.assets.length;
       const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
-      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${all ? "Every value here" : `${stale.length} of ${S.assets.length} values`} is over a year old` + (share > 0.5 ? ` — and that is ${Math.round(share * 100)}% of the total.` : ".")));
+      const subject = all ? S.assets.length === 1 ? "This value is" : "Every value here is" : `${stale.length} of ${S.assets.length} values are`;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${subject} over a year old` + (share > 0.5 ? ` — and that is ${Math.round(share * 100)}% of the total.` : ".")));
     }
     function renderAssets(focusRow) {
       renderAssetKpis();
@@ -5236,7 +5367,6 @@ var require_assets = __commonJS((exports2, module2) => {
             min: "0",
             class: "form-control form-control-sm",
             value: a.value || "",
-            style: "width:140px",
             "aria-label": `Value of ${a.name}`,
             onchange: (e) => {
               a.value = Math.max(0, parseFloat(e.target.value) || 0);
@@ -5245,7 +5375,6 @@ var require_assets = __commonJS((exports2, module2) => {
             }
           })), el("td", {}, dateInput(a.valued, {
             class: "form-control form-control-sm",
-            style: "width:140px",
             "aria-label": `Date ${a.name} was valued`
           }, (v) => {
             a.valued = v;
@@ -5255,7 +5384,6 @@ var require_assets = __commonJS((exports2, module2) => {
             type: "text",
             class: "form-control form-control-sm",
             value: a.notes,
-            style: "width:200px",
             "aria-label": `Notes for ${a.name}`,
             onchange: (e) => {
               a.notes = e.target.value;
@@ -5898,18 +6026,16 @@ var require_owed = __commonJS((exports2, module2) => {
   var { escMd } = require_markdown();
   var { askFields } = require_modal();
   var { daysSince } = require_reconcile();
+  var { outstandingOf, isSettled, owedSummary } = require_owed_math();
   module2.exports = function registerOwed(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
     const { mark, clear: clearDirty } = ctx.dirtyFlag("owedDirty", "#owedSave");
-    const outstandingOf = (o) => Math.max(0, (o.amount || 0) - (o.repaid || 0));
-    const isSettled = (o) => o.status === "paid" || outstandingOf(o) === 0;
     function renderOwedKpis() {
-      const outstanding = S.owed.filter((o) => !isSettled(o)).reduce((s, o) => s + outstandingOf(o), 0);
-      const back = S.owed.reduce((s, o) => s + Math.min(o.repaid || 0, o.amount || 0), 0) + S.owed.filter((o) => o.status === "paid" && !(o.repaid > 0)).reduce((s, o) => s + (o.amount || 0), 0);
+      const s = owedSummary(S.owed);
       const tile = kpiTiles($("#owedKpis"));
-      tile("Outstanding", money(outstanding), outstanding > 0 ? "text-warning" : "");
-      tile("Recovered", money(back), "text-success");
-      tile("Entries", String(S.owed.length));
+      tile("Outstanding", money(s.outstanding), s.outstanding > 0 ? "text-warning" : "");
+      tile("Recovered", money(s.recovered), "text-success");
+      tile("Entries", String(s.entries));
     }
     function renderOwed(focusPerson) {
       renderOwedKpis();
