@@ -67,7 +67,14 @@ module.exports = function registerAssets(ctx) {
      and Debt. */
   function renderAssetKpis() {
     const total = assetTotal(S.assets);
-    const biggest = S.assets.reduce((b, a) => (a.value > (b?.value || 0) ? a : b), null);
+    /* Seeded from the first row rather than from null. `a.value > (b?.value||0)`
+       never advances past null when every value is 0, so a household that has
+       listed the house, the car and the ring but priced none of them yet — a
+       state this page explicitly expects, and the one the Unvalued tile beside
+       this is about — read "Largest: —" as though it owned nothing. */
+    const biggest = S.assets.length
+      ? S.assets.reduce((b, a) => (a.value > b.value ? a : b))
+      : null;
     const unvalued = S.assets.filter(isUnvalued).length;
 
     const tile = kpiTiles($('#assetKpis'));
@@ -87,8 +94,11 @@ module.exports = function registerAssets(ctx) {
     if (!stale.length) return;
     const all = stale.length === S.assets.length;
     const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
+    const subject = all
+      ? (S.assets.length === 1 ? 'This value is' : 'Every value here is')
+      : `${stale.length} of ${S.assets.length} values are`;
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${all ? 'Every value here' : `${stale.length} of ${S.assets.length} values`} is over a year old` +
+      `${subject} over a year old` +
       (share > 0.5 ? ` — and that is ${Math.round(share * 100)}% of the total.` : '.')));
   }
 
@@ -121,18 +131,18 @@ module.exports = function registerAssets(ctx) {
               ? [el('option', { value: a.type, selected: '' }, a.type)] : []),
             ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, k)))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
-            class: 'form-control form-control-sm', value: a.value || '', style: 'width:140px',
+            class: 'form-control form-control-sm', value: a.value || '',
             'aria-label': `Value of ${a.name}`,
             onchange: e => { a.value = Math.max(0, parseFloat(e.target.value) || 0); mark(); renderAssetKpis(); } })),
           /* Editing the value does NOT stamp this date. A valuation is a
              separate act from correcting a typo, and stamping today on every
              keystroke would make the staleness column agree with itself
              forever while meaning nothing. */
-          el('td', {}, dateInput(a.valued, { class: 'form-control form-control-sm', style: 'width:140px',
+          el('td', {}, dateInput(a.valued, { class: 'form-control form-control-sm',
             'aria-label': `Date ${a.name} was valued` },
             v => { a.valued = v; mark(); renderAssets(); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm',
-            value: a.notes, style: 'width:200px', 'aria-label': `Notes for ${a.name}`,
+            value: a.notes, 'aria-label': `Notes for ${a.name}`,
             onchange: e => { a.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${a.name}`,
             onclick: () => { S.assets.splice(S.assets.indexOf(a), 1); mark(); renderAssets(); } }, '✕'))));
