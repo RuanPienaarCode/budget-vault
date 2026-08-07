@@ -7,6 +7,7 @@ const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
 const { parseCsv } = require('./csv');
+const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
 
@@ -52,6 +53,13 @@ module.exports = function registerLoad(ctx) {
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
       // values, so a hand-edited Settings.md can't break the app.
       S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
+      /* Interface language, deliberately independent of country — see the
+         header of i18n.js. Absent means "follow Obsidian's own display
+         language", so a vault that has never heard of this setting reads in
+         whatever language the rest of Obsidian is already in. resolveLanguage
+         falls back to English for an unknown hand-edited value, the same
+         contract localeFor gives country. */
+      S.settings.language = setLanguage(fm.language || defaultLanguage());
       S.settings.household = fm.household || '';
     }
     /* Reads go out in parallel; parsing stays serial. Every loop below used to

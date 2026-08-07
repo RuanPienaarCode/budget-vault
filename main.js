@@ -131,6 +131,1580 @@ var require_markdown = __commonJS((exports2, module2) => {
   module2.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr };
 });
 
+// src/lang/en.js
+var require_en = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "Your private budget, kept safely inside your vault.",
+    "splash.enter": "Enter budget",
+    "nav.menu": "Menu",
+    "nav.close": "Close menu",
+    "nav.section.budget": "Budget",
+    "nav.section.accounts": "Accounts",
+    "nav.section.tools": "Tools",
+    "nav.dashboard": "Dashboard",
+    "nav.transactions": "Transactions",
+    "nav.budgets": "Budget",
+    "nav.savings": "Savings & Investments",
+    "nav.accounts": "Accounts",
+    "nav.assets": "Assets",
+    "nav.debts": "Debt",
+    "nav.owed": "Owed Money",
+    "nav.services": "Services",
+    "nav.tax": "Tax",
+    "nav.loans": "Loan Calculators",
+    "nav.import": "Import CSV",
+    "nav.reload": "Reload from disk",
+    "nav.pluginSettings": "Plugin settings",
+    "topbar.nav": "Budget navigation",
+    "topbar.mainMenu": "Main menu",
+    "topbar.openMenu": "Open navigation menu",
+    "topbar.home": "Go to Dashboard",
+    "topbar.brandSub": "Obsidian vault budget",
+    "topbar.periodNav": "Period navigation",
+    "topbar.prevPeriod": "Previous period",
+    "topbar.currentPeriod": "Jump to current period",
+    "topbar.nextPeriod": "Next period",
+    "topbar.import": "Import CSV",
+    "topbar.importTitle": "Import a bank statement CSV",
+    "topbar.settings": "Open budget settings",
+    "settings.folder.name": "Budget folder",
+    "settings.folder.desc": "Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.",
+    "settings.theme.name": "Theme",
+    "settings.theme.desc": "Follow Obsidian's light/dark mode, or force the Airy Glass dark or light palette.",
+    "settings.theme.auto": "Follow Obsidian",
+    "settings.theme.dark": "Always dark",
+    "settings.theme.light": "Always light",
+    "settings.palette.name": "Colour palette",
+    "settings.palette.desc": "Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.",
+    "settings.wizard.name": "Setup wizard",
+    "settings.wizard.desc": "Re-run the first-run wizard — folder, name, budget period, currency, starter files.",
+    "settings.wizard.button": "Run setup wizard",
+    "settings.startup.name": "Open on startup",
+    "settings.startup.desc": "Open the budget view automatically when Obsidian starts.",
+    "settings.privacy.name": "Privacy splash screen",
+    "settings.privacy.desc": 'Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.',
+    "settings.feedback.name": "Send feedback",
+    "settings.feedback.desc": "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.",
+    "settings.feedback.button": "Open feedback form",
+    "settings.support.name": "Support Budget Vault",
+    "settings.support.desc": "Budget Vault is free and always will be. If you'd like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.",
+    "settings.support.button": "Send a thank you",
+    "settings.data.name": "Budget data",
+    "settings.data.desc": "Stored in Settings.md inside the budget folder, so they apply on every device.",
+    "settings.household.name": "Name / household",
+    "settings.household.desc": "Shown in the dashboard greeting and top bar. Leave blank for none.",
+    "settings.household.placeholder": "Leave blank for none",
+    "settings.monthStart.name": "Month start day",
+    "settings.monthStart.desc": "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.",
+    "settings.monthStart.invalid": "Pick a day between 1 and 28.",
+    "settings.periodLength.name": "Period length",
+    "settings.periodLength.desc": "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.",
+    "settings.anchor.name": "Last payday",
+    "settings.anchor.desc": "When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.",
+    "settings.anchor.invalid": "Use a real date as YYYY-MM-DD, e.g. 2026-08-07.",
+    "settings.country.name": "Country",
+    "settings.country.desc": "Drives amount formatting, bank-statement date order and the Tax view's checklist (tailored to your country's tax authority). Existing tax years keep their data — only labels and new-year seeds change. Independent of the interface language below.",
+    "settings.language.name": "Language",
+    "settings.language.desc": "The language the interface is written in. Independent of Country above — living somewhere does not decide what you want to read. Defaults to Obsidian's own display language, falling back to English. Your own budget text — category names, notes, account names — is never translated.",
+    "settings.currency.name": "Currency symbol",
+    "settings.currency.desc": "Shown before every amount, e.g. R.",
+    "settings.currency.invalid": "Enter a currency symbol.",
+    "settings.budgetsKept": {
+      one: "Budget: your {count} existing budget file stays in the vault. It can't be shown at this period length, and it comes straight back if you change it back.",
+      other: "Budget: your {count} existing budget files stay in the vault. They can't be shown at this period length, and they come straight back if you change it back."
+    },
+    "settings.anchorReslices": {
+      one: "Budget: this shifts every period boundary. {count} budget file named by date will stop matching — it stays in your vault, and setting this date back to {prev} brings it straight back.",
+      other: "Budget: this shifts every period boundary. {count} budget files named by date will stop matching — they stay in your vault, and setting this date back to {prev} brings them straight back."
+    },
+    "settings.dateNotReal": 'Budget: "{value}" is not a date — use the picker, or type YYYY-MM-DD.',
+    "wiz.title": "Set up Budget Vault",
+    "wiz.stepOf": "Step {n} of {total}",
+    "wiz.cancel": "Cancel",
+    "wiz.back": "Back",
+    "wiz.next": "Next",
+    "wiz.letsGo": "Let's go!",
+    "wiz.connectBtn": "Connect budget",
+    "wiz.createBtn": "Create my budget",
+    "wiz.skipped": "Setup skipped — you can run it again from Settings → Budget Vault → Run setup wizard, or the command palette.",
+    "wiz.step.folder": "Where your budget lives",
+    "wiz.step.name": "What should we call you?",
+    "wiz.step.country": "Language, country & currency",
+    "wiz.step.period": "Your budget period",
+    "wiz.step.categories": "Your budget categories",
+    "wiz.step.account": "Your first account",
+    "wiz.step.finish": "Ready to go",
+    "wiz.err.folder": "Enter a folder path for the budget — for example Finances/Budget.",
+    "wiz.err.monthStart": "The month start day must be from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.",
+    "wiz.err.anchor": "Enter the date you were last paid — every pay cycle is counted from it, so without it the budget falls back to monthly periods.",
+    "wiz.err.currency": "Enter a currency symbol, or pick one from the list above.",
+    "wiz.welcome.title": "Welcome to Budget Vault!",
+    "wiz.welcome.intro": "Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else's server. If your vault syncs to your phone, your budget rides along for free.",
+    "wiz.welcome.planLead": "Here's the plan — this wizard sets you up:",
+    "wiz.welcome.plan1": "Choose your budget folder — we scaffold the whole structure for you",
+    "wiz.welcome.plan2": "Pick your language, country & currency — so the app reads right and amounts, dates and tax stuff look right",
+    "wiz.welcome.plan3": "Tell us when you get paid — your budget periods run from payday, if you like",
+    "wiz.welcome.plan4": "Choose your budget categories — tick the ones that fit your life",
+    "wiz.welcome.plan5": "Add your first account — and what's in it right now",
+    "wiz.welcome.thenLead": "Then the fun starts in the app:",
+    "wiz.welcome.app1": "Set your budget — give every category a number to aim for",
+    "wiz.welcome.app2": "Import your bank's CSV — transactions sort themselves as you teach it",
+    "wiz.welcome.app3": "Add new categories anytime — your budget grows with you",
+    "wiz.welcome.app4": "Review as you go — the dashboard shows exactly where the money went",
+    "wiz.welcome.close": "About two minutes of setup. You can change any of it later. Ready?",
+    "wiz.folder.hint": "Everything lives as plain markdown files inside one folder of your vault.",
+    "wiz.folder.blank": "Enter a folder path — for example Finances/Budget.",
+    "wiz.folder.found": 'Found an existing budget in "{folder}" — the wizard will connect to it rather than create new files.',
+    "wiz.folder.exists": '"{folder}" already exists — the budget files will be added inside it.',
+    "wiz.folder.willCreate": `"{folder}" doesn't exist yet — it will be created for you.`,
+    "wiz.folder.name": "Budget folder",
+    "wiz.folder.desc": "Where the categories, accounts, budgets and transactions are kept.",
+    "wiz.folder.connected": 'Found an existing budget in "{folder}" — connecting to it instead of creating new files. Your categories, accounts and transactions are left exactly as they are; the remaining steps only confirm the settings kept in its Settings.md.',
+    "wiz.name.name": "Your name or nickname",
+    "wiz.name.desc": "Shown in the dashboard greeting and the top bar. Leave blank to skip.",
+    "wiz.name.placeholder": "e.g. Alex, or The Smiths",
+    "wiz.language.desc": "The language the app is written in. Independent of the country below — where you live does not decide what you want to read. Your own budget text is never translated.",
+    "wiz.country.desc": "Sets amount formatting, the date order used when reading bank statements, and the Tax view's return checklist for your country's tax authority.",
+    "wiz.currency.desc": "Shown before every amount. Starts from your country — change it if you budget in something else.",
+    "wiz.currency.custom": "Custom symbol",
+    "wiz.currency.customPlaceholder": "e.g. CHF",
+    "wiz.ccy.rand": "R — South African Rand",
+    "wiz.ccy.dollar": "$ — Dollar",
+    "wiz.ccy.euro": "€ — Euro",
+    "wiz.ccy.pound": "£ — Pound",
+    "wiz.ccy.other": "Other…",
+    "wiz.period.howOften": "How often are you paid?",
+    "wiz.period.howOftenDesc": "Monthly periods are named by month and start on the day you choose below. The others line up with a pay cycle instead, counted from your last payday.",
+    "wiz.period.startDay": "Which day does your budget month start?",
+    "wiz.period.startDayDesc": "Usually your payday. Choose 1 for an ordinary calendar month. (1–28)",
+    "wiz.period.badDay": "Pick a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.",
+    "wiz.period.calendarEg": "An ordinary calendar month: each period runs from the {first} to the end of the month, and is named after that month. Right now you are in {month}.",
+    "wiz.period.paydayEg": "Each period runs from the {start} to the {end} of the next month, and is named after the month it ends in. Right now you are in {month}.",
+    "wiz.period.anchorBlank": "Enter the date you were last paid and the periods are worked out from there.",
+    "wiz.period.anchorEg": "Counting from there, the period you are in right now started on {date}. Budget files are named by that start date.",
+    "wiz.period.anchorName": "When were you last paid?",
+    "wiz.period.anchorDesc": "Any recent payday will do — only where it falls within the cycle matters, so an earlier or later one gives the same periods.",
+    "wiz.cats.intro": "Start with a set of budget categories — untick any you don't want. You can add, rename or recolour them later, so nothing here is final.",
+    "wiz.cats.selected": "{count} of {total} selected",
+    "wiz.cats.selectAll": "Select all",
+    "wiz.cats.selectNone": "Select none",
+    "wiz.type.income": "Income",
+    "wiz.type.expense": "Everyday expenses",
+    "wiz.type.debt": "Debt repayments",
+    "wiz.type.services": "Services & subscriptions",
+    "wiz.type.insurance": "Insurance",
+    "wiz.type.giving": "Giving",
+    "wiz.type.savings": "Savings",
+    "wiz.type.investment": "Investments",
+    "wiz.type.luxuries": "Nice-to-haves",
+    "wiz.type.transfer": "Transfers",
+    "wiz.acct.intro": "Transactions are stored per account. Add your main account now, or leave the name blank to skip — you can add accounts any time.",
+    "wiz.acct.name": "Account name",
+    "wiz.acct.namePlaceholder": "e.g. Cheque account",
+    "wiz.acct.type": "Type",
+    "wiz.acct.balance": "Current balance",
+    "wiz.acct.balanceDesc": "Optional — what's in the account right now.",
+    "wiz.acct.balanceHint": "Use your latest statement's closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page.",
+    "wiz.acctType.checking": "Cheque / current account",
+    "wiz.acctType.savings": "Savings account",
+    "wiz.acctType.credit_card": "Credit card",
+    "wiz.acctType.cash": "Cash",
+    "wiz.acctType.investment": "Investment",
+    "wiz.sum.folder": "Folder",
+    "wiz.sum.name": "Name",
+    "wiz.sum.language": "Language",
+    "wiz.sum.country": "Country",
+    "wiz.sum.period": "Budget period",
+    "wiz.sum.currency": "Currency",
+    "wiz.sum.categories": "Categories",
+    "wiz.sum.account": "First account",
+    "wiz.sum.opening": "Opening balance",
+    "wiz.sum.catCount": {
+      one: "{count} starter category",
+      other: "{count} starter categories"
+    },
+    "wiz.sum.monthlyCalendar": "Monthly (calendar month)",
+    "wiz.sum.monthlyOn": "Monthly, starting on the {day}",
+    "wiz.sum.cycleFrom": "{preset}, counted from {date}",
+    "wiz.finish.connectLead": "Connecting to the existing budget folder and saving these settings into its Settings.md:",
+    "wiz.finish.createLead": "This will create the budget folder with Settings.md, your categories, the first budget file and empty Owed Money / Services files:",
+    "wiz.finish.nextLead": "What to do next: ",
+    "wiz.finish.nextBody": "give your categories an amount on the Budgets page, then import your bank's CSV on the Transactions page.",
+    "wiz.finish.privacy": "Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen.",
+    "wiz.done.connected": "Connected to your budget folder.",
+    "wiz.done.created": "Budget folder created — welcome!",
+    "wiz.failed": "Setup failed: {error}"
+  };
+});
+
+// src/lang/af.js
+var require_af = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "Jou private begroting, veilig bewaar binne-in jou kluis.",
+    "splash.enter": "Gaan na begroting",
+    "nav.menu": "Kieslys",
+    "nav.close": "Maak kieslys toe",
+    "nav.section.budget": "Begroting",
+    "nav.section.accounts": "Rekeninge",
+    "nav.section.tools": "Gereedskap",
+    "nav.dashboard": "Paneelbord",
+    "nav.transactions": "Transaksies",
+    "nav.budgets": "Begroting",
+    "nav.savings": "Spaargeld en Beleggings",
+    "nav.accounts": "Rekeninge",
+    "nav.assets": "Bates",
+    "nav.debts": "Skuld",
+    "nav.owed": "Geld Verskuldig",
+    "nav.services": "Dienste",
+    "nav.tax": "Belasting",
+    "nav.loans": "Leningsberekenaars",
+    "nav.import": "Voer CSV in",
+    "nav.reload": "Herlaai vanaf skyf",
+    "nav.pluginSettings": "Inpropinstellings",
+    "topbar.nav": "Begrotingsnavigasie",
+    "topbar.mainMenu": "Hoofkieslys",
+    "topbar.openMenu": "Maak navigasiekieslys oop",
+    "topbar.home": "Gaan na Paneelbord",
+    "topbar.brandSub": "Obsidian-kluisbegroting",
+    "topbar.periodNav": "Tydperknavigasie",
+    "topbar.prevPeriod": "Vorige tydperk",
+    "topbar.currentPeriod": "Spring na huidige tydperk",
+    "topbar.nextPeriod": "Volgende tydperk",
+    "topbar.import": "Voer CSV in",
+    "topbar.importTitle": "Voer 'n bankstaat-CSV in",
+    "topbar.settings": "Maak begrotingsinstellings oop",
+    "settings.folder.name": "Begrotingsvouer",
+    "settings.folder.desc": "Kluispad van die vouer wat Categories/, Accounts/, Budgets/, Transactions/, Settings.md, ens. hou.",
+    "settings.theme.name": "Tema",
+    "settings.theme.desc": "Volg Obsidian se lig/donker-modus, of dwing die Airy Glass donker of ligte palet af.",
+    "settings.theme.auto": "Volg Obsidian",
+    "settings.theme.dark": "Altyd donker",
+    "settings.theme.light": "Altyd lig",
+    "settings.palette.name": "Kleurpalet",
+    "settings.palette.desc": "Watter kleure die begroting in geteken word. Elke palet het sy eie ligte en donker weergawe, dus is dit onafhanklik van die Tema-instelling hierbo.",
+    "settings.wizard.name": "Opstelassistent",
+    "settings.wizard.desc": "Hardloop die eerste-keer-assistent weer — vouer, naam, begrotingstydperk, geldeenheid, beginlêers.",
+    "settings.wizard.button": "Hardloop opstelassistent",
+    "settings.startup.name": "Maak oop met begin",
+    "settings.startup.desc": "Maak die begrotingsaansig outomaties oop wanneer Obsidian begin.",
+    "settings.privacy.name": "Privaatheidskerm",
+    "settings.privacy.desc": `Bedek die begroting met 'n skerm totdat jy "Gaan na begroting" tik — met oopmaak, en weer elke keer wanneer Obsidian na die agtergrond gaan. Niks word uit die kluis gelees voordat jy tik nie.`,
+    "settings.feedback.name": "Stuur terugvoer",
+    "settings.feedback.desc": "Rapporteer 'n fout, meld 'n probleem aan of vra 'n kenmerk aan. Maak 'n Google-vorm in jou blaaier oop — niks uit jou begroting word aangeheg of gestuur nie.",
+    "settings.feedback.button": "Maak terugvoervorm oop",
+    "settings.support.name": "Ondersteun Budget Vault",
+    "settings.support.desc": "Budget Vault is gratis en sal altyd wees. As jy dankie wil sê, maak dit PayPal in jou blaaier oop — heeltemal opsioneel, en niks in die inprop verander so of so nie.",
+    "settings.support.button": "Stuur 'n dankie",
+    "settings.data.name": "Begrotingsdata",
+    "settings.data.desc": "Gestoor in Settings.md binne die begrotingsvouer, sodat dit op elke toestel geld.",
+    "settings.household.name": "Naam / huishouding",
+    "settings.household.desc": "Word in die paneelbord se groet en die boonste balk gewys. Los leeg vir geen.",
+    "settings.household.placeholder": "Los leeg vir geen",
+    "settings.monthStart.name": "Maand se begindag",
+    "settings.monthStart.desc": "Dag van die maand waarop elke finansiële tydperk begin — gewoonlik jou betaaldag. Kies 1 vir 'n gewone kalendermaand. 1–28.",
+    "settings.monthStart.invalid": "Kies 'n dag tussen 1 en 28.",
+    "settings.periodLength.name": "Tydperklengte",
+    "settings.periodLength.desc": "Hoe lank elke begrotingstydperk loop. Maandeliks gebruik die maand se begindag hierbo. Die ander opsies belyn tydperke eerder met 'n betaalsiklus, getel vanaf die datum hieronder.",
+    "settings.anchor.name": "Laaste betaaldag",
+    "settings.anchor.desc": "Wanneer is jy laas betaal? Enige onlangse betaaldag werk — net die dag waarop dit binne die siklus val, maak saak, dus gee 'n vroeër of later een dieselfde uitkoms. Word geïgnoreer wanneer die tydperklengte maandeliks is.",
+    "settings.anchor.invalid": "Gebruik 'n werklike datum as JJJJ-MM-DD, bv. 2026-08-07.",
+    "settings.country.name": "Land",
+    "settings.country.desc": "Dryf bedragformatering, die datumvolgorde van bankstate en die Belasting-aansig se kontrolelys (toegespits op jou land se belastingowerheid). Bestaande belastingjare behou hul data — net etikette en nuwejaarsaanvangswaardes verander. Onafhanklik van die koppelvlaktaal hieronder.",
+    "settings.language.name": "Taal",
+    "settings.language.desc": "Die taal waarin die koppelvlak geskryf is. Onafhanklik van Land hierbo — waar jy woon, bepaal nie wat jy wil lees nie. Volg by verstek Obsidian se eie vertoontaal, met Engels as terugval. Jou eie begrotingsteks — kategoriename, notas, rekeningname — word nooit vertaal nie.",
+    "settings.currency.name": "Geldeenheidsimbool",
+    "settings.currency.desc": "Word voor elke bedrag gewys, bv. R.",
+    "settings.currency.invalid": "Voer 'n geldeenheidsimbool in.",
+    "settings.budgetsKept": {
+      one: "Begroting: jou {count} bestaande begrotingslêer bly in die kluis. Dit kan nie by hierdie tydperklengte gewys word nie, en dit kom dadelik terug as jy dit terugverander.",
+      other: "Begroting: jou {count} bestaande begrotingslêers bly in die kluis. Hulle kan nie by hierdie tydperklengte gewys word nie, en hulle kom dadelik terug as jy dit terugverander."
+    },
+    "settings.anchorReslices": {
+      one: "Begroting: dit skuif elke tydperkgrens. {count} begrotingslêer wat volgens datum benoem is, sal ophou pas — dit bly in jou kluis, en om hierdie datum terug te stel na {prev} bring dit dadelik terug.",
+      other: "Begroting: dit skuif elke tydperkgrens. {count} begrotingslêers wat volgens datum benoem is, sal ophou pas — hulle bly in jou kluis, en om hierdie datum terug te stel na {prev} bring hulle dadelik terug."
+    },
+    "settings.dateNotReal": `Begroting: "{value}" is nie 'n datum nie — gebruik die kieser, of tik JJJJ-MM-DD.`,
+    "wiz.title": "Stel Budget Vault op",
+    "wiz.stepOf": "Stap {n} van {total}",
+    "wiz.cancel": "Kanselleer",
+    "wiz.back": "Terug",
+    "wiz.next": "Volgende",
+    "wiz.letsGo": "Kom ons gaan!",
+    "wiz.connectBtn": "Koppel begroting",
+    "wiz.createBtn": "Skep my begroting",
+    "wiz.skipped": "Opstelling oorgeslaan — jy kan dit weer hardloop vanaf Instellings → Budget Vault → Hardloop opstelassistent, of die bevelpalet.",
+    "wiz.step.folder": "Waar jou begroting bly",
+    "wiz.step.name": "Wat moet ons jou noem?",
+    "wiz.step.country": "Taal, land en geldeenheid",
+    "wiz.step.period": "Jou begrotingstydperk",
+    "wiz.step.categories": "Jou begrotingskategorieë",
+    "wiz.step.account": "Jou eerste rekening",
+    "wiz.step.finish": "Gereed om te begin",
+    "wiz.err.folder": "Voer 'n vouerpad vir die begroting in — byvoorbeeld Finances/Budget.",
+    "wiz.err.monthStart": "Die maand se begindag moet van 1 tot 28 wees. Nie elke maand het 'n 29ste, 30ste of 31ste nie, so as jy op die laaste dag van die maand betaal word, gebruik 28.",
+    "wiz.err.anchor": "Voer die datum in waarop jy laas betaal is — elke betaalsiklus word daarvandaan getel, dus val die begroting daarsonder terug op maandelikse tydperke.",
+    "wiz.err.currency": "Voer 'n geldeenheidsimbool in, of kies een uit die lys hierbo.",
+    "wiz.welcome.title": "Welkom by Budget Vault!",
+    "wiz.welcome.intro": "Jou hele begroting, wat reg hier in jou kluis as gewone markdown leef — geen rekeninge, geen wolk, niemand anders se bediener nie. As jou kluis na jou foon sinkroniseer, ry jou begroting gratis saam.",
+    "wiz.welcome.planLead": "Hier is die plan — hierdie assistent stel jou op:",
+    "wiz.welcome.plan1": "Kies jou begrotingsvouer — ons stel die hele struktuur vir jou op",
+    "wiz.welcome.plan2": "Kies jou taal, land en geldeenheid — sodat die program reg lees en bedrae, datums en belastinggoed reg lyk",
+    "wiz.welcome.plan3": "Sê vir ons wanneer jy betaal word — jou begrotingstydperke loop vanaf betaaldag, as jy wil",
+    "wiz.welcome.plan4": "Kies jou begrotingskategorieë — merk dié wat by jou lewe pas",
+    "wiz.welcome.plan5": "Voeg jou eerste rekening by — en wat tans daarin is",
+    "wiz.welcome.thenLead": "Dan begin die pret in die program:",
+    "wiz.welcome.app1": "Stel jou begroting — gee elke kategorie 'n bedrag om na te mik",
+    "wiz.welcome.app2": "Voer jou bank se CSV in — transaksies sorteer hulself soos jy dit leer",
+    "wiz.welcome.app3": "Voeg enige tyd nuwe kategorieë by — jou begroting groei saam met jou",
+    "wiz.welcome.app4": "Kyk terug soos jy gaan — die paneelbord wys presies waarheen die geld is",
+    "wiz.welcome.close": "Omtrent twee minute se opstelling. Jy kan enigiets daarvan later verander. Gereed?",
+    "wiz.folder.hint": "Alles leef as gewone markdown-lêers binne een vouer van jou kluis.",
+    "wiz.folder.blank": "Voer 'n vouerpad in — byvoorbeeld Finances/Budget.",
+    "wiz.folder.found": `'n Bestaande begroting is in "{folder}" gevind — die assistent sal daaraan koppel eerder as om nuwe lêers te skep.`,
+    "wiz.folder.exists": '"{folder}" bestaan reeds — die begrotingslêers sal daarbinne bygevoeg word.',
+    "wiz.folder.willCreate": '"{folder}" bestaan nog nie — dit sal vir jou geskep word.',
+    "wiz.folder.name": "Begrotingsvouer",
+    "wiz.folder.desc": "Waar die kategorieë, rekeninge, begrotings en transaksies gehou word.",
+    "wiz.folder.connected": `'n Bestaande begroting is in "{folder}" gevind — ons koppel daaraan eerder as om nuwe lêers te skep. Jou kategorieë, rekeninge en transaksies bly presies soos hulle is; die oorblywende stappe bevestig net die instellings wat in sy Settings.md gehou word.`,
+    "wiz.name.name": "Jou naam of bynaam",
+    "wiz.name.desc": "Word in die paneelbord se groet en die boonste balk gewys. Los leeg om oor te slaan.",
+    "wiz.name.placeholder": "bv. Alex, of Die Smiths",
+    "wiz.language.desc": "Die taal waarin die program geskryf is. Onafhanklik van die land hieronder — waar jy woon, bepaal nie wat jy wil lees nie. Jou eie begrotingsteks word nooit vertaal nie.",
+    "wiz.country.desc": "Stel bedragformatering, die datumvolgorde wat gebruik word om bankstate te lees, en die Belasting-aansig se opgawekontrolelys vir jou land se belastingowerheid.",
+    "wiz.currency.desc": "Word voor elke bedrag gewys. Begin by jou land — verander dit as jy in iets anders begroot.",
+    "wiz.currency.custom": "Pasgemaakte simbool",
+    "wiz.currency.customPlaceholder": "bv. CHF",
+    "wiz.ccy.rand": "R — Suid-Afrikaanse rand",
+    "wiz.ccy.dollar": "$ — Dollar",
+    "wiz.ccy.euro": "€ — Euro",
+    "wiz.ccy.pound": "£ — Pond",
+    "wiz.ccy.other": "Ander…",
+    "wiz.period.howOften": "Hoe gereeld word jy betaal?",
+    "wiz.period.howOftenDesc": "Maandelikse tydperke word volgens maand benoem en begin op die dag wat jy hieronder kies. Die ander belyn eerder met 'n betaalsiklus, getel vanaf jou laaste betaaldag.",
+    "wiz.period.startDay": "Op watter dag begin jou begrotingsmaand?",
+    "wiz.period.startDayDesc": "Gewoonlik jou betaaldag. Kies 1 vir 'n gewone kalendermaand. (1–28)",
+    "wiz.period.badDay": "Kies 'n dag van 1 tot 28. Nie elke maand het 'n 29ste, 30ste of 31ste nie, so as jy op die laaste dag van die maand betaal word, gebruik 28.",
+    "wiz.period.calendarEg": "'n Gewone kalendermaand: elke tydperk loop van die {first} tot die einde van die maand, en word na daardie maand vernoem. Jy is nou in {month}.",
+    "wiz.period.paydayEg": "Elke tydperk loop van die {start} tot die {end} van die volgende maand, en word vernoem na die maand waarin dit eindig. Jy is nou in {month}.",
+    "wiz.period.anchorBlank": "Voer die datum in waarop jy laas betaal is, en die tydperke word daarvandaan uitgewerk.",
+    "wiz.period.anchorEg": "Van daar af getel, het die tydperk waarin jy nou is op {date} begin. Begrotingslêers word volgens daardie begindatum benoem.",
+    "wiz.period.anchorName": "Wanneer is jy laas betaal?",
+    "wiz.period.anchorDesc": "Enige onlangse betaaldag sal deug — net waar dit binne die siklus val, maak saak, dus gee 'n vroeër of later een dieselfde tydperke.",
+    "wiz.cats.intro": "Begin met 'n stel begrotingskategorieë — ontmerk enige wat jy nie wil hê nie. Jy kan hulle later byvoeg, hernoem of herkleur, dus is niks hier finaal nie.",
+    "wiz.cats.selected": "{count} van {total} gekies",
+    "wiz.cats.selectAll": "Kies almal",
+    "wiz.cats.selectNone": "Kies geen",
+    "wiz.type.income": "Inkomste",
+    "wiz.type.expense": "Daaglikse uitgawes",
+    "wiz.type.debt": "Skuldafbetalings",
+    "wiz.type.services": "Dienste en intekeninge",
+    "wiz.type.insurance": "Versekering",
+    "wiz.type.giving": "Gee",
+    "wiz.type.savings": "Spaargeld",
+    "wiz.type.investment": "Beleggings",
+    "wiz.type.luxuries": "Lekker-om-te-hê",
+    "wiz.type.transfer": "Oorplasings",
+    "wiz.acct.intro": "Transaksies word per rekening gestoor. Voeg nou jou hoofrekening by, of los die naam leeg om oor te slaan — jy kan enige tyd rekeninge byvoeg.",
+    "wiz.acct.name": "Rekeningnaam",
+    "wiz.acct.namePlaceholder": "bv. Tjekrekening",
+    "wiz.acct.type": "Tipe",
+    "wiz.acct.balance": "Huidige saldo",
+    "wiz.acct.balanceDesc": "Opsioneel — wat tans in die rekening is.",
+    "wiz.acct.balanceHint": "Gebruik jou jongste staat se sluitingsaldo, of wat ook al jou bankprogram wys. Die saldo is 'n momentopname wat jy self op datum hou — om net onlangse transaksies in te voer, gooi dit nooit uit nie — en jy kan dit enige tyd verander deur op die saldo op die Rekeninge-bladsy te tik.",
+    "wiz.acctType.checking": "Tjek-/lopende rekening",
+    "wiz.acctType.savings": "Spaarrekening",
+    "wiz.acctType.credit_card": "Kredietkaart",
+    "wiz.acctType.cash": "Kontant",
+    "wiz.acctType.investment": "Belegging",
+    "wiz.sum.folder": "Vouer",
+    "wiz.sum.name": "Naam",
+    "wiz.sum.language": "Taal",
+    "wiz.sum.country": "Land",
+    "wiz.sum.period": "Begrotingstydperk",
+    "wiz.sum.currency": "Geldeenheid",
+    "wiz.sum.categories": "Kategorieë",
+    "wiz.sum.account": "Eerste rekening",
+    "wiz.sum.opening": "Aanvangsaldo",
+    "wiz.sum.catCount": {
+      one: "{count} beginkategorie",
+      other: "{count} beginkategorieë"
+    },
+    "wiz.sum.monthlyCalendar": "Maandeliks (kalendermaand)",
+    "wiz.sum.monthlyOn": "Maandeliks, begin op die {day}",
+    "wiz.sum.cycleFrom": "{preset}, getel vanaf {date}",
+    "wiz.finish.connectLead": "Ons koppel aan die bestaande begrotingsvouer en stoor hierdie instellings in sy Settings.md:",
+    "wiz.finish.createLead": "Dit sal die begrotingsvouer skep met Settings.md, jou kategorieë, die eerste begrotingslêer en leë Owed Money-/Services-lêers:",
+    "wiz.finish.nextLead": "Wat om volgende te doen: ",
+    "wiz.finish.nextBody": "gee jou kategorieë 'n bedrag op die Begrotings-bladsy, en voer dan jou bank se CSV op die Transaksies-bladsy in.",
+    "wiz.finish.privacy": "Jou begroting maak agter 'n tik-om-in-te-gaan privaatheidskerm oop, sodat niks sigbaar is as iemand vlugtig na jou kluis kyk nie. Skakel dit af by Instellings → Budget Vault → Privaatheidskerm.",
+    "wiz.done.connected": "Gekoppel aan jou begrotingsvouer.",
+    "wiz.done.created": "Begrotingsvouer geskep — welkom!",
+    "wiz.failed": "Opstelling het misluk: {error}"
+  };
+});
+
+// src/lang/de.js
+var require_de = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "Dein privates Budget, sicher in deinem Vault aufbewahrt.",
+    "splash.enter": "Budget öffnen",
+    "nav.menu": "Menü",
+    "nav.close": "Menü schließen",
+    "nav.section.budget": "Budget",
+    "nav.section.accounts": "Konten",
+    "nav.section.tools": "Werkzeuge",
+    "nav.dashboard": "Übersicht",
+    "nav.transactions": "Transaktionen",
+    "nav.budgets": "Budget",
+    "nav.savings": "Sparen und Anlagen",
+    "nav.accounts": "Konten",
+    "nav.assets": "Vermögenswerte",
+    "nav.debts": "Schulden",
+    "nav.owed": "Ausstehende Beträge",
+    "nav.services": "Dienste",
+    "nav.tax": "Steuern",
+    "nav.loans": "Kreditrechner",
+    "nav.import": "CSV importieren",
+    "nav.reload": "Vom Datenträger neu laden",
+    "nav.pluginSettings": "Plugin-Einstellungen",
+    "topbar.nav": "Budget-Navigation",
+    "topbar.mainMenu": "Hauptmenü",
+    "topbar.openMenu": "Navigationsmenü öffnen",
+    "topbar.home": "Zur Übersicht",
+    "topbar.brandSub": "Budget im Obsidian-Vault",
+    "topbar.periodNav": "Zeitraum-Navigation",
+    "topbar.prevPeriod": "Vorheriger Zeitraum",
+    "topbar.currentPeriod": "Zum aktuellen Zeitraum springen",
+    "topbar.nextPeriod": "Nächster Zeitraum",
+    "topbar.import": "CSV importieren",
+    "topbar.importTitle": "Einen Kontoauszug als CSV importieren",
+    "topbar.settings": "Budget-Einstellungen öffnen",
+    "settings.folder.name": "Budget-Ordner",
+    "settings.folder.desc": "Vault-Pfad des Ordners mit Categories/, Accounts/, Budgets/, Transactions/, Settings.md usw.",
+    "settings.theme.name": "Design",
+    "settings.theme.desc": "Dem Hell-/Dunkelmodus von Obsidian folgen oder die helle bzw. dunkle Airy-Glass-Palette erzwingen.",
+    "settings.theme.auto": "Obsidian folgen",
+    "settings.theme.dark": "Immer dunkel",
+    "settings.theme.light": "Immer hell",
+    "settings.palette.name": "Farbpalette",
+    "settings.palette.desc": "In welchen Farben das Budget gezeichnet wird. Jede Palette hat ihre eigene helle und dunkle Fassung und ist daher unabhängig von der Design-Einstellung oben.",
+    "settings.wizard.name": "Einrichtungsassistent",
+    "settings.wizard.desc": "Den Assistenten für den ersten Start erneut ausführen — Ordner, Name, Budgetzeitraum, Währung, Startdateien.",
+    "settings.wizard.button": "Einrichtungsassistent starten",
+    "settings.startup.name": "Beim Start öffnen",
+    "settings.startup.desc": "Die Budget-Ansicht automatisch öffnen, wenn Obsidian startet.",
+    "settings.privacy.name": "Datenschutz-Startbildschirm",
+    "settings.privacy.desc": "Das Budget mit einem Startbildschirm verdecken, bis du auf „Budget öffnen“ tippst — beim Öffnen und jedes Mal, wenn Obsidian in den Hintergrund wechselt. Vor dem Tippen wird nichts aus dem Vault gelesen.",
+    "settings.feedback.name": "Feedback senden",
+    "settings.feedback.desc": "Einen Fehler melden, auf ein Problem hinweisen oder eine Funktion wünschen. Öffnet ein Google-Formular in deinem Browser — nichts aus deinem Budget wird angehängt oder gesendet.",
+    "settings.feedback.button": "Feedback-Formular öffnen",
+    "settings.support.name": "Budget Vault unterstützen",
+    "settings.support.desc": "Budget Vault ist kostenlos und bleibt es. Wenn du danke sagen möchtest, öffnet dies PayPal in deinem Browser — völlig freiwillig, und am Plugin ändert sich so oder so nichts.",
+    "settings.support.button": "Ein Dankeschön senden",
+    "settings.data.name": "Budget-Daten",
+    "settings.data.desc": "In Settings.md im Budget-Ordner gespeichert, damit sie auf jedem Gerät gelten.",
+    "settings.household.name": "Name / Haushalt",
+    "settings.household.desc": "Wird in der Begrüßung der Übersicht und in der Kopfzeile angezeigt. Für keinen leer lassen.",
+    "settings.household.placeholder": "Für keinen leer lassen",
+    "settings.monthStart.name": "Monatsbeginn",
+    "settings.monthStart.desc": "Tag des Monats, an dem jeder Finanzzeitraum beginnt — üblicherweise dein Zahltag. Wähle 1 für einen gewöhnlichen Kalendermonat. 1–28.",
+    "settings.monthStart.invalid": "Wähle einen Tag zwischen 1 und 28.",
+    "settings.periodLength.name": "Zeitraumlänge",
+    "settings.periodLength.desc": "Wie lange jeder Budgetzeitraum läuft. „Monatlich“ nutzt den Monatsbeginn oben. Die anderen Optionen richten die Zeiträume stattdessen an einem Zahlungszyklus aus, gezählt ab dem Datum unten.",
+    "settings.anchor.name": "Letzter Zahltag",
+    "settings.anchor.desc": "Wann wurdest du zuletzt bezahlt? Jeder kürzliche Zahltag funktioniert — es zählt nur, auf welchen Tag im Zyklus er fällt, ein früherer oder späterer ergibt also dasselbe. Wird ignoriert, wenn die Zeitraumlänge monatlich ist.",
+    "settings.anchor.invalid": "Nutze ein echtes Datum im Format JJJJ-MM-TT, z. B. 2026-08-07.",
+    "settings.country.name": "Land",
+    "settings.country.desc": "Steuert die Betragsformatierung, die Datumsreihenfolge von Kontoauszügen und die Checkliste der Steuer-Ansicht (auf die Steuerbehörde deines Landes zugeschnitten). Bestehende Steuerjahre behalten ihre Daten — nur Beschriftungen und Startwerte für neue Jahre ändern sich. Unabhängig von der Oberflächensprache unten.",
+    "settings.language.name": "Sprache",
+    "settings.language.desc": "Die Sprache, in der die Oberfläche geschrieben ist. Unabhängig vom Land oben — wo du lebst, entscheidet nicht darüber, was du lesen möchtest. Folgt standardmäßig der Anzeigesprache von Obsidian, mit Englisch als Rückfall. Dein eigener Budgettext — Kategorienamen, Notizen, Kontonamen — wird nie übersetzt.",
+    "settings.currency.name": "Währungssymbol",
+    "settings.currency.desc": "Wird vor jedem Betrag angezeigt, z. B. R.",
+    "settings.currency.invalid": "Gib ein Währungssymbol ein.",
+    "settings.budgetsKept": {
+      one: "Budget: deine {count} vorhandene Budgetdatei bleibt im Vault. Sie kann bei dieser Zeitraumlänge nicht angezeigt werden und ist sofort wieder da, wenn du die Länge zurückstellst.",
+      other: "Budget: deine {count} vorhandenen Budgetdateien bleiben im Vault. Sie können bei dieser Zeitraumlänge nicht angezeigt werden und sind sofort wieder da, wenn du die Länge zurückstellst."
+    },
+    "settings.anchorReslices": {
+      one: "Budget: das verschiebt jede Zeitraumgrenze. {count} nach Datum benannte Budgetdatei passt dann nicht mehr — sie bleibt in deinem Vault, und dieses Datum zurück auf {prev} zu setzen bringt sie sofort wieder.",
+      other: "Budget: das verschiebt jede Zeitraumgrenze. {count} nach Datum benannte Budgetdateien passen dann nicht mehr — sie bleiben in deinem Vault, und dieses Datum zurück auf {prev} zu setzen bringt sie sofort wieder."
+    },
+    "settings.dateNotReal": "Budget: „{value}“ ist kein Datum — nutze die Auswahl oder tippe JJJJ-MM-TT.",
+    "wiz.title": "Budget Vault einrichten",
+    "wiz.stepOf": "Schritt {n} von {total}",
+    "wiz.cancel": "Abbrechen",
+    "wiz.back": "Zurück",
+    "wiz.next": "Weiter",
+    "wiz.letsGo": "Los geht's!",
+    "wiz.connectBtn": "Budget verbinden",
+    "wiz.createBtn": "Mein Budget erstellen",
+    "wiz.skipped": "Einrichtung übersprungen — du kannst sie jederzeit erneut starten über Einstellungen → Budget Vault → Einrichtungsassistent starten, oder über die Befehlspalette.",
+    "wiz.step.folder": "Wo dein Budget liegt",
+    "wiz.step.name": "Wie sollen wir dich nennen?",
+    "wiz.step.country": "Sprache, Land & Währung",
+    "wiz.step.period": "Dein Budgetzeitraum",
+    "wiz.step.categories": "Deine Budgetkategorien",
+    "wiz.step.account": "Dein erstes Konto",
+    "wiz.step.finish": "Bereit",
+    "wiz.err.folder": "Gib einen Ordnerpfad für das Budget ein — zum Beispiel Finances/Budget.",
+    "wiz.err.monthStart": "Der Monatsbeginn muss zwischen 1 und 28 liegen. Nicht jeder Monat hat einen 29., 30. oder 31., wenn du also am letzten Tag des Monats bezahlt wirst, nimm 28.",
+    "wiz.err.anchor": "Gib das Datum ein, an dem du zuletzt bezahlt wurdest — jeder Zahlungszyklus wird davon aus gezählt, ohne es fällt das Budget auf monatliche Zeiträume zurück.",
+    "wiz.err.currency": "Gib ein Währungssymbol ein oder wähle eines aus der Liste oben.",
+    "wiz.welcome.title": "Willkommen bei Budget Vault!",
+    "wiz.welcome.intro": "Dein ganzes Budget, direkt hier in deinem Vault als einfaches Markdown — keine Konten, keine Cloud, kein fremder Server. Wenn dein Vault mit deinem Handy synchronisiert, kommt dein Budget gratis mit.",
+    "wiz.welcome.planLead": "So ist der Plan — dieser Assistent richtet dich ein:",
+    "wiz.welcome.plan1": "Wähle deinen Budget-Ordner — wir legen die ganze Struktur für dich an",
+    "wiz.welcome.plan2": "Wähle Sprache, Land & Währung — damit die App richtig liest und Beträge, Daten und Steuerliches richtig aussehen",
+    "wiz.welcome.plan3": "Sag uns, wann du bezahlt wirst — deine Budgetzeiträume laufen ab Zahltag, wenn du magst",
+    "wiz.welcome.plan4": "Wähle deine Budgetkategorien — hake die an, die zu deinem Leben passen",
+    "wiz.welcome.plan5": "Füge dein erstes Konto hinzu — und was gerade darauf ist",
+    "wiz.welcome.thenLead": "Dann fängt der spaßige Teil in der App an:",
+    "wiz.welcome.app1": "Setze dein Budget — gib jeder Kategorie eine Zahl als Ziel",
+    "wiz.welcome.app2": "Importiere die CSV deiner Bank — Transaktionen sortieren sich selbst, während du es ihnen beibringst",
+    "wiz.welcome.app3": "Füge jederzeit neue Kategorien hinzu — dein Budget wächst mit dir",
+    "wiz.welcome.app4": "Schau unterwegs nach — die Übersicht zeigt genau, wohin das Geld gegangen ist",
+    "wiz.welcome.close": "Etwa zwei Minuten Einrichtung. Du kannst alles später ändern. Bereit?",
+    "wiz.folder.hint": "Alles liegt als einfache Markdown-Dateien in einem Ordner deines Vaults.",
+    "wiz.folder.blank": "Gib einen Ordnerpfad ein — zum Beispiel Finances/Budget.",
+    "wiz.folder.found": "In „{folder}“ wurde ein vorhandenes Budget gefunden — der Assistent verbindet sich damit, statt neue Dateien anzulegen.",
+    "wiz.folder.exists": "„{folder}“ existiert bereits — die Budgetdateien werden darin angelegt.",
+    "wiz.folder.willCreate": "„{folder}“ existiert noch nicht — der Ordner wird für dich angelegt.",
+    "wiz.folder.name": "Budget-Ordner",
+    "wiz.folder.desc": "Wo die Kategorien, Konten, Budgets und Transaktionen liegen.",
+    "wiz.folder.connected": "In „{folder}“ wurde ein vorhandenes Budget gefunden — wir verbinden uns damit, statt neue Dateien anzulegen. Deine Kategorien, Konten und Transaktionen bleiben genau so, wie sie sind; die restlichen Schritte bestätigen nur die Einstellungen aus der dortigen Settings.md.",
+    "wiz.name.name": "Dein Name oder Spitzname",
+    "wiz.name.desc": "Wird in der Begrüßung der Übersicht und in der Kopfzeile angezeigt. Leer lassen zum Überspringen.",
+    "wiz.name.placeholder": "z. B. Alex, oder Familie Schmidt",
+    "wiz.language.desc": "Die Sprache, in der die App geschrieben ist. Unabhängig vom Land unten — wo du lebst, entscheidet nicht darüber, was du lesen möchtest. Dein eigener Budgettext wird nie übersetzt.",
+    "wiz.country.desc": "Legt die Betragsformatierung fest, die Datumsreihenfolge beim Lesen von Kontoauszügen und die Checkliste der Steuer-Ansicht für die Steuerbehörde deines Landes.",
+    "wiz.currency.desc": "Wird vor jedem Betrag angezeigt. Startet bei deinem Land — ändere es, wenn du in etwas anderem budgetierst.",
+    "wiz.currency.custom": "Eigenes Symbol",
+    "wiz.currency.customPlaceholder": "z. B. CHF",
+    "wiz.ccy.rand": "R — Südafrikanischer Rand",
+    "wiz.ccy.dollar": "$ — Dollar",
+    "wiz.ccy.euro": "€ — Euro",
+    "wiz.ccy.pound": "£ — Pfund",
+    "wiz.ccy.other": "Andere…",
+    "wiz.period.howOften": "Wie oft wirst du bezahlt?",
+    "wiz.period.howOftenDesc": "Monatliche Zeiträume werden nach dem Monat benannt und beginnen an dem Tag, den du unten wählst. Die anderen richten sich stattdessen nach einem Zahlungszyklus, gezählt ab deinem letzten Zahltag.",
+    "wiz.period.startDay": "An welchem Tag beginnt dein Budgetmonat?",
+    "wiz.period.startDayDesc": "Üblicherweise dein Zahltag. Wähle 1 für einen gewöhnlichen Kalendermonat. (1–28)",
+    "wiz.period.badDay": "Wähle einen Tag von 1 bis 28. Nicht jeder Monat hat einen 29., 30. oder 31., wenn du also am letzten Tag des Monats bezahlt wirst, nimm 28.",
+    "wiz.period.calendarEg": "Ein gewöhnlicher Kalendermonat: jeder Zeitraum läuft vom {first} bis zum Monatsende und ist nach diesem Monat benannt. Gerade bist du in {month}.",
+    "wiz.period.paydayEg": "Jeder Zeitraum läuft vom {start} bis zum {end} des Folgemonats und ist nach dem Monat benannt, in dem er endet. Gerade bist du in {month}.",
+    "wiz.period.anchorBlank": "Gib das Datum ein, an dem du zuletzt bezahlt wurdest, dann werden die Zeiträume davon aus berechnet.",
+    "wiz.period.anchorEg": "Von dort gezählt hat der Zeitraum, in dem du gerade bist, am {date} begonnen. Budgetdateien werden nach diesem Startdatum benannt.",
+    "wiz.period.anchorName": "Wann wurdest du zuletzt bezahlt?",
+    "wiz.period.anchorDesc": "Jeder kürzliche Zahltag genügt — es zählt nur, wo er im Zyklus liegt, ein früherer oder späterer ergibt also dieselben Zeiträume.",
+    "wiz.cats.intro": "Beginne mit einem Satz Budgetkategorien — hake ab, was du nicht willst. Du kannst sie später hinzufügen, umbenennen oder umfärben, hier ist also nichts endgültig.",
+    "wiz.cats.selected": "{count} von {total} ausgewählt",
+    "wiz.cats.selectAll": "Alle auswählen",
+    "wiz.cats.selectNone": "Keine auswählen",
+    "wiz.type.income": "Einnahmen",
+    "wiz.type.expense": "Alltägliche Ausgaben",
+    "wiz.type.debt": "Schuldentilgung",
+    "wiz.type.services": "Dienste & Abos",
+    "wiz.type.insurance": "Versicherung",
+    "wiz.type.giving": "Spenden",
+    "wiz.type.savings": "Sparen",
+    "wiz.type.investment": "Anlagen",
+    "wiz.type.luxuries": "Nice-to-have",
+    "wiz.type.transfer": "Umbuchungen",
+    "wiz.acct.intro": "Transaktionen werden pro Konto gespeichert. Füge jetzt dein Hauptkonto hinzu, oder lass den Namen leer zum Überspringen — du kannst jederzeit Konten hinzufügen.",
+    "wiz.acct.name": "Kontoname",
+    "wiz.acct.namePlaceholder": "z. B. Girokonto",
+    "wiz.acct.type": "Art",
+    "wiz.acct.balance": "Aktueller Kontostand",
+    "wiz.acct.balanceDesc": "Optional — was gerade auf dem Konto ist.",
+    "wiz.acct.balanceHint": "Nimm den Schlusssaldo deines letzten Auszugs, oder was deine Banking-App anzeigt. Der Kontostand ist eine Momentaufnahme, die du selbst aktuell hältst — nur die neuesten Transaktionen zu importieren bringt ihn nie durcheinander — und du kannst ihn jederzeit ändern, indem du auf der Konten-Seite auf den Kontostand tippst.",
+    "wiz.acctType.checking": "Girokonto",
+    "wiz.acctType.savings": "Sparkonto",
+    "wiz.acctType.credit_card": "Kreditkarte",
+    "wiz.acctType.cash": "Bargeld",
+    "wiz.acctType.investment": "Anlage",
+    "wiz.sum.folder": "Ordner",
+    "wiz.sum.name": "Name",
+    "wiz.sum.language": "Sprache",
+    "wiz.sum.country": "Land",
+    "wiz.sum.period": "Budgetzeitraum",
+    "wiz.sum.currency": "Währung",
+    "wiz.sum.categories": "Kategorien",
+    "wiz.sum.account": "Erstes Konto",
+    "wiz.sum.opening": "Anfangssaldo",
+    "wiz.sum.catCount": {
+      one: "{count} Startkategorie",
+      other: "{count} Startkategorien"
+    },
+    "wiz.sum.monthlyCalendar": "Monatlich (Kalendermonat)",
+    "wiz.sum.monthlyOn": "Monatlich, beginnend am {day}",
+    "wiz.sum.cycleFrom": "{preset}, gezählt ab {date}",
+    "wiz.finish.connectLead": "Wir verbinden uns mit dem vorhandenen Budget-Ordner und speichern diese Einstellungen in dessen Settings.md:",
+    "wiz.finish.createLead": "Damit werden der Budget-Ordner mit Settings.md, deine Kategorien, die erste Budgetdatei und leere Owed-Money-/Services-Dateien angelegt:",
+    "wiz.finish.nextLead": "Was als Nächstes zu tun ist: ",
+    "wiz.finish.nextBody": "gib deinen Kategorien auf der Budgets-Seite einen Betrag, und importiere dann die CSV deiner Bank auf der Transaktionen-Seite.",
+    "wiz.finish.privacy": "Dein Budget öffnet sich hinter einem Datenschutz-Startbildschirm zum Antippen, damit nichts zu sehen ist, wenn jemand kurz auf deinen Vault schaut. Abschalten unter Einstellungen → Budget Vault → Datenschutz-Startbildschirm.",
+    "wiz.done.connected": "Mit deinem Budget-Ordner verbunden.",
+    "wiz.done.created": "Budget-Ordner angelegt — willkommen!",
+    "wiz.failed": "Einrichtung fehlgeschlagen: {error}"
+  };
+});
+
+// src/lang/es.js
+var require_es = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "Tu presupuesto privado, guardado de forma segura dentro de tu bóveda.",
+    "splash.enter": "Abrir presupuesto",
+    "nav.menu": "Menú",
+    "nav.close": "Cerrar menú",
+    "nav.section.budget": "Presupuesto",
+    "nav.section.accounts": "Cuentas",
+    "nav.section.tools": "Herramientas",
+    "nav.dashboard": "Panel",
+    "nav.transactions": "Transacciones",
+    "nav.budgets": "Presupuesto",
+    "nav.savings": "Ahorros e Inversiones",
+    "nav.accounts": "Cuentas",
+    "nav.assets": "Activos",
+    "nav.debts": "Deudas",
+    "nav.owed": "Dinero Adeudado",
+    "nav.services": "Servicios",
+    "nav.tax": "Impuestos",
+    "nav.loans": "Calculadoras de Préstamos",
+    "nav.import": "Importar CSV",
+    "nav.reload": "Recargar desde el disco",
+    "nav.pluginSettings": "Ajustes del plugin",
+    "topbar.nav": "Navegación del presupuesto",
+    "topbar.mainMenu": "Menú principal",
+    "topbar.openMenu": "Abrir el menú de navegación",
+    "topbar.home": "Ir al Panel",
+    "topbar.brandSub": "Presupuesto en la bóveda de Obsidian",
+    "topbar.periodNav": "Navegación por periodos",
+    "topbar.prevPeriod": "Periodo anterior",
+    "topbar.currentPeriod": "Ir al periodo actual",
+    "topbar.nextPeriod": "Periodo siguiente",
+    "topbar.import": "Importar CSV",
+    "topbar.importTitle": "Importar un extracto bancario en CSV",
+    "topbar.settings": "Abrir los ajustes del presupuesto",
+    "settings.folder.name": "Carpeta del presupuesto",
+    "settings.folder.desc": "Ruta en la bóveda de la carpeta que contiene Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.",
+    "settings.theme.name": "Tema",
+    "settings.theme.desc": "Seguir el modo claro/oscuro de Obsidian, o forzar la paleta Airy Glass clara u oscura.",
+    "settings.theme.auto": "Seguir a Obsidian",
+    "settings.theme.dark": "Siempre oscuro",
+    "settings.theme.light": "Siempre claro",
+    "settings.palette.name": "Paleta de colores",
+    "settings.palette.desc": "Con qué colores se dibuja el presupuesto. Cada paleta tiene su propia versión clara y oscura, así que es independiente del ajuste Tema de arriba.",
+    "settings.wizard.name": "Asistente de configuración",
+    "settings.wizard.desc": "Volver a ejecutar el asistente de primer uso — carpeta, nombre, periodo del presupuesto, moneda, archivos iniciales.",
+    "settings.wizard.button": "Ejecutar el asistente",
+    "settings.startup.name": "Abrir al iniciar",
+    "settings.startup.desc": "Abrir la vista del presupuesto automáticamente cuando Obsidian arranca.",
+    "settings.privacy.name": "Pantalla de privacidad",
+    "settings.privacy.desc": "Cubrir el presupuesto con una pantalla hasta que toques «Abrir presupuesto» — al abrirlo, y de nuevo cada vez que Obsidian pase a segundo plano. No se lee nada de la bóveda hasta que toques.",
+    "settings.feedback.name": "Enviar comentarios",
+    "settings.feedback.desc": "Informar de un error, señalar un problema o pedir una función. Abre un formulario de Google en tu navegador — no se adjunta ni se envía nada de tu presupuesto.",
+    "settings.feedback.button": "Abrir el formulario",
+    "settings.support.name": "Apoyar a Budget Vault",
+    "settings.support.desc": "Budget Vault es gratuito y siempre lo será. Si quieres dar las gracias, esto abre PayPal en tu navegador — totalmente opcional, y en el plugin no cambia nada de una forma u otra.",
+    "settings.support.button": "Enviar un agradecimiento",
+    "settings.data.name": "Datos del presupuesto",
+    "settings.data.desc": "Guardados en Settings.md dentro de la carpeta del presupuesto, para que se apliquen en todos los dispositivos.",
+    "settings.household.name": "Nombre / hogar",
+    "settings.household.desc": "Se muestra en el saludo del panel y en la barra superior. Déjalo en blanco para ninguno.",
+    "settings.household.placeholder": "Déjalo en blanco para ninguno",
+    "settings.monthStart.name": "Día de inicio del mes",
+    "settings.monthStart.desc": "Día del mes en que empieza cada periodo financiero — normalmente tu día de pago. Elige 1 para un mes natural corriente. 1–28.",
+    "settings.monthStart.invalid": "Elige un día entre 1 y 28.",
+    "settings.periodLength.name": "Duración del periodo",
+    "settings.periodLength.desc": "Cuánto dura cada periodo del presupuesto. «Mensual» usa el día de inicio del mes de arriba. Las demás opciones alinean los periodos con un ciclo de pago, contando desde la fecha de abajo.",
+    "settings.anchor.name": "Último día de pago",
+    "settings.anchor.desc": "¿Cuándo te pagaron por última vez? Sirve cualquier día de pago reciente — solo importa el día en que cae dentro del ciclo, así que uno anterior o posterior da el mismo resultado. Se ignora cuando la duración del periodo es mensual.",
+    "settings.anchor.invalid": "Usa una fecha real con el formato AAAA-MM-DD, p. ej. 2026-08-07.",
+    "settings.country.name": "País",
+    "settings.country.desc": "Determina el formato de los importes, el orden de las fechas en los extractos bancarios y la lista de comprobación de la vista Impuestos (adaptada a la agencia tributaria de tu país). Los años fiscales existentes conservan sus datos — solo cambian las etiquetas y los valores iniciales de los años nuevos. Independiente del idioma de la interfaz de abajo.",
+    "settings.language.name": "Idioma",
+    "settings.language.desc": "El idioma en que está escrita la interfaz. Independiente del País de arriba — vivir en un sitio no decide qué quieres leer. Por defecto sigue el idioma de Obsidian, con el inglés como alternativa. Tu propio texto del presupuesto — nombres de categorías, notas, nombres de cuentas — nunca se traduce.",
+    "settings.currency.name": "Símbolo de moneda",
+    "settings.currency.desc": "Se muestra delante de cada importe, p. ej. R.",
+    "settings.currency.invalid": "Introduce un símbolo de moneda.",
+    "settings.budgetsKept": {
+      one: "Presupuesto: tu {count} archivo de presupuesto existente permanece en la bóveda. No puede mostrarse con esta duración de periodo, y vuelve enseguida si la cambias de nuevo.",
+      other: "Presupuesto: tus {count} archivos de presupuesto existentes permanecen en la bóveda. No pueden mostrarse con esta duración de periodo, y vuelven enseguida si la cambias de nuevo."
+    },
+    "settings.anchorReslices": {
+      one: "Presupuesto: esto desplaza cada límite de periodo. {count} archivo de presupuesto con nombre de fecha dejará de coincidir — permanece en tu bóveda, y volver a poner esta fecha en {prev} lo trae enseguida de vuelta.",
+      other: "Presupuesto: esto desplaza cada límite de periodo. {count} archivos de presupuesto con nombre de fecha dejarán de coincidir — permanecen en tu bóveda, y volver a poner esta fecha en {prev} los trae enseguida de vuelta."
+    },
+    "settings.dateNotReal": "Presupuesto: «{value}» no es una fecha — usa el selector, o escribe AAAA-MM-DD.",
+    "wiz.title": "Configurar Budget Vault",
+    "wiz.stepOf": "Paso {n} de {total}",
+    "wiz.cancel": "Cancelar",
+    "wiz.back": "Atrás",
+    "wiz.next": "Siguiente",
+    "wiz.letsGo": "¡Vamos!",
+    "wiz.connectBtn": "Conectar presupuesto",
+    "wiz.createBtn": "Crear mi presupuesto",
+    "wiz.skipped": "Configuración omitida — puedes volver a ejecutarla desde Ajustes → Budget Vault → Ejecutar el asistente, o desde la paleta de comandos.",
+    "wiz.step.folder": "Dónde vive tu presupuesto",
+    "wiz.step.name": "¿Cómo te llamamos?",
+    "wiz.step.country": "Idioma, país y moneda",
+    "wiz.step.period": "Tu periodo de presupuesto",
+    "wiz.step.categories": "Tus categorías de presupuesto",
+    "wiz.step.account": "Tu primera cuenta",
+    "wiz.step.finish": "Todo listo",
+    "wiz.err.folder": "Introduce una ruta de carpeta para el presupuesto — por ejemplo Finances/Budget.",
+    "wiz.err.monthStart": "El día de inicio del mes debe estar entre 1 y 28. No todos los meses tienen 29, 30 o 31, así que si te pagan el último día del mes, usa 28.",
+    "wiz.err.anchor": "Introduce la fecha en que te pagaron por última vez — cada ciclo de pago se cuenta desde ahí, así que sin ella el presupuesto vuelve a periodos mensuales.",
+    "wiz.err.currency": "Introduce un símbolo de moneda, o elige uno de la lista de arriba.",
+    "wiz.welcome.title": "¡Bienvenido a Budget Vault!",
+    "wiz.welcome.intro": "Todo tu presupuesto, viviendo aquí mismo en tu bóveda como markdown simple — sin cuentas, sin nube, sin el servidor de nadie más. Si tu bóveda se sincroniza con tu móvil, tu presupuesto viaja con ella gratis.",
+    "wiz.welcome.planLead": "Este es el plan — este asistente te deja listo:",
+    "wiz.welcome.plan1": "Elige tu carpeta de presupuesto — montamos toda la estructura por ti",
+    "wiz.welcome.plan2": "Elige idioma, país y moneda — para que la app se lea bien y los importes, fechas e impuestos tengan buen aspecto",
+    "wiz.welcome.plan3": "Dinos cuándo cobras — tus periodos pueden ir de día de pago a día de pago",
+    "wiz.welcome.plan4": "Elige tus categorías — marca las que encajen con tu vida",
+    "wiz.welcome.plan5": "Añade tu primera cuenta — y lo que hay en ella ahora mismo",
+    "wiz.welcome.thenLead": "Y entonces empieza lo bueno dentro de la app:",
+    "wiz.welcome.app1": "Fija tu presupuesto — dale a cada categoría una cifra a la que apuntar",
+    "wiz.welcome.app2": "Importa el CSV de tu banco — las transacciones se ordenan solas a medida que le enseñas",
+    "wiz.welcome.app3": "Añade categorías nuevas cuando quieras — tu presupuesto crece contigo",
+    "wiz.welcome.app4": "Revisa sobre la marcha — el panel muestra exactamente adónde fue el dinero",
+    "wiz.welcome.close": "Unos dos minutos de configuración. Puedes cambiar cualquier cosa más tarde. ¿Listo?",
+    "wiz.folder.hint": "Todo vive como archivos markdown simples dentro de una carpeta de tu bóveda.",
+    "wiz.folder.blank": "Introduce una ruta de carpeta — por ejemplo Finances/Budget.",
+    "wiz.folder.found": "Se encontró un presupuesto existente en «{folder}» — el asistente se conectará a él en vez de crear archivos nuevos.",
+    "wiz.folder.exists": "«{folder}» ya existe — los archivos del presupuesto se añadirán dentro.",
+    "wiz.folder.willCreate": "«{folder}» aún no existe — se creará por ti.",
+    "wiz.folder.name": "Carpeta del presupuesto",
+    "wiz.folder.desc": "Donde se guardan las categorías, cuentas, presupuestos y transacciones.",
+    "wiz.folder.connected": "Se encontró un presupuesto existente en «{folder}» — nos conectamos a él en vez de crear archivos nuevos. Tus categorías, cuentas y transacciones se quedan exactamente como están; los pasos restantes solo confirman los ajustes guardados en su Settings.md.",
+    "wiz.name.name": "Tu nombre o apodo",
+    "wiz.name.desc": "Se muestra en el saludo del panel y en la barra superior. Déjalo en blanco para omitirlo.",
+    "wiz.name.placeholder": "p. ej. Alex, o Los García",
+    "wiz.language.desc": "El idioma en que está escrita la app. Independiente del país de abajo — dónde vives no decide qué quieres leer. Tu propio texto del presupuesto nunca se traduce.",
+    "wiz.country.desc": "Fija el formato de los importes, el orden de las fechas al leer extractos bancarios y la lista de comprobación de la vista Impuestos para la agencia tributaria de tu país.",
+    "wiz.currency.desc": "Se muestra delante de cada importe. Parte de tu país — cámbialo si presupuestas en otra cosa.",
+    "wiz.currency.custom": "Símbolo personalizado",
+    "wiz.currency.customPlaceholder": "p. ej. CHF",
+    "wiz.ccy.rand": "R — Rand sudafricano",
+    "wiz.ccy.dollar": "$ — Dólar",
+    "wiz.ccy.euro": "€ — Euro",
+    "wiz.ccy.pound": "£ — Libra",
+    "wiz.ccy.other": "Otro…",
+    "wiz.period.howOften": "¿Cada cuánto cobras?",
+    "wiz.period.howOftenDesc": "Los periodos mensuales se nombran por mes y empiezan el día que elijas abajo. Los demás se alinean con un ciclo de pago, contando desde tu último día de pago.",
+    "wiz.period.startDay": "¿Qué día empieza tu mes de presupuesto?",
+    "wiz.period.startDayDesc": "Normalmente tu día de pago. Elige 1 para un mes natural corriente. (1–28)",
+    "wiz.period.badDay": "Elige un día del 1 al 28. No todos los meses tienen 29, 30 o 31, así que si te pagan el último día del mes, usa 28.",
+    "wiz.period.calendarEg": "Un mes natural corriente: cada periodo va del {first} al final del mes, y lleva el nombre de ese mes. Ahora mismo estás en {month}.",
+    "wiz.period.paydayEg": "Cada periodo va del {start} al {end} del mes siguiente, y lleva el nombre del mes en que termina. Ahora mismo estás en {month}.",
+    "wiz.period.anchorBlank": "Introduce la fecha en que te pagaron por última vez y los periodos se calculan a partir de ahí.",
+    "wiz.period.anchorEg": "Contando desde ahí, el periodo en el que estás ahora empezó el {date}. Los archivos de presupuesto se nombran por esa fecha de inicio.",
+    "wiz.period.anchorName": "¿Cuándo te pagaron por última vez?",
+    "wiz.period.anchorDesc": "Vale cualquier día de pago reciente — solo importa dónde cae dentro del ciclo, así que uno anterior o posterior da los mismos periodos.",
+    "wiz.cats.intro": "Empieza con un conjunto de categorías — desmarca las que no quieras. Puedes añadirlas, renombrarlas o cambiarles el color más tarde, así que aquí nada es definitivo.",
+    "wiz.cats.selected": "{count} de {total} seleccionadas",
+    "wiz.cats.selectAll": "Seleccionar todas",
+    "wiz.cats.selectNone": "No seleccionar ninguna",
+    "wiz.type.income": "Ingresos",
+    "wiz.type.expense": "Gastos del día a día",
+    "wiz.type.debt": "Pago de deudas",
+    "wiz.type.services": "Servicios y suscripciones",
+    "wiz.type.insurance": "Seguros",
+    "wiz.type.giving": "Donaciones",
+    "wiz.type.savings": "Ahorros",
+    "wiz.type.investment": "Inversiones",
+    "wiz.type.luxuries": "Caprichos",
+    "wiz.type.transfer": "Transferencias",
+    "wiz.acct.intro": "Las transacciones se guardan por cuenta. Añade ahora tu cuenta principal, o deja el nombre en blanco para omitirlo — puedes añadir cuentas en cualquier momento.",
+    "wiz.acct.name": "Nombre de la cuenta",
+    "wiz.acct.namePlaceholder": "p. ej. Cuenta corriente",
+    "wiz.acct.type": "Tipo",
+    "wiz.acct.balance": "Saldo actual",
+    "wiz.acct.balanceDesc": "Opcional — lo que hay en la cuenta ahora mismo.",
+    "wiz.acct.balanceHint": "Usa el saldo de cierre de tu último extracto, o lo que muestre la app de tu banco. El saldo es una instantánea que mantienes al día tú mismo — importar solo transacciones recientes nunca lo descuadra — y puedes cambiarlo cuando quieras tocando el saldo en la página Cuentas.",
+    "wiz.acctType.checking": "Cuenta corriente",
+    "wiz.acctType.savings": "Cuenta de ahorro",
+    "wiz.acctType.credit_card": "Tarjeta de crédito",
+    "wiz.acctType.cash": "Efectivo",
+    "wiz.acctType.investment": "Inversión",
+    "wiz.sum.folder": "Carpeta",
+    "wiz.sum.name": "Nombre",
+    "wiz.sum.language": "Idioma",
+    "wiz.sum.country": "País",
+    "wiz.sum.period": "Periodo del presupuesto",
+    "wiz.sum.currency": "Moneda",
+    "wiz.sum.categories": "Categorías",
+    "wiz.sum.account": "Primera cuenta",
+    "wiz.sum.opening": "Saldo inicial",
+    "wiz.sum.catCount": {
+      one: "{count} categoría inicial",
+      other: "{count} categorías iniciales"
+    },
+    "wiz.sum.monthlyCalendar": "Mensual (mes natural)",
+    "wiz.sum.monthlyOn": "Mensual, empezando el {day}",
+    "wiz.sum.cycleFrom": "{preset}, contando desde {date}",
+    "wiz.finish.connectLead": "Conectando con la carpeta de presupuesto existente y guardando estos ajustes en su Settings.md:",
+    "wiz.finish.createLead": "Esto creará la carpeta del presupuesto con Settings.md, tus categorías, el primer archivo de presupuesto y archivos vacíos de Owed Money / Services:",
+    "wiz.finish.nextLead": "Qué hacer ahora: ",
+    "wiz.finish.nextBody": "dale un importe a tus categorías en la página Presupuestos, y luego importa el CSV de tu banco en la página Transacciones.",
+    "wiz.finish.privacy": "Tu presupuesto se abre tras una pantalla de privacidad que requiere un toque, así que no queda nada a la vista si alguien echa un vistazo a tu bóveda. Desactívala en Ajustes → Budget Vault → Pantalla de privacidad.",
+    "wiz.done.connected": "Conectado a tu carpeta de presupuesto.",
+    "wiz.done.created": "Carpeta de presupuesto creada — ¡bienvenido!",
+    "wiz.failed": "La configuración falló: {error}"
+  };
+});
+
+// src/lang/fr.js
+var require_fr = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "Votre budget privé, conservé en sécurité dans votre coffre.",
+    "splash.enter": "Ouvrir le budget",
+    "nav.menu": "Menu",
+    "nav.close": "Fermer le menu",
+    "nav.section.budget": "Budget",
+    "nav.section.accounts": "Comptes",
+    "nav.section.tools": "Outils",
+    "nav.dashboard": "Tableau de bord",
+    "nav.transactions": "Transactions",
+    "nav.budgets": "Budget",
+    "nav.savings": "Épargne et Placements",
+    "nav.accounts": "Comptes",
+    "nav.assets": "Actifs",
+    "nav.debts": "Dettes",
+    "nav.owed": "Sommes Dues",
+    "nav.services": "Services",
+    "nav.tax": "Impôts",
+    "nav.loans": "Calculateurs de Prêt",
+    "nav.import": "Importer un CSV",
+    "nav.reload": "Recharger depuis le disque",
+    "nav.pluginSettings": "Paramètres du plugin",
+    "topbar.nav": "Navigation du budget",
+    "topbar.mainMenu": "Menu principal",
+    "topbar.openMenu": "Ouvrir le menu de navigation",
+    "topbar.home": "Aller au tableau de bord",
+    "topbar.brandSub": "Budget dans le coffre Obsidian",
+    "topbar.periodNav": "Navigation par période",
+    "topbar.prevPeriod": "Période précédente",
+    "topbar.currentPeriod": "Aller à la période actuelle",
+    "topbar.nextPeriod": "Période suivante",
+    "topbar.import": "Importer un CSV",
+    "topbar.importTitle": "Importer un relevé bancaire au format CSV",
+    "topbar.settings": "Ouvrir les paramètres du budget",
+    "settings.folder.name": "Dossier du budget",
+    "settings.folder.desc": "Chemin dans le coffre du dossier contenant Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.",
+    "settings.theme.name": "Thème",
+    "settings.theme.desc": "Suivre le mode clair/sombre d'Obsidian, ou forcer la palette Airy Glass claire ou sombre.",
+    "settings.theme.auto": "Suivre Obsidian",
+    "settings.theme.dark": "Toujours sombre",
+    "settings.theme.light": "Toujours clair",
+    "settings.palette.name": "Palette de couleurs",
+    "settings.palette.desc": "Les couleurs dans lesquelles le budget est dessiné. Chaque palette a sa propre version claire et sombre, elle est donc indépendante du paramètre Thème ci-dessus.",
+    "settings.wizard.name": "Assistant de configuration",
+    "settings.wizard.desc": "Relancer l'assistant de première utilisation — dossier, nom, période budgétaire, devise, fichiers de départ.",
+    "settings.wizard.button": "Lancer l'assistant",
+    "settings.startup.name": "Ouvrir au démarrage",
+    "settings.startup.desc": "Ouvrir la vue budget automatiquement au démarrage d'Obsidian.",
+    "settings.privacy.name": "Écran de confidentialité",
+    "settings.privacy.desc": "Couvrir le budget d'un écran jusqu'à ce que vous touchiez « Ouvrir le budget » — à l'ouverture, et de nouveau chaque fois qu'Obsidian passe en arrière-plan. Rien n'est lu depuis le coffre avant que vous ne touchiez.",
+    "settings.feedback.name": "Envoyer un retour",
+    "settings.feedback.desc": "Signaler un bug, remonter un problème ou demander une fonctionnalité. Ouvre un formulaire Google dans votre navigateur — rien de votre budget n'est joint ni envoyé.",
+    "settings.feedback.button": "Ouvrir le formulaire",
+    "settings.support.name": "Soutenir Budget Vault",
+    "settings.support.desc": "Budget Vault est gratuit et le restera. Si vous souhaitez dire merci, ceci ouvre PayPal dans votre navigateur — entièrement facultatif, et rien ne change dans le plugin dans un cas comme dans l'autre.",
+    "settings.support.button": "Envoyer un merci",
+    "settings.data.name": "Données du budget",
+    "settings.data.desc": "Stockées dans Settings.md à l'intérieur du dossier du budget, afin de s'appliquer sur chaque appareil.",
+    "settings.household.name": "Nom / foyer",
+    "settings.household.desc": "Affiché dans le message d'accueil du tableau de bord et la barre supérieure. Laissez vide pour aucun.",
+    "settings.household.placeholder": "Laissez vide pour aucun",
+    "settings.monthStart.name": "Jour de début du mois",
+    "settings.monthStart.desc": "Jour du mois où commence chaque période financière — généralement votre jour de paie. Choisissez 1 pour un mois calendaire ordinaire. 1–28.",
+    "settings.monthStart.invalid": "Choisissez un jour entre 1 et 28.",
+    "settings.periodLength.name": "Durée de la période",
+    "settings.periodLength.desc": "La durée de chaque période budgétaire. « Mensuel » utilise le jour de début du mois ci-dessus. Les autres options alignent plutôt les périodes sur un cycle de paie, comptées à partir de la date ci-dessous.",
+    "settings.anchor.name": "Dernier jour de paie",
+    "settings.anchor.desc": "Quand avez-vous été payé pour la dernière fois ? N'importe quel jour de paie récent convient — seul compte le jour où il tombe dans le cycle, un plus tôt ou un plus tard donne donc le même résultat. Ignoré lorsque la durée de la période est mensuelle.",
+    "settings.anchor.invalid": "Utilisez une date réelle au format AAAA-MM-JJ, par ex. 2026-08-07.",
+    "settings.country.name": "Pays",
+    "settings.country.desc": "Détermine le formatage des montants, l'ordre des dates des relevés bancaires et la liste de contrôle de la vue Impôts (adaptée à l'administration fiscale de votre pays). Les années fiscales existantes conservent leurs données — seuls les libellés et les valeurs initiales des nouvelles années changent. Indépendant de la langue de l'interface ci-dessous.",
+    "settings.language.name": "Langue",
+    "settings.language.desc": "La langue dans laquelle l'interface est écrite. Indépendante du Pays ci-dessus — vivre quelque part ne décide pas de ce que vous voulez lire. Suit par défaut la langue d'affichage d'Obsidian, avec l'anglais en repli. Votre propre texte de budget — noms de catégories, notes, noms de comptes — n'est jamais traduit.",
+    "settings.currency.name": "Symbole monétaire",
+    "settings.currency.desc": "Affiché devant chaque montant, par ex. R.",
+    "settings.currency.invalid": "Saisissez un symbole monétaire.",
+    "settings.budgetsKept": {
+      one: "Budget : votre {count} fichier de budget existant reste dans le coffre. Il ne peut pas être affiché avec cette durée de période, et il revient aussitôt si vous la remettez comme avant.",
+      other: "Budget : vos {count} fichiers de budget existants restent dans le coffre. Ils ne peuvent pas être affichés avec cette durée de période, et ils reviennent aussitôt si vous la remettez comme avant."
+    },
+    "settings.anchorReslices": {
+      one: "Budget : ceci décale chaque limite de période. {count} fichier de budget nommé par date ne correspondra plus — il reste dans votre coffre, et remettre cette date à {prev} le ramène aussitôt.",
+      other: "Budget : ceci décale chaque limite de période. {count} fichiers de budget nommés par date ne correspondront plus — ils restent dans votre coffre, et remettre cette date à {prev} les ramène aussitôt."
+    },
+    "settings.dateNotReal": "Budget : « {value} » n'est pas une date — utilisez le sélecteur, ou saisissez AAAA-MM-JJ.",
+    "wiz.title": "Configurer Budget Vault",
+    "wiz.stepOf": "Étape {n} sur {total}",
+    "wiz.cancel": "Annuler",
+    "wiz.back": "Retour",
+    "wiz.next": "Suivant",
+    "wiz.letsGo": "C'est parti !",
+    "wiz.connectBtn": "Connecter le budget",
+    "wiz.createBtn": "Créer mon budget",
+    "wiz.skipped": "Configuration ignorée — vous pouvez la relancer depuis Paramètres → Budget Vault → Lancer l'assistant, ou la palette de commandes.",
+    "wiz.step.folder": "Où vit votre budget",
+    "wiz.step.name": "Comment vous appeler ?",
+    "wiz.step.country": "Langue, pays et devise",
+    "wiz.step.period": "Votre période budgétaire",
+    "wiz.step.categories": "Vos catégories budgétaires",
+    "wiz.step.account": "Votre premier compte",
+    "wiz.step.finish": "Prêt à démarrer",
+    "wiz.err.folder": "Saisissez un chemin de dossier pour le budget — par exemple Finances/Budget.",
+    "wiz.err.monthStart": "Le jour de début du mois doit être compris entre 1 et 28. Tous les mois n'ont pas de 29, 30 ou 31, donc si vous êtes payé le dernier jour du mois, prenez 28.",
+    "wiz.err.anchor": "Saisissez la date de votre dernière paie — chaque cycle est compté à partir d'elle, sans quoi le budget revient à des périodes mensuelles.",
+    "wiz.err.currency": "Saisissez un symbole monétaire, ou choisissez-en un dans la liste ci-dessus.",
+    "wiz.welcome.title": "Bienvenue dans Budget Vault !",
+    "wiz.welcome.intro": "Tout votre budget, ici même dans votre coffre, en markdown brut — pas de comptes, pas de cloud, pas le serveur de quelqu'un d'autre. Si votre coffre se synchronise avec votre téléphone, votre budget suit gratuitement.",
+    "wiz.welcome.planLead": "Voici le plan — cet assistant vous met en place :",
+    "wiz.welcome.plan1": "Choisissez votre dossier de budget — nous créons toute la structure pour vous",
+    "wiz.welcome.plan2": "Choisissez langue, pays et devise — pour que l'application se lise bien et que montants, dates et fiscalité soient corrects",
+    "wiz.welcome.plan3": "Dites-nous quand vous êtes payé — vos périodes peuvent partir du jour de paie",
+    "wiz.welcome.plan4": "Choisissez vos catégories — cochez celles qui correspondent à votre vie",
+    "wiz.welcome.plan5": "Ajoutez votre premier compte — et ce qu'il contient maintenant",
+    "wiz.welcome.thenLead": "Ensuite, les choses sérieuses commencent dans l'application :",
+    "wiz.welcome.app1": "Fixez votre budget — donnez à chaque catégorie un montant à viser",
+    "wiz.welcome.app2": "Importez le CSV de votre banque — les transactions se rangent seules à mesure que vous lui apprenez",
+    "wiz.welcome.app3": "Ajoutez de nouvelles catégories quand vous voulez — votre budget grandit avec vous",
+    "wiz.welcome.app4": "Faites le point au fil de l'eau — le tableau de bord montre exactement où est passé l'argent",
+    "wiz.welcome.close": "Environ deux minutes de configuration. Vous pourrez tout changer plus tard. Prêt ?",
+    "wiz.folder.hint": "Tout vit sous forme de fichiers markdown bruts dans un dossier de votre coffre.",
+    "wiz.folder.blank": "Saisissez un chemin de dossier — par exemple Finances/Budget.",
+    "wiz.folder.found": "Un budget existant a été trouvé dans « {folder} » — l'assistant s'y connectera plutôt que de créer de nouveaux fichiers.",
+    "wiz.folder.exists": "« {folder} » existe déjà — les fichiers du budget y seront ajoutés.",
+    "wiz.folder.willCreate": "« {folder} » n'existe pas encore — il sera créé pour vous.",
+    "wiz.folder.name": "Dossier du budget",
+    "wiz.folder.desc": "Où sont conservés les catégories, comptes, budgets et transactions.",
+    "wiz.folder.connected": "Un budget existant a été trouvé dans « {folder} » — nous nous y connectons plutôt que de créer de nouveaux fichiers. Vos catégories, comptes et transactions restent exactement tels quels ; les étapes restantes ne font que confirmer les paramètres conservés dans son Settings.md.",
+    "wiz.name.name": "Votre nom ou surnom",
+    "wiz.name.desc": "Affiché dans le message d'accueil du tableau de bord et la barre supérieure. Laissez vide pour passer.",
+    "wiz.name.placeholder": "par ex. Alex, ou Famille Dupont",
+    "wiz.language.desc": "La langue dans laquelle l'application est écrite. Indépendante du pays ci-dessous — l'endroit où vous vivez ne décide pas de ce que vous voulez lire. Votre propre texte de budget n'est jamais traduit.",
+    "wiz.country.desc": "Détermine le formatage des montants, l'ordre des dates à la lecture des relevés bancaires et la liste de contrôle de la vue Impôts pour l'administration fiscale de votre pays.",
+    "wiz.currency.desc": "Affiché devant chaque montant. Part de votre pays — changez-le si vous budgétez dans autre chose.",
+    "wiz.currency.custom": "Symbole personnalisé",
+    "wiz.currency.customPlaceholder": "par ex. CHF",
+    "wiz.ccy.rand": "R — Rand sud-africain",
+    "wiz.ccy.dollar": "$ — Dollar",
+    "wiz.ccy.euro": "€ — Euro",
+    "wiz.ccy.pound": "£ — Livre",
+    "wiz.ccy.other": "Autre…",
+    "wiz.period.howOften": "À quelle fréquence êtes-vous payé ?",
+    "wiz.period.howOftenDesc": "Les périodes mensuelles portent le nom du mois et commencent le jour choisi ci-dessous. Les autres s'alignent plutôt sur un cycle de paie, compté depuis votre dernier jour de paie.",
+    "wiz.period.startDay": "Quel jour commence votre mois budgétaire ?",
+    "wiz.period.startDayDesc": "Généralement votre jour de paie. Choisissez 1 pour un mois calendaire ordinaire. (1–28)",
+    "wiz.period.badDay": "Choisissez un jour de 1 à 28. Tous les mois n'ont pas de 29, 30 ou 31, donc si vous êtes payé le dernier jour du mois, prenez 28.",
+    "wiz.period.calendarEg": "Un mois calendaire ordinaire : chaque période va du {first} à la fin du mois, et porte le nom de ce mois. Vous êtes actuellement en {month}.",
+    "wiz.period.paydayEg": "Chaque période va du {start} au {end} du mois suivant, et porte le nom du mois où elle se termine. Vous êtes actuellement en {month}.",
+    "wiz.period.anchorBlank": "Saisissez la date de votre dernière paie et les périodes en découleront.",
+    "wiz.period.anchorEg": "À partir de là, la période dans laquelle vous êtes actuellement a commencé le {date}. Les fichiers de budget portent le nom de cette date de début.",
+    "wiz.period.anchorName": "Quand avez-vous été payé pour la dernière fois ?",
+    "wiz.period.anchorDesc": "N'importe quel jour de paie récent convient — seule compte sa place dans le cycle, un plus tôt ou un plus tard donne donc les mêmes périodes.",
+    "wiz.cats.intro": "Commencez avec un jeu de catégories — décochez celles dont vous ne voulez pas. Vous pourrez en ajouter, les renommer ou les recolorer plus tard, rien n'est définitif ici.",
+    "wiz.cats.selected": "{count} sur {total} sélectionnées",
+    "wiz.cats.selectAll": "Tout sélectionner",
+    "wiz.cats.selectNone": "Tout désélectionner",
+    "wiz.type.income": "Revenus",
+    "wiz.type.expense": "Dépenses courantes",
+    "wiz.type.debt": "Remboursements de dettes",
+    "wiz.type.services": "Services et abonnements",
+    "wiz.type.insurance": "Assurance",
+    "wiz.type.giving": "Dons",
+    "wiz.type.savings": "Épargne",
+    "wiz.type.investment": "Placements",
+    "wiz.type.luxuries": "Petits plaisirs",
+    "wiz.type.transfer": "Virements",
+    "wiz.acct.intro": "Les transactions sont stockées par compte. Ajoutez votre compte principal maintenant, ou laissez le nom vide pour passer — vous pourrez ajouter des comptes à tout moment.",
+    "wiz.acct.name": "Nom du compte",
+    "wiz.acct.namePlaceholder": "par ex. Compte courant",
+    "wiz.acct.type": "Type",
+    "wiz.acct.balance": "Solde actuel",
+    "wiz.acct.balanceDesc": "Facultatif — ce qu'il y a sur le compte en ce moment.",
+    "wiz.acct.balanceHint": "Utilisez le solde de clôture de votre dernier relevé, ou ce qu'affiche l'application de votre banque. Le solde est un instantané que vous tenez à jour vous-même — n'importer que les transactions récentes ne le fausse jamais — et vous pouvez le changer à tout moment en touchant le solde sur la page Comptes.",
+    "wiz.acctType.checking": "Compte courant",
+    "wiz.acctType.savings": "Compte d'épargne",
+    "wiz.acctType.credit_card": "Carte de crédit",
+    "wiz.acctType.cash": "Espèces",
+    "wiz.acctType.investment": "Placement",
+    "wiz.sum.folder": "Dossier",
+    "wiz.sum.name": "Nom",
+    "wiz.sum.language": "Langue",
+    "wiz.sum.country": "Pays",
+    "wiz.sum.period": "Période budgétaire",
+    "wiz.sum.currency": "Devise",
+    "wiz.sum.categories": "Catégories",
+    "wiz.sum.account": "Premier compte",
+    "wiz.sum.opening": "Solde d'ouverture",
+    "wiz.sum.catCount": {
+      one: "{count} catégorie de départ",
+      other: "{count} catégories de départ"
+    },
+    "wiz.sum.monthlyCalendar": "Mensuel (mois calendaire)",
+    "wiz.sum.monthlyOn": "Mensuel, à partir du {day}",
+    "wiz.sum.cycleFrom": "{preset}, compté depuis le {date}",
+    "wiz.finish.connectLead": "Connexion au dossier de budget existant et enregistrement de ces paramètres dans son Settings.md :",
+    "wiz.finish.createLead": "Ceci créera le dossier du budget avec Settings.md, vos catégories, le premier fichier de budget et des fichiers Owed Money / Services vides :",
+    "wiz.finish.nextLead": "Que faire ensuite : ",
+    "wiz.finish.nextBody": "donnez un montant à vos catégories sur la page Budgets, puis importez le CSV de votre banque sur la page Transactions.",
+    "wiz.finish.privacy": "Votre budget s'ouvre derrière un écran de confidentialité à toucher, ainsi rien n'est visible si quelqu'un jette un œil à votre coffre. Désactivez-le dans Paramètres → Budget Vault → Écran de confidentialité.",
+    "wiz.done.connected": "Connecté à votre dossier de budget.",
+    "wiz.done.created": "Dossier de budget créé — bienvenue !",
+    "wiz.failed": "Échec de la configuration : {error}"
+  };
+});
+
+// src/lang/ja.js
+var require_ja = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "あなただけの予算を、保管庫の中に安全に保管します。",
+    "splash.enter": "予算を開く",
+    "nav.menu": "メニュー",
+    "nav.close": "メニューを閉じる",
+    "nav.section.budget": "予算",
+    "nav.section.accounts": "口座",
+    "nav.section.tools": "ツール",
+    "nav.dashboard": "ダッシュボード",
+    "nav.transactions": "取引",
+    "nav.budgets": "予算",
+    "nav.savings": "貯蓄と投資",
+    "nav.accounts": "口座",
+    "nav.assets": "資産",
+    "nav.debts": "負債",
+    "nav.owed": "貸したお金",
+    "nav.services": "サービス",
+    "nav.tax": "税金",
+    "nav.loans": "ローン計算機",
+    "nav.import": "CSV を取り込む",
+    "nav.reload": "ディスクから再読み込み",
+    "nav.pluginSettings": "プラグイン設定",
+    "topbar.nav": "予算ナビゲーション",
+    "topbar.mainMenu": "メインメニュー",
+    "topbar.openMenu": "ナビゲーションメニューを開く",
+    "topbar.home": "ダッシュボードへ移動",
+    "topbar.brandSub": "Obsidian 保管庫の予算",
+    "topbar.periodNav": "期間ナビゲーション",
+    "topbar.prevPeriod": "前の期間",
+    "topbar.currentPeriod": "現在の期間へ移動",
+    "topbar.nextPeriod": "次の期間",
+    "topbar.import": "CSV を取り込む",
+    "topbar.importTitle": "銀行明細の CSV を取り込む",
+    "topbar.settings": "予算の設定を開く",
+    "settings.folder.name": "予算フォルダ",
+    "settings.folder.desc": "Categories/、Accounts/、Budgets/、Transactions/、Settings.md などを格納しているフォルダの保管庫内パス。",
+    "settings.theme.name": "テーマ",
+    "settings.theme.desc": "Obsidian のライト/ダークモードに従うか、Airy Glass のダークまたはライトのパレットを固定します。",
+    "settings.theme.auto": "Obsidian に従う",
+    "settings.theme.dark": "常にダーク",
+    "settings.theme.light": "常にライト",
+    "settings.palette.name": "カラーパレット",
+    "settings.palette.desc": "予算を描画する色。各パレットはライト版とダーク版の両方を持つため、上のテーマ設定とは独立しています。",
+    "settings.wizard.name": "セットアップウィザード",
+    "settings.wizard.desc": "初回起動時のウィザードをもう一度実行します — フォルダ、名前、予算期間、通貨、初期ファイル。",
+    "settings.wizard.button": "セットアップウィザードを実行",
+    "settings.startup.name": "起動時に開く",
+    "settings.startup.desc": "Obsidian の起動時に予算ビューを自動的に開きます。",
+    "settings.privacy.name": "プライバシー画面",
+    "settings.privacy.desc": "「予算を開く」をタップするまで予算を覆い隠します — 開いたとき、および Obsidian がバックグラウンドに移るたびに表示されます。タップするまで保管庫からは何も読み込まれません。",
+    "settings.feedback.name": "フィードバックを送る",
+    "settings.feedback.desc": "不具合の報告、問題の指摘、機能の要望。ブラウザで Google フォームを開きます — 予算の内容が添付されたり送信されたりすることはありません。",
+    "settings.feedback.button": "フィードバックフォームを開く",
+    "settings.support.name": "Budget Vault を支援する",
+    "settings.support.desc": "Budget Vault は無料で、これからもずっと無料です。お礼を伝えたい場合は、ブラウザで PayPal を開きます — 完全に任意で、どちらの場合もプラグインの動作は変わりません。",
+    "settings.support.button": "お礼を送る",
+    "settings.data.name": "予算データ",
+    "settings.data.desc": "予算フォルダ内の Settings.md に保存され、すべてのデバイスに適用されます。",
+    "settings.household.name": "名前 / 世帯",
+    "settings.household.desc": "ダッシュボードの挨拶と上部バーに表示されます。不要な場合は空欄にしてください。",
+    "settings.household.placeholder": "不要な場合は空欄に",
+    "settings.monthStart.name": "月の開始日",
+    "settings.monthStart.desc": "各会計期間が始まる日 — 通常は給料日です。通常の暦月にする場合は 1 を選びます。1〜28。",
+    "settings.monthStart.invalid": "1 から 28 の間の日を選んでください。",
+    "settings.periodLength.name": "期間の長さ",
+    "settings.periodLength.desc": "各予算期間の長さ。「毎月」は上の月の開始日を使います。その他の選択肢では、下の日付から数えて給与サイクルに合わせて期間を区切ります。",
+    "settings.anchor.name": "最後の給料日",
+    "settings.anchor.desc": "最後に給与を受け取ったのはいつですか。最近の給料日であればどれでも構いません — サイクル内のどの日に当たるかだけが重要なので、それより前でも後でも同じ結果になります。期間の長さが毎月の場合は無視されます。",
+    "settings.anchor.invalid": "YYYY-MM-DD 形式の実在する日付を入力してください（例: 2026-08-07）。",
+    "settings.country.name": "国",
+    "settings.country.desc": "金額の表示形式、銀行明細の日付順、税金ビューのチェックリスト（お住まいの国の税務当局に合わせたもの）を決めます。既存の税年度のデータはそのまま残り、変わるのはラベルと新しい年度の初期値だけです。下のインターフェース言語とは独立しています。",
+    "settings.language.name": "言語",
+    "settings.language.desc": "インターフェースを表示する言語。上の「国」とは独立しています — どこに住んでいるかが、何を読みたいかを決めるわけではありません。既定では Obsidian の表示言語に従い、対応がなければ英語になります。カテゴリ名、メモ、口座名など、あなた自身が書いた予算のテキストが翻訳されることはありません。",
+    "settings.currency.name": "通貨記号",
+    "settings.currency.desc": "すべての金額の前に表示されます（例: R）。",
+    "settings.currency.invalid": "通貨記号を入力してください。",
+    "settings.budgetsKept": {
+      other: "予算: 既存の予算ファイル {count} 件は保管庫に残ります。この期間の長さでは表示できませんが、設定を元に戻せばすぐに再び表示されます。"
+    },
+    "settings.anchorReslices": {
+      other: "予算: これによりすべての期間の区切りがずれます。日付で名付けられた予算ファイル {count} 件が一致しなくなります — ファイルは保管庫に残り、この日付を {prev} に戻せばすぐに元どおりになります。"
+    },
+    "settings.dateNotReal": "予算: 「{value}」は日付ではありません — 日付選択を使うか、YYYY-MM-DD 形式で入力してください。",
+    "wiz.title": "Budget Vault をセットアップ",
+    "wiz.stepOf": "ステップ {n} / {total}",
+    "wiz.cancel": "キャンセル",
+    "wiz.back": "戻る",
+    "wiz.next": "次へ",
+    "wiz.letsGo": "はじめる",
+    "wiz.connectBtn": "予算に接続",
+    "wiz.createBtn": "予算を作成",
+    "wiz.skipped": "セットアップをスキップしました — 設定 → Budget Vault → セットアップウィザードを実行、またはコマンドパレットからいつでも実行できます。",
+    "wiz.step.folder": "予算を置く場所",
+    "wiz.step.name": "お名前は？",
+    "wiz.step.country": "言語・国・通貨",
+    "wiz.step.period": "予算期間",
+    "wiz.step.categories": "予算のカテゴリ",
+    "wiz.step.account": "最初の口座",
+    "wiz.step.finish": "準備完了",
+    "wiz.err.folder": "予算のフォルダパスを入力してください — 例: Finances/Budget。",
+    "wiz.err.monthStart": "月の開始日は 1 から 28 の間で指定してください。29 日、30 日、31 日がない月もあるため、月末に給与を受け取る場合は 28 を使ってください。",
+    "wiz.err.anchor": "最後に給与を受け取った日付を入力してください — 給与サイクルはそこから数えるため、入力がないと予算は毎月の期間に戻ります。",
+    "wiz.err.currency": "通貨記号を入力するか、上のリストから選んでください。",
+    "wiz.welcome.title": "Budget Vault へようこそ",
+    "wiz.welcome.intro": "予算のすべてが、ただのマークダウンとしてこの保管庫の中に置かれます — アカウントもクラウドも、誰か他人のサーバーも不要です。保管庫がスマートフォンと同期していれば、予算もそのまま一緒に持ち歩けます。",
+    "wiz.welcome.planLead": "流れはこうです — このウィザードで準備が整います:",
+    "wiz.welcome.plan1": "予算フォルダを選ぶ — 構成一式はこちらで用意します",
+    "wiz.welcome.plan2": "言語・国・通貨を選ぶ — 表示が読みやすくなり、金額・日付・税金の扱いも正しくなります",
+    "wiz.welcome.plan3": "給料日を教える — お望みなら予算期間を給料日始まりにできます",
+    "wiz.welcome.plan4": "予算のカテゴリを選ぶ — 自分の生活に合うものにチェックを入れてください",
+    "wiz.welcome.plan5": "最初の口座を追加する — 今の残高もあわせて",
+    "wiz.welcome.thenLead": "そのあとはアプリでの楽しい部分です:",
+    "wiz.welcome.app1": "予算を決める — カテゴリごとに目標額を入れます",
+    "wiz.welcome.app2": "銀行の CSV を取り込む — 使いながら教えるほど、取引が自動で仕分けされます",
+    "wiz.welcome.app3": "いつでもカテゴリを追加できます — 予算はあなたに合わせて育ちます",
+    "wiz.welcome.app4": "折にふれて振り返る — ダッシュボードがお金の行き先をそのまま示します",
+    "wiz.welcome.close": "セットアップは 2 分ほどです。あとからいつでも変更できます。よろしいですか。",
+    "wiz.folder.hint": "すべては保管庫内の 1 つのフォルダに、ただのマークダウンファイルとして置かれます。",
+    "wiz.folder.blank": "フォルダパスを入力してください — 例: Finances/Budget。",
+    "wiz.folder.found": "「{folder}」に既存の予算が見つかりました — 新しくファイルを作らず、そちらに接続します。",
+    "wiz.folder.exists": "「{folder}」はすでに存在します — 予算ファイルはその中に追加されます。",
+    "wiz.folder.willCreate": "「{folder}」はまだ存在しません — こちらで作成します。",
+    "wiz.folder.name": "予算フォルダ",
+    "wiz.folder.desc": "カテゴリ、口座、予算、取引を保管する場所です。",
+    "wiz.folder.connected": "「{folder}」に既存の予算が見つかりました — 新しくファイルを作らず、そちらに接続します。カテゴリ、口座、取引はそのまま残ります。残りのステップでは、その Settings.md に保存されている設定を確認するだけです。",
+    "wiz.name.name": "お名前またはニックネーム",
+    "wiz.name.desc": "ダッシュボードの挨拶と上部バーに表示されます。空欄のままにすればスキップできます。",
+    "wiz.name.placeholder": "例: アレックス、田中家",
+    "wiz.language.desc": "アプリを表示する言語です。下の「国」とは独立しています — どこに住んでいるかが、何を読みたいかを決めるわけではありません。あなた自身が書いた予算のテキストが翻訳されることはありません。",
+    "wiz.country.desc": "金額の表示形式、銀行明細を読むときの日付順、そしてお住まいの国の税務当局に合わせた税金ビューの申告チェックリストを決めます。",
+    "wiz.currency.desc": "すべての金額の前に表示されます。国に応じた既定値から始まります — 別の通貨で予算を組む場合は変更してください。",
+    "wiz.currency.custom": "カスタム記号",
+    "wiz.currency.customPlaceholder": "例: CHF",
+    "wiz.ccy.rand": "R — 南アフリカランド",
+    "wiz.ccy.dollar": "$ — ドル",
+    "wiz.ccy.euro": "€ — ユーロ",
+    "wiz.ccy.pound": "£ — ポンド",
+    "wiz.ccy.other": "その他…",
+    "wiz.period.howOften": "給与の頻度は？",
+    "wiz.period.howOftenDesc": "毎月の期間は月名で呼ばれ、下で選んだ日から始まります。その他は、最後の給料日から数えて給与サイクルに合わせます。",
+    "wiz.period.startDay": "予算上の月は何日から始まりますか？",
+    "wiz.period.startDayDesc": "通常は給料日です。普通の暦月にする場合は 1 を選びます。(1〜28)",
+    "wiz.period.badDay": "1 から 28 の間で日を選んでください。29 日、30 日、31 日がない月もあるため、月末に給与を受け取る場合は 28 を使ってください。",
+    "wiz.period.calendarEg": "普通の暦月です: 各期間は{first}から月末までで、その月の名前が付きます。現在は {month} です。",
+    "wiz.period.paydayEg": "各期間は{start}から翌月の{end}までで、終わる月の名前が付きます。現在は {month} です。",
+    "wiz.period.anchorBlank": "最後に給与を受け取った日付を入力すると、そこから期間が計算されます。",
+    "wiz.period.anchorEg": "そこから数えると、現在の期間は {date} に始まりました。予算ファイルはその開始日で名前が付きます。",
+    "wiz.period.anchorName": "最後に給与を受け取ったのはいつですか？",
+    "wiz.period.anchorDesc": "最近の給料日ならどれでも構いません — サイクル内のどこに当たるかだけが重要なので、それより前でも後でも同じ期間になります。",
+    "wiz.cats.intro": "まずは予算カテゴリの一式から始めます — 不要なものはチェックを外してください。あとから追加・名前の変更・色の変更ができるので、ここで決めたことは最終ではありません。",
+    "wiz.cats.selected": "{total} 件中 {count} 件を選択",
+    "wiz.cats.selectAll": "すべて選択",
+    "wiz.cats.selectNone": "選択を解除",
+    "wiz.type.income": "収入",
+    "wiz.type.expense": "日常の支出",
+    "wiz.type.debt": "借入の返済",
+    "wiz.type.services": "サービスとサブスクリプション",
+    "wiz.type.insurance": "保険",
+    "wiz.type.giving": "寄付",
+    "wiz.type.savings": "貯蓄",
+    "wiz.type.investment": "投資",
+    "wiz.type.luxuries": "あると嬉しいもの",
+    "wiz.type.transfer": "振替",
+    "wiz.acct.intro": "取引は口座ごとに保存されます。主に使う口座を今追加するか、名前を空欄のままにしてスキップしてください — 口座はいつでも追加できます。",
+    "wiz.acct.name": "口座名",
+    "wiz.acct.namePlaceholder": "例: 普通預金口座",
+    "wiz.acct.type": "種類",
+    "wiz.acct.balance": "現在の残高",
+    "wiz.acct.balanceDesc": "任意 — 現在その口座にある金額です。",
+    "wiz.acct.balanceHint": "直近の明細の期末残高か、銀行アプリに表示されている金額を使ってください。残高はご自身で最新に保つスナップショットです — 最近の取引だけを取り込んでもずれることはありません — 口座ページで残高をタップすればいつでも変更できます。",
+    "wiz.acctType.checking": "普通預金・当座預金口座",
+    "wiz.acctType.savings": "貯蓄口座",
+    "wiz.acctType.credit_card": "クレジットカード",
+    "wiz.acctType.cash": "現金",
+    "wiz.acctType.investment": "投資",
+    "wiz.sum.folder": "フォルダ",
+    "wiz.sum.name": "名前",
+    "wiz.sum.language": "言語",
+    "wiz.sum.country": "国",
+    "wiz.sum.period": "予算期間",
+    "wiz.sum.currency": "通貨",
+    "wiz.sum.categories": "カテゴリ",
+    "wiz.sum.account": "最初の口座",
+    "wiz.sum.opening": "開始残高",
+    "wiz.sum.catCount": {
+      other: "初期カテゴリ {count} 件"
+    },
+    "wiz.sum.monthlyCalendar": "毎月（暦月）",
+    "wiz.sum.monthlyOn": "毎月、{day}から開始",
+    "wiz.sum.cycleFrom": "{preset}、{date} から起算",
+    "wiz.finish.connectLead": "既存の予算フォルダに接続し、以下の設定をその Settings.md に保存します:",
+    "wiz.finish.createLead": "予算フォルダを作成し、Settings.md、カテゴリ、最初の予算ファイル、空の Owed Money / Services ファイルを用意します:",
+    "wiz.finish.nextLead": "次にすること: ",
+    "wiz.finish.nextBody": "予算ページでカテゴリに金額を設定し、取引ページで銀行の CSV を取り込んでください。",
+    "wiz.finish.privacy": "予算はタップして入るプライバシー画面の後ろで開くので、誰かが保管庫をちらりと見ても中身は表示されません。設定 → Budget Vault → プライバシー画面 でオフにできます。",
+    "wiz.done.connected": "予算フォルダに接続しました。",
+    "wiz.done.created": "予算フォルダを作成しました — ようこそ！",
+    "wiz.failed": "セットアップに失敗しました: {error}"
+  };
+});
+
+// src/lang/zh.js
+var require_zh = __commonJS((exports2, module2) => {
+  module2.exports = {
+    "splash.sub": "你的私人预算，安全地保存在你的仓库中。",
+    "splash.enter": "进入预算",
+    "nav.menu": "菜单",
+    "nav.close": "关闭菜单",
+    "nav.section.budget": "预算",
+    "nav.section.accounts": "账户",
+    "nav.section.tools": "工具",
+    "nav.dashboard": "仪表板",
+    "nav.transactions": "交易",
+    "nav.budgets": "预算",
+    "nav.savings": "储蓄与投资",
+    "nav.accounts": "账户",
+    "nav.assets": "资产",
+    "nav.debts": "债务",
+    "nav.owed": "应收款项",
+    "nav.services": "服务",
+    "nav.tax": "税务",
+    "nav.loans": "贷款计算器",
+    "nav.import": "导入 CSV",
+    "nav.reload": "从磁盘重新加载",
+    "nav.pluginSettings": "插件设置",
+    "topbar.nav": "预算导航",
+    "topbar.mainMenu": "主菜单",
+    "topbar.openMenu": "打开导航菜单",
+    "topbar.home": "前往仪表板",
+    "topbar.brandSub": "Obsidian 仓库预算",
+    "topbar.periodNav": "周期导航",
+    "topbar.prevPeriod": "上一周期",
+    "topbar.currentPeriod": "跳到当前周期",
+    "topbar.nextPeriod": "下一周期",
+    "topbar.import": "导入 CSV",
+    "topbar.importTitle": "导入银行对账单 CSV",
+    "topbar.settings": "打开预算设置",
+    "settings.folder.name": "预算文件夹",
+    "settings.folder.desc": "存放 Categories/、Accounts/、Budgets/、Transactions/、Settings.md 等内容的文件夹在仓库中的路径。",
+    "settings.theme.name": "主题",
+    "settings.theme.desc": "跟随 Obsidian 的浅色/深色模式，或强制使用 Airy Glass 的深色或浅色配色。",
+    "settings.theme.auto": "跟随 Obsidian",
+    "settings.theme.dark": "始终深色",
+    "settings.theme.light": "始终浅色",
+    "settings.palette.name": "配色方案",
+    "settings.palette.desc": "预算界面使用的颜色。每套配色都有各自的浅色和深色版本，因此与上面的主题设置相互独立。",
+    "settings.wizard.name": "设置向导",
+    "settings.wizard.desc": "重新运行首次启动向导 — 文件夹、名称、预算周期、货币、初始文件。",
+    "settings.wizard.button": "运行设置向导",
+    "settings.startup.name": "启动时打开",
+    "settings.startup.desc": "Obsidian 启动时自动打开预算视图。",
+    "settings.privacy.name": "隐私启动屏",
+    "settings.privacy.desc": "在你点击「进入预算」之前用启动屏遮住预算 — 打开时如此，Obsidian 每次切到后台后也是如此。在你点击之前不会从仓库读取任何内容。",
+    "settings.feedback.name": "发送反馈",
+    "settings.feedback.desc": "报告缺陷、反映问题或提出功能建议。会在浏览器中打开一个 Google 表单 — 不会附带或发送你预算中的任何内容。",
+    "settings.feedback.button": "打开反馈表单",
+    "settings.support.name": "支持 Budget Vault",
+    "settings.support.desc": "Budget Vault 是免费的，并且会一直免费。如果你想表达谢意，这会在浏览器中打开 PayPal — 完全自愿，无论如何插件都不会有任何变化。",
+    "settings.support.button": "送上一份谢意",
+    "settings.data.name": "预算数据",
+    "settings.data.desc": "保存在预算文件夹内的 Settings.md 中，因此在每台设备上都生效。",
+    "settings.household.name": "名称 / 家庭",
+    "settings.household.desc": "显示在仪表板的问候语和顶部栏中。留空则不显示。",
+    "settings.household.placeholder": "留空则不显示",
+    "settings.monthStart.name": "每月起始日",
+    "settings.monthStart.desc": "每个财务周期开始的日期 — 通常是你的发薪日。选择 1 表示普通的自然月。1–28。",
+    "settings.monthStart.invalid": "请选择 1 到 28 之间的某一天。",
+    "settings.periodLength.name": "周期长度",
+    "settings.periodLength.desc": "每个预算周期的长度。「每月」使用上面的每月起始日。其他选项则从下面的日期开始计算，把周期与发薪周期对齐。",
+    "settings.anchor.name": "上次发薪日",
+    "settings.anchor.desc": "你上一次领薪是什么时候？任何近期的发薪日都可以 — 只有它落在周期中的哪一天才有影响，因此早一些或晚一些结果相同。当周期长度为每月时会被忽略。",
+    "settings.anchor.invalid": "请使用真实日期，格式为 YYYY-MM-DD，例如 2026-08-07。",
+    "settings.country.name": "国家/地区",
+    "settings.country.desc": "决定金额格式、银行对账单的日期顺序，以及税务视图的清单（针对你所在国家/地区的税务机关）。已有的纳税年度会保留其数据 — 只有标签和新年度的初始值会变化。与下面的界面语言相互独立。",
+    "settings.language.name": "语言",
+    "settings.language.desc": "界面所使用的语言。与上面的国家/地区相互独立 — 住在哪里并不决定你想读什么。默认跟随 Obsidian 自身的显示语言，没有对应语言时回退到英语。你自己写的预算内容 — 分类名称、备注、账户名称 — 永远不会被翻译。",
+    "settings.currency.name": "货币符号",
+    "settings.currency.desc": "显示在每个金额之前，例如 R。",
+    "settings.currency.invalid": "请输入货币符号。",
+    "settings.budgetsKept": {
+      other: "预算：你现有的 {count} 个预算文件仍保留在仓库中。它们无法在当前的周期长度下显示，但只要改回原来的设置就会立即恢复。"
+    },
+    "settings.anchorReslices": {
+      other: "预算：这会移动每一个周期的边界。以日期命名的 {count} 个预算文件将不再匹配 — 它们仍保留在你的仓库中，把这个日期改回 {prev} 就会立即恢复。"
+    },
+    "settings.dateNotReal": "预算：「{value}」不是日期 — 请使用日期选择器，或输入 YYYY-MM-DD。",
+    "wiz.title": "设置 Budget Vault",
+    "wiz.stepOf": "第 {n} 步，共 {total} 步",
+    "wiz.cancel": "取消",
+    "wiz.back": "上一步",
+    "wiz.next": "下一步",
+    "wiz.letsGo": "开始吧！",
+    "wiz.connectBtn": "连接预算",
+    "wiz.createBtn": "创建我的预算",
+    "wiz.skipped": "已跳过设置 — 你可以随时从「设置 → Budget Vault → 运行设置向导」或命令面板重新运行。",
+    "wiz.step.folder": "预算存放的位置",
+    "wiz.step.name": "我们怎么称呼你？",
+    "wiz.step.country": "语言、国家/地区与货币",
+    "wiz.step.period": "你的预算周期",
+    "wiz.step.categories": "你的预算分类",
+    "wiz.step.account": "你的第一个账户",
+    "wiz.step.finish": "准备就绪",
+    "wiz.err.folder": "请输入预算的文件夹路径 — 例如 Finances/Budget。",
+    "wiz.err.monthStart": "每月起始日必须在 1 到 28 之间。并非每个月都有 29、30 或 31 日，因此如果你在月末发薪，请使用 28。",
+    "wiz.err.anchor": "请输入你上次领薪的日期 — 每个发薪周期都从这里开始计算，缺少它预算就会退回到按月周期。",
+    "wiz.err.currency": "请输入货币符号，或从上面的列表中选择一个。",
+    "wiz.welcome.title": "欢迎使用 Budget Vault！",
+    "wiz.welcome.intro": "你的整份预算，就以纯 markdown 的形式存放在这个仓库里 — 无需账号、不上云、也不经过别人的服务器。如果你的仓库会同步到手机，预算也会一并带上。",
+    "wiz.welcome.planLead": "计划是这样的 — 这个向导会帮你准备好:",
+    "wiz.welcome.plan1": "选择预算文件夹 — 整个结构由我们为你搭建",
+    "wiz.welcome.plan2": "选择语言、国家/地区与货币 — 让界面读起来顺畅，金额、日期和税务也都正确",
+    "wiz.welcome.plan3": "告诉我们你的发薪时间 — 如果你愿意，预算周期可以从发薪日开始",
+    "wiz.welcome.plan4": "选择预算分类 — 勾选适合你生活的那些",
+    "wiz.welcome.plan5": "添加第一个账户 — 以及它当前的余额",
+    "wiz.welcome.thenLead": "接下来就是应用里有意思的部分了:",
+    "wiz.welcome.app1": "设定预算 — 给每个分类一个努力的目标金额",
+    "wiz.welcome.app2": "导入银行 CSV — 你教得越多，交易就越会自动归类",
+    "wiz.welcome.app3": "随时添加新分类 — 预算会跟着你一起成长",
+    "wiz.welcome.app4": "边走边回顾 — 仪表板会清楚地显示钱花到哪里去了",
+    "wiz.welcome.close": "大约两分钟即可设置完成。之后随时都能修改。准备好了吗？",
+    "wiz.folder.hint": "所有内容都以纯 markdown 文件的形式存放在仓库的一个文件夹里。",
+    "wiz.folder.blank": "请输入文件夹路径 — 例如 Finances/Budget。",
+    "wiz.folder.found": "在「{folder}」中找到了已有的预算 — 向导会连接到它，而不是创建新文件。",
+    "wiz.folder.exists": "「{folder}」已存在 — 预算文件将添加到其中。",
+    "wiz.folder.willCreate": "「{folder}」尚不存在 — 我们会为你创建。",
+    "wiz.folder.name": "预算文件夹",
+    "wiz.folder.desc": "存放分类、账户、预算和交易的位置。",
+    "wiz.folder.connected": "在「{folder}」中找到了已有的预算 — 我们会连接到它，而不是创建新文件。你的分类、账户和交易都会原样保留；接下来的步骤只是确认其 Settings.md 中保存的设置。",
+    "wiz.name.name": "你的名字或昵称",
+    "wiz.name.desc": "显示在仪表板的问候语和顶部栏中。留空即可跳过。",
+    "wiz.name.placeholder": "例如：小明，或者「张家」",
+    "wiz.language.desc": "应用界面使用的语言。与下面的国家/地区相互独立 — 住在哪里并不决定你想读什么。你自己写的预算内容永远不会被翻译。",
+    "wiz.country.desc": "决定金额格式、读取银行对账单时的日期顺序，以及税务视图中针对你所在国家/地区税务机关的申报清单。",
+    "wiz.currency.desc": "显示在每个金额之前。默认取自你的国家/地区 — 如果你用其他货币记账，请自行更改。",
+    "wiz.currency.custom": "自定义符号",
+    "wiz.currency.customPlaceholder": "例如：CHF",
+    "wiz.ccy.rand": "R — 南非兰特",
+    "wiz.ccy.dollar": "$ — 美元",
+    "wiz.ccy.euro": "€ — 欧元",
+    "wiz.ccy.pound": "£ — 英镑",
+    "wiz.ccy.other": "其他…",
+    "wiz.period.howOften": "你多久领一次薪？",
+    "wiz.period.howOftenDesc": "按月的周期以月份命名，并从你在下面选择的日期开始。其他选项则从上次发薪日算起，与发薪周期对齐。",
+    "wiz.period.startDay": "你的预算月从哪一天开始？",
+    "wiz.period.startDayDesc": "通常是你的发薪日。选择 1 表示普通的自然月。(1–28)",
+    "wiz.period.badDay": "请选择 1 到 28 之间的某一天。并非每个月都有 29、30 或 31 日，因此如果你在月末发薪，请使用 28。",
+    "wiz.period.calendarEg": "普通的自然月：每个周期从 {first} 到月末，并以该月份命名。你现在处于 {month}。",
+    "wiz.period.paydayEg": "每个周期从 {start} 到次月 {end}，并以结束所在的月份命名。你现在处于 {month}。",
+    "wiz.period.anchorBlank": "输入你上次领薪的日期，周期就会据此推算出来。",
+    "wiz.period.anchorEg": "从那天算起，你当前所处的周期开始于 {date}。预算文件会以该起始日期命名。",
+    "wiz.period.anchorName": "你上一次领薪是什么时候？",
+    "wiz.period.anchorDesc": "任何近期的发薪日都可以 — 只有它落在周期中的位置才有影响，因此早一些或晚一些得到的周期相同。",
+    "wiz.cats.intro": "先从一组预算分类开始 — 不需要的可以取消勾选。之后还能添加、重命名或改颜色，所以这里没有什么是定死的。",
+    "wiz.cats.selected": "已选择 {count} / {total}",
+    "wiz.cats.selectAll": "全选",
+    "wiz.cats.selectNone": "全不选",
+    "wiz.type.income": "收入",
+    "wiz.type.expense": "日常开支",
+    "wiz.type.debt": "偿还债务",
+    "wiz.type.services": "服务与订阅",
+    "wiz.type.insurance": "保险",
+    "wiz.type.giving": "捐赠",
+    "wiz.type.savings": "储蓄",
+    "wiz.type.investment": "投资",
+    "wiz.type.luxuries": "锦上添花",
+    "wiz.type.transfer": "转账",
+    "wiz.acct.intro": "交易按账户分别存放。现在添加你的主要账户，或把名称留空以跳过 — 你随时都可以添加账户。",
+    "wiz.acct.name": "账户名称",
+    "wiz.acct.namePlaceholder": "例如：活期账户",
+    "wiz.acct.type": "类型",
+    "wiz.acct.balance": "当前余额",
+    "wiz.acct.balanceDesc": "可选 — 该账户当前的金额。",
+    "wiz.acct.balanceHint": "可以使用最近一期对账单的期末余额，或银行 App 上显示的金额。余额是一份由你自己保持更新的快照 — 只导入最近的交易并不会让它出错 — 你随时可以在账户页面点击余额来修改它。",
+    "wiz.acctType.checking": "活期/支票账户",
+    "wiz.acctType.savings": "储蓄账户",
+    "wiz.acctType.credit_card": "信用卡",
+    "wiz.acctType.cash": "现金",
+    "wiz.acctType.investment": "投资",
+    "wiz.sum.folder": "文件夹",
+    "wiz.sum.name": "名称",
+    "wiz.sum.language": "语言",
+    "wiz.sum.country": "国家/地区",
+    "wiz.sum.period": "预算周期",
+    "wiz.sum.currency": "货币",
+    "wiz.sum.categories": "分类",
+    "wiz.sum.account": "第一个账户",
+    "wiz.sum.opening": "期初余额",
+    "wiz.sum.catCount": {
+      other: "{count} 个初始分类"
+    },
+    "wiz.sum.monthlyCalendar": "按月（自然月）",
+    "wiz.sum.monthlyOn": "按月，从 {day} 开始",
+    "wiz.sum.cycleFrom": "{preset}，自 {date} 起算",
+    "wiz.finish.connectLead": "将连接到已有的预算文件夹，并把这些设置保存到它的 Settings.md 中:",
+    "wiz.finish.createLead": "这会创建预算文件夹，并生成 Settings.md、你的分类、第一个预算文件，以及空的 Owed Money / Services 文件:",
+    "wiz.finish.nextLead": "接下来该做什么: ",
+    "wiz.finish.nextBody": "先在预算页面为各个分类填上金额，然后在交易页面导入银行的 CSV。",
+    "wiz.finish.privacy": "你的预算会在一个需要点击进入的隐私屏后面打开，这样别人瞥一眼你的仓库也看不到任何内容。可在「设置 → Budget Vault → 隐私启动屏」中关闭。",
+    "wiz.done.connected": "已连接到你的预算文件夹。",
+    "wiz.done.created": "预算文件夹已创建 — 欢迎！",
+    "wiz.failed": "设置失败: {error}"
+  };
+});
+
+// src/i18n.js
+var require_i18n = __commonJS((exports2, module2) => {
+  var en = require_en();
+  var af = require_af();
+  var de = require_de();
+  var es = require_es();
+  var fr = require_fr();
+  var ja = require_ja();
+  var zh = require_zh();
+  var TABLES = { en, af, de, es, fr, ja, zh };
+  var LANGUAGE_NAMES = {
+    en: "English",
+    af: "Afrikaans",
+    de: "Deutsch",
+    es: "Español",
+    fr: "Français",
+    ja: "日本語",
+    zh: "中文"
+  };
+  var LANGUAGE_ORDER = ["en", "af", "de", "es", "fr", "ja", "zh"].filter((id) => TABLES[id]);
+  var ONE_FORM = new Set(["zh", "ja"]);
+  var ZERO_IS_SINGULAR = new Set(["fr"]);
+  function pluralCategory(lang, n) {
+    const count = Math.abs(Number(n) || 0);
+    if (ONE_FORM.has(lang))
+      return "other";
+    if (ZERO_IS_SINGULAR.has(lang))
+      return count < 2 ? "one" : "other";
+    return count === 1 ? "one" : "other";
+  }
+  var ORDINAL_DAY = {
+    en: (n) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    },
+    af: (n) => n + (n === 1 || n === 8 || n >= 20 ? "ste" : "de"),
+    de: (n) => n + ".",
+    es: (n) => String(n),
+    fr: (n) => n + (n === 1 ? "er" : ""),
+    ja: (n) => n + "日",
+    zh: (n) => n + " 日"
+  };
+  function ordinalDay(lang, n) {
+    const fn = ORDINAL_DAY[lang] || ORDINAL_DAY.en;
+    return fn(Number(n));
+  }
+  function day(n) {
+    return ordinalDay(current, n);
+  }
+  var current = defaultLanguage();
+  function resolveLanguage(code) {
+    const id = (code || "").toString().trim().toLowerCase();
+    return TABLES[id] ? id : "en";
+  }
+  function setLanguage(code) {
+    current = resolveLanguage(code);
+    return current;
+  }
+  function currentLanguage() {
+    return current;
+  }
+  function defaultLanguage() {
+    const base = (v) => (v || "").toString().trim().toLowerCase().split(/[-_]/)[0];
+    try {
+      const obsidian = base(window.localStorage.getItem("language"));
+      if (TABLES[obsidian])
+        return obsidian;
+    } catch (e) {}
+    try {
+      const nav = base(navigator.language);
+      if (TABLES[nav])
+        return nav;
+    } catch (e) {}
+    return "en";
+  }
+  var PLACEHOLDER = /\{(\w+)\}/g;
+  function interpolate(s, params) {
+    if (!params || typeof s !== "string")
+      return s;
+    return s.replace(PLACEHOLDER, (whole, name) => Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : whole);
+  }
+  function lookup(lang, key, count) {
+    const table = TABLES[lang];
+    if (!table)
+      return;
+    const v = table[key];
+    if (v === undefined || v === null)
+      return;
+    if (typeof v === "string")
+      return v;
+    const cat = pluralCategory(lang, count);
+    return v[cat] !== undefined ? v[cat] : v.other;
+  }
+  function t(key, params) {
+    const count = params && params.count;
+    let s = lookup(current, key, count);
+    if (s === undefined && current !== "en")
+      s = lookup("en", key, count);
+    if (s === undefined)
+      return key;
+    return interpolate(s, params);
+  }
+  var DOM_BINDINGS = [
+    ["data-i18n", null],
+    ["data-i18n-aria", "aria-label"],
+    ["data-i18n-title", "title"],
+    ["data-i18n-placeholder", "placeholder"]
+  ];
+  function applyDom(root) {
+    if (!root || !root.querySelectorAll)
+      return;
+    for (const [attr, target] of DOM_BINDINGS) {
+      root.querySelectorAll("[" + attr + "]").forEach((node) => {
+        const s = t(node.getAttribute(attr));
+        if (target)
+          node.setAttribute(target, s);
+        else
+          node.textContent = s;
+      });
+    }
+  }
+  module2.exports = {
+    t,
+    setLanguage,
+    currentLanguage,
+    resolveLanguage,
+    defaultLanguage,
+    pluralCategory,
+    ordinalDay,
+    day,
+    applyDom,
+    TABLES,
+    LANGUAGE_NAMES,
+    LANGUAGE_ORDER
+  };
+});
+
 // src/dates.js
 var require_dates = __commonJS((exports2, module2) => {
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -281,98 +1855,98 @@ var require_shell = __commonJS((exports2, module2) => {
     <div class="splash-inner">
       <div class="splash-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></div>
       <h1 class="splash-title" id="gateTitle">Budget Vault</h1>
-      <p class="splash-sub">Your private budget, kept safely inside your vault.</p>
-      <button type="button" class="btn-gradient splash-btn" id="gateEnter">Enter budget</button>
+      <p class="splash-sub" data-i18n="splash.sub">Your private budget, kept safely inside your vault.</p>
+      <button type="button" class="btn-gradient splash-btn" id="gateEnter" data-i18n="splash.enter">Enter budget</button>
     </div>
   </div>
 
   <div class="drawer-overlay" id="drawerOverlay"></div>
 
-  <nav class="app-drawer" id="appDrawer" aria-label="Main menu" inert>
+  <nav class="app-drawer" id="appDrawer" aria-label="Main menu" data-i18n-aria="topbar.mainMenu" inert>
     <div class="drawer-head">
-      <b>Menu</b>
-      <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
+      <b data-i18n="nav.menu">Menu</b>
+      <button type="button" class="drawer-close" aria-label="Close menu" data-i18n-aria="nav.close" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Budget</div>
+    <div class="drawer-section-label" data-i18n="nav.section.budget">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
-      <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
+      <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span><span data-i18n="nav.dashboard">Dashboard</span>
     </button>
     <button class="drawer-link" data-view="transactions">
-      <span class="di"><span class="ico" data-ico="arrow-left-right"></span></span>Transactions
+      <span class="di"><span class="ico" data-ico="arrow-left-right"></span></span><span data-i18n="nav.transactions">Transactions</span>
     </button>
     <button class="drawer-link" data-view="budgets">
-      <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
+      <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
 
     <div class="drawer-divider"></div>
 
-    <div class="drawer-section-label">Accounts</div>
+    <div class="drawer-section-label" data-i18n="nav.section.accounts">Accounts</div>
     <button class="drawer-link" data-view="savings">
-      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span>Savings &amp; Investments
+      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; Investments</span>
     </button>
     <button class="drawer-link" data-view="accounts">
-      <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
+      <span class="di"><span class="ico" data-ico="landmark"></span></span><span data-i18n="nav.accounts">Accounts</span>
     </button>
     <button class="drawer-link" data-view="assets">
-      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span>Assets
+      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span><span data-i18n="nav.assets">Assets</span>
     </button>
     <button class="drawer-link" data-view="debts">
-      <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
+      <span class="di"><span class="ico" data-ico="credit-card"></span></span><span data-i18n="nav.debts">Debt</span>
     </button>
     <button class="drawer-link" data-view="owed">
-      <span class="di"><span class="ico" data-ico="users"></span></span>Owed Money
+      <span class="di"><span class="ico" data-ico="users"></span></span><span data-i18n="nav.owed">Owed Money</span>
     </button>
     <button class="drawer-link" data-view="services">
-      <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+      <span class="di"><span class="ico" data-ico="layers"></span></span><span data-i18n="nav.services">Services</span>
     </button>
     <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span><span data-i18n="nav.tax">Tax</span>
     </button>
 
     <div class="drawer-divider"></div>
 
-    <div class="drawer-section-label">Tools</div>
+    <div class="drawer-section-label" data-i18n="nav.section.tools">Tools</div>
     <button class="drawer-link" data-view="loans">
-      <span class="di"><span class="ico" data-ico="calculator"></span></span>Loan Calculators
+      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
     </button>
     <button class="drawer-link" data-view="import">
-      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span>Import CSV
+      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span><span data-i18n="nav.import">Import CSV</span>
     </button>
     <button class="drawer-link" id="reloadLink">
-      <span class="di"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></span>Reload from disk
+      <span class="di"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></span><span data-i18n="nav.reload">Reload from disk</span>
     </button>
     <button class="drawer-link" id="pluginSettingsLink">
-      <span class="di"><span class="ico" data-ico="settings"></span></span>Plugin settings
+      <span class="di"><span class="ico" data-ico="settings"></span></span><span data-i18n="nav.pluginSettings">Plugin settings</span>
     </button>
   </nav>
 
-  <header class="topbar" aria-label="Budget navigation">
-    <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="appDrawer" aria-label="Open navigation menu">
+  <header class="topbar" aria-label="Budget navigation" data-i18n-aria="topbar.nav">
+    <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="appDrawer" aria-label="Open navigation menu" data-i18n-aria="topbar.openMenu">
       <span></span><span></span><span></span>
     </button>
 
-    <button type="button" class="brand" id="brandHome" aria-label="Go to Dashboard">
+    <button type="button" class="brand" id="brandHome" aria-label="Go to Dashboard" data-i18n-aria="topbar.home">
       <span class="brand-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></span>
       <span class="brand-text">
         <b>Budget Vault</b>
-        <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
+        <span class="brand-sub" id="brandSub" data-i18n="topbar.brandSub">Obsidian vault budget</span>
       </span>
     </button>
 
-    <div class="header-period-pill hidden" id="periodPill" role="group" aria-label="Period navigation">
-      <button class="pnav-btn" id="prevPeriod" aria-label="Previous period"><span class="ico" data-ico="chevron-left"></span></button>
+    <div class="header-period-pill hidden" id="periodPill" role="group" aria-label="Period navigation" data-i18n-aria="topbar.periodNav">
+      <button class="pnav-btn" id="prevPeriod" aria-label="Previous period" data-i18n-aria="topbar.prevPeriod"><span class="ico" data-ico="chevron-left"></span></button>
       <span class="pnav-dot" aria-hidden="true"></span>
       <span class="pnav-label" id="periodLabel"></span>
-      <button class="pnav-btn" id="currentPeriod" aria-label="Jump to current period"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></button>
-      <button class="pnav-btn" id="nextPeriod" aria-label="Next period"><span class="ico" data-ico="chevron-right"></span></button>
+      <button class="pnav-btn" id="currentPeriod" aria-label="Jump to current period" data-i18n-aria="topbar.currentPeriod"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></button>
+      <button class="pnav-btn" id="nextPeriod" aria-label="Next period" data-i18n-aria="topbar.nextPeriod"><span class="ico" data-ico="chevron-right"></span></button>
     </div>
 
     <div class="ml-auto">
-      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" title="Import a bank statement CSV">
+      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" data-i18n-aria="topbar.import" title="Import a bank statement CSV" data-i18n-title="topbar.importTitle">
         <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
       </button>
-      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
+      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings" data-i18n-aria="topbar.settings">BV</button>
     </div>
   </header>
 
@@ -394,7 +1968,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-dashboard" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Dashboard</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.dashboard">Dashboard</h1>
         </div>
         <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
@@ -458,7 +2032,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-transactions" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Transactions</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.transactions">Transactions</h1>
           <div class="sub-note" id="txSubNote"></div>
         </div>
         <div class="card">
@@ -486,7 +2060,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-budgets" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Budget</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.budgets">Budget</h1>
           <div class="sub-note" id="budPeriodLabel"></div>
         </div>
         <div id="budShapeNote" class="bud-shape-note hidden"></div>
@@ -512,7 +2086,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-tax" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Tax</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.tax">Tax</h1>
           <div class="sub-note" id="taxSubNote">Tax return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
         </div>
 
@@ -587,7 +2161,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-savings" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Savings &amp; Investments</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.savings">Savings &amp; Investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
         <!-- Tiles and the caveat that qualifies them are ONE block, and the
@@ -622,7 +2196,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-accounts" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Accounts</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.accounts">Accounts</h1>
           <div class="sub-note">Click a balance to update it, or a name to see that account's transactions — the account's markdown file is rewritten.</div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
@@ -634,7 +2208,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-assets" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Assets</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.assets">Assets</h1>
           <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
         </div>
         <!-- One block, owning its own gap — see the note on Savings above. -->
@@ -658,7 +2232,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-debts" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Debt</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.debts">Debt</h1>
           <div class="sub-note">Balances, what the interest costs, and how fast you can be free of it · saved to <code>Debts.md</code></div>
         </div>
 
@@ -707,7 +2281,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-owed" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Owed Money</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.owed">Owed Money</h1>
           <div class="sub-note">Money owed to the household · saved to <code>Owed Money.md</code></div>
         </div>
         <div class="mini-grid mini-kpis-3 mb-4" id="owedKpis"></div>
@@ -727,7 +2301,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-services" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Services</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.services">Services</h1>
           <div class="sub-note">Recurring services &amp; subscriptions · saved to <code>Services.md</code></div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="servicesKpis"></div>
@@ -747,7 +2321,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-loans" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Loan Calculators</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.loans">Loan Calculators</h1>
           <div class="sub-note" id="loansSubNote"></div>
         </div>
 
@@ -817,7 +2391,7 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Import CSV</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.import">Import CSV</h1>
           <div class="sub-note" id="importSubNote">Bank statement CSV exports — or your own CSV</div>
         </div>
         <div class="card mb-4">
@@ -2256,6 +3830,7 @@ var require_load = __commonJS((exports2, module2) => {
   var { parseNum, normalizeAmount } = require_amount();
   var { parseFrontmatter, parseMdTable, unescMd } = require_markdown();
   var { parseCsv } = require_csv();
+  var { setLanguage, defaultLanguage } = require_i18n();
   var { safeSeg } = require_vault_path();
   var { isRealIsoDate } = require_dates();
   function fmNum(v) {
@@ -2279,6 +3854,7 @@ var require_load = __commonJS((exports2, module2) => {
         if (fm.currency)
           S.settings.currency = fm.currency;
         S.settings.country = (fm.country || "za").toString().trim().toLowerCase();
+        S.settings.language = setLanguage(fm.language || defaultLanguage());
         S.settings.household = fm.household || "";
       }
       const read = async (files) => {
@@ -8585,6 +10161,7 @@ var require_controller = __commonJS((exports2, module2) => {
   var { SHELL_HTML } = require_shell();
   var { confirmModal } = require_modal();
   var { localeFor } = require_locale();
+  var { applyDom } = require_i18n();
   var { PALETTE_PRESETS, DEFAULT_PALETTE } = require_constants();
   var registerIo = require_io();
   var registerPeriod = require_period();
@@ -8612,12 +10189,13 @@ var require_controller = __commonJS((exports2, module2) => {
     const parsed = new DOMParser().parseFromString(SHELL_HTML, "text/html");
     while (parsed.body.firstChild)
       root.appendChild(parsed.body.firstChild);
+    applyDom(root);
     root.querySelectorAll("span[data-ico]").forEach((sp) => setIco(sp, sp.getAttribute("data-ico").split("|")));
     const $ = (s) => root.querySelector(s);
     const $$ = (s) => root.querySelectorAll(s);
     const S = {
       loaded: false,
-      settings: { month_start_day: 23, currency: "R", country: "za", period_days: 0, period_anchor: "" },
+      settings: { month_start_day: 23, currency: "R", country: "za", language: "en", period_days: 0, period_anchor: "" },
       categories: [],
       accounts: [],
       budgets: {},
@@ -9154,6 +10732,8 @@ var require_view = __commonJS((exports2, module2) => {
 var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
   var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
+  var i18n = require_i18n();
+  var { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
   var { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require_constants();
   var { periodDaysOrZero } = require_dates();
   var { normalizeAmount } = require_amount();
@@ -9180,45 +10760,12 @@ var require_onboarding = __commonJS((exports2, module2) => {
     { name: "Entertainment", type: "luxuries", color: "#a78bfa" },
     { name: "Transfer between accounts", type: "transfer", color: "#888888" }
   ];
-  var ACCOUNT_TYPES = [
-    ["checking", "Cheque / current account"],
-    ["savings", "Savings account"],
-    ["credit_card", "Credit card"],
-    ["cash", "Cash"],
-    ["investment", "Investment"]
-  ];
-  var CURRENCIES = [
-    ["R", "R — South African Rand"],
-    ["$", "$ — Dollar"],
-    ["€", "€ — Euro"],
-    ["£", "£ — Pound"],
-    ["__custom__", "Other…"]
-  ];
-  var TYPE_LABELS = {
-    income: "Income",
-    expense: "Everyday expenses",
-    debt: "Debt repayments",
-    services: "Services & subscriptions",
-    insurance: "Insurance",
-    giving: "Giving",
-    savings: "Savings",
-    investment: "Investments",
-    luxuries: "Nice-to-haves",
-    transfer: "Transfers"
-  };
-  var STEP_TITLES = {
-    folder: "Where your budget lives",
-    name: "What should we call you?",
-    country: "Country & currency",
-    period: "Your budget period",
-    categories: "Your budget categories",
-    account: "Your first account",
-    finish: "Ready to go"
-  };
-  var ordinal = (n) => {
-    const s = ["th", "st", "nd", "rd"], v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
+  var ACCOUNT_TYPE_KEYS = ["checking", "savings", "credit_card", "cash", "investment"];
+  var accountTypes = () => ACCOUNT_TYPE_KEYS.map((k) => [k, i18n.t("wiz.acctType." + k)]);
+  var CURRENCY_KEYS = [["R", "rand"], ["$", "dollar"], ["€", "euro"], ["£", "pound"], ["__custom__", "other"]];
+  var currencies = () => CURRENCY_KEYS.map(([sym, k]) => [sym, i18n.t("wiz.ccy." + k)]);
+  var typeLabel = (type) => i18n.t("wiz.type." + type);
+  var stepTitle = (step) => i18n.t("wiz.step." + step);
   var monthLabel = (period) => {
     const [y, m] = period.split("-");
     return `${MONTHS[Number(m) - 1]} ${y}`;
@@ -9254,6 +10801,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
         folder: plugin.settings.budgetFolder || "Finances/Budget",
         name: "",
         country: "za",
+        language: i18n.defaultLanguage(),
         periodDays: 0,
         payday: 25,
         periodAnchor: "",
@@ -9270,7 +10818,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
       return this.mode === "connect" ? ["welcome", "folder", "name", "country", "period", "finish"] : ["welcome", "folder", "name", "country", "period", "categories", "account", "finish"];
     }
     onOpen() {
-      this.titleEl.setText("Set up Budget Vault");
+      setLanguage(this.data.language);
+      this.titleEl.setText(i18n.t("wiz.title"));
       this.renderStep();
     }
     onClose() {
@@ -9279,7 +10828,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
         return;
       if (this.stepIdx === 0)
         return;
-      new Notice("Setup skipped — you can run it again from Settings → Budget Vault → Run setup wizard, or the command palette.", 8000);
+      new Notice(i18n.t("wiz.skipped"), 8000);
       this.plugin.settings.onboarded = true;
       this.plugin.saveSettings();
     }
@@ -9291,21 +10840,21 @@ var require_onboarding = __commonJS((exports2, module2) => {
       const steps = this.steps();
       const step = steps[this.stepIdx];
       if (step !== "welcome") {
-        c.createDiv({ cls: "budget-onb-step", text: `Step ${this.stepIdx} of ${steps.length - 1}` });
-        c.createEl("h3", { cls: "budget-onb-title", text: STEP_TITLES[step] });
+        c.createDiv({ cls: "budget-onb-step", text: i18n.t("wiz.stepOf", { n: this.stepIdx, total: steps.length - 1 }) });
+        c.createEl("h3", { cls: "budget-onb-title", text: stepTitle(step) });
       }
       this["render_" + step](c);
       if (err)
         c.createDiv({ cls: "budget-onb-error", text: err });
       const nav = new Setting(c);
       nav.settingEl.addClass("budget-onb-nav");
-      nav.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()));
+      nav.addButton((b) => b.setButtonText(i18n.t("wiz.cancel")).onClick(() => this.close()));
       if (this.stepIdx > 0)
-        nav.addButton((b) => b.setButtonText("Back").onClick(() => {
+        nav.addButton((b) => b.setButtonText(i18n.t("wiz.back")).onClick(() => {
           this.stepIdx--;
           this.renderStep();
         }));
-      nav.addButton((b) => b.setButtonText(step === "finish" ? this.mode === "connect" ? "Connect budget" : "Create my budget" : step === "welcome" ? "Let's go!" : "Next").setCta().onClick(() => this.next()));
+      nav.addButton((b) => b.setButtonText(step === "finish" ? i18n.t(this.mode === "connect" ? "wiz.connectBtn" : "wiz.createBtn") : step === "welcome" ? i18n.t("wiz.letsGo") : i18n.t("wiz.next")).setCta().onClick(() => this.next()));
     }
     fail(msg) {
       this.error = msg;
@@ -9316,7 +10865,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (step === "folder") {
         const folder = normalizePath((this.data.folder || "").trim());
         if (!folder || folder === "/") {
-          this.fail("Enter a folder path for the budget — for example Finances/Budget.");
+          this.fail(i18n.t("wiz.err.folder"));
           return;
         }
         this.data.folder = folder;
@@ -9329,16 +10878,16 @@ var require_onboarding = __commonJS((exports2, module2) => {
         if (!periodDaysOrZero(this.data.periodDays)) {
           const d = Number(this.data.payday);
           if (!Number.isInteger(d) || d < 1 || d > 28) {
-            this.fail("The month start day must be from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.");
+            this.fail(i18n.t("wiz.err.monthStart"));
             return;
           }
         } else if (!isRealIsoDate(this.data.periodAnchor)) {
-          this.fail("Enter the date you were last paid — every pay cycle is counted from it, so without it the budget falls back to monthly periods.");
+          this.fail(i18n.t("wiz.err.anchor"));
           return;
         }
       }
       if (step === "country" && this.data.currency === "__custom__" && !this.data.customCurrency.trim()) {
-        this.fail("Enter a currency symbol, or pick one from the list above.");
+        this.fail(i18n.t("wiz.err.currency"));
         return;
       }
       if (step === "finish") {
@@ -9370,8 +10919,11 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (fm.country && PROFILES[fm.country.toString().trim().toLowerCase()]) {
         this.data.country = fm.country.toString().trim().toLowerCase();
       }
+      if (fm.language)
+        this.data.language = i18n.resolveLanguage(fm.language);
+      setLanguage(this.data.language);
       if (fm.currency) {
-        if (CURRENCIES.some(([v]) => v === fm.currency))
+        if (CURRENCY_KEYS.some(([v]) => v === fm.currency))
           this.data.currency = fm.currency;
         else {
           this.data.currency = "__custom__";
@@ -9382,50 +10934,50 @@ var require_onboarding = __commonJS((exports2, module2) => {
         this.data.name = fm.household;
     }
     render_welcome(c) {
-      c.createEl("h2", { text: "Welcome to Budget Vault!" });
-      c.createEl("p", { text: "Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else's server. If your vault syncs to your phone, your budget rides along for free." });
+      c.createEl("h2", { text: i18n.t("wiz.welcome.title") });
+      c.createEl("p", { text: i18n.t("wiz.welcome.intro") });
       const intro = c.createEl("p");
-      intro.createEl("b", { text: "Here's the plan — this wizard sets you up:" });
+      intro.createEl("b", { text: i18n.t("wiz.welcome.planLead") });
       const setup = c.createEl("ol", { cls: "budget-onb-journey" });
       for (const t of [
-        "Choose your budget folder — we scaffold the whole structure for you",
-        "Pick your country & currency — so amounts, dates and tax stuff look right",
-        "Tell us when you get paid — your budget periods run from payday, if you like",
-        "Choose your budget categories — tick the ones that fit your life",
-        "Add your first account — and what's in it right now"
+        i18n.t("wiz.welcome.plan1"),
+        i18n.t("wiz.welcome.plan2"),
+        i18n.t("wiz.welcome.plan3"),
+        i18n.t("wiz.welcome.plan4"),
+        i18n.t("wiz.welcome.plan5")
       ])
         setup.createEl("li", { text: t });
       const then = c.createEl("p");
-      then.createEl("b", { text: "Then the fun starts in the app:" });
+      then.createEl("b", { text: i18n.t("wiz.welcome.thenLead") });
       const inApp = c.createEl("ol", { cls: "budget-onb-journey" });
       for (const t of [
-        "Set your budget — give every category a number to aim for",
-        "Import your bank's CSV — transactions sort themselves as you teach it",
-        "Add new categories anytime — your budget grows with you",
-        "Review as you go — the dashboard shows exactly where the money went"
+        i18n.t("wiz.welcome.app1"),
+        i18n.t("wiz.welcome.app2"),
+        i18n.t("wiz.welcome.app3"),
+        i18n.t("wiz.welcome.app4")
       ])
         inApp.createEl("li", { text: t });
-      c.createEl("p", { text: "About two minutes of setup. You can change any of it later. Ready?" });
+      c.createEl("p", { text: i18n.t("wiz.welcome.close") });
     }
     render_folder(c) {
-      c.createEl("p", { text: "Everything lives as plain markdown files inside one folder of your vault." });
+      c.createEl("p", { text: i18n.t("wiz.folder.hint") });
       const hint = document.createElement("div");
       hint.className = "budget-onb-hint";
       const paint = () => {
         const raw = (this.data.folder || "").trim();
         if (!raw || raw === "/") {
-          hint.textContent = "Enter a folder path — for example Finances/Budget.";
+          hint.textContent = i18n.t("wiz.folder.blank");
           return;
         }
         const f = normalizePath(raw);
         if (this.detectExisting(f))
-          hint.textContent = `Found an existing budget in "${f}" — the wizard will connect to it rather than create new files.`;
+          hint.textContent = i18n.t("wiz.folder.found", { folder: f });
         else if (this.app.vault.getFolderByPath(f))
-          hint.textContent = `"${f}" already exists — the budget files will be added inside it.`;
+          hint.textContent = i18n.t("wiz.folder.exists", { folder: f });
         else
-          hint.textContent = `"${f}" doesn't exist yet — it will be created for you.`;
+          hint.textContent = i18n.t("wiz.folder.willCreate", { folder: f });
       };
-      new Setting(c).setName("Budget folder").setDesc("Where the categories, accounts, budgets and transactions are kept.").addText((t) => t.setPlaceholder("Finances/Budget").setValue(this.data.folder).onChange((v) => {
+      new Setting(c).setName(i18n.t("wiz.folder.name")).setDesc(i18n.t("wiz.folder.desc")).addText((t) => t.setPlaceholder("Finances/Budget").setValue(this.data.folder).onChange((v) => {
         this.data.folder = v;
         paint();
       }));
@@ -9436,28 +10988,38 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (this.mode === "connect") {
         c.createDiv({
           cls: "budget-onb-callout",
-          text: `Found an existing budget in "${this.data.folder}" — connecting to it instead of creating new files. Your categories, accounts and transactions are left exactly as they are; the remaining steps only confirm the settings kept in its Settings.md.`
+          text: i18n.t("wiz.folder.connected", { folder: this.data.folder })
         });
       }
-      new Setting(c).setName("Your name or nickname").setDesc("Shown in the dashboard greeting and the top bar. Leave blank to skip.").addText((t) => t.setPlaceholder("e.g. Alex, or The Smiths").setValue(this.data.name).onChange((v) => {
+      new Setting(c).setName(i18n.t("wiz.name.name")).setDesc(i18n.t("wiz.name.desc")).addText((t) => t.setPlaceholder(i18n.t("wiz.name.placeholder")).setValue(this.data.name).onChange((v) => {
         this.data.name = v;
       }));
     }
     render_country(c) {
-      new Setting(c).setName("Country").setDesc("Sets amount formatting, the date order used when reading bank statements, and the Tax view's return checklist for your country's tax authority.").addDropdown((d) => {
+      new Setting(c).setName(i18n.t("settings.language.name")).setDesc(i18n.t("wiz.language.desc")).addDropdown((d) => {
+        for (const id of LANGUAGE_ORDER)
+          d.addOption(id, LANGUAGE_NAMES[id]);
+        d.setValue(i18n.resolveLanguage(this.data.language));
+        d.onChange((v) => {
+          this.data.language = v;
+          setLanguage(v);
+          this.renderStep();
+        });
+      });
+      new Setting(c).setName(i18n.t("settings.country.name")).setDesc(i18n.t("wiz.country.desc")).addDropdown((d) => {
         for (const code of COUNTRY_ORDER)
           d.addOption(code, PROFILES[code].label);
         d.setValue(this.data.country);
         d.onChange((v) => {
           this.data.country = v;
-          this.data.currency = CURRENCIES.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : "__custom__";
+          this.data.currency = CURRENCY_KEYS.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : "__custom__";
           if (this.data.currency === "__custom__")
             this.data.customCurrency = PROFILES[v].currency;
           this.renderStep();
         });
       });
-      new Setting(c).setName("Currency symbol").setDesc("Shown before every amount. Starts from your country — change it if you budget in something else.").addDropdown((d) => {
-        for (const [v, label] of CURRENCIES)
+      new Setting(c).setName(i18n.t("settings.currency.name")).setDesc(i18n.t("wiz.currency.desc")).addDropdown((d) => {
+        for (const [v, label] of currencies())
           d.addOption(v, label);
         d.setValue(this.data.currency);
         d.onChange((v) => {
@@ -9466,14 +11028,14 @@ var require_onboarding = __commonJS((exports2, module2) => {
         });
       });
       if (this.data.currency === "__custom__") {
-        new Setting(c).setName("Custom symbol").addText((t) => t.setPlaceholder("e.g. CHF").setValue(this.data.customCurrency).onChange((v) => {
+        new Setting(c).setName(i18n.t("wiz.currency.custom")).addText((t) => t.setPlaceholder(i18n.t("wiz.currency.customPlaceholder")).setValue(this.data.customCurrency).onChange((v) => {
           this.data.customCurrency = v;
         }));
       }
     }
     render_period(c) {
       const days = periodDaysOrZero(this.data.periodDays);
-      new Setting(c).setName("How often are you paid?").setDesc("Monthly periods are named by month and start on the day you choose below. The others line up with a pay cycle instead, counted from your last payday.").addDropdown((d) => {
+      new Setting(c).setName(i18n.t("wiz.period.howOften")).setDesc(i18n.t("wiz.period.howOftenDesc")).addDropdown((d) => {
         for (const [v, label] of Object.entries(periodLengthOptions(days)))
           d.addOption(v, label);
         d.setValue(String(days));
@@ -9488,12 +11050,16 @@ var require_onboarding = __commonJS((exports2, module2) => {
         const paint = () => {
           const d = parseInt(this.data.payday, 10);
           if (!(d >= 1 && d <= 28)) {
-            hint.textContent = "Pick a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.";
+            hint.textContent = i18n.t("wiz.period.badDay");
             return;
           }
-          hint.textContent = d === 1 ? `An ordinary calendar month: each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.` : `Each period runs from the ${ordinal(d)} to the ${ordinal(d - 1)} of the next month, and is named after the month it ends in. Right now you are in ${monthLabel(currentPeriodFor(d))}.`;
+          hint.textContent = d === 1 ? i18n.t("wiz.period.calendarEg", { first: i18n.day(1), month: monthLabel(currentPeriodFor(1)) }) : i18n.t("wiz.period.paydayEg", {
+            start: i18n.day(d),
+            end: i18n.day(d - 1),
+            month: monthLabel(currentPeriodFor(d))
+          });
         };
-        new Setting(c).setName("Which day does your budget month start?").setDesc("Usually your payday. Choose 1 for an ordinary calendar month. (1–28)").addText((t) => {
+        new Setting(c).setName(i18n.t("wiz.period.startDay")).setDesc(i18n.t("wiz.period.startDayDesc")).addText((t) => {
           t.inputEl.type = "number";
           t.inputEl.min = "1";
           t.inputEl.max = "28";
@@ -9513,12 +11079,12 @@ var require_onboarding = __commonJS((exports2, module2) => {
         hint.className = "budget-onb-hint";
         const paint = () => {
           if (!isRealIsoDate(this.data.periodAnchor)) {
-            hint.textContent = "Enter the date you were last paid and the periods are worked out from there.";
+            hint.textContent = i18n.t("wiz.period.anchorBlank");
             return;
           }
-          hint.textContent = `Counting from there, the period you are in right now started on ${currentPeriodForCycle(days, this.data.periodAnchor)}. Budget files are named by that start date.`;
+          hint.textContent = i18n.t("wiz.period.anchorEg", { date: currentPeriodForCycle(days, this.data.periodAnchor) });
         };
-        new Setting(c).setName("When were you last paid?").setDesc("Any recent payday will do — only where it falls within the cycle matters, so an earlier or later one gives the same periods.").addText((t) => {
+        new Setting(c).setName(i18n.t("wiz.period.anchorName")).setDesc(i18n.t("wiz.period.anchorDesc")).addText((t) => {
           t.inputEl.type = "date";
           t.setValue(this.data.periodAnchor);
           t.onChange((v) => {
@@ -9531,12 +11097,12 @@ var require_onboarding = __commonJS((exports2, module2) => {
       }
     }
     render_categories(c) {
-      c.createEl("p", { text: "Start with a set of budget categories — untick any you don't want. You can add, rename or recolour them later, so nothing here is final." });
+      c.createEl("p", { text: i18n.t("wiz.cats.intro") });
       const boxes = [];
       const bar = c.createDiv({ cls: "budget-onb-catbar" });
       const count = bar.createEl("span", { cls: "budget-onb-catcount" });
       const paintCount = () => {
-        count.textContent = `${this.data.cats.size} of ${STARTER_CATEGORIES.length} selected`;
+        count.textContent = i18n.t("wiz.cats.selected", { count: this.data.cats.size, total: STARTER_CATEGORIES.length });
       };
       const setAll = (on) => {
         for (const { cb, cat } of boxes) {
@@ -9548,13 +11114,13 @@ var require_onboarding = __commonJS((exports2, module2) => {
         }
         paintCount();
       };
-      bar.createEl("button", { text: "Select all", cls: "budget-onb-catbtn", attr: { type: "button" } }).addEventListener("click", () => setAll(true));
-      bar.createEl("button", { text: "Select none", cls: "budget-onb-catbtn", attr: { type: "button" } }).addEventListener("click", () => setAll(false));
+      bar.createEl("button", { text: i18n.t("wiz.cats.selectAll"), cls: "budget-onb-catbtn", attr: { type: "button" } }).addEventListener("click", () => setAll(true));
+      bar.createEl("button", { text: i18n.t("wiz.cats.selectNone"), cls: "budget-onb-catbtn", attr: { type: "button" } }).addEventListener("click", () => setAll(false));
       for (const type of TYPE_ORDER) {
         const inType = STARTER_CATEGORIES.filter((x) => x.type === type);
         if (!inType.length)
           continue;
-        c.createDiv({ cls: "budget-onb-cat-group", text: TYPE_LABELS[type] || type });
+        c.createDiv({ cls: "budget-onb-cat-group", text: typeLabel(type) });
         const grid = c.createDiv({ cls: "budget-onb-cats" });
         for (const cat of inType) {
           const label = grid.createEl("label");
@@ -9575,12 +11141,12 @@ var require_onboarding = __commonJS((exports2, module2) => {
       paintCount();
     }
     render_account(c) {
-      c.createEl("p", { text: "Transactions are stored per account. Add your main account now, or leave the name blank to skip — you can add accounts any time." });
-      new Setting(c).setName("Account name").addText((t) => t.setPlaceholder("e.g. Cheque account").setValue(this.data.acctName).onChange((v) => {
+      c.createEl("p", { text: i18n.t("wiz.acct.intro") });
+      new Setting(c).setName(i18n.t("wiz.acct.name")).addText((t) => t.setPlaceholder(i18n.t("wiz.acct.namePlaceholder")).setValue(this.data.acctName).onChange((v) => {
         this.data.acctName = v;
       }));
-      new Setting(c).setName("Type").addDropdown((d) => {
-        for (const [v, label] of ACCOUNT_TYPES)
+      new Setting(c).setName(i18n.t("wiz.acct.type")).addDropdown((d) => {
+        for (const [v, label] of accountTypes())
           d.addOption(v, label);
         d.setValue(this.data.acctType);
         d.onChange((v) => {
@@ -9590,34 +11156,38 @@ var require_onboarding = __commonJS((exports2, module2) => {
       new Setting(c).setName("Bank / institution").setDesc("Optional.").addText((t) => t.setValue(this.data.acctInstitution).onChange((v) => {
         this.data.acctInstitution = v;
       }));
-      new Setting(c).setName("Current balance").setDesc("Optional — what's in the account right now.").addText((t) => {
+      new Setting(c).setName(i18n.t("wiz.acct.balance")).setDesc(i18n.t("wiz.acct.balanceDesc")).addText((t) => {
         t.inputEl.type = "number";
         t.inputEl.step = "0.01";
         t.setPlaceholder("0.00").setValue(this.data.acctBalance).onChange((v) => {
           this.data.acctBalance = v;
         });
       });
-      c.createDiv({ cls: "budget-onb-hint", text: "Use your latest statement's closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page." });
+      c.createDiv({ cls: "budget-onb-hint", text: i18n.t("wiz.acct.balanceHint") });
     }
     render_finish(c) {
       const day = this.monthStartDay();
       const cd = this.cycleDays();
       const rows = [
-        ["Folder", this.data.folder],
-        ["Name", this.data.name.trim() || "—"],
-        ["Country", localeFor(this.data.country).label],
-        ["Budget period", cd ? `${PERIOD_PRESETS[cd] || `Every ${cd} days`}, counted from ${this.data.periodAnchor}` : day === 1 ? "Monthly (calendar month)" : `Monthly, starting on the ${ordinal(day)}`],
-        ["Currency", this.currencySymbol()]
+        [i18n.t("wiz.sum.folder"), this.data.folder],
+        [i18n.t("wiz.sum.name"), this.data.name.trim() || "—"],
+        [i18n.t("wiz.sum.language"), LANGUAGE_NAMES[i18n.resolveLanguage(this.data.language)]],
+        [i18n.t("wiz.sum.country"), localeFor(this.data.country).label],
+        [i18n.t("wiz.sum.period"), cd ? i18n.t("wiz.sum.cycleFrom", {
+          preset: PERIOD_PRESETS[cd] || `Every ${cd} days`,
+          date: this.data.periodAnchor
+        }) : day === 1 ? i18n.t("wiz.sum.monthlyCalendar") : i18n.t("wiz.sum.monthlyOn", { day: i18n.day(day) })],
+        [i18n.t("wiz.sum.currency"), this.currencySymbol()]
       ];
       if (this.mode === "create") {
-        rows.push(["Categories", `${this.data.cats.size} starter categories`]);
-        rows.push(["First account", this.data.acctName.trim() || "—"]);
+        rows.push([i18n.t("wiz.sum.categories"), i18n.t("wiz.sum.catCount", { count: this.data.cats.size })]);
+        rows.push([i18n.t("wiz.sum.account"), this.data.acctName.trim() || "—"]);
         const bal = this.openingBalance();
         if (this.data.acctName.trim() && bal !== 0)
-          rows.push(["Opening balance", `${this.currencySymbol()} ${bal.toFixed(2)}`]);
+          rows.push([i18n.t("wiz.sum.opening"), `${this.currencySymbol()} ${bal.toFixed(2)}`]);
       }
       c.createEl("p", {
-        text: this.mode === "connect" ? "Connecting to the existing budget folder and saving these settings into its Settings.md:" : "This will create the budget folder with Settings.md, your categories, the first budget file and empty Owed Money / Services files:"
+        text: i18n.t(this.mode === "connect" ? "wiz.finish.connectLead" : "wiz.finish.createLead")
       });
       const ul = c.createEl("ul");
       for (const [k, v] of rows) {
@@ -9626,9 +11196,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
         li.appendText(v);
       }
       const next = c.createEl("p");
-      next.createEl("b", { text: "What to do next: " });
-      next.appendText("give your categories an amount on the Budgets page, then import your bank's CSV on the Transactions page.");
-      c.createDiv({ cls: "budget-onb-hint", text: "Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen." });
+      next.createEl("b", { text: i18n.t("wiz.finish.nextLead") });
+      next.appendText(i18n.t("wiz.finish.nextBody"));
+      c.createDiv({ cls: "budget-onb-hint", text: i18n.t("wiz.finish.privacy") });
     }
     monthStartDay() {
       return Math.min(28, Math.max(1, parseInt(this.data.payday, 10) || 25));
@@ -9686,6 +11256,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
           await p.updateBudgetSettingsMd("period_anchor", this.cycleAnchor());
           await p.updateBudgetSettingsMd("currency", `"${cur.replace(/"/g, "")}"`);
           await p.updateBudgetSettingsMd("country", this.data.country);
+          await p.updateBudgetSettingsMd("language", i18n.resolveLanguage(this.data.language));
           if (name)
             await p.updateBudgetSettingsMd("household", `"${name.replace(/"/g, "")}"`);
         } else {
@@ -9698,6 +11269,7 @@ month_start_day: ${day}
 period_anchor: ${this.cycleAnchor()}
 ` : "") + `currency: "${cur.replace(/"/g, "")}"
 country: ${this.data.country}
+` + `language: ${i18n.resolveLanguage(this.data.language)}
 ` + (name ? `household: "${name.replace(/"/g, "")}"
 ` : "") + `tags: [finance, finance/budget, vault-meta]
 ---
@@ -9709,6 +11281,7 @@ country: ${this.data.country}
 ` + `- **period_anchor** — a payday every period is counted from. Only where it falls within the cycle matters.
 ` : "") + `- **currency** — symbol shown before every amount in the Budget Vault plugin.
 ` + `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).
+` + `- **language** — the language the app is written in (${LANGUAGE_ORDER.join(", ")}). Separate from country: neither decides the other.
 ` + `- **household** — name shown in the dashboard greeting.
 
 ` + `Edit the values above directly, or change them in **Settings → Budget Vault** —
@@ -9806,11 +11379,11 @@ tags: [finance, finance/budget, finance/budget/services]
         await p.saveSettings();
         this.finished = true;
         this.close();
-        new Notice(this.mode === "connect" ? "Connected to your budget folder." : "Budget folder created — welcome!");
+        new Notice(i18n.t(this.mode === "connect" ? "wiz.done.connected" : "wiz.done.created"));
         p.reloadViews();
         await p.activateView();
       } catch (e) {
-        new Notice("Setup failed: " + (e.message || e), 8000);
+        new Notice(i18n.t("wiz.failed", { error: e.message || e }), 8000);
       }
     }
   }
@@ -9823,10 +11396,13 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
+  var i18n = require_i18n();
+  var { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
   var { periodDaysOrZero } = require_dates();
   var { yamlStr } = require_markdown();
   var { ISO_DATE, isoDayNumber, isRealIsoDate } = require_dates();
-  var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
+  var MD_KEYS = new Set(["household", "month_start_day", "country", "language", "currency", "period_days", "period_anchor"]);
+  var languageOptions = () => Object.fromEntries(LANGUAGE_ORDER.map((id) => [id, LANGUAGE_NAMES[id]]));
   var PALETTE_DESC = "Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.";
   var MONTH_START_DESC = "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.";
   var PERIOD_LENGTH_DESC = "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.";
@@ -9884,6 +11460,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
     }
     async renderMdSettings(containerEl) {
       const md = await this.plugin.readBudgetSettingsMd();
+      setLanguage(md.language || i18n.defaultLanguage());
       new Setting(containerEl).setName("Name / household").setDesc("Shown in the dashboard greeting and top bar. Leave blank for none.").addText((t) => {
         t.setValue(md.household ?? "");
         t.onChange((v) => {
@@ -9934,7 +11511,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           this._anchorTimer = setTimeout(async () => {
             const next = v.trim();
             if (next && !isRealIsoDate(next)) {
-              new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
+              new Notice(i18n.t("settings.dateNotReal", { value: next }), 6000);
               return;
             }
             await this.warnIfAnchorReslices(md, next);
@@ -9951,6 +11528,17 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         d.onChange(async (v) => {
           await this.plugin.updateBudgetSettingsMd("country", v);
           this.plugin.reloadViews();
+        });
+      });
+      new Setting(containerEl).setName(i18n.t("settings.language.name")).setDesc(i18n.t("settings.language.desc")).addDropdown((d) => {
+        for (const [id, label] of Object.entries(languageOptions()))
+          d.addOption(id, label);
+        d.setValue(i18n.resolveLanguage(md.language ?? i18n.defaultLanguage()));
+        d.onChange(async (v) => {
+          setLanguage(v);
+          await this.plugin.updateBudgetSettingsMd("language", v);
+          this.plugin.reloadViews();
+          this.display();
         });
       });
       new Setting(containerEl).setName("Currency symbol").setDesc("Shown before every amount, e.g. R.").addText((t) => {
@@ -9998,7 +11586,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const n = this.strandedBudgetCount(before, after);
       if (!n)
         return;
-      new Notice(`Budget: your ${n} existing budget ${n === 1 ? "file stays" : "files stay"} in the vault. ` + `They can't be shown at this period length, and they come straight back if you change it back.`, 1e4);
+      new Notice(i18n.t("settings.budgetsKept", { count: n }), 1e4);
     }
     monthBudgetCount() {
       const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
@@ -10014,7 +11602,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       const n = this.datedBudgetCount();
       if (!n)
         return;
-      new Notice(`Budget: this shifts every period boundary. ${n} budget ${n === 1 ? "file" : "files"} ` + `named by date will stop matching — they stay in your vault, and setting this date ` + `back to ${prev} brings them straight back.`, 12000);
+      new Notice(i18n.t("settings.anchorReslices", { count: n, prev }), 12000);
     }
     getControlValue(key) {
       if (!MD_KEYS.has(key))
@@ -10034,6 +11622,8 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         const c = (md.country ?? "za").toString().trim().toLowerCase();
         return PROFILES[c] ? c : "za";
       }
+      if (key === "language")
+        return i18n.resolveLanguage(md.language ?? i18n.defaultLanguage());
       return;
     }
     async setControlValue(key, value) {
@@ -10058,13 +11648,16 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       if (key === "period_days") {
         this.noticeBudgetsKept(periodDaysOrZero(this.mdSettings().period_days), periodDaysOrZero(value));
       }
-      const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "period_days" ? String(periodDaysOrZero(value)) : key === "period_anchor" ? String(value).trim() : key === "country" ? String(value) : null;
+      const raw = key === "household" || key === "currency" ? yamlStr(String(value).trim()) : key === "month_start_day" ? String(parseInt(value, 10)) : key === "period_days" ? String(periodDaysOrZero(value)) : key === "period_anchor" ? String(value).trim() : key === "country" ? String(value) : key === "language" ? i18n.resolveLanguage(value) : null;
       if (raw === null)
         return;
+      if (key === "language")
+        setLanguage(raw);
       await this.plugin.updateBudgetSettingsMd(key, raw);
       this.plugin.reloadViews();
     }
     getSettingDefinitions() {
+      setLanguage(this.mdSettings().language || i18n.defaultLanguage());
       return [
         {
           name: "Budget folder",
@@ -10183,6 +11776,16 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           }
         },
         {
+          name: i18n.t("settings.language.name"),
+          desc: i18n.t("settings.language.desc"),
+          control: {
+            type: "dropdown",
+            key: "language",
+            defaultValue: i18n.defaultLanguage(),
+            options: languageOptions()
+          }
+        },
+        {
           name: "Currency symbol",
           desc: "Shown before every amount, e.g. R.",
           control: {
@@ -10202,6 +11805,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
 var { Plugin, TFile, TFolder, Notice, normalizePath } = require("obsidian");
 var { VIEW_TYPE, DEFAULT_SETTINGS } = require_constants();
 var { parseFrontmatter } = require_markdown();
+var { defaultLanguage } = require_i18n();
 var { BudgetView } = require_view();
 var { BudgetSettingTab } = require_settings_tab();
 var { OnboardingWizard } = require_onboarding();
@@ -10309,7 +11913,7 @@ ${key}: ${value}
       await this.app.vault.modify(f, text);
       this._lastWrite = Date.now();
     } else {
-      const defaults = { month_start_day: "23", currency: "R", country: "za" };
+      const defaults = { month_start_day: "23", currency: "R", country: "za", language: defaultLanguage() };
       defaults[key] = value;
       this._lastWrite = Date.now();
       await this.app.vault.create(path, `---
