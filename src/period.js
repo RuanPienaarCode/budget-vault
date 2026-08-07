@@ -203,6 +203,28 @@ module.exports = function registerPeriod(ctx) {
     return S.accounts.find(a =>
       a.tx_label === label || a.name === label || safeSeg(a.name) === want) || null;
   }
+  /* account -> { rows, labels } in ONE pass over S.txFiles.
+
+     Lives here rather than in a view because Accounts and Savings both need it
+     and would otherwise keep private copies that drift. Resolving per account
+     instead of indexing once would walk every month file once per account.
+
+     Rows are handed over unfiltered — excluded ones included. Callers decide
+     what to drop, and the two that exist deliberately drop nothing: money that
+     left the bank still left the bank whether or not it counts in the budget. */
+  function accountIndex() {
+    const idx = new Map();
+    for (const f of Object.values(S.txFiles)) {
+      const a = accountForLabel(f.label);
+      if (!a) continue;                 // an orphan folder with no account file
+      let e = idx.get(a);
+      if (!e) { e = { rows: [], labels: new Set() }; idx.set(a, e); }
+      e.labels.add(f.label);
+      for (const r of f.rows) e.rows.push(r);
+    }
+    return idx;
+  }
+
   /* Labels belonging to `budget: false` accounts. Resolved per call rather than
      cached because periodSummary runs six times over for the dashboard trend
      and an account can be toggled between any two of them. */
@@ -329,7 +351,7 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel,
-    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, nonBudgetLabels,
+    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, nonBudgetLabels,
     intervalDays, periodKeyValid,
   });
 };

@@ -8,7 +8,8 @@
 const { el, keepScroll, escMd, icoEl } = require('../util');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
-const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require('../debt-math');
+const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
+const { todayIso } = require('../reconcile');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
@@ -307,10 +308,33 @@ module.exports = function registerDebts(ctx) {
           const paidOff = d.original > 0 ? Math.min(100, Math.max(0, ((d.original - d.balance) / d.original) * 100)) : 0;
           barFill.style.width = `${paidOff}%`;
           payoffCell.empty();
-          payoffCell.append(d.original > 0
+          const prog = d.original > 0
             ? el('div', { class: 'debt-prog' }, el('div', { class: 'cat-bar' }, barFill),
               el('span', { class: 'num' }, `${Math.round(paidOff)}%`))
-            : el('span', { class: 'text-muted' }, '—'));
+            : el('span', { class: 'text-muted' }, '—');
+          payoffCell.append(prog);
+
+          /* Where the schedule says this debt should be today. A hand-typed
+             debt balance goes out of date faster than any other figure in the
+             app — the lender moves it every month — and nothing here ever
+             questioned it. Only shown when it MATERIALLY disagrees: a schedule
+             is an estimate (a missed payment, a rate change, a fee), so small
+             differences are noise and flagging them would train the reader to
+             ignore the line that matters. */
+          if (d.status !== 'paid') {
+            const exp = expectedBalance(d, todayIso());
+            if (exp) {
+              const gap = d.balance - exp.expected;
+              const material = Math.abs(gap) > Math.max(50, d.original * 0.02);
+              if (material) {
+                payoffCell.append(el('div', { class: 'debt-implied',
+                  title: `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
+                    + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. `
+                    + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.` },
+                `schedule says ${money(exp.expected, 0)}`));
+              }
+            }
+          }
 
           const a = amortise(d.balance, d.rate, committed(d));
           clearCell.empty(); interestCell.empty();

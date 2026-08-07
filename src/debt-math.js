@@ -152,4 +152,47 @@ function humanMonths(n) {
   return r ? `${y} yr ${r} mo` : `${y} year${y === 1 ? '' : 's'}`;
 }
 
-module.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, MAX_MONTHS, EPS };
+/* Where a debt SHOULD be today, given what it started at and what has been paid
+   into it since — the Accounts page's reconciliation argument, made on the one
+   page where a hand-typed figure goes out of date fastest, because a debt
+   balance moves every single month.
+
+   It cannot be made the same way as an account's. A debt row carries no
+   "balance as of" date, and payments are attributed per CATEGORY rather than
+   per debt (three debts sharing one category would each claim the full amount).
+   So the projection runs from the fields the file already has — `original`,
+   `rate`, `payment` + `extra`, `start` — and needs no new column.
+
+   Interest is applied BEFORE each payment, month by month, because a debt does
+   not fall by the instalment: the lender adds interest between statements.
+   Subtracting payments alone would report a debt shrinking faster than it is,
+   which is the flattering direction and therefore the dangerous one.
+
+   Returns null when the row cannot support the projection — no start date, no
+   original, no instalment, or a start date in the future. A missing answer is
+   the honest output; a projection from guessed inputs is not. */
+function expectedBalance(debt, today) {
+  const d = debt || {};
+  const original = Number(d.original) || 0;
+  const pay = (Number(d.payment) || 0) + (Number(d.extra) || 0);
+  if (!original || pay <= 0) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(today || '')) return null;
+
+  const [sy, sm] = d.start.split('-').map(Number);
+  const [ty, tm] = today.split('-').map(Number);
+  const months = (ty - sy) * 12 + (tm - sm);
+  if (months <= 0) return null;
+
+  const r = monthlyRate(d.rate);
+  let b = original;
+  let paid = 0, interest = 0;
+  for (let m = 0; m < months && b > EPS; m++) {
+    const i = b * r;
+    b += i; interest += i;
+    const step = Math.min(pay, b);
+    b -= step; paid += step;
+  }
+  return { expected: b, months, paid, interest, settled: b <= EPS };
+}
+
+module.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance, MAX_MONTHS, EPS };
