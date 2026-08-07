@@ -21,7 +21,7 @@ const SHELL_HTML = `
       <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Menu</div>
+    <div class="drawer-section-label">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
       <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
     </button>
@@ -30,9 +30,6 @@ const SHELL_HTML = `
     </button>
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
-    </button>
-    <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -55,6 +52,9 @@ const SHELL_HTML = `
     </button>
     <button class="drawer-link" data-view="services">
       <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+    </button>
+    <button class="drawer-link" data-view="tax">
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -123,8 +123,7 @@ const SHELL_HTML = `
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero" id="heroCard"></div>
-        <div class="kpi-caveat mb-4" id="dashStale"></div>
+        <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -162,6 +161,25 @@ const SHELL_HTML = `
           <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="dashBudget"></table></div>
           </div>
+        </div>
+        <!-- Position, not flow. Everything above this band moves when the period
+             changes; nothing in it does, which is why the subtitle says so — a
+             card that ignores the control above it reads as broken otherwise.
+
+             Deliberately NOT wrapped in a .card. Its tiles are .mini cards with
+             borders of their own, and every other mini-grid in the app (Savings,
+             Accounts, Debt, Owed, Assets, Services) sits bare on the page
+             background for exactly that reason. The heading it does need comes
+             from .section-h, which carries the card header's type scale without
+             the card's chrome or its 44px gutters. -->
+        <div class="mb-4" id="dashPositionCard">
+          <div class="section-h">
+            <h2>Where you stand</h2>
+            <div class="sub" id="dashPositionSub"></div>
+          </div>
+          <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
+          <div class="kpi-caveat" id="dashPositionNote"></div>
+          <div class="kpi-caveat" id="dashStale"></div>
         </div>
       </section>
 
