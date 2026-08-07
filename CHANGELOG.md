@@ -3,6 +3,29 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.6.1 — 2026-08-07
+
+### Fixed
+
+- **The background follows the palette you picked.** The soft washes of colour
+  behind the app and behind the lock screen were painted green whichever
+  palette you were on, so Ocean and Plum sat on a faintly emerald background.
+  They now take their colour from the palette. Vault Green is unchanged, down
+  to the exact shade it always used.
+
+### Changed
+
+- **Export asks where to save.** Choosing Export now opens a dialog with the
+  folder to write to, filled in with wherever you sent the last one, and tells
+  you what it is about to write before it writes it. The folder is somewhere in
+  your vault — Obsidian gives a plugin no way to open your system's own save
+  dialog, and a button that worked on the desktop and did nothing on your phone
+  would be worse than asking. Once the file is in the vault, sharing it out
+  works the way any other note does.
+
+  A folder that fails is never remembered as your default, and cancelling does
+  nothing at all.
+
 ## 1.6.0 — 2026-08-07
 
 ### Added
