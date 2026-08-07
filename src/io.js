@@ -39,6 +39,36 @@ module.exports = function registerIo(ctx) {
     }
     return path;
   }
+  /* Write somewhere the user NAMED, anywhere in the vault.
+
+     Separate from writeFile on purpose. writeFile is rooted at the budget
+     folder and refuses to leave it, because the paths it is handed are built
+     from data — an account label, a category name — that arrives by sync and
+     could be anything; "../../evil" in a synced Accounts file must not become a
+     write. Export is the opposite case: the destination is typed into a dialog
+     by the person sitting there, and confining it to the budget folder would
+     mean you cannot put an export next to the tax return it is for.
+
+     So the containment moves out one ring rather than disappearing: still no
+     escaping the VAULT, still collapsed before it is trusted, still refused
+     rather than silently rebased. */
+  function guardedVaultPath(rel) {
+    const collapsed = collapsePath(normalizePath(String(rel || '')));
+    if (!collapsed) throw new Error(`Refused write outside the vault: ${rel}`);
+    return collapsed;
+  }
+  async function writeVaultFile(rel, content) {
+    const path = guardedVaultPath(rel);
+    stampWrite();
+    const f = vault.getFileByPath(path);
+    if (f) { await vault.modify(f, content); }
+    else {
+      await ensureFolder(path.split('/').slice(0, -1).join('/'));
+      await vault.create(path, content);
+    }
+    stampWrite();
+    return path;
+  }
   async function writeFile(rel, content) {
     const path = guardedPath(rel);
     stampWrite();
@@ -78,7 +108,7 @@ module.exports = function registerIo(ctx) {
   }
 
   ctx.provide({
-    basePath, relPath, readFile, writeFile, writeBinary, fileAt, mdFilesIn, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, fileAt, mdFilesIn, subfoldersIn, ensureFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   });
 };
