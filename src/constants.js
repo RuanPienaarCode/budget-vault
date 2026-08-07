@@ -43,6 +43,12 @@ const DEFAULT_SETTINGS = {
      hand-editable file — UI preferences do not belong in it. Two keys rather
      than one because the two charts mean different things by a range (history
      behind you vs a schedule ahead of you) and want different defaults. */
+  /* Where the last export was written, vault-relative. Remembered so the second
+     export does not ask the same question again — the dialog still opens, with
+     this prefilled, so the answer is confirmed rather than assumed. Plugin data
+     rather than Settings.md for the same reason the chart ranges are: it is
+     display state, and Settings.md is the user's own hand-editable file. */
+  exportFolder: 'Exports',
   chartTrendRange: '6m',
   chartDebtRange: '5y',
 };

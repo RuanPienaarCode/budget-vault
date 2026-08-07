@@ -128,14 +128,34 @@ const ROWS = [
     'a partial export says what was filtered out — otherwise it reads as the whole set');
 }
 
-/* ---- 7. a period name cannot escape the export folder ---- */
+/* ---- 7. neither the period name nor the chosen folder can escape ----
+
+   The folder is typed into a dialog, so it is user input reaching a file write.
+   io.js's guardedVaultPath is the second ring; this is the first, and the two
+   are deliberately independent — a bug in either alone still leaves the write
+   contained. */
 {
   eq(safeName('../../etc/passwd'), '..-..-etc-passwd', 'every path separator becomes a dash');
   eq(safeName(''), 'export', 'and an empty name still produces a usable filename');
-  ok(!exportPaths('../../evil').txCsv.includes('../'), 'so the built path cannot climb out of the export folder');
-  ok(exportPaths('Aug 2026').txCsv.startsWith(EXPORT_DIR + '/'), 'exports land in the export folder');
-  eq(exportPaths('Aug 2026').txCsv, 'Exports/Transactions Aug 2026.csv', 'named after what is in it');
-  eq(exportPaths('Aug 2026').txMd, 'Exports/Transactions Aug 2026.md', 'markdown sits beside the CSV');
+  ok(!exportPaths('../../evil').txCsv.includes('../'), 'a hostile RANGE cannot climb out');
+
+  /* Each segment is sanitised, so a nested folder survives... */
+  eq(exportPaths('Aug 2026', 'Admin/Tax 2026').txCsv, 'Admin/Tax 2026/Transactions Aug 2026.csv',
+    'a nested destination is kept intact');
+  /* ...while a traversal segment is defused rather than honoured. */
+  const escaped = exportPaths('Aug 2026', '../../secrets');
+  ok(!escaped.txCsv.includes('../'), 'a hostile FOLDER cannot climb out either');
+  eq(escaped.dir, 'secrets', 'the traversal segments are dropped, leaving the folder actually named');
+  eq(safeName('..'), 'export', 'and a bare traversal can never become a filename either');
+  eq(safeName('.'), 'export', 'nor a single dot');
+
+  eq(exportPaths('Aug 2026', '').dir, EXPORT_DIR, 'an empty folder falls back to the default');
+  eq(exportPaths('Aug 2026', undefined).dir, EXPORT_DIR, 'so does a missing one');
+  eq(exportPaths('Aug 2026', '///').dir, EXPORT_DIR, 'and so does one that is only separators');
+
+  eq(exportPaths('Aug 2026', 'Exports').txCsv, 'Exports/Transactions Aug 2026.csv', 'named after what is in it');
+  eq(exportPaths('Aug 2026', 'Exports').txMd, 'Exports/Transactions Aug 2026.md', 'markdown sits beside the CSV');
+  eq(exportPaths('Aug 2026', 'Admin').catCsv, 'Admin/Categories.csv', 'categories land in the same folder');
 }
 
 /* ---- 8. categories ---- */

@@ -10,7 +10,7 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
+  const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -308,18 +308,46 @@ module.exports = function registerTransactions(ctx) {
     const { rows, range, filters } = filteredRows();
     if (!rows.length) return toast('Nothing to export — no rows match the current filters', true);
 
-    const paths = exportPaths(range);
+    /* Ask where, every time, with last time's answer prefilled.
+
+       A folder INSIDE THE VAULT, not an OS save dialog. Obsidian's API has no
+       cross-platform file picker; reaching Electron's showSaveDialog would mean
+       a Node API in src/ and a button that silently does nothing on the phone
+       this plugin ships to. Once the file is in the vault, the OS share sheet
+       and the desktop file manager can both take it from there.
+
+       Asked rather than assumed even when the answer is remembered: an export
+       overwrites whatever it wrote last time, and a silent overwrite of a file
+       someone has since edited is not something a toast can undo. */
+    const answer = await askFields(app, 'Export transactions', [{
+      key: 'folder',
+      label: 'Save to folder',
+      desc: `Vault folder for the export. ${rows.length} row${rows.length === 1 ? '' : 's'} (${range}) plus ${S.categories.length} categories, as CSV and markdown.`,
+      value: plugin.settings.exportFolder || 'Exports',
+      placeholder: 'Exports',
+    }]);
+    if (!answer) return;                       // cancelled — say nothing, do nothing
+
+    const paths = exportPaths(range, answer.folder);
     const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    let written;
     try {
-      await writeFile(paths.txCsv, transactionsCsv(rows, csvCell));
-      await writeFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
-      await writeFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
-      await writeFile(paths.catMd, categoriesMarkdown(S.categories, generated));
+      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, csvCell));
+      await writeVaultFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
+      await writeVaultFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+      await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {
       console.error('Budget: export failed', e);
-      return toast('Could not write the export — check the folder is writable', true);
+      return toast('Could not write the export — check the folder name', true);
     }
-    toast(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'} and ${S.categories.length} categories to ${paths.txCsv.split('/')[0]}/`);
+    /* Remembered only after a write actually succeeded. Storing the typed value
+       up front would leave a destination that failed prefilled as the default
+       for every future export. */
+    if (plugin.settings.exportFolder !== paths.dir) {
+      plugin.settings.exportFolder = paths.dir;
+      await plugin.saveSettings();
+    }
+    toast(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'} and ${S.categories.length} categories to ${written.split('/').slice(0, -1).join('/')}/`);
   }
 
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });

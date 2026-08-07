@@ -36,7 +36,13 @@ const EXPORT_DIR = 'Exports';
    user controls (a household could name a period anything), so this runs over
    every generated filename rather than trusting the caller. */
 function safeName(s) {
-  return String(s ?? '').replace(/[\\/:*?"<>|#^[\]]/g, '-').replace(/\s+/g, ' ').trim() || 'export';
+  const cleaned = String(s ?? '').replace(/[\\/:*?"<>|#^[\]]/g, '-').replace(/\s+/g, ' ').trim();
+  /* A name of nothing but dots is "." or ".." — a traversal, not a name, and
+     the one input that survives the character filter above untouched because
+     a dot is legal in a filename everywhere else. Caught here so the traversal
+     never reaches a path at all; io.js refuses it a second time at the write,
+     and neither ring is allowed to be the only one that works. */
+  return /^\.+$/.test(cleaned) ? 'export' : (cleaned || 'export');
 }
 
 /* ------------------------------- CSV ---------------------------------- */
@@ -159,13 +165,26 @@ function categoriesMarkdown(categories, generated) {
    category and exported again expects — a folder accumulating
    "Transactions (3).csv" is a worse outcome than a file that is simply current.
    The generated timestamp lives inside the markdown for anyone who needs it. */
-function exportPaths(range) {
-  const base = `${EXPORT_DIR}/Transactions ${safeName(range)}`;
+/* `folder` is vault-relative and comes from the export dialog. Each SEGMENT is
+   sanitised rather than the whole string, so a nested destination like
+   "Admin/Tax 2026" survives while a "../" segment cannot: safeName turns the
+   dots into dashes, and io.js's guardedVaultPath refuses anything that still
+   resolves outside the vault. Two rings, because this path is user input and
+   the file write is the thing that cannot be taken back. */
+function exportPaths(range, folder) {
+  const dir = String(folder || EXPORT_DIR).split('/')
+    /* Dropped, not sanitised: turning "../../secrets" into "export/export/
+       secrets" would honour a traversal attempt by inventing two folders for
+       it. Removing the segments resolves it to the folder actually named. */
+    .filter(seg => seg.trim() && !/^\.+$/.test(seg.trim()))
+    .map(safeName).join('/') || EXPORT_DIR;
+  const base = `${dir}/Transactions ${safeName(range)}`;
   return {
+    dir,
     txCsv: `${base}.csv`,
     txMd: `${base}.md`,
-    catCsv: `${EXPORT_DIR}/Categories.csv`,
-    catMd: `${EXPORT_DIR}/Categories.md`,
+    catCsv: `${dir}/Categories.csv`,
+    catMd: `${dir}/Categories.md`,
   };
 }
 
