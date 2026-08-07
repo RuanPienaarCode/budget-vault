@@ -324,4 +324,75 @@ module.exports = {
     other: 'Copied {count} categories from the previous period',
   },
   'bud.copy.nothing': 'Nothing to copy — every category already has a value',
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Whole history',
+  'tx.allAccounts': 'All accounts',
+  'tx.allCategories': 'All categories',
+  'tx.uncategorised': 'Uncategorised',
+  'tx.count.window': '{shown} of {total} rows',
+  'tx.count.all': { one: '{count} row', other: '{count} rows' },
+
+  'tx.col.date': 'Date',
+  'tx.col.desc': 'Description',
+  'tx.col.account': 'Account',
+  'tx.col.category': 'Category',
+  'tx.col.amount': 'Amount',
+  'tx.col.excl': 'Excl.',
+  'tx.col.note': 'Note',
+  'tx.col.split': 'Split',
+
+  'tx.aria.category': 'Category for {date} {desc}',
+  'tx.aria.exclude': 'Exclude {desc} from budget totals',
+  'tx.aria.note': 'Note for {date} {desc}',
+  'tx.aria.split': 'Split {date} {desc} into categories',
+  'tx.title.split': 'Split into categories',
+
+  'tx.none': 'No transactions match.',
+  'tx.showMore': 'Show {n} more of {remaining} remaining',
+
+  'tx.split.zero': 'A zero-amount line has nothing to split',
+  'tx.split.excluded': 'This line is already excluded — untick it first',
+  'tx.split.marker': 'Split into {n}',
+  'tx.split.done': 'Split into {n} — review, then Save changes',
+
+  'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
+  'tx.add.title': 'Add transaction',
+  'tx.field.date': 'Date',
+  'tx.field.desc': 'Description',
+  'tx.field.descPlaceholder': 'e.g. Cash — vegetables at the market',
+  'tx.field.account': 'Account',
+  'tx.field.direction': 'Direction',
+  'tx.dir.out': 'Money out',
+  'tx.dir.in': 'Money in',
+  'tx.field.amount': 'Amount',
+  'tx.field.amountDesc': 'Always positive — direction sets the sign',
+  'tx.field.category': 'Category',
+  'tx.field.none': '— none —',
+  'tx.field.note': 'Note',
+  'tx.field.notePlaceholder': 'optional',
+
+  'tx.err.date': 'Date must be YYYY-MM-DD',
+  'tx.err.desc': 'Description is required',
+  'tx.err.account': 'Invalid account name',
+  'tx.err.amount': 'Amount must be a number other than 0',
+  'tx.err.save': 'Could not save the transaction ({error})',
+
+  'tx.saved': { one: 'Saved {count} file', other: 'Saved {count} files' },
+  'tx.savedLearned': { one: ' · learned {count} new rule', other: ' · learned {count} new rules' },
+
+  'tx.export.dirty': 'Save your changes first — an export of unsaved edits would not match the vault',
+  'tx.export.empty': 'Nothing to export — no rows match the current filters',
+  'tx.export.title': 'Export transactions',
+  'tx.export.folder': 'Save to folder',
+  'tx.export.desc': {
+    one: 'Vault folder for the export. {count} row ({range}) plus {cats} categories, as CSV and markdown.',
+    other: 'Vault folder for the export. {count} rows ({range}) plus {cats} categories, as CSV and markdown.',
+  },
+  'tx.export.failed': 'Could not write the export — check the folder name',
+  'tx.export.done': {
+    one: 'Exported {count} row and {cats} categories to {path}/',
+    other: 'Exported {count} rows and {cats} categories to {path}/',
+  },
+
 };

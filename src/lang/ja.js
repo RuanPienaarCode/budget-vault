@@ -312,4 +312,73 @@ module.exports = {
   },
   'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
 
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': '全期間',
+  'tx.allAccounts': 'すべての口座',
+  'tx.allCategories': 'すべてのカテゴリ',
+  'tx.uncategorised': 'カテゴリなし',
+  'tx.count.window': '{total} 行中 {shown} 行',
+  'tx.count.all': { other: '{count} 行' },
+
+  'tx.col.date': '日付',
+  'tx.col.desc': '摘要',
+  'tx.col.account': '口座',
+  'tx.col.category': 'カテゴリ',
+  'tx.col.amount': '金額',
+  'tx.col.excl': '除外',
+  'tx.col.note': 'メモ',
+  'tx.col.split': '分割',
+
+  'tx.aria.category': '{date} {desc} のカテゴリ',
+  'tx.aria.exclude': '{desc} を予算の合計から除外',
+  'tx.aria.note': '{date} {desc} のメモ',
+  'tx.aria.split': '{date} {desc} をカテゴリに分割',
+  'tx.title.split': 'カテゴリに分割',
+
+  'tx.none': '該当する取引はありません。',
+  'tx.showMore': '残り {remaining} 件のうち {n} 件を表示',
+
+  'tx.split.zero': '金額が 0 の行には分割するものがありません',
+  'tx.split.excluded': 'この行はすでに除外されています — まずチェックを外してください',
+  'tx.split.marker': '{n} 件に分割',
+  'tx.split.done': '{n} 件に分割しました — 確認してから変更を保存してください',
+
+  'tx.add.noAccount': '先に口座を追加してください — 取引は必ずいずれかの口座に属します',
+  'tx.add.title': '取引を追加',
+  'tx.field.date': '日付',
+  'tx.field.desc': '摘要',
+  'tx.field.descPlaceholder': '例: 現金 — 市場で野菜',
+  'tx.field.account': '口座',
+  'tx.field.direction': '入出金',
+  'tx.dir.out': '出金',
+  'tx.dir.in': '入金',
+  'tx.field.amount': '金額',
+  'tx.field.amountDesc': '常に正の数で — 符号は入出金の向きで決まります',
+  'tx.field.category': 'カテゴリ',
+  'tx.field.none': '— なし —',
+  'tx.field.note': 'メモ',
+  'tx.field.notePlaceholder': '任意',
+
+  'tx.err.date': '日付は YYYY-MM-DD 形式で入力してください',
+  'tx.err.desc': '摘要は必須です',
+  'tx.err.account': '口座名が正しくありません',
+  'tx.err.amount': '金額は 0 以外の数値にしてください',
+  'tx.err.save': '取引を保存できませんでした（{error}）',
+
+  'tx.saved': { other: '{count} 件のファイルを保存しました' },
+  'tx.savedLearned': { other: ' · 新しいルールを {count} 件学習しました' },
+
+  'tx.export.dirty': '先に変更を保存してください — 未保存の編集を書き出すと保管庫の内容と一致しません',
+  'tx.export.empty': '書き出すものがありません — 現在の絞り込みに該当する行がありません',
+  'tx.export.title': '取引を書き出す',
+  'tx.export.folder': '保存先フォルダ',
+  'tx.export.desc': {
+    other: '書き出し先の保管庫内フォルダ。{count} 行（{range}）とカテゴリ {cats} 件を、CSV とマークダウンで書き出します。',
+  },
+  'tx.export.failed': '書き出しに失敗しました — フォルダ名を確認してください',
+  'tx.export.done': {
+    other: '{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました',
+  },
+
 };

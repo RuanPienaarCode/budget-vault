@@ -313,4 +313,75 @@ module.exports = {
   },
   'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
 
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Hele geskiedenis',
+  'tx.allAccounts': 'Alle rekeninge',
+  'tx.allCategories': 'Alle kategorieë',
+  'tx.uncategorised': 'Ongekategoriseer',
+  'tx.count.window': '{shown} van {total} rye',
+  'tx.count.all': { one: '{count} ry', other: '{count} rye' },
+
+  'tx.col.date': 'Datum',
+  'tx.col.desc': 'Beskrywing',
+  'tx.col.account': 'Rekening',
+  'tx.col.category': 'Kategorie',
+  'tx.col.amount': 'Bedrag',
+  'tx.col.excl': 'Uitgesl.',
+  'tx.col.note': 'Nota',
+  'tx.col.split': 'Verdeel',
+
+  'tx.aria.category': 'Kategorie vir {date} {desc}',
+  'tx.aria.exclude': 'Sluit {desc} uit begrotingstotale uit',
+  'tx.aria.note': 'Nota vir {date} {desc}',
+  'tx.aria.split': 'Verdeel {date} {desc} in kategorieë',
+  'tx.title.split': 'Verdeel in kategorieë',
+
+  'tx.none': 'Geen transaksies pas nie.',
+  'tx.showMore': 'Wys {n} meer van {remaining} wat oorbly',
+
+  'tx.split.zero': "\'n Reël met \'n nulbedrag het niks om te verdeel nie",
+  'tx.split.excluded': 'Hierdie reël is reeds uitgesluit — ontmerk dit eers',
+  'tx.split.marker': 'Verdeel in {n}',
+  'tx.split.done': 'Verdeel in {n} — gaan na, en stoor dan die veranderinge',
+
+  'tx.add.noAccount': 'Voeg eers \'n rekening by — elke transaksie hoort by een',
+  'tx.add.title': 'Voeg transaksie by',
+  'tx.field.date': 'Datum',
+  'tx.field.desc': 'Beskrywing',
+  'tx.field.descPlaceholder': 'bv. Kontant — groente by die mark',
+  'tx.field.account': 'Rekening',
+  'tx.field.direction': 'Rigting',
+  'tx.dir.out': 'Geld uit',
+  'tx.dir.in': 'Geld in',
+  'tx.field.amount': 'Bedrag',
+  'tx.field.amountDesc': 'Altyd positief — die rigting bepaal die teken',
+  'tx.field.category': 'Kategorie',
+  'tx.field.none': '— geen —',
+  'tx.field.note': 'Nota',
+  'tx.field.notePlaceholder': 'opsioneel',
+
+  'tx.err.date': 'Datum moet JJJJ-MM-DD wees',
+  'tx.err.desc': 'Beskrywing is verpligtend',
+  'tx.err.account': 'Ongeldige rekeningnaam',
+  'tx.err.amount': 'Bedrag moet \'n getal anders as 0 wees',
+  'tx.err.save': 'Kon nie die transaksie stoor nie ({error})',
+
+  'tx.saved': { one: '{count} lêer gestoor', other: '{count} lêers gestoor' },
+  'tx.savedLearned': { one: ' · {count} nuwe reël geleer', other: ' · {count} nuwe reëls geleer' },
+
+  'tx.export.dirty': 'Stoor eers jou veranderinge — \'n uitvoer van ongestoorde wysigings sal nie by die kluis pas nie',
+  'tx.export.empty': 'Niks om uit te voer nie — geen rye pas by die huidige filters nie',
+  'tx.export.title': 'Voer transaksies uit',
+  'tx.export.folder': 'Stoor na vouer',
+  'tx.export.desc': {
+    one: 'Kluisvouer vir die uitvoer. {count} ry ({range}) plus {cats} kategorieë, as CSV en markdown.',
+    other: 'Kluisvouer vir die uitvoer. {count} rye ({range}) plus {cats} kategorieë, as CSV en markdown.',
+  },
+  'tx.export.failed': 'Kon nie die uitvoer skryf nie — kyk na die vouernaam',
+  'tx.export.done': {
+    one: '{count} ry en {cats} kategorieë na {path}/ uitgevoer',
+    other: '{count} rye en {cats} kategorieë na {path}/ uitgevoer',
+  },
+
 };
