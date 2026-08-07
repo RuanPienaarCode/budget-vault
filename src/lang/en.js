@@ -240,11 +240,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Optional — what\'s in the account right now.',
   'wiz.acct.balanceHint': 'Use your latest statement\'s closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page.',
 
-  'wiz.acctType.checking': 'Cheque / current account',
-  'wiz.acctType.savings': 'Savings account',
-  'wiz.acctType.credit_card': 'Credit card',
-  'wiz.acctType.cash': 'Cash',
-  'wiz.acctType.investment': 'Investment',
+  'acctType.checking': 'Cheque / current account',
+  'acctType.savings': 'Savings account',
+  'acctType.credit_card': 'Credit card',
+  'acctType.cash': 'Cash',
+  'acctType.investment': 'Investment',
+  'acctType.other': 'Other',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Folder',

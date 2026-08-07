@@ -233,11 +233,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Opcional — lo que hay en la cuenta ahora mismo.',
   'wiz.acct.balanceHint': 'Usa el saldo de cierre de tu último extracto, o lo que muestre la app de tu banco. El saldo es una instantánea que mantienes al día tú mismo — importar solo transacciones recientes nunca lo descuadra — y puedes cambiarlo cuando quieras tocando el saldo en la página Cuentas.',
 
-  'wiz.acctType.checking': 'Cuenta corriente',
-  'wiz.acctType.savings': 'Cuenta de ahorro',
-  'wiz.acctType.credit_card': 'Tarjeta de crédito',
-  'wiz.acctType.cash': 'Efectivo',
-  'wiz.acctType.investment': 'Inversión',
+  'acctType.checking': 'Cuenta corriente',
+  'acctType.savings': 'Cuenta de ahorro',
+  'acctType.credit_card': 'Tarjeta de crédito',
+  'acctType.cash': 'Efectivo',
+  'acctType.investment': 'Inversión',
+  'acctType.other': 'Otra',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Carpeta',

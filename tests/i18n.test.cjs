@@ -234,7 +234,7 @@ const acctKeys = (onboarding.match(/const ACCOUNT_TYPE_KEYS = \[([^\]]*)\]/) || 
 const acctList = [...acctKeys.matchAll(/'([^']+)'/g)].map(m => m[1]);
 ok(acctList.length >= 4, `ACCOUNT_TYPE_KEYS parsed (${acctList.length} types)`);
 for (const k of acctList) {
-  ok(('wiz.acctType.' + k) in en, `ACCOUNT_TYPE_KEYS has '${k}' but lang/en.js has no 'wiz.acctType.${k}'`);
+  ok(('acctType.' + k) in en, `ACCOUNT_TYPE_KEYS has '${k}' but lang/en.js has no 'acctType.${k}'`);
 }
 
 /* Only the strings inside the two ARRAY literals steps() returns — a loose

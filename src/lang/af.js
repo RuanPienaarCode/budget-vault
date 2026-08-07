@@ -231,11 +231,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Opsioneel — wat tans in die rekening is.',
   'wiz.acct.balanceHint': 'Gebruik jou jongste staat se sluitingsaldo, of wat ook al jou bankprogram wys. Die saldo is \'n momentopname wat jy self op datum hou — om net onlangse transaksies in te voer, gooi dit nooit uit nie — en jy kan dit enige tyd verander deur op die saldo op die Rekeninge-bladsy te tik.',
 
-  'wiz.acctType.checking': 'Tjek-/lopende rekening',
-  'wiz.acctType.savings': 'Spaarrekening',
-  'wiz.acctType.credit_card': 'Kredietkaart',
-  'wiz.acctType.cash': 'Kontant',
-  'wiz.acctType.investment': 'Belegging',
+  'acctType.checking': 'Tjek-/lopende rekening',
+  'acctType.savings': 'Spaarrekening',
+  'acctType.credit_card': 'Kredietkaart',
+  'acctType.cash': 'Kontant',
+  'acctType.investment': 'Belegging',
+  'acctType.other': 'Ander',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Vouer',

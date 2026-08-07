@@ -234,11 +234,12 @@ module.exports = {
   'wiz.acct.balanceDesc': '任意 — 現在その口座にある金額です。',
   'wiz.acct.balanceHint': '直近の明細の期末残高か、銀行アプリに表示されている金額を使ってください。残高はご自身で最新に保つスナップショットです — 最近の取引だけを取り込んでもずれることはありません — 口座ページで残高をタップすればいつでも変更できます。',
 
-  'wiz.acctType.checking': '普通預金・当座預金口座',
-  'wiz.acctType.savings': '貯蓄口座',
-  'wiz.acctType.credit_card': 'クレジットカード',
-  'wiz.acctType.cash': '現金',
-  'wiz.acctType.investment': '投資',
+  'acctType.checking': '普通預金・当座預金口座',
+  'acctType.savings': '貯蓄口座',
+  'acctType.credit_card': 'クレジットカード',
+  'acctType.cash': '現金',
+  'acctType.investment': '投資',
+  'acctType.other': 'その他',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'フォルダ',
