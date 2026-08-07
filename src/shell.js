@@ -120,7 +120,8 @@ const SHELL_HTML = `
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero mb-4" id="heroCard"></div>
+        <div class="card hero" id="heroCard"></div>
+        <div class="kpi-caveat mb-4" id="dashStale"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>

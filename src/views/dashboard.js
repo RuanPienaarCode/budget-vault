@@ -3,6 +3,7 @@
 
 const { el, icoEl, safeSeg } = require('../util');
 const { TYPE_ORDER } = require('../constants');
+const { stalenessSummary } = require('../reconcile');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, distinctColors,
@@ -12,7 +13,85 @@ const {
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
 
+  /* ------------------------------ card guards ---------------------------
+     Each card draws behind its own try/catch. Before this the four sections
+     were four bare calls in a row, with no catch anywhere between here and
+     controller.js's render(): a throw while building the trend took the donut
+     and the budget table down with it. Crucially they did not go BLANK — both
+     had already been drawn once, so they froze on the previous period's
+     picture while the hero above them, built first, updated normally. A chart
+     that is frozen but plausible is worse than one that is missing: it reads
+     as "the graph doesn't update", so it gets reported as a staleness bug and
+     the actual exception is never looked for.
+
+     The message is deliberately on screen and not only in the console. Most of
+     this plugin's users are on a phone, where there is no console to open. */
+  function guard(sel, label, fn) {
+    try {
+      fn();
+    } catch (e) {
+      console.error(`Budget: the ${label} card failed to render`, e);
+      /* The recovery gets its own catch. Whatever threw upstairs may well have
+         been a DOM call, in which case the same call here throws again — out
+         of the catch block, past render(), and the guard that was supposed to
+         contain one broken card takes down all four instead. The console line
+         above is already away by this point, so the diagnosis survives even
+         when nothing can be painted. */
+      try {
+        const box = $(sel);
+        if (!box) return;
+        box.empty();
+        const msg = `Could not draw the ${label} — ${e?.message || e}`;
+        // A <p> dropped straight into a <table> is not rendered by any engine,
+        // so the one table target gets a row instead.
+        box.append(box.tagName === 'TABLE'
+          ? el('tbody', {}, el('tr', {}, el('td', { class: 'text-danger', colspan: '5' }, msg)))
+          : el('p', { class: 'text-danger', style: 'margin:0' }, msg));
+      } catch (inner) {
+        console.error(`Budget: the ${label} card could not report its own failure`, inner);
+      }
+    }
+  }
+  /* Guarded at the boundary rather than at each call site, because these two
+     are also called straight from applyTheme() on a theme flip — where the
+     same throw would freeze the same two cards. */
+  const guardedTrend = () => guard('#trendChart', 'spending trend', renderTrend);
+  const guardedSplit = () => guard('#dashSplit', 'spending split', renderSplit);
+
   function renderDashboard() {
+    guard('#heroCard', 'summary', renderHero);
+    guard('#dashStale', 'balance staleness', renderStale);
+    guardedTrend();
+    guardedSplit();
+    guard('#dashBudget', 'budget table', renderBudgetTable);
+  }
+
+  /* Balances nobody has confirmed in a while.
+
+     The Accounts page has computed this per card for a long time, but you have
+     to already be on that page to learn it — so on the vault this was built
+     against, fourteen of sixteen balances sat four months stale while the app
+     said nothing anywhere the reader actually looks. This is the one line that
+     closes the loop, and it is deliberately the quietest thing on the page:
+     it reports the AGE of a figure, not a problem with it. */
+  function renderStale() {
+    const wrap = $('#dashStale'); wrap.empty();
+    const s = stalenessSummary(S.accounts);
+    if (!s.stale) return;
+    const age = s.oldestDays === null ? 'none carry a date' : `the oldest ${s.oldestDays} days ago`;
+    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+      `${s.stale} of ${s.total} account balances unconfirmed — ${age}.`));
+    const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+      'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
+    btn.addEventListener('click', () => ctx.switchView('accounts'));
+    wrap.append(btn);
+  }
+
+  /* Each section recomputes its own totals rather than sharing one snapshot
+     from renderDashboard. periodSummary is a sub-millisecond pass over the
+     period's rows, and computing it inside the guard means a throw in there
+     costs one card instead of all four. */
+  function renderHero() {
     const sum = periodSummary(S.period);
     const bud = budgetTotals(S.period);
     const available = bud.spend - sum.spend;
@@ -57,10 +136,10 @@ module.exports = function registerDashboard(ctx) {
         el('div', { class: 'hero-sub' }, el('b', {}, money(sum.spend)), ' spent of ', el('b', {}, money(bud.spend)), ' budgeted'),
         meter),
       statCol));
+  }
 
-    renderTrend();
-    renderSplit();
-
+  function renderBudgetTable() {
+    const sum = periodSummary(S.period);
     const t = $('#dashBudget'); t.empty();
     $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     t.append(el('thead', {}, el('tr', {},
@@ -269,14 +348,28 @@ module.exports = function registerDashboard(ctx) {
     }
     spend.sort((a, b) => b.amount - a.amount);
 
+    /* Uncategorised rows land in byCat under the empty-string key and are
+       skipped above — a gap in the data is not a place the money went, and it
+       has no colour, no budget and nothing to drill into. But it must not be
+       SILENT. The hero's "Total Spent" counts uncategorised spending and this
+       donut does not, so the two disagree by exactly this much with nothing on
+       screen to say why. A reader who then categorises nothing sees the number
+       above move on every import while the donut below it sits still, which is
+       indistinguishable from a chart that has stopped updating — and gets
+       reported as one. Net, not gross, to match how the slices treat a refund. */
+    const uncat = -Math.min(0, sum.byCat[''] || 0);
+    const uncatNote = uncat > 0 ? ` · ${money(uncat)} uncategorised, not shown` : '';
+
     const total = spend.reduce((t, x) => t + x.amount, 0);
-    $('#dashSplitSub').textContent = total > 0
+    $('#dashSplitSub').textContent = (total > 0
       ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? 'y' : 'ies'} · ${periodMonthName(S.period)}`
-      : periodMonthName(S.period);
+      : periodMonthName(S.period)) + uncatNote;
 
     if (!total) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
-        'Nothing categorised as spending in this period yet.'));
+        uncat > 0
+          ? `${money(uncat)} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.`
+          : 'Nothing categorised as spending in this period yet.'));
       return;
     }
 
@@ -410,5 +503,8 @@ module.exports = function registerDashboard(ctx) {
     await app.workspace.getLeaf('tab').openFile(file);
   }
 
-  ctx.provide({ renderDashboard, renderTrend, renderSplit });
+  /* The guarded wrappers, not the raw ones: applyTheme() calls both of these
+     directly on a theme flip, and an unguarded throw there freezes the same
+     two cards this module just took care to isolate. */
+  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit });
 };
