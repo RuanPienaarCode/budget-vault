@@ -799,6 +799,7 @@ var require_shell = __commonJS((exports2, module2) => {
             </div>
             <div class="row">
               <span id="txCount" class="count-note"></span>
+              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> Export</button>
               <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> Add transaction</button>
               <button class="btn-gradient" id="txSave" disabled>Save changes</button>
             </div>
@@ -3621,15 +3622,156 @@ var require_dashboard = __commonJS((exports2, module2) => {
   };
 });
 
+// src/exporter.js
+var require_exporter = __commonJS((exports2, module2) => {
+  var EXPORT_DIR = "Exports";
+  function safeName(s) {
+    return String(s ?? "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim() || "export";
+  }
+  function amountCell(row, cell) {
+    const v = row.amountRaw != null ? row.amountRaw : Number(row.amount || 0).toFixed(2);
+    return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : cell(v);
+  }
+  function transactionsCsv(rows, cell) {
+    const head = ["Date", "Description", "Account", "Category", "Amount", "Excluded", "Note"];
+    const body = rows.map((r) => [
+      cell(r.date),
+      cell(r.desc),
+      cell(r.label),
+      cell(r.cat || ""),
+      amountCell(r, cell),
+      cell(r.excluded ? "yes" : ""),
+      cell(r.note || "")
+    ].join(","));
+    return [head.map(cell).join(","), ...body].join(`
+`) + `
+`;
+  }
+  function categoriesCsv(categories, cell) {
+    const head = ["Name", "Type", "Colour"];
+    const body = (categories || []).map((c) => [c.name, c.type || "", c.color || ""].map(cell).join(","));
+    return [head.map(cell).join(","), ...body].join(`
+`) + `
+`;
+  }
+  function escMd(s) {
+    return String(s ?? "").replace(/\|/g, "\\|");
+  }
+  function transactionsMarkdown(rows, meta, money) {
+    const { range, filters, generated } = meta;
+    const included = rows.filter((r) => !r.excluded);
+    const inTotal = included.filter((r) => r.amount > 0).reduce((t, r) => t + r.amount, 0);
+    const outTotal = included.filter((r) => r.amount < 0).reduce((t, r) => t + r.amount, 0);
+    const out = [
+      "---",
+      "generated: " + generated,
+      "range: " + JSON.stringify(String(range)),
+      "---",
+      "",
+      "# Transactions",
+      "",
+      `**${range}** · ${rows.length} row${rows.length === 1 ? "" : "s"}`
+    ];
+    if (filters.length)
+      out.push("", "Filtered by: " + filters.join(" · "));
+    out.push("", `Money in **${money(inTotal)}** · money out **${money(outTotal)}** · net **${money(inTotal + outTotal)}**`, "", ...rows.length !== included.length ? [`Totals cover ${included.length} of ${rows.length} rows — excluded rows are listed but not counted.`, ""] : [], "| Date | Description | Account | Category | Amount | Excluded | Note |", "|------|-------------|---------|----------|-------:|----------|------|");
+    for (const r of rows) {
+      out.push(`| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? "yes" : ""} | ${escMd(r.note)} |`);
+    }
+    return out.join(`
+`) + `
+`;
+  }
+  function categoriesMarkdown(categories, generated) {
+    const list = categories || [];
+    const byType = new Map;
+    for (const c of list) {
+      const k = (c.type || "").trim() || "other";
+      if (!byType.has(k))
+        byType.set(k, []);
+      byType.get(k).push(c);
+    }
+    const out = [
+      "---",
+      "generated: " + generated,
+      "---",
+      "",
+      "# Categories",
+      "",
+      `${list.length} categor${list.length === 1 ? "y" : "ies"}`,
+      ""
+    ];
+    for (const [type, cats] of [...byType].sort((a, b) => a[0].localeCompare(b[0]))) {
+      out.push(`## ${type}`, "", "| Name | Colour |", "|------|--------|");
+      for (const c of cats.sort((a, b) => a.name.localeCompare(b.name))) {
+        out.push(`| ${escMd(c.name)} | ${escMd(c.color)} |`);
+      }
+      out.push("");
+    }
+    return out.join(`
+`) + `
+`;
+  }
+  function exportPaths(range) {
+    const base = `${EXPORT_DIR}/Transactions ${safeName(range)}`;
+    return {
+      txCsv: `${base}.csv`,
+      txMd: `${base}.md`,
+      catCsv: `${EXPORT_DIR}/Categories.csv`,
+      catMd: `${EXPORT_DIR}/Categories.md`
+    };
+  }
+  module2.exports = {
+    EXPORT_DIR,
+    safeName,
+    escMd,
+    amountCell,
+    transactionsCsv,
+    categoriesCsv,
+    transactionsMarkdown,
+    categoriesMarkdown,
+    exportPaths
+  };
+});
+
 // src/views/transactions.js
 var require_transactions = __commonJS((exports2, module2) => {
-  var { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr } = require_util();
+  var { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr, csvCell } = require_util();
   var { askFields, askSplit } = require_modal();
+  var { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require_exporter();
   module2.exports = function registerTransactions(ctx) {
     const { S, $, app, money, toast, writeFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
     const PAGE = 100;
     let shown = PAGE, shownFor = null;
+    function filteredRows() {
+      let list;
+      const whole = $("#txWholeHistory").checked;
+      if (whole) {
+        list = [];
+        for (const f of Object.values(S.txFiles))
+          for (const r of f.rows)
+            list.push({ ...r, label: f.label, _file: f, _row: r });
+        list.sort((a, b) => b.date.localeCompare(a.date));
+      } else {
+        list = txInPeriod(S.period).reverse();
+      }
+      const acc = $("#txAccount").value, cat = $("#txCategory").value, q = $("#txSearch").value.trim().toLowerCase();
+      const rows = list.filter((t) => (!acc || t.label === acc) && (!cat || (cat === "__none__" ? !t.cat : t.cat === cat)) && (!q || t.desc.toLowerCase().includes(q)));
+      const filters = [];
+      if (acc)
+        filters.push(`account: ${acc}`);
+      if (cat)
+        filters.push(`category: ${cat === "__none__" ? "Uncategorised" : cat}`);
+      if (q)
+        filters.push(`search: "${$("#txSearch").value.trim()}"`);
+      return {
+        rows,
+        token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
+        range: whole ? "Whole history" : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+        filters
+      };
+    }
     function renderTransactions() {
       $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const syncOptions = (sel, values, fixed) => {
@@ -3646,20 +3788,8 @@ var require_transactions = __commonJS((exports2, module2) => {
       };
       syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", "All accounts"]]);
       syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", "All categories"], ["__none__", "Uncategorised"]]);
-      const accSel = $("#txAccount"), catSel = $("#txCategory");
-      let list;
-      if ($("#txWholeHistory").checked) {
-        list = [];
-        for (const f of Object.values(S.txFiles))
-          for (const r of f.rows)
-            list.push({ ...r, label: f.label, _file: f, _row: r });
-        list.sort((a, b) => b.date.localeCompare(a.date));
-      } else {
-        list = txInPeriod(S.period).reverse();
-      }
-      const acc = accSel.value, cat = catSel.value, q = $("#txSearch").value.trim().toLowerCase();
-      const renderToken = `${acc}|${cat}|${q}|${$("#txWholeHistory").checked}|${S.period}`;
-      list = list.filter((t2) => (!acc || t2.label === acc) && (!cat || (cat === "__none__" ? !t2.cat : t2.cat === cat)) && (!q || t2.desc.toLowerCase().includes(q)));
+      const { rows: filtered, token: renderToken } = filteredRows();
+      let list = filtered;
       const total = list.length;
       if (shownFor !== renderToken) {
         shown = PAGE;
@@ -3850,7 +3980,27 @@ var require_transactions = __commonJS((exports2, module2) => {
       $("#txSave").disabled = true;
       toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
-    ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction });
+    async function exportTransactions() {
+      if (Object.values(S.txFiles).some((f) => f.dirty)) {
+        return toast("Save your changes first — an export of unsaved edits would not match the vault", true);
+      }
+      const { rows, range, filters } = filteredRows();
+      if (!rows.length)
+        return toast("Nothing to export — no rows match the current filters", true);
+      const paths = exportPaths(range);
+      const generated = new Date().toISOString().slice(0, 16).replace("T", " ");
+      try {
+        await writeFile(paths.txCsv, transactionsCsv(rows, csvCell));
+        await writeFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
+        await writeFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+        await writeFile(paths.catMd, categoriesMarkdown(S.categories, generated));
+      } catch (e) {
+        console.error("Budget: export failed", e);
+        return toast("Could not write the export — check the folder is writable", true);
+      }
+      toast(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} and ${S.categories.length} categories to ${paths.txCsv.split("/")[0]}/`);
+    }
+    ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
   };
 });
 
@@ -8252,6 +8402,7 @@ var require_controller = __commonJS((exports2, module2) => {
     });
     $("#txSave").addEventListener("click", ctx.saveTransactions);
     $("#txAdd").addEventListener("click", ctx.addTransaction);
+    $("#txExport").addEventListener("click", ctx.exportTransactions);
     for (const id of ["txAccount", "txCategory", "txWholeHistory"])
       $("#" + id).addEventListener("change", ctx.renderTransactions);
     $("#txSearch").addEventListener("input", () => {

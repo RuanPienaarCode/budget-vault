@@ -179,6 +179,7 @@ const SHELL_HTML = `
             </div>
             <div class="row">
               <span id="txCount" class="count-note"></span>
+              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> Export</button>
               <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> Add transaction</button>
               <button class="btn-gradient" id="txSave" disabled>Save changes</button>
             </div>

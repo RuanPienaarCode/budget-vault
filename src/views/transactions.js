@@ -2,8 +2,9 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr } = require('../util');
+const { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr, csvCell } = require('../util');
 const { askFields, askSplit } = require('../modal');
+const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
@@ -21,6 +22,47 @@ module.exports = function registerTransactions(ctx) {
      must not throw the reader back to the first page. */
   const PAGE = 100;
   let shown = PAGE, shownFor = null;
+
+  /* The rows the current filters select — ALL of them, before the table's page
+     window is applied.
+
+     Extracted from renderTransactions so export cannot accidentally inherit
+     that window. The table shows `shown` rows at a time (100, then more on
+     request); an export built from what the table happens to have rendered
+     would silently write 100 of 5,700 rows and look completely successful
+     doing it. One source of truth for "which rows are we talking about", used
+     by both.
+
+     Also returns how to DESCRIBE the selection, because the export names its
+     file after the range and lists the filters in the document — and deriving
+     that separately is how a file ends up labelled with a range it doesn't
+     contain. */
+  function filteredRows() {
+    let list;
+    const whole = $('#txWholeHistory').checked;
+    if (whole) {
+      list = [];
+      for (const f of Object.values(S.txFiles)) for (const r of f.rows) list.push({ ...r, label: f.label, _file: f, _row: r });
+      list.sort((a, b) => b.date.localeCompare(a.date));
+    } else {
+      list = txInPeriod(S.period).reverse();
+    }
+    const acc = $('#txAccount').value, cat = $('#txCategory').value, q = $('#txSearch').value.trim().toLowerCase();
+    const rows = list.filter(t =>
+      (!acc || t.label === acc) &&
+      (!cat || (cat === '__none__' ? !t.cat : t.cat === cat)) &&
+      (!q || t.desc.toLowerCase().includes(q)));
+    const filters = [];
+    if (acc) filters.push(`account: ${acc}`);
+    if (cat) filters.push(`category: ${cat === '__none__' ? 'Uncategorised' : cat}`);
+    if (q) filters.push(`search: "${$('#txSearch').value.trim()}"`);
+    return {
+      rows,
+      token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
+      range: whole ? 'Whole history' : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+      filters,
+    };
+  }
 
   function renderTransactions() {
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? 'Whole history' : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -43,21 +85,8 @@ module.exports = function registerTransactions(ctx) {
       [['', 'All accounts']]);
     syncOptions($('#txCategory'), S.categories.map(c => c.name),
       [['', 'All categories'], ['__none__', 'Uncategorised']]);
-    const accSel = $('#txAccount'), catSel = $('#txCategory');
-    let list;
-    if ($('#txWholeHistory').checked) {
-      list = [];
-      for (const f of Object.values(S.txFiles)) for (const r of f.rows) list.push({ ...r, label: f.label, _file: f, _row: r });
-      list.sort((a, b) => b.date.localeCompare(a.date));
-    } else {
-      list = txInPeriod(S.period).reverse();
-    }
-    const acc = accSel.value, cat = catSel.value, q = $('#txSearch').value.trim().toLowerCase();
-    const renderToken = `${acc}|${cat}|${q}|${$('#txWholeHistory').checked}|${S.period}`;
-    list = list.filter(t =>
-      (!acc || t.label === acc) &&
-      (!cat || (cat === '__none__' ? !t.cat : t.cat === cat)) &&
-      (!q || t.desc.toLowerCase().includes(q)));
+    const { rows: filtered, token: renderToken } = filteredRows();
+    let list = filtered;
     /* Window the table. The old shape sliced to 800 and built every one: ~13,600
        nodes and, before deferredCatSelect, 800 native <select>s — rebuilt in full
        on every search pause and filter change. Render a page at a time instead
@@ -258,5 +287,40 @@ module.exports = function registerTransactions(ctx) {
     toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
-  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction });
+  /* Write the current selection out as four files: CSV for a spreadsheet,
+     markdown for reading and for Obsidian's own Export to PDF.
+
+     Into the vault rather than a browser download. An <a download> with a blob
+     URL is unreliable inside Obsidian's iOS WebView, and this plugin ships with
+     isDesktopOnly:false — a button that works on the desktop and quietly does
+     nothing on a phone is worse than no button. Writing a file behaves the same
+     everywhere, reuses the containment-guarded writeFile, and leaves the result
+     somewhere the vault's own sharing can pick it up.
+
+     Refuses while there are unsaved edits. Exporting the in-memory rows would
+     produce a file that matches neither the vault nor what the reader is about
+     to save, and the disagreement would only surface later, in a spreadsheet,
+     with nothing to explain it. */
+  async function exportTransactions() {
+    if (Object.values(S.txFiles).some(f => f.dirty)) {
+      return toast('Save your changes first — an export of unsaved edits would not match the vault', true);
+    }
+    const { rows, range, filters } = filteredRows();
+    if (!rows.length) return toast('Nothing to export — no rows match the current filters', true);
+
+    const paths = exportPaths(range);
+    const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    try {
+      await writeFile(paths.txCsv, transactionsCsv(rows, csvCell));
+      await writeFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
+      await writeFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+      await writeFile(paths.catMd, categoriesMarkdown(S.categories, generated));
+    } catch (e) {
+      console.error('Budget: export failed', e);
+      return toast('Could not write the export — check the folder is writable', true);
+    }
+    toast(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'} and ${S.categories.length} categories to ${paths.txCsv.split('/')[0]}/`);
+  }
+
+  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
 };
