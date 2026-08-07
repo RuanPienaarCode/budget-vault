@@ -317,8 +317,15 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title">Savings &amp; Investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
-        <div class="mini-grid mini-kpis-4" id="savingsKpis"></div>
-        <div class="kpi-caveat mb-4" id="savingsStale"></div>
+        <!-- Tiles and the caveat that qualifies them are ONE block, and the
+             block owns the gap to whatever follows — the same shape as the
+             dashboard's position band. The caveat is not rendered when nothing
+             is stale, so a gap hung on it is a gap that exists only while
+             something is wrong. -->
+        <div class="mb-4">
+          <div class="mini-grid mini-kpis-4" id="savingsKpis"></div>
+          <div class="kpi-caveat" id="savingsStale"></div>
+        </div>
         <div class="card mb-4" id="savingsWorthCard">
           <div class="card-h">
             <div>
@@ -357,8 +364,11 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title">Assets</h1>
           <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
         </div>
-        <div class="mini-grid mini-kpis-4" id="assetKpis"></div>
-        <div class="kpi-caveat mb-4" id="assetStale"></div>
+        <!-- One block, owning its own gap — see the note on Savings above. -->
+        <div class="mb-4">
+          <div class="mini-grid mini-kpis-4" id="assetKpis"></div>
+          <div class="kpi-caveat" id="assetStale"></div>
+        </div>
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div><h2>What you own</h2><div class="sub">Edit a value or a valuation date, then save</div></div>
