@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.6.2 — 2026-08-07
+
+### Changed
+
+- **Each palette now has its own gold.** All four shared the same amber, so the
+  big "remaining this period" figure faded to the same warm tail and one of the
+  background washes stayed amber whichever palette you were on. Ocean now takes
+  an orange, Plum a warm yellow-gold, and Slate a muted bronze — a bright amber
+  on a grey palette reads as a mistake rather than an accent. Vault Green is
+  unchanged.
+
 ## 1.6.1 — 2026-08-07
 
 ### Fixed
