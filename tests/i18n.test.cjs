@@ -76,17 +76,29 @@ const placeholders = s => {
   for (const m of String(s).matchAll(/\{(\w+)\}/g)) out.add(m[1]);
   return [...out].sort();
 };
-const formsOf = v => (typeof v === 'string' ? [v] : Object.values(v));
+/* Compared PER PLURAL FORM, not against the union of the English forms. A
+   singular form legitimately drops the count when the language has a word for
+   it — English says "Built from a balance" against "Built from {count}
+   balances" — and demanding every form carry every placeholder would force
+   {count} back into a sentence that reads better without it. What must not
+   happen is `other` losing the number that only `other` states. */
 for (const [lang, table] of Object.entries(TABLES)) {
   if (lang === 'en') continue;
   for (const key of enKeys) {
-    const want = placeholders(formsOf(en[key]).join(' '));
-    if (!want.length) continue;
-    for (const form of formsOf(table[key])) {
-      const got = placeholders(form);
-      const dropped = want.filter(p => !got.includes(p));
+    const enV = en[key], v = table[key];
+    const pairs = typeof enV === 'string'
+      ? [['', enV, v]]
+      : Object.keys(enV)
+        // Only forms this language actually asks for; zh/ja never see `one`.
+        .filter(cat => typeof v === 'object' && typeof v[cat] === 'string')
+        .map(cat => [cat, enV[cat], v[cat]]);
+    for (const [cat, enForm, form] of pairs) {
+      const want = placeholders(enForm);
+      if (!want.length) continue;
+      const dropped = want.filter(p => !placeholders(form).includes(p));
       eq(dropped, [],
-        `${lang}.js '${key}' drops the ${dropped.map(d => '{' + d + '}').join(', ')} placeholder — ` +
+        `${lang}.js '${key}'${cat ? ` (${cat})` : ''} drops the ` +
+        `${dropped.map(d => '{' + d + '}').join(', ')} placeholder — ` +
         'the value would vanish from the sentence');
     }
   }
