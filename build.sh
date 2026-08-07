@@ -22,10 +22,21 @@ node scripts/gen-presets.cjs
 # generated half at the end makes the assembled file readable.
 cat src/styles.css src/styles-presets.css > styles.css
 
+# --minify: this source is commented far more heavily than most, and every one
+# of those comments was being parsed by the engine on every plugin load — 175KB
+# of the 679KB bundle, ~26%, was comments and whitespace. They are for readers
+# of src/, not for WebKit. Nothing here reads a function or class name at
+# runtime, so renaming is safe; the classes that matter extend Obsidian's own
+# base classes and are located by inheritance, not by name.
+#
+# The guard tests below DO NOT cover this flag — they require src/ directly, so
+# they pass identically whether or not the bundle minifies. The bundle-level
+# gates are `node --check` (it parses) and tests/bundle-smoke.test.cjs (it
+# evaluates and exports a plugin class against the obsidian stub).
 if command -v bun >/dev/null 2>&1; then
-  bun build src/main.js --format=cjs --external obsidian --outfile=main.js
+  bun build src/main.js --format=cjs --external obsidian --minify --outfile=main.js
 elif command -v npx >/dev/null 2>&1; then
-  npx -y esbuild src/main.js --bundle --format=cjs --platform=browser --external:obsidian --outfile=main.js
+  npx -y esbuild src/main.js --bundle --format=cjs --platform=browser --external:obsidian --minify --outfile=main.js
 else
   echo "Need bun or npx (esbuild) to build." >&2
   exit 1

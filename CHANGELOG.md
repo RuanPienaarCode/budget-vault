@@ -3,6 +3,47 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.0 — 2026-08-07
+
+### Added
+
+- **The Accounts page is translated.** Group headings, account types, the four
+  summary tiles, every card — balance, badges, activity line, the
+  reconciliation prompt and its "Use this" button — plus the edit and new-account
+  forms with all their field descriptions and validation messages.
+
+  Account types now come from one shared set of labels rather than a second copy
+  kept beside the setup wizard's, so the same account cannot read as one thing
+  when you create it and another when you edit it.
+
+### Changed
+
+- **The Afrikaans reads like Afrikaans now.** A batch of phrases had been
+  translated word by word, which is accurate on each word and wrong as a
+  sentence — "Where it went" had become "Waarheen dit is", which is not
+  something anyone would say. It now reads "Waar dit gegaan het", and fifteen
+  others were rewritten the same way: "dated ahead" no longer comes out as
+  "vorentoe gedateer", stale balances are "bereken uit" rather than "gebou uit",
+  and "oudste {n} dae uit" became "oudste al {n} dae uitstaande".
+
+- **The plugin is a quarter smaller and starts faster**, on the phone most of
+  all. The shipped bundle is built minified from now on: 679KB down to 504KB.
+  Nothing about what the plugin does has changed — the missing 175KB was source
+  comments and indentation, written for people reading the code and parsed by
+  the browser engine on every single load anyway.
+
+### Internal
+
+- A bundle-level smoke test now guards that build. Every other test reads the
+  source files directly, so all of them would pass just as happily against a
+  bundle that was mangled into uselessness — the new one loads the built
+  `main.js` itself and checks it still exports a working plugin.
+
+### Notes
+
+- Eight pages are still English: Tax, Debt, Loan Calculators, Import, Savings,
+  Assets, Services and Owed Money.
+
 ## 1.10.0 — 2026-08-07
 
 ### Added
