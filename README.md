@@ -109,3 +109,6 @@ Budget Vault is free and always will be. If it's useful to you and you'd like to
 ## License
 
 [PolyForm Noncommercial License 1.0.0](LICENSE) © Ruan Pienaar
+
+Free for personal and other noncommercial use — use it, change it, share it.
+Commercial use is not granted; get in touch if you need a commercial licence.
