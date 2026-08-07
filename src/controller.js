@@ -485,6 +485,7 @@ function mountApp(view) {
   });
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
+  $('#txExport').addEventListener('click', ctx.exportTransactions);
   for (const id of ['txAccount', 'txCategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
   $('#txSearch').addEventListener('input', () => { clearTimeout(S._q); S._q = setTimeout(ctx.renderTransactions, 200); });
   $('#budSave').addEventListener('click', ctx.saveBudget);
