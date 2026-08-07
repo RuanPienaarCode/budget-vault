@@ -3,9 +3,38 @@
 
 const VIEW_TYPE = 'budget-app-view';
 
+/* Colour palettes, id -> label for the settings dropdown.
+
+   The id is also the CSS class the view carries (`bud-palette-<id>`), and the
+   blocks behind these live in src/styles-presets.css, generated at build time
+   from the seeds in scripts/presets.cjs. This map is the ONLY part of the
+   palette system that ships in the bundle: no colour arithmetic runs at runtime,
+   because every palette is already literal CSS by the time Obsidian loads it.
+   tests/palette.test.cjs pins these ids against the generator's, so the dropdown
+   cannot offer a palette that has no CSS behind it.
+
+   Kept here rather than in settings-tab.js for the same reason PERIOD_PRESETS
+   is: both the settings tab and controller.js need it, and settings-tab.js
+   already requires onboarding.js, so a shared table in either would be a
+   require cycle. */
+const PALETTE_PRESETS = {
+  'vault-green': 'Vault Green',
+  ocean: 'Ocean',
+  plum: 'Plum',
+  slate: 'Slate',
+};
+
+const DEFAULT_PALETTE = 'vault-green';
+
 const DEFAULT_SETTINGS = {
   budgetFolder: 'Finances/Budget',
   theme: 'auto',          // 'auto' (follow Obsidian) | 'dark' | 'light'
+  /* Which colour palette the two themes above are drawn in. Orthogonal to
+     `theme` on purpose: every palette defines BOTH a light and a dark block, so
+     picking one never costs you the ability to follow Obsidian's light/dark
+     switch. Defaults to the palette the plugin has always shipped, so an
+     upgrade changes nothing until it is asked to. */
+  palette: DEFAULT_PALETTE,
   openOnStartup: false,
   onboarded: false,       // first-run wizard shown (or an existing budget was detected)
   privacyLock: true,      // splash gate: nothing loads or paints until "Enter budget" is tapped
@@ -50,4 +79,4 @@ function periodLengthOptions(current) {
 const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, periodLengthOptions };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions };

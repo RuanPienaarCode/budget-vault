@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, periodLengthOptions } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 const { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require('./util');
@@ -20,6 +20,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 'period_days', 'period_anchor']);
 
 /* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
+const PALETTE_DESC = 'Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.';
 const MONTH_START_DESC = 'Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.';
 const PERIOD_LENGTH_DESC = 'How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.';
 const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
@@ -60,6 +61,19 @@ class BudgetSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           this.plugin.forEachView(ctl => ctl.applyTheme());
         }));
+
+    new Setting(containerEl)
+      .setName('Colour palette')
+      .setDesc(PALETTE_DESC)
+      .addDropdown(d => {
+        for (const [id, label] of Object.entries(PALETTE_PRESETS)) d.addOption(id, label);
+        d.setValue(this.plugin.settings.palette)
+          .onChange(async v => {
+            this.plugin.settings.palette = v;
+            await this.plugin.saveSettings();
+            this.plugin.forEachView(ctl => ctl.applyTheme());
+          });
+      });
 
     new Setting(containerEl)
       .setName('Setup wizard')
@@ -346,7 +360,9 @@ class BudgetSettingTab extends PluginSettingTab {
       // folder path is normalised on the way to disk here.
       if (key === 'budgetFolder') value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
       await super.setControlValue(key, value);
-      if (key === 'theme') this.plugin.forEachView(ctl => ctl.applyTheme());
+      // Both axes of the look are applied by the same call: applyTheme() sets
+      // the dark class and the palette class together.
+      if (key === 'theme' || key === 'palette') this.plugin.forEachView(ctl => ctl.applyTheme());
       else if (key === 'privacyLock') this.plugin.forEachView(ctl => ctl.applyPrivacyLock());
       else if (key === 'budgetFolder') this.plugin.reloadViews();
       return;
@@ -387,6 +403,14 @@ class BudgetSettingTab extends PluginSettingTab {
         control: {
           type: 'dropdown', key: 'theme', defaultValue: DEFAULT_SETTINGS.theme,
           options: { auto: 'Follow Obsidian', dark: 'Always dark', light: 'Always light' },
+        },
+      },
+      {
+        name: 'Colour palette',
+        desc: PALETTE_DESC,
+        control: {
+          type: 'dropdown', key: 'palette', defaultValue: DEFAULT_SETTINGS.palette,
+          options: PALETTE_PRESETS,
         },
       },
       {
