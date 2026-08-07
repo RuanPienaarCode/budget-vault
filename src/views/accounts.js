@@ -7,6 +7,8 @@ const { el, kpiTiles, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
+/* Namespace import: this file binds `t` in askFields callbacks. */
+const i18n = require('../i18n');
 const { askFields } = require('../modal');
 /* The reconciliation engine was written here first and now lives in its own
    module, because Savings, Services and Debt all need to make the same argument
@@ -21,20 +23,20 @@ module.exports = function registerAccounts(ctx) {
   // Every type the loader can produce must appear in exactly one group, or an
   // account renders nowhere on this page — including `other`, which is what a
   // file with no `type:` in its frontmatter falls back to (load.js).
+  /* Key on the left, translated at render time — a group heading must follow
+     the language, and these are resolved on call rather than at module load. */
   const ACCT_GROUPS = [
-    ['Bank accounts', ['checking', 'credit_card', 'cash']],
-    ['Savings', ['savings']],
-    ['Investments', ['investment']],
-    ['Other', ['other']],
+    ['acct.group.bank', ['checking', 'credit_card', 'cash']],
+    ['acct.group.savings', ['savings']],
+    ['acct.group.investments', ['investment']],
+    ['acct.group.other', ['other']],
   ];
   const ACCT_TYPES = ACCT_GROUPS.flatMap(([, types]) => types);
   // Same labels the setup wizard uses (onboarding.js ACCOUNT_TYPES), so a type
   // reads the same whether the account was created there or here.
-  const ACCT_TYPE_LABELS = {
-    checking: 'Cheque / current account', savings: 'Savings account',
-    credit_card: 'Credit card', cash: 'Cash', investment: 'Investment', other: 'Other',
-  };
-  const ACCT_TYPE_OPTIONS = ACCT_TYPES.map(v => ({ value: v, label: ACCT_TYPE_LABELS[v] }));
+  /* Shared with the setup wizard under acctType.* — one label, two screens, so
+     they cannot drift. Built per call so a language change is picked up. */
+  const acctTypeOptions = () => ACCT_TYPES.map(v => ({ value: v, label: i18n.t('acctType.' + v) }));
 
   /* Frontmatter key → the line to write for this account's current value, or
      null to REMOVE the key. saveAccount only patches the keys it is handed, so
@@ -104,25 +106,25 @@ module.exports = function registerAccounts(ctx) {
 
   async function openAccountFile(a) {
     const f = fileAt(`Accounts/${a.name}.md`);
-    if (!f) return toast(`Accounts/${a.name}.md not found`, true);
+    if (!f) return toast(i18n.t('acct.noteMissing', { name: a.name }), true);
     // A new tab, not this one: the budget view is a workspace leaf like any
     // other, and opening in place would close the app the reader is using.
     await app.workspace.getLeaf('tab').openFile(f);
   }
 
   async function editBalance(a) {
-    const r = await askFields(app, `Update balance — ${a.name}`, [
-      { key: 'balance', label: 'New balance', type: 'number', value: a.balance.toFixed(2) },
+    const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
+      { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: a.balance.toFixed(2) },
     ]);
     if (!r) return;
     const num = parseAmount(r.balance);
-    if (num === null || isNaN(num)) return toast('Not a number', true);
+    if (num === null || isNaN(num)) return toast(i18n.t('acct.err.nan'), true);
     a.balance = num;
     a.balanceRaw = null;   // the user just gave us a clean figure
     a.balance_updated = todayIso();
     await saveAccount(a);
     renderAccounts();
-    toast(`${a.name} balance updated`);
+    toast(i18n.t('acct.balance.updated', { name: a.name }));
   }
 
   /* Accept the implied figure. Stamping today is what stops the rows just
@@ -134,7 +136,7 @@ module.exports = function registerAccounts(ctx) {
     a.balance_updated = todayIso();
     await saveAccount(a);
     renderAccounts();
-    toast(`${a.name} reconciled to ${money(implied)}`);
+    toast(i18n.t('acct.reconciled', { name: a.name, amount: money(implied) }));
   }
 
   /* Everything about the account EXCEPT its balance and its name. The balance
@@ -143,39 +145,39 @@ module.exports = function registerAccounts(ctx) {
      silently orphan the history — that is a move-the-files operation, not a
      form field. */
   async function editAccount(a) {
-    const r = await askFields(app, `Edit account — ${a.name}`, [
-      { key: 'type', label: 'Type', type: 'select', options: ACCT_TYPE_OPTIONS, value: a.type },
-      { key: 'institution', label: 'Institution', type: 'text', value: a.institution },
-      { key: 'account_number', label: 'Account number', type: 'text', value: a.account_number,
-        desc: 'Used to match a downloaded statement to this account on import.' },
-      { key: 'tx_label', label: 'Transactions folder', type: 'text', value: a.tx_label,
-        desc: `Leave blank to use “${a.name}”. Set it only when the folder under Transactions/ has a different name.` },
-      { key: 'budget', label: 'Counts toward the budget', type: 'select',
+    const r = await askFields(app, i18n.t('acct.edit.title', { name: a.name }), [
+      { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: a.type },
+      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', value: a.institution },
+      { key: 'account_number', label: i18n.t('acct.field.number'), type: 'text', value: a.account_number,
+        desc: i18n.t('acct.field.numberDesc') },
+      { key: 'tx_label', label: i18n.t('acct.field.folder'), type: 'text', value: a.tx_label,
+        desc: i18n.t('acct.field.folderDesc', { name: a.name }) },
+      { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select',
         value: a.in_budget ? 'yes' : 'no',
-        options: [{ value: 'yes', label: 'Yes — normal spending account' },
-          { value: 'no', label: 'No — investment or savings wrapper' }] },
-      { key: 'credit_limit', label: 'Credit limit', type: 'number',
+        options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
+          { value: 'no', label: i18n.t('acct.counts.no') }] },
+      { key: 'credit_limit', label: i18n.t('acct.field.limit'), type: 'number',
         value: a.credit_limit != null ? String(a.credit_limit) : '',
-        desc: 'Shows a utilisation bar on credit cards.' },
-      { key: 'goal_amount', label: 'Savings goal', type: 'number',
+        desc: i18n.t('acct.field.limitDesc') },
+      { key: 'goal_amount', label: i18n.t('acct.field.goal'), type: 'number',
         value: a.goal_amount != null ? String(a.goal_amount) : '' },
-      { key: 'target_date', label: 'Goal target date', type: 'date', value: a.target_date },
-      { key: 'monthly_contribution', label: 'Monthly contribution', type: 'number',
+      { key: 'target_date', label: i18n.t('acct.field.goalDate'), type: 'date', value: a.target_date },
+      { key: 'monthly_contribution', label: i18n.t('acct.field.monthly'), type: 'number',
         value: a.monthly_contribution != null ? String(a.monthly_contribution) : '' },
-      { key: 'total_invested', label: 'Total invested', type: 'number',
+      { key: 'total_invested', label: i18n.t('acct.field.invested'), type: 'number',
         value: a.total_invested != null ? String(a.total_invested) : '',
-        desc: 'What you have put in, so growth can be shown against it.' },
-      { key: 'starting_amount', label: 'Starting amount', type: 'number',
+        desc: i18n.t('acct.field.investedDesc') },
+      { key: 'starting_amount', label: i18n.t('acct.field.starting'), type: 'number',
         value: a.starting_amount != null ? String(a.starting_amount) : '' },
-      { key: 'inception_date', label: 'Opened on', type: 'date', value: a.inception_date },
+      { key: 'inception_date', label: i18n.t('acct.field.opened'), type: 'date', value: a.inception_date },
     ]);
     if (!r) return;
 
-    if (!ACCT_TYPES.includes(r.type)) return toast('Invalid type', true);
+    if (!ACCT_TYPES.includes(r.type)) return toast(i18n.t('acct.err.type'), true);
     const nums = {};
     for (const k of ['credit_limit', 'goal_amount', 'monthly_contribution', 'total_invested', 'starting_amount']) {
       const n = parseAmount(r[k]);
-      if (n !== null && isNaN(n)) return toast(`${k.replace(/_/g, ' ')} is not a number`, true);
+      if (n !== null && isNaN(n)) return toast(i18n.t('acct.err.notNumber', { field: k.replace(/_/g, ' ') }), true);
       nums[k] = n;
     }
     // Validate everything BEFORE assigning any of it: a half-applied edit would
@@ -200,9 +202,7 @@ module.exports = function registerAccounts(ctx) {
     a.in_budget = !a.in_budget;
     await saveAccount(a);
     renderAccounts();
-    toast(a.in_budget
-      ? `${a.name} counts toward the budget again`
-      : `${a.name} no longer counts toward budget totals`);
+    toast(i18n.t(a.in_budget ? 'acct.budget.on' : 'acct.budget.off', { name: a.name }));
   }
 
   /* ------------------------------ rendering ------------------------------ */
@@ -229,15 +229,15 @@ module.exports = function registerAccounts(ctx) {
     const { used, pct, over, near, available } = u;
     return el('div', { class: 'acct-util' },
       el('div', { class: 'acct-util-top' },
-        el('span', {}, 'Credit used'),
-        el('span', { class: 'num' }, `${money(used, 0)} of ${money(a.credit_limit, 0)}`)),
+        el('span', {}, i18n.t('acct.creditUsed')),
+        el('span', { class: 'num' }, i18n.t('acct.creditOf', { used: money(used, 0), limit: money(a.credit_limit, 0) }))),
       el('div', { class: 'cat-bar' },
         el('i', { class: `cat-bar-fill${over ? ' bg-danger' : near ? ' bg-warning' : ''}`,
           style: `width:${Math.min(100, pct).toFixed(1)}%` })),
       el('div', { class: `acct-util-sub${over ? ' text-danger' : near ? ' text-warning' : ''}` },
         over
-          ? `Over limit by ${money(-available, 0)}`
-          : `${Math.round(pct)}% used · ${money(available, 0)} available`));
+          ? i18n.t('acct.overLimit', { amount: money(-available, 0) })
+          : i18n.t('acct.utilised', { pct: Math.round(pct), available: money(available, 0) })));
   }
 
   function renderKpis() {
@@ -273,12 +273,12 @@ module.exports = function registerAccounts(ctx) {
       || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
 
     const tile = kpiTiles(wrap);
-    tile('In credit', money(assets), 'text-success');
-    tile('Overdrawn', money(liabilities), liabilities > 0 ? 'text-danger' : '');
-    tile('Net worth', money(assets - liabilities), assets - liabilities >= 0 ? 'grad-txt' : 'text-danger',
-      elsewhere ? 'across these accounts only' : null);
-    tile('Needs attention', String(attention), attention > 0 ? 'text-warning' : '',
-      attention > 0 ? 'unverified or drifting balances' : 'every balance checks out');
+    tile(i18n.t('acct.kpi.inCredit'), money(assets), 'text-success');
+    tile(i18n.t('acct.kpi.overdrawn'), money(liabilities), liabilities > 0 ? 'text-danger' : '');
+    tile(i18n.t('acct.kpi.netWorth'), money(assets - liabilities), assets - liabilities >= 0 ? 'grad-txt' : 'text-danger',
+      elsewhere ? i18n.t('acct.kpi.netWorthNote') : null);
+    tile(i18n.t('acct.kpi.attention'), String(attention), attention > 0 ? 'text-warning' : '',
+      i18n.t(attention > 0 ? 'acct.kpi.attentionNote' : 'acct.kpi.allGood'));
   }
 
   function accountTile(a, entry) {
@@ -291,7 +291,7 @@ module.exports = function registerAccounts(ctx) {
     const primary = [...labels][0];
     if (primary) {
       const nameBtn = el('button', { type: 'button', class: 'l acct-name-btn',
-        'aria-label': `Show ${a.name} transactions` }, a.name);
+        'aria-label': i18n.t('acct.aria.showTx', { name: a.name }) }, a.name);
       nameBtn.addEventListener('click', () => openTransactions(primary));
       card.append(nameBtn);
     } else {
@@ -299,7 +299,7 @@ module.exports = function registerAccounts(ctx) {
     }
 
     const v = el('button', { type: 'button', class: `v num${a.balance < 0 ? ' text-danger' : ''}`,
-      'aria-label': `Balance for ${a.name}, ${money(a.balance)} — click to update` }, money(a.balance));
+      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }) }, money(a.balance));
     v.addEventListener('click', () => editBalance(a));
     card.append(v);
 
@@ -308,75 +308,73 @@ module.exports = function registerAccounts(ctx) {
     const util = utilisation(a);
     card.append(el('div', { class: 's' },
       [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · '),
-      !util && a.credit_limit ? ` · limit ${money(a.credit_limit, 0)}` : '',
-      a.monthly_contribution ? ` · ${money(a.monthly_contribution, 0)}/m` : ''));
+      !util && a.credit_limit ? i18n.t('acct.limitSuffix', { amount: money(a.credit_limit, 0) }) : '',
+      a.monthly_contribution ? i18n.t('acct.monthlySuffix', { amount: money(a.monthly_contribution, 0) }) : ''));
     if (util) card.append(util);
 
     /* Badges — the state of the figure above, not the account's details. */
     const days = daysSince(a.balance_updated);
     const badges = el('div', { class: 'acct-badges' });
-    if (!a.in_budget) badges.append(badge('not in budget', 'muted'));
-    if (!rows.length) badges.append(badge('no transactions', 'warn'));
-    if (a.balance_updated && days === null) badges.append(badge(`as of ${a.balance_updated}`, 'muted'));
-    else if (days === null) badges.append(badge('never confirmed', 'warn'));
-    else if (days > STALE_DAYS) badges.append(badge(`unconfirmed ${days} days`, 'warn'));
+    if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
+    if (!rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
+    if (a.balance_updated && days === null) badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
+    else if (days === null) badges.append(badge(i18n.t('acct.badge.neverConfirmed'), 'warn'));
+    else if (days > STALE_DAYS) badges.append(badge(i18n.t('acct.badge.unconfirmed', { count: days }), 'warn'));
     if (badges.childElementCount) card.append(badges);
 
     /* Activity in the period the header is showing. */
     const act = periodActivity(labels);
     if (act.count) {
       card.append(el('div', { class: 'acct-act' },
-        el('span', { class: 'text-success' }, `+${money(act.inAmt, 0)}`), ' in · ',
-        el('span', { class: 'text-danger' }, `-${money(act.outAmt, 0)}`), ' out · ',
-        `${act.count} ${act.count === 1 ? 'transaction' : 'transactions'} in ${periodMonthName(S.period)}`));
+        el('span', { class: 'text-success' }, `+${money(act.inAmt, 0)}`), i18n.t('acct.act.in'),
+        el('span', { class: 'text-danger' }, `-${money(act.outAmt, 0)}`), i18n.t('acct.act.out'),
+        i18n.t('acct.act.count', { count: act.count, month: periodMonthName(S.period) })));
     }
 
     /* Reconciliation — the stated figure measured against what has moved. */
     const rec = reconcile(a, rows);
     // Rows dated ahead of today are named wherever they exist, so "matches your
     // transactions" is never quietly hiding a scheduled debit order.
-    const pending = n => n ? ` · ${n} dated ahead, not counted yet` : '';
+    const pending = n => (n ? i18n.t('acct.recon.pending', { count: n }) : '');
     if (rec.state === 'drift') {
       const line = el('div', { class: 'acct-recon' },
         el('div', { class: 'acct-recon-txt' },
-          `${rec.count} ${rec.count === 1 ? 'transaction' : 'transactions'} since · implies `,
+          i18n.t('acct.recon.since', { count: rec.count }),
           el('b', { class: 'num' }, money(rec.implied)),
           pending(rec.ahead)));
       const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-        'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` },
-        icoEl(['check']), 'Use this');
+        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: money(rec.implied) }) },
+        icoEl(['check']), i18n.t('acct.recon.useThis'));
       btn.addEventListener('click', () => acceptImplied(a, rec.implied));
       line.append(btn);
       card.append(line);
     } else if (rec.state === 'clean') {
       card.append(el('div', { class: 'acct-recon' },
-        el('div', { class: 'acct-recon-txt text-success' }, 'Matches your transactions')));
+        el('div', { class: 'acct-recon-txt text-success' }, i18n.t('acct.recon.matches'))));
     } else if (rec.state === 'pending') {
       card.append(el('div', { class: 'acct-recon' },
         el('div', { class: 'acct-recon-txt text-muted' },
-          `Up to date · ${rec.ahead} ${rec.ahead === 1 ? 'transaction' : 'transactions'} dated ahead`)));
+          i18n.t('acct.recon.upToDate', { count: rec.ahead }))));
     } else if (rec.state === 'no-date' && rows.length) {
       card.append(el('div', { class: 'acct-recon' },
         el('div', { class: 'acct-recon-txt text-muted' },
-          'Set a balance date to check this against your transactions')));
+          i18n.t('acct.recon.setDate'))));
     }
 
     /* Footer — the two actions that are about the FILE rather than the figure. */
     const foot = el('div', { class: 'acct-foot' });
-    const updated = a.balance_updated ? `updated ${a.balance_updated}` : 'no balance date';
+    const updated = a.balance_updated ? i18n.t('acct.foot.updated', { date: a.balance_updated }) : i18n.t('acct.foot.noDate');
     foot.append(el('span', { class: 's2' }, updated));
     const acts = el('span', { class: 'acct-foot-acts' });
     const budgetBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': a.in_budget
-        ? `Stop counting ${a.name} toward budget totals`
-        : `Count ${a.name} toward budget totals again` },
-      a.in_budget ? 'Exclude from budget' : 'Include in budget');
+      'aria-label': i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }) },
+      i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'));
     budgetBtn.addEventListener('click', () => toggleBudget(a));
     const editBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': `Edit ${a.name}` }, 'Edit');
+      'aria-label': i18n.t('acct.aria.edit', { name: a.name }) }, i18n.t('acct.btn.edit'));
     editBtn.addEventListener('click', () => editAccount(a));
     const openBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': `Open the ${a.name} note` }, 'Open note');
+      'aria-label': i18n.t('acct.aria.openNote', { name: a.name }) }, i18n.t('acct.btn.openNote'));
     openBtn.addEventListener('click', () => openAccountFile(a));
     acts.append(editBtn, budgetBtn, openBtn);
     foot.append(acts);
@@ -389,7 +387,7 @@ module.exports = function registerAccounts(ctx) {
     renderKpis();
     const idx = accountIndex();
     const wrap = $('#acctSections'); wrap.empty();
-    for (const [title, types] of ACCT_GROUPS) {
+    for (const [titleKey, types] of ACCT_GROUPS) {
       const accounts = S.accounts.filter(a => types.includes(a.type));
       if (!accounts.length) continue;
       const grid = el('div', { class: 'mini-grid' });
@@ -397,14 +395,14 @@ module.exports = function registerAccounts(ctx) {
       for (const a of accounts) grid.append(accountTile(a, idx.get(a)));
       wrap.append(el('div', { class: 'card mb-4' },
         el('div', { class: 'card-h' },
-          el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${accounts.length} accounts`)),
+          el('div', {}, el('h2', {}, i18n.t(titleKey)), el('div', { class: 'sub' }, i18n.t('acct.group.count', { count: accounts.length }))),
           el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total))))),
         el('div', { class: 'body-pad' }, grid)));
     }
     if (!S.accounts.length) {
       wrap.append(el('div', { class: 'card' }, el('div', { class: 'body-pad' },
         el('p', { class: 'text-muted', style: 'margin:0' },
-          'No accounts yet. Use “New account” above to add a bank account, savings pot or investment.'))));
+          i18n.t('acct.empty')))));
     }
   }
 
@@ -465,19 +463,19 @@ module.exports = function registerAccounts(ctx) {
   /* Create an account file + its in-memory record. Reachable from both the
      Accounts page and Savings & Investments. */
   async function addAccount() {
-    const r = await askFields(app, 'New account', [
-      { key: 'name', label: 'Account name', type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
-      { key: 'type', label: 'Type', type: 'select', options: ACCT_TYPE_OPTIONS, value: 'savings' },
-      { key: 'institution', label: 'Institution', type: 'text', placeholder: 'e.g. Easy Equities' },
-      { key: 'balance', label: 'Current balance', type: 'number', value: '0' },
-      { key: 'goal_amount', label: 'Savings goal (optional)', type: 'number',
-        desc: 'Shows a progress bar on Savings & Investments.' },
-      { key: 'total_invested', label: 'Total invested (optional)', type: 'number',
-        desc: 'What you have put in, so growth can be shown against it.' },
-      { key: 'budget', label: 'Counts toward the budget', type: 'select', value: 'yes',
-        options: [{ value: 'yes', label: 'Yes — normal spending account' },
-          { value: 'no', label: 'No — investment or savings wrapper' }],
-        desc: 'Choose No for an account whose interest is not household income and whose contributions are not household spending. Its transactions still import and show in Transactions.' },
+    const r = await askFields(app, i18n.t('acct.new.title'), [
+      { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
+      { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: 'savings' },
+      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: 'e.g. Easy Equities' },
+      { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
+      { key: 'goal_amount', label: i18n.t('acct.field.goalOpt'), type: 'number',
+        desc: i18n.t('acct.field.goalOptDesc') },
+      { key: 'total_invested', label: i18n.t('acct.field.investedOpt'), type: 'number',
+        desc: i18n.t('acct.field.investedDesc') },
+      { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select', value: 'yes',
+        options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
+          { value: 'no', label: i18n.t('acct.counts.no') }],
+        desc: i18n.t('acct.field.countsDesc') },
     ]);
     if (!r) return;
 
@@ -486,14 +484,14 @@ module.exports = function registerAccounts(ctx) {
     // the sanitised path segment. Store anything else and the first balance edit
     // would write to a different file than the one created here.
     const name = safeSeg(r.name);
-    if (!name) return toast('Account name required', true);
-    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) return toast('Account already exists', true);
-    if (!ACCT_TYPES.includes(r.type)) return toast('Invalid type', true);
+    if (!name) return toast(i18n.t('acct.err.nameRequired'), true);
+    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) return toast(i18n.t('acct.err.exists'), true);
+    if (!ACCT_TYPES.includes(r.type)) return toast(i18n.t('acct.err.type'), true);
 
     const balance = parseAmount(r.balance) ?? 0;
     const goal = parseAmount(r.goal_amount);
     const invested = parseAmount(r.total_invested);
-    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) return toast('Not a number', true);
+    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) return toast(i18n.t('acct.err.nan'), true);
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),
