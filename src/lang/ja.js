@@ -103,7 +103,7 @@ module.exports = {
   'settings.periodLength.desc': '各予算期間の長さ。「毎月」は上の月の開始日を使います。その他の選択肢では、下の日付から数えて給与サイクルに合わせて期間を区切ります。',
 
   'settings.anchor.name': '最後の給料日',
-  'settings.anchor.desc': '最後に給与を受け取ったのはいつですか。最近の給料日であればどれでも構いません — サイクル内のどの日に当たるかだけが重要なので、それより前でも後でも同じ結果になります。期間の長さが毎月の場合は無視されます。',
+  'settings.anchor.desc': '最後に給与を受け取ったのはいつですか？最近の給料日であればどれでも構いません — サイクル内のどの日に当たるかだけが重要なので、それより前でも後でも同じ結果になります。期間の長さが毎月の場合は無視されます。',
   'settings.anchor.invalid': 'YYYY-MM-DD 形式の実在する日付を入力してください（例: 2026-08-07）。',
 
   'settings.country.name': '国',
@@ -151,7 +151,7 @@ module.exports = {
   'wiz.err.currency': '通貨記号を入力するか、上のリストから選んでください。',
 
   /* ---- welcome ---- */
-  'wiz.welcome.title': 'Budget Vault へようこそ',
+  'wiz.welcome.title': 'Budget Vault へようこそ！',
   'wiz.welcome.intro': '予算のすべてが、ただのマークダウンとしてこの保管庫の中に置かれます — アカウントもクラウドも、誰か他人のサーバーも不要です。保管庫がスマートフォンと同期していれば、予算もそのまま一緒に持ち歩けます。',
   'wiz.welcome.planLead': '流れはこうです — このウィザードで準備が整います:',
   'wiz.welcome.plan1': '予算フォルダを選ぶ — 構成一式はこちらで用意します',
@@ -164,7 +164,7 @@ module.exports = {
   'wiz.welcome.app2': '銀行の CSV を取り込む — 使いながら教えるほど、取引が自動で仕分けされます',
   'wiz.welcome.app3': 'いつでもカテゴリを追加できます — 予算はあなたに合わせて育ちます',
   'wiz.welcome.app4': '折にふれて振り返る — ダッシュボードがお金の行き先をそのまま示します',
-  'wiz.welcome.close': 'セットアップは 2 分ほどです。あとからいつでも変更できます。よろしいですか。',
+  'wiz.welcome.close': 'セットアップは 2 分ほどです。あとからいつでも変更できます。よろしいですか？',
 
   /* ---- folder ---- */
   'wiz.folder.hint': 'すべては保管庫内の 1 つのフォルダに、ただのマークダウンファイルとして置かれます。',
@@ -199,7 +199,7 @@ module.exports = {
   'wiz.period.howOften': '給与の頻度は？',
   'wiz.period.howOftenDesc': '毎月の期間は月名で呼ばれ、下で選んだ日から始まります。その他は、最後の給料日から数えて給与サイクルに合わせます。',
   'wiz.period.startDay': '予算上の月は何日から始まりますか？',
-  'wiz.period.startDayDesc': '通常は給料日です。普通の暦月にする場合は 1 を選びます。(1〜28)',
+  'wiz.period.startDayDesc': '通常は給料日です。普通の暦月にする場合は 1 を選びます。（1〜28）',
   'wiz.period.badDay': '1 から 28 の間で日を選んでください。29 日、30 日、31 日がない月もあるため、月末に給与を受け取る場合は 28 を使ってください。',
   'wiz.period.calendarEg': '普通の暦月です: 各期間は{first}から月末までで、その月の名前が付きます。現在は {month} です。',
   'wiz.period.paydayEg': '各期間は{start}から翌月の{end}までで、終わる月の名前が付きます。現在は {month} です。',
@@ -319,7 +319,7 @@ module.exports = {
   'tx.allAccounts': 'すべての口座',
   'tx.allCategories': 'すべてのカテゴリ',
   'tx.uncategorised': 'カテゴリなし',
-  'tx.count.window': '{total} 行中 {shown} 行',
+  'tx.count.window': { other: '{total} 行中 {shown} 行' },
   'tx.count.all': { other: '{count} 行' },
 
   'tx.col.date': '日付',
@@ -338,7 +338,7 @@ module.exports = {
   'tx.title.split': 'カテゴリに分割',
 
   'tx.none': '該当する取引はありません。',
-  'tx.showMore': '残り {remaining} 件のうち {n} 件を表示',
+  'tx.showMore': { other: '残り {remaining} 件のうち {n} 件を表示' },
 
   'tx.split.zero': '金額が 0 の行には分割するものがありません',
   'tx.split.excluded': 'この行はすでに除外されています — まずチェックを外してください',
@@ -460,7 +460,7 @@ module.exports = {
   'acct.act.count': { other: '{month} の取引 {count} 件' },
 
   'acct.recon.since': { other: 'その後 {count} 件の取引 · 推定残高 ' },
-  'acct.recon.pending': ' · {count} 件は先の日付のため未計上',
+  'acct.recon.pending': { other: ' · {count} 件は先の日付のため未計上' },
   'acct.recon.useThis': 'これを使う',
   'acct.aria.useThis': '{name} の残高を {amount} に設定',
   'acct.recon.matches': '取引と一致しています',
@@ -533,8 +533,8 @@ module.exports = {
   'dash.pos.debtSay': '負債 {amount}。負債ページを開きます。',
   'dash.pos.debtSayNone': '負債はありません。負債ページを開きます。',
   'dash.pos.owed': '貸したお金',
-  'dash.pos.owedOpen': '未回収 {count} 件',
-  'dash.pos.owedOldest': ' · 最も古いものは {days} 日前',
+  'dash.pos.owedOpen': { other: '未回収 {count} 件' },
+  'dash.pos.owedOldest': { other: ' · 最も古いものは {days} 日前' },
   'dash.pos.owedRecovered': '{amount} 回収済み',
   'dash.pos.owedNone': '貸出なし',
   'dash.pos.owedSay': {
@@ -545,11 +545,11 @@ module.exports = {
   'dash.pos.savingsSub': '貯蓄 {savings} · 投資 {invested}',
   'dash.pos.savingsSay': '貯蓄と投資で {amount}。貯蓄と投資を開きます。',
 
-  'dash.overlap': 'クレジットカード口座 {accounts} 件とカード負債 {debts} 件を記録しています — 同じカードが両方にある場合、上では二重に数えられます。',
+  'dash.overlap': '記録中のクレジットカード口座: {accounts} · カード負債: {debts} — 同じカードが両方にある場合、上では二重に数えられます。',
   'dash.overlap.btn': '負債を確認',
   'dash.overlap.aria': '負債ページで記録中の負債を確認',
   'dash.stale.noDate': 'いずれも日付がありません',
-  'dash.stale.oldest': '最も古いもので {days} 日前',
+  'dash.stale.oldest': { other: '最も古いもので {days} 日前' },
   'dash.stale.all': { other: '最近だれも確認していない残高 {count} 件から算出' },
   'dash.stale.some': '{total} 件中 {stale} 件の、最近だれも確認していない残高から算出',
   'dash.stale.line': '{line} — {age}。',
@@ -560,7 +560,7 @@ module.exports = {
   'dash.trend.sub': { other: '支出と予算 · {count} 期間' },
   'dash.trend.clamped': ' · これまでに取り込んだ全期間',
   'dash.trend.empty': '2 つ目の期間の取引を取り込むと、ここから推移線が始まります。',
-  'dash.trend.aria': '直近 {count} 期間の支出・予算・収入',
+  'dash.trend.aria': { other: '直近 {count} 期間の支出・予算・収入' },
 
   'dash.split.uncatNote': ' · カテゴリなし {amount} は未表示',
   'dash.split.onlyUncat': 'この期間に {amount} が出ていますが、まだどれもカテゴリ分けされていません — 取引ページでカテゴリを設定すると、ここに内訳が表示されます。',
