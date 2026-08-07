@@ -627,7 +627,14 @@ function mountApp(view) {
        many times as the language changes. Same shape as applyTheme and
        applyPrivacyLock above — a settings change that has to act on open views
        immediately rather than at the next mount. */
-    applyLanguage: () => applyDom(root),
+    /* Two halves, because the interface is built two different ways. The shell
+       is static markup translated in place by applyDom; the view bodies are
+       rebuilt from scratch by render(), which picks up the new language simply
+       by running again. render() rather than reload(): the strings do not come
+       from the vault, and reload() DECLINES when there are unsaved edits —
+       which would leave someone who changed the language mid-edit looking at
+       the old one with no idea why. */
+    applyLanguage: () => { applyDom(root); render(); },
     /* Toggling the setting acts on open views immediately: switching it off
        lifts a gate the user is currently staring at (rather than stranding
        them behind it), switching it on covers the numbers right away. */

@@ -333,7 +333,49 @@ var require_en = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen.",
     "wiz.done.connected": "Connected to your budget folder.",
     "wiz.done.created": "Budget folder created — welcome!",
-    "wiz.failed": "Setup failed: {error}"
+    "wiz.failed": "Setup failed: {error}",
+    "bud.shape.title": "Your other budgets are still here",
+    "bud.shape.body": {
+      one: "{count} budget file is saved under a different period length — it is Budgets/{newest}.md. It stays in your vault, and it comes back as soon as you set the period length back. Amounts start blank here because this period isn't the same length as that one was.",
+      other: "{count} budget files are saved under a different period length — the most recent is Budgets/{newest}.md. They stay in your vault, and they come back as soon as you set the period length back. Amounts start blank here because this period isn't the same length as those were."
+    },
+    "bud.shape.bring": "Bring over the categories and notes from {newest}",
+    "bud.shape.empty": "That budget is empty",
+    "bud.shape.brought": {
+      one: "Brought over {count} category — set the amount for this period",
+      other: "Brought over {count} categories — set the amounts for this period"
+    },
+    "bud.shape.allHere": "Every category from that budget is already here",
+    "bud.total.income": "Total income",
+    "bud.total.incomeNote": "{amount} received so far",
+    "bud.total.budgeted": "Total budgeted",
+    "bud.total.budgetedNote": "{pct}% of budgeted income",
+    "bud.total.over": "Over-budgeted",
+    "bud.total.overNote": "budgeted beyond income",
+    "bud.total.left": "Left to budget",
+    "bud.total.leftNote": "income not yet allocated",
+    "bud.total.spent": "Total spent",
+    "bud.total.spentNote": "{pct}% of budget used",
+    "bud.col.category": "Category",
+    "bud.col.type": "Type",
+    "bud.col.amount": "Amount",
+    "bud.col.actual": "Actual so far",
+    "bud.col.notes": "Notes",
+    "bud.remaining.over": "{amount} over",
+    "bud.remaining.left": "{amount} left",
+    "bud.aria.amount": "Budget amount for {category}",
+    "bud.aria.notes": "Notes for {category}",
+    "bud.aria.clear": "Clear budget for {category}",
+    "bud.title.clear": "Clear this category from the period file",
+    "bud.aria.delete": "Delete category {category}",
+    "bud.title.delete": "Delete this category everywhere",
+    "bud.saved": "Budget saved to Budgets/{period}.md",
+    "bud.copy.none": "No budget found for the previous period",
+    "bud.copy.done": {
+      one: "Copied {count} category from the previous period",
+      other: "Copied {count} categories from the previous period"
+    },
+    "bud.copy.nothing": "Nothing to copy — every category already has a value"
   };
 });
 
@@ -539,7 +581,49 @@ var require_af = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Jou begroting maak agter 'n tik-om-in-te-gaan privaatheidskerm oop, sodat niks sigbaar is as iemand vlugtig na jou kluis kyk nie. Skakel dit af by Instellings → Budget Vault → Privaatheidskerm.",
     "wiz.done.connected": "Gekoppel aan jou begrotingsvouer.",
     "wiz.done.created": "Begrotingsvouer geskep — welkom!",
-    "wiz.failed": "Opstelling het misluk: {error}"
+    "wiz.failed": "Opstelling het misluk: {error}",
+    "bud.shape.title": "Jou ander begrotings is steeds hier",
+    "bud.shape.body": {
+      one: "{count} begrotingslêer is onder 'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.",
+      other: "{count} begrotingslêers is onder 'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie."
+    },
+    "bud.shape.bring": "Bring die kategorieë en notas van {newest} oor",
+    "bud.shape.empty": "Daardie begroting is leeg",
+    "bud.shape.brought": {
+      one: "{count} kategorie oorgebring — stel die bedrag vir hierdie tydperk",
+      other: "{count} kategorieë oorgebring — stel die bedrae vir hierdie tydperk"
+    },
+    "bud.shape.allHere": "Elke kategorie uit daardie begroting is reeds hier",
+    "bud.total.income": "Totale inkomste",
+    "bud.total.incomeNote": "{amount} tot dusver ontvang",
+    "bud.total.budgeted": "Totaal begroot",
+    "bud.total.budgetedNote": "{pct}% van begrote inkomste",
+    "bud.total.over": "Oorbegroot",
+    "bud.total.overNote": "meer begroot as inkomste",
+    "bud.total.left": "Nog te begroot",
+    "bud.total.leftNote": "inkomste nog nie toegewys nie",
+    "bud.total.spent": "Totaal bestee",
+    "bud.total.spentNote": "{pct}% van begroting gebruik",
+    "bud.col.category": "Kategorie",
+    "bud.col.type": "Tipe",
+    "bud.col.amount": "Bedrag",
+    "bud.col.actual": "Werklik tot dusver",
+    "bud.col.notes": "Notas",
+    "bud.remaining.over": "{amount} oor die begroting",
+    "bud.remaining.left": "{amount} oor",
+    "bud.aria.amount": "Begrotingsbedrag vir {category}",
+    "bud.aria.notes": "Notas vir {category}",
+    "bud.aria.clear": "Maak begroting vir {category} skoon",
+    "bud.title.clear": "Verwyder hierdie kategorie uit die tydperklêer",
+    "bud.aria.delete": "Skrap kategorie {category}",
+    "bud.title.delete": "Skrap hierdie kategorie oral",
+    "bud.saved": "Begroting gestoor na Budgets/{period}.md",
+    "bud.copy.none": "Geen begroting vir die vorige tydperk gevind nie",
+    "bud.copy.done": {
+      one: "{count} kategorie uit die vorige tydperk gekopieer",
+      other: "{count} kategorieë uit die vorige tydperk gekopieer"
+    },
+    "bud.copy.nothing": "Niks om te kopieer nie — elke kategorie het reeds 'n waarde"
   };
 });
 
@@ -745,7 +829,49 @@ var require_de = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Dein Budget öffnet sich hinter einem Datenschutz-Startbildschirm zum Antippen, damit nichts zu sehen ist, wenn jemand kurz auf deinen Vault schaut. Abschalten unter Einstellungen → Budget Vault → Datenschutz-Startbildschirm.",
     "wiz.done.connected": "Mit deinem Budget-Ordner verbunden.",
     "wiz.done.created": "Budget-Ordner angelegt — willkommen!",
-    "wiz.failed": "Einrichtung fehlgeschlagen: {error}"
+    "wiz.failed": "Einrichtung fehlgeschlagen: {error}",
+    "bud.shape.title": "Deine anderen Budgets sind noch da",
+    "bud.shape.body": {
+      one: "{count} Budgetdatei ist unter einer anderen Zeitraumlänge gespeichert — es ist Budgets/{newest}.md. Sie bleibt in deinem Vault und ist wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jener.",
+      other: "{count} Budgetdateien sind unter einer anderen Zeitraumlänge gespeichert — die neueste ist Budgets/{newest}.md. Sie bleiben in deinem Vault und sind wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jene."
+    },
+    "bud.shape.bring": "Kategorien und Notizen aus {newest} übernehmen",
+    "bud.shape.empty": "Dieses Budget ist leer",
+    "bud.shape.brought": {
+      one: "{count} Kategorie übernommen — setze den Betrag für diesen Zeitraum",
+      other: "{count} Kategorien übernommen — setze die Beträge für diesen Zeitraum"
+    },
+    "bud.shape.allHere": "Jede Kategorie aus diesem Budget ist bereits hier",
+    "bud.total.income": "Einnahmen gesamt",
+    "bud.total.incomeNote": "{amount} bisher erhalten",
+    "bud.total.budgeted": "Budgetiert gesamt",
+    "bud.total.budgetedNote": "{pct}% der budgetierten Einnahmen",
+    "bud.total.over": "Überbudgetiert",
+    "bud.total.overNote": "mehr budgetiert als eingenommen",
+    "bud.total.left": "Noch zu budgetieren",
+    "bud.total.leftNote": "Einnahmen noch nicht zugeteilt",
+    "bud.total.spent": "Ausgegeben gesamt",
+    "bud.total.spentNote": "{pct}% des Budgets verbraucht",
+    "bud.col.category": "Kategorie",
+    "bud.col.type": "Art",
+    "bud.col.amount": "Betrag",
+    "bud.col.actual": "Tatsächlich bisher",
+    "bud.col.notes": "Notizen",
+    "bud.remaining.over": "{amount} darüber",
+    "bud.remaining.left": "{amount} übrig",
+    "bud.aria.amount": "Budgetbetrag für {category}",
+    "bud.aria.notes": "Notizen zu {category}",
+    "bud.aria.clear": "Budget für {category} leeren",
+    "bud.title.clear": "Diese Kategorie aus der Zeitraumdatei entfernen",
+    "bud.aria.delete": "Kategorie {category} löschen",
+    "bud.title.delete": "Diese Kategorie überall löschen",
+    "bud.saved": "Budget gespeichert unter Budgets/{period}.md",
+    "bud.copy.none": "Kein Budget für den vorherigen Zeitraum gefunden",
+    "bud.copy.done": {
+      one: "{count} Kategorie aus dem vorherigen Zeitraum kopiert",
+      other: "{count} Kategorien aus dem vorherigen Zeitraum kopiert"
+    },
+    "bud.copy.nothing": "Nichts zu kopieren — jede Kategorie hat bereits einen Wert"
   };
 });
 
@@ -951,7 +1077,49 @@ var require_es = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Tu presupuesto se abre tras una pantalla de privacidad que requiere un toque, así que no queda nada a la vista si alguien echa un vistazo a tu bóveda. Desactívala en Ajustes → Budget Vault → Pantalla de privacidad.",
     "wiz.done.connected": "Conectado a tu carpeta de presupuesto.",
     "wiz.done.created": "Carpeta de presupuesto creada — ¡bienvenido!",
-    "wiz.failed": "La configuración falló: {error}"
+    "wiz.failed": "La configuración falló: {error}",
+    "bud.shape.title": "Tus otros presupuestos siguen aquí",
+    "bud.shape.body": {
+      one: "{count} archivo de presupuesto está guardado con otra duración de periodo — es Budgets/{newest}.md. Permanece en tu bóveda y vuelve en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquel.",
+      other: "{count} archivos de presupuesto están guardados con otra duración de periodo — el más reciente es Budgets/{newest}.md. Permanecen en tu bóveda y vuelven en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquellos."
+    },
+    "bud.shape.bring": "Traer las categorías y notas de {newest}",
+    "bud.shape.empty": "Ese presupuesto está vacío",
+    "bud.shape.brought": {
+      one: "Se trajo {count} categoría — pon el importe para este periodo",
+      other: "Se trajeron {count} categorías — pon los importes para este periodo"
+    },
+    "bud.shape.allHere": "Todas las categorías de ese presupuesto ya están aquí",
+    "bud.total.income": "Ingresos totales",
+    "bud.total.incomeNote": "{amount} recibido hasta ahora",
+    "bud.total.budgeted": "Total presupuestado",
+    "bud.total.budgetedNote": "{pct}% de los ingresos presupuestados",
+    "bud.total.over": "Presupuestado de más",
+    "bud.total.overNote": "presupuestado por encima de los ingresos",
+    "bud.total.left": "Por presupuestar",
+    "bud.total.leftNote": "ingresos aún sin asignar",
+    "bud.total.spent": "Total gastado",
+    "bud.total.spentNote": "{pct}% del presupuesto usado",
+    "bud.col.category": "Categoría",
+    "bud.col.type": "Tipo",
+    "bud.col.amount": "Importe",
+    "bud.col.actual": "Real hasta ahora",
+    "bud.col.notes": "Notas",
+    "bud.remaining.over": "{amount} de más",
+    "bud.remaining.left": "{amount} restante",
+    "bud.aria.amount": "Importe presupuestado para {category}",
+    "bud.aria.notes": "Notas de {category}",
+    "bud.aria.clear": "Vaciar el presupuesto de {category}",
+    "bud.title.clear": "Quitar esta categoría del archivo del periodo",
+    "bud.aria.delete": "Eliminar la categoría {category}",
+    "bud.title.delete": "Eliminar esta categoría en todas partes",
+    "bud.saved": "Presupuesto guardado en Budgets/{period}.md",
+    "bud.copy.none": "No se encontró presupuesto del periodo anterior",
+    "bud.copy.done": {
+      one: "Copiada {count} categoría del periodo anterior",
+      other: "Copiadas {count} categorías del periodo anterior"
+    },
+    "bud.copy.nothing": "Nada que copiar — todas las categorías ya tienen un valor"
   };
 });
 
@@ -1157,7 +1325,49 @@ var require_fr = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Votre budget s'ouvre derrière un écran de confidentialité à toucher, ainsi rien n'est visible si quelqu'un jette un œil à votre coffre. Désactivez-le dans Paramètres → Budget Vault → Écran de confidentialité.",
     "wiz.done.connected": "Connecté à votre dossier de budget.",
     "wiz.done.created": "Dossier de budget créé — bienvenue !",
-    "wiz.failed": "Échec de la configuration : {error}"
+    "wiz.failed": "Échec de la configuration : {error}",
+    "bud.shape.title": "Vos autres budgets sont toujours là",
+    "bud.shape.body": {
+      one: "{count} fichier de budget est enregistré sous une autre durée de période — il s'agit de Budgets/{newest}.md. Il reste dans votre coffre et revient dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n'a pas la même durée que celle-là.",
+      other: "{count} fichiers de budget sont enregistrés sous une autre durée de période — le plus récent est Budgets/{newest}.md. Ils restent dans votre coffre et reviennent dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n'a pas la même durée que celles-là."
+    },
+    "bud.shape.bring": "Reprendre les catégories et les notes de {newest}",
+    "bud.shape.empty": "Ce budget est vide",
+    "bud.shape.brought": {
+      one: "{count} catégorie reprise — indiquez le montant pour cette période",
+      other: "{count} catégories reprises — indiquez les montants pour cette période"
+    },
+    "bud.shape.allHere": "Toutes les catégories de ce budget sont déjà ici",
+    "bud.total.income": "Revenus totaux",
+    "bud.total.incomeNote": "{amount} reçu jusqu'ici",
+    "bud.total.budgeted": "Total budgété",
+    "bud.total.budgetedNote": "{pct}% des revenus budgétés",
+    "bud.total.over": "Sur-budgété",
+    "bud.total.overNote": "budgété au-delà des revenus",
+    "bud.total.left": "Reste à budgéter",
+    "bud.total.leftNote": "revenus pas encore affectés",
+    "bud.total.spent": "Total dépensé",
+    "bud.total.spentNote": "{pct}% du budget utilisé",
+    "bud.col.category": "Catégorie",
+    "bud.col.type": "Type",
+    "bud.col.amount": "Montant",
+    "bud.col.actual": "Réel à ce jour",
+    "bud.col.notes": "Notes",
+    "bud.remaining.over": "{amount} de dépassement",
+    "bud.remaining.left": "{amount} restant",
+    "bud.aria.amount": "Montant budgété pour {category}",
+    "bud.aria.notes": "Notes de {category}",
+    "bud.aria.clear": "Vider le budget de {category}",
+    "bud.title.clear": "Retirer cette catégorie du fichier de la période",
+    "bud.aria.delete": "Supprimer la catégorie {category}",
+    "bud.title.delete": "Supprimer cette catégorie partout",
+    "bud.saved": "Budget enregistré dans Budgets/{period}.md",
+    "bud.copy.none": "Aucun budget trouvé pour la période précédente",
+    "bud.copy.done": {
+      one: "{count} catégorie copiée depuis la période précédente",
+      other: "{count} catégories copiées depuis la période précédente"
+    },
+    "bud.copy.nothing": "Rien à copier — chaque catégorie a déjà une valeur"
   };
 });
 
@@ -1360,7 +1570,46 @@ var require_ja = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "予算はタップして入るプライバシー画面の後ろで開くので、誰かが保管庫をちらりと見ても中身は表示されません。設定 → Budget Vault → プライバシー画面 でオフにできます。",
     "wiz.done.connected": "予算フォルダに接続しました。",
     "wiz.done.created": "予算フォルダを作成しました — ようこそ！",
-    "wiz.failed": "セットアップに失敗しました: {error}"
+    "wiz.failed": "セットアップに失敗しました: {error}",
+    "bud.shape.title": "他の予算はそのまま残っています",
+    "bud.shape.body": {
+      other: "別の期間の長さで保存された予算ファイルが {count} 件あります — 最新のものは Budgets/{newest}.md です。保管庫にはそのまま残っており、期間の長さを元に戻せばまた表示されます。この期間はそれらとは長さが違うため、金額は空の状態から始まります。"
+    },
+    "bud.shape.bring": "{newest} からカテゴリとメモを引き継ぐ",
+    "bud.shape.empty": "その予算は空です",
+    "bud.shape.brought": {
+      other: "カテゴリを {count} 件引き継ぎました — この期間の金額を設定してください"
+    },
+    "bud.shape.allHere": "その予算のカテゴリはすべてすでにここにあります",
+    "bud.total.income": "収入合計",
+    "bud.total.incomeNote": "これまでに {amount} を受け取りました",
+    "bud.total.budgeted": "予算合計",
+    "bud.total.budgetedNote": "予算収入の {pct}%",
+    "bud.total.over": "予算超過",
+    "bud.total.overNote": "収入を超えて予算を組んでいます",
+    "bud.total.left": "未配分",
+    "bud.total.leftNote": "まだ配分していない収入",
+    "bud.total.spent": "支出合計",
+    "bud.total.spentNote": "予算の {pct}% を使用",
+    "bud.col.category": "カテゴリ",
+    "bud.col.type": "種類",
+    "bud.col.amount": "金額",
+    "bud.col.actual": "実績",
+    "bud.col.notes": "メモ",
+    "bud.remaining.over": "{amount} 超過",
+    "bud.remaining.left": "残り {amount}",
+    "bud.aria.amount": "{category} の予算額",
+    "bud.aria.notes": "{category} のメモ",
+    "bud.aria.clear": "{category} の予算を消去",
+    "bud.title.clear": "この期間のファイルからこのカテゴリを外す",
+    "bud.aria.delete": "カテゴリ {category} を削除",
+    "bud.title.delete": "このカテゴリをすべての場所から削除",
+    "bud.saved": "予算を Budgets/{period}.md に保存しました",
+    "bud.copy.none": "前の期間の予算が見つかりません",
+    "bud.copy.done": {
+      other: "前の期間から {count} 件のカテゴリをコピーしました"
+    },
+    "bud.copy.nothing": "コピーするものがありません — すべてのカテゴリにすでに値があります"
   };
 });
 
@@ -1563,7 +1812,46 @@ var require_zh = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "你的预算会在一个需要点击进入的隐私屏后面打开，这样别人瞥一眼你的仓库也看不到任何内容。可在「设置 → Budget Vault → 隐私启动屏」中关闭。",
     "wiz.done.connected": "已连接到你的预算文件夹。",
     "wiz.done.created": "预算文件夹已创建 — 欢迎！",
-    "wiz.failed": "设置失败: {error}"
+    "wiz.failed": "设置失败: {error}",
+    "bud.shape.title": "你的其他预算都还在",
+    "bud.shape.body": {
+      other: "有 {count} 个预算文件保存在另一种周期长度下 — 最新的是 Budgets/{newest}.md。它们仍保留在你的仓库中，只要把周期长度改回去就会重新出现。这里的金额从空白开始，因为本周期与那些周期的长度不同。"
+    },
+    "bud.shape.bring": "从 {newest} 带入分类和备注",
+    "bud.shape.empty": "那份预算是空的",
+    "bud.shape.brought": {
+      other: "已带入 {count} 个分类 — 请为本周期填上金额"
+    },
+    "bud.shape.allHere": "那份预算中的分类都已经在这里了",
+    "bud.total.income": "收入合计",
+    "bud.total.incomeNote": "目前已收到 {amount}",
+    "bud.total.budgeted": "预算合计",
+    "bud.total.budgetedNote": "占预算收入的 {pct}%",
+    "bud.total.over": "超出预算",
+    "bud.total.overNote": "预算超过了收入",
+    "bud.total.left": "待分配",
+    "bud.total.leftNote": "尚未分配的收入",
+    "bud.total.spent": "支出合计",
+    "bud.total.spentNote": "已用预算的 {pct}%",
+    "bud.col.category": "分类",
+    "bud.col.type": "类型",
+    "bud.col.amount": "金额",
+    "bud.col.actual": "实际已发生",
+    "bud.col.notes": "备注",
+    "bud.remaining.over": "超出 {amount}",
+    "bud.remaining.left": "剩余 {amount}",
+    "bud.aria.amount": "{category} 的预算金额",
+    "bud.aria.notes": "{category} 的备注",
+    "bud.aria.clear": "清除 {category} 的预算",
+    "bud.title.clear": "把这个分类从本周期的文件中移除",
+    "bud.aria.delete": "删除分类 {category}",
+    "bud.title.delete": "在所有位置删除这个分类",
+    "bud.saved": "预算已保存到 Budgets/{period}.md",
+    "bud.copy.none": "找不到上一周期的预算",
+    "bud.copy.done": {
+      other: "已从上一周期复制 {count} 个分类"
+    },
+    "bud.copy.nothing": "没有可复制的内容 — 每个分类都已有数值"
   };
 });
 
@@ -5693,6 +5981,7 @@ var require_budgets = __commonJS((exports2, module2) => {
   var { el, icoEl } = require_dom();
   var { escMd, patchFrontmatter } = require_markdown();
   var { TYPE_ORDER } = require_constants();
+  var i18n = require_i18n();
   module2.exports = function registerBudgets(ctx) {
     const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
     function otherShapeBudgets() {
@@ -5710,13 +5999,13 @@ var require_budgets = __commonJS((exports2, module2) => {
       box.classList.remove("hidden");
       const newest = others[others.length - 1];
       const n = others.length;
-      box.append(el("div", { class: "bud-shape-note-t" }, "Your other budgets are still here"));
-      box.append(el("p", {}, `${n} budget ${n === 1 ? "file is" : "files are"} saved under a different period length — ` + `the most recent is Budgets/${newest}.md. They stay in your vault, and they come back ` + `as soon as you set the period length back. Amounts start blank here because this period ` + `isn't the same length as those were.`));
+      box.append(el("div", { class: "bud-shape-note-t" }, i18n.t("bud.shape.title")));
+      box.append(el("p", {}, i18n.t("bud.shape.body", { count: n, newest })));
       box.append(el("button", {
         class: "btn btn-ghost",
         type: "button",
         onclick: () => bringOverFrom(newest)
-      }, `Bring over the categories and notes from ${newest}`));
+      }, i18n.t("bud.shape.bring", { newest })));
     }
     function carryStructure(src, draft) {
       let brought = 0;
@@ -5738,14 +6027,14 @@ var require_budgets = __commonJS((exports2, module2) => {
     function bringOverFrom(key) {
       const src = S.budgets[key] || [];
       if (!src.length)
-        return toast("That budget is empty", true);
+        return toast(i18n.t("bud.shape.empty"), true);
       const brought = carryStructure(src, budgetDraft());
       if (brought) {
         budDirty = true;
         $("#budSave").disabled = false;
       }
       renderBudgets();
-      toast(brought ? `Brought over ${brought} ${brought === 1 ? "category" : "categories"} — set the amounts for this period` : "Every category from that budget is already here");
+      toast(brought ? i18n.t("bud.shape.brought", { count: brought }) : i18n.t("bud.shape.allHere"));
     }
     let budDraft = null, budDraftPeriod = null;
     let budDirty = false;
@@ -5788,19 +6077,28 @@ var require_budgets = __commonJS((exports2, module2) => {
       const usedPct = budgeted > 0 ? Math.round(sum.spend / budgeted * 100) : null;
       const unallocated = income - budgeted;
       return [
-        { label: "Total income", value: money(income), grad: true, note: `${money(sum.income)} received so far` },
-        { label: "Total budgeted", value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : "" },
         {
-          label: unallocated < 0 ? "Over-budgeted" : "Left to budget",
-          value: money(Math.abs(unallocated)),
-          over: unallocated < 0,
-          note: unallocated < 0 ? "budgeted beyond income" : income > 0 ? "income not yet allocated" : ""
+          label: i18n.t("bud.total.income"),
+          value: money(income),
+          grad: true,
+          note: i18n.t("bud.total.incomeNote", { amount: money(sum.income) })
         },
         {
-          label: "Total spent",
+          label: i18n.t("bud.total.budgeted"),
+          value: money(budgeted),
+          note: allocPct !== null ? i18n.t("bud.total.budgetedNote", { pct: allocPct }) : ""
+        },
+        {
+          label: i18n.t(unallocated < 0 ? "bud.total.over" : "bud.total.left"),
+          value: money(Math.abs(unallocated)),
+          over: unallocated < 0,
+          note: unallocated < 0 ? i18n.t("bud.total.overNote") : income > 0 ? i18n.t("bud.total.leftNote") : ""
+        },
+        {
+          label: i18n.t("bud.total.spent"),
           value: money(sum.spend),
           over: budgeted > 0 && sum.spend > budgeted,
-          note: usedPct !== null ? `${usedPct}% of budget used` : ""
+          note: usedPct !== null ? i18n.t("bud.total.spentNote", { pct: usedPct }) : ""
         }
       ];
     }
@@ -5823,7 +6121,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       const sum = periodSummary(S.period);
       const t = $("#budTable");
       t.empty();
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Type"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col", class: "num" }, "Actual so far"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, i18n.t("bud.col.category")), el("th", { scope: "col" }, i18n.t("bud.col.type")), el("th", { scope: "col", class: "num" }, i18n.t("bud.col.amount")), el("th", { scope: "col", class: "num" }, i18n.t("bud.col.actual")), el("th", { scope: "col" }, i18n.t("bud.col.notes")), el("th", { scope: "col" }, ""))));
       const body = el("tbody", {});
       const mark = () => {
         budDirty = true;
@@ -5848,7 +6146,7 @@ var require_budgets = __commonJS((exports2, module2) => {
           }
           const rem = d.amount - actual;
           const over = rem < 0 && d.type !== "income";
-          remainingEl.textContent = over ? `${money(-rem)} over` : `${money(rem)} left`;
+          remainingEl.textContent = over ? i18n.t("bud.remaining.over", { amount: money(-rem) }) : i18n.t("bud.remaining.left", { amount: money(rem) });
           remainingEl.className = "bud-remaining" + (over ? " over" : "");
         };
         updateRemaining();
@@ -5857,7 +6155,7 @@ var require_budgets = __commonJS((exports2, module2) => {
           step: "0.01",
           class: "form-control form-control-sm",
           value: d.amount || "",
-          "aria-label": `Budget amount for ${d.category}`,
+          "aria-label": i18n.t("bud.aria.amount", { category: d.category }),
           onchange: (e) => {
             d.amount = parseFloat(e.target.value) || 0;
             d.amountRaw = null;
@@ -5870,19 +6168,19 @@ var require_budgets = __commonJS((exports2, module2) => {
           class: "form-control form-control-sm",
           value: d.notes,
           style: "width:230px",
-          "aria-label": `Notes for ${d.category}`,
+          "aria-label": i18n.t("bud.aria.notes", { category: d.category }),
           onchange: (e) => {
             d.notes = e.target.value;
             mark();
           }
-        })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
+        })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": i18n.t("bud.aria.clear", { category: d.category }), title: i18n.t("bud.title.clear"), onclick: () => {
           d.amount = 0;
           d.amountRaw = null;
           d.notes = "";
           d.inFile = false;
           mark();
           renderBudgets();
-        } }, "✕") : "", el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Delete category ${d.category}`, title: "Delete this category everywhere", onclick: async () => {
+        } }, "✕") : "", el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": i18n.t("bud.aria.delete", { category: d.category }), title: i18n.t("bud.title.delete"), onclick: async () => {
           if (await promptDeleteCategory(d.category)) {
             const draft2 = budgetDraft();
             const i = draft2.indexOf(d);
@@ -5931,12 +6229,12 @@ var require_budgets = __commonJS((exports2, module2) => {
 `));
       budDirty = false;
       $("#budSave").disabled = true;
-      toast(`Budget saved to Budgets/${S.period}.md`);
+      toast(i18n.t("bud.saved", { period: S.period }));
     }
     function copyPreviousBudget() {
       const prev = S.budgets[shiftPeriod(S.period, -1)];
       if (!prev || !prev.length)
-        return toast("No budget found for the previous period", true);
+        return toast(i18n.t("bud.copy.none"), true);
       const draft = budgetDraft();
       let copied = 0;
       for (const r of prev) {
@@ -5957,7 +6255,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       if (copied)
         $("#budSave").disabled = false;
       renderBudgets();
-      toast(copied ? `Copied ${copied} categories from the previous period` : "Nothing to copy — every category already has a value");
+      toast(copied ? i18n.t("bud.copy.done", { count: copied }) : i18n.t("bud.copy.nothing"));
     }
     async function addNewCategory() {
       const cat = await promptCreateCategory();
@@ -10649,7 +10947,10 @@ var require_controller = __commonJS((exports2, module2) => {
         await connectVault();
       },
       applyTheme,
-      applyLanguage: () => applyDom(root),
+      applyLanguage: () => {
+        applyDom(root);
+        render();
+      },
       applyPrivacyLock: () => {
         if (plugin.settings.privacyLock)
           lockGate();

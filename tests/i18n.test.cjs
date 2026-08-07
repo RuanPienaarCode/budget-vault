@@ -294,8 +294,16 @@ ok(/updateBudgetSettingsMd\('language'/.test(onboarding),
    of the settings tab have to push the new language into open views, the same
    way applyTheme and applyPrivacyLock do. */
 const controller = fs.readFileSync(path.join(SRC, 'controller.js'), 'utf8');
-ok(/applyLanguage:\s*\(\)\s*=>\s*applyDom\(root\)/.test(controller),
+/* Both halves, because the interface is built two ways: the shell is static
+   markup applyDom() re-translates in place, and the view bodies are rebuilt by
+   render(). Missing either one leaves half the screen in the old language. */
+const applyLang = (controller.match(/applyLanguage:[^\n]*\n?[^\n]*/) || [''])[0];
+ok(/applyLanguage:/.test(controller),
   'controller must expose applyLanguage() so an open view can be re-translated in place');
+ok(/applyDom\(root\)/.test(applyLang),
+  'applyLanguage() must re-run applyDom — otherwise the shell keeps its mounted language');
+ok(/render\(\)/.test(applyLang),
+  'applyLanguage() must re-run render() — otherwise the view bodies keep their old strings');
 eq(settingsTab.split('ctl.applyLanguage()').length - 1, 2,
   'BOTH settings paths (display() dropdown and setControlValue) must re-translate open views — ' +
   'miss one and users on that side of the 1.13 line see nothing change');

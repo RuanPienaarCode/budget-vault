@@ -263,4 +263,54 @@ module.exports = {
   'wiz.done.connected': 'Gekoppel aan jou begrotingsvouer.',
   'wiz.done.created': 'Begrotingsvouer geskep — welkom!',
   'wiz.failed': 'Opstelling het misluk: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Jou ander begrotings is steeds hier',
+  'bud.shape.body': {
+    one: '{count} begrotingslêer is onder \'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
+    other: '{count} begrotingslêers is onder \'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
+  },
+  'bud.shape.bring': 'Bring die kategorieë en notas van {newest} oor',
+  'bud.shape.empty': 'Daardie begroting is leeg',
+  'bud.shape.brought': {
+    one: '{count} kategorie oorgebring — stel die bedrag vir hierdie tydperk',
+    other: '{count} kategorieë oorgebring — stel die bedrae vir hierdie tydperk',
+  },
+  'bud.shape.allHere': 'Elke kategorie uit daardie begroting is reeds hier',
+
+  'bud.total.income': 'Totale inkomste',
+  'bud.total.incomeNote': '{amount} tot dusver ontvang',
+  'bud.total.budgeted': 'Totaal begroot',
+  'bud.total.budgetedNote': '{pct}% van begrote inkomste',
+  'bud.total.over': 'Oorbegroot',
+  'bud.total.overNote': 'meer begroot as inkomste',
+  'bud.total.left': 'Nog te begroot',
+  'bud.total.leftNote': 'inkomste nog nie toegewys nie',
+  'bud.total.spent': 'Totaal bestee',
+  'bud.total.spentNote': '{pct}% van begroting gebruik',
+
+  'bud.col.category': 'Kategorie',
+  'bud.col.type': 'Tipe',
+  'bud.col.amount': 'Bedrag',
+  'bud.col.actual': 'Werklik tot dusver',
+  'bud.col.notes': 'Notas',
+
+  'bud.remaining.over': '{amount} oor die begroting',
+  'bud.remaining.left': '{amount} oor',
+
+  'bud.aria.amount': 'Begrotingsbedrag vir {category}',
+  'bud.aria.notes': 'Notas vir {category}',
+  'bud.aria.clear': 'Maak begroting vir {category} skoon',
+  'bud.title.clear': 'Verwyder hierdie kategorie uit die tydperklêer',
+  'bud.aria.delete': 'Skrap kategorie {category}',
+  'bud.title.delete': 'Skrap hierdie kategorie oral',
+
+  'bud.saved': 'Begroting gestoor na Budgets/{period}.md',
+  'bud.copy.none': 'Geen begroting vir die vorige tydperk gevind nie',
+  'bud.copy.done': {
+    one: '{count} kategorie uit die vorige tydperk gekopieer',
+    other: '{count} kategorieë uit die vorige tydperk gekopieer',
+  },
+  'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
+
 };
