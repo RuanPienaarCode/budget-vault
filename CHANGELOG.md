@@ -3,6 +3,21 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.8.1 — 2026-08-07
+
+### Fixed
+
+- **Changing the language now changes the language.** In 1.8.0, picking a new
+  one in settings wrote the setting and did nothing you could see: the budget
+  view is translated once when it opens, so a view that was already open kept
+  the language it opened in until you closed and reopened it. It now
+  re-translates in place, immediately, as often as you change it.
+
+  What this covers is the app's frame — the menu, the page titles, the top bar
+  and the welcome screen. The pages themselves, most of the settings
+  descriptions and the Tax view's country checklists are still English; they are
+  the next piece of work, not part of this fix.
+
 ## 1.8.0 — 2026-08-07
 
 ### Added

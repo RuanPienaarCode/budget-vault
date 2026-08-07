@@ -155,6 +155,26 @@ applyDom({
 });
 eq(label.textContent, 'Paneelbord', 'applyDom writes textContent for data-i18n');
 eq(aria.attrs['aria-label'], 'Maak kieslys toe', 'applyDom writes aria-label for data-i18n-aria');
+
+/* applyDom must be RE-RUNNABLE over the same nodes. The shell is translated
+   once at mount, so changing the language can only take effect on an open view
+   if the pass can be run again — which requires it to READ data-i18n rather
+   than consume it. This shipped broken in 1.8.0: the setting was written and
+   the language moved, but an open budget view kept the language it was mounted
+   in until it was closed and reopened. */
+const fakeRoot = {
+  querySelectorAll(sel) {
+    const attr = sel.slice(1, -1);
+    return all.filter(n => attr in n.attrs);
+  },
+};
+setLanguage('de');
+applyDom(fakeRoot);
+eq(label.textContent, 'Übersicht', 'a second applyDom re-translates an already-translated node');
+eq(aria.attrs['aria-label'], 'Menü schließen', 'and re-writes the attribute too');
+setLanguage('en');
+applyDom(fakeRoot);
+eq(label.textContent, 'Dashboard', 'and back again — the pass is idempotent per language');
 setLanguage('en');
 
 /* Read once here — invariants 6 and 8 both analyse these files. */
@@ -267,6 +287,18 @@ ok(/language:\s*\$\{/.test(onboarding),
   'the create path must write `language:` into the Settings.md it generates');
 ok(/updateBudgetSettingsMd\('language'/.test(onboarding),
   'the connect path must write `language` through updateBudgetSettingsMd');
+
+/* A language change must reach views that are ALREADY OPEN. The shell is
+   translated at mount, and reloadViews() re-reads the vault without
+   re-mounting — so writing the setting is not enough on its own. Both halves
+   of the settings tab have to push the new language into open views, the same
+   way applyTheme and applyPrivacyLock do. */
+const controller = fs.readFileSync(path.join(SRC, 'controller.js'), 'utf8');
+ok(/applyLanguage:\s*\(\)\s*=>\s*applyDom\(root\)/.test(controller),
+  'controller must expose applyLanguage() so an open view can be re-translated in place');
+eq(settingsTab.split('ctl.applyLanguage()').length - 1, 2,
+  'BOTH settings paths (display() dropdown and setControlValue) must re-translate open views — ' +
+  'miss one and users on that side of the 1.13 line see nothing change');
 
 /* i18n.js itself must seed from Obsidian rather than hardcoding English, or
    the first run renders in English no matter what Obsidian is set to. */
