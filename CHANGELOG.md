@@ -3,6 +3,67 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.6.0 — 2026-08-07
+
+### Added
+
+- **Colour palettes.** A second setting beside Theme, offering Vault Green
+  (unchanged, and still what you get), Ocean, Plum and Slate. The two settings
+  are independent: every palette has its own light *and* dark version, so
+  choosing one never costs you the ability to follow Obsidian's light/dark
+  switch.
+
+  Nothing is calculated while the plugin runs. Each palette's colours are
+  worked out when the plugin is built and shipped as plain CSS, so switching
+  palette costs a phone nothing. Status colours are deliberately left alone —
+  red still means over budget under every palette, because a colour that means
+  something cannot also be decoration.
+
+- **Export.** A button on the Transactions page writes what you are looking at
+  to `Exports/` — transactions and categories, each as a CSV a spreadsheet
+  opens and a markdown file you can read (and, on desktop, hand to Obsidian's
+  own Export to PDF).
+
+  It exports exactly what is on screen. The account, category, search and
+  "whole history" controls you already use decide what goes in the file, the
+  file is named after the range, and any filters you applied are written inside
+  the document — so a partial export can never be mistaken for the whole set.
+  Excluded rows are included and marked, because they are vetoed from your
+  totals, not hidden from you; the totals count only the rest, and say so when
+  the two differ.
+
+### Fixed
+
+- **A savings balance no longer reports contributions as growth.** The Savings
+  page showed `balance − total invested` and called the difference growth.
+  Those agree only while the invested figure keeps pace with every
+  contribution, and nothing made it: a monthly debit order moved the balance,
+  left the baseline behind, and the gap was then presented as performance.
+  Measured against four real accounts it was wrong on all four — most starkly
+  on a tax-free account where contributions outweighed real growth by roughly
+  twenty to one. The page now reports the shape every provider statement uses:
+  opening, plus contributions, plus growth, less withdrawals.
+
+- **Listed services are now measured against what actually left the account.**
+  The Services page is a list of what you believe you pay, and nothing had ever
+  compared it to your statements. On the vault this was built against, four of
+  six listed services disagreed — a fibre line listed R80 under its real price,
+  a subscription that had quietly risen 19%, and one still marked active whose
+  last charge under that name was five months earlier. Matching is by merchant
+  rather than by budget category, because a phone contract and a cloud
+  subscription commonly share a category, and when nothing matches you are told
+  so rather than shown another company's debit order.
+
+- **One broken dashboard card no longer takes the rest of the page with it.**
+  Each card now fails on its own and says so in place, instead of stopping
+  every card below it from rendering.
+
+### Changed
+
+- Debt rows show where the payment schedule says the balance should be, Owed
+  Money shows how long the money has been out, and Services offers the next
+  billing date it works out from your history beside the one you typed.
+
 ## 1.5.0 — 2026-08-07
 
 ### Fixed
