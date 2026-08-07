@@ -42,11 +42,21 @@ All notable changes to Budget Vault. Versions match the plugin version in
   colours are yours, one per file, and nothing ever stopped two files carrying
   the same one — the vault this was measured on had 15 categories on one red
   and 10 on one blue, which drew a chart that could not be read. Duplicates are
-  now separated at draw time, biggest wedge keeping its colour, and nothing is
-  written back to your files.
+  now separated at draw time, the biggest wedge keeping the colour its file
+  asks for, and nothing is written back to your files.
 
-- **The dashboard donut is readable by screen reader**, and its legend rows
-  are clickable through to the category behind them.
+  Two colours also no longer have to be *identical* to be a problem: near
+  matches are separated too, because a wedge of `#3b82f6` beside one of
+  `#0d6efd` is the same blue to the eye whatever the files say. The stand-in
+  colours are never red — red already means "over budget" on the trend chart
+  and in the budget table, and a category wearing it would have the dashboard
+  signalling something it does not mean.
+
+- **"Where it went" links through to the spending behind it.** A wedge or a
+  legend row opens Transactions filtered to that category, for the period on
+  screen rather than all of history; a second button on each row opens the
+  category's own note. The "Other" row stays inert — it is a bucket of several
+  categories, so neither action has a single thing to point at.
 
 ## 1.4.1 — 2026-08-06
 
