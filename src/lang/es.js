@@ -233,11 +233,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Opcional — lo que hay en la cuenta ahora mismo.',
   'wiz.acct.balanceHint': 'Usa el saldo de cierre de tu último extracto, o lo que muestre la app de tu banco. El saldo es una instantánea que mantienes al día tú mismo — importar solo transacciones recientes nunca lo descuadra — y puedes cambiarlo cuando quieras tocando el saldo en la página Cuentas.',
 
-  'wiz.acctType.checking': 'Cuenta corriente',
-  'wiz.acctType.savings': 'Cuenta de ahorro',
-  'wiz.acctType.credit_card': 'Tarjeta de crédito',
-  'wiz.acctType.cash': 'Efectivo',
-  'wiz.acctType.investment': 'Inversión',
+  'acctType.checking': 'Cuenta corriente',
+  'acctType.savings': 'Cuenta de ahorro',
+  'acctType.credit_card': 'Tarjeta de crédito',
+  'acctType.cash': 'Efectivo',
+  'acctType.investment': 'Inversión',
+  'acctType.other': 'Otra',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Carpeta',
@@ -265,4 +266,125 @@ module.exports = {
   'wiz.done.connected': 'Conectado a tu carpeta de presupuesto.',
   'wiz.done.created': 'Carpeta de presupuesto creada — ¡bienvenido!',
   'wiz.failed': 'La configuración falló: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Tus otros presupuestos siguen aquí',
+  'bud.shape.body': {
+    one: '{count} archivo de presupuesto está guardado con otra duración de periodo — es Budgets/{newest}.md. Permanece en tu bóveda y vuelve en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquel.',
+    other: '{count} archivos de presupuesto están guardados con otra duración de periodo — el más reciente es Budgets/{newest}.md. Permanecen en tu bóveda y vuelven en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquellos.',
+  },
+  'bud.shape.bring': 'Traer las categorías y notas de {newest}',
+  'bud.shape.empty': 'Ese presupuesto está vacío',
+  'bud.shape.brought': {
+    one: 'Se trajo {count} categoría — pon el importe para este periodo',
+    other: 'Se trajeron {count} categorías — pon los importes para este periodo',
+  },
+  'bud.shape.allHere': 'Todas las categorías de ese presupuesto ya están aquí',
+
+  'bud.total.income': 'Ingresos totales',
+  'bud.total.incomeNote': '{amount} recibido hasta ahora',
+  'bud.total.budgeted': 'Total presupuestado',
+  'bud.total.budgetedNote': '{pct}% de los ingresos presupuestados',
+  'bud.total.over': 'Presupuestado de más',
+  'bud.total.overNote': 'presupuestado por encima de los ingresos',
+  'bud.total.left': 'Por presupuestar',
+  'bud.total.leftNote': 'ingresos aún sin asignar',
+  'bud.total.spent': 'Total gastado',
+  'bud.total.spentNote': '{pct}% del presupuesto usado',
+
+  'bud.col.category': 'Categoría',
+  'bud.col.type': 'Tipo',
+  'bud.col.amount': 'Importe',
+  'bud.col.actual': 'Real hasta ahora',
+  'bud.col.notes': 'Notas',
+
+  'bud.remaining.over': '{amount} de más',
+  'bud.remaining.left': '{amount} restante',
+
+  'bud.aria.amount': 'Importe presupuestado para {category}',
+  'bud.aria.notes': 'Notas de {category}',
+  'bud.aria.clear': 'Vaciar el presupuesto de {category}',
+  'bud.title.clear': 'Quitar esta categoría del archivo del periodo',
+  'bud.aria.delete': 'Eliminar la categoría {category}',
+  'bud.title.delete': 'Eliminar esta categoría en todas partes',
+
+  'bud.saved': 'Presupuesto guardado en Budgets/{period}.md',
+  'bud.copy.none': 'No se encontró presupuesto del periodo anterior',
+  'bud.copy.done': {
+    one: 'Copiada {count} categoría del periodo anterior',
+    other: 'Copiadas {count} categorías del periodo anterior',
+  },
+  'bud.copy.nothing': 'Nada que copiar — todas las categorías ya tienen un valor',
+
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Todo el historial',
+  'tx.allAccounts': 'Todas las cuentas',
+  'tx.allCategories': 'Todas las categorías',
+  'tx.uncategorised': 'Sin categoría',
+  'tx.count.window': '{shown} de {total} filas',
+  'tx.count.all': { one: '{count} fila', other: '{count} filas' },
+
+  'tx.col.date': 'Fecha',
+  'tx.col.desc': 'Descripción',
+  'tx.col.account': 'Cuenta',
+  'tx.col.category': 'Categoría',
+  'tx.col.amount': 'Importe',
+  'tx.col.excl': 'Excl.',
+  'tx.col.note': 'Nota',
+  'tx.col.split': 'Dividir',
+
+  'tx.aria.category': 'Categoría de {date} {desc}',
+  'tx.aria.exclude': 'Excluir {desc} de los totales del presupuesto',
+  'tx.aria.note': 'Nota de {date} {desc}',
+  'tx.aria.split': 'Dividir {date} {desc} en categorías',
+  'tx.title.split': 'Dividir en categorías',
+
+  'tx.none': 'Ninguna transacción coincide.',
+  'tx.showMore': 'Mostrar {n} más de {remaining} restantes',
+
+  'tx.split.zero': 'Una línea con importe cero no tiene nada que dividir',
+  'tx.split.excluded': 'Esta línea ya está excluida — desmárcala primero',
+  'tx.split.marker': 'Dividida en {n}',
+  'tx.split.done': 'Dividida en {n} — revisa y luego guarda los cambios',
+
+  'tx.add.noAccount': 'Añade una cuenta primero — cada transacción pertenece a una',
+  'tx.add.title': 'Añadir transacción',
+  'tx.field.date': 'Fecha',
+  'tx.field.desc': 'Descripción',
+  'tx.field.descPlaceholder': 'p. ej. Efectivo — verduras en el mercado',
+  'tx.field.account': 'Cuenta',
+  'tx.field.direction': 'Dirección',
+  'tx.dir.out': 'Dinero que sale',
+  'tx.dir.in': 'Dinero que entra',
+  'tx.field.amount': 'Importe',
+  'tx.field.amountDesc': 'Siempre positivo — la dirección pone el signo',
+  'tx.field.category': 'Categoría',
+  'tx.field.none': '— ninguna —',
+  'tx.field.note': 'Nota',
+  'tx.field.notePlaceholder': 'opcional',
+
+  'tx.err.date': 'La fecha debe ser AAAA-MM-DD',
+  'tx.err.desc': 'La descripción es obligatoria',
+  'tx.err.account': 'Nombre de cuenta no válido',
+  'tx.err.amount': 'El importe debe ser un número distinto de 0',
+  'tx.err.save': 'No se pudo guardar la transacción ({error})',
+
+  'tx.saved': { one: '{count} archivo guardado', other: '{count} archivos guardados' },
+  'tx.savedLearned': { one: ' · aprendida {count} regla nueva', other: ' · aprendidas {count} reglas nuevas' },
+
+  'tx.export.dirty': 'Guarda tus cambios primero — una exportación con ediciones sin guardar no coincidiría con la bóveda',
+  'tx.export.empty': 'Nada que exportar — ninguna fila coincide con los filtros actuales',
+  'tx.export.title': 'Exportar transacciones',
+  'tx.export.folder': 'Guardar en la carpeta',
+  'tx.export.desc': {
+    one: 'Carpeta de la bóveda para la exportación. {count} fila ({range}) más {cats} categorías, como CSV y markdown.',
+    other: 'Carpeta de la bóveda para la exportación. {count} filas ({range}) más {cats} categorías, como CSV y markdown.',
+  },
+  'tx.export.failed': 'No se pudo escribir la exportación — revisa el nombre de la carpeta',
+  'tx.export.done': {
+    one: 'Exportada {count} fila y {cats} categorías a {path}/',
+    other: 'Exportadas {count} filas y {cats} categorías a {path}/',
+  },
+
 };

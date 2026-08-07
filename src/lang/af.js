@@ -231,11 +231,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Opsioneel — wat tans in die rekening is.',
   'wiz.acct.balanceHint': 'Gebruik jou jongste staat se sluitingsaldo, of wat ook al jou bankprogram wys. Die saldo is \'n momentopname wat jy self op datum hou — om net onlangse transaksies in te voer, gooi dit nooit uit nie — en jy kan dit enige tyd verander deur op die saldo op die Rekeninge-bladsy te tik.',
 
-  'wiz.acctType.checking': 'Tjek-/lopende rekening',
-  'wiz.acctType.savings': 'Spaarrekening',
-  'wiz.acctType.credit_card': 'Kredietkaart',
-  'wiz.acctType.cash': 'Kontant',
-  'wiz.acctType.investment': 'Belegging',
+  'acctType.checking': 'Tjek-/lopende rekening',
+  'acctType.savings': 'Spaarrekening',
+  'acctType.credit_card': 'Kredietkaart',
+  'acctType.cash': 'Kontant',
+  'acctType.investment': 'Belegging',
+  'acctType.other': 'Ander',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Vouer',
@@ -263,4 +264,125 @@ module.exports = {
   'wiz.done.connected': 'Gekoppel aan jou begrotingsvouer.',
   'wiz.done.created': 'Begrotingsvouer geskep — welkom!',
   'wiz.failed': 'Opstelling het misluk: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Jou ander begrotings is steeds hier',
+  'bud.shape.body': {
+    one: '{count} begrotingslêer is onder \'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
+    other: '{count} begrotingslêers is onder \'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
+  },
+  'bud.shape.bring': 'Bring die kategorieë en notas van {newest} oor',
+  'bud.shape.empty': 'Daardie begroting is leeg',
+  'bud.shape.brought': {
+    one: '{count} kategorie oorgebring — stel die bedrag vir hierdie tydperk',
+    other: '{count} kategorieë oorgebring — stel die bedrae vir hierdie tydperk',
+  },
+  'bud.shape.allHere': 'Elke kategorie uit daardie begroting is reeds hier',
+
+  'bud.total.income': 'Totale inkomste',
+  'bud.total.incomeNote': '{amount} tot dusver ontvang',
+  'bud.total.budgeted': 'Totaal begroot',
+  'bud.total.budgetedNote': '{pct}% van begrote inkomste',
+  'bud.total.over': 'Oorbegroot',
+  'bud.total.overNote': 'meer begroot as inkomste',
+  'bud.total.left': 'Nog te begroot',
+  'bud.total.leftNote': 'inkomste nog nie toegewys nie',
+  'bud.total.spent': 'Totaal bestee',
+  'bud.total.spentNote': '{pct}% van begroting gebruik',
+
+  'bud.col.category': 'Kategorie',
+  'bud.col.type': 'Tipe',
+  'bud.col.amount': 'Bedrag',
+  'bud.col.actual': 'Werklik tot dusver',
+  'bud.col.notes': 'Notas',
+
+  'bud.remaining.over': '{amount} oor die begroting',
+  'bud.remaining.left': '{amount} oor',
+
+  'bud.aria.amount': 'Begrotingsbedrag vir {category}',
+  'bud.aria.notes': 'Notas vir {category}',
+  'bud.aria.clear': 'Maak begroting vir {category} skoon',
+  'bud.title.clear': 'Verwyder hierdie kategorie uit die tydperklêer',
+  'bud.aria.delete': 'Skrap kategorie {category}',
+  'bud.title.delete': 'Skrap hierdie kategorie oral',
+
+  'bud.saved': 'Begroting gestoor na Budgets/{period}.md',
+  'bud.copy.none': 'Geen begroting vir die vorige tydperk gevind nie',
+  'bud.copy.done': {
+    one: '{count} kategorie uit die vorige tydperk gekopieer',
+    other: '{count} kategorieë uit die vorige tydperk gekopieer',
+  },
+  'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
+
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Hele geskiedenis',
+  'tx.allAccounts': 'Alle rekeninge',
+  'tx.allCategories': 'Alle kategorieë',
+  'tx.uncategorised': 'Ongekategoriseer',
+  'tx.count.window': '{shown} van {total} rye',
+  'tx.count.all': { one: '{count} ry', other: '{count} rye' },
+
+  'tx.col.date': 'Datum',
+  'tx.col.desc': 'Beskrywing',
+  'tx.col.account': 'Rekening',
+  'tx.col.category': 'Kategorie',
+  'tx.col.amount': 'Bedrag',
+  'tx.col.excl': 'Uitgesl.',
+  'tx.col.note': 'Nota',
+  'tx.col.split': 'Verdeel',
+
+  'tx.aria.category': 'Kategorie vir {date} {desc}',
+  'tx.aria.exclude': 'Sluit {desc} uit begrotingstotale uit',
+  'tx.aria.note': 'Nota vir {date} {desc}',
+  'tx.aria.split': 'Verdeel {date} {desc} in kategorieë',
+  'tx.title.split': 'Verdeel in kategorieë',
+
+  'tx.none': 'Geen transaksies pas nie.',
+  'tx.showMore': 'Wys {n} meer van {remaining} wat oorbly',
+
+  'tx.split.zero': "\'n Reël met \'n nulbedrag het niks om te verdeel nie",
+  'tx.split.excluded': 'Hierdie reël is reeds uitgesluit — ontmerk dit eers',
+  'tx.split.marker': 'Verdeel in {n}',
+  'tx.split.done': 'Verdeel in {n} — gaan na, en stoor dan die veranderinge',
+
+  'tx.add.noAccount': 'Voeg eers \'n rekening by — elke transaksie hoort by een',
+  'tx.add.title': 'Voeg transaksie by',
+  'tx.field.date': 'Datum',
+  'tx.field.desc': 'Beskrywing',
+  'tx.field.descPlaceholder': 'bv. Kontant — groente by die mark',
+  'tx.field.account': 'Rekening',
+  'tx.field.direction': 'Rigting',
+  'tx.dir.out': 'Geld uit',
+  'tx.dir.in': 'Geld in',
+  'tx.field.amount': 'Bedrag',
+  'tx.field.amountDesc': 'Altyd positief — die rigting bepaal die teken',
+  'tx.field.category': 'Kategorie',
+  'tx.field.none': '— geen —',
+  'tx.field.note': 'Nota',
+  'tx.field.notePlaceholder': 'opsioneel',
+
+  'tx.err.date': 'Datum moet JJJJ-MM-DD wees',
+  'tx.err.desc': 'Beskrywing is verpligtend',
+  'tx.err.account': 'Ongeldige rekeningnaam',
+  'tx.err.amount': 'Bedrag moet \'n getal anders as 0 wees',
+  'tx.err.save': 'Kon nie die transaksie stoor nie ({error})',
+
+  'tx.saved': { one: '{count} lêer gestoor', other: '{count} lêers gestoor' },
+  'tx.savedLearned': { one: ' · {count} nuwe reël geleer', other: ' · {count} nuwe reëls geleer' },
+
+  'tx.export.dirty': 'Stoor eers jou veranderinge — \'n uitvoer van ongestoorde wysigings sal nie by die kluis pas nie',
+  'tx.export.empty': 'Niks om uit te voer nie — geen rye pas by die huidige filters nie',
+  'tx.export.title': 'Voer transaksies uit',
+  'tx.export.folder': 'Stoor na vouer',
+  'tx.export.desc': {
+    one: 'Kluisvouer vir die uitvoer. {count} ry ({range}) plus {cats} kategorieë, as CSV en markdown.',
+    other: 'Kluisvouer vir die uitvoer. {count} rye ({range}) plus {cats} kategorieë, as CSV en markdown.',
+  },
+  'tx.export.failed': 'Kon nie die uitvoer skryf nie — kyk na die vouernaam',
+  'tx.export.done': {
+    one: '{count} ry en {cats} kategorieë na {path}/ uitgevoer',
+    other: '{count} rye en {cats} kategorieë na {path}/ uitgevoer',
+  },
+
 };

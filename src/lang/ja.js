@@ -234,11 +234,12 @@ module.exports = {
   'wiz.acct.balanceDesc': '任意 — 現在その口座にある金額です。',
   'wiz.acct.balanceHint': '直近の明細の期末残高か、銀行アプリに表示されている金額を使ってください。残高はご自身で最新に保つスナップショットです — 最近の取引だけを取り込んでもずれることはありません — 口座ページで残高をタップすればいつでも変更できます。',
 
-  'wiz.acctType.checking': '普通預金・当座預金口座',
-  'wiz.acctType.savings': '貯蓄口座',
-  'wiz.acctType.credit_card': 'クレジットカード',
-  'wiz.acctType.cash': '現金',
-  'wiz.acctType.investment': '投資',
+  'acctType.checking': '普通預金・当座預金口座',
+  'acctType.savings': '貯蓄口座',
+  'acctType.credit_card': 'クレジットカード',
+  'acctType.cash': '現金',
+  'acctType.investment': '投資',
+  'acctType.other': 'その他',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'フォルダ',
@@ -265,4 +266,120 @@ module.exports = {
   'wiz.done.connected': '予算フォルダに接続しました。',
   'wiz.done.created': '予算フォルダを作成しました — ようこそ！',
   'wiz.failed': 'セットアップに失敗しました: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': '他の予算はそのまま残っています',
+  'bud.shape.body': {
+    other: '別の期間の長さで保存された予算ファイルが {count} 件あります — 最新のものは Budgets/{newest}.md です。保管庫にはそのまま残っており、期間の長さを元に戻せばまた表示されます。この期間はそれらとは長さが違うため、金額は空の状態から始まります。',
+  },
+  'bud.shape.bring': '{newest} からカテゴリとメモを引き継ぐ',
+  'bud.shape.empty': 'その予算は空です',
+  'bud.shape.brought': {
+    other: 'カテゴリを {count} 件引き継ぎました — この期間の金額を設定してください',
+  },
+  'bud.shape.allHere': 'その予算のカテゴリはすべてすでにここにあります',
+
+  'bud.total.income': '収入合計',
+  'bud.total.incomeNote': 'これまでに {amount} を受け取りました',
+  'bud.total.budgeted': '予算合計',
+  'bud.total.budgetedNote': '予算収入の {pct}%',
+  'bud.total.over': '予算超過',
+  'bud.total.overNote': '収入を超えて予算を組んでいます',
+  'bud.total.left': '未配分',
+  'bud.total.leftNote': 'まだ配分していない収入',
+  'bud.total.spent': '支出合計',
+  'bud.total.spentNote': '予算の {pct}% を使用',
+
+  'bud.col.category': 'カテゴリ',
+  'bud.col.type': '種類',
+  'bud.col.amount': '金額',
+  'bud.col.actual': '実績',
+  'bud.col.notes': 'メモ',
+
+  'bud.remaining.over': '{amount} 超過',
+  'bud.remaining.left': '残り {amount}',
+
+  'bud.aria.amount': '{category} の予算額',
+  'bud.aria.notes': '{category} のメモ',
+  'bud.aria.clear': '{category} の予算を消去',
+  'bud.title.clear': 'この期間のファイルからこのカテゴリを外す',
+  'bud.aria.delete': 'カテゴリ {category} を削除',
+  'bud.title.delete': 'このカテゴリをすべての場所から削除',
+
+  'bud.saved': '予算を Budgets/{period}.md に保存しました',
+  'bud.copy.none': '前の期間の予算が見つかりません',
+  'bud.copy.done': {
+    other: '前の期間から {count} 件のカテゴリをコピーしました',
+  },
+  'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
+
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': '全期間',
+  'tx.allAccounts': 'すべての口座',
+  'tx.allCategories': 'すべてのカテゴリ',
+  'tx.uncategorised': 'カテゴリなし',
+  'tx.count.window': '{total} 行中 {shown} 行',
+  'tx.count.all': { other: '{count} 行' },
+
+  'tx.col.date': '日付',
+  'tx.col.desc': '摘要',
+  'tx.col.account': '口座',
+  'tx.col.category': 'カテゴリ',
+  'tx.col.amount': '金額',
+  'tx.col.excl': '除外',
+  'tx.col.note': 'メモ',
+  'tx.col.split': '分割',
+
+  'tx.aria.category': '{date} {desc} のカテゴリ',
+  'tx.aria.exclude': '{desc} を予算の合計から除外',
+  'tx.aria.note': '{date} {desc} のメモ',
+  'tx.aria.split': '{date} {desc} をカテゴリに分割',
+  'tx.title.split': 'カテゴリに分割',
+
+  'tx.none': '該当する取引はありません。',
+  'tx.showMore': '残り {remaining} 件のうち {n} 件を表示',
+
+  'tx.split.zero': '金額が 0 の行には分割するものがありません',
+  'tx.split.excluded': 'この行はすでに除外されています — まずチェックを外してください',
+  'tx.split.marker': '{n} 件に分割',
+  'tx.split.done': '{n} 件に分割しました — 確認してから変更を保存してください',
+
+  'tx.add.noAccount': '先に口座を追加してください — 取引は必ずいずれかの口座に属します',
+  'tx.add.title': '取引を追加',
+  'tx.field.date': '日付',
+  'tx.field.desc': '摘要',
+  'tx.field.descPlaceholder': '例: 現金 — 市場で野菜',
+  'tx.field.account': '口座',
+  'tx.field.direction': '入出金',
+  'tx.dir.out': '出金',
+  'tx.dir.in': '入金',
+  'tx.field.amount': '金額',
+  'tx.field.amountDesc': '常に正の数で — 符号は入出金の向きで決まります',
+  'tx.field.category': 'カテゴリ',
+  'tx.field.none': '— なし —',
+  'tx.field.note': 'メモ',
+  'tx.field.notePlaceholder': '任意',
+
+  'tx.err.date': '日付は YYYY-MM-DD 形式で入力してください',
+  'tx.err.desc': '摘要は必須です',
+  'tx.err.account': '口座名が正しくありません',
+  'tx.err.amount': '金額は 0 以外の数値にしてください',
+  'tx.err.save': '取引を保存できませんでした（{error}）',
+
+  'tx.saved': { other: '{count} 件のファイルを保存しました' },
+  'tx.savedLearned': { other: ' · 新しいルールを {count} 件学習しました' },
+
+  'tx.export.dirty': '先に変更を保存してください — 未保存の編集を書き出すと保管庫の内容と一致しません',
+  'tx.export.empty': '書き出すものがありません — 現在の絞り込みに該当する行がありません',
+  'tx.export.title': '取引を書き出す',
+  'tx.export.folder': '保存先フォルダ',
+  'tx.export.desc': {
+    other: '書き出し先の保管庫内フォルダ。{count} 行（{range}）とカテゴリ {cats} 件を、CSV とマークダウンで書き出します。',
+  },
+  'tx.export.failed': '書き出しに失敗しました — フォルダ名を確認してください',
+  'tx.export.done': {
+    other: '{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました',
+  },
+
 };

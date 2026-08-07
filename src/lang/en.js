@@ -240,11 +240,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Optional — what\'s in the account right now.',
   'wiz.acct.balanceHint': 'Use your latest statement\'s closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page.',
 
-  'wiz.acctType.checking': 'Cheque / current account',
-  'wiz.acctType.savings': 'Savings account',
-  'wiz.acctType.credit_card': 'Credit card',
-  'wiz.acctType.cash': 'Cash',
-  'wiz.acctType.investment': 'Investment',
+  'acctType.checking': 'Cheque / current account',
+  'acctType.savings': 'Savings account',
+  'acctType.credit_card': 'Credit card',
+  'acctType.cash': 'Cash',
+  'acctType.investment': 'Investment',
+  'acctType.other': 'Other',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Folder',
@@ -272,4 +273,127 @@ module.exports = {
   'wiz.done.connected': 'Connected to your budget folder.',
   'wiz.done.created': 'Budget folder created — welcome!',
   'wiz.failed': 'Setup failed: {error}',
+
+  /* ============================== Budget page ============================= */
+  /* NOT here: the markdown Budgets/<period>.md is written with. That is vault
+     file content, not interface copy — same rule the wizard follows. */
+
+  'bud.shape.title': 'Your other budgets are still here',
+  'bud.shape.body': {
+    one: '{count} budget file is saved under a different period length — it is Budgets/{newest}.md. It stays in your vault, and it comes back as soon as you set the period length back. Amounts start blank here because this period isn\'t the same length as that one was.',
+    other: '{count} budget files are saved under a different period length — the most recent is Budgets/{newest}.md. They stay in your vault, and they come back as soon as you set the period length back. Amounts start blank here because this period isn\'t the same length as those were.',
+  },
+  'bud.shape.bring': 'Bring over the categories and notes from {newest}',
+  'bud.shape.empty': 'That budget is empty',
+  'bud.shape.brought': {
+    one: 'Brought over {count} category — set the amount for this period',
+    other: 'Brought over {count} categories — set the amounts for this period',
+  },
+  'bud.shape.allHere': 'Every category from that budget is already here',
+
+  'bud.total.income': 'Total income',
+  'bud.total.incomeNote': '{amount} received so far',
+  'bud.total.budgeted': 'Total budgeted',
+  'bud.total.budgetedNote': '{pct}% of budgeted income',
+  'bud.total.over': 'Over-budgeted',
+  'bud.total.overNote': 'budgeted beyond income',
+  'bud.total.left': 'Left to budget',
+  'bud.total.leftNote': 'income not yet allocated',
+  'bud.total.spent': 'Total spent',
+  'bud.total.spentNote': '{pct}% of budget used',
+
+  'bud.col.category': 'Category',
+  'bud.col.type': 'Type',
+  'bud.col.amount': 'Amount',
+  'bud.col.actual': 'Actual so far',
+  'bud.col.notes': 'Notes',
+
+  'bud.remaining.over': '{amount} over',
+  'bud.remaining.left': '{amount} left',
+
+  'bud.aria.amount': 'Budget amount for {category}',
+  'bud.aria.notes': 'Notes for {category}',
+  'bud.aria.clear': 'Clear budget for {category}',
+  'bud.title.clear': 'Clear this category from the period file',
+  'bud.aria.delete': 'Delete category {category}',
+  'bud.title.delete': 'Delete this category everywhere',
+
+  'bud.saved': 'Budget saved to Budgets/{period}.md',
+  'bud.copy.none': 'No budget found for the previous period',
+  'bud.copy.done': {
+    one: 'Copied {count} category from the previous period',
+    other: 'Copied {count} categories from the previous period',
+  },
+  'bud.copy.nothing': 'Nothing to copy — every category already has a value',
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Whole history',
+  'tx.allAccounts': 'All accounts',
+  'tx.allCategories': 'All categories',
+  'tx.uncategorised': 'Uncategorised',
+  'tx.count.window': '{shown} of {total} rows',
+  'tx.count.all': { one: '{count} row', other: '{count} rows' },
+
+  'tx.col.date': 'Date',
+  'tx.col.desc': 'Description',
+  'tx.col.account': 'Account',
+  'tx.col.category': 'Category',
+  'tx.col.amount': 'Amount',
+  'tx.col.excl': 'Excl.',
+  'tx.col.note': 'Note',
+  'tx.col.split': 'Split',
+
+  'tx.aria.category': 'Category for {date} {desc}',
+  'tx.aria.exclude': 'Exclude {desc} from budget totals',
+  'tx.aria.note': 'Note for {date} {desc}',
+  'tx.aria.split': 'Split {date} {desc} into categories',
+  'tx.title.split': 'Split into categories',
+
+  'tx.none': 'No transactions match.',
+  'tx.showMore': 'Show {n} more of {remaining} remaining',
+
+  'tx.split.zero': 'A zero-amount line has nothing to split',
+  'tx.split.excluded': 'This line is already excluded — untick it first',
+  'tx.split.marker': 'Split into {n}',
+  'tx.split.done': 'Split into {n} — review, then Save changes',
+
+  'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
+  'tx.add.title': 'Add transaction',
+  'tx.field.date': 'Date',
+  'tx.field.desc': 'Description',
+  'tx.field.descPlaceholder': 'e.g. Cash — vegetables at the market',
+  'tx.field.account': 'Account',
+  'tx.field.direction': 'Direction',
+  'tx.dir.out': 'Money out',
+  'tx.dir.in': 'Money in',
+  'tx.field.amount': 'Amount',
+  'tx.field.amountDesc': 'Always positive — direction sets the sign',
+  'tx.field.category': 'Category',
+  'tx.field.none': '— none —',
+  'tx.field.note': 'Note',
+  'tx.field.notePlaceholder': 'optional',
+
+  'tx.err.date': 'Date must be YYYY-MM-DD',
+  'tx.err.desc': 'Description is required',
+  'tx.err.account': 'Invalid account name',
+  'tx.err.amount': 'Amount must be a number other than 0',
+  'tx.err.save': 'Could not save the transaction ({error})',
+
+  'tx.saved': { one: 'Saved {count} file', other: 'Saved {count} files' },
+  'tx.savedLearned': { one: ' · learned {count} new rule', other: ' · learned {count} new rules' },
+
+  'tx.export.dirty': 'Save your changes first — an export of unsaved edits would not match the vault',
+  'tx.export.empty': 'Nothing to export — no rows match the current filters',
+  'tx.export.title': 'Export transactions',
+  'tx.export.folder': 'Save to folder',
+  'tx.export.desc': {
+    one: 'Vault folder for the export. {count} row ({range}) plus {cats} categories, as CSV and markdown.',
+    other: 'Vault folder for the export. {count} rows ({range}) plus {cats} categories, as CSV and markdown.',
+  },
+  'tx.export.failed': 'Could not write the export — check the folder name',
+  'tx.export.done': {
+    one: 'Exported {count} row and {cats} categories to {path}/',
+    other: 'Exported {count} rows and {cats} categories to {path}/',
+  },
+
 };
