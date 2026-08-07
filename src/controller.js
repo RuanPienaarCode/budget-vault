@@ -8,6 +8,7 @@ const { el, setIco, setInert } = require('./dom');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
+const { applyDom } = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const registerIo = require('./io');
@@ -43,6 +44,12 @@ function mountApp(view) {
   root.empty();
   const parsed = new DOMParser().parseFromString(SHELL_HTML, 'text/html');
   while (parsed.body.firstChild) root.appendChild(parsed.body.firstChild);
+  /* The shell ships its English text inline and carries data-i18n attributes
+     beside it, so this pass is a no-op in English and the markup stays readable
+     as markup. Runs BEFORE the icon pass purely so a data-i18n element can
+     never be handed an already-resolved icon to overwrite — no element carries
+     both today, and this keeps that cheap to maintain. */
+  applyDom(root);
   root.querySelectorAll('span[data-ico]').forEach(sp => setIco(sp, sp.getAttribute('data-ico').split('|')));
 
   const $ = s => root.querySelector(s);
@@ -51,7 +58,7 @@ function mountApp(view) {
   /* ------------------------------- state -------------------------------- */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', period_days: 0, period_anchor: '' },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '' },
     categories: [],            // {name, type, color}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
