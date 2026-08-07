@@ -4,7 +4,7 @@
    writes so the change-watcher can tell them apart from external edits. */
 
 const { normalizePath, TFile, TFolder } = require('obsidian');
-const { collapsePath } = require('./util');
+const { collapsePath } = require('./vault-path');
 
 module.exports = function registerIo(ctx) {
   const { vault, plugin } = ctx;

@@ -13,7 +13,7 @@
         reconciliation, including the exempt-vs-omitted prompt that is the whole
         reason the reconciliation exists.
 
-   Runs in bare node — locale.js and util.js have no `obsidian` dependency.
+   Runs in bare node — locale.js, markdown.js and amount.js are all pure.
    Wired into ./build.sh.
      node tests/tax-figures.test.cjs        # non-zero exit on failure
 
@@ -23,14 +23,15 @@
 const assert = require('assert');
 const Module = require('module');
 
-// util.js imports `setIcon` from obsidian — stub it so this runs in bare node.
+// Kept for the modules below that still reach obsidian — stub it for bare node.
 const origLoad = Module._load;
 Module._load = function (req, ...rest) {
   if (req === 'obsidian') return { setIcon() {}, normalizePath: p => p };
   return origLoad.call(this, req, ...rest);
 };
 
-const { escMd, unescMd, parseMdTable } = require('../src/util');
+const { normalizeAmount } = require('../src/amount');
+const { escMd, unescMd, parseMdTable } = require('../src/markdown');
 const { PROFILES } = require('../src/locale');
 
 let checks = 0;
@@ -44,15 +45,10 @@ const section = (body, name) => {
   }
   return '';
 };
-const figAmount = s => {
-  const t = (s || '').toString().replace(/[^\d.,-]/g, '');
-  if (!t) return 0;
-  const norm = t.lastIndexOf(',') > t.lastIndexOf('.')
-    ? t.replace(/\./g, '').replace(',', '.')
-    : t.replace(/,/g, '');
-  const n = Number(norm);
-  return Number.isFinite(n) ? n : 0;
-};
+/* Not a mirror any more: load.js's figAmount IS this expression, so the
+   coercion assertions below drive the shipped reader rather than a copy of it
+   that could silently drift from it. */
+const figAmount = s => normalizeAmount(s) ?? 0;
 const loadFigures = body => parseMdTable(section(body, 'figures')).slice(1).filter(c => c[0]).map(c => ({
   code: unescMd(c[0]), description: unescMd(c[1] || ''),
   source: unescMd(c[2] || ''), amount: figAmount(c[3]),

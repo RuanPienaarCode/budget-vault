@@ -35,6 +35,13 @@ const FILES = {
 
   [`${B}/Accounts/FNB Cheque.md`]: '---\ntype: checking\ninstitution: "FNB"\naccount_number: "12345678901"\ntx_label: "FNB Cheque"\nbalance: 1234.56\nbalance_updated: 2026-07-01\ntags: [finance]\n---\n\n# FNB Cheque\n\nNotes body.\n',
   [`${B}/Accounts/Odd Balance.md`]: '---\ntype: savings\nbalance: 1 234,56\n---\n',
+  /* Every OPTIONAL numeric key, written the way a person writes them by hand.
+     These used to go through parseFloat, which reads "15,000" as 15 and
+     "1.234,56" as 1.234 — and because saveAccount writes them back, the next
+     edit to ANY field on this account serialised the truncated figure over the
+     user's own. The values below are chosen so a regression is unmistakable
+     rather than merely off. */
+  [`${B}/Accounts/Grouped Numbers.md`]: '---\ntype: credit_card\ncredit_limit: 15,000\ngoal_amount: 1.234,56\nmonthly_contribution: 2 500\ntotal_invested: 250,000.75\nstarting_amount: 0\n---\n',
 
   [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\naliases: [July budget]\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 | weekly shop \\| incl. household |\n| Kids/School | expense | 1 234,56 | hand-edited cell |\n',
 
@@ -43,6 +50,11 @@ const FILES = {
   [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status |\n|---|---:|---|---|---|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding |\n| Léa | 40.00 | multi<br>line | | paid |\n',
 
   [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n',
+
+  /* A hand-written Assets.md: a space-grouped value that parseFloat would read
+     as 15, an unescaped pipe in a name, a non-ISO valuation date, a kind that
+     is not one of the presets, and a row with nothing but a name. */
+  [`${B}/Assets.md`]: '---\nkind: assets\naliases: [possessions]\n---\n\n# Assets\n\n| Item | Kind | Value | Valued | Notes |\n|------|------|------:|--------|-------|\n| The house \\| Gardens | property | 15 000 000 | 2026-03-01 | bonded \\| see Debts |\n| Corolla | vehicle | 70000.00 | when we bought it | non-ISO date |\n| Rings | jewellery | 60000.00 | 2019-11-02 | multi<br>line |\n| Krugerrands | precious metals | 1.234,56 | | hand-edited cell |\n| Nameplate only | | | | |\n',
 
   [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n',
 
@@ -91,6 +103,19 @@ const FILES = {
   const fnb = S.accounts.find(a => a.name === 'FNB Cheque');
   eq(fnb.balanceRaw, null, 'a canonical balance carries no raw');
 
+  /* The optional numeric keys get the same reading as `balance`, because they
+     are written back the same way. A grouped thousands separator is the normal
+     way to type a credit limit; truncating it is silent data loss. */
+  const grp = S.accounts.find(a => a.name === 'Grouped Numbers');
+  eq(grp.credit_limit, 15000, 'credit_limit "15,000" must read as 15000, not 15');
+  eq(grp.goal_amount, 1234.56, 'goal_amount "1.234,56" must read as 1234.56, not 1.234');
+  eq(grp.monthly_contribution, 2500, 'a space-grouped monthly_contribution must read whole');
+  eq(grp.total_invested, 250000.75, 'a comma-grouped total_invested must keep its cents');
+  // Zero is a figure the file states; it must not collapse into "not set".
+  eq(grp.starting_amount, 0, 'an explicit 0 stays 0');
+  const noneSet = S.accounts.find(a => a.name === 'FNB Cheque');
+  eq(noneSet.credit_limit, null, 'an absent optional number is null, not NaN');
+
   eq(Object.keys(S.txFiles).length, 1, 'one transactions file');
   const txKey = 'FNB Cheque/2026-07';
   ok(S.txFiles[txKey], 'txFiles must be keyed by folder name + month');
@@ -98,6 +123,19 @@ const FILES = {
   eq(S.owed.length, 2, 'both owed rows load');
   eq(S.services.length, 2, 'both services load');
   eq(S.debts.length, 2, 'both debts load');
+
+  eq(S.assets.length, 5, 'every asset row loads, including the one with only a name');
+  const house = S.assets.find(a => a.name === 'The house | Gardens');
+  eq(house.value, 15000000, 'a space-grouped value must be READ, not truncated to 15');
+  eq(house.type, 'property', 'the kind loads');
+  eq(S.assets.find(a => a.name === 'Krugerrands').value, 1234.56,
+    'a decimal-comma value must be read the same way a debt balance is');
+  eq(S.assets.find(a => a.name === 'Corolla').valued, 'when we bought it',
+    'a hand-typed valuation date is kept verbatim rather than blanked');
+  const bare = S.assets.find(a => a.name === 'Nameplate only');
+  eq([bare.value, bare.valued, bare.notes], [0, '', ''],
+    'a row with nothing but a name loads with empty optionals, not NaN');
+  eq(bare.type, 'other', 'and an absent kind is named rather than left blank');
   eq(S.debts[1].balance, 1234.56, 'a decimal-comma debt balance must be READ, not truncated to 1');
   eq(S.debts[0].original, 12000, 'the original amount loads for the paid-off bar');
   eq(S.debts[1].status, 'paid', 'a settled debt keeps its status');
@@ -114,12 +152,14 @@ const FILES = {
   require('../src/views/budgets')(ctx);
   require('../src/views/accounts')(ctx);
   require('../src/views/savings')(ctx);
+  require('../src/views/assets')(ctx);
   require('../src/views/debts')(ctx);
   require('../src/views/owed')(ctx);
   require('../src/views/services')(ctx);
   require('../src/views/tax')(ctx);
 
-  for (const name of ['serializeTxFile', 'serializeDebts', 'serializeOwed', 'serializeServices', 'serializeTax']) {
+  for (const name of ['serializeTxFile', 'serializeDebts', 'serializeOwed', 'serializeServices',
+                      'serializeTax', 'serializeAssets']) {
     ok(typeof ctx[name] === 'function', `${name} must be published on ctx`);
   }
 
@@ -128,6 +168,7 @@ const FILES = {
   rewritten[`${B}/Debts.md`] = ctx.serializeDebts();
   rewritten[`${B}/Owed Money.md`] = ctx.serializeOwed();
   rewritten[`${B}/Services.md`] = ctx.serializeServices();
+  rewritten[`${B}/Assets.md`] = ctx.serializeAssets();
   ctx.S.taxYear = '2026';
   rewritten[`${B}/Tax/2026.md`] = ctx.serializeTax('2026');
 
@@ -141,6 +182,7 @@ const FILES = {
   eq(S2.owed, S.owed, 'owed rows must survive the round-trip');
   eq(S2.services, S.services, 'services rows must survive the round-trip');
   eq(S2.debts, S.debts, 'debt rows must survive the round-trip');
+  eq(S2.assets, S.assets, 'asset rows must survive the round-trip');
 
   const t1 = S.tax['2026'], t2 = S2.tax['2026'];
   for (const k of ['taxpayer_type', 'assessment', 'deadline_standard', 'deadline_provisional',
@@ -158,6 +200,8 @@ const FILES = {
     'owed frontmatter must be preserved verbatim');
   ok(/aliases:\s*\[liabilities\]/.test(rewritten[`${B}/Debts.md`]),
     'debts frontmatter must be preserved verbatim');
+  ok(/aliases:\s*\[possessions\]/.test(rewritten[`${B}/Assets.md`]),
+    'assets frontmatter must be preserved verbatim');
 
   /* ---------------- the non-canonical cell is written back verbatim ------- */
   ok(rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`].includes('1 234,56'),

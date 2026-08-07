@@ -22,7 +22,7 @@
    `display:none` section returns zeroes and would silently collapse the
    geometry. */
 
-const { el } = require('./util');
+const { el } = require('./dom');
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -340,7 +340,7 @@ function rangePills({ ranges, value, onPick, label }) {
 }
 
 module.exports = {
-  NS, themeColors, createChart, scales, gridlines, axisLabels,
+  themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip,
   SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,

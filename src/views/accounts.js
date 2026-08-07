@@ -3,12 +3,16 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
-const { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require('../util');
+const { el, kpiTiles, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { patchFrontmatter, yamlStr } = require('../markdown');
+const { safeSeg } = require('../vault-path');
 const { askFields } = require('../modal');
 /* The reconciliation engine was written here first and now lives in its own
    module, because Savings, Services and Debt all need to make the same argument
    about a hand-typed figure. Behaviour on this page is unchanged. */
-const { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile } = require('../reconcile');
+const { STALE_DAYS, daysSince, isStale, reconcile } = require('../reconcile');
+const { ISO_DATE, todayIso } = require('../dates');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, money, toast, writeFile, ensureFolder, relPath, fileAt,
@@ -55,11 +59,19 @@ module.exports = function registerAccounts(ctx) {
 
   /* Blank → null (field left empty); unparseable → NaN. Callers decide which of
      the two they accept — the balance prompt rejects both, the optional fields
-     on the create form treat blank as "not set". */
+     on the create form treat blank as "not set".
+
+     normalizeAmount rather than a local parseFloat: the old one mapped ',' to
+     '.' and then stripped everything else, so a reader who typed a grouped
+     "1,234.56" got 1.23456 and one who typed "15,000" got 15.0 — and this is
+     the parser standing between the edit dialog and a value that gets written
+     straight back to the account file. It also reads what the loader reads,
+     so a figure cannot change meaning by being opened and re-saved. */
   function parseAmount(v) {
     const s = String(v ?? '').trim();
     if (!s) return null;
-    return parseFloat(s.replace(',', '.').replace(/[^\d.-]/g, ''));
+    const n = normalizeAmount(s);
+    return n === null ? NaN : n;
   }
 
   /* Money in / out for the period the header is showing. Separate from the
@@ -232,10 +244,15 @@ module.exports = function registerAccounts(ctx) {
     const wrap = $('#acctKpis');
     if (!wrap) return;
     wrap.empty();
-    // Assets and liabilities by the SIGN of the balance rather than by account
-    // type: a credit card in credit is not a liability, and an overdrawn cheque
-    // account is one. Net worth is then simply the sum, which is the same
-    // figure Savings & Investments reports.
+    /* By the SIGN of the balance rather than by account type: a credit card in
+       credit is not a liability, and an overdrawn cheque account is one.
+
+       Scoped to THIS PAGE's accounts, and says so. Savings & Investments
+       reports a whole-household net worth that also carries the Assets page
+       and the Debt page, so the two figures legitimately differ — but a tile
+       labelled "Net worth" with no qualifier reads as the household's, and a
+       reader who spots the two disagreeing has no way to tell which is wrong.
+       The sub-line is what makes them both true at once. */
     let assets = 0, liabilities = 0;
     for (const a of S.accounts) {
       if (a.balance >= 0) assets += a.balance; else liabilities += -a.balance;
@@ -248,15 +265,18 @@ module.exports = function registerAccounts(ctx) {
       return reconcile(a, e.rows).state === 'drift';
     }).length;
 
-    const tile = (l, v, cls, sub) => {
-      const t = el('div', { class: 'mini' },
-        el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v));
-      if (sub) t.append(el('div', { class: 's' }, sub));
-      wrap.append(t);
-    };
-    tile('Assets', money(assets), 'text-success');
-    tile('Liabilities', money(liabilities), liabilities > 0 ? 'text-danger' : '');
-    tile('Net worth', money(assets - liabilities), assets - liabilities >= 0 ? 'grad-txt' : 'text-danger');
+    // Only qualify the tile when there IS something elsewhere for it to
+    // disagree with — on a vault with no assets and no debts the two pages
+    // report the same number, and a caveat about a difference that does not
+    // exist is just noise.
+    const elsewhere = (S.assets || []).some(a => a.value > 0)
+      || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
+
+    const tile = kpiTiles(wrap);
+    tile('In credit', money(assets), 'text-success');
+    tile('Overdrawn', money(liabilities), liabilities > 0 ? 'text-danger' : '');
+    tile('Net worth', money(assets - liabilities), assets - liabilities >= 0 ? 'grad-txt' : 'text-danger',
+      elsewhere ? 'across these accounts only' : null);
     tile('Needs attention', String(attention), attention > 0 ? 'text-warning' : '',
       attention > 0 ? 'unverified or drifting balances' : 'every balance checks out');
   }

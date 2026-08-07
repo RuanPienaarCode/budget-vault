@@ -44,6 +44,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
     </button>
+    <button class="drawer-link" data-view="assets">
+      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span>Assets
+    </button>
     <button class="drawer-link" data-view="debts">
       <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
     </button>
@@ -329,6 +332,27 @@ const SHELL_HTML = `
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
+      </section>
+
+      <section id="view-assets" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Assets</h1>
+          <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
+        </div>
+        <div class="mini-grid mini-kpis-4" id="assetKpis"></div>
+        <div class="kpi-caveat mb-4" id="assetStale"></div>
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>What you own</h2><div class="sub">Edit a value or a valuation date, then save</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="assetAdd"><span class="ico" data-ico="plus"></span> New asset</button>
+              <button class="btn-gradient" id="assetSave" disabled>Save changes</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table table-hover" id="assetTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-debts" class="hidden">

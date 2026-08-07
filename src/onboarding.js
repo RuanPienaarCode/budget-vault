@@ -8,7 +8,9 @@
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
 const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require('./constants');
-const { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require('./util');
+const { periodDaysOrZero } = require('./dates');
+const { normalizeAmount } = require('./amount');
+const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
 
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
@@ -98,12 +100,9 @@ function currentPeriodFor(day) {
    today is normally after it — but nothing stops someone entering their next
    one, and a truncating divide would put them a period out. */
 function currentPeriodForCycle(days, anchor) {
-  const now = new Date();
-  const today = isoDayNumber(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
+  const today = isoDayNumber(todayIso());
   const a = isoDayNumber(anchor);
-  const start = a + Math.floor((today - a) / days) * days;
-  const d = new Date(start * 86400000);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  return isoFromDayNumber(a + Math.floor((today - a) / days) * days);
 }
 const safeFileName = s => s.replace(/[\\/:*?"<>|]/g, '-').trim();
 
@@ -239,7 +238,7 @@ class OnboardingWizard extends Modal {
   async prefillFromSettingsMd() {
     const f = this.app.vault.getFileByPath(normalizePath(this.data.folder + '/Settings.md'));
     if (!f) return;
-    const { parseFrontmatter } = require('./util');
+    const { parseFrontmatter } = require('./markdown');
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     // Shape and phase read independently, the same way Settings.md stores them.
     // They no longer compete: a fortnightly vault keeps its cycle AND its month
@@ -542,8 +541,8 @@ class OnboardingWizard extends Modal {
     if (this.mode === 'create') {
       rows.push(['Categories', `${this.data.cats.size} starter categories`]);
       rows.push(['First account', this.data.acctName.trim() || '—']);
-      const bal = parseFloat(String(this.data.acctBalance).replace(',', '.').replace(/[^\d.-]/g, ''));
-      if (this.data.acctName.trim() && !isNaN(bal) && bal !== 0) rows.push(['Opening balance', `${this.currencySymbol()} ${bal.toFixed(2)}`]);
+      const bal = this.openingBalance();
+      if (this.data.acctName.trim() && bal !== 0) rows.push(['Opening balance', `${this.currencySymbol()} ${bal.toFixed(2)}`]);
     }
     c.createEl('p', {
       text: this.mode === 'connect'
@@ -592,6 +591,16 @@ class OnboardingWizard extends Modal {
   }
   currencySymbol() {
     return (this.data.currency === '__custom__' ? this.data.customCurrency.trim() : this.data.currency) || 'R';
+  }
+  /* The typed opening balance as a number, 0 if it can't be read. One method
+     rather than the same expression on the summary step and again in the
+     writer: those two used a local parser that mapped ',' to '.' and stripped
+     the rest, so someone typing a grouped "15,000" was SHOWN 15.00 on the
+     confirmation screen and then had 15.00 written into their account file.
+     normalizeAmount reads what the loader reads, so the figure the summary
+     promises is the figure that lands on disk. */
+  openingBalance() {
+    return normalizeAmount(this.data.acctBalance) ?? 0;
   }
 
   /* Write-guard stamped create: skip files that already exist so re-running
@@ -661,13 +670,12 @@ class OnboardingWizard extends Modal {
         const acct = this.data.acctName.trim();
         if (acct) {
           const safe = safeFileName(acct);
-          const today = new Date();
-          const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-          const bal = parseFloat(String(this.data.acctBalance).replace(',', '.').replace(/[^\d.-]/g, ''));
+          const ymd = todayIso();
+          const bal = this.openingBalance();
           await this.writeIfAbsent(normalizePath(`${folder}/Accounts/${safe}.md`),
             `---\ntype: ${this.data.acctType}\n` +
             (this.data.acctInstitution.trim() ? `institution: ${this.data.acctInstitution.trim()}\n` : '') +
-            `balance: ${(isNaN(bal) ? 0 : bal).toFixed(2)}\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
+            `balance: ${bal.toFixed(2)}\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
           await this.ensureFolder(normalizePath(`${folder}/Transactions/${safe}`));
         }
         const period = this.firstPeriod();

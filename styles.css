@@ -1086,6 +1086,12 @@
 .budget-app-root .owed-age { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 2px; }
 .budget-app-root .owed-acts { display: inline-flex; gap: 4px; }
 
+/* Assets — how old the valuation under each item's name is. Warning-coloured
+   past a year rather than hidden: an out-of-date figure is still the best one
+   anybody has, it just should not read as freshly measured. */
+.budget-app-root .asset-age { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 2px; }
+.budget-app-root .asset-age-old { color: var(--color-warning); }
+
 /* Debt — where the amortisation schedule says the balance should be. */
 .budget-app-root .debt-implied { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 3px; cursor: help; }
 

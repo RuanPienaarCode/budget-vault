@@ -5,11 +5,13 @@
    The arithmetic lives in ../debt-math (pure, separately tested); this file is
    presentation and editing only. */
 
-const { el, keepScroll, escMd, icoEl } = require('../util');
+const { el, kpiTiles, keepScroll, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { escMd } = require('../markdown');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
-const { todayIso } = require('../reconcile');
+const { todayIso } = require('../dates');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
@@ -23,8 +25,7 @@ const DEBT_TYPES = ['credit card', 'personal loan', 'vehicle', 'home loan', 'stu
 module.exports = function registerDebts(ctx) {
   const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod } = ctx;
 
-  const mark = () => { S.debtsDirty = true; $('#debtSave').disabled = false; };
-  ctx.registerDirty(() => S.debtsDirty);
+  const { mark, clear: clearDirty } = ctx.dirtyFlag('debtsDirty', '#debtSave');
 
   /* Copies, each stamped with a stable `key`, because two debts can share a
      name — "Credit card" once per bank is the normal case, not an edge one —
@@ -58,12 +59,7 @@ module.exports = function registerDebts(ctx) {
     const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
     const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
 
-    const kpis = $('#debtKpis'); kpis.empty();
-    const tile = (l, v, cls, sub) => {
-      const t = el('div', { class: 'mini' }, el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v));
-      if (sub) t.append(el('div', { class: 's' }, sub));
-      kpis.append(t);
-    };
+    const tile = kpiTiles($('#debtKpis'));
     tile('Total debt', money(total), total > 0 ? 'text-danger' : 'text-success',
       `${list.length} active · ${S.debts.length} tracked`);
     tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
@@ -441,7 +437,7 @@ module.exports = function registerDebts(ctx) {
 
   async function saveDebts() {
     await writeFile('Debts.md', serializeDebts());
-    S.debtsDirty = false; $('#debtSave').disabled = true;
+    clearDirty();
     toast('Saved Debts.md');
   }
 
@@ -461,10 +457,8 @@ module.exports = function registerDebts(ctx) {
        and focus restores by row index, so nothing downstream needs the name to
        be distinct. */
     const name = r.name.trim();
-    const num = v => parseFloat(String(v ?? '').replace(',', '.'));
-    const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
-    if ([balance, rate, payment].some(isNaN)) return toast('Balance, rate and payment must be numbers', true);
-    const today = new Date();
+    const balance = normalizeAmount(r.balance), rate = normalizeAmount(r.rate), payment = normalizeAmount(r.payment);
+    if ([balance, rate, payment].some(v => v === null)) return toast('Balance, rate and payment must be numbers', true);
     S.debts.push({
       name, lender: (r.lender || '').trim(), type: r.type || 'other',
       balance: Math.max(0, balance),
@@ -472,10 +466,10 @@ module.exports = function registerDebts(ctx) {
       // one; edit it in Debts.md to the real original amount for a true figure.
       original: Math.max(0, balance),
       rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
-      start: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+      start: todayIso(),
       category: (r.category || '').trim(), status: 'active', notes: '',
     });
-    S.debtsDirty = true; $('#debtSave').disabled = false; renderDebts();
+    mark(); renderDebts();
   }
 
   // The three planner controls all recompute the same two panels.

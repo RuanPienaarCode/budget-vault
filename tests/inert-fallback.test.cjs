@@ -72,8 +72,8 @@ global.HTMLElement = function HTMLElement() {};
 global.HTMLElement.prototype = {};
 assert.ok(!('inert' in global.HTMLElement.prototype), 'precondition: inert unsupported');
 
-delete require.cache[require.resolve('../src/util.js')];
-const { setInert } = require('../src/util.js');
+delete require.cache[require.resolve('../src/dom.js')];
+const { setInert } = require('../src/dom.js');
 
 /* --- fixture ----------------------------------------------------------- */
 const drawer = new FakeEl('nav', { id: 'drawer' });

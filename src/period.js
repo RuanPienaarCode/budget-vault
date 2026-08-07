@@ -20,7 +20,9 @@
    a whole number of intervals actually moves a boundary. */
 
 const { MONTHS } = require('./constants');
-const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum, isRealIsoDate } = require('./util');
+const { periodDaysOrZero } = require('./dates');
+const { safeSeg } = require('./vault-path');
+const { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require('./dates');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -31,24 +33,18 @@ const { safeSeg, periodDaysOrZero, isoDayNumber: dayNum, isRealIsoDate } = requi
 
    Absent or zero means the payday month, so a vault that has never heard of
    this setting behaves exactly as it always did. The band the value must fall
-   in is enforced by periodDaysOrZero in util.js, which the loader applies on
+   in is enforced by periodDaysOrZero in dates.js, which the loader applies on
    the way in so the stored setting and the running one can never disagree. */
 
 /* Month 01–12, not any two digits: '2026-13' is date-SHAPED but not a month,
    and Date's rollover turned it into a real 31-day window titled "undefined
    2026" that the arrows would happily walk into. */
 const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
-const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-/* Whole-day arithmetic in UTC. Local-time date maths would drift by a day
-   across a DST boundary — a period would silently gain or lose a day twice a
-   year, which is exactly the kind of failure that shows up as "my totals moved"
-   with no error to point at. */
-const DAY = 86400000;
-function isoFromDayNum(n) {
-  const d = new Date(n * DAY);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-}
+/* Whole-day arithmetic in UTC (dayNum / isoFromDayNum, from src/dates.js).
+   Local-time date maths would drift by a day across a DST boundary — a period
+   would silently gain or lose a day twice a year, which is exactly the kind of
+   failure that shows up as "my totals moved" with no error to point at. */
 
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
@@ -116,17 +112,15 @@ module.exports = function registerPeriod(ctx) {
     if (n === 1) {
       return { start: `${p}-01`, end: `${p}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}` };
     }
-    const sd = new Date(y, m - 2, n);
-    const ed = new Date(y, m - 1, n - 1);
-    const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return { start: f(sd), end: f(ed) };
+    // Constructed and read in local time, so the month boundary is the one the
+    // reader's own calendar shows — isoOf reads with the same local getters.
+    return { start: isoOf(new Date(y, m - 2, n)), end: isoOf(new Date(y, m - 1, n - 1)) };
   }
   function currentPeriod() {
     const now = new Date();
     const iv = intervalDays();
     if (iv) {
-      const today = dayNum(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
-      return isoFromDayNum(periodStartOnOrBefore(today, iv));
+      return isoFromDayNum(periodStartOnOrBefore(dayNum(isoOf(now)), iv));
     }
     let y = now.getFullYear(), m = now.getMonth() + 1;
     if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {

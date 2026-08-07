@@ -21,6 +21,8 @@
    useful, honest answer, and far better than confidently pairing a service with
    another company's debit order. */
 
+const { ISO_DATE, isoDayNumber } = require('./dates');
+
 /* Words that appear in so many service names they cannot identify a merchant. */
 const STOP = new Set([
   'the', 'and', 'for', 'with', 'plan', 'plus', 'pro', 'premium', 'couple', 'family',
@@ -143,9 +145,6 @@ function matchCharges(service, rows, tokens) {
   };
 }
 
-const DAY = 86400000;
-const dayNum = iso => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
-const isoOf = n => new Date(n * DAY).toISOString().slice(0, 10);
 
 /* When the next charge is due, predicted from the last one and the cycle.
    Beats the hand-typed field it replaces, every value of which was months in
@@ -178,8 +177,8 @@ function nextExpected(stats, cycle) {
      'overdue'  nothing for more than two cycles */
 function chargeStatus(stats, cycle, today) {
   if (!stats) return { state: 'unseen', daysSince: null };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(today || '')) return { state: 'active', daysSince: null };
-  const gap = dayNum(today) - dayNum(stats.last);
+  if (!ISO_DATE.test(today || '')) return { state: 'active', daysSince: null };
+  const gap = isoDayNumber(today) - isoDayNumber(stats.last);
   const cycleDays = cycle === 'annual' ? 365 : 31;
   return { state: gap > cycleDays * 2 ? 'overdue' : 'active', daysSince: gap };
 }
@@ -208,5 +207,4 @@ function comparePrice(service, stats) {
 
 module.exports = {
   normDesc, serviceTokens, matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice,
-  _dayNum: dayNum, _isoOf: isoOf,
 };
