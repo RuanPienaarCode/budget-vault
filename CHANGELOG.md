@@ -5,16 +5,6 @@ All notable changes to Budget Vault. Versions match the plugin version in
 
 ## 1.11.0 — 2026-08-07
 
-### Changed
-
-- **The Afrikaans reads like Afrikaans now.** A batch of phrases had been
-  translated word by word, which is accurate on each word and wrong as a
-  sentence — "Where it went" had become "Waarheen dit is", which is not
-  something anyone would say. It now reads "Waar dit gegaan het", and fifteen
-  others were rewritten the same way: "dated ahead" no longer comes out as
-  "vorentoe gedateer", stale balances are "bereken uit" rather than "gebou uit",
-  and "oudste {n} dae uit" became "oudste al {n} dae uitstaande".
-
 ### Added
 
 - **The Accounts page is translated.** Group headings, account types, the four
@@ -27,6 +17,14 @@ All notable changes to Budget Vault. Versions match the plugin version in
   when you create it and another when you edit it.
 
 ### Changed
+
+- **The Afrikaans reads like Afrikaans now.** A batch of phrases had been
+  translated word by word, which is accurate on each word and wrong as a
+  sentence — "Where it went" had become "Waarheen dit is", which is not
+  something anyone would say. It now reads "Waar dit gegaan het", and fifteen
+  others were rewritten the same way: "dated ahead" no longer comes out as
+  "vorentoe gedateer", stale balances are "bereken uit" rather than "gebou uit",
+  and "oudste {n} dae uit" became "oudste al {n} dae uitstaande".
 
 - **The plugin is a quarter smaller and starts faster**, on the phone most of
   all. The shipped bundle is built minified from now on: 679KB down to 504KB.
