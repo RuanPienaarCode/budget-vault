@@ -2,13 +2,47 @@
 /* Services — recurring subscriptions grouped by budget category, saved to
    Services.md. */
 
-const { el, dateInput, keepScroll, escMd } = require('../util');
+const { el, dateInput, keepScroll, escMd, icoEl } = require('../util');
 const { askFields } = require('../modal');
+const { todayIso } = require('../reconcile');
+const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
 
 module.exports = function registerServices(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
   function monthlyEquiv(s) { return s.cycle === 'annual' ? s.amount / 12 : s.amount; }
+
+  /* ------------------- what the statements actually say -------------------
+     The list on this page is what the reader BELIEVES they pay. The vault holds
+     what was really charged, and until now nothing compared the two — so the
+     page drifted quietly: a fibre line listed R40 under its real price, a
+     subscription still marked active whose description had stopped appearing
+     five months earlier, and a "next billing" column every value of which was
+     months in the past.
+
+     Built once per render over every transaction, then handed to each row —
+     matching per service inside the row loop would walk the whole history once
+     per service. */
+  function chargeIndex() {
+    const rows = [];
+    for (const f of Object.values(S.txFiles)) for (const r of f.rows) rows.push(r);
+    const today = todayIso();
+    const out = new Map();
+    for (const s of S.services) {
+      const m = matchCharges(s, rows);
+      const stats = chargeStats(m.charges);
+      out.set(s, {
+        stats,
+        // Liveness follows the MERCHANT — every description the tokens hit —
+        // because a renamed debit order is not a cancellation.
+        status: chargeStatus(chargeStats(m.all), s.cycle, today),
+        price: comparePrice(s, stats),
+        next: nextExpected(stats, s.cycle),
+        related: m.related,
+      });
+    }
+    return out;
+  }
   const mark = () => { S.servicesDirty = true; $('#svcSave').disabled = false; };
   ctx.registerDirty(() => S.servicesDirty);
 
@@ -41,8 +75,52 @@ module.exports = function registerServices(ctx) {
     }
   }
 
+  /* Badges beside the service name. Every one of them is a QUESTION or an
+     observation, never an assertion: this can see an absence of charges, and an
+     absence is not a cancellation — a bank posts late, a card gets reissued,
+     an annual plan is silent for eleven months by design. */
+  function svcFlags(s, c) {
+    const out = [];
+    if (!c.stats) {
+      out.push(el('span', { class: 'category-badge badge-dup',
+        title: `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.` },
+      'not seen'));
+      return out;
+    }
+    if (s.active && c.status && c.status.state === 'overdue') {
+      const months = Math.round(c.status.daysSince / 30);
+      out.push(el('span', { class: 'category-badge badge-transfer',
+        title: `Last charged ${c.stats.last}. Still marked active — has it been cancelled?` },
+      `last charged ${months}mo ago`));
+    }
+    if (c.price && c.price.varies) {
+      out.push(el('span', { class: 'category-badge badge-dup',
+        title: 'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.' },
+      'varies'));
+    } else if (c.price && !c.price.agrees) {
+      const d = c.price.diff;
+      out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`,
+        title: `Your bank is charging ${money(c.price.actual)}, not ${money(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.` },
+      `really ${money(c.price.actual, 0)}`));
+    }
+    return out;
+  }
+
+  /* A one-tap "use the date the charges imply". Only offered when it differs
+     from what is already there, so a correct row shows nothing. */
+  function svcNextHint(s, c) {
+    const stale = !s.next || s.next < todayIso();
+    const btn = el('button', { type: 'button', class: 'svc-next-hint',
+      title: `Billed around day ${c.stats.day} each ${s.cycle === 'annual' ? 'year' : 'month'}; last charged ${c.stats.last}.`,
+      'aria-label': `Set next billing for ${s.name} to ${c.next}` },
+    icoEl(['calendar-check', 'calendar']), stale ? `due ${c.next}` : c.next);
+    btn.addEventListener('click', () => { s.next = c.next; mark(); renderServices(); });
+    return btn;
+  }
+
   function renderServices() {
     renderServicesKpis();
+    const charged = chargeIndex();
     const t = $('#svcTable');
     keepScroll(t, () => {
       t.empty();
@@ -59,8 +137,9 @@ module.exports = function registerServices(ctx) {
           el('td', { class: 'num' }, `${money(gMonthly, 0)}/mo`)));
         for (const s of groups[cat]) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
+          const c = charged.get(s) || {};
           body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
-            el('td', { style: 'font-weight:600' }, s.name),
+            el('td', { style: 'font-weight:600' }, s.name, ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
               'aria-label': `Amount for ${s.name}`,
@@ -73,7 +152,13 @@ module.exports = function registerServices(ctx) {
             // renders blank in a date input, hiding a value that is still on disk.
             el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm', style: 'width:140px',
               'aria-label': `Next billing date for ${s.name}` },
-              v => { s.next = v; mark(); })),
+              v => { s.next = v; mark(); }),
+            /* The typed date is a fossil the moment it passes — every value on
+               the vault this was built against was months old. The charge
+               history already knows: billed on the 2nd, last seen 2 July, so
+               next is 2 August. Offered rather than written, because the reader
+               may be tracking a plan change the history cannot know about. */
+            ...(c.next && c.next !== s.next ? [svcNextHint(s, c)] : [])),
             el('td', {}, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
               onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
             el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,

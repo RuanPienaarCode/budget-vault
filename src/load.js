@@ -148,9 +148,14 @@ module.exports = function registerLoad(ctx) {
     S.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
     if (owedTxt) for (const c of parseMdTable(owedTxt).slice(1)) {
       if (!c[0]) continue;
+      /* Columns 5 and 6 (repaid, lent) are additive: a file written before they
+         existed has neither, and must mean exactly what it always meant —
+         nothing repaid, no lending date. Never reorder the first five. */
       S.owed.push({
         person: unescMd(c[0]), amount: parseFloat(c[1]) || 0, description: unescMd(c[2] || ''),
         due: (c[3] || '').trim(), status: (c[4] || 'outstanding').trim().toLowerCase() === 'paid' ? 'paid' : 'outstanding',
+        repaid: parseFloat(c[5]) || 0,
+        lent: (c[6] || '').trim(),
       });
     }
 

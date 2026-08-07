@@ -3,22 +3,12 @@
 
 const { el, icoEl } = require('../util');
 const { themeColors, createChart, tip } = require('../chart');
-const { isStale, stalenessSummary } = require('../reconcile');
+const { isStale, stalenessSummary, reconcile, todayIso } = require('../reconcile');
+const { accountFlows } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, debtsByType } = require('../worth');
 
 module.exports = function registerSavings(ctx) {
-  const { S, $, root, money, accountForLabel } = ctx;
-
-  /* Does the vault hold transactions for this account? If it does, money has
-     been moving through it that `total_invested` knows nothing about — which is
-     what makes the figure below not-growth. Also the seam the derived
-     contribution split will read from once it exists. */
-  function hasTransactions(a) {
-    for (const f of Object.values(S.txFiles)) {
-      if (accountForLabel(f.label) === a && f.rows && f.rows.length) return true;
-    }
-    return false;
-  }
+  const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
 
   function renderSavings() {
     const savings = S.accounts.filter(a => a.type === 'savings');
@@ -50,7 +40,19 @@ module.exports = function registerSavings(ctx) {
     renderWorth();
 
     renderGoals();
-    renderSections(savings, investments);
+    renderSections(savings, investments, accountIndex());
+  }
+
+  /* Accept the implied balance. Identical contract to the Accounts page: stamp
+     today, so the rows just absorbed cannot be counted a second time — the next
+     reconciliation window starts clear of them. */
+  async function acceptImplied(a, implied) {
+    a.balance = implied;
+    a.balanceRaw = null;
+    a.balance_updated = todayIso();
+    await saveAccount(a);
+    renderSavings();
+    toast(`${a.name} reconciled to ${money(implied)}`);
   }
 
   /* ----------------------- how old is this number ------------------------
@@ -116,7 +118,7 @@ module.exports = function registerSavings(ctx) {
     }
   }
 
-  function renderSections(savings, investments) {
+  function renderSections(savings, investments, idx) {
     const wrap = $('#savingsSections'); wrap.empty();
     for (const [title, list] of [['Savings', savings], ['Investments', investments]]) {
       if (!list.length) continue;
@@ -129,33 +131,70 @@ module.exports = function registerSavings(ctx) {
           el('div', { class: 'l' }, a.name),
           el('div', { class: 'v num' }, money(a.balance)),
           el('div', { class: 's' }, parts.filter(Boolean).join(' · ')));
-        /* total_invested (what you've put in) is the better baseline; fall back
-           to starting_amount (what it opened with) so that field isn't inert.
+        /* What the balance is MADE of, derived from the account's own
+           transactions: contributions are money the household put in, growth is
+           what the account earned on its own. The old single figure —
+           `balance − total_invested` — called the whole difference growth, and
+           since nothing keeps total_invested in step with a debit order, every
+           contribution was reported as performance. */
+        const rows = (idx.get(a) || {}).rows || [];
+        const flows = accountFlows(a, rows, catType);
 
-           This figure is NOT growth, and no longer claims to be. `balance −
-           what you put in` only equals growth while `total_invested` keeps pace
-           with every contribution — and nothing makes it. A monthly debit order
-           moves the balance and leaves the baseline where it was, so the
-           difference grows by the contribution and reports it as performance.
-           Measured against four real accounts, that was wrong on all four.
+        if (flows.basis === 'derived') {
+          const g = flows.growth;
+          const line = el('div', { class: 's2' },
+            `in ${money(flows.contributions, 0)} · `,
+            el('span', { class: `num ${g >= 0 ? 'text-success' : 'text-danger'}` },
+              `${g >= 0 ? '▲' : '▼'} ${money(Math.abs(g), 0)}`));
+          if (flows.withdrawals) line.append(` · out ${money(flows.withdrawals, 0)}`);
+          card.append(line);
+          /* Growth is recognised by category TYPE, and income the household
+             EARNED and then deposited here is income-type too — counselling
+             fees paid into a savings account, a salary routed straight to it.
+             Neither is growth: the household put that money in, the account did
+             not earn it. Nothing in the data tells the two apart.
 
-           Until the split is derived from transactions, the honest thing is to
-           show the arithmetic under its true name and say what is folded into
-           it. An account the vault holds transactions for is the case where the
-           overstatement is certain, so it is the one that gets told. */
-        const baseline = a.total_invested || a.starting_amount;
-        if (baseline) {
-          const over = a.balance - baseline;
-          card.append(el('div', { class: `s2 num ${over >= 0 ? 'text-success' : 'text-danger'}` },
-            `${over >= 0 ? '▲' : '▼'} ${money(Math.abs(over), 0)} vs ${money(baseline, 0)} in`));
-          if (hasTransactions(a)) {
+             So where more than one category fed the figure, they are named ON
+             the card rather than in a tooltip. On the vault this was built
+             against, one account's growth was 41% counselling income — an
+             error big enough that hiding it behind a hover would have been the
+             same silent overstatement this whole change set out to end. */
+          if (flows.growthCategories.length > 1) {
             card.append(el('div', { class: 's2 s2-caveat',
-              title: 'This is the balance less what the account file records as put in — not growth. '
-                + 'Contributions since that figure was last updated are counted inside it.' },
-            'includes contributions'));
+              title: 'Anything here that is not interest or dividends is really a contribution. '
+                + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.' },
+            'growth from ' + flows.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', ')));
           }
+        } else if (flows.basis === 'stated') {
+          /* No transactions for this account, so the hand-typed baseline is the
+             only signal there is. Shown, but never called derived. */
+          const over = flows.growth;
+          card.append(el('div', { class: `s2 num ${over >= 0 ? 'text-success' : 'text-danger'}` },
+            `${over >= 0 ? '▲' : '▼'} ${money(Math.abs(over), 0)} vs ${money(flows.opening, 0)} in`));
+          card.append(el('div', { class: 's2 s2-caveat',
+            title: 'No transactions in the vault for this account, so this is the balance less what the '
+              + 'account file records as put in. Import its statements and the split becomes real.' },
+          'from the account file'));
         } else if (a.inception_date) {
           card.append(el('div', { class: 's2' }, `since ${a.inception_date}`));
+        }
+
+        /* Reconciliation — the same argument the Accounts page makes, on the
+           page where the balance is largest and least often confirmed. */
+        const rec = reconcile(a, rows);
+        if (rec.state === 'drift') {
+          const line = el('div', { class: 'acct-recon' },
+            el('div', { class: 'acct-recon-txt' },
+              `${rec.count} since · implies `, el('b', { class: 'num' }, money(rec.implied)),
+              rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
+          const btn = el('button', { type: 'button', class: 'acct-recon-btn',
+            'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` }, icoEl(['check']), 'Use this');
+          btn.addEventListener('click', () => acceptImplied(a, rec.implied));
+          line.append(btn);
+          card.append(line);
+        } else if (rec.state === 'clean') {
+          card.append(el('div', { class: 'acct-recon' },
+            el('div', { class: 'acct-recon-txt text-success' }, 'Matches your transactions')));
         }
         grid.append(card);
       }

@@ -12,7 +12,7 @@ const { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile } = requir
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, money, toast, writeFile, ensureFolder, relPath, fileAt,
-    txInPeriod, accountForLabel, periodMonthName } = ctx;
+    txInPeriod, accountForLabel, accountIndex, periodMonthName } = ctx;
 
   // Every type the loader can produce must appear in exactly one group, or an
   // account renders nowhere on this page — including `other`, which is what a
@@ -60,23 +60,6 @@ module.exports = function registerAccounts(ctx) {
     const s = String(v ?? '').trim();
     if (!s) return null;
     return parseFloat(s.replace(',', '.').replace(/[^\d.-]/g, ''));
-  }
-
-  /* ------------------------- transaction linkage -------------------------
-     One pass over S.txFiles, grouped onto the account each folder belongs to.
-     Built once per render: resolving per account instead would walk every
-     month file once per account. */
-  function accountIndex() {
-    const idx = new Map();   // account -> { rows, labels:Set }
-    for (const f of Object.values(S.txFiles)) {
-      const a = accountForLabel(f.label);
-      if (!a) continue;      // an orphan folder with no account file
-      let e = idx.get(a);
-      if (!e) { e = { rows: [], labels: new Set() }; idx.set(a, e); }
-      e.labels.add(f.label);
-      for (const r of f.rows) e.rows.push(r);
-    }
-    return idx;
   }
 
   /* Money in / out for the period the header is showing. Separate from the
@@ -515,9 +498,11 @@ module.exports = function registerAccounts(ctx) {
     toast(`Created Accounts/${name}.md`);
   }
 
-  // accountIndex and accountReconcile are published so a test can drive the
-  // REAL linkage and arithmetic — the same reason owed.js publishes its
-  // serializer. Nothing else on ctx calls them.
-  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, accountIndex,
+  // accountReconcile is published so a test can drive the REAL arithmetic — the
+  // same reason owed.js publishes its serializer. Nothing else on ctx calls it.
+  // accountIndex used to be published here too; it now lives on period.js,
+  // which is where Savings reaches it from as well. Publishing it twice would
+  // be a duplicate ctx key, which shell-contract.test.cjs rejects.
+  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };

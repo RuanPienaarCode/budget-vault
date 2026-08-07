@@ -4,9 +4,17 @@ var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, 
 // src/constants.js
 var require_constants = __commonJS((exports2, module2) => {
   var VIEW_TYPE = "budget-app-view";
+  var PALETTE_PRESETS = {
+    "vault-green": "Vault Green",
+    ocean: "Ocean",
+    plum: "Plum",
+    slate: "Slate"
+  };
+  var DEFAULT_PALETTE = "vault-green";
   var DEFAULT_SETTINGS = {
     budgetFolder: "Finances/Budget",
     theme: "auto",
+    palette: DEFAULT_PALETTE,
     openOnStartup: false,
     onboarded: false,
     privacyLock: true,
@@ -24,7 +32,7 @@ var require_constants = __commonJS((exports2, module2) => {
   }
   var TYPE_ORDER = ["income", "expense", "debt", "services", "insurance", "giving", "savings", "investment", "luxuries", "transfer"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, periodLengthOptions };
+  module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions };
 });
 
 // src/util.js
@@ -732,7 +740,8 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero mb-4" id="heroCard"></div>
+        <div class="card hero" id="heroCard"></div>
+        <div class="kpi-caveat mb-4" id="dashStale"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -2262,6 +2271,23 @@ var require_period = __commonJS((exports2, module2) => {
       const want = safeSeg(label);
       return S.accounts.find((a) => a.tx_label === label || a.name === label || safeSeg(a.name) === want) || null;
     }
+    function accountIndex() {
+      const idx = new Map;
+      for (const f of Object.values(S.txFiles)) {
+        const a = accountForLabel(f.label);
+        if (!a)
+          continue;
+        let e = idx.get(a);
+        if (!e) {
+          e = { rows: [], labels: new Set };
+          idx.set(a, e);
+        }
+        e.labels.add(f.label);
+        for (const r of f.rows)
+          e.rows.push(r);
+      }
+      return idx;
+    }
     function nonBudgetLabels() {
       const out = new Set;
       for (const f of Object.values(S.txFiles)) {
@@ -2350,6 +2376,7 @@ var require_period = __commonJS((exports2, module2) => {
       monthlyIncome,
       budgetTotals,
       accountForLabel,
+      accountIndex,
       nonBudgetLabels,
       intervalDays,
       periodKeyValid
@@ -2482,7 +2509,9 @@ var require_load = __commonJS((exports2, module2) => {
             amount: parseFloat(c[1]) || 0,
             description: unescMd(c[2] || ""),
             due: (c[3] || "").trim(),
-            status: (c[4] || "outstanding").trim().toLowerCase() === "paid" ? "paid" : "outstanding"
+            status: (c[4] || "outstanding").trim().toLowerCase() === "paid" ? "paid" : "outstanding",
+            repaid: parseFloat(c[5]) || 0,
+            lent: (c[6] || "").trim()
           });
         }
       S.debts = [];
@@ -2950,6 +2979,62 @@ Budget category of type **${type}**.
   };
 });
 
+// src/reconcile.js
+var require_reconcile = __commonJS((exports2, module2) => {
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var STALE_DAYS = 30;
+  function todayIso() {
+    const d = new Date;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function daysSince(iso, today) {
+    if (!ISO_DATE.test(iso || ""))
+      return null;
+    const then = new Date(`${iso}T00:00:00`);
+    if (isNaN(then.getTime()))
+      return null;
+    const now = ISO_DATE.test(today || "") ? new Date(`${today}T00:00:00`) : new Date;
+    now.setHours(0, 0, 0, 0);
+    return Math.round((now.getTime() - then.getTime()) / 86400000);
+  }
+  function isStale(iso, today) {
+    const d = daysSince(iso, today);
+    return d === null || d > STALE_DAYS;
+  }
+  function reconcile(a, rows, today) {
+    if (!rows || !rows.length)
+      return { state: "no-tx" };
+    if (!ISO_DATE.test(a.balance_updated || ""))
+      return { state: "no-date" };
+    const now = ISO_DATE.test(today || "") ? today : todayIso();
+    const since = [], ahead = [];
+    for (const r of rows) {
+      if (r.date <= a.balance_updated)
+        continue;
+      (r.date > now ? ahead : since).push(r);
+    }
+    const delta = since.reduce((s, r) => s + r.amount, 0);
+    if (!since.length) {
+      return ahead.length ? { state: "pending", ahead: ahead.length } : { state: "clean" };
+    }
+    return { state: "drift", count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
+  }
+  function stalenessSummary(accounts, today) {
+    let stale = 0, oldest = null, dated = 0;
+    for (const a of accounts || []) {
+      const d = daysSince(a.balance_updated, today);
+      if (d !== null)
+        dated++;
+      if (isStale(a.balance_updated, today))
+        stale++;
+      if (d !== null && (oldest === null || d > oldest))
+        oldest = d;
+    }
+    return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
+  }
+  module2.exports = { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile, stalenessSummary };
+});
+
 // src/chart.js
 var require_chart = __commonJS((exports2, module2) => {
   var { el } = require_util();
@@ -3162,6 +3247,7 @@ var require_chart = __commonJS((exports2, module2) => {
 var require_dashboard = __commonJS((exports2, module2) => {
   var { el, icoEl, safeSeg } = require_util();
   var { TYPE_ORDER } = require_constants();
+  var { stalenessSummary } = require_reconcile();
   var {
     themeColors,
     createChart,
@@ -3180,7 +3266,49 @@ var require_dashboard = __commonJS((exports2, module2) => {
   } = require_chart();
   module2.exports = function registerDashboard(ctx) {
     const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
+    function guard(sel, label, fn) {
+      try {
+        fn();
+      } catch (e) {
+        console.error(`Budget: the ${label} card failed to render`, e);
+        try {
+          const box = $(sel);
+          if (!box)
+            return;
+          box.empty();
+          const msg = `Could not draw the ${label} — ${e?.message || e}`;
+          box.append(box.tagName === "TABLE" ? el("tbody", {}, el("tr", {}, el("td", { class: "text-danger", colspan: "5" }, msg))) : el("p", { class: "text-danger", style: "margin:0" }, msg));
+        } catch (inner) {
+          console.error(`Budget: the ${label} card could not report its own failure`, inner);
+        }
+      }
+    }
+    const guardedTrend = () => guard("#trendChart", "spending trend", renderTrend);
+    const guardedSplit = () => guard("#dashSplit", "spending split", renderSplit);
     function renderDashboard() {
+      guard("#heroCard", "summary", renderHero);
+      guard("#dashStale", "balance staleness", renderStale);
+      guardedTrend();
+      guardedSplit();
+      guard("#dashBudget", "budget table", renderBudgetTable);
+    }
+    function renderStale() {
+      const wrap = $("#dashStale");
+      wrap.empty();
+      const s = stalenessSummary(S.accounts);
+      if (!s.stale)
+        return;
+      const age = s.oldestDays === null ? "none carry a date" : `the oldest ${s.oldestDays} days ago`;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${s.stale} of ${s.total} account balances unconfirmed — ${age}.`));
+      const btn = el("button", {
+        type: "button",
+        class: "kpi-caveat-btn",
+        "aria-label": "Review account balances on the Accounts page"
+      }, "Review balances");
+      btn.addEventListener("click", () => ctx.switchView("accounts"));
+      wrap.append(btn);
+    }
+    function renderHero() {
       const sum = periodSummary(S.period);
       const bud = budgetTotals(S.period);
       const available = bud.spend - sum.spend;
@@ -3203,8 +3331,9 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const hour = new Date().getHours();
       const greeting = hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
       hero.append(el("div", { class: "hero-grid" }, el("div", {}, S.settings.household ? el("div", { class: "hero-greet" }, `${greeting}, ${S.settings.household}`) : "", el("div", { class: "hero-lbl" }, heroNegative ? "Overspent this period" : "Remaining this period"), heroNum, el("div", { class: "hero-sub" }, el("b", {}, money(sum.spend)), " spent of ", el("b", {}, money(bud.spend)), " budgeted"), meter), statCol));
-      renderTrend();
-      renderSplit();
+    }
+    function renderBudgetTable() {
+      const sum = periodSummary(S.period);
       const t = $("#dashBudget");
       t.empty();
       $("#dashBudgetSub").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -3381,10 +3510,12 @@ var require_dashboard = __commonJS((exports2, module2) => {
         spend.push({ cat, amount: -amt, color: catColor(cat) });
       }
       spend.sort((a2, b) => b.amount - a2.amount);
+      const uncat = -Math.min(0, sum.byCat[""] || 0);
+      const uncatNote = uncat > 0 ? ` · ${money(uncat)} uncategorised, not shown` : "";
       const total = spend.reduce((t, x) => t + x.amount, 0);
-      $("#dashSplitSub").textContent = total > 0 ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? "y" : "ies"} · ${periodMonthName(S.period)}` : periodMonthName(S.period);
+      $("#dashSplitSub").textContent = (total > 0 ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? "y" : "ies"} · ${periodMonthName(S.period)}` : periodMonthName(S.period)) + uncatNote;
       if (!total) {
-        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Nothing categorised as spending in this period yet."));
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, uncat > 0 ? `${money(uncat)} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.` : "Nothing categorised as spending in this period yet."));
         return;
       }
       const shown = spend.slice(0, SPLIT_SLICES);
@@ -3486,7 +3617,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
         return toast(`No category note found for "${cat}"`, true);
       await app.workspace.getLeaf("tab").openFile(file);
     }
-    ctx.provide({ renderDashboard, renderTrend, renderSplit });
+    ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit });
   };
 });
 
@@ -4012,62 +4143,6 @@ var require_budgets = __commonJS((exports2, module2) => {
   };
 });
 
-// src/reconcile.js
-var require_reconcile = __commonJS((exports2, module2) => {
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-  var STALE_DAYS = 30;
-  function todayIso() {
-    const d = new Date;
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
-  function daysSince(iso, today) {
-    if (!ISO_DATE.test(iso || ""))
-      return null;
-    const then = new Date(`${iso}T00:00:00`);
-    if (isNaN(then.getTime()))
-      return null;
-    const now = ISO_DATE.test(today || "") ? new Date(`${today}T00:00:00`) : new Date;
-    now.setHours(0, 0, 0, 0);
-    return Math.round((now.getTime() - then.getTime()) / 86400000);
-  }
-  function isStale(iso, today) {
-    const d = daysSince(iso, today);
-    return d === null || d > STALE_DAYS;
-  }
-  function reconcile(a, rows, today) {
-    if (!rows || !rows.length)
-      return { state: "no-tx" };
-    if (!ISO_DATE.test(a.balance_updated || ""))
-      return { state: "no-date" };
-    const now = ISO_DATE.test(today || "") ? today : todayIso();
-    const since = [], ahead = [];
-    for (const r of rows) {
-      if (r.date <= a.balance_updated)
-        continue;
-      (r.date > now ? ahead : since).push(r);
-    }
-    const delta = since.reduce((s, r) => s + r.amount, 0);
-    if (!since.length) {
-      return ahead.length ? { state: "pending", ahead: ahead.length } : { state: "clean" };
-    }
-    return { state: "drift", count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
-  }
-  function stalenessSummary(accounts, today) {
-    let stale = 0, oldest = null, dated = 0;
-    for (const a of accounts || []) {
-      const d = daysSince(a.balance_updated, today);
-      if (d !== null)
-        dated++;
-      if (isStale(a.balance_updated, today))
-        stale++;
-      if (d !== null && (oldest === null || d > oldest))
-        oldest = d;
-    }
-    return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
-  }
-  module2.exports = { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile, stalenessSummary };
-});
-
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
   var { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require_util();
@@ -4086,6 +4161,7 @@ var require_accounts = __commonJS((exports2, module2) => {
       fileAt,
       txInPeriod,
       accountForLabel,
+      accountIndex,
       periodMonthName
     } = ctx;
     const ACCT_GROUPS = [
@@ -4123,23 +4199,6 @@ var require_accounts = __commonJS((exports2, module2) => {
       if (!s)
         return null;
       return parseFloat(s.replace(",", ".").replace(/[^\d.-]/g, ""));
-    }
-    function accountIndex() {
-      const idx = new Map;
-      for (const f of Object.values(S.txFiles)) {
-        const a = accountForLabel(f.label);
-        if (!a)
-          continue;
-        let e = idx.get(a);
-        if (!e) {
-          e = { rows: [], labels: new Set };
-          idx.set(a, e);
-        }
-        e.labels.add(f.label);
-        for (const r of f.rows)
-          e.rows.push(r);
-      }
-      return idx;
     }
     function periodActivity(labels) {
       let inAmt = 0, outAmt = 0, count = 0;
@@ -4584,12 +4643,109 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
       saveAccount,
       addAccount,
       editAccount,
-      accountIndex,
       accountReconcile: reconcile,
       accountUtilisation: utilisationOf,
       ACCOUNT_FM_KEYS: EDITABLE_KEYS
     });
   };
+});
+
+// src/savings-math.js
+var require_savings_math = __commonJS((exports2, module2) => {
+  function splitFlows(rows, typeOf, opts) {
+    const from = opts && opts.from || "";
+    const to = opts && opts.to || "";
+    let contributions = 0, growth = 0, withdrawals = 0, count = 0;
+    const growthCategories = new Map;
+    for (const r of rows || []) {
+      if (!r || typeof r.amount !== "number" || !r.amount)
+        continue;
+      if (from && r.date < from)
+        continue;
+      if (to && r.date > to)
+        continue;
+      count++;
+      if (r.amount < 0) {
+        withdrawals += -r.amount;
+        continue;
+      }
+      const t = typeOf ? typeOf(r.cat) : null;
+      if (t === "income") {
+        growth += r.amount;
+        const k = r.cat || "(uncategorised)";
+        growthCategories.set(k, (growthCategories.get(k) || 0) + r.amount);
+      } else {
+        contributions += r.amount;
+      }
+    }
+    return {
+      contributions,
+      growth,
+      withdrawals,
+      count,
+      net: contributions + growth - withdrawals,
+      growthCategories: [...growthCategories].sort((a, b) => b[1] - a[1]).map(([cat, amount]) => ({ cat, amount }))
+    };
+  }
+  function accountFlows(account, rows, typeOf, opts) {
+    const a = account || {};
+    const balance = typeof a.balance === "number" ? a.balance : 0;
+    const has = (rows || []).length > 0;
+    if (has) {
+      const f = splitFlows(rows, typeOf, opts);
+      return {
+        basis: "derived",
+        opening: balance - f.net,
+        contributions: f.contributions,
+        growth: f.growth,
+        withdrawals: f.withdrawals,
+        closing: balance,
+        count: f.count,
+        growthCategories: f.growthCategories
+      };
+    }
+    const baseline = a.total_invested || a.starting_amount || 0;
+    if (baseline) {
+      return {
+        basis: "stated",
+        opening: baseline,
+        contributions: 0,
+        growth: balance - baseline,
+        withdrawals: 0,
+        closing: balance,
+        count: 0,
+        growthCategories: []
+      };
+    }
+    return {
+      basis: "none",
+      opening: balance,
+      contributions: 0,
+      growth: 0,
+      withdrawals: 0,
+      closing: balance,
+      count: 0,
+      growthCategories: []
+    };
+  }
+  function contributionRate(rows, typeOf, months, today) {
+    if (!months || months < 1)
+      return null;
+    const now = today && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : null;
+    if (!now)
+      return null;
+    const [y, m] = now.split("-").map(Number);
+    const endY = m === 1 ? y - 1 : y, endM = m === 1 ? 12 : m - 1;
+    const startTotal = endY * 12 + (endM - 1) - (months - 1);
+    const sY = Math.floor(startTotal / 12), sM = startTotal % 12 + 1;
+    const from = `${String(sY).padStart(4, "0")}-${String(sM).padStart(2, "0")}-01`;
+    const to = `${String(endY).padStart(4, "0")}-${String(endM).padStart(2, "0")}-31`;
+    const f = splitFlows(rows, typeOf, { from, to });
+    if (!f.count)
+      return null;
+    return { perMonth: f.contributions / months, months, from, to, total: f.contributions };
+  }
+  module2.exports = { splitFlows, accountFlows, contributionRate };
 });
 
 // src/worth.js
@@ -4628,17 +4784,11 @@ var require_worth = __commonJS((exports2, module2) => {
 var require_savings = __commonJS((exports2, module2) => {
   var { el, icoEl } = require_util();
   var { themeColors, createChart, tip } = require_chart();
-  var { isStale, stalenessSummary } = require_reconcile();
+  var { isStale, stalenessSummary, reconcile, todayIso } = require_reconcile();
+  var { accountFlows } = require_savings_math();
   var { worth, activeDebts, cardOverlap, debtsByType } = require_worth();
   module2.exports = function registerSavings(ctx) {
-    const { S, $, root, money, accountForLabel } = ctx;
-    function hasTransactions(a) {
-      for (const f of Object.values(S.txFiles)) {
-        if (accountForLabel(f.label) === a && f.rows && f.rows.length)
-          return true;
-      }
-      return false;
-    }
+    const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
     function renderSavings() {
       const savings = S.accounts.filter((a) => a.type === "savings");
       const investments = S.accounts.filter((a) => a.type === "investment");
@@ -4661,7 +4811,15 @@ var require_savings = __commonJS((exports2, module2) => {
       renderStaleNote();
       renderWorth();
       renderGoals();
-      renderSections(savings, investments);
+      renderSections(savings, investments, accountIndex());
+    }
+    async function acceptImplied(a, implied) {
+      a.balance = implied;
+      a.balanceRaw = null;
+      a.balance_updated = todayIso();
+      await saveAccount(a);
+      renderSavings();
+      toast(`${a.name} reconciled to ${money(implied)}`);
     }
     function renderStaleNote() {
       const wrap = $("#savingsStale");
@@ -4699,7 +4857,7 @@ var require_savings = __commonJS((exports2, module2) => {
         goalsWrap.append(g);
       }
     }
-    function renderSections(savings, investments) {
+    function renderSections(savings, investments, idx) {
       const wrap = $("#savingsSections");
       wrap.empty();
       for (const [title, list] of [["Savings", savings], ["Investments", investments]]) {
@@ -4712,18 +4870,43 @@ var require_savings = __commonJS((exports2, module2) => {
           if (a.monthly_contribution)
             parts.push(`${money(a.monthly_contribution, 0)}/m`);
           const card = el("div", { class: "mini" }, el("div", { class: "l" }, a.name), el("div", { class: "v num" }, money(a.balance)), el("div", { class: "s" }, parts.filter(Boolean).join(" · ")));
-          const baseline = a.total_invested || a.starting_amount;
-          if (baseline) {
-            const over = a.balance - baseline;
-            card.append(el("div", { class: `s2 num ${over >= 0 ? "text-success" : "text-danger"}` }, `${over >= 0 ? "▲" : "▼"} ${money(Math.abs(over), 0)} vs ${money(baseline, 0)} in`));
-            if (hasTransactions(a)) {
+          const rows = (idx.get(a) || {}).rows || [];
+          const flows = accountFlows(a, rows, catType);
+          if (flows.basis === "derived") {
+            const g = flows.growth;
+            const line = el("div", { class: "s2" }, `in ${money(flows.contributions, 0)} · `, el("span", { class: `num ${g >= 0 ? "text-success" : "text-danger"}` }, `${g >= 0 ? "▲" : "▼"} ${money(Math.abs(g), 0)}`));
+            if (flows.withdrawals)
+              line.append(` · out ${money(flows.withdrawals, 0)}`);
+            card.append(line);
+            if (flows.growthCategories.length > 1) {
               card.append(el("div", {
                 class: "s2 s2-caveat",
-                title: "This is the balance less what the account file records as put in — not growth. " + "Contributions since that figure was last updated are counted inside it."
-              }, "includes contributions"));
+                title: "Anything here that is not interest or dividends is really a contribution. " + "Recategorise the rows, or change the category's type, and this figure corrects itself."
+              }, "growth from " + flows.growthCategories.map((c) => `${c.cat} ${money(c.amount, 0)}`).join(", ")));
             }
+          } else if (flows.basis === "stated") {
+            const over = flows.growth;
+            card.append(el("div", { class: `s2 num ${over >= 0 ? "text-success" : "text-danger"}` }, `${over >= 0 ? "▲" : "▼"} ${money(Math.abs(over), 0)} vs ${money(flows.opening, 0)} in`));
+            card.append(el("div", {
+              class: "s2 s2-caveat",
+              title: "No transactions in the vault for this account, so this is the balance less what the " + "account file records as put in. Import its statements and the split becomes real."
+            }, "from the account file"));
           } else if (a.inception_date) {
             card.append(el("div", { class: "s2" }, `since ${a.inception_date}`));
+          }
+          const rec = reconcile(a, rows);
+          if (rec.state === "drift") {
+            const line = el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt" }, `${rec.count} since · implies `, el("b", { class: "num" }, money(rec.implied)), rec.ahead ? ` · ${rec.ahead} dated ahead` : ""));
+            const btn = el("button", {
+              type: "button",
+              class: "acct-recon-btn",
+              "aria-label": `Set ${a.name} balance to ${money(rec.implied)}`
+            }, icoEl(["check"]), "Use this");
+            btn.addEventListener("click", () => acceptImplied(a, rec.implied));
+            line.append(btn);
+            card.append(line);
+          } else if (rec.state === "clean") {
+            card.append(el("div", { class: "acct-recon" }, el("div", { class: "acct-recon-txt text-success" }, "Matches your transactions")));
           }
           grid.append(card);
         }
@@ -4947,7 +5130,33 @@ var require_debt_math = __commonJS((exports2, module2) => {
     const y = Math.floor(n / 12), r = n % 12;
     return r ? `${y} yr ${r} mo` : `${y} year${y === 1 ? "" : "s"}`;
   }
-  module2.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, MAX_MONTHS, EPS };
+  function expectedBalance(debt, today) {
+    const d = debt || {};
+    const original = Number(d.original) || 0;
+    const pay = (Number(d.payment) || 0) + (Number(d.extra) || 0);
+    if (!original || pay <= 0)
+      return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.start || "") || !/^\d{4}-\d{2}-\d{2}$/.test(today || ""))
+      return null;
+    const [sy, sm] = d.start.split("-").map(Number);
+    const [ty, tm] = today.split("-").map(Number);
+    const months = (ty - sy) * 12 + (tm - sm);
+    if (months <= 0)
+      return null;
+    const r = monthlyRate(d.rate);
+    let b = original;
+    let paid = 0, interest = 0;
+    for (let m = 0;m < months && b > EPS; m++) {
+      const i = b * r;
+      b += i;
+      interest += i;
+      const step = Math.min(pay, b);
+      b -= step;
+      paid += step;
+    }
+    return { expected: b, months, paid, interest, settled: b <= EPS };
+  }
+  module2.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance, MAX_MONTHS, EPS };
 });
 
 // src/views/debts.js
@@ -4955,7 +5164,8 @@ var require_debts = __commonJS((exports2, module2) => {
   var { el, keepScroll, escMd, icoEl } = require_util();
   var { askFields } = require_modal();
   var { MONTHS } = require_constants();
-  var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths } = require_debt_math();
+  var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require_debt_math();
+  var { todayIso } = require_reconcile();
   var {
     themeColors,
     createChart,
@@ -5115,7 +5325,21 @@ var require_debts = __commonJS((exports2, module2) => {
             const paidOff = d.original > 0 ? Math.min(100, Math.max(0, (d.original - d.balance) / d.original * 100)) : 0;
             barFill.style.width = `${paidOff}%`;
             payoffCell.empty();
-            payoffCell.append(d.original > 0 ? el("div", { class: "debt-prog" }, el("div", { class: "cat-bar" }, barFill), el("span", { class: "num" }, `${Math.round(paidOff)}%`)) : el("span", { class: "text-muted" }, "—"));
+            const prog = d.original > 0 ? el("div", { class: "debt-prog" }, el("div", { class: "cat-bar" }, barFill), el("span", { class: "num" }, `${Math.round(paidOff)}%`)) : el("span", { class: "text-muted" }, "—");
+            payoffCell.append(prog);
+            if (d.status !== "paid") {
+              const exp = expectedBalance(d, todayIso());
+              if (exp) {
+                const gap = d.balance - exp.expected;
+                const material = Math.abs(gap) > Math.max(50, d.original * 0.02);
+                if (material) {
+                  payoffCell.append(el("div", {
+                    class: "debt-implied",
+                    title: `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, ` + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. ` + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? "higher" : "lower"} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.`
+                  }, `schedule says ${money(exp.expected, 0)}`));
+                }
+              }
+            }
             const a = amortise(d.balance, d.rate, committed(d));
             clearCell.empty();
             interestCell.empty();
@@ -5372,6 +5596,7 @@ var require_debts = __commonJS((exports2, module2) => {
 var require_owed = __commonJS((exports2, module2) => {
   var { el, dateInput, keepScroll, escMd, icoEl } = require_util();
   var { askFields } = require_modal();
+  var { daysSince } = require_reconcile();
   module2.exports = function registerOwed(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
     const mark = () => {
@@ -5379,14 +5604,16 @@ var require_owed = __commonJS((exports2, module2) => {
       $("#owedSave").disabled = false;
     };
     ctx.registerDirty(() => S.owedDirty);
+    const outstandingOf = (o) => Math.max(0, (o.amount || 0) - (o.repaid || 0));
+    const isSettled = (o) => o.status === "paid" || outstandingOf(o) === 0;
     function renderOwedKpis() {
-      const outstanding = S.owed.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amount, 0);
-      const paid = S.owed.filter((o) => o.status === "paid").reduce((s, o) => s + o.amount, 0);
+      const outstanding = S.owed.filter((o) => !isSettled(o)).reduce((s, o) => s + outstandingOf(o), 0);
+      const back = S.owed.reduce((s, o) => s + Math.min(o.repaid || 0, o.amount || 0), 0) + S.owed.filter((o) => o.status === "paid" && !(o.repaid > 0)).reduce((s, o) => s + (o.amount || 0), 0);
       const kpis = $("#owedKpis");
       kpis.empty();
       const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
       tile("Outstanding", money(outstanding), outstanding > 0 ? "text-warning" : "");
-      tile("Paid", money(paid), "text-success");
+      tile("Recovered", money(back), "text-success");
       tile("Entries", String(S.owed.length));
     }
     function renderOwed(focusPerson) {
@@ -5397,16 +5624,21 @@ var require_owed = __commonJS((exports2, module2) => {
         t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Person"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Due date"), el("th", { scope: "col" }, "Status"), el("th", { scope: "col" }, ""))));
         const body = el("tbody", {});
         for (const o of S.owed) {
+          const settled = isSettled(o);
+          const left = outstandingOf(o);
+          const label = settled ? "Paid" : o.repaid > 0 ? `${money(left, 0)} left` : "Outstanding";
           const pill = el("button", {
-            class: `status-pill status-${o.status}`,
-            "aria-label": `${o.person}: ${o.status === "paid" ? "Paid" : "Outstanding"} — click to change`
-          }, icoEl(o.status === "paid" ? ["circle-check", "check-circle"] : ["hourglass"]), o.status === "paid" ? "Paid" : "Outstanding");
+            class: `status-pill status-${settled ? "paid" : "outstanding"}`,
+            title: o.repaid > 0 ? `${money(o.amount)} lent · ${money(o.repaid)} back · ${money(left)} outstanding` : "",
+            "aria-label": `${o.person}: ${label} — click to change`
+          }, icoEl(settled ? ["circle-check", "check-circle"] : ["hourglass"]), label);
           pill.addEventListener("click", () => {
-            o.status = o.status === "paid" ? "outstanding" : "paid";
+            o.status = settled ? "outstanding" : "paid";
             mark();
             renderOwed(o.person);
           });
-          body.append(el("tr", {}, el("td", { style: "font-weight:600" }, o.person), el("td", {}, el("input", {
+          const age = daysSince(o.lent);
+          body.append(el("tr", {}, el("td", { style: "font-weight:600" }, o.person, ...age !== null && !settled ? [el("div", { class: "owed-age" }, `out ${age} day${age === 1 ? "" : "s"}`)] : []), el("td", {}, el("input", {
             type: "text",
             class: "form-control form-control-sm",
             value: o.description,
@@ -5430,7 +5662,12 @@ var require_owed = __commonJS((exports2, module2) => {
           })), el("td", {}, dateInput(o.due, { class: "form-control form-control-sm", style: "width:120px", "aria-label": `Due date for ${o.person}` }, (v) => {
             o.due = v;
             mark();
-          })), el("td", {}, pill), el("td", {}, el("button", {
+          })), el("td", {}, pill), el("td", {}, el("div", { class: "owed-acts" }, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Record a repayment from ${o.person}`,
+            title: "Record money that came back",
+            onclick: () => recordRepayment(o)
+          }, icoEl(["plus"])), el("button", {
             class: "btn-ghost btn-ghost-sm",
             "aria-label": `Remove ${o.person}`,
             onclick: () => {
@@ -5438,7 +5675,7 @@ var require_owed = __commonJS((exports2, module2) => {
               mark();
               renderOwed();
             }
-          }, "✕"))));
+          }, "✕")))));
         }
         if (!S.owed.length)
           body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "No entries yet.")));
@@ -5451,6 +5688,29 @@ var require_owed = __commonJS((exports2, module2) => {
           pill.focus();
       }
     }
+    async function recordRepayment(o) {
+      const left = outstandingOf(o);
+      const r = await askFields(app, `Repayment from ${o.person}`, [
+        {
+          key: "amount",
+          label: "Amount that came back",
+          type: "number",
+          value: left ? left.toFixed(2) : "",
+          desc: `${money(o.amount)} lent · ${money(o.repaid || 0)} back so far.`
+        }
+      ]);
+      if (!r)
+        return;
+      const amount = parseFloat(String(r.amount).replace(",", "."));
+      if (isNaN(amount) || amount <= 0)
+        return toast("Not a number", true);
+      o.repaid = (o.repaid || 0) + amount;
+      if (outstandingOf(o) === 0)
+        o.status = "paid";
+      mark();
+      renderOwed(o.person);
+      toast(`${money(amount)} back from ${o.person}`);
+    }
     function serializeOwed() {
       const lines = [
         "---",
@@ -5461,12 +5721,13 @@ var require_owed = __commonJS((exports2, module2) => {
         "# Owed Money",
         "",
         "Money owed to the household. `status` is `outstanding` or `paid`.",
+        "`Repaid` is how much has come back; `Lent` is when it went out.",
         "",
-        "| Person | Amount | Description | Due date | Status |",
-        "|--------|-------:|-------------|----------|--------|"
+        "| Person | Amount | Description | Due date | Status | Repaid | Lent |",
+        "|--------|-------:|-------------|----------|--------|-------:|------|"
       ];
       for (const o of S.owed) {
-        lines.push(`| ${escMd(o.person)} | ${o.amount.toFixed(2)} | ${escMd(o.description)} | ${escMd(o.due)} | ${o.status} |`);
+        lines.push(`| ${escMd(o.person)} | ${o.amount.toFixed(2)} | ${escMd(o.description)} | ${escMd(o.due)} | ${o.status} | ${(o.repaid || 0).toFixed(2)} | ${escMd(o.lent || "")} |`);
       }
       lines.push("");
       return lines.join(`
@@ -5488,7 +5749,7 @@ var require_owed = __commonJS((exports2, module2) => {
       const amount = parseFloat(String(r.amount).replace(",", "."));
       if (isNaN(amount))
         return toast("Not a number", true);
-      S.owed.push({ person: r.person.trim(), amount, description: "", due: "", status: "outstanding" });
+      S.owed.push({ person: r.person.trim(), amount, description: "", due: "", status: "outstanding", repaid: 0, lent: "" });
       S.owedDirty = true;
       $("#owedSave").disabled = false;
       renderOwed();
@@ -5497,14 +5758,194 @@ var require_owed = __commonJS((exports2, module2) => {
   };
 });
 
+// src/recurring.js
+var require_recurring = __commonJS((exports2, module2) => {
+  var STOP = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "plan",
+    "plus",
+    "pro",
+    "premium",
+    "couple",
+    "family",
+    "monthly",
+    "annual",
+    "yearly",
+    "subscription",
+    "account",
+    "service",
+    "services",
+    "fee",
+    "fees",
+    "payment",
+    "debit",
+    "order",
+    "card",
+    "bank",
+    "insurance",
+    "data"
+  ]);
+  function normDesc(s) {
+    return String(s || "").toLowerCase().replace(/\d+/g, " ").replace(/[^a-z]+/g, " ").replace(/\s+/g, " ").trim();
+  }
+  function serviceTokens(service) {
+    const s = service || {};
+    const words = normDesc(`${s.provider || ""} ${s.name || ""}`).split(" ");
+    return [...new Set(words.filter((w) => w.length >= 4 && !STOP.has(w)))];
+  }
+  var median = (arr) => {
+    if (!arr.length)
+      return 0;
+    const a = [...arr].sort((x, y) => x - y);
+    const m = a.length >> 1;
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  };
+  function chargeStats(charges) {
+    if (!charges || !charges.length)
+      return null;
+    const sorted = [...charges].sort((a, b) => a.date.localeCompare(b.date));
+    const amounts = sorted.map((c) => Math.abs(c.amount));
+    const months = [...new Set(sorted.map((c) => c.date.slice(0, 7)))];
+    const days = sorted.map((c) => Number(c.date.slice(8, 10)));
+    const W = Math.min(6, Math.floor(sorted.length / 2));
+    const early = W >= 2 ? median(amounts.slice(0, W)) : null;
+    const late = W >= 2 ? median(amounts.slice(-W)) : null;
+    const recentAmounts = amounts.slice(-3);
+    const recent = median(recentAmounts);
+    const spread = recent ? (Math.max(...recentAmounts) - Math.min(...recentAmounts)) / recent : 0;
+    return {
+      count: sorted.length,
+      months: months.length,
+      median: median(amounts),
+      recent,
+      varies: spread > 0.15,
+      first: sorted[0].date,
+      last: sorted[sorted.length - 1].date,
+      lastAmount: Math.abs(sorted[sorted.length - 1].amount),
+      day: median(days),
+      early,
+      late,
+      drift: early && late ? (late - early) / early : null
+    };
+  }
+  function matchCharges(service, rows, tokens) {
+    const toks = tokens || serviceTokens(service);
+    if (!toks.length)
+      return { charges: [], related: [], tokens: toks };
+    const groups = new Map;
+    for (const r of rows || []) {
+      if (!r || typeof r.amount !== "number" || r.amount >= 0)
+        continue;
+      const n = normDesc(r.desc);
+      if (!n)
+        continue;
+      if (!toks.some((t) => n.includes(t)))
+        continue;
+      if (!groups.has(n))
+        groups.set(n, []);
+      groups.get(n).push(r);
+    }
+    if (!groups.size)
+      return { charges: [], related: [], tokens: toks };
+    const scored = [...groups].map(([key, list]) => ({
+      key,
+      list,
+      total: list.reduce((s, r) => s + Math.abs(r.amount), 0)
+    })).sort((a, b) => b.total - a.total);
+    return {
+      charges: scored[0].list,
+      related: scored.slice(1).map((g) => ({ key: g.key, count: g.list.length, total: g.total })),
+      all: [...groups.values()].flat().sort((a, b) => a.date.localeCompare(b.date)),
+      tokens: toks
+    };
+  }
+  var DAY = 86400000;
+  var dayNum = (iso) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
+  var isoOf = (n) => new Date(n * DAY).toISOString().slice(0, 10);
+  function nextExpected(stats, cycle) {
+    if (!stats || !stats.last)
+      return null;
+    if (cycle === "annual") {
+      const [y2, m2, d2] = stats.last.split("-").map(Number);
+      return `${y2 + 1}-${String(m2).padStart(2, "0")}-${String(d2).padStart(2, "0")}`;
+    }
+    const [y, m, d] = stats.last.split("-").map(Number);
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+    return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, lastDay)).padStart(2, "0")}`;
+  }
+  function chargeStatus(stats, cycle, today) {
+    if (!stats)
+      return { state: "unseen", daysSince: null };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today || ""))
+      return { state: "active", daysSince: null };
+    const gap = dayNum(today) - dayNum(stats.last);
+    const cycleDays = cycle === "annual" ? 365 : 31;
+    return { state: gap > cycleDays * 2 ? "overdue" : "active", daysSince: gap };
+  }
+  function comparePrice(service, stats) {
+    const stated = Math.abs(Number((service || {}).amount) || 0);
+    if (!stats || !stated)
+      return null;
+    if (stats.varies)
+      return { stated, actual: null, varies: true, diff: null, pct: null, agrees: null };
+    const actual = stats.recent;
+    const diff = actual - stated;
+    return {
+      stated,
+      actual,
+      diff,
+      varies: false,
+      pct: stated ? diff / stated : null,
+      agrees: Math.abs(diff) <= Math.max(2, stated * 0.04)
+    };
+  }
+  module2.exports = {
+    normDesc,
+    serviceTokens,
+    matchCharges,
+    chargeStats,
+    nextExpected,
+    chargeStatus,
+    comparePrice,
+    _dayNum: dayNum,
+    _isoOf: isoOf
+  };
+});
+
 // src/views/services.js
 var require_services = __commonJS((exports2, module2) => {
-  var { el, dateInput, keepScroll, escMd } = require_util();
+  var { el, dateInput, keepScroll, escMd, icoEl } = require_util();
   var { askFields } = require_modal();
+  var { todayIso } = require_reconcile();
+  var { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require_recurring();
   module2.exports = function registerServices(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
     function monthlyEquiv(s) {
       return s.cycle === "annual" ? s.amount / 12 : s.amount;
+    }
+    function chargeIndex() {
+      const rows = [];
+      for (const f of Object.values(S.txFiles))
+        for (const r of f.rows)
+          rows.push(r);
+      const today = todayIso();
+      const out = new Map;
+      for (const s of S.services) {
+        const m = matchCharges(s, rows);
+        const stats = chargeStats(m.charges);
+        out.set(s, {
+          stats,
+          status: chargeStatus(chargeStats(m.all), s.cycle, today),
+          price: comparePrice(s, stats),
+          next: nextExpected(stats, s.cycle),
+          related: m.related
+        });
+      }
+      return out;
     }
     const mark = () => {
       S.servicesDirty = true;
@@ -5533,8 +5974,54 @@ var require_services = __commonJS((exports2, module2) => {
         row.lastElementChild.textContent = `${money(gMonthly, 0)}/mo`;
       }
     }
+    function svcFlags(s, c) {
+      const out = [];
+      if (!c.stats) {
+        out.push(el("span", {
+          class: "category-badge badge-dup",
+          title: `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.`
+        }, "not seen"));
+        return out;
+      }
+      if (s.active && c.status && c.status.state === "overdue") {
+        const months = Math.round(c.status.daysSince / 30);
+        out.push(el("span", {
+          class: "category-badge badge-transfer",
+          title: `Last charged ${c.stats.last}. Still marked active — has it been cancelled?`
+        }, `last charged ${months}mo ago`));
+      }
+      if (c.price && c.price.varies) {
+        out.push(el("span", {
+          class: "category-badge badge-dup",
+          title: "The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name."
+        }, "varies"));
+      } else if (c.price && !c.price.agrees) {
+        const d = c.price.diff;
+        out.push(el("span", {
+          class: `category-badge ${d > 0 ? "badge-debt" : "badge-savings"}`,
+          title: `Your bank is charging ${money(c.price.actual)}, not ${money(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.`
+        }, `really ${money(c.price.actual, 0)}`));
+      }
+      return out;
+    }
+    function svcNextHint(s, c) {
+      const stale = !s.next || s.next < todayIso();
+      const btn = el("button", {
+        type: "button",
+        class: "svc-next-hint",
+        title: `Billed around day ${c.stats.day} each ${s.cycle === "annual" ? "year" : "month"}; last charged ${c.stats.last}.`,
+        "aria-label": `Set next billing for ${s.name} to ${c.next}`
+      }, icoEl(["calendar-check", "calendar"]), stale ? `due ${c.next}` : c.next);
+      btn.addEventListener("click", () => {
+        s.next = c.next;
+        mark();
+        renderServices();
+      });
+      return btn;
+    }
     function renderServices() {
       renderServicesKpis();
+      const charged = chargeIndex();
       const t = $("#svcTable");
       keepScroll(t, () => {
         t.empty();
@@ -5552,7 +6039,8 @@ var require_services = __commonJS((exports2, module2) => {
               renderServicesKpis();
               renderServiceSubtotals();
             };
-            body.append(el("tr", { class: s.active ? "" : "svc-inactive" }, el("td", { style: "font-weight:600" }, s.name), el("td", { class: "text-muted" }, s.provider), el("td", { class: "num" }, el("input", {
+            const c = charged.get(s) || {};
+            body.append(el("tr", { class: s.active ? "" : "svc-inactive" }, el("td", { style: "font-weight:600" }, s.name, ...svcFlags(s, c)), el("td", { class: "text-muted" }, s.provider), el("td", { class: "num" }, el("input", {
               type: "number",
               step: "0.01",
               class: "form-control form-control-sm",
@@ -5576,7 +6064,7 @@ var require_services = __commonJS((exports2, module2) => {
             }, (v) => {
               s.next = v;
               mark();
-            })), el("td", {}, el("input", {
+            }), ...c.next && c.next !== s.next ? [svcNextHint(s, c)] : []), el("td", {}, el("input", {
               type: "checkbox",
               "aria-label": `${s.name} is active`,
               ...s.active ? { checked: "" } : {},
@@ -7391,6 +7879,7 @@ var require_controller = __commonJS((exports2, module2) => {
   var { SHELL_HTML } = require_shell();
   var { confirmModal } = require_modal();
   var { localeFor } = require_locale();
+  var { PALETTE_PRESETS, DEFAULT_PALETTE } = require_constants();
   var registerIo = require_io();
   var registerPeriod = require_period();
   var registerLoad = require_load();
@@ -7559,6 +8048,12 @@ var require_controller = __commonJS((exports2, module2) => {
       const pref = plugin.settings.theme;
       const dark = pref === "dark" || pref === "auto" && document.body.classList.contains("theme-dark");
       root.classList.toggle("bud-dark", dark);
+      for (const c of [...root.classList]) {
+        if (c.startsWith("bud-palette-"))
+          root.classList.remove(c);
+      }
+      const id = PALETTE_PRESETS[plugin.settings.palette] ? plugin.settings.palette : DEFAULT_PALETTE;
+      root.classList.add(`bud-palette-${id}`);
       if (!S.loaded)
         return;
       if (S.view === "dashboard") {
@@ -7661,6 +8156,7 @@ var require_controller = __commonJS((exports2, module2) => {
         return true;
       return Date.now() - lastInputAt < 3000;
     }
+    const RELOAD_RETRY_MAX = 30000;
     let reloadTimer = null;
     function scheduleReload(delay) {
       clearTimeout(reloadTimer);
@@ -7668,7 +8164,7 @@ var require_controller = __commonJS((exports2, module2) => {
         if (Date.now() - ctx.lastWriteAt() < 2000)
           return;
         if (hasDirty())
-          return;
+          return scheduleReload(Math.min(delay * 2, RELOAD_RETRY_MAX));
         if (isEditing())
           return scheduleReload(1500);
         await connectVault();
@@ -7682,8 +8178,6 @@ var require_controller = __commonJS((exports2, module2) => {
       if (path !== bp && !path.startsWith(bp + "/"))
         return;
       if (Date.now() - ctx.lastWriteAt() < 2000)
-        return;
-      if (hasDirty())
         return;
       scheduleReload(800);
     };
@@ -8599,12 +9093,13 @@ tags: [finance, finance/budget, finance/budget/services]
 // src/settings-tab.js
 var require_settings_tab = __commonJS((exports2, module2) => {
   var { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require("obsidian");
-  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, periodLengthOptions } = require_constants();
+  var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
   var { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require_util();
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
+  var PALETTE_DESC = "Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.";
   var MONTH_START_DESC = "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.";
   var PERIOD_LENGTH_DESC = "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.";
   var PERIOD_ANCHOR_DESC = "When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.";
@@ -8629,6 +9124,15 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         await this.plugin.saveSettings();
         this.plugin.forEachView((ctl) => ctl.applyTheme());
       }));
+      new Setting(containerEl).setName("Colour palette").setDesc(PALETTE_DESC).addDropdown((d) => {
+        for (const [id, label] of Object.entries(PALETTE_PRESETS))
+          d.addOption(id, label);
+        d.setValue(this.plugin.settings.palette).onChange(async (v) => {
+          this.plugin.settings.palette = v;
+          await this.plugin.saveSettings();
+          this.plugin.forEachView((ctl) => ctl.applyTheme());
+        });
+      });
       new Setting(containerEl).setName("Setup wizard").setDesc("Re-run the first-run wizard — folder, name, budget period, currency, starter files.").addButton((b) => b.setButtonText("Run setup wizard").onClick(() => new OnboardingWizard(this.app, this.plugin).open()));
       new Setting(containerEl).setName("Open on startup").setDesc("Open the budget view automatically when Obsidian starts.").addToggle((t) => t.setValue(this.plugin.settings.openOnStartup).onChange(async (v) => {
         this.plugin.settings.openOnStartup = v;
@@ -8809,7 +9313,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         if (key === "budgetFolder")
           value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
         await super.setControlValue(key, value);
-        if (key === "theme")
+        if (key === "theme" || key === "palette")
           this.plugin.forEachView((ctl) => ctl.applyTheme());
         else if (key === "privacyLock")
           this.plugin.forEachView((ctl) => ctl.applyPrivacyLock());
@@ -8847,6 +9351,16 @@ var require_settings_tab = __commonJS((exports2, module2) => {
             key: "theme",
             defaultValue: DEFAULT_SETTINGS.theme,
             options: { auto: "Follow Obsidian", dark: "Always dark", light: "Always light" }
+          }
+        },
+        {
+          name: "Colour palette",
+          desc: PALETTE_DESC,
+          control: {
+            type: "dropdown",
+            key: "palette",
+            defaultValue: DEFAULT_SETTINGS.palette,
+            options: PALETTE_PRESETS
           }
         },
         {

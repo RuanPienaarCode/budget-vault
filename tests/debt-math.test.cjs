@@ -201,3 +201,35 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
 }
 
 console.log(`PASS — debt amortisation, strategy simulation and formatting (${checks} checks).`);
+
+/* ---- expectedBalance: where a debt should be today ----
+   Interest is applied BEFORE each payment. Subtracting instalments alone would
+   report a debt shrinking faster than it is — the flattering direction, and so
+   the dangerous one. */
+{
+  const { expectedBalance } = require('../src/debt-math');
+
+  // Interest-free: 12 months of 100 off 1200 clears it exactly.
+  const free = expectedBalance({ original: 1200, rate: 0, payment: 100, start: '2025-08-01' }, '2026-08-01');
+  eq(free.months, 12, 'twelve months elapsed');
+  ok(free.settled, 'and an interest-free debt is gone');
+
+  // With interest, the same payments leave a balance behind.
+  const withInt = expectedBalance({ original: 1200, rate: 24, payment: 100, start: '2025-08-01' }, '2026-08-01');
+  ok(!withInt.settled, 'at 24% the same instalments do not clear it');
+  ok(withInt.expected > 0, 'something is still owed');
+  ok(withInt.interest > 0, 'because interest was charged along the way');
+  ok(withInt.expected < 1200, 'but it did come down');
+
+  // Extra payments count toward the instalment.
+  const extra = expectedBalance({ original: 1200, rate: 0, payment: 50, extra: 50, start: '2025-08-01' }, '2026-08-01');
+  ok(extra.settled, 'payment + extra is what actually leaves the account');
+
+  // Rows that cannot support a projection say so rather than guessing.
+  eq(expectedBalance({ original: 0, payment: 100, start: '2025-01-01' }, '2026-08-01'), null, 'no original');
+  eq(expectedBalance({ original: 1000, payment: 0, start: '2025-01-01' }, '2026-08-01'), null, 'no instalment');
+  eq(expectedBalance({ original: 1000, payment: 100, start: '' }, '2026-08-01'), null, 'no start date');
+  eq(expectedBalance({ original: 1000, payment: 100, start: '2027-01-01' }, '2026-08-01'), null, 'starts in the future');
+  eq(expectedBalance({ original: 1000, payment: 100, start: '2026-08-01' }, '2026-08-01'), null, 'no months elapsed yet');
+  eq(expectedBalance(null, '2026-08-01'), null, 'missing debt does not throw');
+}
