@@ -1103,6 +1103,13 @@
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   flex-wrap: wrap; margin-top: 8px;
 }
+/* A caveat with nothing to say is not there at all — which is why NO page may
+   hang its spacing on this element. Assets and Savings once did, carrying the
+   gap to the card below on the caveat's own `mb-4`, and lost it entirely on any
+   vault where every value was current: the page broke precisely when nothing
+   was wrong. Both now wrap the tiles and the caveat in a block that owns the
+   gap, as the dashboard's position band always has. Guarded by
+   tests/vanishing-margin.test.cjs. */
 .budget-app-root .kpi-caveat:empty { display: none; margin-top: 0; }
 .budget-app-root .kpi-caveat-txt {
   display: inline-flex; align-items: center; gap: 6px;
