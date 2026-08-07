@@ -128,12 +128,12 @@ const SHELL_HTML = `
 
       <section id="view-connect">
         <div class="card" id="connect-card">
-          <div class="card-h" style="justify-content:center"><h2>Budget folder not found</h2></div>
+          <div class="card-h" style="justify-content:center"><h2 data-i18n="shell.connect.title">Budget folder not found</h2></div>
           <div class="body-pad">
             <p>This plugin reads and writes the markdown files in your budget folder —
               accounts, categories, budgets and transactions all live as plain files in the vault.</p>
             <p class="text-muted" id="connectPathNote"></p>
-            <p style="margin-top:1.4rem"><button class="btn-gradient" id="openSettingsBtn" style="padding:0.55rem 1.5rem">Open plugin settings…</button></p>
+            <p style="margin-top:1.4rem"><button class="btn-gradient" id="openSettingsBtn" style="padding:0.55rem 1.5rem" data-i18n="shell.connect.btn">Open plugin settings…</button></p>
             <p id="connectErr" class="text-danger"></p>
           </div>
         </div>
@@ -147,15 +147,15 @@ const SHELL_HTML = `
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2>Spending Trend</h2>
-              <div class="sub" id="trendSub">Spent vs budget</div>
+              <h2 data-i18n="shell.dash.trend">Spending Trend</h2>
+              <div class="sub" id="trendSub" data-i18n="shell.dash.trendSub">Spent vs budget</div>
             </div>
             <div class="card-h-controls">
               <div class="legend">
-                <span><i style="background:var(--color-success)"></i>Spent</span>
-                <span><i style="background:var(--color-danger)"></i>Over budget</span>
-                <span><i style="background:var(--color-info)"></i>Income</span>
-                <span><i class="legend-dash"></i>Budget</span>
+                <span><i style="background:var(--color-success)"></i><span data-i18n="shell.legend.spent">Spent</span></span>
+                <span><i style="background:var(--color-danger)"></i><span data-i18n="shell.legend.over">Over budget</span></span>
+                <span><i style="background:var(--color-info)"></i><span data-i18n="shell.legend.income">Income</span></span>
+                <span><i class="legend-dash"></i><span data-i18n="shell.legend.budget">Budget</span></span>
               </div>
               <div id="trendRange"></div>
             </div>
@@ -165,7 +165,7 @@ const SHELL_HTML = `
         <div class="card mb-4" id="dashSplitCard">
           <div class="card-h">
             <div>
-              <h2>Where it went</h2>
+              <h2 data-i18n="shell.dash.split">Where it went</h2>
               <div class="sub" id="dashSplitSub"></div>
             </div>
           </div>
@@ -174,7 +174,7 @@ const SHELL_HTML = `
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2>Budget vs Actual</h2>
+              <h2 data-i18n="shell.dash.vsActual">Budget vs Actual</h2>
               <div class="sub" id="dashBudgetSub"></div>
             </div>
           </div>
@@ -194,7 +194,7 @@ const SHELL_HTML = `
              the card's chrome or its 44px gutters. -->
         <div class="mb-4" id="dashPositionCard">
           <div class="section-h">
-            <h2>Where you stand</h2>
+            <h2 data-i18n="shell.dash.position">Where you stand</h2>
             <div class="sub" id="dashPositionSub"></div>
           </div>
           <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
@@ -211,18 +211,18 @@ const SHELL_HTML = `
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div class="row" style="flex:1">
-              <select id="txAccount" class="form-select form-select-sm"><option value="">All accounts</option></select>
-              <select id="txCategory" class="form-select form-select-sm"><option value="">All categories</option><option value="__none__">Uncategorised</option></select>
-              <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…">
+              <select id="txAccount" class="form-select form-select-sm"><option value="" data-i18n="tx.allAccounts">All accounts</option></select>
+              <select id="txCategory" class="form-select form-select-sm"><option value="" data-i18n="tx.allCategories">All categories</option><option value="__none__" data-i18n="tx.uncategorised">Uncategorised</option></select>
+              <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…" data-i18n-placeholder="shell.tx.search">
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
-                <input type="checkbox" id="txWholeHistory"> whole history
+                <input type="checkbox" id="txWholeHistory"> <span data-i18n="shell.tx.wholeHistory">whole history</span>
               </label>
             </div>
             <div class="row">
               <span id="txCount" class="count-note"></span>
-              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> Export</button>
-              <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> Add transaction</button>
-              <button class="btn-gradient" id="txSave" disabled>Save changes</button>
+              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
+              <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="shell.tx.add">Add transaction</span></button>
+              <button class="btn-gradient" id="txSave" disabled data-i18n="shell.saveChanges">Save changes</button>
             </div>
           </div>
           <div class="body-pad body-pad-tight">
@@ -240,13 +240,13 @@ const SHELL_HTML = `
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div>
-              <h2>Category budgets</h2>
+              <h2 data-i18n="shell.bud.title">Category budgets</h2>
               <div class="sub">Amounts are per financial period · saved to <code>Budgets/&lt;period&gt;.md</code></div>
             </div>
             <div class="row">
-              <button class="btn-ghost" id="budCopyPrev">Copy previous period</button>
+              <button class="btn-ghost" id="budCopyPrev" data-i18n="shell.bud.copyPrev">Copy previous period</button>
               <button class="btn-ghost" id="budAddCat"><span class="ico" data-ico="plus"></span> New category</button>
-              <button class="btn-gradient" id="budSave" disabled>Save budget</button>
+              <button class="btn-gradient" id="budSave" disabled data-i18n="shell.bud.save">Save budget</button>
             </div>
           </div>
           <div class="body-pad body-pad-tight">
