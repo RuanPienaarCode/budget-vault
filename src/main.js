@@ -12,6 +12,7 @@
 const { Plugin, TFile, TFolder, Notice, normalizePath } = require('obsidian');
 const { VIEW_TYPE, DEFAULT_SETTINGS } = require('./constants');
 const { parseFrontmatter } = require('./markdown');
+const { defaultLanguage } = require('./i18n');
 const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
 const { OnboardingWizard } = require('./onboarding');
@@ -117,7 +118,7 @@ class BudgetPlugin extends Plugin {
       // No Settings.md yet — create it with defaults plus the requested key,
       // whatever that key is (country/household included, not just the two
       // defaults).
-      const defaults = { month_start_day: '23', currency: 'R', country: 'za' };
+      const defaults = { month_start_day: '23', currency: 'R', country: 'za', language: defaultLanguage() };
       defaults[key] = value;
       this._lastWrite = Date.now();
       await this.app.vault.create(path,

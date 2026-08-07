@@ -307,13 +307,25 @@ const open = (app, plugin) => { const w = new OnboardingWizard(app, plugin); w.o
   /* ---- 5: country changes update the currency control, not just the value -- */
   w.stepIdx = w.steps().indexOf('country'); w.renderStep();
   const selects = all(w.contentEl, e => e.tagName === 'SELECT');
-  eq(selects.length, 2, 'country and currency share one step');
-  const before = selects[1].value;
-  selects[0]._onChange('uk');
-  const after = all(w.contentEl, e => e.tagName === 'SELECT')[1].value;
+  eq(selects.length, 3, 'language, country and currency share one step');
+  // Language sits first because it governs everything the wizard says after it.
+  const LANG = 0, COUNTRY = 1, CURRENCY = 2;
+  const before = selects[CURRENCY].value;
+  const langBefore = selects[LANG].value;
+  selects[COUNTRY]._onChange('uk');
+  const nowSelects = all(w.contentEl, e => e.tagName === 'SELECT');
+  const after = nowSelects[CURRENCY].value;
   eq(w.data.currency, '£', 'choosing the UK sets the currency behind the scenes');
   eq(after, '£', 'AND the control the user is looking at now shows it');
   ok(before !== after, 'the two controls cannot silently disagree');
+
+  /* Country and language are separate axes (see the header of src/i18n.js).
+     The currency control above is DELIBERATELY dragged by the country; the
+     language control deliberately is not. Pinned because the obvious "helpful"
+     change — defaulting language from the country — is exactly the behaviour
+     Ruan ruled out: someone in Germany may still want the app in English. */
+  eq(nowSelects[LANG].value, langBefore, 'choosing a country does not change the language');
+  eq(w.data.language, langBefore, 'and does not change it behind the scenes either');
 
   /* ---- 6: Cancel is not wedged between Back and Next ---- */
   w.stepIdx = 3; w.renderStep();

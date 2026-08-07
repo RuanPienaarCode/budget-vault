@@ -1,105 +1,125 @@
 'use strict';
 /* Static view markup — same shell as Budget App.html, minus the folder-picker
    connect screen (replaced by a settings pointer) and the theme toggle (now a
-   setting). Icons are lucide slots (span[data-ico]) resolved after mount. */
+   setting). Icons are lucide slots (span[data-ico]) resolved after mount.
+
+   TRANSLATION: text carries a data-i18n attribute beside the English, applied
+   by i18n.applyDom() after the DOMParser pass in controller.js — the English
+   below stays readable as markup, and the pass is a no-op in English.
+
+     data-i18n              -> textContent  (element must hold TEXT ONLY)
+     data-i18n-aria         -> aria-label
+     data-i18n-title        -> title
+     data-i18n-placeholder  -> placeholder
+
+   Because data-i18n writes textContent, a drawer link wraps its label in its
+   own span element rather than leaving it as a bare text node beside the icon
+   span — otherwise applying the translation would delete the icon. The wrapper
+   is layout-neutral: .drawer-link is `display:flex; gap:12px`, so the bare text
+   node was already an anonymous flex item and the span is a named one.
+
+   Write tag names in this header as prose, never as real markup:
+   tests/vanishing-margin.test.cjs parses this whole FILE as a tag stream, so an
+   angle-bracketed tag in a comment reads to it as an element the shell opened
+   and never closed. */
 
 const SHELL_HTML = `
   <div class="splash-gate hidden" id="splashGate" role="group" aria-labelledby="gateTitle">
     <div class="splash-inner">
       <div class="splash-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></div>
       <h1 class="splash-title" id="gateTitle">Budget Vault</h1>
-      <p class="splash-sub">Your private budget, kept safely inside your vault.</p>
-      <button type="button" class="btn-gradient splash-btn" id="gateEnter">Enter budget</button>
+      <p class="splash-sub" data-i18n="splash.sub">Your private budget, kept safely inside your vault.</p>
+      <button type="button" class="btn-gradient splash-btn" id="gateEnter" data-i18n="splash.enter">Enter budget</button>
     </div>
   </div>
 
   <div class="drawer-overlay" id="drawerOverlay"></div>
 
-  <nav class="app-drawer" id="appDrawer" aria-label="Main menu" inert>
+  <nav class="app-drawer" id="appDrawer" aria-label="Main menu" data-i18n-aria="topbar.mainMenu" inert>
     <div class="drawer-head">
-      <b>Menu</b>
-      <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
+      <b data-i18n="nav.menu">Menu</b>
+      <button type="button" class="drawer-close" aria-label="Close menu" data-i18n-aria="nav.close" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Budget</div>
+    <div class="drawer-section-label" data-i18n="nav.section.budget">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
-      <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
+      <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span><span data-i18n="nav.dashboard">Dashboard</span>
     </button>
     <button class="drawer-link" data-view="transactions">
-      <span class="di"><span class="ico" data-ico="arrow-left-right"></span></span>Transactions
+      <span class="di"><span class="ico" data-ico="arrow-left-right"></span></span><span data-i18n="nav.transactions">Transactions</span>
     </button>
     <button class="drawer-link" data-view="budgets">
-      <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
+      <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
 
     <div class="drawer-divider"></div>
 
-    <div class="drawer-section-label">Accounts</div>
+    <div class="drawer-section-label" data-i18n="nav.section.accounts">Accounts</div>
     <button class="drawer-link" data-view="savings">
-      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span>Savings &amp; Investments
+      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; Investments</span>
     </button>
     <button class="drawer-link" data-view="accounts">
-      <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
+      <span class="di"><span class="ico" data-ico="landmark"></span></span><span data-i18n="nav.accounts">Accounts</span>
     </button>
     <button class="drawer-link" data-view="assets">
-      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span>Assets
+      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span><span data-i18n="nav.assets">Assets</span>
     </button>
     <button class="drawer-link" data-view="debts">
-      <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
+      <span class="di"><span class="ico" data-ico="credit-card"></span></span><span data-i18n="nav.debts">Debt</span>
     </button>
     <button class="drawer-link" data-view="owed">
-      <span class="di"><span class="ico" data-ico="users"></span></span>Owed Money
+      <span class="di"><span class="ico" data-ico="users"></span></span><span data-i18n="nav.owed">Owed Money</span>
     </button>
     <button class="drawer-link" data-view="services">
-      <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+      <span class="di"><span class="ico" data-ico="layers"></span></span><span data-i18n="nav.services">Services</span>
     </button>
     <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span><span data-i18n="nav.tax">Tax</span>
     </button>
 
     <div class="drawer-divider"></div>
 
-    <div class="drawer-section-label">Tools</div>
+    <div class="drawer-section-label" data-i18n="nav.section.tools">Tools</div>
     <button class="drawer-link" data-view="loans">
-      <span class="di"><span class="ico" data-ico="calculator"></span></span>Loan Calculators
+      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
     </button>
     <button class="drawer-link" data-view="import">
-      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span>Import CSV
+      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span><span data-i18n="nav.import">Import CSV</span>
     </button>
     <button class="drawer-link" id="reloadLink">
-      <span class="di"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></span>Reload from disk
+      <span class="di"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></span><span data-i18n="nav.reload">Reload from disk</span>
     </button>
     <button class="drawer-link" id="pluginSettingsLink">
-      <span class="di"><span class="ico" data-ico="settings"></span></span>Plugin settings
+      <span class="di"><span class="ico" data-ico="settings"></span></span><span data-i18n="nav.pluginSettings">Plugin settings</span>
     </button>
   </nav>
 
-  <header class="topbar" aria-label="Budget navigation">
-    <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="appDrawer" aria-label="Open navigation menu">
+  <header class="topbar" aria-label="Budget navigation" data-i18n-aria="topbar.nav">
+    <button type="button" class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="appDrawer" aria-label="Open navigation menu" data-i18n-aria="topbar.openMenu">
       <span></span><span></span><span></span>
     </button>
 
-    <button type="button" class="brand" id="brandHome" aria-label="Go to Dashboard">
+    <button type="button" class="brand" id="brandHome" aria-label="Go to Dashboard" data-i18n-aria="topbar.home">
       <span class="brand-logo" aria-hidden="true"><span class="ico" data-ico="wallet|banknote|coins"></span></span>
       <span class="brand-text">
         <b>Budget Vault</b>
-        <span class="brand-sub" id="brandSub">Obsidian vault budget</span>
+        <span class="brand-sub" id="brandSub" data-i18n="topbar.brandSub">Obsidian vault budget</span>
       </span>
     </button>
 
-    <div class="header-period-pill hidden" id="periodPill" role="group" aria-label="Period navigation">
-      <button class="pnav-btn" id="prevPeriod" aria-label="Previous period"><span class="ico" data-ico="chevron-left"></span></button>
+    <div class="header-period-pill hidden" id="periodPill" role="group" aria-label="Period navigation" data-i18n-aria="topbar.periodNav">
+      <button class="pnav-btn" id="prevPeriod" aria-label="Previous period" data-i18n-aria="topbar.prevPeriod"><span class="ico" data-ico="chevron-left"></span></button>
       <span class="pnav-dot" aria-hidden="true"></span>
       <span class="pnav-label" id="periodLabel"></span>
-      <button class="pnav-btn" id="currentPeriod" aria-label="Jump to current period"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></button>
-      <button class="pnav-btn" id="nextPeriod" aria-label="Next period"><span class="ico" data-ico="chevron-right"></span></button>
+      <button class="pnav-btn" id="currentPeriod" aria-label="Jump to current period" data-i18n-aria="topbar.currentPeriod"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></button>
+      <button class="pnav-btn" id="nextPeriod" aria-label="Next period" data-i18n-aria="topbar.nextPeriod"><span class="ico" data-ico="chevron-right"></span></button>
     </div>
 
     <div class="ml-auto">
-      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" title="Import a bank statement CSV">
+      <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" data-i18n-aria="topbar.import" title="Import a bank statement CSV" data-i18n-title="topbar.importTitle">
         <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
       </button>
-      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings">BV</button>
+      <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings" data-i18n-aria="topbar.settings">BV</button>
     </div>
   </header>
 
@@ -121,7 +141,7 @@ const SHELL_HTML = `
 
       <section id="view-dashboard" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Dashboard</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.dashboard">Dashboard</h1>
         </div>
         <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
@@ -185,7 +205,7 @@ const SHELL_HTML = `
 
       <section id="view-transactions" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Transactions</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.transactions">Transactions</h1>
           <div class="sub-note" id="txSubNote"></div>
         </div>
         <div class="card">
@@ -213,7 +233,7 @@ const SHELL_HTML = `
 
       <section id="view-budgets" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Budget</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.budgets">Budget</h1>
           <div class="sub-note" id="budPeriodLabel"></div>
         </div>
         <div id="budShapeNote" class="bud-shape-note hidden"></div>
@@ -239,7 +259,7 @@ const SHELL_HTML = `
 
       <section id="view-tax" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Tax</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.tax">Tax</h1>
           <div class="sub-note" id="taxSubNote">Tax return tracking · saved to <code>Tax/&lt;year&gt;.md</code></div>
         </div>
 
@@ -314,7 +334,7 @@ const SHELL_HTML = `
 
       <section id="view-savings" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Savings &amp; Investments</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.savings">Savings &amp; Investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
         <!-- Tiles and the caveat that qualifies them are ONE block, and the
@@ -349,7 +369,7 @@ const SHELL_HTML = `
 
       <section id="view-accounts" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Accounts</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.accounts">Accounts</h1>
           <div class="sub-note">Click a balance to update it, or a name to see that account's transactions — the account's markdown file is rewritten.</div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
@@ -361,7 +381,7 @@ const SHELL_HTML = `
 
       <section id="view-assets" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Assets</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.assets">Assets</h1>
           <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
         </div>
         <!-- One block, owning its own gap — see the note on Savings above. -->
@@ -385,7 +405,7 @@ const SHELL_HTML = `
 
       <section id="view-debts" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Debt</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.debts">Debt</h1>
           <div class="sub-note">Balances, what the interest costs, and how fast you can be free of it · saved to <code>Debts.md</code></div>
         </div>
 
@@ -434,7 +454,7 @@ const SHELL_HTML = `
 
       <section id="view-owed" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Owed Money</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.owed">Owed Money</h1>
           <div class="sub-note">Money owed to the household · saved to <code>Owed Money.md</code></div>
         </div>
         <div class="mini-grid mini-kpis-3 mb-4" id="owedKpis"></div>
@@ -454,7 +474,7 @@ const SHELL_HTML = `
 
       <section id="view-services" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Services</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.services">Services</h1>
           <div class="sub-note">Recurring services &amp; subscriptions · saved to <code>Services.md</code></div>
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="servicesKpis"></div>
@@ -474,7 +494,7 @@ const SHELL_HTML = `
 
       <section id="view-loans" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Loan Calculators</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.loans">Loan Calculators</h1>
           <div class="sub-note" id="loansSubNote"></div>
         </div>
 
@@ -544,7 +564,7 @@ const SHELL_HTML = `
 
       <section id="view-import" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title">Import CSV</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.import">Import CSV</h1>
           <div class="sub-note" id="importSubNote">Bank statement CSV exports — or your own CSV</div>
         </div>
         <div class="card mb-4">
