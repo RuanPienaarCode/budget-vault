@@ -10649,6 +10649,7 @@ var require_controller = __commonJS((exports2, module2) => {
         await connectVault();
       },
       applyTheme,
+      applyLanguage: () => applyDom(root),
       applyPrivacyLock: () => {
         if (plugin.settings.privacyLock)
           lockGate();
@@ -11537,6 +11538,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         d.onChange(async (v) => {
           setLanguage(v);
           await this.plugin.updateBudgetSettingsMd("language", v);
+          this.plugin.forEachView((ctl) => ctl.applyLanguage());
           this.plugin.reloadViews();
           this.display();
         });
@@ -11654,6 +11656,8 @@ var require_settings_tab = __commonJS((exports2, module2) => {
       if (key === "language")
         setLanguage(raw);
       await this.plugin.updateBudgetSettingsMd(key, raw);
+      if (key === "language")
+        this.plugin.forEachView((ctl) => ctl.applyLanguage());
       this.plugin.reloadViews();
     }
     getSettingDefinitions() {

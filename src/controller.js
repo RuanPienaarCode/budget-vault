@@ -613,6 +613,21 @@ function mountApp(view) {
       await connectVault();
     },
     applyTheme,
+    /* The shell is translated ONCE, at mount, by the applyDom() call up in
+       mountApp. Changing the language therefore did nothing to a view that was
+       already open: the setting was written, the live language moved, the data
+       reloaded — and the drawer, top bar and page titles went on showing
+       whatever language they were mounted in, until the view was closed and
+       reopened. Which reads, entirely reasonably, as "I changed it and nothing
+       happened".
+
+       Re-running applyDom over the mounted root fixes that: every translated
+       element still carries its data-i18n attribute (the pass reads them, it
+       does not consume them), so the shell can be re-translated in place as
+       many times as the language changes. Same shape as applyTheme and
+       applyPrivacyLock above — a settings change that has to act on open views
+       immediately rather than at the next mount. */
+    applyLanguage: () => applyDom(root),
     /* Toggling the setting acts on open views immediately: switching it off
        lifts a gate the user is currently staring at (rather than stranding
        them behind it), switching it on covers the numbers right away. */
