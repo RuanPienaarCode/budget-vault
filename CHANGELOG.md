@@ -3,6 +3,54 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.1 — 2026-08-07
+
+### Fixed
+
+- **Two German strings told you to do the opposite of what they meant.** The
+  category step of the setup wizard and the split-transaction warning both said
+  *abhaken* — to tick — where the instruction is to **un**tick. Anyone following
+  them literally selected every category they had just been told to remove.
+
+- **Grammar across the seven language tables.** Afrikaans had a clause with no
+  verb ("waarheen die geld is"), a promise that never finished ("gratis en sal
+  altyd wees"), and a plural sentence that referred back to its subject in the
+  singular. German had "davon aus gezählt" twice, which is not German. Spanish
+  paired a perfect tense with *hace tiempo* in a way that does not parse.
+
+- **Words that were the wrong word.** Afrikaans used *hardloop* — to jog — for
+  running the setup wizard. Spanish used *debido* ("due to") for money owed,
+  against the *adeudado* used everywhere else. French listed loan tools as
+  *calculateurs* rather than *simulateurs de prêt*.
+
+- **Two labels read as nouns instead of verbs.** On the account form, Spanish
+  "Cuenta para el presupuesto" and French "Compte dans le budget" both read as
+  *account*, not *counts*. They now read as the setting they are.
+
+- **Counts no longer disagree with their nouns.** Seven strings interpolated a
+  number without a singular form, so a single item read "1 dae", "1 jours",
+  "1 Tagen", "1 días" — and in English, "over the last 1 periods". Each is now
+  a plural entry with its own singular, and the views pass the count that
+  selects between them.
+
+### Changed
+
+- **Two sentences carried two independent counts each**, which no plural rule
+  can agree with at once. Both were reworded so each number follows a label
+  rather than preceding a noun that has to match it.
+
+- The debt breakdown on the dashboard read "{amount} accounts" because it
+  interpolates money into a slot the wording treated as a count. It now reads
+  "{amount} on accounts".
+
+- Spanish and French page names dropped English Title Case — "Dinero adeudado",
+  "Sommes dues", "Épargne et placements" — with every in-sentence reference to
+  those names updated to match.
+
+- Typographic consistency per language: straight quotes in English and
+  Afrikaans, full-width colons and parentheses in Chinese, question marks rather
+  than full stops on Japanese questions.
+
 ## 1.11.0 — 2026-08-07
 
 ### Added

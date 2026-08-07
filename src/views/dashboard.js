@@ -174,7 +174,7 @@ module.exports = function registerDashboard(ctx) {
       cls: owed.outstanding > 0 ? 'text-warning' : '',
       sub: owed.outstanding > 0
         ? i18n.t('dash.pos.owedOpen', { count: owed.open })
-          + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays }) : '')
+          + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
         : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')),
       view: 'owed',
       say: owed.outstanding > 0
@@ -231,7 +231,7 @@ module.exports = function registerDashboard(ctx) {
     const wrap = $('#dashStale'); wrap.empty();
     const s = stalenessSummary(S.accounts);
     if (!s.stale) return;
-    const age = s.oldestDays === null ? i18n.t('dash.stale.noDate') : i18n.t('dash.stale.oldest', { days: s.oldestDays });
+    const age = s.oldestDays === null ? i18n.t('dash.stale.noDate') : i18n.t('dash.stale.oldest', { days: s.oldestDays, count: s.oldestDays });
     const all = s.stale === s.total;
     const line = all
       ? i18n.t('dash.stale.all', { count: s.total })
