@@ -3,6 +3,27 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.10.0 — 2026-08-07
+
+### Added
+
+- **The Dashboard is translated.** The greeting, the big remaining figure and
+  its label, the income/budgeted/spent column, the percentages, the budget
+  table, the "where you stand" tiles, the trend and split cards and every
+  screen-reader description behind them.
+
+- **Card headings across the whole app now translate too.** "Spending Trend",
+  "Where it went", "Budget vs Actual", "Where you stand", the chart legend, the
+  Transactions filters and buttons, and the Budget page's own header row were
+  written into the app's fixed markup and had been missed — so they stayed
+  English on every page regardless of the language. They no longer do.
+
+### Notes
+
+- Nine pages are still English: Tax, Accounts, Debt, Loan Calculators, Import,
+  Savings, Assets, Services and Owed Money. Their card headings are translated;
+  their contents are not yet.
+
 ## 1.9.0 — 2026-08-07
 
 ### Added

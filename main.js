@@ -436,7 +436,175 @@ var require_en = __commonJS((exports2, module2) => {
     "tx.export.done": {
       one: "Exported {count} row and {cats} categories to {path}/",
       other: "Exported {count} rows and {cats} categories to {path}/"
-    }
+    },
+    "acct.group.bank": "Bank accounts",
+    "acct.group.savings": "Savings",
+    "acct.group.investments": "Investments",
+    "acct.group.other": "Other",
+    "acct.group.count": { one: "{count} account", other: "{count} accounts" },
+    "acct.noteMissing": "Accounts/{name}.md not found",
+    "acct.balance.title": "Update balance — {name}",
+    "acct.balance.field": "New balance",
+    "acct.balance.updated": "{name} balance updated",
+    "acct.reconciled": "{name} reconciled to {amount}",
+    "acct.err.nan": "Not a number",
+    "acct.err.type": "Invalid type",
+    "acct.err.notNumber": "{field} is not a number",
+    "acct.err.nameRequired": "Account name required",
+    "acct.err.exists": "Account already exists",
+    "acct.edit.title": "Edit account — {name}",
+    "acct.new.title": "New account",
+    "acct.field.name": "Account name",
+    "acct.field.type": "Type",
+    "acct.field.institution": "Institution",
+    "acct.field.number": "Account number",
+    "acct.field.numberDesc": "Used to match a downloaded statement to this account on import.",
+    "acct.field.folder": "Transactions folder",
+    "acct.field.folderDesc": "Leave blank to use “{name}”. Set it only when the folder under Transactions/ has a different name.",
+    "acct.field.counts": "Counts toward the budget",
+    "acct.counts.yes": "Yes — normal spending account",
+    "acct.counts.no": "No — investment or savings wrapper",
+    "acct.field.countsDesc": "Choose No for an account whose interest is not household income and whose contributions are not household spending. Its transactions still import and show in Transactions.",
+    "acct.field.limit": "Credit limit",
+    "acct.field.limitDesc": "Shows a utilisation bar on credit cards.",
+    "acct.field.balance": "Current balance",
+    "acct.field.goal": "Savings goal",
+    "acct.field.goalOpt": "Savings goal (optional)",
+    "acct.field.goalOptDesc": "Shows a progress bar on Savings & Investments.",
+    "acct.field.goalDate": "Goal target date",
+    "acct.field.monthly": "Monthly contribution",
+    "acct.field.invested": "Total invested",
+    "acct.field.investedOpt": "Total invested (optional)",
+    "acct.field.investedDesc": "What you have put in, so growth can be shown against it.",
+    "acct.field.starting": "Starting amount",
+    "acct.field.opened": "Opened on",
+    "acct.budget.on": "{name} counts toward the budget again",
+    "acct.budget.off": "{name} no longer counts toward budget totals",
+    "acct.creditUsed": "Credit used",
+    "acct.creditOf": "{used} of {limit}",
+    "acct.overLimit": "Over limit by {amount}",
+    "acct.utilised": "{pct}% used · {available} available",
+    "acct.kpi.inCredit": "In credit",
+    "acct.kpi.overdrawn": "Overdrawn",
+    "acct.kpi.netWorth": "Net worth",
+    "acct.kpi.netWorthNote": "across these accounts only",
+    "acct.kpi.attention": "Needs attention",
+    "acct.kpi.attentionNote": "unverified or drifting balances",
+    "acct.kpi.allGood": "every balance checks out",
+    "acct.aria.showTx": "Show {name} transactions",
+    "acct.aria.balance": "Balance for {name}, {amount} — click to update",
+    "acct.limitSuffix": " · limit {amount}",
+    "acct.monthlySuffix": " · {amount}/m",
+    "acct.badge.notInBudget": "not in budget",
+    "acct.badge.noTx": "no transactions",
+    "acct.badge.asOf": "as of {date}",
+    "acct.badge.neverConfirmed": "never confirmed",
+    "acct.badge.unconfirmed": { one: "unconfirmed {count} day", other: "unconfirmed {count} days" },
+    "acct.act.in": " in · ",
+    "acct.act.out": " out · ",
+    "acct.act.count": { one: "{count} transaction in {month}", other: "{count} transactions in {month}" },
+    "acct.recon.since": { one: "{count} transaction since · implies ", other: "{count} transactions since · implies " },
+    "acct.recon.pending": " · {count} dated ahead, not counted yet",
+    "acct.recon.useThis": "Use this",
+    "acct.aria.useThis": "Set {name} balance to {amount}",
+    "acct.recon.matches": "Matches your transactions",
+    "acct.recon.upToDate": { one: "Up to date · {count} transaction dated ahead", other: "Up to date · {count} transactions dated ahead" },
+    "acct.recon.setDate": "Set a balance date to check this against your transactions",
+    "acct.foot.updated": "updated {date}",
+    "acct.foot.noDate": "no balance date",
+    "acct.aria.exclude": "Stop counting {name} toward budget totals",
+    "acct.aria.include": "Count {name} toward budget totals again",
+    "acct.btn.exclude": "Exclude from budget",
+    "acct.btn.include": "Include in budget",
+    "acct.aria.edit": "Edit {name}",
+    "acct.btn.edit": "Edit",
+    "acct.aria.openNote": "Open the {name} note",
+    "acct.btn.openNote": "Open note",
+    "acct.empty": "No accounts yet. Use “New account” above to add a bank account, savings pot or investment.",
+    "shell.connect.title": "Budget folder not found",
+    "shell.connect.btn": "Open plugin settings…",
+    "shell.saveChanges": "Save changes",
+    "shell.dash.trend": "Spending Trend",
+    "shell.dash.trendSub": "Spent vs budget",
+    "shell.dash.split": "Where it went",
+    "shell.dash.vsActual": "Budget vs Actual",
+    "shell.dash.position": "Where you stand",
+    "shell.legend.spent": "Spent",
+    "shell.legend.over": "Over budget",
+    "shell.legend.income": "Income",
+    "shell.legend.budget": "Budget",
+    "shell.tx.search": "Search description…",
+    "shell.tx.wholeHistory": "whole history",
+    "shell.tx.export": "Export",
+    "shell.tx.add": "Add transaction",
+    "shell.bud.title": "Category budgets",
+    "shell.bud.copyPrev": "Copy previous period",
+    "shell.bud.save": "Save budget",
+    "dash.greet.morning": "Good morning",
+    "dash.greet.afternoon": "Good afternoon",
+    "dash.greet.evening": "Good evening",
+    "dash.greet.line": "{greeting}, {name}",
+    "dash.hero.remaining": "Remaining this period",
+    "dash.hero.overspent": "Overspent this period",
+    "dash.hero.sub": "{spent} spent of {budgeted} budgeted",
+    "dash.stat.income": "Total Income",
+    "dash.stat.budgeted": "Budgeted",
+    "dash.stat.spent": "Total Spent",
+    "dash.stat.uncategorised": "Uncategorised",
+    "dash.stat.allocated": "{pct}% allocated",
+    "dash.stat.used": "{pct}% used",
+    "dash.stat.review": "review in Transactions",
+    "dash.col.category": "Category",
+    "dash.col.budget": "Budget",
+    "dash.col.spent": "Spent",
+    "dash.col.remaining": "Remaining",
+    "dash.table.empty": "No budget or transactions in this period yet.",
+    "dash.pos.sub": "As things stand today — these do not move with the period above",
+    "dash.pos.netWorth": "Net worth",
+    "dash.pos.netWorthSub": "{owned} owned · {owed} owed",
+    "dash.pos.netWorthSay": "Net worth {net} — {owned} owned against {owed} owed. Open Savings and Investments.",
+    "dash.pos.debt": "Debt",
+    "dash.pos.debtSplit": "{accounts} accounts · {debts} debt page",
+    "dash.pos.debtActive": { one: "{count} active", other: "{count} active" },
+    "dash.pos.debtNone": "nothing owed",
+    "dash.pos.debtSay": "Debt {amount} owed. Open the Debt page.",
+    "dash.pos.debtSayNone": "No debt owed. Open the Debt page.",
+    "dash.pos.owed": "Owed to you",
+    "dash.pos.owedOpen": "{count} outstanding",
+    "dash.pos.owedOldest": " · oldest out {days} days",
+    "dash.pos.owedRecovered": "{amount} recovered",
+    "dash.pos.owedNone": "nothing lent out",
+    "dash.pos.owedSay": {
+      one: "{amount} owed to you across {count} entry. Open Owed Money.",
+      other: "{amount} owed to you across {count} entries. Open Owed Money."
+    },
+    "dash.pos.owedSayNone": "Nothing outstanding. Open Owed Money.",
+    "dash.pos.savings": "Savings & investments",
+    "dash.pos.savingsSub": "{savings} savings · {invested} invested",
+    "dash.pos.savingsSay": "{amount} in savings and investments. Open Savings and Investments.",
+    "dash.overlap": "{accounts} credit-card accounts and {debts} card debts are tracked — if any card is in both, it is counted twice above.",
+    "dash.overlap.btn": "Review debts",
+    "dash.overlap.aria": "Review tracked debts on the Debt page",
+    "dash.stale.noDate": "none of them carry a date",
+    "dash.stale.oldest": "the oldest {days} days ago",
+    "dash.stale.all": { one: "Built from a balance nobody has confirmed recently", other: "Built from {count} balances nobody has confirmed recently" },
+    "dash.stale.some": "Built from {stale} of {total} balances nobody has confirmed recently",
+    "dash.stale.line": "{line} — {age}.",
+    "dash.stale.btn": "Review balances",
+    "dash.stale.aria": "Review account balances on the Accounts page",
+    "dash.trend.range": "Spending trend range",
+    "dash.trend.sub": { one: "Spent vs budget · {count} period", other: "Spent vs budget · {count} periods" },
+    "dash.trend.clamped": " · all the history imported so far",
+    "dash.trend.empty": "Import a second period of transactions and the trend line starts here.",
+    "dash.trend.aria": "Spent, budgeted and income over the last {count} periods",
+    "dash.split.uncatNote": " · {amount} uncategorised, not shown",
+    "dash.split.onlyUncat": "{amount} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.",
+    "dash.split.empty": "Nothing categorised as spending in this period yet.",
+    "dash.split.aria": "Spending split for {month}: ",
+    "dash.split.sliceAria": "{cat}: {amount}, {pct}% of spending — show transactions",
+    "dash.split.noteAria": "Open the {cat} category note",
+    "dash.split.noteMissing": 'No category note found for "{cat}"',
+    "dash.err.render": "Could not draw the {label} — {error}"
   };
 });
 
@@ -745,7 +913,175 @@ var require_af = __commonJS((exports2, module2) => {
     "tx.export.done": {
       one: "{count} ry en {cats} kategorieë na {path}/ uitgevoer",
       other: "{count} rye en {cats} kategorieë na {path}/ uitgevoer"
-    }
+    },
+    "acct.group.bank": "Bankrekeninge",
+    "acct.group.savings": "Spaargeld",
+    "acct.group.investments": "Beleggings",
+    "acct.group.other": "Ander",
+    "acct.group.count": { one: "{count} rekening", other: "{count} rekeninge" },
+    "acct.noteMissing": "Accounts/{name}.md nie gevind nie",
+    "acct.balance.title": "Werk saldo by — {name}",
+    "acct.balance.field": "Nuwe saldo",
+    "acct.balance.updated": "{name} se saldo is bygewerk",
+    "acct.reconciled": "{name} is na {amount} gerekonsilieer",
+    "acct.err.nan": "Nie 'n getal nie",
+    "acct.err.type": "Ongeldige tipe",
+    "acct.err.notNumber": "{field} is nie 'n getal nie",
+    "acct.err.nameRequired": "Rekeningnaam is verpligtend",
+    "acct.err.exists": "Rekening bestaan reeds",
+    "acct.edit.title": "Wysig rekening — {name}",
+    "acct.new.title": "Nuwe rekening",
+    "acct.field.name": "Rekeningnaam",
+    "acct.field.type": "Tipe",
+    "acct.field.institution": "Instelling",
+    "acct.field.number": "Rekeningnommer",
+    "acct.field.numberDesc": "Word gebruik om 'n afgelaaide staat met hierdie rekening te pas wanneer jy invoer.",
+    "acct.field.folder": "Transaksievouer",
+    "acct.field.folderDesc": "Los leeg om “{name}” te gebruik. Stel dit net wanneer die vouer onder Transactions/ 'n ander naam het.",
+    "acct.field.counts": "Tel by die begroting",
+    "acct.counts.yes": "Ja — gewone bestedingsrekening",
+    "acct.counts.no": "Nee — belegging of spaarhouer",
+    "acct.field.countsDesc": "Kies Nee vir 'n rekening waarvan die rente nie huishoudelike inkomste is nie en waarvan die bydraes nie huishoudelike besteding is nie. Die transaksies word steeds ingevoer en in Transaksies gewys.",
+    "acct.field.limit": "Kredietperk",
+    "acct.field.limitDesc": "Wys 'n benuttingsbalk op kredietkaarte.",
+    "acct.field.balance": "Huidige saldo",
+    "acct.field.goal": "Spaardoelwit",
+    "acct.field.goalOpt": "Spaardoelwit (opsioneel)",
+    "acct.field.goalOptDesc": "Wys 'n vorderingsbalk op Spaargeld en Beleggings.",
+    "acct.field.goalDate": "Doelwit se teikendatum",
+    "acct.field.monthly": "Maandelikse bydrae",
+    "acct.field.invested": "Totaal belê",
+    "acct.field.investedOpt": "Totaal belê (opsioneel)",
+    "acct.field.investedDesc": "Wat jy ingesit het, sodat groei daarteen gewys kan word.",
+    "acct.field.starting": "Beginbedrag",
+    "acct.field.opened": "Geopen op",
+    "acct.budget.on": "{name} tel weer by die begroting",
+    "acct.budget.off": "{name} tel nie meer by begrotingstotale nie",
+    "acct.creditUsed": "Krediet gebruik",
+    "acct.creditOf": "{used} van {limit}",
+    "acct.overLimit": "{amount} oor die perk",
+    "acct.utilised": "{pct}% gebruik · {available} beskikbaar",
+    "acct.kpi.inCredit": "In krediet",
+    "acct.kpi.overdrawn": "Oortrokke",
+    "acct.kpi.netWorth": "Netto waarde",
+    "acct.kpi.netWorthNote": "net oor hierdie rekeninge",
+    "acct.kpi.attention": "Benodig aandag",
+    "acct.kpi.attentionNote": "onbevestigde of afwykende saldo's",
+    "acct.kpi.allGood": "elke saldo klop",
+    "acct.aria.showTx": "Wys {name} se transaksies",
+    "acct.aria.balance": "Saldo vir {name}, {amount} — klik om by te werk",
+    "acct.limitSuffix": " · perk {amount}",
+    "acct.monthlySuffix": " · {amount}/m",
+    "acct.badge.notInBudget": "nie in begroting nie",
+    "acct.badge.noTx": "geen transaksies",
+    "acct.badge.asOf": "soos op {date}",
+    "acct.badge.neverConfirmed": "nooit bevestig nie",
+    "acct.badge.unconfirmed": { one: "{count} dag onbevestig", other: "{count} dae onbevestig" },
+    "acct.act.in": " in · ",
+    "acct.act.out": " uit · ",
+    "acct.act.count": { one: "{count} transaksie in {month}", other: "{count} transaksies in {month}" },
+    "acct.recon.since": { one: "{count} transaksie sedertdien · impliseer ", other: "{count} transaksies sedertdien · impliseer " },
+    "acct.recon.pending": " · {count} vorentoe gedateer, nog nie getel nie",
+    "acct.recon.useThis": "Gebruik hierdie",
+    "acct.aria.useThis": "Stel {name} se saldo op {amount}",
+    "acct.recon.matches": "Pas by jou transaksies",
+    "acct.recon.upToDate": { one: "Op datum · {count} transaksie vorentoe gedateer", other: "Op datum · {count} transaksies vorentoe gedateer" },
+    "acct.recon.setDate": "Stel 'n saldodatum om dit teen jou transaksies te toets",
+    "acct.foot.updated": "bygewerk {date}",
+    "acct.foot.noDate": "geen saldodatum",
+    "acct.aria.exclude": "Hou op om {name} by begrotingstotale te tel",
+    "acct.aria.include": "Tel {name} weer by begrotingstotale",
+    "acct.btn.exclude": "Sluit uit begroting",
+    "acct.btn.include": "Sluit in by begroting",
+    "acct.aria.edit": "Wysig {name}",
+    "acct.btn.edit": "Wysig",
+    "acct.aria.openNote": "Maak {name} se nota oop",
+    "acct.btn.openNote": "Maak nota oop",
+    "acct.empty": "Nog geen rekeninge nie. Gebruik “Nuwe rekening” hierbo om 'n bankrekening, spaarpot of belegging by te voeg.",
+    "shell.connect.title": "Begrotingsvouer nie gevind nie",
+    "shell.connect.btn": "Maak inpropinstellings oop…",
+    "shell.saveChanges": "Stoor veranderinge",
+    "shell.dash.trend": "Bestedingstendens",
+    "shell.dash.trendSub": "Bestee teenoor begroot",
+    "shell.dash.split": "Waarheen dit is",
+    "shell.dash.vsActual": "Begroot teenoor werklik",
+    "shell.dash.position": "Waar jy staan",
+    "shell.legend.spent": "Bestee",
+    "shell.legend.over": "Oor begroting",
+    "shell.legend.income": "Inkomste",
+    "shell.legend.budget": "Begroting",
+    "shell.tx.search": "Soek beskrywing…",
+    "shell.tx.wholeHistory": "hele geskiedenis",
+    "shell.tx.export": "Voer uit",
+    "shell.tx.add": "Voeg transaksie by",
+    "shell.bud.title": "Kategoriebegrotings",
+    "shell.bud.copyPrev": "Kopieer vorige tydperk",
+    "shell.bud.save": "Stoor begroting",
+    "dash.greet.morning": "Goeie môre",
+    "dash.greet.afternoon": "Goeie middag",
+    "dash.greet.evening": "Goeie aand",
+    "dash.greet.line": "{greeting}, {name}",
+    "dash.hero.remaining": "Oor vir hierdie tydperk",
+    "dash.hero.overspent": "Oorbestee hierdie tydperk",
+    "dash.hero.sub": "{spent} bestee van {budgeted} begroot",
+    "dash.stat.income": "Totale inkomste",
+    "dash.stat.budgeted": "Begroot",
+    "dash.stat.spent": "Totaal bestee",
+    "dash.stat.uncategorised": "Ongekategoriseer",
+    "dash.stat.allocated": "{pct}% toegewys",
+    "dash.stat.used": "{pct}% gebruik",
+    "dash.stat.review": "gaan na in Transaksies",
+    "dash.col.category": "Kategorie",
+    "dash.col.budget": "Begroting",
+    "dash.col.spent": "Bestee",
+    "dash.col.remaining": "Oor",
+    "dash.table.empty": "Nog geen begroting of transaksies in hierdie tydperk nie.",
+    "dash.pos.sub": "Soos dit vandag staan — hierdie beweeg nie saam met die tydperk hierbo nie",
+    "dash.pos.netWorth": "Netto waarde",
+    "dash.pos.netWorthSub": "{owned} besit · {owed} verskuldig",
+    "dash.pos.netWorthSay": "Netto waarde {net} — {owned} besit teenoor {owed} verskuldig. Maak Spaargeld en Beleggings oop.",
+    "dash.pos.debt": "Skuld",
+    "dash.pos.debtSplit": "{accounts} rekeninge · {debts} skuldbladsy",
+    "dash.pos.debtActive": { one: "{count} aktief", other: "{count} aktief" },
+    "dash.pos.debtNone": "niks verskuldig nie",
+    "dash.pos.debtSay": "Skuld {amount} verskuldig. Maak die Skuld-bladsy oop.",
+    "dash.pos.debtSayNone": "Geen skuld verskuldig nie. Maak die Skuld-bladsy oop.",
+    "dash.pos.owed": "Aan jou verskuldig",
+    "dash.pos.owedOpen": "{count} uitstaande",
+    "dash.pos.owedOldest": " · oudste {days} dae uit",
+    "dash.pos.owedRecovered": "{amount} verhaal",
+    "dash.pos.owedNone": "niks uitgeleen nie",
+    "dash.pos.owedSay": {
+      one: "{amount} aan jou verskuldig oor {count} inskrywing. Maak Geld Verskuldig oop.",
+      other: "{amount} aan jou verskuldig oor {count} inskrywings. Maak Geld Verskuldig oop."
+    },
+    "dash.pos.owedSayNone": "Niks uitstaande nie. Maak Geld Verskuldig oop.",
+    "dash.pos.savings": "Spaargeld en beleggings",
+    "dash.pos.savingsSub": "{savings} spaargeld · {invested} belê",
+    "dash.pos.savingsSay": "{amount} in spaargeld en beleggings. Maak Spaargeld en Beleggings oop.",
+    "dash.overlap": "{accounts} kredietkaartrekeninge en {debts} kaartskulde word gevolg — as enige kaart in albei is, word dit hierbo dubbel getel.",
+    "dash.overlap.btn": "Gaan skuld na",
+    "dash.overlap.aria": "Gaan gevolgde skulde op die Skuld-bladsy na",
+    "dash.stale.noDate": "nie een van hulle dra 'n datum nie",
+    "dash.stale.oldest": "die oudste {days} dae gelede",
+    "dash.stale.all": { one: "Gebou uit 'n saldo wat niemand onlangs bevestig het nie", other: "Gebou uit {count} saldo's wat niemand onlangs bevestig het nie" },
+    "dash.stale.some": "Gebou uit {stale} van {total} saldo's wat niemand onlangs bevestig het nie",
+    "dash.stale.line": "{line} — {age}.",
+    "dash.stale.btn": "Gaan saldo's na",
+    "dash.stale.aria": "Gaan rekeningsaldo's op die Rekeninge-bladsy na",
+    "dash.trend.range": "Bestedingstendens se reeks",
+    "dash.trend.sub": { one: "Bestee teenoor begroot · {count} tydperk", other: "Bestee teenoor begroot · {count} tydperke" },
+    "dash.trend.clamped": " · al die geskiedenis wat tot dusver ingevoer is",
+    "dash.trend.empty": "Voer 'n tweede tydperk se transaksies in, dan begin die tendenslyn hier.",
+    "dash.trend.aria": "Bestee, begroot en inkomste oor die laaste {count} tydperke",
+    "dash.split.uncatNote": " · {amount} ongekategoriseer, nie gewys nie",
+    "dash.split.onlyUncat": "{amount} het hierdie tydperk uitgegaan, maar niks daarvan is nog gekategoriseer nie — stel kategorieë in Transaksies, dan verskyn die verdeling hier.",
+    "dash.split.empty": "Nog niks as besteding in hierdie tydperk gekategoriseer nie.",
+    "dash.split.aria": "Bestedingsverdeling vir {month}: ",
+    "dash.split.sliceAria": "{cat}: {amount}, {pct}% van besteding — wys transaksies",
+    "dash.split.noteAria": "Maak die {cat}-kategorienota oop",
+    "dash.split.noteMissing": 'Geen kategorienota vir "{cat}" gevind nie',
+    "dash.err.render": "Kon nie die {label} teken nie — {error}"
   };
 });
 
@@ -1054,7 +1390,175 @@ var require_de = __commonJS((exports2, module2) => {
     "tx.export.done": {
       one: "{count} Zeile und {cats} Kategorien nach {path}/ exportiert",
       other: "{count} Zeilen und {cats} Kategorien nach {path}/ exportiert"
-    }
+    },
+    "acct.group.bank": "Bankkonten",
+    "acct.group.savings": "Sparen",
+    "acct.group.investments": "Anlagen",
+    "acct.group.other": "Sonstiges",
+    "acct.group.count": { one: "{count} Konto", other: "{count} Konten" },
+    "acct.noteMissing": "Accounts/{name}.md nicht gefunden",
+    "acct.balance.title": "Kontostand aktualisieren — {name}",
+    "acct.balance.field": "Neuer Kontostand",
+    "acct.balance.updated": "Kontostand von {name} aktualisiert",
+    "acct.reconciled": "{name} auf {amount} abgeglichen",
+    "acct.err.nan": "Keine Zahl",
+    "acct.err.type": "Ungültige Art",
+    "acct.err.notNumber": "{field} ist keine Zahl",
+    "acct.err.nameRequired": "Kontoname erforderlich",
+    "acct.err.exists": "Konto existiert bereits",
+    "acct.edit.title": "Konto bearbeiten — {name}",
+    "acct.new.title": "Neues Konto",
+    "acct.field.name": "Kontoname",
+    "acct.field.type": "Art",
+    "acct.field.institution": "Institut",
+    "acct.field.number": "Kontonummer",
+    "acct.field.numberDesc": "Dient dazu, einen heruntergeladenen Auszug beim Import diesem Konto zuzuordnen.",
+    "acct.field.folder": "Transaktionsordner",
+    "acct.field.folderDesc": "Leer lassen, um „{name}“ zu verwenden. Nur setzen, wenn der Ordner unter Transactions/ anders heißt.",
+    "acct.field.counts": "Zählt zum Budget",
+    "acct.counts.yes": "Ja — normales Ausgabenkonto",
+    "acct.counts.no": "Nein — Anlage- oder Sparmantel",
+    "acct.field.countsDesc": "Wähle Nein für ein Konto, dessen Zinsen keine Haushaltseinnahmen und dessen Einzahlungen keine Haushaltsausgaben sind. Die Transaktionen werden weiterhin importiert und unter Transaktionen angezeigt.",
+    "acct.field.limit": "Kreditrahmen",
+    "acct.field.limitDesc": "Zeigt bei Kreditkarten einen Auslastungsbalken.",
+    "acct.field.balance": "Aktueller Kontostand",
+    "acct.field.goal": "Sparziel",
+    "acct.field.goalOpt": "Sparziel (optional)",
+    "acct.field.goalOptDesc": "Zeigt einen Fortschrittsbalken unter Sparen und Anlagen.",
+    "acct.field.goalDate": "Zieldatum",
+    "acct.field.monthly": "Monatlicher Beitrag",
+    "acct.field.invested": "Insgesamt angelegt",
+    "acct.field.investedOpt": "Insgesamt angelegt (optional)",
+    "acct.field.investedDesc": "Was du eingezahlt hast, damit der Zuwachs dagegen gezeigt werden kann.",
+    "acct.field.starting": "Anfangsbetrag",
+    "acct.field.opened": "Eröffnet am",
+    "acct.budget.on": "{name} zählt wieder zum Budget",
+    "acct.budget.off": "{name} zählt nicht mehr zu den Budgetsummen",
+    "acct.creditUsed": "Kredit genutzt",
+    "acct.creditOf": "{used} von {limit}",
+    "acct.overLimit": "{amount} über dem Rahmen",
+    "acct.utilised": "{pct}% genutzt · {available} verfügbar",
+    "acct.kpi.inCredit": "Im Haben",
+    "acct.kpi.overdrawn": "Überzogen",
+    "acct.kpi.netWorth": "Nettovermögen",
+    "acct.kpi.netWorthNote": "nur über diese Konten",
+    "acct.kpi.attention": "Braucht Aufmerksamkeit",
+    "acct.kpi.attentionNote": "unbestätigte oder abweichende Kontostände",
+    "acct.kpi.allGood": "jeder Kontostand stimmt",
+    "acct.aria.showTx": "Transaktionen von {name} anzeigen",
+    "acct.aria.balance": "Kontostand von {name}, {amount} — zum Aktualisieren klicken",
+    "acct.limitSuffix": " · Rahmen {amount}",
+    "acct.monthlySuffix": " · {amount}/Mon.",
+    "acct.badge.notInBudget": "nicht im Budget",
+    "acct.badge.noTx": "keine Transaktionen",
+    "acct.badge.asOf": "Stand {date}",
+    "acct.badge.neverConfirmed": "nie bestätigt",
+    "acct.badge.unconfirmed": { one: "seit {count} Tag unbestätigt", other: "seit {count} Tagen unbestätigt" },
+    "acct.act.in": " rein · ",
+    "acct.act.out": " raus · ",
+    "acct.act.count": { one: "{count} Transaktion im {month}", other: "{count} Transaktionen im {month}" },
+    "acct.recon.since": { one: "{count} Transaktion seitdem · ergibt ", other: "{count} Transaktionen seitdem · ergibt " },
+    "acct.recon.pending": " · {count} in der Zukunft datiert, noch nicht gezählt",
+    "acct.recon.useThis": "Übernehmen",
+    "acct.aria.useThis": "Kontostand von {name} auf {amount} setzen",
+    "acct.recon.matches": "Passt zu deinen Transaktionen",
+    "acct.recon.upToDate": { one: "Aktuell · {count} Transaktion in der Zukunft datiert", other: "Aktuell · {count} Transaktionen in der Zukunft datiert" },
+    "acct.recon.setDate": "Setze ein Kontostandsdatum, um dies gegen deine Transaktionen zu prüfen",
+    "acct.foot.updated": "aktualisiert {date}",
+    "acct.foot.noDate": "kein Kontostandsdatum",
+    "acct.aria.exclude": "{name} nicht mehr zu den Budgetsummen zählen",
+    "acct.aria.include": "{name} wieder zu den Budgetsummen zählen",
+    "acct.btn.exclude": "Aus Budget ausschließen",
+    "acct.btn.include": "Ins Budget aufnehmen",
+    "acct.aria.edit": "{name} bearbeiten",
+    "acct.btn.edit": "Bearbeiten",
+    "acct.aria.openNote": "Notiz zu {name} öffnen",
+    "acct.btn.openNote": "Notiz öffnen",
+    "acct.empty": "Noch keine Konten. Nutze oben „Neues Konto“, um ein Bankkonto, einen Spartopf oder eine Anlage hinzuzufügen.",
+    "shell.connect.title": "Budget-Ordner nicht gefunden",
+    "shell.connect.btn": "Plugin-Einstellungen öffnen…",
+    "shell.saveChanges": "Änderungen speichern",
+    "shell.dash.trend": "Ausgabentrend",
+    "shell.dash.trendSub": "Ausgegeben vs. Budget",
+    "shell.dash.split": "Wohin es ging",
+    "shell.dash.vsActual": "Budget vs. Tatsächlich",
+    "shell.dash.position": "Wo du stehst",
+    "shell.legend.spent": "Ausgegeben",
+    "shell.legend.over": "Über Budget",
+    "shell.legend.income": "Einnahmen",
+    "shell.legend.budget": "Budget",
+    "shell.tx.search": "Beschreibung suchen…",
+    "shell.tx.wholeHistory": "gesamte Historie",
+    "shell.tx.export": "Exportieren",
+    "shell.tx.add": "Transaktion hinzufügen",
+    "shell.bud.title": "Kategoriebudgets",
+    "shell.bud.copyPrev": "Vorherigen Zeitraum kopieren",
+    "shell.bud.save": "Budget speichern",
+    "dash.greet.morning": "Guten Morgen",
+    "dash.greet.afternoon": "Guten Tag",
+    "dash.greet.evening": "Guten Abend",
+    "dash.greet.line": "{greeting}, {name}",
+    "dash.hero.remaining": "Übrig in diesem Zeitraum",
+    "dash.hero.overspent": "In diesem Zeitraum überzogen",
+    "dash.hero.sub": "{spent} von {budgeted} budgetiert ausgegeben",
+    "dash.stat.income": "Einnahmen gesamt",
+    "dash.stat.budgeted": "Budgetiert",
+    "dash.stat.spent": "Ausgegeben gesamt",
+    "dash.stat.uncategorised": "Ohne Kategorie",
+    "dash.stat.allocated": "{pct}% zugeteilt",
+    "dash.stat.used": "{pct}% genutzt",
+    "dash.stat.review": "in Transaktionen prüfen",
+    "dash.col.category": "Kategorie",
+    "dash.col.budget": "Budget",
+    "dash.col.spent": "Ausgegeben",
+    "dash.col.remaining": "Übrig",
+    "dash.table.empty": "Noch kein Budget und keine Transaktionen in diesem Zeitraum.",
+    "dash.pos.sub": "Stand heute — diese Zahlen bewegen sich nicht mit dem Zeitraum oben",
+    "dash.pos.netWorth": "Nettovermögen",
+    "dash.pos.netWorthSub": "{owned} Besitz · {owed} Schulden",
+    "dash.pos.netWorthSay": "Nettovermögen {net} — {owned} Besitz gegen {owed} Schulden. Sparen und Anlagen öffnen.",
+    "dash.pos.debt": "Schulden",
+    "dash.pos.debtSplit": "{accounts} Konten · {debts} Schulden-Seite",
+    "dash.pos.debtActive": { one: "{count} aktiv", other: "{count} aktiv" },
+    "dash.pos.debtNone": "nichts geschuldet",
+    "dash.pos.debtSay": "Schulden {amount}. Die Schulden-Seite öffnen.",
+    "dash.pos.debtSayNone": "Keine Schulden. Die Schulden-Seite öffnen.",
+    "dash.pos.owed": "Dir geschuldet",
+    "dash.pos.owedOpen": "{count} offen",
+    "dash.pos.owedOldest": " · ältestes seit {days} Tagen",
+    "dash.pos.owedRecovered": "{amount} zurückerhalten",
+    "dash.pos.owedNone": "nichts verliehen",
+    "dash.pos.owedSay": {
+      one: "{amount} dir geschuldet über {count} Eintrag. Ausstehende Beträge öffnen.",
+      other: "{amount} dir geschuldet über {count} Einträge. Ausstehende Beträge öffnen."
+    },
+    "dash.pos.owedSayNone": "Nichts offen. Ausstehende Beträge öffnen.",
+    "dash.pos.savings": "Sparen und Anlagen",
+    "dash.pos.savingsSub": "{savings} gespart · {invested} angelegt",
+    "dash.pos.savingsSay": "{amount} in Sparen und Anlagen. Sparen und Anlagen öffnen.",
+    "dash.overlap": "{accounts} Kreditkartenkonten und {debts} Kartenschulden werden geführt — steht eine Karte in beiden, ist sie oben doppelt gezählt.",
+    "dash.overlap.btn": "Schulden prüfen",
+    "dash.overlap.aria": "Geführte Schulden auf der Schulden-Seite prüfen",
+    "dash.stale.noDate": "keiner davon trägt ein Datum",
+    "dash.stale.oldest": "der älteste vor {days} Tagen",
+    "dash.stale.all": { one: "Gebildet aus einem Kontostand, den niemand kürzlich bestätigt hat", other: "Gebildet aus {count} Kontoständen, die niemand kürzlich bestätigt hat" },
+    "dash.stale.some": "Gebildet aus {stale} von {total} Kontoständen, die niemand kürzlich bestätigt hat",
+    "dash.stale.line": "{line} — {age}.",
+    "dash.stale.btn": "Kontostände prüfen",
+    "dash.stale.aria": "Kontostände auf der Konten-Seite prüfen",
+    "dash.trend.range": "Zeitraum des Ausgabentrends",
+    "dash.trend.sub": { one: "Ausgegeben vs. Budget · {count} Zeitraum", other: "Ausgegeben vs. Budget · {count} Zeiträume" },
+    "dash.trend.clamped": " · die gesamte bisher importierte Historie",
+    "dash.trend.empty": "Importiere einen zweiten Zeitraum an Transaktionen, dann beginnt hier die Trendlinie.",
+    "dash.trend.aria": "Ausgegeben, budgetiert und Einnahmen über die letzten {count} Zeiträume",
+    "dash.split.uncatNote": " · {amount} ohne Kategorie, nicht gezeigt",
+    "dash.split.onlyUncat": "{amount} sind in diesem Zeitraum abgeflossen, davon ist aber noch nichts kategorisiert — setze Kategorien unter Transaktionen, dann erscheint die Aufteilung hier.",
+    "dash.split.empty": "In diesem Zeitraum ist noch nichts als Ausgabe kategorisiert.",
+    "dash.split.aria": "Ausgabenaufteilung für {month}: ",
+    "dash.split.sliceAria": "{cat}: {amount}, {pct}% der Ausgaben — Transaktionen anzeigen",
+    "dash.split.noteAria": "Notiz zur Kategorie {cat} öffnen",
+    "dash.split.noteMissing": "Keine Kategorienotiz für „{cat}“ gefunden",
+    "dash.err.render": "Die Karte {label} konnte nicht gezeichnet werden — {error}"
   };
 });
 
@@ -1363,7 +1867,175 @@ var require_es = __commonJS((exports2, module2) => {
     "tx.export.done": {
       one: "Exportada {count} fila y {cats} categorías a {path}/",
       other: "Exportadas {count} filas y {cats} categorías a {path}/"
-    }
+    },
+    "acct.group.bank": "Cuentas bancarias",
+    "acct.group.savings": "Ahorros",
+    "acct.group.investments": "Inversiones",
+    "acct.group.other": "Otras",
+    "acct.group.count": { one: "{count} cuenta", other: "{count} cuentas" },
+    "acct.noteMissing": "No se encontró Accounts/{name}.md",
+    "acct.balance.title": "Actualizar saldo — {name}",
+    "acct.balance.field": "Nuevo saldo",
+    "acct.balance.updated": "Saldo de {name} actualizado",
+    "acct.reconciled": "{name} conciliada a {amount}",
+    "acct.err.nan": "No es un número",
+    "acct.err.type": "Tipo no válido",
+    "acct.err.notNumber": "{field} no es un número",
+    "acct.err.nameRequired": "El nombre de la cuenta es obligatorio",
+    "acct.err.exists": "La cuenta ya existe",
+    "acct.edit.title": "Editar cuenta — {name}",
+    "acct.new.title": "Nueva cuenta",
+    "acct.field.name": "Nombre de la cuenta",
+    "acct.field.type": "Tipo",
+    "acct.field.institution": "Entidad",
+    "acct.field.number": "Número de cuenta",
+    "acct.field.numberDesc": "Sirve para asociar un extracto descargado a esta cuenta al importarlo.",
+    "acct.field.folder": "Carpeta de transacciones",
+    "acct.field.folderDesc": "Déjalo en blanco para usar «{name}». Ponlo solo cuando la carpeta bajo Transactions/ tenga otro nombre.",
+    "acct.field.counts": "Cuenta para el presupuesto",
+    "acct.counts.yes": "Sí — cuenta de gasto normal",
+    "acct.counts.no": "No — envoltorio de inversión o ahorro",
+    "acct.field.countsDesc": "Elige No para una cuenta cuyos intereses no son ingresos del hogar y cuyas aportaciones no son gasto del hogar. Sus transacciones se siguen importando y se ven en Transacciones.",
+    "acct.field.limit": "Límite de crédito",
+    "acct.field.limitDesc": "Muestra una barra de uso en las tarjetas de crédito.",
+    "acct.field.balance": "Saldo actual",
+    "acct.field.goal": "Objetivo de ahorro",
+    "acct.field.goalOpt": "Objetivo de ahorro (opcional)",
+    "acct.field.goalOptDesc": "Muestra una barra de progreso en Ahorros e Inversiones.",
+    "acct.field.goalDate": "Fecha objetivo",
+    "acct.field.monthly": "Aportación mensual",
+    "acct.field.invested": "Total invertido",
+    "acct.field.investedOpt": "Total invertido (opcional)",
+    "acct.field.investedDesc": "Lo que has puesto, para poder mostrar el crecimiento frente a ello.",
+    "acct.field.starting": "Importe inicial",
+    "acct.field.opened": "Abierta el",
+    "acct.budget.on": "{name} vuelve a contar para el presupuesto",
+    "acct.budget.off": "{name} ya no cuenta para los totales del presupuesto",
+    "acct.creditUsed": "Crédito usado",
+    "acct.creditOf": "{used} de {limit}",
+    "acct.overLimit": "{amount} por encima del límite",
+    "acct.utilised": "{pct}% usado · {available} disponible",
+    "acct.kpi.inCredit": "A favor",
+    "acct.kpi.overdrawn": "En descubierto",
+    "acct.kpi.netWorth": "Patrimonio neto",
+    "acct.kpi.netWorthNote": "solo de estas cuentas",
+    "acct.kpi.attention": "Requiere atención",
+    "acct.kpi.attentionNote": "saldos sin verificar o desviados",
+    "acct.kpi.allGood": "todos los saldos cuadran",
+    "acct.aria.showTx": "Mostrar las transacciones de {name}",
+    "acct.aria.balance": "Saldo de {name}, {amount} — haz clic para actualizar",
+    "acct.limitSuffix": " · límite {amount}",
+    "acct.monthlySuffix": " · {amount}/mes",
+    "acct.badge.notInBudget": "fuera del presupuesto",
+    "acct.badge.noTx": "sin transacciones",
+    "acct.badge.asOf": "a fecha de {date}",
+    "acct.badge.neverConfirmed": "nunca confirmado",
+    "acct.badge.unconfirmed": { one: "sin confirmar desde hace {count} día", other: "sin confirmar desde hace {count} días" },
+    "acct.act.in": " entra · ",
+    "acct.act.out": " sale · ",
+    "acct.act.count": { one: "{count} transacción en {month}", other: "{count} transacciones en {month}" },
+    "acct.recon.since": { one: "{count} transacción desde entonces · implica ", other: "{count} transacciones desde entonces · implica " },
+    "acct.recon.pending": " · {count} con fecha futura, aún sin contar",
+    "acct.recon.useThis": "Usar este",
+    "acct.aria.useThis": "Poner el saldo de {name} en {amount}",
+    "acct.recon.matches": "Coincide con tus transacciones",
+    "acct.recon.upToDate": { one: "Al día · {count} transacción con fecha futura", other: "Al día · {count} transacciones con fecha futura" },
+    "acct.recon.setDate": "Pon una fecha de saldo para contrastarlo con tus transacciones",
+    "acct.foot.updated": "actualizado {date}",
+    "acct.foot.noDate": "sin fecha de saldo",
+    "acct.aria.exclude": "Dejar de contar {name} en los totales del presupuesto",
+    "acct.aria.include": "Volver a contar {name} en los totales del presupuesto",
+    "acct.btn.exclude": "Excluir del presupuesto",
+    "acct.btn.include": "Incluir en el presupuesto",
+    "acct.aria.edit": "Editar {name}",
+    "acct.btn.edit": "Editar",
+    "acct.aria.openNote": "Abrir la nota de {name}",
+    "acct.btn.openNote": "Abrir nota",
+    "acct.empty": "Aún no hay cuentas. Usa «Nueva cuenta» arriba para añadir una cuenta bancaria, un fondo de ahorro o una inversión.",
+    "shell.connect.title": "No se encontró la carpeta del presupuesto",
+    "shell.connect.btn": "Abrir los ajustes del plugin…",
+    "shell.saveChanges": "Guardar cambios",
+    "shell.dash.trend": "Tendencia de gasto",
+    "shell.dash.trendSub": "Gastado frente a presupuesto",
+    "shell.dash.split": "Adónde fue",
+    "shell.dash.vsActual": "Presupuesto frente a real",
+    "shell.dash.position": "Cómo estás",
+    "shell.legend.spent": "Gastado",
+    "shell.legend.over": "Por encima del presupuesto",
+    "shell.legend.income": "Ingresos",
+    "shell.legend.budget": "Presupuesto",
+    "shell.tx.search": "Buscar descripción…",
+    "shell.tx.wholeHistory": "todo el historial",
+    "shell.tx.export": "Exportar",
+    "shell.tx.add": "Añadir transacción",
+    "shell.bud.title": "Presupuestos por categoría",
+    "shell.bud.copyPrev": "Copiar el periodo anterior",
+    "shell.bud.save": "Guardar presupuesto",
+    "dash.greet.morning": "Buenos días",
+    "dash.greet.afternoon": "Buenas tardes",
+    "dash.greet.evening": "Buenas noches",
+    "dash.greet.line": "{greeting}, {name}",
+    "dash.hero.remaining": "Queda en este periodo",
+    "dash.hero.overspent": "Gastado de más en este periodo",
+    "dash.hero.sub": "{spent} gastado de {budgeted} presupuestado",
+    "dash.stat.income": "Ingresos totales",
+    "dash.stat.budgeted": "Presupuestado",
+    "dash.stat.spent": "Total gastado",
+    "dash.stat.uncategorised": "Sin categoría",
+    "dash.stat.allocated": "{pct}% asignado",
+    "dash.stat.used": "{pct}% usado",
+    "dash.stat.review": "revisar en Transacciones",
+    "dash.col.category": "Categoría",
+    "dash.col.budget": "Presupuesto",
+    "dash.col.spent": "Gastado",
+    "dash.col.remaining": "Restante",
+    "dash.table.empty": "Aún no hay presupuesto ni transacciones en este periodo.",
+    "dash.pos.sub": "Tal como está hoy — estas cifras no se mueven con el periodo de arriba",
+    "dash.pos.netWorth": "Patrimonio neto",
+    "dash.pos.netWorthSub": "{owned} en propiedad · {owed} debido",
+    "dash.pos.netWorthSay": "Patrimonio neto {net} — {owned} en propiedad frente a {owed} debido. Abre Ahorros e Inversiones.",
+    "dash.pos.debt": "Deuda",
+    "dash.pos.debtSplit": "{accounts} cuentas · {debts} página de deudas",
+    "dash.pos.debtActive": { one: "{count} activa", other: "{count} activas" },
+    "dash.pos.debtNone": "nada debido",
+    "dash.pos.debtSay": "Deuda de {amount}. Abre la página Deudas.",
+    "dash.pos.debtSayNone": "Sin deudas. Abre la página Deudas.",
+    "dash.pos.owed": "Te deben",
+    "dash.pos.owedOpen": "{count} pendientes",
+    "dash.pos.owedOldest": " · el más antiguo hace {days} días",
+    "dash.pos.owedRecovered": "{amount} recuperado",
+    "dash.pos.owedNone": "nada prestado",
+    "dash.pos.owedSay": {
+      one: "{amount} te deben en {count} entrada. Abre Dinero Adeudado.",
+      other: "{amount} te deben en {count} entradas. Abre Dinero Adeudado."
+    },
+    "dash.pos.owedSayNone": "Nada pendiente. Abre Dinero Adeudado.",
+    "dash.pos.savings": "Ahorros e inversiones",
+    "dash.pos.savingsSub": "{savings} en ahorro · {invested} invertido",
+    "dash.pos.savingsSay": "{amount} en ahorros e inversiones. Abre Ahorros e Inversiones.",
+    "dash.overlap": "Se registran {accounts} cuentas de tarjeta y {debts} deudas de tarjeta — si alguna tarjeta está en ambas, arriba se cuenta dos veces.",
+    "dash.overlap.btn": "Revisar deudas",
+    "dash.overlap.aria": "Revisar las deudas registradas en la página Deudas",
+    "dash.stale.noDate": "ninguno lleva fecha",
+    "dash.stale.oldest": "el más antiguo hace {days} días",
+    "dash.stale.all": { one: "Construido a partir de un saldo que nadie ha confirmado hace tiempo", other: "Construido a partir de {count} saldos que nadie ha confirmado hace tiempo" },
+    "dash.stale.some": "Construido a partir de {stale} de {total} saldos que nadie ha confirmado hace tiempo",
+    "dash.stale.line": "{line} — {age}.",
+    "dash.stale.btn": "Revisar saldos",
+    "dash.stale.aria": "Revisar los saldos de las cuentas en la página Cuentas",
+    "dash.trend.range": "Rango de la tendencia de gasto",
+    "dash.trend.sub": { one: "Gastado frente a presupuesto · {count} periodo", other: "Gastado frente a presupuesto · {count} periodos" },
+    "dash.trend.clamped": " · todo el historial importado hasta ahora",
+    "dash.trend.empty": "Importa un segundo periodo de transacciones y la línea de tendencia empieza aquí.",
+    "dash.trend.aria": "Gastado, presupuestado e ingresos en los últimos {count} periodos",
+    "dash.split.uncatNote": " · {amount} sin categoría, no mostrado",
+    "dash.split.onlyUncat": "Salieron {amount} en este periodo, pero nada está categorizado todavía — pon categorías en Transacciones y el reparto aparecerá aquí.",
+    "dash.split.empty": "Aún no hay nada categorizado como gasto en este periodo.",
+    "dash.split.aria": "Reparto del gasto de {month}: ",
+    "dash.split.sliceAria": "{cat}: {amount}, {pct}% del gasto — mostrar transacciones",
+    "dash.split.noteAria": "Abrir la nota de la categoría {cat}",
+    "dash.split.noteMissing": "No se encontró nota de categoría para «{cat}»",
+    "dash.err.render": "No se pudo dibujar {label} — {error}"
   };
 });
 
@@ -1672,7 +2344,175 @@ var require_fr = __commonJS((exports2, module2) => {
     "tx.export.done": {
       one: "{count} ligne et {cats} catégories exportées vers {path}/",
       other: "{count} lignes et {cats} catégories exportées vers {path}/"
-    }
+    },
+    "acct.group.bank": "Comptes bancaires",
+    "acct.group.savings": "Épargne",
+    "acct.group.investments": "Placements",
+    "acct.group.other": "Autres",
+    "acct.group.count": { one: "{count} compte", other: "{count} comptes" },
+    "acct.noteMissing": "Accounts/{name}.md introuvable",
+    "acct.balance.title": "Mettre à jour le solde — {name}",
+    "acct.balance.field": "Nouveau solde",
+    "acct.balance.updated": "Solde de {name} mis à jour",
+    "acct.reconciled": "{name} rapproché à {amount}",
+    "acct.err.nan": "Pas un nombre",
+    "acct.err.type": "Type invalide",
+    "acct.err.notNumber": "{field} n'est pas un nombre",
+    "acct.err.nameRequired": "Le nom du compte est obligatoire",
+    "acct.err.exists": "Ce compte existe déjà",
+    "acct.edit.title": "Modifier le compte — {name}",
+    "acct.new.title": "Nouveau compte",
+    "acct.field.name": "Nom du compte",
+    "acct.field.type": "Type",
+    "acct.field.institution": "Établissement",
+    "acct.field.number": "Numéro de compte",
+    "acct.field.numberDesc": "Sert à rattacher un relevé téléchargé à ce compte lors de l'import.",
+    "acct.field.folder": "Dossier des transactions",
+    "acct.field.folderDesc": "Laissez vide pour utiliser « {name} ». À renseigner seulement si le dossier sous Transactions/ porte un autre nom.",
+    "acct.field.counts": "Compte dans le budget",
+    "acct.counts.yes": "Oui — compte de dépenses ordinaire",
+    "acct.counts.no": "Non — enveloppe de placement ou d'épargne",
+    "acct.field.countsDesc": "Choisissez Non pour un compte dont les intérêts ne sont pas un revenu du foyer et dont les versements ne sont pas une dépense du foyer. Ses transactions sont toujours importées et visibles dans Transactions.",
+    "acct.field.limit": "Plafond de crédit",
+    "acct.field.limitDesc": "Affiche une barre d'utilisation sur les cartes de crédit.",
+    "acct.field.balance": "Solde actuel",
+    "acct.field.goal": "Objectif d'épargne",
+    "acct.field.goalOpt": "Objectif d'épargne (facultatif)",
+    "acct.field.goalOptDesc": "Affiche une barre de progression dans Épargne et Placements.",
+    "acct.field.goalDate": "Date cible",
+    "acct.field.monthly": "Versement mensuel",
+    "acct.field.invested": "Total investi",
+    "acct.field.investedOpt": "Total investi (facultatif)",
+    "acct.field.investedDesc": "Ce que vous avez versé, pour situer la croissance par rapport à cela.",
+    "acct.field.starting": "Montant de départ",
+    "acct.field.opened": "Ouvert le",
+    "acct.budget.on": "{name} compte de nouveau dans le budget",
+    "acct.budget.off": "{name} ne compte plus dans les totaux du budget",
+    "acct.creditUsed": "Crédit utilisé",
+    "acct.creditOf": "{used} sur {limit}",
+    "acct.overLimit": "{amount} au-dessus du plafond",
+    "acct.utilised": "{pct}% utilisé · {available} disponible",
+    "acct.kpi.inCredit": "Créditeur",
+    "acct.kpi.overdrawn": "À découvert",
+    "acct.kpi.netWorth": "Valeur nette",
+    "acct.kpi.netWorthNote": "sur ces comptes uniquement",
+    "acct.kpi.attention": "À vérifier",
+    "acct.kpi.attentionNote": "soldes non confirmés ou en écart",
+    "acct.kpi.allGood": "tous les soldes concordent",
+    "acct.aria.showTx": "Afficher les transactions de {name}",
+    "acct.aria.balance": "Solde de {name}, {amount} — cliquez pour mettre à jour",
+    "acct.limitSuffix": " · plafond {amount}",
+    "acct.monthlySuffix": " · {amount}/mois",
+    "acct.badge.notInBudget": "hors budget",
+    "acct.badge.noTx": "aucune transaction",
+    "acct.badge.asOf": "au {date}",
+    "acct.badge.neverConfirmed": "jamais confirmé",
+    "acct.badge.unconfirmed": { one: "non confirmé depuis {count} jour", other: "non confirmé depuis {count} jours" },
+    "acct.act.in": " entrée · ",
+    "acct.act.out": " sortie · ",
+    "acct.act.count": { one: "{count} transaction en {month}", other: "{count} transactions en {month}" },
+    "acct.recon.since": { one: "{count} transaction depuis · implique ", other: "{count} transactions depuis · implique " },
+    "acct.recon.pending": " · {count} datées en avance, pas encore comptées",
+    "acct.recon.useThis": "Utiliser",
+    "acct.aria.useThis": "Mettre le solde de {name} à {amount}",
+    "acct.recon.matches": "Correspond à vos transactions",
+    "acct.recon.upToDate": { one: "À jour · {count} transaction datée en avance", other: "À jour · {count} transactions datées en avance" },
+    "acct.recon.setDate": "Indiquez une date de solde pour la confronter à vos transactions",
+    "acct.foot.updated": "mis à jour le {date}",
+    "acct.foot.noDate": "pas de date de solde",
+    "acct.aria.exclude": "Ne plus compter {name} dans les totaux du budget",
+    "acct.aria.include": "Compter de nouveau {name} dans les totaux du budget",
+    "acct.btn.exclude": "Exclure du budget",
+    "acct.btn.include": "Inclure dans le budget",
+    "acct.aria.edit": "Modifier {name}",
+    "acct.btn.edit": "Modifier",
+    "acct.aria.openNote": "Ouvrir la note de {name}",
+    "acct.btn.openNote": "Ouvrir la note",
+    "acct.empty": "Aucun compte pour l'instant. Utilisez « Nouveau compte » ci-dessus pour ajouter un compte bancaire, une épargne ou un placement.",
+    "shell.connect.title": "Dossier du budget introuvable",
+    "shell.connect.btn": "Ouvrir les paramètres du plugin…",
+    "shell.saveChanges": "Enregistrer les modifications",
+    "shell.dash.trend": "Tendance des dépenses",
+    "shell.dash.trendSub": "Dépensé vs budget",
+    "shell.dash.split": "Où est passé l'argent",
+    "shell.dash.vsActual": "Budget vs réel",
+    "shell.dash.position": "Où vous en êtes",
+    "shell.legend.spent": "Dépensé",
+    "shell.legend.over": "Au-dessus du budget",
+    "shell.legend.income": "Revenus",
+    "shell.legend.budget": "Budget",
+    "shell.tx.search": "Rechercher une description…",
+    "shell.tx.wholeHistory": "tout l'historique",
+    "shell.tx.export": "Exporter",
+    "shell.tx.add": "Ajouter une transaction",
+    "shell.bud.title": "Budgets par catégorie",
+    "shell.bud.copyPrev": "Copier la période précédente",
+    "shell.bud.save": "Enregistrer le budget",
+    "dash.greet.morning": "Bonjour",
+    "dash.greet.afternoon": "Bon après-midi",
+    "dash.greet.evening": "Bonsoir",
+    "dash.greet.line": "{greeting}, {name}",
+    "dash.hero.remaining": "Reste sur cette période",
+    "dash.hero.overspent": "Dépassement sur cette période",
+    "dash.hero.sub": "{spent} dépensé sur {budgeted} budgété",
+    "dash.stat.income": "Revenus totaux",
+    "dash.stat.budgeted": "Budgété",
+    "dash.stat.spent": "Total dépensé",
+    "dash.stat.uncategorised": "Sans catégorie",
+    "dash.stat.allocated": "{pct}% affecté",
+    "dash.stat.used": "{pct}% utilisé",
+    "dash.stat.review": "à vérifier dans Transactions",
+    "dash.col.category": "Catégorie",
+    "dash.col.budget": "Budget",
+    "dash.col.spent": "Dépensé",
+    "dash.col.remaining": "Restant",
+    "dash.table.empty": "Aucun budget ni transaction sur cette période pour l'instant.",
+    "dash.pos.sub": "À ce jour — ces chiffres ne suivent pas la période ci-dessus",
+    "dash.pos.netWorth": "Valeur nette",
+    "dash.pos.netWorthSub": "{owned} détenu · {owed} dû",
+    "dash.pos.netWorthSay": "Valeur nette {net} — {owned} détenu face à {owed} dû. Ouvrir Épargne et Placements.",
+    "dash.pos.debt": "Dettes",
+    "dash.pos.debtSplit": "{accounts} comptes · {debts} page Dettes",
+    "dash.pos.debtActive": { one: "{count} active", other: "{count} actives" },
+    "dash.pos.debtNone": "rien de dû",
+    "dash.pos.debtSay": "Dettes de {amount}. Ouvrir la page Dettes.",
+    "dash.pos.debtSayNone": "Aucune dette. Ouvrir la page Dettes.",
+    "dash.pos.owed": "On vous doit",
+    "dash.pos.owedOpen": "{count} en attente",
+    "dash.pos.owedOldest": " · la plus ancienne depuis {days} jours",
+    "dash.pos.owedRecovered": "{amount} récupéré",
+    "dash.pos.owedNone": "rien de prêté",
+    "dash.pos.owedSay": {
+      one: "{amount} vous est dû sur {count} entrée. Ouvrir Sommes Dues.",
+      other: "{amount} vous est dû sur {count} entrées. Ouvrir Sommes Dues."
+    },
+    "dash.pos.owedSayNone": "Rien en attente. Ouvrir Sommes Dues.",
+    "dash.pos.savings": "Épargne et placements",
+    "dash.pos.savingsSub": "{savings} d'épargne · {invested} investi",
+    "dash.pos.savingsSay": "{amount} en épargne et placements. Ouvrir Épargne et Placements.",
+    "dash.overlap": "{accounts} comptes de carte et {debts} dettes de carte sont suivis — si une carte figure dans les deux, elle est comptée deux fois ci-dessus.",
+    "dash.overlap.btn": "Vérifier les dettes",
+    "dash.overlap.aria": "Vérifier les dettes suivies sur la page Dettes",
+    "dash.stale.noDate": "aucun ne porte de date",
+    "dash.stale.oldest": "le plus ancien il y a {days} jours",
+    "dash.stale.all": { one: "Construit à partir d'un solde que personne n'a confirmé récemment", other: "Construit à partir de {count} soldes que personne n'a confirmés récemment" },
+    "dash.stale.some": "Construit à partir de {stale} soldes sur {total} que personne n'a confirmés récemment",
+    "dash.stale.line": "{line} — {age}.",
+    "dash.stale.btn": "Vérifier les soldes",
+    "dash.stale.aria": "Vérifier les soldes des comptes sur la page Comptes",
+    "dash.trend.range": "Plage de la tendance des dépenses",
+    "dash.trend.sub": { one: "Dépensé vs budget · {count} période", other: "Dépensé vs budget · {count} périodes" },
+    "dash.trend.clamped": " · tout l'historique importé jusqu'ici",
+    "dash.trend.empty": "Importez une deuxième période de transactions et la courbe de tendance démarre ici.",
+    "dash.trend.aria": "Dépensé, budgété et revenus sur les {count} dernières périodes",
+    "dash.split.uncatNote": " · {amount} sans catégorie, non affiché",
+    "dash.split.onlyUncat": "{amount} sont sortis sur cette période, mais rien n'est encore catégorisé — mettez des catégories dans Transactions et la répartition apparaîtra ici.",
+    "dash.split.empty": "Rien n'est encore catégorisé comme dépense sur cette période.",
+    "dash.split.aria": "Répartition des dépenses pour {month} : ",
+    "dash.split.sliceAria": "{cat} : {amount}, {pct}% des dépenses — afficher les transactions",
+    "dash.split.noteAria": "Ouvrir la note de la catégorie {cat}",
+    "dash.split.noteMissing": "Aucune note de catégorie trouvée pour « {cat} »",
+    "dash.err.render": "Impossible de dessiner {label} — {error}"
   };
 });
 
@@ -1973,7 +2813,174 @@ var require_ja = __commonJS((exports2, module2) => {
     "tx.export.failed": "書き出しに失敗しました — フォルダ名を確認してください",
     "tx.export.done": {
       other: "{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました"
-    }
+    },
+    "acct.group.bank": "銀行口座",
+    "acct.group.savings": "貯蓄",
+    "acct.group.investments": "投資",
+    "acct.group.other": "その他",
+    "acct.group.count": { other: "口座 {count} 件" },
+    "acct.noteMissing": "Accounts/{name}.md が見つかりません",
+    "acct.balance.title": "残高を更新 — {name}",
+    "acct.balance.field": "新しい残高",
+    "acct.balance.updated": "{name} の残高を更新しました",
+    "acct.reconciled": "{name} を {amount} に照合しました",
+    "acct.err.nan": "数値ではありません",
+    "acct.err.type": "種類が正しくありません",
+    "acct.err.notNumber": "{field} が数値ではありません",
+    "acct.err.nameRequired": "口座名は必須です",
+    "acct.err.exists": "その口座はすでに存在します",
+    "acct.edit.title": "口座を編集 — {name}",
+    "acct.new.title": "新しい口座",
+    "acct.field.name": "口座名",
+    "acct.field.type": "種類",
+    "acct.field.institution": "金融機関",
+    "acct.field.number": "口座番号",
+    "acct.field.numberDesc": "取り込み時に、ダウンロードした明細をこの口座に対応づけるために使います。",
+    "acct.field.folder": "取引フォルダ",
+    "acct.field.folderDesc": "空欄にすると「{name}」を使います。Transactions/ 配下のフォルダ名が異なる場合のみ設定してください。",
+    "acct.field.counts": "予算に含める",
+    "acct.counts.yes": "はい — 通常の支出口座",
+    "acct.counts.no": "いいえ — 投資または貯蓄用の口座",
+    "acct.field.countsDesc": "利息が家計の収入ではなく、入金が家計の支出でもない口座には「いいえ」を選んでください。取引の取り込みと取引ページでの表示は続きます。",
+    "acct.field.limit": "利用限度額",
+    "acct.field.limitDesc": "クレジットカードに利用率バーを表示します。",
+    "acct.field.balance": "現在の残高",
+    "acct.field.goal": "貯蓄目標",
+    "acct.field.goalOpt": "貯蓄目標（任意）",
+    "acct.field.goalOptDesc": "貯蓄と投資のページに進捗バーを表示します。",
+    "acct.field.goalDate": "目標期日",
+    "acct.field.monthly": "毎月の積立額",
+    "acct.field.invested": "投資額の合計",
+    "acct.field.investedOpt": "投資額の合計（任意）",
+    "acct.field.investedDesc": "投入した金額です。これを基準に増減を表示します。",
+    "acct.field.starting": "開始時の金額",
+    "acct.field.opened": "開設日",
+    "acct.budget.on": "{name} を再び予算に含めます",
+    "acct.budget.off": "{name} は予算の合計に含めなくなりました",
+    "acct.creditUsed": "利用額",
+    "acct.creditOf": "{limit} 中 {used}",
+    "acct.overLimit": "限度額を {amount} 超過",
+    "acct.utilised": "{pct}% 利用 · 残り {available}",
+    "acct.kpi.inCredit": "プラス残高",
+    "acct.kpi.overdrawn": "マイナス残高",
+    "acct.kpi.netWorth": "純資産",
+    "acct.kpi.netWorthNote": "これらの口座のみ",
+    "acct.kpi.attention": "要確認",
+    "acct.kpi.attentionNote": "未確認またはずれのある残高",
+    "acct.kpi.allGood": "すべての残高が一致しています",
+    "acct.aria.showTx": "{name} の取引を表示",
+    "acct.aria.balance": "{name} の残高 {amount} — クリックして更新",
+    "acct.limitSuffix": " · 限度額 {amount}",
+    "acct.monthlySuffix": " · 月 {amount}",
+    "acct.badge.notInBudget": "予算対象外",
+    "acct.badge.noTx": "取引なし",
+    "acct.badge.asOf": "{date} 時点",
+    "acct.badge.neverConfirmed": "未確認",
+    "acct.badge.unconfirmed": { other: "{count} 日間未確認" },
+    "acct.act.in": " 入金 · ",
+    "acct.act.out": " 出金 · ",
+    "acct.act.count": { other: "{month} の取引 {count} 件" },
+    "acct.recon.since": { other: "その後 {count} 件の取引 · 推定残高 " },
+    "acct.recon.pending": " · {count} 件は先の日付のため未計上",
+    "acct.recon.useThis": "これを使う",
+    "acct.aria.useThis": "{name} の残高を {amount} に設定",
+    "acct.recon.matches": "取引と一致しています",
+    "acct.recon.upToDate": { other: "最新 · 先の日付の取引が {count} 件" },
+    "acct.recon.setDate": "残高の日付を設定すると、取引と照合できます",
+    "acct.foot.updated": "{date} に更新",
+    "acct.foot.noDate": "残高の日付なし",
+    "acct.aria.exclude": "{name} を予算の合計に含めないようにする",
+    "acct.aria.include": "{name} を再び予算の合計に含める",
+    "acct.btn.exclude": "予算から除外",
+    "acct.btn.include": "予算に含める",
+    "acct.aria.edit": "{name} を編集",
+    "acct.btn.edit": "編集",
+    "acct.aria.openNote": "{name} のノートを開く",
+    "acct.btn.openNote": "ノートを開く",
+    "acct.empty": "まだ口座がありません。上の「新しい口座」から、銀行口座・貯蓄・投資を追加してください。",
+    "shell.connect.title": "予算フォルダが見つかりません",
+    "shell.connect.btn": "プラグイン設定を開く…",
+    "shell.saveChanges": "変更を保存",
+    "shell.dash.trend": "支出の推移",
+    "shell.dash.trendSub": "支出と予算",
+    "shell.dash.split": "使いみちの内訳",
+    "shell.dash.vsActual": "予算と実績",
+    "shell.dash.position": "現在の状況",
+    "shell.legend.spent": "支出",
+    "shell.legend.over": "予算超過",
+    "shell.legend.income": "収入",
+    "shell.legend.budget": "予算",
+    "shell.tx.search": "摘要を検索…",
+    "shell.tx.wholeHistory": "全期間",
+    "shell.tx.export": "書き出し",
+    "shell.tx.add": "取引を追加",
+    "shell.bud.title": "カテゴリ別の予算",
+    "shell.bud.copyPrev": "前の期間をコピー",
+    "shell.bud.save": "予算を保存",
+    "dash.greet.morning": "おはようございます",
+    "dash.greet.afternoon": "こんにちは",
+    "dash.greet.evening": "こんばんは",
+    "dash.greet.line": "{name}さん、{greeting}",
+    "dash.hero.remaining": "今期の残り",
+    "dash.hero.overspent": "今期の超過額",
+    "dash.hero.sub": "予算 {budgeted} のうち {spent} を支出",
+    "dash.stat.income": "収入合計",
+    "dash.stat.budgeted": "予算",
+    "dash.stat.spent": "支出合計",
+    "dash.stat.uncategorised": "カテゴリなし",
+    "dash.stat.allocated": "{pct}% 配分済み",
+    "dash.stat.used": "{pct}% 使用",
+    "dash.stat.review": "取引ページで確認",
+    "dash.col.category": "カテゴリ",
+    "dash.col.budget": "予算",
+    "dash.col.spent": "支出",
+    "dash.col.remaining": "残り",
+    "dash.table.empty": "この期間にはまだ予算も取引もありません。",
+    "dash.pos.sub": "本日時点 — これらは上の期間とは連動しません",
+    "dash.pos.netWorth": "純資産",
+    "dash.pos.netWorthSub": "資産 {owned} · 負債 {owed}",
+    "dash.pos.netWorthSay": "純資産 {net} — 資産 {owned} に対し負債 {owed}。貯蓄と投資を開きます。",
+    "dash.pos.debt": "負債",
+    "dash.pos.debtSplit": "口座 {accounts} · 負債ページ {debts}",
+    "dash.pos.debtActive": { other: "{count} 件が有効" },
+    "dash.pos.debtNone": "負債なし",
+    "dash.pos.debtSay": "負債 {amount}。負債ページを開きます。",
+    "dash.pos.debtSayNone": "負債はありません。負債ページを開きます。",
+    "dash.pos.owed": "貸したお金",
+    "dash.pos.owedOpen": "未回収 {count} 件",
+    "dash.pos.owedOldest": " · 最も古いものは {days} 日前",
+    "dash.pos.owedRecovered": "{amount} 回収済み",
+    "dash.pos.owedNone": "貸出なし",
+    "dash.pos.owedSay": {
+      other: "{count} 件で合計 {amount} が未回収です。貸したお金を開きます。"
+    },
+    "dash.pos.owedSayNone": "未回収はありません。貸したお金を開きます。",
+    "dash.pos.savings": "貯蓄と投資",
+    "dash.pos.savingsSub": "貯蓄 {savings} · 投資 {invested}",
+    "dash.pos.savingsSay": "貯蓄と投資で {amount}。貯蓄と投資を開きます。",
+    "dash.overlap": "クレジットカード口座 {accounts} 件とカード負債 {debts} 件を記録しています — 同じカードが両方にある場合、上では二重に数えられます。",
+    "dash.overlap.btn": "負債を確認",
+    "dash.overlap.aria": "負債ページで記録中の負債を確認",
+    "dash.stale.noDate": "いずれも日付がありません",
+    "dash.stale.oldest": "最も古いもので {days} 日前",
+    "dash.stale.all": { other: "最近だれも確認していない残高 {count} 件から算出" },
+    "dash.stale.some": "{total} 件中 {stale} 件の、最近だれも確認していない残高から算出",
+    "dash.stale.line": "{line} — {age}。",
+    "dash.stale.btn": "残高を確認",
+    "dash.stale.aria": "口座ページで口座残高を確認",
+    "dash.trend.range": "支出推移の期間",
+    "dash.trend.sub": { other: "支出と予算 · {count} 期間" },
+    "dash.trend.clamped": " · これまでに取り込んだ全期間",
+    "dash.trend.empty": "2 つ目の期間の取引を取り込むと、ここから推移線が始まります。",
+    "dash.trend.aria": "直近 {count} 期間の支出・予算・収入",
+    "dash.split.uncatNote": " · カテゴリなし {amount} は未表示",
+    "dash.split.onlyUncat": "この期間に {amount} が出ていますが、まだどれもカテゴリ分けされていません — 取引ページでカテゴリを設定すると、ここに内訳が表示されます。",
+    "dash.split.empty": "この期間にはまだ支出としてカテゴリ分けされたものがありません。",
+    "dash.split.aria": "{month} の支出内訳: ",
+    "dash.split.sliceAria": "{cat}: {amount}、支出の {pct}% — 取引を表示",
+    "dash.split.noteAria": "{cat} のカテゴリノートを開く",
+    "dash.split.noteMissing": "「{cat}」のカテゴリノートが見つかりません",
+    "dash.err.render": "{label} を描画できませんでした — {error}"
   };
 });
 
@@ -2274,7 +3281,174 @@ var require_zh = __commonJS((exports2, module2) => {
     "tx.export.failed": "无法写入导出文件 — 请检查文件夹名称",
     "tx.export.done": {
       other: "已把 {count} 行和 {cats} 个分类导出到 {path}/"
-    }
+    },
+    "acct.group.bank": "银行账户",
+    "acct.group.savings": "储蓄",
+    "acct.group.investments": "投资",
+    "acct.group.other": "其他",
+    "acct.group.count": { other: "{count} 个账户" },
+    "acct.noteMissing": "找不到 Accounts/{name}.md",
+    "acct.balance.title": "更新余额 — {name}",
+    "acct.balance.field": "新余额",
+    "acct.balance.updated": "已更新 {name} 的余额",
+    "acct.reconciled": "已把 {name} 对账为 {amount}",
+    "acct.err.nan": "不是数字",
+    "acct.err.type": "类型无效",
+    "acct.err.notNumber": "{field} 不是数字",
+    "acct.err.nameRequired": "账户名称为必填项",
+    "acct.err.exists": "该账户已存在",
+    "acct.edit.title": "编辑账户 — {name}",
+    "acct.new.title": "新建账户",
+    "acct.field.name": "账户名称",
+    "acct.field.type": "类型",
+    "acct.field.institution": "开户机构",
+    "acct.field.number": "账号",
+    "acct.field.numberDesc": "用于在导入时把下载的对账单与这个账户对应起来。",
+    "acct.field.folder": "交易文件夹",
+    "acct.field.folderDesc": "留空则使用「{name}」。只有当 Transactions/ 下的文件夹名称不同时才需要填写。",
+    "acct.field.counts": "计入预算",
+    "acct.counts.yes": "是 — 普通支出账户",
+    "acct.counts.no": "否 — 投资或储蓄账户",
+    "acct.field.countsDesc": "如果这个账户的利息不算家庭收入、投入也不算家庭支出，请选择「否」。它的交易仍会导入，并显示在交易页面。",
+    "acct.field.limit": "信用额度",
+    "acct.field.limitDesc": "在信用卡上显示额度使用条。",
+    "acct.field.balance": "当前余额",
+    "acct.field.goal": "储蓄目标",
+    "acct.field.goalOpt": "储蓄目标（选填）",
+    "acct.field.goalOptDesc": "在「储蓄与投资」页面显示进度条。",
+    "acct.field.goalDate": "目标日期",
+    "acct.field.monthly": "每月投入",
+    "acct.field.invested": "累计投入",
+    "acct.field.investedOpt": "累计投入（选填）",
+    "acct.field.investedDesc": "你投入的金额，以便据此显示增长。",
+    "acct.field.starting": "起始金额",
+    "acct.field.opened": "开户日期",
+    "acct.budget.on": "{name} 重新计入预算",
+    "acct.budget.off": "{name} 不再计入预算合计",
+    "acct.creditUsed": "已用额度",
+    "acct.creditOf": "{limit} 中已用 {used}",
+    "acct.overLimit": "超出额度 {amount}",
+    "acct.utilised": "已用 {pct}% · 可用 {available}",
+    "acct.kpi.inCredit": "正余额",
+    "acct.kpi.overdrawn": "透支",
+    "acct.kpi.netWorth": "净资产",
+    "acct.kpi.netWorthNote": "仅限这些账户",
+    "acct.kpi.attention": "需要留意",
+    "acct.kpi.attentionNote": "未核实或有偏差的余额",
+    "acct.kpi.allGood": "每个余额都对得上",
+    "acct.aria.showTx": "显示 {name} 的交易",
+    "acct.aria.balance": "{name} 的余额 {amount} — 点击可更新",
+    "acct.limitSuffix": " · 额度 {amount}",
+    "acct.monthlySuffix": " · {amount}/月",
+    "acct.badge.notInBudget": "不计入预算",
+    "acct.badge.noTx": "没有交易",
+    "acct.badge.asOf": "截至 {date}",
+    "acct.badge.neverConfirmed": "从未确认",
+    "acct.badge.unconfirmed": { other: "已 {count} 天未确认" },
+    "acct.act.in": " 收入 · ",
+    "acct.act.out": " 支出 · ",
+    "acct.act.count": { other: "{month} 有 {count} 笔交易" },
+    "acct.recon.since": { other: "此后有 {count} 笔交易 · 推算为 " },
+    "acct.recon.pending": " · 其中 {count} 笔日期在未来，尚未计入",
+    "acct.recon.useThis": "采用",
+    "acct.aria.useThis": "把 {name} 的余额设为 {amount}",
+    "acct.recon.matches": "与你的交易一致",
+    "acct.recon.upToDate": { other: "已是最新 · {count} 笔交易日期在未来" },
+    "acct.recon.setDate": "设置一个余额日期，就能与你的交易核对",
+    "acct.foot.updated": "{date} 更新",
+    "acct.foot.noDate": "没有余额日期",
+    "acct.aria.exclude": "不再把 {name} 计入预算合计",
+    "acct.aria.include": "重新把 {name} 计入预算合计",
+    "acct.btn.exclude": "排除出预算",
+    "acct.btn.include": "计入预算",
+    "acct.aria.edit": "编辑 {name}",
+    "acct.btn.edit": "编辑",
+    "acct.aria.openNote": "打开 {name} 的笔记",
+    "acct.btn.openNote": "打开笔记",
+    "acct.empty": "还没有账户。使用上方的「新建账户」来添加银行账户、储蓄或投资。",
+    "shell.connect.title": "找不到预算文件夹",
+    "shell.connect.btn": "打开插件设置…",
+    "shell.saveChanges": "保存更改",
+    "shell.dash.trend": "支出趋势",
+    "shell.dash.trendSub": "支出与预算对比",
+    "shell.dash.split": "钱花到哪里",
+    "shell.dash.vsActual": "预算与实际",
+    "shell.dash.position": "你的状况",
+    "shell.legend.spent": "支出",
+    "shell.legend.over": "超出预算",
+    "shell.legend.income": "收入",
+    "shell.legend.budget": "预算",
+    "shell.tx.search": "搜索摘要…",
+    "shell.tx.wholeHistory": "全部历史",
+    "shell.tx.export": "导出",
+    "shell.tx.add": "添加交易",
+    "shell.bud.title": "分类预算",
+    "shell.bud.copyPrev": "复制上一周期",
+    "shell.bud.save": "保存预算",
+    "dash.greet.morning": "早上好",
+    "dash.greet.afternoon": "下午好",
+    "dash.greet.evening": "晚上好",
+    "dash.greet.line": "{greeting}，{name}",
+    "dash.hero.remaining": "本周期剩余",
+    "dash.hero.overspent": "本周期超支",
+    "dash.hero.sub": "预算 {budgeted}，已花 {spent}",
+    "dash.stat.income": "收入合计",
+    "dash.stat.budgeted": "预算",
+    "dash.stat.spent": "支出合计",
+    "dash.stat.uncategorised": "未分类",
+    "dash.stat.allocated": "已分配 {pct}%",
+    "dash.stat.used": "已用 {pct}%",
+    "dash.stat.review": "在交易页面查看",
+    "dash.col.category": "分类",
+    "dash.col.budget": "预算",
+    "dash.col.spent": "支出",
+    "dash.col.remaining": "剩余",
+    "dash.table.empty": "本周期还没有预算或交易。",
+    "dash.pos.sub": "截至今日 — 这些数字不随上方的周期变动",
+    "dash.pos.netWorth": "净资产",
+    "dash.pos.netWorthSub": "资产 {owned} · 负债 {owed}",
+    "dash.pos.netWorthSay": "净资产 {net} — 资产 {owned}，负债 {owed}。打开储蓄与投资。",
+    "dash.pos.debt": "债务",
+    "dash.pos.debtSplit": "账户 {accounts} · 债务页面 {debts}",
+    "dash.pos.debtActive": { other: "{count} 笔在还" },
+    "dash.pos.debtNone": "没有欠款",
+    "dash.pos.debtSay": "债务 {amount}。打开债务页面。",
+    "dash.pos.debtSayNone": "没有债务。打开债务页面。",
+    "dash.pos.owed": "别人欠你",
+    "dash.pos.owedOpen": "{count} 笔未收",
+    "dash.pos.owedOldest": " · 最早的已过 {days} 天",
+    "dash.pos.owedRecovered": "已收回 {amount}",
+    "dash.pos.owedNone": "没有借出",
+    "dash.pos.owedSay": {
+      other: "{count} 笔合计 {amount} 尚未收回。打开应收款项。"
+    },
+    "dash.pos.owedSayNone": "没有未收款项。打开应收款项。",
+    "dash.pos.savings": "储蓄与投资",
+    "dash.pos.savingsSub": "储蓄 {savings} · 投资 {invested}",
+    "dash.pos.savingsSay": "储蓄与投资共 {amount}。打开储蓄与投资。",
+    "dash.overlap": "已记录 {accounts} 个信用卡账户和 {debts} 笔信用卡债务 — 如果同一张卡两边都有，上面会重复计算。",
+    "dash.overlap.btn": "查看债务",
+    "dash.overlap.aria": "在债务页面查看已记录的债务",
+    "dash.stale.noDate": "它们都没有日期",
+    "dash.stale.oldest": "最早的是 {days} 天前",
+    "dash.stale.all": { other: "基于 {count} 个近期无人确认的余额" },
+    "dash.stale.some": "基于 {total} 个余额中 {stale} 个近期无人确认的余额",
+    "dash.stale.line": "{line} — {age}。",
+    "dash.stale.btn": "查看余额",
+    "dash.stale.aria": "在账户页面查看账户余额",
+    "dash.trend.range": "支出趋势的时间范围",
+    "dash.trend.sub": { other: "支出与预算 · {count} 个周期" },
+    "dash.trend.clamped": " · 目前已导入的全部历史",
+    "dash.trend.empty": "再导入一个周期的交易，趋势线就会从这里开始。",
+    "dash.trend.aria": "最近 {count} 个周期的支出、预算与收入",
+    "dash.split.uncatNote": " · 未分类 {amount}，未显示",
+    "dash.split.onlyUncat": "本周期支出了 {amount}，但还没有任何一笔被归类 — 在交易页面设置分类后，这里就会显示占比。",
+    "dash.split.empty": "本周期还没有被归为支出的内容。",
+    "dash.split.aria": "{month} 的支出占比：",
+    "dash.split.sliceAria": "{cat}：{amount}，占支出的 {pct}% — 显示交易",
+    "dash.split.noteAria": "打开 {cat} 的分类笔记",
+    "dash.split.noteMissing": "找不到「{cat}」的分类笔记",
+    "dash.err.render": "无法绘制{label} — {error}"
   };
 });
 
@@ -2666,12 +3840,12 @@ var require_shell = __commonJS((exports2, module2) => {
 
       <section id="view-connect">
         <div class="card" id="connect-card">
-          <div class="card-h" style="justify-content:center"><h2>Budget folder not found</h2></div>
+          <div class="card-h" style="justify-content:center"><h2 data-i18n="shell.connect.title">Budget folder not found</h2></div>
           <div class="body-pad">
             <p>This plugin reads and writes the markdown files in your budget folder —
               accounts, categories, budgets and transactions all live as plain files in the vault.</p>
             <p class="text-muted" id="connectPathNote"></p>
-            <p style="margin-top:1.4rem"><button class="btn-gradient" id="openSettingsBtn" style="padding:0.55rem 1.5rem">Open plugin settings…</button></p>
+            <p style="margin-top:1.4rem"><button class="btn-gradient" id="openSettingsBtn" style="padding:0.55rem 1.5rem" data-i18n="shell.connect.btn">Open plugin settings…</button></p>
             <p id="connectErr" class="text-danger"></p>
           </div>
         </div>
@@ -2685,15 +3859,15 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2>Spending Trend</h2>
-              <div class="sub" id="trendSub">Spent vs budget</div>
+              <h2 data-i18n="shell.dash.trend">Spending Trend</h2>
+              <div class="sub" id="trendSub" data-i18n="shell.dash.trendSub">Spent vs budget</div>
             </div>
             <div class="card-h-controls">
               <div class="legend">
-                <span><i style="background:var(--color-success)"></i>Spent</span>
-                <span><i style="background:var(--color-danger)"></i>Over budget</span>
-                <span><i style="background:var(--color-info)"></i>Income</span>
-                <span><i class="legend-dash"></i>Budget</span>
+                <span><i style="background:var(--color-success)"></i><span data-i18n="shell.legend.spent">Spent</span></span>
+                <span><i style="background:var(--color-danger)"></i><span data-i18n="shell.legend.over">Over budget</span></span>
+                <span><i style="background:var(--color-info)"></i><span data-i18n="shell.legend.income">Income</span></span>
+                <span><i class="legend-dash"></i><span data-i18n="shell.legend.budget">Budget</span></span>
               </div>
               <div id="trendRange"></div>
             </div>
@@ -2703,7 +3877,7 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="card mb-4" id="dashSplitCard">
           <div class="card-h">
             <div>
-              <h2>Where it went</h2>
+              <h2 data-i18n="shell.dash.split">Where it went</h2>
               <div class="sub" id="dashSplitSub"></div>
             </div>
           </div>
@@ -2712,7 +3886,7 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2>Budget vs Actual</h2>
+              <h2 data-i18n="shell.dash.vsActual">Budget vs Actual</h2>
               <div class="sub" id="dashBudgetSub"></div>
             </div>
           </div>
@@ -2732,7 +3906,7 @@ var require_shell = __commonJS((exports2, module2) => {
              the card's chrome or its 44px gutters. -->
         <div class="mb-4" id="dashPositionCard">
           <div class="section-h">
-            <h2>Where you stand</h2>
+            <h2 data-i18n="shell.dash.position">Where you stand</h2>
             <div class="sub" id="dashPositionSub"></div>
           </div>
           <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
@@ -2749,18 +3923,18 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div class="row" style="flex:1">
-              <select id="txAccount" class="form-select form-select-sm"><option value="">All accounts</option></select>
-              <select id="txCategory" class="form-select form-select-sm"><option value="">All categories</option><option value="__none__">Uncategorised</option></select>
-              <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…">
+              <select id="txAccount" class="form-select form-select-sm"><option value="" data-i18n="tx.allAccounts">All accounts</option></select>
+              <select id="txCategory" class="form-select form-select-sm"><option value="" data-i18n="tx.allCategories">All categories</option><option value="__none__" data-i18n="tx.uncategorised">Uncategorised</option></select>
+              <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…" data-i18n-placeholder="shell.tx.search">
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
-                <input type="checkbox" id="txWholeHistory"> whole history
+                <input type="checkbox" id="txWholeHistory"> <span data-i18n="shell.tx.wholeHistory">whole history</span>
               </label>
             </div>
             <div class="row">
               <span id="txCount" class="count-note"></span>
-              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> Export</button>
-              <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> Add transaction</button>
-              <button class="btn-gradient" id="txSave" disabled>Save changes</button>
+              <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
+              <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="shell.tx.add">Add transaction</span></button>
+              <button class="btn-gradient" id="txSave" disabled data-i18n="shell.saveChanges">Save changes</button>
             </div>
           </div>
           <div class="body-pad body-pad-tight">
@@ -2778,13 +3952,13 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div>
-              <h2>Category budgets</h2>
+              <h2 data-i18n="shell.bud.title">Category budgets</h2>
               <div class="sub">Amounts are per financial period · saved to <code>Budgets/&lt;period&gt;.md</code></div>
             </div>
             <div class="row">
-              <button class="btn-ghost" id="budCopyPrev">Copy previous period</button>
+              <button class="btn-ghost" id="budCopyPrev" data-i18n="shell.bud.copyPrev">Copy previous period</button>
               <button class="btn-ghost" id="budAddCat"><span class="ico" data-ico="plus"></span> New category</button>
-              <button class="btn-gradient" id="budSave" disabled>Save budget</button>
+              <button class="btn-gradient" id="budSave" disabled data-i18n="shell.bud.save">Save budget</button>
             </div>
           </div>
           <div class="body-pad body-pad-tight">
@@ -5541,6 +6715,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
   var { el, icoEl } = require_dom();
   var { safeSeg } = require_vault_path();
   var { TYPE_ORDER } = require_constants();
+  var i18n = require_i18n();
   var { stalenessSummary } = require_reconcile();
   var { worth, cardOverlap } = require_worth();
   var { owedSummary } = require_owed_math();
@@ -5572,7 +6747,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
           if (!box)
             return;
           box.empty();
-          const msg = `Could not draw the ${label} — ${e?.message || e}`;
+          const msg = i18n.t("dash.err.render", { label, error: e?.message || e });
           box.append(box.tagName === "TABLE" ? el("tbody", {}, el("tr", {}, el("td", { class: "text-danger", colspan: "5" }, msg))) : el("p", { class: "text-danger", style: "margin:0" }, msg));
         } catch (inner) {
           console.error(`Budget: the ${label} card could not report its own failure`, inner);
@@ -5616,39 +6791,39 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const hasCaveat = stalenessSummary(S.accounts).stale > 0;
       if (card)
         card.classList.toggle("hidden", !hasLedger && !hasCaveat);
-      $("#dashPositionSub").textContent = hasLedger ? "As things stand today — these do not move with the period above" : "";
+      $("#dashPositionSub").textContent = hasLedger ? i18n.t("dash.pos.sub") : "";
       if (!hasLedger)
         return;
       posTile(grid, {
-        label: "Net worth",
+        label: i18n.t("dash.pos.netWorth"),
         value: money(w.net, 0),
         cls: w.net >= 0 ? "grad-txt" : "text-danger",
-        sub: `${money(w.assets, 0)} owned · ${money(w.liabilities, 0)} owed`,
+        sub: i18n.t("dash.pos.netWorthSub", { owned: money(w.assets, 0), owed: money(w.liabilities, 0) }),
         view: "savings",
-        say: `Net worth ${money(w.net)} — ${money(w.assets)} owned against ${money(w.liabilities)} owed. Open Savings and Investments.`
+        say: i18n.t("dash.pos.netWorthSay", { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) })
       });
       posTile(grid, {
-        label: "Debt",
+        label: i18n.t("dash.pos.debt"),
         value: money(-w.liabilities, 0),
         cls: w.liabilities > 0 ? "text-danger" : "",
-        sub: w.fromDebts && w.fromAccounts ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page` : w.liabilities > 0 ? `${w.active.length} active` : "nothing owed",
+        sub: w.fromDebts && w.fromAccounts ? i18n.t("dash.pos.debtSplit", { accounts: money(w.fromAccounts, 0), debts: money(w.fromDebts, 0) }) : w.liabilities > 0 ? i18n.t("dash.pos.debtActive", { count: w.active.length }) : i18n.t("dash.pos.debtNone"),
         view: "debts",
-        say: w.liabilities > 0 ? `Debt ${money(w.liabilities)} owed. Open the Debt page.` : "No debt owed. Open the Debt page."
+        say: w.liabilities > 0 ? i18n.t("dash.pos.debtSay", { amount: money(w.liabilities) }) : i18n.t("dash.pos.debtSayNone")
       });
       posTile(grid, {
-        label: "Owed to you",
+        label: i18n.t("dash.pos.owed"),
         value: money(owed.outstanding, 0),
         cls: owed.outstanding > 0 ? "text-warning" : "",
-        sub: owed.outstanding > 0 ? `${owed.open} outstanding${owed.oldestDays !== null ? ` · oldest out ${owed.oldestDays} days` : ""}` : owed.entries ? `${money(owed.recovered, 0)} recovered` : "nothing lent out",
+        sub: owed.outstanding > 0 ? i18n.t("dash.pos.owedOpen", { count: owed.open }) + (owed.oldestDays !== null ? i18n.t("dash.pos.owedOldest", { days: owed.oldestDays }) : "") : owed.entries ? i18n.t("dash.pos.owedRecovered", { amount: money(owed.recovered, 0) }) : i18n.t("dash.pos.owedNone"),
         view: "owed",
-        say: owed.outstanding > 0 ? `${money(owed.outstanding)} owed to you across ${owed.open} ${owed.open === 1 ? "entry" : "entries"}. Open Owed Money.` : "Nothing outstanding. Open Owed Money."
+        say: owed.outstanding > 0 ? i18n.t("dash.pos.owedSay", { amount: money(owed.outstanding), count: owed.open }) : i18n.t("dash.pos.owedSayNone")
       });
       posTile(grid, {
-        label: "Savings & investments",
+        label: i18n.t("dash.pos.savings"),
         value: money(savings + invest, 0),
-        sub: `${money(savings, 0)} savings · ${money(invest, 0)} invested`,
+        sub: i18n.t("dash.pos.savingsSub", { savings: money(savings, 0), invested: money(invest, 0) }),
         view: "savings",
-        say: `${money(savings + invest)} in savings and investments. Open Savings and Investments.`
+        say: i18n.t("dash.pos.savingsSay", { amount: money(savings + invest) })
       });
     }
     function renderOverlapNote() {
@@ -5657,12 +6832,12 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const o = cardOverlap(S.accounts, S.debts);
       if (!o)
         return;
-      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${o.cardAccounts} credit-card ${o.cardAccounts === 1 ? "account" : "accounts"} and ` + `${o.cardDebts} card ${o.cardDebts === 1 ? "debt" : "debts"} are tracked — if any card is in both, it is counted twice above.`));
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), i18n.t("dash.overlap", { accounts: o.cardAccounts, debts: o.cardDebts })));
       const btn = el("button", {
         type: "button",
         class: "kpi-caveat-btn",
-        "aria-label": "Review tracked debts on the Debt page"
-      }, "Review debts");
+        "aria-label": i18n.t("dash.overlap.aria")
+      }, i18n.t("dash.overlap.btn"));
       btn.addEventListener("click", () => ctx.switchView("debts"));
       wrap.append(btn);
     }
@@ -5672,15 +6847,15 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const s = stalenessSummary(S.accounts);
       if (!s.stale)
         return;
-      const age = s.oldestDays === null ? "none of them carry a date" : `the oldest ${s.oldestDays} days ago`;
+      const age = s.oldestDays === null ? i18n.t("dash.stale.noDate") : i18n.t("dash.stale.oldest", { days: s.oldestDays });
       const all = s.stale === s.total;
-      const line = all ? `Built from ${s.total === 1 ? "a balance" : `${s.total} balances`} nobody has confirmed recently` : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
-      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${line} — ${age}.`));
+      const line = all ? i18n.t("dash.stale.all", { count: s.total }) : i18n.t("dash.stale.some", { stale: s.stale, total: s.total });
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), i18n.t("dash.stale.line", { line, age })));
       const btn = el("button", {
         type: "button",
         class: "kpi-caveat-btn",
-        "aria-label": "Review account balances on the Accounts page"
-      }, "Review balances");
+        "aria-label": i18n.t("dash.stale.aria")
+      }, i18n.t("dash.stale.btn"));
       btn.addEventListener("click", () => ctx.switchView("accounts"));
       wrap.append(btn);
     }
@@ -5701,19 +6876,19 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const meter = el("div", { class: `hero-meter${heroNegative ? " over" : ""}` }, el("i", { style: `width:${fillPct}%` }));
       if (markPct !== null)
         meter.append(el("span", { class: "hero-mark", style: `left:${markPct}%`, "aria-hidden": "true" }));
-      const statCol = el("div", { class: "stat-col" }, el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, "Total Income")), el("div", {}, el("div", { class: "sv grad-txt" }, money(sum.income)))), el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, "Budgeted")), el("div", {}, el("div", { class: "sv" }, money(bud.spend)), budgetedPct !== null ? el("div", { class: "st" }, `${budgetedPct}% allocated`) : "")), el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, "Total Spent")), el("div", {}, el("div", { class: "sv" }, money(sum.spend)), usedPct !== null ? el("div", { class: "st" }, el("span", { class: "tag warn" }, `${usedPct}% used`)) : "")));
+      const statCol = el("div", { class: "stat-col" }, el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, i18n.t("dash.stat.income"))), el("div", {}, el("div", { class: "sv grad-txt" }, money(sum.income)))), el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, i18n.t("dash.stat.budgeted"))), el("div", {}, el("div", { class: "sv" }, money(bud.spend)), budgetedPct !== null ? el("div", { class: "st" }, i18n.t("dash.stat.allocated", { pct: budgetedPct })) : "")), el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, i18n.t("dash.stat.spent"))), el("div", {}, el("div", { class: "sv" }, money(sum.spend)), usedPct !== null ? el("div", { class: "st" }, el("span", { class: "tag warn" }, i18n.t("dash.stat.used", { pct: usedPct }))) : "")));
       if (sum.uncategorised > 0)
-        statCol.append(el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, "Uncategorised")), el("div", {}, el("div", { class: "sv", style: "color: var(--color-warning)" }, String(sum.uncategorised)), el("div", { class: "st" }, "review in Transactions"))));
+        statCol.append(el("div", { class: "stat" }, el("div", {}, el("div", { class: "sl" }, i18n.t("dash.stat.uncategorised"))), el("div", {}, el("div", { class: "sv", style: "color: var(--color-warning)" }, String(sum.uncategorised)), el("div", { class: "st" }, i18n.t("dash.stat.review")))));
       const hour = new Date().getHours();
-      const greeting = hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-      hero.append(el("div", { class: "hero-grid" }, el("div", {}, S.settings.household ? el("div", { class: "hero-greet" }, `${greeting}, ${S.settings.household}`) : "", el("div", { class: "hero-lbl" }, heroNegative ? "Overspent this period" : "Remaining this period"), heroNum, el("div", { class: "hero-sub" }, el("b", {}, money(sum.spend)), " spent of ", el("b", {}, money(bud.spend)), " budgeted"), meter), statCol));
+      const greeting = i18n.t(hour < 5 ? "dash.greet.evening" : hour < 12 ? "dash.greet.morning" : hour < 18 ? "dash.greet.afternoon" : "dash.greet.evening");
+      hero.append(el("div", { class: "hero-grid" }, el("div", {}, S.settings.household ? el("div", { class: "hero-greet" }, i18n.t("dash.greet.line", { greeting, name: S.settings.household })) : "", el("div", { class: "hero-lbl" }, i18n.t(heroNegative ? "dash.hero.overspent" : "dash.hero.remaining")), heroNum, el("div", { class: "hero-sub" }, i18n.t("dash.hero.sub", { spent: money(sum.spend), budgeted: money(bud.spend) })), meter), statCol));
     }
     function renderBudgetTable() {
       const sum = periodSummary(S.period);
       const t = $("#dashBudget");
       t.empty();
       $("#dashBudgetSub").textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Budget"), el("th", { scope: "col", class: "num" }, "Spent"), el("th", { scope: "col", style: "width:26%" }, ""), el("th", { scope: "col", class: "num" }, "Remaining"))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, i18n.t("dash.col.category")), el("th", { scope: "col", class: "num" }, i18n.t("dash.col.budget")), el("th", { scope: "col", class: "num" }, i18n.t("dash.col.spent")), el("th", { scope: "col", style: "width:26%" }, ""), el("th", { scope: "col", class: "num" }, i18n.t("dash.col.remaining")))));
       const body = el("tbody", {});
       const budget = S.budgets[S.period] || [];
       const rows = new Map;
@@ -5745,7 +6920,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
 `)[0]) : ""), el("td", { class: "num" }, r.budget ? money(r.budget) : "—"), el("td", { class: "num" }, money(r.actual)), el("td", {}, bar), el("td", { class: `num${over ? " text-danger" : ""}` }, r.budget ? money(remaining) : "")));
       }
       if (!sorted.length)
-        body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, "No budget or transactions in this period yet.")));
+        body.append(el("tr", {}, el("td", { colspan: "5", class: "text-muted" }, i18n.t("dash.table.empty"))));
       t.append(body);
     }
     function periodsForMonths(months) {
@@ -5791,7 +6966,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       pills.append(rangePills({
         ranges: historicalRanges(),
         value: range.key,
-        label: "Spending trend range",
+        label: i18n.t("dash.trend.range"),
         onPick: async (key) => {
           plugin.settings.chartTrendRange = key;
           await plugin.saveSettings();
@@ -5799,9 +6974,9 @@ var require_dashboard = __commonJS((exports2, module2) => {
         }
       }));
       const clamped = periods.length < want;
-      $("#trendSub").textContent = `Spent vs budget · ${periods.length} period${periods.length === 1 ? "" : "s"}` + (clamped ? ` · all the history imported so far` : "");
+      $("#trendSub").textContent = i18n.t("dash.trend.sub", { count: periods.length }) + (clamped ? i18n.t("dash.trend.clamped") : "");
       if (data.length < 2) {
-        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Import a second period of transactions and the trend line starts here."));
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, i18n.t("dash.trend.empty")));
         return;
       }
       const W = 1000, H = 300;
@@ -5812,7 +6987,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const { svg, add } = createChart({
         w: W,
         h: H,
-        label: `Spent, budgeted and income over the last ${data.length} periods`
+        label: i18n.t("dash.trend.aria", { count: data.length })
       });
       const fill = areaGradient(add, "trendSpentArea", c.success);
       gridlines(add, s, W);
@@ -5887,11 +7062,11 @@ var require_dashboard = __commonJS((exports2, module2) => {
       }
       spend.sort((a2, b) => b.amount - a2.amount);
       const uncat = -Math.min(0, sum.byCat[""] || 0);
-      const uncatNote = uncat > 0 ? ` · ${money(uncat)} uncategorised, not shown` : "";
+      const uncatNote = uncat > 0 ? i18n.t("dash.split.uncatNote", { amount: money(uncat) }) : "";
       const total = spend.reduce((t, x) => t + x.amount, 0);
       $("#dashSplitSub").textContent = (total > 0 ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? "y" : "ies"} · ${periodMonthName(S.period)}` : periodMonthName(S.period)) + uncatNote;
       if (!total) {
-        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, uncat > 0 ? `${money(uncat)} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.` : "Nothing categorised as spending in this period yet."));
+        wrap.append(el("p", { class: "text-muted", style: "margin:0" }, uncat > 0 ? i18n.t("dash.split.onlyUncat", { amount: money(uncat) }) : i18n.t("dash.split.empty")));
         return;
       }
       const shown = spend.slice(0, SPLIT_SLICES);
@@ -5914,7 +7089,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
         w: W,
         h: H,
         cls: "donut",
-        label: `Spending split for ${periodMonthName(S.period)}: ` + shown.map((x) => `${x.cat} ${Math.round(x.amount / total * 100)}%`).join(", ")
+        label: i18n.t("dash.split.aria", { month: periodMonthName(S.period) }) + shown.map((x) => `${x.cat} ${Math.round(x.amount / total * 100)}%`).join(", ")
       });
       let a = -Math.PI / 2;
       for (const x of shown) {
@@ -5965,12 +7140,12 @@ var require_dashboard = __commonJS((exports2, module2) => {
         legend.append(el("li", {}, el("button", {
           type: "button",
           class: "dl-link",
-          "aria-label": `${x.cat}: ${money(x.amount)}, ${pct}% of spending — show transactions`,
+          "aria-label": i18n.t("dash.split.sliceAria", { cat: x.cat, amount: money(x.amount), pct }),
           onclick: () => openCategory(x.cat)
         }, face()), el("button", {
           type: "button",
           class: "dl-note",
-          "aria-label": `Open the ${x.cat} category note`,
+          "aria-label": i18n.t("dash.split.noteAria", { cat: x.cat }),
           title: "Open category note",
           onclick: () => openCategoryFile(x.cat)
         }, icoEl(["file-text", "file"]))));
@@ -5990,7 +7165,7 @@ var require_dashboard = __commonJS((exports2, module2) => {
     async function openCategoryFile(cat) {
       const file = fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
       if (!file)
-        return toast(`No category note found for "${cat}"`, true);
+        return toast(i18n.t("dash.split.noteMissing", { cat }), true);
       await app.workspace.getLeaf("tab").openFile(file);
     }
     ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit });
