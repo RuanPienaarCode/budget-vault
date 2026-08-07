@@ -363,6 +363,42 @@ function normalizeAmount(raw) {
    Returns { verified, flip, order, pairs, agreement }. `verified: false` means
    "this file did not prove itself" — never "the amounts are wrong". Callers
    must degrade to showing the user rather than to guessing. */
+/* Does this description name one of the reader's OWN other accounts?
+
+   Every non-interest line on a linked savings statement is a transfer to or
+   from the cheque account next door. Imported without recognition, moving your
+   own money between your own accounts registers as income — and then the
+   Dashboard reports a month where the household earned its own savings.
+
+   Matching is exact on a run of digits, never fuzzy. A bank reference is full
+   of numbers that are not account numbers, and the cost of a wrong match here
+   is a real income figure quietly deleted, so the rule is deliberately strict:
+
+     - only digit runs of 4+ are considered, so a card's " 1234" cent amount or
+       a date fragment cannot collide with a short account number
+     - the digits must EQUAL a known account_number, not merely contain it —
+       "10410051720" is not account "1041005172", it is a different account
+     - the account being imported INTO is skipped. A statement routinely quotes
+       its own number in its rows, and tagging those as transfers would exclude
+       an entire import.
+
+   Returns the matching account, or null. Deciding what to do about it is the
+   caller's — this function never mutates a row. */
+function counterpartyAccount(desc, accounts, selfLabel) {
+  const runs = String(desc || '').match(/\d{4,}/g);
+  if (!runs) return null;
+  for (const n of runs) {
+    for (const a of accounts || []) {
+      const num = String(a.account_number || '').trim();
+      if (!num || num !== n) continue;
+      const label = a.tx_label || a.name;
+      if (selfLabel && label === selfLabel) continue;   // the statement's own account
+      return a;
+    }
+  }
+  return null;
+}
+
 function reconcileAmounts(rows) {
   const c = v => Math.round(v * 100);
   const pts = (rows || []).filter(r => r && r.amount != null && r.balance != null);
@@ -726,4 +762,4 @@ function isRealIsoDate(s) {
   return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, counterpartyAccount, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };

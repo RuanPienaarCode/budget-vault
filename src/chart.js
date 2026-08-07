@@ -50,6 +50,116 @@ function themeColors(root) {
   };
 }
 
+/* ---------------------------- slice colours ----------------------------
+
+   Category colours are the user's, set in each Categories/<name>.md. Nothing
+   has ever stopped two categories carrying the same one, and in practice they
+   do — a real vault here had 15 categories on #dc3545 and 10 on #3b82f6 — so a
+   donut drawn straight from them comes out as several wedges of the same red
+   and several of the same blue, which is a chart that cannot be read.
+
+   distinctColors() below fixes that at RENDER time and never writes to the
+   vault: a colour someone chose deliberately is still theirs, it just cannot
+   be worn by two wedges at once. */
+
+/* Fallback wedge colours.
+
+   Fixed hexes rather than theme variables: a wedge must stay the same colour
+   when the theme flips, and the plugin's --color-* set is redefined between
+   light and dark. Every entry clears 1.9:1 on the light card and 3:1 on the
+   dark one, and no two are closer than 173 under colorDistance() — comfortably
+   past the ~115 where two fills stop being tellable apart at wedge size, and
+   past SLICE_MIN_DISTANCE so the palette can always satisfy its own rule.
+
+   Deliberately no red, and no near-red: red means "over budget" on the trend
+   chart and in the budget table, so a category wearing it would have the
+   dashboard signalling something it does not mean. That is easy to break by
+   eye — the first draft of this list had #ea580c in it, which scores 90
+   against #ef4444 and reads as plain red on a wedge — so tests/slice-colours
+   pins every entry at least SLICE_MIN_DISTANCE away from the common reds
+   rather than trusting the hue name. */
+const SLICE_PALETTE = [
+  '#fb923c', '#0ea5e9', '#a16207', '#0369a1', '#84cc16',
+  '#6366f1', '#15803d', '#e879f9', '#34d399', '#a21caf',
+];
+
+/* Below this distance two fills read as "the same colour" on a wedge. Measured
+   against the colours real category files actually carry: the closest genuinely
+   distinguishable pair sat at 133 and the worst confusable pair at 79, so 130
+   separates them. It also has to stay under the palette's own 148 minimum, or
+   the palette would reject its own entries and have nothing left to hand out. */
+const SLICE_MIN_DISTANCE = 130;
+
+/* The colour promptCreateCategory() stamps on every new category file, and the
+   loader's fallback for a file with no colour at all. Neither is a choice
+   anyone made, so both are treated as "unset" and always replaced — otherwise
+   the first category to be drawn wins grey and every donut has a wedge the
+   same colour as its own "Other". */
+const PLACEHOLDER_COLORS = ['#888', '#888888'];
+
+/* "#abc", "#aabbcc" or "rgb(…)" → [r,g,b]; anything else → null.
+   Both forms are needed: frontmatter is hand-written hex, but a colour read
+   back through getComputedStyle arrives as rgb(). A colour that parses as
+   neither (a CSS keyword, a typo) is left alone rather than guessed at. */
+function parseColor(value) {
+  const raw = (value || '').trim();
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].replace(/./g, c => c + c) : hex[1];
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  }
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(raw);
+  return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
+}
+
+/* Distance between two colours, 0 (identical) to ~765.
+
+   "Redmean" — a weighted RGB metric — rather than plain euclidean distance.
+   It costs one extra divide and is markedly better at agreeing with the eye
+   about blues, which is exactly where category colours collide: plain RGB
+   scores #3b82f6 against #0d6efd far enough apart to keep both, and on screen
+   they are the same blue. A full Lab conversion would be better still and is
+   not worth the code here. */
+function colorDistance(a, b) {
+  const rmean = (a[0] + b[0]) / 2;
+  const dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
+  return Math.sqrt(
+    (2 + rmean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rmean) / 256) * db * db);
+}
+
+/* Resolve a list of wanted colours to ones that can actually be told apart.
+
+   `wanted` MUST arrive in priority order — largest wedge first — because the
+   rule is "first claim wins": the biggest slice keeps the colour its category
+   file asks for, and the smaller ones that would have duplicated it move to
+   the palette. Sorted the other way round, the largest wedge on the chart is
+   the one that gets its colour taken away, which is the most visible possible
+   place to overrule the user.
+
+   `reserved` are colours already spoken for by something not in this list —
+   the muted "Other" wedge — so nothing is assigned close enough to be mistaken
+   for it. Returns the ORIGINAL string when a colour is kept, so a hand-written
+   #3B82F6 is not silently rewritten to lowercase in the legend swatch. */
+function distinctColors(wanted, { reserved = [], palette = SLICE_PALETTE,
+                                  minDistance = SLICE_MIN_DISTANCE } = {}) {
+  const taken = reserved.map(parseColor).filter(Boolean);
+  const clashes = rgb => taken.some(t => colorDistance(rgb, t) < minDistance);
+  const out = [];
+  for (const raw of wanted) {
+    const placeholder = PLACEHOLDER_COLORS.includes((raw || '').trim().toLowerCase());
+    const own = placeholder ? null : parseColor(raw);
+    if (own && !clashes(own)) { taken.push(own); out.push(raw); continue; }
+    /* More wedges than the palette can keep apart — only reachable if the
+       slice count is raised past the palette length. Wrapping repeats a colour,
+       which is the same failure this function exists to prevent, but a repeat
+       at position 11 beats leaving a wedge with no fill at all. */
+    const pick = palette.find(p => !clashes(parseColor(p))) || palette[out.length % palette.length];
+    taken.push(parseColor(pick));
+    out.push(pick);
+  }
+  return out;
+}
+
 /* ------------------------------ scaffold ------------------------------ */
 
 /* An <svg> plus the `add(tag, attrs, parent)` helper every chart builds with.
@@ -232,5 +342,6 @@ function rangePills({ ranges, value, onPick, label }) {
 module.exports = {
   NS, themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip,
+  SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,
 };

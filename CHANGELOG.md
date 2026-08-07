@@ -3,6 +3,51 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.5.0 — 2026-08-07
+
+### Fixed
+
+- **Net worth counts everything you owe.** The liabilities figure on the
+  Savings page was built from account balances alone, so a card in overdraft
+  counted and a home loan on the Debt page did not. The tile and the chart
+  beneath it both read from the same short definition now — assets are the
+  positive balances, liabilities are the negative ones *plus* every active
+  debt row — so the headline number and the picture under it can no longer
+  disagree.
+
+  A credit card can honestly be tracked as an account or as a debt row, and
+  nothing stops you doing both, which would count it twice. That case is
+  reported rather than guessed at: names are free text, and any rule for
+  matching "Discovery" against "Discovery Bank" would be wrong on real data
+  in both directions. You are told the overlap is possible and get to look.
+
+### Added
+
+- **Every stated balance now says how old it is.** A balance is something you
+  typed, not something the vault knows, and one confirmed in March should not
+  prop up a net-worth figure read in August. Balances unconfirmed for more
+  than 30 days are counted and disclosed where the total is stated. An
+  account that has never been confirmed says so, rather than reporting zero
+  days.
+
+- **Moving your own money between your own accounts stops counting as income
+  and spend.** An import that names another of your accounts by its number is
+  recognised as a transfer and arrives excluded. It is excluded *by name* —
+  the row says what made it so, so a figure that looks missing later has a
+  trail rather than a mystery.
+
+### Changed
+
+- **Two categories can no longer wear the same colour on the donut.** Category
+  colours are yours, one per file, and nothing ever stopped two files carrying
+  the same one — the vault this was measured on had 15 categories on one red
+  and 10 on one blue, which drew a chart that could not be read. Duplicates are
+  now separated at draw time, biggest wedge keeping its colour, and nothing is
+  written back to your files.
+
+- **The dashboard donut is readable by screen reader**, and its legend rows
+  are clickable through to the category behind them.
+
 ## 1.4.1 — 2026-08-06
 
 ### Fixed

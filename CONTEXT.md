@@ -61,3 +61,47 @@ _Avoid_: ignored, hidden, skipped
 An account whose every transaction sits outside income and spend totals. The
 per-account counterpart to an excluded transaction.
 _Avoid_: off-budget, untracked, external
+
+### Saving
+
+**Contribution**:
+Money the household moves into a savings or investment account out of its own
+funds. Wears the budget category it came from rather than one of its own, so it
+is recognised by what it is not — an inflow that isn't growth.
+_Avoid_: deposit, top-up, payment in, investment
+
+**Withdrawal**:
+Money taken back out of a savings or investment account. The counterpart to a
+contribution.
+_Avoid_: drawdown, redemption, disinvestment
+
+**Growth**:
+What an account earned without the household putting anything in. Deliberately
+not the balance less what was put in — that figure counts every contribution as
+growth, and was wrong on all four real accounts it was measured against.
+_Avoid_: return, gain, profit, yield, performance
+
+**Interest**:
+Growth the institution credits as a dated transaction of its own. Kept out of
+income and spend totals, because it cannot be spent in the period it lands in —
+but read directly by everything that reports growth or taxable earnings, since
+being excluded from a total was never the same as being invisible.
+_Avoid_: interest earned, investment income
+
+### Balances
+
+**Stated balance**:
+What the user says an account holds, and the date they last said it. A claim
+with an age, never a fact.
+_Avoid_: current balance, actual balance
+
+**Implied balance**:
+What an account would hold if every transaction recorded since the stated
+balance is complete and correct. The second opinion, not the answer.
+_Avoid_: calculated balance, derived balance, true balance
+
+**Reconciliation**:
+Measuring the stated balance against the implied one and showing the reader the
+disagreement. It never silently overwrites either figure — the reader is the one
+who decides which is wrong.
+_Avoid_: sync, refresh, auto-update, verification

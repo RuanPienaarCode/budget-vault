@@ -348,6 +348,23 @@ var require_util = __commonJS((exports2, module2) => {
     const n = Number(s);
     return neg ? -n : n;
   }
+  function counterpartyAccount(desc, accounts, selfLabel) {
+    const runs = String(desc || "").match(/\d{4,}/g);
+    if (!runs)
+      return null;
+    for (const n of runs) {
+      for (const a of accounts || []) {
+        const num = String(a.account_number || "").trim();
+        if (!num || num !== n)
+          continue;
+        const label = a.tx_label || a.name;
+        if (selfLabel && label === selfLabel)
+          continue;
+        return a;
+      }
+    }
+    return null;
+  }
   function reconcileAmounts(rows) {
     const c = (v) => Math.round(v * 100);
     const pts = (rows || []).filter((r) => r && r.amount != null && r.balance != null);
@@ -593,7 +610,7 @@ var require_util = __commonJS((exports2, module2) => {
     const back = new Date(t);
     return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
   }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, counterpartyAccount, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
 });
 
 // src/shell.js
@@ -889,7 +906,8 @@ var require_shell = __commonJS((exports2, module2) => {
           <h1 class="financial-period-banner-title">Savings &amp; Investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
-        <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
+        <div class="mini-grid mini-kpis-4" id="savingsKpis"></div>
+        <div class="kpi-caveat mb-4" id="savingsStale"></div>
         <div class="card mb-4" id="savingsWorthCard">
           <div class="card-h">
             <div>
@@ -2951,6 +2969,57 @@ var require_chart = __commonJS((exports2, module2) => {
       hole: root.classList.contains("bud-dark") ? "#0a0f1e" : "#ffffff"
     };
   }
+  var SLICE_PALETTE = [
+    "#fb923c",
+    "#0ea5e9",
+    "#a16207",
+    "#0369a1",
+    "#84cc16",
+    "#6366f1",
+    "#15803d",
+    "#e879f9",
+    "#34d399",
+    "#a21caf"
+  ];
+  var SLICE_MIN_DISTANCE = 130;
+  var PLACEHOLDER_COLORS = ["#888", "#888888"];
+  function parseColor(value) {
+    const raw = (value || "").trim();
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+    if (hex) {
+      const h = hex[1].length === 3 ? hex[1].replace(/./g, (c) => c + c) : hex[1];
+      return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    }
+    const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(raw);
+    return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
+  }
+  function colorDistance(a, b) {
+    const rmean = (a[0] + b[0]) / 2;
+    const dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
+    return Math.sqrt((2 + rmean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rmean) / 256) * db * db);
+  }
+  function distinctColors(wanted, {
+    reserved = [],
+    palette = SLICE_PALETTE,
+    minDistance = SLICE_MIN_DISTANCE
+  } = {}) {
+    const taken = reserved.map(parseColor).filter(Boolean);
+    const clashes = (rgb) => taken.some((t) => colorDistance(rgb, t) < minDistance);
+    const out = [];
+    for (const raw of wanted) {
+      const placeholder = PLACEHOLDER_COLORS.includes((raw || "").trim().toLowerCase());
+      const own = placeholder ? null : parseColor(raw);
+      if (own && !clashes(own)) {
+        taken.push(own);
+        out.push(raw);
+        continue;
+      }
+      const pick = palette.find((p) => !clashes(parseColor(p))) || palette[out.length % palette.length];
+      taken.push(parseColor(pick));
+      out.push(pick);
+    }
+    return out;
+  }
   function createChart({ w, h, label, cls }) {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
@@ -3078,6 +3147,10 @@ var require_chart = __commonJS((exports2, module2) => {
     areaGradient,
     arcPath,
     tip,
+    SLICE_PALETTE,
+    parseColor,
+    colorDistance,
+    distinctColors,
     RANGES,
     historicalRanges,
     rangeFor,
@@ -3087,7 +3160,7 @@ var require_chart = __commonJS((exports2, module2) => {
 
 // src/views/dashboard.js
 var require_dashboard = __commonJS((exports2, module2) => {
-  var { el } = require_util();
+  var { el, icoEl, safeSeg } = require_util();
   var { TYPE_ORDER } = require_constants();
   var {
     themeColors,
@@ -3100,12 +3173,13 @@ var require_dashboard = __commonJS((exports2, module2) => {
     areaGradient,
     arcPath,
     tip,
+    distinctColors,
     historicalRanges,
     rangeFor,
     rangePills
   } = require_chart();
   module2.exports = function registerDashboard(ctx) {
-    const { S, $, root, plugin, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
+    const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
     function renderDashboard() {
       const sum = periodSummary(S.period);
       const bud = budgetTotals(S.period);
@@ -3315,11 +3389,17 @@ var require_dashboard = __commonJS((exports2, module2) => {
       }
       const shown = spend.slice(0, SPLIT_SLICES);
       const rest = spend.slice(SPLIT_SLICES);
+      const otherColor = themeColors(root).muted;
+      const resolved = distinctColors(shown.map((x) => x.color), { reserved: [otherColor] });
+      shown.forEach((x, i) => {
+        x.color = resolved[i];
+      });
       if (rest.length) {
         shown.push({
           cat: `Other (${rest.length})`,
           amount: rest.reduce((t, x) => t + x.amount, 0),
-          color: themeColors(root).muted
+          color: otherColor,
+          other: true
         });
       }
       const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
@@ -3336,9 +3416,12 @@ var require_dashboard = __commonJS((exports2, module2) => {
           d: arcPath(cx, cy, rOut, rIn, a, a + sweep),
           fill: x.color,
           stroke: themeColors(root).hole,
-          "stroke-width": "2"
+          "stroke-width": "2",
+          class: x.other ? null : "donut-slice"
         });
         tip(add, seg, `${x.cat}: ${money(x.amount)} · ${Math.round(x.amount / total * 100)}%`);
+        if (!x.other)
+          seg.addEventListener("click", () => openCategory(x.cat));
         a += sweep;
       }
       add("text", {
@@ -3359,11 +3442,49 @@ var require_dashboard = __commonJS((exports2, module2) => {
         fill: "currentColor",
         "font-family": "inherit"
       }).textContent = money(total, 0);
-      const legend = el("ul", { class: "donut-legend" });
+      const legend = el("ul", { class: "donut-legend donut-legend--linked" });
       for (const x of shown) {
-        legend.append(el("li", {}, el("i", { style: `background:${x.color}` }), el("span", { class: "dl-name" }, x.cat), el("span", { class: "dl-val num" }, money(x.amount, 0)), el("span", { class: "dl-pct num" }, `${Math.round(x.amount / total * 100)}%`)));
+        const pct = Math.round(x.amount / total * 100);
+        const face = () => [
+          el("i", { style: `background:${x.color}` }),
+          el("span", { class: "dl-name" }, x.cat),
+          el("span", { class: "dl-val num" }, money(x.amount, 0)),
+          el("span", { class: "dl-pct num" }, `${pct}%`)
+        ];
+        if (x.other) {
+          legend.append(el("li", {}, face()));
+          continue;
+        }
+        legend.append(el("li", {}, el("button", {
+          type: "button",
+          class: "dl-link",
+          "aria-label": `${x.cat}: ${money(x.amount)}, ${pct}% of spending — show transactions`,
+          onclick: () => openCategory(x.cat)
+        }, face()), el("button", {
+          type: "button",
+          class: "dl-note",
+          "aria-label": `Open the ${x.cat} category note`,
+          title: "Open category note",
+          onclick: () => openCategoryFile(x.cat)
+        }, icoEl(["file-text", "file"]))));
       }
       wrap.append(svg, legend);
+    }
+    function openCategory(cat) {
+      ctx.switchView("transactions");
+      const sel = $("#txCategory");
+      if ([...sel.options].some((o) => o.value === cat))
+        sel.value = cat;
+      $("#txAccount").value = "";
+      $("#txSearch").value = "";
+      $("#txWholeHistory").checked = false;
+      ctx.renderTransactions();
+    }
+    async function openCategoryFile(cat) {
+      const file = fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
+      if (!file)
+        return toast(`No category note found for "${cat}"`, true);
+      await app.workspace.getLeaf("tab").openFile(file);
     }
     ctx.provide({ renderDashboard, renderTrend, renderSplit });
   };
@@ -3891,12 +4012,67 @@ var require_budgets = __commonJS((exports2, module2) => {
   };
 });
 
+// src/reconcile.js
+var require_reconcile = __commonJS((exports2, module2) => {
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var STALE_DAYS = 30;
+  function todayIso() {
+    const d = new Date;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function daysSince(iso, today) {
+    if (!ISO_DATE.test(iso || ""))
+      return null;
+    const then = new Date(`${iso}T00:00:00`);
+    if (isNaN(then.getTime()))
+      return null;
+    const now = ISO_DATE.test(today || "") ? new Date(`${today}T00:00:00`) : new Date;
+    now.setHours(0, 0, 0, 0);
+    return Math.round((now.getTime() - then.getTime()) / 86400000);
+  }
+  function isStale(iso, today) {
+    const d = daysSince(iso, today);
+    return d === null || d > STALE_DAYS;
+  }
+  function reconcile(a, rows, today) {
+    if (!rows || !rows.length)
+      return { state: "no-tx" };
+    if (!ISO_DATE.test(a.balance_updated || ""))
+      return { state: "no-date" };
+    const now = ISO_DATE.test(today || "") ? today : todayIso();
+    const since = [], ahead = [];
+    for (const r of rows) {
+      if (r.date <= a.balance_updated)
+        continue;
+      (r.date > now ? ahead : since).push(r);
+    }
+    const delta = since.reduce((s, r) => s + r.amount, 0);
+    if (!since.length) {
+      return ahead.length ? { state: "pending", ahead: ahead.length } : { state: "clean" };
+    }
+    return { state: "drift", count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
+  }
+  function stalenessSummary(accounts, today) {
+    let stale = 0, oldest = null, dated = 0;
+    for (const a of accounts || []) {
+      const d = daysSince(a.balance_updated, today);
+      if (d !== null)
+        dated++;
+      if (isStale(a.balance_updated, today))
+        stale++;
+      if (d !== null && (oldest === null || d > oldest))
+        oldest = d;
+    }
+    return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
+  }
+  module2.exports = { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile, stalenessSummary };
+});
+
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
   var { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require_util();
   var { askFields } = require_modal();
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-  var STALE_DAYS = 30;
+  var { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile } = require_reconcile();
   module2.exports = function registerAccounts(ctx) {
     const {
       S,
@@ -3948,20 +4124,6 @@ var require_accounts = __commonJS((exports2, module2) => {
         return null;
       return parseFloat(s.replace(",", ".").replace(/[^\d.-]/g, ""));
     }
-    function todayIso() {
-      const d = new Date;
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    }
-    function daysSince(iso) {
-      if (!ISO_DATE.test(iso || ""))
-        return null;
-      const then = new Date(`${iso}T00:00:00`);
-      if (isNaN(then.getTime()))
-        return null;
-      const today = new Date;
-      today.setHours(0, 0, 0, 0);
-      return Math.round((today.getTime() - then.getTime()) / 86400000);
-    }
     function accountIndex() {
       const idx = new Map;
       for (const f of Object.values(S.txFiles)) {
@@ -3978,24 +4140,6 @@ var require_accounts = __commonJS((exports2, module2) => {
           e.rows.push(r);
       }
       return idx;
-    }
-    function reconcile(a, rows) {
-      if (!rows || !rows.length)
-        return { state: "no-tx" };
-      if (!ISO_DATE.test(a.balance_updated || ""))
-        return { state: "no-date" };
-      const today = todayIso();
-      const since = [], ahead = [];
-      for (const r of rows) {
-        if (r.date <= a.balance_updated)
-          continue;
-        (r.date > today ? ahead : since).push(r);
-      }
-      const delta = since.reduce((s, r) => s + r.amount, 0);
-      if (!since.length) {
-        return ahead.length ? { state: "pending", ahead: ahead.length } : { state: "clean" };
-      }
-      return { state: "drift", count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
     }
     function periodActivity(labels) {
       let inAmt = 0, outAmt = 0, count = 0;
@@ -4179,8 +4323,7 @@ var require_accounts = __commonJS((exports2, module2) => {
         const e = idx.get(a);
         if (!e)
           return true;
-        const d = daysSince(a.balance_updated);
-        if (d === null || d > STALE_DAYS)
+        if (isStale(a.balance_updated))
           return true;
         return reconcile(a, e.rows).state === "drift";
       }).length;
@@ -4449,27 +4592,96 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
   };
 });
 
+// src/worth.js
+var require_worth = __commonJS((exports2, module2) => {
+  function activeDebts(debts) {
+    return (debts || []).filter((d) => d && d.status !== "paid");
+  }
+  function worth(accounts, debts) {
+    const list = accounts || [];
+    const assets = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
+    const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
+    const active = activeDebts(debts);
+    const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
+    const liabilities = fromAccounts + fromDebts;
+    return { assets, liabilities, fromAccounts, fromDebts, net: assets - liabilities, active };
+  }
+  function cardOverlap(accounts, debts) {
+    const cardAccounts = (accounts || []).filter((a) => a.type === "credit_card" && (a.balance || 0) < 0);
+    const cardDebts = activeDebts(debts).filter((d) => /credit\s*card/i.test(d.type || ""));
+    return cardAccounts.length && cardDebts.length ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length } : null;
+  }
+  function debtsByType(debts) {
+    const byType = new Map;
+    for (const d of activeDebts(debts)) {
+      if (!(d.balance > 0))
+        continue;
+      const k = (d.type || "").trim() || "other";
+      byType.set(k, (byType.get(k) || 0) + d.balance);
+    }
+    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  }
+  module2.exports = { worth, activeDebts, cardOverlap, debtsByType };
+});
+
 // src/views/savings.js
 var require_savings = __commonJS((exports2, module2) => {
-  var { el } = require_util();
+  var { el, icoEl } = require_util();
   var { themeColors, createChart, tip } = require_chart();
+  var { isStale, stalenessSummary } = require_reconcile();
+  var { worth, activeDebts, cardOverlap, debtsByType } = require_worth();
   module2.exports = function registerSavings(ctx) {
-    const { S, $, root, money } = ctx;
+    const { S, $, root, money, accountForLabel } = ctx;
+    function hasTransactions(a) {
+      for (const f of Object.values(S.txFiles)) {
+        if (accountForLabel(f.label) === a && f.rows && f.rows.length)
+          return true;
+      }
+      return false;
+    }
     function renderSavings() {
       const savings = S.accounts.filter((a) => a.type === "savings");
       const investments = S.accounts.filter((a) => a.type === "investment");
       const totalSavings = savings.reduce((s, a) => s + a.balance, 0);
       const totalInvest = investments.reduce((s, a) => s + a.balance, 0);
-      const netWorth = S.accounts.reduce((s, a) => s + a.balance, 0);
-      const creditDebt = S.accounts.filter((a) => a.type === "credit_card").reduce((s, a) => s + Math.min(0, a.balance), 0);
+      const w = worth(S.accounts, S.debts);
+      const netWorth = w.net;
       const kpis = $("#savingsKpis");
       kpis.empty();
-      const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
+      const tile = (l, v, cls, sub) => {
+        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
+        if (sub)
+          t.append(el("div", { class: "s" }, sub));
+        kpis.append(t);
+      };
       tile("Net worth", money(netWorth), netWorth >= 0 ? "grad-txt" : "text-danger");
       tile("Savings", money(totalSavings));
       tile("Investments", money(totalInvest));
-      tile("Credit debt", money(creditDebt), "text-danger");
+      tile("Debt", money(-w.liabilities), "text-danger", w.fromDebts && w.fromAccounts ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page` : null);
+      renderStaleNote();
       renderWorth();
+      renderGoals();
+      renderSections(savings, investments);
+    }
+    function renderStaleNote() {
+      const wrap = $("#savingsStale");
+      wrap.empty();
+      const s = stalenessSummary(S.accounts);
+      if (!s.stale)
+        return;
+      const all = s.stale === s.total;
+      const line = all ? `Built from ${s.total === 1 ? "a balance" : `${s.total} balances`} nobody has confirmed recently` : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
+      const age = s.oldestDays === null ? "none of them carry a date" : `the oldest ${s.oldestDays} days ago`;
+      const note = el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${line} — ${age}.`);
+      const btn = el("button", {
+        type: "button",
+        class: "kpi-caveat-btn",
+        "aria-label": "Review account balances on the Accounts page"
+      }, "Review balances");
+      btn.addEventListener("click", () => ctx.switchView("accounts"));
+      wrap.append(note, btn);
+    }
+    function renderGoals() {
       const withGoals = S.accounts.filter((a) => a.goal_amount);
       const goalsWrap = $("#savingsGoals");
       goalsWrap.empty();
@@ -4480,10 +4692,14 @@ var require_savings = __commonJS((exports2, module2) => {
         for (const a of withGoals) {
           const pct = Math.min(100, Math.max(0, a.balance / a.goal_amount * 100));
           const reached = a.balance >= a.goal_amount;
-          g.append(el("div", {}, el("div", { class: "goal-h" }, el("div", { class: "gn" }, a.name), el("div", { class: "gv" }, el("b", {}, money(a.balance)), " / ", money(a.goal_amount))), el("div", { class: "cat-bar" }, el("i", { class: "cat-bar-fill", style: `width:${pct}%` })), el("div", { class: "goal-pct" }, reached ? "Goal reached!" : `${Math.round(pct)}%${a.target_date ? " · target " + a.target_date : ""}`)));
+          const stale = isStale(a.balance_updated);
+          const pctLine = reached ? "Goal reached!" : `${Math.round(pct)}%${a.target_date ? " · target " + a.target_date : ""}`;
+          g.append(el("div", {}, el("div", { class: "goal-h" }, el("div", { class: "gn" }, a.name), el("div", { class: "gv" }, el("b", {}, money(a.balance)), " / ", money(a.goal_amount))), el("div", { class: `cat-bar${stale ? " cat-bar-stale" : ""}` }, el("i", { class: "cat-bar-fill", style: `width:${pct}%` })), el("div", { class: "goal-pct" }, pctLine, ...stale ? [el("span", { class: "goal-stale" }, " · balance unconfirmed")] : [])));
         }
         goalsWrap.append(g);
       }
+    }
+    function renderSections(savings, investments) {
       const wrap = $("#savingsSections");
       wrap.empty();
       for (const [title, list] of [["Savings", savings], ["Investments", investments]]) {
@@ -4498,8 +4714,14 @@ var require_savings = __commonJS((exports2, module2) => {
           const card = el("div", { class: "mini" }, el("div", { class: "l" }, a.name), el("div", { class: "v num" }, money(a.balance)), el("div", { class: "s" }, parts.filter(Boolean).join(" · ")));
           const baseline = a.total_invested || a.starting_amount;
           if (baseline) {
-            const growth = a.balance - baseline;
-            card.append(el("div", { class: `s2 num ${growth >= 0 ? "text-success" : "text-danger"}` }, `${growth >= 0 ? "▲" : "▼"} ${money(Math.abs(growth), 0)} vs ${money(baseline, 0)} in`));
+            const over = a.balance - baseline;
+            card.append(el("div", { class: `s2 num ${over >= 0 ? "text-success" : "text-danger"}` }, `${over >= 0 ? "▲" : "▼"} ${money(Math.abs(over), 0)} vs ${money(baseline, 0)} in`));
+            if (hasTransactions(a)) {
+              card.append(el("div", {
+                class: "s2 s2-caveat",
+                title: "This is the balance less what the account file records as put in — not growth. " + "Contributions since that figure was last updated are counted inside it."
+              }, "includes contributions"));
+            }
           } else if (a.inception_date) {
             card.append(el("div", { class: "s2" }, `since ${a.inception_date}`));
           }
@@ -4532,10 +4754,18 @@ var require_savings = __commonJS((exports2, module2) => {
         if (neg < 0)
           debts.push({ label, amount: -neg, color });
       }
+      const DEBT_VARS = ["--color-warning", "--color-danger", "--color-investment", "--ink-faint"];
+      const DEBT_FALLBACKS = ["#f5a524", "#f43f5e", "#6f42c1", "#5f6779"];
+      debtsByType(S.debts).forEach((d, i) => {
+        const color = (css.getPropertyValue(DEBT_VARS[i % DEBT_VARS.length]) || "").trim() || DEBT_FALLBACKS[i % DEBT_FALLBACKS.length];
+        debts.push({ label: d.type, amount: d.amount, color, fromDebtPage: true });
+      });
       const totalAssets = assets.reduce((t, x) => t + x.amount, 0);
       const totalDebts = debts.reduce((t, x) => t + x.amount, 0);
       const net = totalAssets - totalDebts;
-      $("#savingsWorthSub").textContent = "Across your accounts · the Debt page is tracked separately";
+      const active = activeDebts(S.debts);
+      const overlap = cardOverlap(S.accounts, S.debts);
+      $("#savingsWorthSub").textContent = overlap ? "Across your accounts and the Debt page · a credit card appears on both, so it may be counted twice" : active.length ? "Across your accounts and the Debt page" : "Across your accounts";
       if (!totalAssets && !totalDebts) {
         wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Add a balance to any account and the split appears here."));
         return;
@@ -6760,7 +6990,7 @@ var require_dedupe = __commonJS((exports2, module2) => {
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require_util();
+  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, counterpartyAccount, prepareRules, autoCategorise } = require_util();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
@@ -6848,7 +7078,16 @@ var require_import = __commonJS((exports2, module2) => {
           ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
         const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
         if (date && desc && amount != null && amount !== 0) {
-          items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
+          const other = counterpartyAccount(desc, S.accounts, label0);
+          items.push({
+            date,
+            desc,
+            amount: parseFloat(amount.toFixed(2)),
+            cat: autoCategorise(desc, rules),
+            include: true,
+            excluded: !!other,
+            transferTo: other ? other.tx_label || other.name : ""
+          });
         } else if (date || amount != null) {
           skipped++;
         }
@@ -7055,6 +7294,11 @@ var require_import = __commonJS((exports2, module2) => {
         })), el("td", { class: "text-muted", style: "white-space:nowrap" }, it.date), el("td", {}, it.desc, ...it.near ? [
           el("span", { class: "category-badge badge-near", title: nearWhy }, "likely dup"),
           el("div", { class: "imp-near-why" }, nearWhy)
+        ] : [], ...it.transferTo ? [
+          el("span", {
+            class: "category-badge badge-transfer",
+            title: `The description names your ${it.transferTo} account, so this looks like money moved between your own accounts rather than income or spend. Untick Exclude to count it.`
+          }, "transfer")
         ] : []), el("td", { class: `num${it.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(it.amount)), el("td", {}, it.dup ? it.cat || "" : deferredCatSelect(it.cat, (v) => {
           it.cat = v;
           it.manual = true;
