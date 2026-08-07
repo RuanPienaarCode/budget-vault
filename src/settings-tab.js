@@ -260,6 +260,11 @@ class BudgetSettingTab extends PluginSettingTab {
           // language until the next open reads as if nothing happened.
           setLanguage(v);
           await this.plugin.updateBudgetSettingsMd('language', v);
+          // Re-translate any OPEN budget view. reloadViews() re-reads the vault
+          // but does not re-mount, and the shell is translated at mount — so
+          // without this the drawer and page titles sit in the old language
+          // until the view is closed and reopened.
+          this.plugin.forEachView(ctl => ctl.applyLanguage());
           this.plugin.reloadViews();
           this.display();
         });
@@ -427,6 +432,9 @@ class BudgetSettingTab extends PluginSettingTab {
     // write, so whatever redraws next is already in the new language.
     if (key === 'language') setLanguage(raw);
     await this.plugin.updateBudgetSettingsMd(key, raw);
+    // Same as display()'s dropdown: re-translate open views in place, because
+    // reloadViews() re-reads the vault without re-mounting the shell.
+    if (key === 'language') this.plugin.forEachView(ctl => ctl.applyLanguage());
     this.plugin.reloadViews();
   }
 
