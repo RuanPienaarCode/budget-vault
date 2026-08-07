@@ -24,8 +24,18 @@
         chart that reached it and the fallback would start repeating colours —
         a regression that only shows up on a donut with enough slices.
 
+     5. It holds for EVERY palette the plugin ships, not just the default one.
+        The "Other" wedge is drawn in `--ink-faint`, which each colour preset
+        redefines, and that colour is RESERVED — nothing may be assigned near
+        it. So each preset shrinks the usable palette by a different amount,
+        and a preset whose grey happens to sit near several entries could leave
+        too few to separate eight wedges. Nobody would see that coming from the
+        preset's own definition, which looks like an ordinary muted grey.
+
    Bare node: chart.js pulls in util.js, which imports `obsidian`. */
 
+const fs = require('fs');
+const path = require('path');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
 
@@ -140,6 +150,53 @@ ok(!distinctColors(Array(6).fill('#888888'), { reserved: [GREY] }).includes(GREY
 /* An empty period draws no donut at all, but the helper must not throw on the
    way to finding that out. */
 ok(distinctColors([], { reserved: [GREY] }).length === 0, 'an empty list is an empty list');
+
+/* ------------------- 5. every palette the plugin ships ------------------- */
+/* GREY above is the default theme's --ink-faint, hard-coded so the rest of
+   this file stays readable. But the plugin ships colour presets that each
+   redefine it, so the real question is whether the donut survives ALL of them.
+   Read out of the stylesheets rather than listed here: a copy would drift the
+   first time a preset's grey was nudged, and drift silently. */
+const SRC = path.join(__dirname, '..', 'src');
+const inkFaints = file => {
+  const at = path.join(SRC, file);
+  if (!fs.existsSync(at)) return null;
+  return [...fs.readFileSync(at, 'utf8').matchAll(/--ink-faint:\s*(#[0-9a-fA-F]{3,6})/g)]
+    .map(m => ({ grey: m[1], file }));
+};
+
+const handWritten = inkFaints('styles.css');
+ok(handWritten && handWritten.length > 0,
+  'src/styles.css still defines --ink-faint (the "Other" wedge has a colour at all)');
+
+/* The presets half is BUILD OUTPUT — scripts/gen-presets.cjs writes it and
+   build.sh runs that before these tests, so in the build it is always there.
+   Tie the two together rather than skipping quietly: if the generator exists
+   the generated file must too, otherwise this guard would drop from ten
+   palettes to two without anything going red. */
+const generated = inkFaints('styles-presets.css');
+if (fs.existsSync(path.join(__dirname, '..', 'scripts', 'gen-presets.cjs'))) {
+  ok(generated !== null,
+    'scripts/gen-presets.cjs exists, so src/styles-presets.css must too — run ./build.sh');
+  ok(generated === null || generated.length > 0,
+    'the generated presets define at least one --ink-faint');
+}
+
+const palettes = [...(handWritten || []), ...(generated || [])];
+ok(palettes.length > 0, 'found at least one palette grey to test against');
+
+/* Worst case per palette: every top spender on the stamped default, so nothing
+   keeps its own colour and all eight come out of the fallback — the state in
+   which a shrunken palette runs out. */
+for (const { grey, file } of palettes) {
+  const got = distinctColors(Array(8).fill('#888888'), { reserved: [grey] });
+  const uniq = new Set(got.map(c => c.toLowerCase())).size;
+  const worst = worstSeparation(got, [grey]);
+  ok(uniq === 8, `${file} ${grey}: eight wedges get eight different colours (got ${uniq})`);
+  ok(worst >= MIN, `${file} ${grey}: worst separation ${worst.toFixed(0)} >= ${MIN}`);
+  ok(!got.some(c => c.toLowerCase() === grey.toLowerCase()),
+    `${file} ${grey}: the reserved "Other" grey is never given to a category`);
+}
 
 if (fail) {
   console.log(`\nFAIL — ${fail} of ${checks} slice-colour checks failed.`);
