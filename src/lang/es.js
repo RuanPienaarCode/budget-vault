@@ -315,4 +315,75 @@ module.exports = {
   },
   'bud.copy.nothing': 'Nada que copiar — todas las categorías ya tienen un valor',
 
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Todo el historial',
+  'tx.allAccounts': 'Todas las cuentas',
+  'tx.allCategories': 'Todas las categorías',
+  'tx.uncategorised': 'Sin categoría',
+  'tx.count.window': '{shown} de {total} filas',
+  'tx.count.all': { one: '{count} fila', other: '{count} filas' },
+
+  'tx.col.date': 'Fecha',
+  'tx.col.desc': 'Descripción',
+  'tx.col.account': 'Cuenta',
+  'tx.col.category': 'Categoría',
+  'tx.col.amount': 'Importe',
+  'tx.col.excl': 'Excl.',
+  'tx.col.note': 'Nota',
+  'tx.col.split': 'Dividir',
+
+  'tx.aria.category': 'Categoría de {date} {desc}',
+  'tx.aria.exclude': 'Excluir {desc} de los totales del presupuesto',
+  'tx.aria.note': 'Nota de {date} {desc}',
+  'tx.aria.split': 'Dividir {date} {desc} en categorías',
+  'tx.title.split': 'Dividir en categorías',
+
+  'tx.none': 'Ninguna transacción coincide.',
+  'tx.showMore': 'Mostrar {n} más de {remaining} restantes',
+
+  'tx.split.zero': 'Una línea con importe cero no tiene nada que dividir',
+  'tx.split.excluded': 'Esta línea ya está excluida — desmárcala primero',
+  'tx.split.marker': 'Dividida en {n}',
+  'tx.split.done': 'Dividida en {n} — revisa y luego guarda los cambios',
+
+  'tx.add.noAccount': 'Añade una cuenta primero — cada transacción pertenece a una',
+  'tx.add.title': 'Añadir transacción',
+  'tx.field.date': 'Fecha',
+  'tx.field.desc': 'Descripción',
+  'tx.field.descPlaceholder': 'p. ej. Efectivo — verduras en el mercado',
+  'tx.field.account': 'Cuenta',
+  'tx.field.direction': 'Dirección',
+  'tx.dir.out': 'Dinero que sale',
+  'tx.dir.in': 'Dinero que entra',
+  'tx.field.amount': 'Importe',
+  'tx.field.amountDesc': 'Siempre positivo — la dirección pone el signo',
+  'tx.field.category': 'Categoría',
+  'tx.field.none': '— ninguna —',
+  'tx.field.note': 'Nota',
+  'tx.field.notePlaceholder': 'opcional',
+
+  'tx.err.date': 'La fecha debe ser AAAA-MM-DD',
+  'tx.err.desc': 'La descripción es obligatoria',
+  'tx.err.account': 'Nombre de cuenta no válido',
+  'tx.err.amount': 'El importe debe ser un número distinto de 0',
+  'tx.err.save': 'No se pudo guardar la transacción ({error})',
+
+  'tx.saved': { one: '{count} archivo guardado', other: '{count} archivos guardados' },
+  'tx.savedLearned': { one: ' · aprendida {count} regla nueva', other: ' · aprendidas {count} reglas nuevas' },
+
+  'tx.export.dirty': 'Guarda tus cambios primero — una exportación con ediciones sin guardar no coincidiría con la bóveda',
+  'tx.export.empty': 'Nada que exportar — ninguna fila coincide con los filtros actuales',
+  'tx.export.title': 'Exportar transacciones',
+  'tx.export.folder': 'Guardar en la carpeta',
+  'tx.export.desc': {
+    one: 'Carpeta de la bóveda para la exportación. {count} fila ({range}) más {cats} categorías, como CSV y markdown.',
+    other: 'Carpeta de la bóveda para la exportación. {count} filas ({range}) más {cats} categorías, como CSV y markdown.',
+  },
+  'tx.export.failed': 'No se pudo escribir la exportación — revisa el nombre de la carpeta',
+  'tx.export.done': {
+    one: 'Exportada {count} fila y {cats} categorías a {path}/',
+    other: 'Exportadas {count} filas y {cats} categorías a {path}/',
+  },
+
 };

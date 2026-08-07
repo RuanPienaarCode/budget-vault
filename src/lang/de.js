@@ -314,4 +314,75 @@ module.exports = {
   },
   'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
 
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Gesamte Historie',
+  'tx.allAccounts': 'Alle Konten',
+  'tx.allCategories': 'Alle Kategorien',
+  'tx.uncategorised': 'Ohne Kategorie',
+  'tx.count.window': '{shown} von {total} Zeilen',
+  'tx.count.all': { one: '{count} Zeile', other: '{count} Zeilen' },
+
+  'tx.col.date': 'Datum',
+  'tx.col.desc': 'Beschreibung',
+  'tx.col.account': 'Konto',
+  'tx.col.category': 'Kategorie',
+  'tx.col.amount': 'Betrag',
+  'tx.col.excl': 'Ausg.',
+  'tx.col.note': 'Notiz',
+  'tx.col.split': 'Aufteilen',
+
+  'tx.aria.category': 'Kategorie für {date} {desc}',
+  'tx.aria.exclude': '{desc} aus den Budgetsummen ausschließen',
+  'tx.aria.note': 'Notiz zu {date} {desc}',
+  'tx.aria.split': '{date} {desc} auf Kategorien aufteilen',
+  'tx.title.split': 'Auf Kategorien aufteilen',
+
+  'tx.none': 'Keine Transaktionen passen.',
+  'tx.showMore': '{n} weitere von {remaining} verbleibenden anzeigen',
+
+  'tx.split.zero': 'Eine Zeile mit dem Betrag 0 hat nichts aufzuteilen',
+  'tx.split.excluded': 'Diese Zeile ist bereits ausgeschlossen — hake sie zuerst ab',
+  'tx.split.marker': 'Aufgeteilt auf {n}',
+  'tx.split.done': 'Auf {n} aufgeteilt — prüfen, dann Änderungen speichern',
+
+  'tx.add.noAccount': 'Lege zuerst ein Konto an — jede Transaktion gehört zu einem',
+  'tx.add.title': 'Transaktion hinzufügen',
+  'tx.field.date': 'Datum',
+  'tx.field.desc': 'Beschreibung',
+  'tx.field.descPlaceholder': 'z. B. Bargeld — Gemüse auf dem Markt',
+  'tx.field.account': 'Konto',
+  'tx.field.direction': 'Richtung',
+  'tx.dir.out': 'Geld raus',
+  'tx.dir.in': 'Geld rein',
+  'tx.field.amount': 'Betrag',
+  'tx.field.amountDesc': 'Immer positiv — die Richtung setzt das Vorzeichen',
+  'tx.field.category': 'Kategorie',
+  'tx.field.none': '— keine —',
+  'tx.field.note': 'Notiz',
+  'tx.field.notePlaceholder': 'optional',
+
+  'tx.err.date': 'Das Datum muss JJJJ-MM-TT sein',
+  'tx.err.desc': 'Eine Beschreibung ist erforderlich',
+  'tx.err.account': 'Ungültiger Kontoname',
+  'tx.err.amount': 'Der Betrag muss eine Zahl ungleich 0 sein',
+  'tx.err.save': 'Die Transaktion konnte nicht gespeichert werden ({error})',
+
+  'tx.saved': { one: '{count} Datei gespeichert', other: '{count} Dateien gespeichert' },
+  'tx.savedLearned': { one: ' · {count} neue Regel gelernt', other: ' · {count} neue Regeln gelernt' },
+
+  'tx.export.dirty': 'Speichere zuerst deine Änderungen — ein Export ungespeicherter Bearbeitungen würde nicht zum Vault passen',
+  'tx.export.empty': 'Nichts zu exportieren — keine Zeile passt zu den aktuellen Filtern',
+  'tx.export.title': 'Transaktionen exportieren',
+  'tx.export.folder': 'In Ordner speichern',
+  'tx.export.desc': {
+    one: 'Vault-Ordner für den Export. {count} Zeile ({range}) plus {cats} Kategorien, als CSV und Markdown.',
+    other: 'Vault-Ordner für den Export. {count} Zeilen ({range}) plus {cats} Kategorien, als CSV und Markdown.',
+  },
+  'tx.export.failed': 'Der Export konnte nicht geschrieben werden — prüfe den Ordnernamen',
+  'tx.export.done': {
+    one: '{count} Zeile und {cats} Kategorien nach {path}/ exportiert',
+    other: '{count} Zeilen und {cats} Kategorien nach {path}/ exportiert',
+  },
+
 };

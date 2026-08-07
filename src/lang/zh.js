@@ -312,4 +312,73 @@ module.exports = {
   },
   'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
 
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': '全部历史',
+  'tx.allAccounts': '所有账户',
+  'tx.allCategories': '所有分类',
+  'tx.uncategorised': '未分类',
+  'tx.count.window': '共 {total} 行，显示 {shown} 行',
+  'tx.count.all': { other: '{count} 行' },
+
+  'tx.col.date': '日期',
+  'tx.col.desc': '摘要',
+  'tx.col.account': '账户',
+  'tx.col.category': '分类',
+  'tx.col.amount': '金额',
+  'tx.col.excl': '排除',
+  'tx.col.note': '备注',
+  'tx.col.split': '拆分',
+
+  'tx.aria.category': '{date} {desc} 的分类',
+  'tx.aria.exclude': '把 {desc} 从预算合计中排除',
+  'tx.aria.note': '{date} {desc} 的备注',
+  'tx.aria.split': '把 {date} {desc} 拆分到多个分类',
+  'tx.title.split': '拆分到多个分类',
+
+  'tx.none': '没有符合条件的交易。',
+  'tx.showMore': '在剩余的 {remaining} 行中再显示 {n} 行',
+
+  'tx.split.zero': '金额为零的行没有可拆分的内容',
+  'tx.split.excluded': '这一行已被排除 — 请先取消勾选',
+  'tx.split.marker': '拆分为 {n} 笔',
+  'tx.split.done': '已拆分为 {n} 笔 — 请检查后保存更改',
+
+  'tx.add.noAccount': '请先添加一个账户 — 每笔交易都要归属于某个账户',
+  'tx.add.title': '添加交易',
+  'tx.field.date': '日期',
+  'tx.field.desc': '摘要',
+  'tx.field.descPlaceholder': '例如：现金 — 在市场买菜',
+  'tx.field.account': '账户',
+  'tx.field.direction': '收支方向',
+  'tx.dir.out': '支出',
+  'tx.dir.in': '收入',
+  'tx.field.amount': '金额',
+  'tx.field.amountDesc': '始终填正数 — 正负由收支方向决定',
+  'tx.field.category': '分类',
+  'tx.field.none': '— 无 —',
+  'tx.field.note': '备注',
+  'tx.field.notePlaceholder': '选填',
+
+  'tx.err.date': '日期必须为 YYYY-MM-DD',
+  'tx.err.desc': '摘要为必填项',
+  'tx.err.account': '账户名称无效',
+  'tx.err.amount': '金额必须是不等于 0 的数字',
+  'tx.err.save': '无法保存该交易（{error}）',
+
+  'tx.saved': { other: '已保存 {count} 个文件' },
+  'tx.savedLearned': { other: ' · 学习了 {count} 条新规则' },
+
+  'tx.export.dirty': '请先保存更改 — 导出未保存的编辑将与仓库内容不一致',
+  'tx.export.empty': '没有可导出的内容 — 当前筛选条件下没有匹配的行',
+  'tx.export.title': '导出交易',
+  'tx.export.folder': '保存到文件夹',
+  'tx.export.desc': {
+    other: '导出目标在仓库中的文件夹。{count} 行（{range}）以及 {cats} 个分类，导出为 CSV 和 markdown。',
+  },
+  'tx.export.failed': '无法写入导出文件 — 请检查文件夹名称',
+  'tx.export.done': {
+    other: '已把 {count} 行和 {cats} 个分类导出到 {path}/',
+  },
+
 };

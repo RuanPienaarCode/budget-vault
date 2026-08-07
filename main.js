@@ -375,7 +375,67 @@ var require_en = __commonJS((exports2, module2) => {
       one: "Copied {count} category from the previous period",
       other: "Copied {count} categories from the previous period"
     },
-    "bud.copy.nothing": "Nothing to copy — every category already has a value"
+    "bud.copy.nothing": "Nothing to copy — every category already has a value",
+    "tx.wholeHistory": "Whole history",
+    "tx.allAccounts": "All accounts",
+    "tx.allCategories": "All categories",
+    "tx.uncategorised": "Uncategorised",
+    "tx.count.window": "{shown} of {total} rows",
+    "tx.count.all": { one: "{count} row", other: "{count} rows" },
+    "tx.col.date": "Date",
+    "tx.col.desc": "Description",
+    "tx.col.account": "Account",
+    "tx.col.category": "Category",
+    "tx.col.amount": "Amount",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Note",
+    "tx.col.split": "Split",
+    "tx.aria.category": "Category for {date} {desc}",
+    "tx.aria.exclude": "Exclude {desc} from budget totals",
+    "tx.aria.note": "Note for {date} {desc}",
+    "tx.aria.split": "Split {date} {desc} into categories",
+    "tx.title.split": "Split into categories",
+    "tx.none": "No transactions match.",
+    "tx.showMore": "Show {n} more of {remaining} remaining",
+    "tx.split.zero": "A zero-amount line has nothing to split",
+    "tx.split.excluded": "This line is already excluded — untick it first",
+    "tx.split.marker": "Split into {n}",
+    "tx.split.done": "Split into {n} — review, then Save changes",
+    "tx.add.noAccount": "Add an account first — every transaction belongs to one",
+    "tx.add.title": "Add transaction",
+    "tx.field.date": "Date",
+    "tx.field.desc": "Description",
+    "tx.field.descPlaceholder": "e.g. Cash — vegetables at the market",
+    "tx.field.account": "Account",
+    "tx.field.direction": "Direction",
+    "tx.dir.out": "Money out",
+    "tx.dir.in": "Money in",
+    "tx.field.amount": "Amount",
+    "tx.field.amountDesc": "Always positive — direction sets the sign",
+    "tx.field.category": "Category",
+    "tx.field.none": "— none —",
+    "tx.field.note": "Note",
+    "tx.field.notePlaceholder": "optional",
+    "tx.err.date": "Date must be YYYY-MM-DD",
+    "tx.err.desc": "Description is required",
+    "tx.err.account": "Invalid account name",
+    "tx.err.amount": "Amount must be a number other than 0",
+    "tx.err.save": "Could not save the transaction ({error})",
+    "tx.saved": { one: "Saved {count} file", other: "Saved {count} files" },
+    "tx.savedLearned": { one: " · learned {count} new rule", other: " · learned {count} new rules" },
+    "tx.export.dirty": "Save your changes first — an export of unsaved edits would not match the vault",
+    "tx.export.empty": "Nothing to export — no rows match the current filters",
+    "tx.export.title": "Export transactions",
+    "tx.export.folder": "Save to folder",
+    "tx.export.desc": {
+      one: "Vault folder for the export. {count} row ({range}) plus {cats} categories, as CSV and markdown.",
+      other: "Vault folder for the export. {count} rows ({range}) plus {cats} categories, as CSV and markdown."
+    },
+    "tx.export.failed": "Could not write the export — check the folder name",
+    "tx.export.done": {
+      one: "Exported {count} row and {cats} categories to {path}/",
+      other: "Exported {count} rows and {cats} categories to {path}/"
+    }
   };
 });
 
@@ -623,7 +683,67 @@ var require_af = __commonJS((exports2, module2) => {
       one: "{count} kategorie uit die vorige tydperk gekopieer",
       other: "{count} kategorieë uit die vorige tydperk gekopieer"
     },
-    "bud.copy.nothing": "Niks om te kopieer nie — elke kategorie het reeds 'n waarde"
+    "bud.copy.nothing": "Niks om te kopieer nie — elke kategorie het reeds 'n waarde",
+    "tx.wholeHistory": "Hele geskiedenis",
+    "tx.allAccounts": "Alle rekeninge",
+    "tx.allCategories": "Alle kategorieë",
+    "tx.uncategorised": "Ongekategoriseer",
+    "tx.count.window": "{shown} van {total} rye",
+    "tx.count.all": { one: "{count} ry", other: "{count} rye" },
+    "tx.col.date": "Datum",
+    "tx.col.desc": "Beskrywing",
+    "tx.col.account": "Rekening",
+    "tx.col.category": "Kategorie",
+    "tx.col.amount": "Bedrag",
+    "tx.col.excl": "Uitgesl.",
+    "tx.col.note": "Nota",
+    "tx.col.split": "Verdeel",
+    "tx.aria.category": "Kategorie vir {date} {desc}",
+    "tx.aria.exclude": "Sluit {desc} uit begrotingstotale uit",
+    "tx.aria.note": "Nota vir {date} {desc}",
+    "tx.aria.split": "Verdeel {date} {desc} in kategorieë",
+    "tx.title.split": "Verdeel in kategorieë",
+    "tx.none": "Geen transaksies pas nie.",
+    "tx.showMore": "Wys {n} meer van {remaining} wat oorbly",
+    "tx.split.zero": "'n Reël met 'n nulbedrag het niks om te verdeel nie",
+    "tx.split.excluded": "Hierdie reël is reeds uitgesluit — ontmerk dit eers",
+    "tx.split.marker": "Verdeel in {n}",
+    "tx.split.done": "Verdeel in {n} — gaan na, en stoor dan die veranderinge",
+    "tx.add.noAccount": "Voeg eers 'n rekening by — elke transaksie hoort by een",
+    "tx.add.title": "Voeg transaksie by",
+    "tx.field.date": "Datum",
+    "tx.field.desc": "Beskrywing",
+    "tx.field.descPlaceholder": "bv. Kontant — groente by die mark",
+    "tx.field.account": "Rekening",
+    "tx.field.direction": "Rigting",
+    "tx.dir.out": "Geld uit",
+    "tx.dir.in": "Geld in",
+    "tx.field.amount": "Bedrag",
+    "tx.field.amountDesc": "Altyd positief — die rigting bepaal die teken",
+    "tx.field.category": "Kategorie",
+    "tx.field.none": "— geen —",
+    "tx.field.note": "Nota",
+    "tx.field.notePlaceholder": "opsioneel",
+    "tx.err.date": "Datum moet JJJJ-MM-DD wees",
+    "tx.err.desc": "Beskrywing is verpligtend",
+    "tx.err.account": "Ongeldige rekeningnaam",
+    "tx.err.amount": "Bedrag moet 'n getal anders as 0 wees",
+    "tx.err.save": "Kon nie die transaksie stoor nie ({error})",
+    "tx.saved": { one: "{count} lêer gestoor", other: "{count} lêers gestoor" },
+    "tx.savedLearned": { one: " · {count} nuwe reël geleer", other: " · {count} nuwe reëls geleer" },
+    "tx.export.dirty": "Stoor eers jou veranderinge — 'n uitvoer van ongestoorde wysigings sal nie by die kluis pas nie",
+    "tx.export.empty": "Niks om uit te voer nie — geen rye pas by die huidige filters nie",
+    "tx.export.title": "Voer transaksies uit",
+    "tx.export.folder": "Stoor na vouer",
+    "tx.export.desc": {
+      one: "Kluisvouer vir die uitvoer. {count} ry ({range}) plus {cats} kategorieë, as CSV en markdown.",
+      other: "Kluisvouer vir die uitvoer. {count} rye ({range}) plus {cats} kategorieë, as CSV en markdown."
+    },
+    "tx.export.failed": "Kon nie die uitvoer skryf nie — kyk na die vouernaam",
+    "tx.export.done": {
+      one: "{count} ry en {cats} kategorieë na {path}/ uitgevoer",
+      other: "{count} rye en {cats} kategorieë na {path}/ uitgevoer"
+    }
   };
 });
 
@@ -871,7 +991,67 @@ var require_de = __commonJS((exports2, module2) => {
       one: "{count} Kategorie aus dem vorherigen Zeitraum kopiert",
       other: "{count} Kategorien aus dem vorherigen Zeitraum kopiert"
     },
-    "bud.copy.nothing": "Nichts zu kopieren — jede Kategorie hat bereits einen Wert"
+    "bud.copy.nothing": "Nichts zu kopieren — jede Kategorie hat bereits einen Wert",
+    "tx.wholeHistory": "Gesamte Historie",
+    "tx.allAccounts": "Alle Konten",
+    "tx.allCategories": "Alle Kategorien",
+    "tx.uncategorised": "Ohne Kategorie",
+    "tx.count.window": "{shown} von {total} Zeilen",
+    "tx.count.all": { one: "{count} Zeile", other: "{count} Zeilen" },
+    "tx.col.date": "Datum",
+    "tx.col.desc": "Beschreibung",
+    "tx.col.account": "Konto",
+    "tx.col.category": "Kategorie",
+    "tx.col.amount": "Betrag",
+    "tx.col.excl": "Ausg.",
+    "tx.col.note": "Notiz",
+    "tx.col.split": "Aufteilen",
+    "tx.aria.category": "Kategorie für {date} {desc}",
+    "tx.aria.exclude": "{desc} aus den Budgetsummen ausschließen",
+    "tx.aria.note": "Notiz zu {date} {desc}",
+    "tx.aria.split": "{date} {desc} auf Kategorien aufteilen",
+    "tx.title.split": "Auf Kategorien aufteilen",
+    "tx.none": "Keine Transaktionen passen.",
+    "tx.showMore": "{n} weitere von {remaining} verbleibenden anzeigen",
+    "tx.split.zero": "Eine Zeile mit dem Betrag 0 hat nichts aufzuteilen",
+    "tx.split.excluded": "Diese Zeile ist bereits ausgeschlossen — hake sie zuerst ab",
+    "tx.split.marker": "Aufgeteilt auf {n}",
+    "tx.split.done": "Auf {n} aufgeteilt — prüfen, dann Änderungen speichern",
+    "tx.add.noAccount": "Lege zuerst ein Konto an — jede Transaktion gehört zu einem",
+    "tx.add.title": "Transaktion hinzufügen",
+    "tx.field.date": "Datum",
+    "tx.field.desc": "Beschreibung",
+    "tx.field.descPlaceholder": "z. B. Bargeld — Gemüse auf dem Markt",
+    "tx.field.account": "Konto",
+    "tx.field.direction": "Richtung",
+    "tx.dir.out": "Geld raus",
+    "tx.dir.in": "Geld rein",
+    "tx.field.amount": "Betrag",
+    "tx.field.amountDesc": "Immer positiv — die Richtung setzt das Vorzeichen",
+    "tx.field.category": "Kategorie",
+    "tx.field.none": "— keine —",
+    "tx.field.note": "Notiz",
+    "tx.field.notePlaceholder": "optional",
+    "tx.err.date": "Das Datum muss JJJJ-MM-TT sein",
+    "tx.err.desc": "Eine Beschreibung ist erforderlich",
+    "tx.err.account": "Ungültiger Kontoname",
+    "tx.err.amount": "Der Betrag muss eine Zahl ungleich 0 sein",
+    "tx.err.save": "Die Transaktion konnte nicht gespeichert werden ({error})",
+    "tx.saved": { one: "{count} Datei gespeichert", other: "{count} Dateien gespeichert" },
+    "tx.savedLearned": { one: " · {count} neue Regel gelernt", other: " · {count} neue Regeln gelernt" },
+    "tx.export.dirty": "Speichere zuerst deine Änderungen — ein Export ungespeicherter Bearbeitungen würde nicht zum Vault passen",
+    "tx.export.empty": "Nichts zu exportieren — keine Zeile passt zu den aktuellen Filtern",
+    "tx.export.title": "Transaktionen exportieren",
+    "tx.export.folder": "In Ordner speichern",
+    "tx.export.desc": {
+      one: "Vault-Ordner für den Export. {count} Zeile ({range}) plus {cats} Kategorien, als CSV und Markdown.",
+      other: "Vault-Ordner für den Export. {count} Zeilen ({range}) plus {cats} Kategorien, als CSV und Markdown."
+    },
+    "tx.export.failed": "Der Export konnte nicht geschrieben werden — prüfe den Ordnernamen",
+    "tx.export.done": {
+      one: "{count} Zeile und {cats} Kategorien nach {path}/ exportiert",
+      other: "{count} Zeilen und {cats} Kategorien nach {path}/ exportiert"
+    }
   };
 });
 
@@ -1119,7 +1299,67 @@ var require_es = __commonJS((exports2, module2) => {
       one: "Copiada {count} categoría del periodo anterior",
       other: "Copiadas {count} categorías del periodo anterior"
     },
-    "bud.copy.nothing": "Nada que copiar — todas las categorías ya tienen un valor"
+    "bud.copy.nothing": "Nada que copiar — todas las categorías ya tienen un valor",
+    "tx.wholeHistory": "Todo el historial",
+    "tx.allAccounts": "Todas las cuentas",
+    "tx.allCategories": "Todas las categorías",
+    "tx.uncategorised": "Sin categoría",
+    "tx.count.window": "{shown} de {total} filas",
+    "tx.count.all": { one: "{count} fila", other: "{count} filas" },
+    "tx.col.date": "Fecha",
+    "tx.col.desc": "Descripción",
+    "tx.col.account": "Cuenta",
+    "tx.col.category": "Categoría",
+    "tx.col.amount": "Importe",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Nota",
+    "tx.col.split": "Dividir",
+    "tx.aria.category": "Categoría de {date} {desc}",
+    "tx.aria.exclude": "Excluir {desc} de los totales del presupuesto",
+    "tx.aria.note": "Nota de {date} {desc}",
+    "tx.aria.split": "Dividir {date} {desc} en categorías",
+    "tx.title.split": "Dividir en categorías",
+    "tx.none": "Ninguna transacción coincide.",
+    "tx.showMore": "Mostrar {n} más de {remaining} restantes",
+    "tx.split.zero": "Una línea con importe cero no tiene nada que dividir",
+    "tx.split.excluded": "Esta línea ya está excluida — desmárcala primero",
+    "tx.split.marker": "Dividida en {n}",
+    "tx.split.done": "Dividida en {n} — revisa y luego guarda los cambios",
+    "tx.add.noAccount": "Añade una cuenta primero — cada transacción pertenece a una",
+    "tx.add.title": "Añadir transacción",
+    "tx.field.date": "Fecha",
+    "tx.field.desc": "Descripción",
+    "tx.field.descPlaceholder": "p. ej. Efectivo — verduras en el mercado",
+    "tx.field.account": "Cuenta",
+    "tx.field.direction": "Dirección",
+    "tx.dir.out": "Dinero que sale",
+    "tx.dir.in": "Dinero que entra",
+    "tx.field.amount": "Importe",
+    "tx.field.amountDesc": "Siempre positivo — la dirección pone el signo",
+    "tx.field.category": "Categoría",
+    "tx.field.none": "— ninguna —",
+    "tx.field.note": "Nota",
+    "tx.field.notePlaceholder": "opcional",
+    "tx.err.date": "La fecha debe ser AAAA-MM-DD",
+    "tx.err.desc": "La descripción es obligatoria",
+    "tx.err.account": "Nombre de cuenta no válido",
+    "tx.err.amount": "El importe debe ser un número distinto de 0",
+    "tx.err.save": "No se pudo guardar la transacción ({error})",
+    "tx.saved": { one: "{count} archivo guardado", other: "{count} archivos guardados" },
+    "tx.savedLearned": { one: " · aprendida {count} regla nueva", other: " · aprendidas {count} reglas nuevas" },
+    "tx.export.dirty": "Guarda tus cambios primero — una exportación con ediciones sin guardar no coincidiría con la bóveda",
+    "tx.export.empty": "Nada que exportar — ninguna fila coincide con los filtros actuales",
+    "tx.export.title": "Exportar transacciones",
+    "tx.export.folder": "Guardar en la carpeta",
+    "tx.export.desc": {
+      one: "Carpeta de la bóveda para la exportación. {count} fila ({range}) más {cats} categorías, como CSV y markdown.",
+      other: "Carpeta de la bóveda para la exportación. {count} filas ({range}) más {cats} categorías, como CSV y markdown."
+    },
+    "tx.export.failed": "No se pudo escribir la exportación — revisa el nombre de la carpeta",
+    "tx.export.done": {
+      one: "Exportada {count} fila y {cats} categorías a {path}/",
+      other: "Exportadas {count} filas y {cats} categorías a {path}/"
+    }
   };
 });
 
@@ -1367,7 +1607,67 @@ var require_fr = __commonJS((exports2, module2) => {
       one: "{count} catégorie copiée depuis la période précédente",
       other: "{count} catégories copiées depuis la période précédente"
     },
-    "bud.copy.nothing": "Rien à copier — chaque catégorie a déjà une valeur"
+    "bud.copy.nothing": "Rien à copier — chaque catégorie a déjà une valeur",
+    "tx.wholeHistory": "Tout l'historique",
+    "tx.allAccounts": "Tous les comptes",
+    "tx.allCategories": "Toutes les catégories",
+    "tx.uncategorised": "Sans catégorie",
+    "tx.count.window": "{shown} sur {total} lignes",
+    "tx.count.all": { one: "{count} ligne", other: "{count} lignes" },
+    "tx.col.date": "Date",
+    "tx.col.desc": "Description",
+    "tx.col.account": "Compte",
+    "tx.col.category": "Catégorie",
+    "tx.col.amount": "Montant",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Note",
+    "tx.col.split": "Répartir",
+    "tx.aria.category": "Catégorie pour {date} {desc}",
+    "tx.aria.exclude": "Exclure {desc} des totaux du budget",
+    "tx.aria.note": "Note pour {date} {desc}",
+    "tx.aria.split": "Répartir {date} {desc} en catégories",
+    "tx.title.split": "Répartir en catégories",
+    "tx.none": "Aucune transaction ne correspond.",
+    "tx.showMore": "Afficher {n} de plus sur {remaining} restantes",
+    "tx.split.zero": "Une ligne à zéro n'a rien à répartir",
+    "tx.split.excluded": "Cette ligne est déjà exclue — décochez-la d'abord",
+    "tx.split.marker": "Répartie en {n}",
+    "tx.split.done": "Répartie en {n} — vérifiez, puis enregistrez les modifications",
+    "tx.add.noAccount": "Ajoutez d'abord un compte — chaque transaction appartient à un compte",
+    "tx.add.title": "Ajouter une transaction",
+    "tx.field.date": "Date",
+    "tx.field.desc": "Description",
+    "tx.field.descPlaceholder": "par ex. Espèces — légumes au marché",
+    "tx.field.account": "Compte",
+    "tx.field.direction": "Sens",
+    "tx.dir.out": "Argent sortant",
+    "tx.dir.in": "Argent entrant",
+    "tx.field.amount": "Montant",
+    "tx.field.amountDesc": "Toujours positif — le sens donne le signe",
+    "tx.field.category": "Catégorie",
+    "tx.field.none": "— aucune —",
+    "tx.field.note": "Note",
+    "tx.field.notePlaceholder": "facultatif",
+    "tx.err.date": "La date doit être au format AAAA-MM-JJ",
+    "tx.err.desc": "La description est obligatoire",
+    "tx.err.account": "Nom de compte invalide",
+    "tx.err.amount": "Le montant doit être un nombre différent de 0",
+    "tx.err.save": "Impossible d'enregistrer la transaction ({error})",
+    "tx.saved": { one: "{count} fichier enregistré", other: "{count} fichiers enregistrés" },
+    "tx.savedLearned": { one: " · {count} nouvelle règle apprise", other: " · {count} nouvelles règles apprises" },
+    "tx.export.dirty": "Enregistrez d'abord vos modifications — un export de modifications non enregistrées ne correspondrait pas au coffre",
+    "tx.export.empty": "Rien à exporter — aucune ligne ne correspond aux filtres actuels",
+    "tx.export.title": "Exporter les transactions",
+    "tx.export.folder": "Enregistrer dans le dossier",
+    "tx.export.desc": {
+      one: "Dossier du coffre pour l'export. {count} ligne ({range}) plus {cats} catégories, en CSV et markdown.",
+      other: "Dossier du coffre pour l'export. {count} lignes ({range}) plus {cats} catégories, en CSV et markdown."
+    },
+    "tx.export.failed": "Impossible d'écrire l'export — vérifiez le nom du dossier",
+    "tx.export.done": {
+      one: "{count} ligne et {cats} catégories exportées vers {path}/",
+      other: "{count} lignes et {cats} catégories exportées vers {path}/"
+    }
   };
 });
 
@@ -1609,7 +1909,65 @@ var require_ja = __commonJS((exports2, module2) => {
     "bud.copy.done": {
       other: "前の期間から {count} 件のカテゴリをコピーしました"
     },
-    "bud.copy.nothing": "コピーするものがありません — すべてのカテゴリにすでに値があります"
+    "bud.copy.nothing": "コピーするものがありません — すべてのカテゴリにすでに値があります",
+    "tx.wholeHistory": "全期間",
+    "tx.allAccounts": "すべての口座",
+    "tx.allCategories": "すべてのカテゴリ",
+    "tx.uncategorised": "カテゴリなし",
+    "tx.count.window": "{total} 行中 {shown} 行",
+    "tx.count.all": { other: "{count} 行" },
+    "tx.col.date": "日付",
+    "tx.col.desc": "摘要",
+    "tx.col.account": "口座",
+    "tx.col.category": "カテゴリ",
+    "tx.col.amount": "金額",
+    "tx.col.excl": "除外",
+    "tx.col.note": "メモ",
+    "tx.col.split": "分割",
+    "tx.aria.category": "{date} {desc} のカテゴリ",
+    "tx.aria.exclude": "{desc} を予算の合計から除外",
+    "tx.aria.note": "{date} {desc} のメモ",
+    "tx.aria.split": "{date} {desc} をカテゴリに分割",
+    "tx.title.split": "カテゴリに分割",
+    "tx.none": "該当する取引はありません。",
+    "tx.showMore": "残り {remaining} 件のうち {n} 件を表示",
+    "tx.split.zero": "金額が 0 の行には分割するものがありません",
+    "tx.split.excluded": "この行はすでに除外されています — まずチェックを外してください",
+    "tx.split.marker": "{n} 件に分割",
+    "tx.split.done": "{n} 件に分割しました — 確認してから変更を保存してください",
+    "tx.add.noAccount": "先に口座を追加してください — 取引は必ずいずれかの口座に属します",
+    "tx.add.title": "取引を追加",
+    "tx.field.date": "日付",
+    "tx.field.desc": "摘要",
+    "tx.field.descPlaceholder": "例: 現金 — 市場で野菜",
+    "tx.field.account": "口座",
+    "tx.field.direction": "入出金",
+    "tx.dir.out": "出金",
+    "tx.dir.in": "入金",
+    "tx.field.amount": "金額",
+    "tx.field.amountDesc": "常に正の数で — 符号は入出金の向きで決まります",
+    "tx.field.category": "カテゴリ",
+    "tx.field.none": "— なし —",
+    "tx.field.note": "メモ",
+    "tx.field.notePlaceholder": "任意",
+    "tx.err.date": "日付は YYYY-MM-DD 形式で入力してください",
+    "tx.err.desc": "摘要は必須です",
+    "tx.err.account": "口座名が正しくありません",
+    "tx.err.amount": "金額は 0 以外の数値にしてください",
+    "tx.err.save": "取引を保存できませんでした（{error}）",
+    "tx.saved": { other: "{count} 件のファイルを保存しました" },
+    "tx.savedLearned": { other: " · 新しいルールを {count} 件学習しました" },
+    "tx.export.dirty": "先に変更を保存してください — 未保存の編集を書き出すと保管庫の内容と一致しません",
+    "tx.export.empty": "書き出すものがありません — 現在の絞り込みに該当する行がありません",
+    "tx.export.title": "取引を書き出す",
+    "tx.export.folder": "保存先フォルダ",
+    "tx.export.desc": {
+      other: "書き出し先の保管庫内フォルダ。{count} 行（{range}）とカテゴリ {cats} 件を、CSV とマークダウンで書き出します。"
+    },
+    "tx.export.failed": "書き出しに失敗しました — フォルダ名を確認してください",
+    "tx.export.done": {
+      other: "{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました"
+    }
   };
 });
 
@@ -1851,7 +2209,65 @@ var require_zh = __commonJS((exports2, module2) => {
     "bud.copy.done": {
       other: "已从上一周期复制 {count} 个分类"
     },
-    "bud.copy.nothing": "没有可复制的内容 — 每个分类都已有数值"
+    "bud.copy.nothing": "没有可复制的内容 — 每个分类都已有数值",
+    "tx.wholeHistory": "全部历史",
+    "tx.allAccounts": "所有账户",
+    "tx.allCategories": "所有分类",
+    "tx.uncategorised": "未分类",
+    "tx.count.window": "共 {total} 行，显示 {shown} 行",
+    "tx.count.all": { other: "{count} 行" },
+    "tx.col.date": "日期",
+    "tx.col.desc": "摘要",
+    "tx.col.account": "账户",
+    "tx.col.category": "分类",
+    "tx.col.amount": "金额",
+    "tx.col.excl": "排除",
+    "tx.col.note": "备注",
+    "tx.col.split": "拆分",
+    "tx.aria.category": "{date} {desc} 的分类",
+    "tx.aria.exclude": "把 {desc} 从预算合计中排除",
+    "tx.aria.note": "{date} {desc} 的备注",
+    "tx.aria.split": "把 {date} {desc} 拆分到多个分类",
+    "tx.title.split": "拆分到多个分类",
+    "tx.none": "没有符合条件的交易。",
+    "tx.showMore": "在剩余的 {remaining} 行中再显示 {n} 行",
+    "tx.split.zero": "金额为零的行没有可拆分的内容",
+    "tx.split.excluded": "这一行已被排除 — 请先取消勾选",
+    "tx.split.marker": "拆分为 {n} 笔",
+    "tx.split.done": "已拆分为 {n} 笔 — 请检查后保存更改",
+    "tx.add.noAccount": "请先添加一个账户 — 每笔交易都要归属于某个账户",
+    "tx.add.title": "添加交易",
+    "tx.field.date": "日期",
+    "tx.field.desc": "摘要",
+    "tx.field.descPlaceholder": "例如：现金 — 在市场买菜",
+    "tx.field.account": "账户",
+    "tx.field.direction": "收支方向",
+    "tx.dir.out": "支出",
+    "tx.dir.in": "收入",
+    "tx.field.amount": "金额",
+    "tx.field.amountDesc": "始终填正数 — 正负由收支方向决定",
+    "tx.field.category": "分类",
+    "tx.field.none": "— 无 —",
+    "tx.field.note": "备注",
+    "tx.field.notePlaceholder": "选填",
+    "tx.err.date": "日期必须为 YYYY-MM-DD",
+    "tx.err.desc": "摘要为必填项",
+    "tx.err.account": "账户名称无效",
+    "tx.err.amount": "金额必须是不等于 0 的数字",
+    "tx.err.save": "无法保存该交易（{error}）",
+    "tx.saved": { other: "已保存 {count} 个文件" },
+    "tx.savedLearned": { other: " · 学习了 {count} 条新规则" },
+    "tx.export.dirty": "请先保存更改 — 导出未保存的编辑将与仓库内容不一致",
+    "tx.export.empty": "没有可导出的内容 — 当前筛选条件下没有匹配的行",
+    "tx.export.title": "导出交易",
+    "tx.export.folder": "保存到文件夹",
+    "tx.export.desc": {
+      other: "导出目标在仓库中的文件夹。{count} 行（{range}）以及 {cats} 个分类，导出为 CSV 和 markdown。"
+    },
+    "tx.export.failed": "无法写入导出文件 — 请检查文件夹名称",
+    "tx.export.done": {
+      other: "已把 {count} 行和 {cats} 个分类导出到 {path}/"
+    }
   };
 });
 
@@ -5698,6 +6114,7 @@ var require_transactions = __commonJS((exports2, module2) => {
   var { askFields, askSplit } = require_modal();
   var { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require_exporter();
   var { ISO_DATE, todayIso } = require_dates();
+  var i18n = require_i18n();
   module2.exports = function registerTransactions(ctx) {
     const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
@@ -5728,12 +6145,12 @@ var require_transactions = __commonJS((exports2, module2) => {
       return {
         rows,
         token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
-        range: whole ? "Whole history" : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+        range: whole ? i18n.t("tx.wholeHistory") : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
         filters
       };
     }
     function renderTransactions() {
-      $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+      $("#txSubNote").textContent = $("#txWholeHistory").checked ? i18n.t("tx.wholeHistory") : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const syncOptions = (sel, values, fixed) => {
         const current = [...sel.options].slice(fixed.length).map((o) => o.value);
         if (current.length === values.length && current.every((v, i) => v === values[i]))
@@ -5746,8 +6163,8 @@ var require_transactions = __commonJS((exports2, module2) => {
           sel.append(el("option", { value: v }, v));
         sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "";
       };
-      syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", "All accounts"]]);
-      syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", "All categories"], ["__none__", "Uncategorised"]]);
+      syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", i18n.t("tx.allAccounts")]]);
+      syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", i18n.t("tx.allCategories")], ["__none__", i18n.t("tx.uncategorised")]]);
       const { rows: filtered, token: renderToken } = filteredRows();
       let list = filtered;
       const total = list.length;
@@ -5756,11 +6173,11 @@ var require_transactions = __commonJS((exports2, module2) => {
         shownFor = renderToken;
       }
       const visible = list.slice(0, shown);
-      $("#txCount").textContent = total > visible.length ? `${visible.length} of ${total} rows` : `${total} rows`;
+      $("#txCount").textContent = total > visible.length ? i18n.t("tx.count.window", { shown: visible.length, total }) : i18n.t("tx.count.all", { count: total });
       list = visible;
       const t = $("#txTable");
       t.empty();
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"), el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Split")))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, i18n.t("tx.col.date")), el("th", { scope: "col" }, i18n.t("tx.col.desc")), el("th", { scope: "col" }, i18n.t("tx.col.account")), el("th", { scope: "col" }, i18n.t("tx.col.category")), el("th", { scope: "col", class: "num" }, i18n.t("tx.col.amount")), el("th", { scope: "col" }, i18n.t("tx.col.excl")), el("th", { scope: "col" }, i18n.t("tx.col.note")), el("th", { scope: "col" }, el("span", { class: "sr-only" }, i18n.t("tx.col.split"))))));
       const body = el("tbody", {});
       for (const item of list) {
         const r = item._row;
@@ -5775,9 +6192,9 @@ var require_transactions = __commonJS((exports2, module2) => {
           else
             pendingLearns.delete(r.desc);
           mark();
-        }, `Category for ${r.date} ${r.desc}`)), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", {
+        }, i18n.t("tx.aria.category", { date: r.date, desc: r.desc }))), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", {
           type: "checkbox",
-          "aria-label": `Exclude ${r.desc} from budget totals`,
+          "aria-label": i18n.t("tx.aria.exclude", { desc: r.desc }),
           ...r.excluded ? { checked: "" } : {},
           onchange: (e) => {
             r.excluded = e.target.checked;
@@ -5788,7 +6205,7 @@ var require_transactions = __commonJS((exports2, module2) => {
           class: "form-control form-control-sm",
           value: r.note,
           style: "width:130px",
-          "aria-label": `Note for ${r.date} ${r.desc}`,
+          "aria-label": i18n.t("tx.aria.note", { date: r.date, desc: r.desc }),
           onchange: (e) => {
             r.note = e.target.value;
             mark();
@@ -5796,9 +6213,9 @@ var require_transactions = __commonJS((exports2, module2) => {
         })), el("td", {}, splitButton(item))));
       }
       if (!list.length)
-        body.append(el("tr", {}, el("td", { colspan: "8", class: "text-muted" }, "No transactions match.")));
+        body.append(el("tr", {}, el("td", { colspan: "8", class: "text-muted" }, i18n.t("tx.none"))));
       if (total > list.length) {
-        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
+        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, i18n.t("tx.showMore", { n: Math.min(PAGE, total - list.length), remaining: total - list.length }));
         more.addEventListener("click", () => {
           shown += PAGE;
           renderTransactions();
@@ -5812,8 +6229,8 @@ var require_transactions = __commonJS((exports2, module2) => {
       const b = el("button", {
         type: "button",
         class: "btn-ghost btn-ghost-sm",
-        "aria-label": `Split ${r.date} ${r.desc} into categories`,
-        title: "Split into categories"
+        "aria-label": i18n.t("tx.aria.split", { date: r.date, desc: r.desc }),
+        title: i18n.t("tx.title.split")
       }, icoEl(["split", "git-fork", "scissors"]));
       b.addEventListener("click", () => splitTransaction(item));
       return b;
@@ -5821,9 +6238,9 @@ var require_transactions = __commonJS((exports2, module2) => {
     async function splitTransaction(item) {
       const r = item._row;
       if (!r.amount)
-        return toast("A zero-amount line has nothing to split", true);
+        return toast(i18n.t("tx.split.zero"), true);
       if (r.excluded)
-        return toast("This line is already excluded — untick it first", true);
+        return toast(i18n.t("tx.split.excluded"), true);
       const parts = await askSplit(app, {
         tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
         categories: S.categories.map((c) => c.name),
@@ -5840,13 +6257,13 @@ var require_transactions = __commonJS((exports2, module2) => {
         note: p.note
       }));
       r.excluded = true;
-      const marker = `Split into ${rows.length}`;
+      const marker = i18n.t("tx.split.marker", { n: rows.length });
       r.note = r.note ? `${r.note} · ${marker}` : marker;
       item._file.rows.push(...rows);
       item._file.dirty = true;
       $("#txSave").disabled = false;
       renderTransactions();
-      toast(`Split into ${rows.length} — review, then Save changes`);
+      toast(i18n.t("tx.split.done", { n: rows.length }));
     }
     function serializeTxFile(f) {
       const fm = patchFrontmatter(f.fmRaw || "", { account: yamlStr(f.label), month: f.month });
@@ -5873,36 +6290,36 @@ var require_transactions = __commonJS((exports2, module2) => {
         ...Object.values(S.txFiles).map((f) => f.label)
       ])].sort();
       if (!labels.length)
-        return toast("Add an account first — every transaction belongs to one", true);
-      const r = await askFields(app, "Add transaction", [
-        { key: "date", label: "Date", type: "date", value: todayIso() },
-        { key: "desc", label: "Description", type: "text", placeholder: "e.g. Cash — vegetables at the market" },
-        { key: "label", label: "Account", type: "select", options: labels, value: $("#txAccount").value || labels[0] },
-        { key: "dir", label: "Direction", type: "select", value: "out", options: [
-          { value: "out", label: "Money out" },
-          { value: "in", label: "Money in" }
+        return toast(i18n.t("tx.add.noAccount"), true);
+      const r = await askFields(app, i18n.t("tx.add.title"), [
+        { key: "date", label: i18n.t("tx.field.date"), type: "date", value: todayIso() },
+        { key: "desc", label: i18n.t("tx.field.desc"), type: "text", placeholder: i18n.t("tx.field.descPlaceholder") },
+        { key: "label", label: i18n.t("tx.field.account"), type: "select", options: labels, value: $("#txAccount").value || labels[0] },
+        { key: "dir", label: i18n.t("tx.field.direction"), type: "select", value: "out", options: [
+          { value: "out", label: i18n.t("tx.dir.out") },
+          { value: "in", label: i18n.t("tx.dir.in") }
         ] },
-        { key: "amount", label: "Amount", type: "number", placeholder: "0.00", desc: "Always positive — direction sets the sign" },
-        { key: "cat", label: "Category", type: "select", options: [
-          { value: "", label: "— none —" },
+        { key: "amount", label: i18n.t("tx.field.amount"), type: "number", placeholder: "0.00", desc: i18n.t("tx.field.amountDesc") },
+        { key: "cat", label: i18n.t("tx.field.category"), type: "select", options: [
+          { value: "", label: i18n.t("tx.field.none") },
           ...S.categories.map((c) => ({ value: c.name, label: c.name }))
         ], value: "" },
-        { key: "note", label: "Note", type: "text", placeholder: "optional" }
+        { key: "note", label: i18n.t("tx.field.note"), type: "text", placeholder: i18n.t("tx.field.notePlaceholder") }
       ]);
       if (!r)
         return;
       const date = r.date.trim();
       if (!ISO_DATE.test(date))
-        return toast("Date must be YYYY-MM-DD", true);
+        return toast(i18n.t("tx.err.date"), true);
       const desc = r.desc.trim();
       if (!desc)
-        return toast("Description is required", true);
+        return toast(i18n.t("tx.err.desc"), true);
       const label = txSegment(r.label);
       if (!label)
-        return toast("Invalid account name", true);
+        return toast(i18n.t("tx.err.account"), true);
       let amount = normalizeAmount(r.amount);
       if (amount == null || amount === 0)
-        return toast("Amount must be a number other than 0", true);
+        return toast(i18n.t("tx.err.amount"), true);
       amount = parseFloat((r.dir === "in" ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
       const month = date.slice(0, 7);
       const key = `${label}/${month}`;
@@ -5913,7 +6330,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       try {
         await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
       } catch (err) {
-        return toast(`Could not save the transaction (${err.message || err})`, true);
+        return toast(i18n.t("tx.err.save", { error: err.message || err }), true);
       }
       if (!S.txFiles[key])
         S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
@@ -5936,19 +6353,19 @@ var require_transactions = __commonJS((exports2, module2) => {
         pendingLearns.clear();
       }
       clearSaveButton();
-      toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
+      toast(i18n.t("tx.saved", { count: n }) + (learned ? i18n.t("tx.savedLearned", { count: learned }) : ""));
     }
     async function exportTransactions() {
       if (Object.values(S.txFiles).some((f) => f.dirty)) {
-        return toast("Save your changes first — an export of unsaved edits would not match the vault", true);
+        return toast(i18n.t("tx.export.dirty"), true);
       }
       const { rows, range, filters } = filteredRows();
       if (!rows.length)
-        return toast("Nothing to export — no rows match the current filters", true);
-      const answer = await askFields(app, "Export transactions", [{
+        return toast(i18n.t("tx.export.empty"), true);
+      const answer = await askFields(app, i18n.t("tx.export.title"), [{
         key: "folder",
-        label: "Save to folder",
-        desc: `Vault folder for the export. ${rows.length} row${rows.length === 1 ? "" : "s"} (${range}) plus ${S.categories.length} categories, as CSV and markdown.`,
+        label: i18n.t("tx.export.folder"),
+        desc: i18n.t("tx.export.desc", { count: rows.length, range, cats: S.categories.length }),
         value: plugin.settings.exportFolder || "Exports",
         placeholder: "Exports"
       }]);
@@ -5964,13 +6381,13 @@ var require_transactions = __commonJS((exports2, module2) => {
         await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
       } catch (e) {
         console.error("Budget: export failed", e);
-        return toast("Could not write the export — check the folder name", true);
+        return toast(i18n.t("tx.export.failed"), true);
       }
       if (plugin.settings.exportFolder !== paths.dir) {
         plugin.settings.exportFolder = paths.dir;
         await plugin.saveSettings();
       }
-      toast(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} and ${S.categories.length} categories to ${written.split("/").slice(0, -1).join("/")}/`);
+      toast(i18n.t("tx.export.done", { count: rows.length, cats: S.categories.length, path: written.split("/").slice(0, -1).join("/") }));
     }
     ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
   };
