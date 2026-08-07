@@ -3,6 +3,37 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.8.0 — 2026-08-07
+
+### Added
+
+- **Budget Vault speaks seven languages.** English, Afrikaans, German, Spanish,
+  French, Japanese and Chinese. Pick yours under Settings → Budget Vault →
+  Language, or on the first screen of the setup wizard, which is translated too.
+
+  Language is its own setting, deliberately separate from Country. Where you
+  live decides how your money is formatted, which date order your bank statements
+  use and which tax authority's checklist the Tax view shows. It does not decide
+  what language you want to read. Someone in Germany can run the app in English,
+  and someone in South Africa can run it in German with South African tax
+  handling intact — neither choice drags the other with it.
+
+  If you have never set it, the app follows Obsidian's own display language and
+  falls back to English. Afrikaans is the one exception: Obsidian does not offer
+  it, so it has to be chosen here.
+
+  Your own words are never touched. Category names, account names, notes and
+  every file in your budget folder stay exactly as you wrote them — this
+  translates the app, not your budget.
+
+### Notes
+
+- Japanese and Chinese are a first pass. The structure is right, but if a
+  financial term reads oddly to a native speaker, the feedback form is the place
+  to say so.
+- The views, the settings descriptions and the Tax view's country checklists are
+  still English for now.
+
 ## 1.7.1 — 2026-08-07
 
 ### Changed
