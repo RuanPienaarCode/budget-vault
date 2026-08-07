@@ -3,6 +3,64 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.7.0 — 2026-08-07
+
+### Added
+
+- **An Assets page — what you own that isn't a bank account.** Your house, your
+  car, the contents of it, gold, a ring. Net worth was built out of your bank
+  balances and your debts, so if you had a bond you read as several hundred
+  thousand rand in the hole while living in a house worth several million. The
+  loan was counted in full and the thing it bought was not counted at all.
+
+  Anything you list here now counts toward net worth, and shows up as its own
+  block in "What net worth is made of" on the Savings page, so the house, the
+  car and the ring are told apart rather than lumped together.
+
+  A value is a claim with an age, and the page says so. Each row shows when it
+  was last worked out — "valued 6 months ago", "never valued" — and anything
+  over a year old is called out above the table and again on the Savings page.
+  A year rather than the thirty days a bank balance gets: nobody has a house
+  valued monthly, and a warning that fired on every row forever would be one
+  you learned to skip.
+
+  Saved to `Assets.md` as an ordinary table you can edit by hand.
+
+- **"Where you stand" on the Dashboard.** Net worth, what you owe, what you have
+  lent out and what you have saved were four taps away on four different pages.
+  They now sit in a band below the period cards. Nothing in that band moves when
+  you change period, and it says so — a figure that holds still while the
+  control above it moves looks broken otherwise.
+
+### Changed
+
+- **The Accounts page calls its top figures "In credit" and "Overdrawn".** They
+  were "Assets" and "Liabilities", which now means something else one line down
+  in the menu. Its "Net worth" also says *across these accounts only* whenever
+  there is something on the Assets or Debt page that would make it differ from
+  the whole-household figure on Savings — both numbers are true, and now you can
+  tell which is which.
+
+### Fixed
+
+- **An out-of-date valuation is now legible in light mode.** The warning amber is
+  a fill colour, and as small text on white it measured 2.2:1 — the line telling
+  you a figure is stale was the least readable thing in the row. It now has its
+  own darker ink and measures 5.4:1. Dark mode is unchanged.
+
+- **Date fields stop borrowing Obsidian's colours.** The "/" separators and the
+  empty `yyyy/mm/dd` placeholder were painted from the app's theme rather than
+  the plugin's, so with the plugin set to light inside a dark Obsidian (or the
+  reverse) they came out the wrong grey on the wrong background. Every date
+  field in the app, not just the new one.
+
+- **Hand-typed amounts with spaces or commas are read, not truncated.** A credit
+  limit written `15,000` was read as `15` and then written back over your own
+  figure the next time anything on that account was edited.
+
+- **"Reload from disk" no longer leaves the Transactions Save button lit** over
+  edits it had already discarded.
+
 ## 1.6.2 — 2026-08-07
 
 ### Changed
