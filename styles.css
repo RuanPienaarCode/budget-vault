@@ -2022,7 +2022,7 @@
   --color-primary-dark:  #082f49;
   --color-primary-light: #dbeafe;
   --color-accent:        #0891b2;
-  --color-gold:          #b45309;
+  --color-gold:          #c2410c;
   --surface:             #ffffff;
   --body-bg:             #eef2f6;
   --bg-0:                #eef2f6;
@@ -2039,7 +2039,7 @@
   --focus-ring:          rgba(12,74,110,0.20);
   --glow-accent-rgb:     125,211,252;
   --glow-primary-rgb:    56,189,248;
-  --glow-gold-rgb:       251,191,36;
+  --glow-gold-rgb:       251,146,60;
   --glow-deep-rgb:       8,145,178;
 }
 .budget-app-root.bud-palette-ocean.bud-dark {
@@ -2047,7 +2047,7 @@
   --color-primary-dark:  #0284c7;
   --color-primary-light: rgba(56,189,248,0.18);
   --color-accent:        #7dd3fc;
-  --color-gold:          #fbbf24;
+  --color-gold:          #fb923c;
   --surface:             #111a2e;
   --body-bg:             #03060e;
   --bg-0:                #03060e;
@@ -2070,7 +2070,7 @@
   --color-primary-dark:  #4c1d78;
   --color-primary-light: #f3e8ff;
   --color-accent:        #9333ea;
-  --color-gold:          #b45309;
+  --color-gold:          #a16207;
   --surface:             #ffffff;
   --body-bg:             #f2eef6;
   --bg-0:                #f2eef6;
@@ -2087,7 +2087,7 @@
   --focus-ring:          rgba(107,33,168,0.20);
   --glow-accent-rgb:     233,213,255;
   --glow-primary-rgb:    192,132,252;
-  --glow-gold-rgb:       251,191,36;
+  --glow-gold-rgb:       252,211,77;
   --glow-deep-rgb:       147,51,234;
 }
 .budget-app-root.bud-palette-plum.bud-dark {
@@ -2095,7 +2095,7 @@
   --color-primary-dark:  #9333ea;
   --color-primary-light: rgba(192,132,252,0.18);
   --color-accent:        #e9d5ff;
-  --color-gold:          #fbbf24;
+  --color-gold:          #fcd34d;
   --surface:             #1b1430;
   --body-bg:             #08040e;
   --bg-0:                #08040e;
@@ -2118,7 +2118,7 @@
   --color-primary-dark:  #1e293b;
   --color-primary-light: #e2e8f0;
   --color-accent:        #475569;
-  --color-gold:          #b45309;
+  --color-gold:          #92400e;
   --surface:             #ffffff;
   --body-bg:             #eef0f3;
   --bg-0:                #eef0f3;
@@ -2135,7 +2135,7 @@
   --focus-ring:          rgba(51,65,85,0.20);
   --glow-accent-rgb:     203,213,225;
   --glow-primary-rgb:    148,163,184;
-  --glow-gold-rgb:       251,191,36;
+  --glow-gold-rgb:       212,163,115;
   --glow-deep-rgb:       71,85,105;
 }
 .budget-app-root.bud-palette-slate.bud-dark {
@@ -2143,7 +2143,7 @@
   --color-primary-dark:  #64748b;
   --color-primary-light: rgba(148,163,184,0.18);
   --color-accent:        #cbd5e1;
-  --color-gold:          #fbbf24;
+  --color-gold:          #d4a373;
   --surface:             #161a22;
   --body-bg:             #050609;
   --bg-0:                #050609;

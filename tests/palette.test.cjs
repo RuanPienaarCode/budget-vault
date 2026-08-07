@@ -205,15 +205,23 @@ function norm(v) {
   for (const t of GLOW) ok(t in hand, `the base palette declares ${t}`);
 
   const generated = fs.readFileSync(path.join(root, 'src', 'styles-presets.css'), 'utf8');
-  const perPalette = PRESETS.map(p => {
+  const blocks = PRESETS.map(p => {
     const block = tokensOf(generated, `.budget-app-root.bud-palette-${p.id}`);
     for (const t of GLOW) ok(t in block, `${p.id} emits ${t}`);
-    return block['--glow-primary-rgb'];
+    return block;
   });
-  eq(new Set(perPalette).size, PRESETS.length,
-    'every palette glows in its own colour — identical values would mean the wash ignores the palette');
-  eq(perPalette[PRESETS.findIndex(p => p.id === 'vault-green')], '16,185,129',
-    'and Vault Green still glows the emerald it always did');
+  /* Checked per token rather than on one of them. All three washes started life
+     as the same literals, and the gold one stayed shared across every palette
+     for a while after the other two were made to vary — an easy thing to miss,
+     because two of the three moving looks like the feature works. */
+  for (const t of GLOW) {
+    const values = blocks.map(b => b[t]);
+    eq(new Set(values).size, PRESETS.length,
+      `${t} differs across all ${PRESETS.length} palettes — a shared value means that wash ignores the palette`);
+  }
+  const vg = blocks[PRESETS.findIndex(p => p.id === 'vault-green')];
+  eq(vg['--glow-primary-rgb'], '16,185,129', 'and Vault Green still glows the emerald it always did');
+  eq(vg['--glow-gold-rgb'], '251,191,36', 'in the gold it always did');
 }
 
 /* ---- 6. the generated stylesheet on disk is current ----
