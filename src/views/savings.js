@@ -2,12 +2,17 @@
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
 const { el, kpiTiles, icoEl } = require('../dom');
-const { themeColors, createChart, tip } = require('../chart');
+const { themeColors, createChart, tip, parseColor } = require('../chart');
 const { isStale, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
+
+/* Bumped once per composition chart drawn, to keep its clipPath and gradient
+   ids unique across every render AND across every open leaf. Module scope
+   rather than per-registration for exactly that second reason. */
+let worthSeq = 0;
 
 module.exports = function registerSavings(ctx) {
   const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
@@ -330,12 +335,57 @@ module.exports = function registerSavings(ctx) {
     const W = 1000, H = 210, padL = 8, padR = 8, barH = 46;
     const scale = Math.max(totalAssets, totalDebts, 1);
     const innerW = W - padL - padR;
-    const { svg, add } = createChart({
-      w: W, h: H,
-      label: `Net worth ${money(net)}: assets ${money(totalAssets)} against debts ${money(totalDebts)}`,
-    });
 
-    const row = (y, segs, total, heading) => {
+    /* Every id minted below is per-render. Two plugin leaves open at once put
+       two of these charts in one document, and a repeated clipPath or gradient
+       id means the second bar silently references the first one's — the same
+       trap areaGradient() documents in chart.js. */
+    const uid = `bud-worth-${++worthSeq}`;
+
+    /* The segment <title>s below are the ONLY thing a pointer gets, but they are
+       invisible to a screen reader: createChart marks the svg role="img", which
+       collapses the whole thing to one node and hides its children. So the
+       breakdown has to be in the label itself, or a non-sighted reader gets two
+       totals and no composition — and on a desktop, where the titles are
+       dropped in favour of the tooltip, nothing at all. */
+    const listFor = segs => segs.map(s => `${s.label} ${money(s.amount, 0)}`).join(', ');
+    const { svg, add } = createChart({
+      w: W, h: H, cls: 'worth-svg',
+      label: `Net worth ${money(net)}: assets ${money(totalAssets)} against debts ${money(totalDebts)}`
+        + (assets.length ? `. Owned: ${listFor(assets)}` : '')
+        + (debts.length ? `. Owed: ${listFor(debts)}` : ''),
+    });
+    const defs = add('defs', {});
+
+    /* A single top-to-bottom sheen laid over every bar — the "glow". Drawn as
+       SVG rather than a CSS filter because it has to survive the iOS 15 floor
+       untouched, and because a gradient overlay costs nothing to composite. */
+    const sheen = add('linearGradient', { id: `${uid}-sheen`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    add('stop', { offset: '0%', 'stop-color': '#ffffff', 'stop-opacity': '0.22' }, sheen);
+    add('stop', { offset: '48%', 'stop-color': '#ffffff', 'stop-opacity': '0.05' }, sheen);
+    add('stop', { offset: '100%', 'stop-color': '#000000', 'stop-opacity': '0.08' }, sheen);
+
+    /* Hover is a real capability question, not a screen-size one. Where there
+       is a fine pointer the HTML tooltip below reads better and lands instantly,
+       so the native <title> is left off — two tooltips for one segment is worse
+       than either. Where there is not (every phone, which is where this plugin
+       mostly lives) nothing changes: touch-and-hold still shows the <title> it
+       always did, and no hover-only affordance is invented for a finger. */
+    const hoverable = typeof window.matchMedia === 'function'
+      && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+    const tipBox = el('div', { class: 'worth-tip', 'aria-hidden': 'true' });
+    const tipName = el('div', { class: 'worth-tip-name' });
+    const tipVal = el('div', { class: 'worth-tip-val num' });
+    tipBox.append(tipName, tipVal);
+
+    const clearHover = () => {
+      svg.classList.remove('is-hover');
+      for (const n of svg.querySelectorAll('.worth-seg.is-on')) n.classList.remove('is-on');
+      tipBox.classList.remove('is-on');
+    };
+
+    const row = (y, segs, total, heading, idx) => {
       add('text', {
         x: padL, y: y - 10, 'font-size': '13', 'font-weight': '600',
         fill: 'currentColor', 'fill-opacity': '0.55', 'font-family': 'inherit',
@@ -350,28 +400,90 @@ module.exports = function registerSavings(ctx) {
         fill: 'currentColor', 'fill-opacity': '0.05',
       });
       if (!total) return;
+
+      /* The bar wipes in left to right behind a clip rect rather than each
+         segment growing from its own left edge — segments are adjacent, so
+         growing them individually opens gaps between them for the length of
+         the animation and reads as a broken chart rather than an entering one. */
+      const clip = add('clipPath', { id: `${uid}-wipe-${idx}` }, defs);
+      add('rect', {
+        class: `worth-wipe${idx ? ' worth-wipe--b' : ''}`,
+        x: padL, y, width: innerW, height: barH,
+      }, clip);
+      const band = add('g', { 'clip-path': `url(#${uid}-wipe-${idx})` });
+
       let x = padL;
       for (const seg of segs) {
         const w = (seg.amount / scale) * innerW;
+        const share = Math.round((seg.amount / total) * 100);
+        /* The glow is the segment's OWN colour at low alpha, so it reads as the
+           block lighting up rather than a generic highlight landing on it. The
+           fill arrives as a resolved rgb() from getComputedStyle or as a hex
+           fallback; parseColor takes both, and a colour it cannot read simply
+           gets no glow rather than an invented one. */
+        const rgb = parseColor(seg.color);
+        const g = add('g', {
+          class: 'worth-seg',
+          style: rgb
+            ? `--seg-soft:rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.28);` +
+              `--seg-glow:rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.6)`
+            : null,
+        }, band);
         const node = add('rect', {
           x, y, width: Math.max(2, w), height: barH,
           fill: seg.color, rx: w > 20 ? 10 : 2,
-        });
-        tip(add, node, `${seg.label}: ${money(seg.amount)} · ${Math.round((seg.amount / total) * 100)}% of ${heading.toLowerCase()}`);
+        }, g);
+        if (hoverable) {
+          g.addEventListener('pointerenter', () => {
+            svg.classList.add('is-hover');
+            for (const n of svg.querySelectorAll('.worth-seg.is-on')) n.classList.remove('is-on');
+            g.classList.add('is-on');
+            tipName.textContent = seg.label;
+            tipVal.textContent = `${money(seg.amount)} · ${share}% of ${heading.toLowerCase()}`;
+            tipBox.classList.add('is-on');
+          });
+        } else {
+          tip(add, node, `${seg.label}: ${money(seg.amount)} · ${share}% of ${heading.toLowerCase()}`);
+        }
         // Only label a segment wide enough to hold the text without clipping.
         if (w > 96) {
           add('text', {
             x: x + w / 2, y: y + barH / 2 + 5, 'text-anchor': 'middle',
             'font-size': '13', 'font-weight': '600', fill: c.hole, 'font-family': 'inherit',
-          }).textContent = seg.label;
+          }, g).textContent = seg.label;
         }
         x += w;
       }
+
+      /* Laid over the finished row, and only as far as the row actually runs —
+         a sheen across the empty track would draw a ghost bar the full width of
+         the chart. Inert to the pointer so it cannot steal a segment's hover. */
+      add('rect', {
+        x: padL, y, width: (total / scale) * innerW, height: barH, rx: 10,
+        fill: `url(#${uid}-sheen)`, 'pointer-events': 'none',
+      }, band);
     };
 
-    row(34, assets, totalAssets, 'What you own');
-    row(132, debts, totalDebts, 'What you owe');
-    wrap.append(svg);
+    row(34, assets, totalAssets, 'What you own', 0);
+    row(132, debts, totalDebts, 'What you owe', 1);
+
+    if (hoverable) {
+      /* Positioned from the pointer rather than from the segment: a segment can
+         be most of the chart wide, and a tooltip parked at its centre ends up
+         nowhere near the cursor. Measured at pointer time, which is the one
+         moment the chart is guaranteed to be on screen — the standing rule
+         against DOM measurement here is about rendering into a hidden tab. */
+      svg.addEventListener('pointermove', e => {
+        if (!tipBox.classList.contains('is-on')) return;
+        const r = svg.getBoundingClientRect();
+        const pad = Math.min(60, r.width / 2);
+        tipBox.style.left = `${Math.max(pad, Math.min(e.clientX - r.left, r.width - pad))}px`;
+        tipBox.style.top = `${e.clientY - r.top}px`;
+      });
+      svg.addEventListener('pointerleave', clearHover);
+    }
+
+    wrap.append(svg, tipBox);
 
     const legend = el('ul', { class: 'donut-legend donut-legend--inline' });
     for (const seg of [...assets, ...debts.map(d => ({ ...d, label: `${d.label} (owed)` }))]) {

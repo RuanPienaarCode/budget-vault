@@ -3,6 +3,32 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.7.1 — 2026-08-07
+
+### Changed
+
+- **"What net worth is made of" is worth looking at now.** The two bars draw
+  themselves in from the left when the page opens, owned first and owed a beat
+  behind, and each block carries a soft sheen and a faint glow in its own colour
+  instead of sitting flat.
+
+  On a computer, resting the pointer on any block names it and gives you the
+  figure and its share — "Investments · R302,000.00 · 9% of what you own" —
+  while every other block dims, so you can see how much of the bar one thing
+  actually is. On a phone nothing changes: touch and hold still gives you the
+  same figure, and no affordance that needs a mouse was invented for a finger.
+
+  The motion is decoration and knows it. It respects your system's reduce-motion
+  setting, and on older iPhones it simply doesn't run — the bars draw complete
+  rather than half-drawn.
+
+### Fixed
+
+- **A screen reader now hears what the net-worth bars are made of.** The chart
+  announces itself as a single image, which meant the per-block descriptions
+  underneath it were never read out — you got two totals and no breakdown. The
+  description now lists every block on both sides with its amount.
+
 ## 1.7.0 — 2026-08-07
 
 ### Added

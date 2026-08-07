@@ -1542,8 +1542,69 @@
 /* Donut sits beside its legend on a wide card and above it on a narrow one. */
 .budget-app-root .donut-wrap { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
 .budget-app-root .donut-wrap svg.donut { width: 260px; height: auto; flex: none; display: block; }
-.budget-app-root .stack-wrap { width: 100%; }
+/* Positioned so the net-worth tooltip below can be placed against the chart
+   rather than against the page. */
+.budget-app-root .stack-wrap { width: 100%; position: relative; }
 .budget-app-root .stack-wrap svg { width: 100%; height: auto; display: block; }
+
+/* ---------------- net-worth composition bar (Savings & Investments) --------
+   Each segment carries its own colour inline as --seg-soft / --seg-glow, read
+   off the resolved fill at render time, so the glow is the block's own colour
+   at rest and a brighter version of it under the pointer. A segment whose fill
+   could not be parsed falls back to `transparent` and simply has no glow. */
+.budget-app-root .worth-seg {
+  filter: drop-shadow(0 0 2px var(--seg-soft, transparent));
+  transition: opacity .18s ease, filter .18s ease;
+}
+/* Hovering one block dims the rest. The chart is about proportion, and the
+   fastest way to say "this much of it" is to quiet everything it is not. */
+.budget-app-root .worth-svg.is-hover .worth-seg { opacity: .38; }
+.budget-app-root .worth-svg.is-hover .worth-seg.is-on {
+  opacity: 1;
+  filter: drop-shadow(0 0 9px var(--seg-glow, transparent));
+}
+
+/* Why an animation and not a transition, and why only a `from` — the same
+   reasoning as bud-bar-grow above: the keyframe's `to` comes from the element's
+   own computed width, so nothing is ever painted at zero and no rAF is needed,
+   which means a chart built inside a hidden pane cannot strand at width 0.
+   On the iOS 15 floor `width` is not yet a CSS property on an SVG rect, so the
+   wipe simply never applies and the bar draws complete — the correct static
+   picture rather than a broken one. Newer WebKit and Chromium animate it. */
+@keyframes bud-worth-wipe { from { width: 0; } }
+.budget-app-root .worth-wipe { animation: bud-worth-wipe .85s cubic-bezier(.22, 1, .36, 1); }
+/* The owed bar follows the owned one in. `backwards` holds it at zero through
+   the delay; without it the bar paints full, then snaps back to draw itself. */
+.budget-app-root .worth-wipe--b { animation-delay: .12s; animation-fill-mode: backwards; }
+
+/* Pointer-follow readout. Only ever built where there is a fine pointer — on a
+   phone the segment's own <title> carries the number instead. */
+.budget-app-root .worth-tip {
+  position: absolute; left: 0; top: 0;
+  transform: translate(-50%, -100%);
+  margin-top: -14px;
+  z-index: 3;
+  padding: 7px 11px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  pointer-events: none;                  /* never eats its own segment's hover */
+  opacity: 0; visibility: hidden;
+  transition: opacity .14s ease;
+}
+.budget-app-root .worth-tip.is-on { opacity: 1; visibility: visible; }
+.budget-app-root .worth-tip-name { font-size: 12.5px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .worth-tip-val { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* All decoration — the bar reads identically frozen, and the tooltip still
+   appears, it just stops fading. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .worth-wipe { animation: none; }
+  .budget-app-root .worth-seg,
+  .budget-app-root .worth-tip { transition: none; }
+}
 
 .budget-app-root .donut-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 260px; min-width: 0; }
 .budget-app-root .donut-legend li {
