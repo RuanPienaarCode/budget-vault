@@ -294,7 +294,8 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title">Savings &amp; Investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
-        <div class="mini-grid mini-kpis-4 mb-4" id="savingsKpis"></div>
+        <div class="mini-grid mini-kpis-4" id="savingsKpis"></div>
+        <div class="kpi-caveat mb-4" id="savingsStale"></div>
         <div class="card mb-4" id="savingsWorthCard">
           <div class="card-h">
             <div>

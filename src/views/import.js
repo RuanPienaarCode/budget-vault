@@ -12,7 +12,7 @@
    and both are deliberately confined to FOREIGN files — the app's own CSVs are
    read by parseCsv, which is comma-only. */
 
-const { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, prepareRules, autoCategorise } = require('../util');
+const { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, counterpartyAccount, prepareRules, autoCategorise } = require('../util');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 
 module.exports = function registerImport(ctx) {
@@ -125,7 +125,18 @@ module.exports = function registerImport(ctx) {
       if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
       const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
       if (date && desc && amount != null && amount !== 0) {
-        items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules), include: true, excluded: false });
+        /* Moving your own money between your own accounts is not income and
+           not spend, so a recognised counterparty arrives pre-excluded rather
+           than counted. Pre-EXCLUDED, not pre-categorised: there is no transfer
+           category in this app's vocabulary, and "vetoed from income and spend
+           totals" is exactly what an excluded transaction means.
+
+           A suggestion, never a decision — the review screen's exclude tick is
+           live on this row like any other, and `transferTo` is carried only so
+           the reader can see WHY it arrived ticked. */
+        const other = counterpartyAccount(desc, S.accounts, label0);
+        items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules),
+          include: true, excluded: !!other, transferTo: other ? (other.tx_label || other.name) : '' });
       } else if (date || amount != null) {
         // Looked like a transaction and wasn't usable — worth reporting.
         skipped++;
@@ -384,6 +395,12 @@ module.exports = function registerImport(ctx) {
         el('td', {}, it.desc, ...(it.near ? [
           el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
           el('div', { class: 'imp-near-why' }, nearWhy),
+        ] : []), ...(it.transferTo ? [
+          // Named, not silent: a row that arrives excluded must say what made
+          // it so, or the reader finds a missing figure later with no trail.
+          el('span', { class: 'category-badge badge-transfer',
+            title: `The description names your ${it.transferTo} account, so this looks like money moved between your own accounts rather than income or spend. Untick Exclude to count it.` },
+          'transfer'),
         ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),

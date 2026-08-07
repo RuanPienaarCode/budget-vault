@@ -5,12 +5,10 @@
 
 const { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require('../util');
 const { askFields } = require('../modal');
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-/* A balance nobody has confirmed in this long is treated as unverified. Long
-   enough that a monthly statement cycle doesn't trip it, short enough that a
-   figure quietly drifting for a quarter can't hide behind "recently updated". */
-const STALE_DAYS = 30;
+/* The reconciliation engine was written here first and now lives in its own
+   module, because Savings, Services and Debt all need to make the same argument
+   about a hand-typed figure. Behaviour on this page is unchanged. */
+const { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile } = require('../reconcile');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, money, toast, writeFile, ensureFolder, relPath, fileAt,
@@ -64,26 +62,6 @@ module.exports = function registerAccounts(ctx) {
     return parseFloat(s.replace(',', '.').replace(/[^\d.-]/g, ''));
   }
 
-  /* Today as a LOCAL calendar date. Deliberately not toISOString().slice(0,10),
-     which is UTC: at 01:00 in Johannesburg that returns yesterday, and this
-     value is compared against transaction dates — which are local calendar
-     dates off a bank statement — to decide which rows land after the balance
-     was last confirmed. An hour's drift there silently double-counts a day. */
-  function todayIso() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
-  /* Whole days between an ISO date and today, or null if the value isn't a
-     date this can reason about (blank, or a hand-typed "end of June"). */
-  function daysSince(iso) {
-    if (!ISO_DATE.test(iso || '')) return null;
-    const then = new Date(`${iso}T00:00:00`);
-    if (isNaN(then.getTime())) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Math.round((today.getTime() - then.getTime()) / 86400000);
-  }
-
   /* ------------------------- transaction linkage -------------------------
      One pass over S.txFiles, grouped onto the account each folder belongs to.
      Built once per render: resolving per account instead would walk every
@@ -99,36 +77,6 @@ module.exports = function registerAccounts(ctx) {
       for (const r of f.rows) e.rows.push(r);
     }
     return idx;
-  }
-
-  /* What the balance should read RIGHT NOW: the last confirmed figure plus
-     everything dated after it, up to and including today.
-
-     Two windows, not one. A statement can carry rows dated ahead — a scheduled
-     debit order, a pending card authorisation — and money that has not moved
-     yet is not part of what the account reads today. Folding those in and then
-     stamping the reconciliation with today's date would also count them a
-     second time on the next pass, because they would still be dated after the
-     new balance date. They are reported separately instead, and roll into the
-     window on their own once the day arrives.
-
-     Excluded rows DO count here: "exclude" keeps a row out of the BUDGET, but
-     the money still left the bank, so skipping it would make every
-     reconciliation on an account with one excluded transfer wrong. */
-  function reconcile(a, rows) {
-    if (!rows || !rows.length) return { state: 'no-tx' };
-    if (!ISO_DATE.test(a.balance_updated || '')) return { state: 'no-date' };
-    const today = todayIso();
-    const since = [], ahead = [];
-    for (const r of rows) {
-      if (r.date <= a.balance_updated) continue;
-      (r.date > today ? ahead : since).push(r);
-    }
-    const delta = since.reduce((s, r) => s + r.amount, 0);
-    if (!since.length) {
-      return ahead.length ? { state: 'pending', ahead: ahead.length } : { state: 'clean' };
-    }
-    return { state: 'drift', count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
   }
 
   /* Money in / out for the period the header is showing. Separate from the
@@ -313,8 +261,7 @@ module.exports = function registerAccounts(ctx) {
     const attention = S.accounts.filter(a => {
       const e = idx.get(a);
       if (!e) return true;                                   // nothing importing into it
-      const d = daysSince(a.balance_updated);
-      if (d === null || d > STALE_DAYS) return true;         // never or long ago
+      if (isStale(a.balance_updated)) return true;            // never confirmed, or long ago
       return reconcile(a, e.rows).state === 'drift';
     }).length;
 

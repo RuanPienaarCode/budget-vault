@@ -1,16 +1,16 @@
 'use strict';
 /* Dashboard — hero card, spending-trend SVG, category split, budget-vs-actual. */
 
-const { el } = require('../util');
+const { el, icoEl, safeSeg } = require('../util');
 const { TYPE_ORDER } = require('../constants');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
-  linePath, areaPath, areaGradient, arcPath, tip,
+  linePath, areaPath, areaGradient, arcPath, tip, distinctColors,
   historicalRanges, rangeFor, rangePills,
 } = require('../chart');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, root, plugin, money, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
 
   function renderDashboard() {
     const sum = periodSummary(S.period);
@@ -285,11 +285,26 @@ module.exports = function registerDashboard(ctx) {
        point at anyway. */
     const shown = spend.slice(0, SPLIT_SLICES);
     const rest = spend.slice(SPLIT_SLICES);
+
+    /* Category colours are chosen per category with nothing stopping two
+       categories sharing one, so the drawn set has to be de-collided before it
+       reaches the chart — see distinctColors() in chart.js. `spend` is already
+       sorted biggest-first, which is the order that function wants: the largest
+       wedge keeps the colour its category file asks for.
+
+       Other's muted grey is RESERVED rather than assigned. It is the one colour
+       here that carries a meaning — "this is a bucket, not a category" — so
+       nothing may be given a colour near it, and it is never reassigned. */
+    const otherColor = themeColors(root).muted;
+    const resolved = distinctColors(shown.map(x => x.color), { reserved: [otherColor] });
+    shown.forEach((x, i) => { x.color = resolved[i]; });
+
     if (rest.length) {
       shown.push({
         cat: `Other (${rest.length})`,
         amount: rest.reduce((t, x) => t + x.amount, 0),
-        color: themeColors(root).muted,
+        color: otherColor,
+        other: true,
       });
     }
 
@@ -306,8 +321,15 @@ module.exports = function registerDashboard(ctx) {
       const seg = add('path', {
         d: arcPath(cx, cy, rOut, rIn, a, a + sweep),
         fill: x.color, stroke: themeColors(root).hole, 'stroke-width': '2',
+        class: x.other ? null : 'donut-slice',
       });
       tip(add, seg, `${x.cat}: ${money(x.amount)} · ${Math.round((x.amount / total) * 100)}%`);
+      /* Pointer only, deliberately: the <svg> is role="img", which takes its
+         whole subtree out of the accessibility tree, so a focusable wedge would
+         be a tab stop no screen reader can announce. The legend below carries
+         the same two actions as real buttons — that is the keyboard and AT
+         path, and the wedge is the convenience one for a mouse or thumb. */
+      if (!x.other) seg.addEventListener('click', () => openCategory(x.cat));
       a += sweep;
     }
 
@@ -320,15 +342,72 @@ module.exports = function registerDashboard(ctx) {
       fill: 'currentColor', 'font-family': 'inherit',
     }).textContent = money(total, 0);
 
-    const legend = el('ul', { class: 'donut-legend' });
+    const legend = el('ul', { class: 'donut-legend donut-legend--linked' });
     for (const x of shown) {
-      legend.append(el('li', {},
+      const pct = Math.round((x.amount / total) * 100);
+      /* Rebuilt per row rather than shared: these are appended into either a
+         plain <li> or a <button>, and a node can only live in one of them. */
+      const face = () => [
         el('i', { style: `background:${x.color}` }),
         el('span', { class: 'dl-name' }, x.cat),
         el('span', { class: 'dl-val num' }, money(x.amount, 0)),
-        el('span', { class: 'dl-pct num' }, `${Math.round((x.amount / total) * 100)}%`)));
+        el('span', { class: 'dl-pct num' }, `${pct}%`),
+      ];
+      /* "Other" is a bucket of categories, so neither action has a single
+         target to point at — it stays an inert row. */
+      if (x.other) { legend.append(el('li', {}, face())); continue; }
+      legend.append(el('li', {},
+        /* aria-label rather than the row's own text: read as-is a screen
+           reader gets "Groceries 4 200 32", three unlabelled fragments. */
+        el('button', {
+          type: 'button', class: 'dl-link',
+          'aria-label': `${x.cat}: ${money(x.amount)}, ${pct}% of spending — show transactions`,
+          onclick: () => openCategory(x.cat),
+        }, face()),
+        el('button', {
+          type: 'button', class: 'dl-note',
+          'aria-label': `Open the ${x.cat} category note`,
+          title: 'Open category note',
+          onclick: () => openCategoryFile(x.cat),
+          /* An ARRAY, not the 'a|b' string the shell's data-ico attributes
+             use — icoEl walks a list, and only controller.js splits on the
+             pipe. Passed as a string the whole thing is treated as one icon
+             name, setIcon silently draws nothing, and the button ships empty. */
+        }, icoEl(['file-text', 'file']))));
     }
     wrap.append(svg, legend);
+  }
+
+  /* ---------------------- category drill-through ------------------------
+     Jump to Transactions filtered to this category. switchView renders the
+     view first, which is what rebuilds the category <select>'s options — so
+     the name is on the list by the time it is selected. Mirrors the Accounts
+     page's openTransactions(), for the same reasons.
+
+     The other filters are cleared because a search or account left over from
+     an earlier visit would land the reader on "0 rows" with nothing visible to
+     explain it. `whole history` goes too, and that one matters more here than
+     it does on Accounts: this donut is explicitly one period's spending, and
+     leaving the box ticked answers a question the reader did not ask. */
+  function openCategory(cat) {
+    ctx.switchView('transactions');
+    const sel = $('#txCategory');
+    if ([...sel.options].some(o => o.value === cat)) sel.value = cat;
+    $('#txAccount').value = '';
+    $('#txSearch').value = '';
+    $('#txWholeHistory').checked = false;
+    ctx.renderTransactions();
+  }
+
+  /* Open the category's own note — where its colour, type and notes live.
+     The filename is the sanitised name (safeSeg), but files made by hand or by
+     an older build may sit under the raw name, so both are tried before giving
+     up. A new tab, not this one: the budget view is a workspace leaf like any
+     other, and opening in place would close the app the reader is using. */
+  async function openCategoryFile(cat) {
+    const file = fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
+    if (!file) return toast(`No category note found for "${cat}"`, true);
+    await app.workspace.getLeaf('tab').openFile(file);
   }
 
   ctx.provide({ renderDashboard, renderTrend, renderSplit });

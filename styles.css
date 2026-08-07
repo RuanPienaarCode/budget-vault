@@ -1032,6 +1032,42 @@
 .budget-app-root .acct-recon-btn .ico svg { width: 0.8rem; height: 0.8rem; }
 .budget-app-root .acct-recon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* Net-worth staleness caveat. Sits directly under the KPI tiles it qualifies,
+   deliberately quiet: it reports the AGE of a figure, not a problem with it.
+   Styled as a note rather than a warning banner — an unconfirmed balance is
+   still the best answer anyone has, and shouting about it every visit trains
+   the reader to stop reading the line. */
+.budget-app-root .kpi-caveat {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; margin-top: 8px;
+}
+.budget-app-root .kpi-caveat:empty { display: none; margin-top: 0; }
+.budget-app-root .kpi-caveat-txt {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted);
+}
+.budget-app-root .kpi-caveat-txt .ico svg { width: 0.85rem; height: 0.85rem; }
+.budget-app-root .kpi-caveat-btn {
+  flex: none; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--color-primary); background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+.budget-app-root .kpi-caveat-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* A goal bar built on an unconfirmed balance. Dashed rather than dimmed: the
+   progress is real, its vintage isn't current, and a faded bar would read as
+   "less progress" instead of "same progress, older reading". */
+.budget-app-root .cat-bar-stale { border: 1px dashed var(--border-color); background: transparent; }
+.budget-app-root .goal-stale { color: var(--ink-faint); }
+
+/* "includes contributions" under a savings tile's ▲ figure. Deliberately plain
+   and small: it qualifies the number above it rather than competing with it. */
+.budget-app-root .s2-caveat {
+  color: var(--ink-faint); font-size: 11px; font-weight: 500;
+  cursor: help; margin-top: 1px;
+}
+
 .budget-app-root .acct-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   flex-wrap: wrap; margin-top: 8px;
@@ -1409,6 +1445,40 @@
 .budget-app-root .donut-legend .dl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
 .budget-app-root .donut-legend .dl-val { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .budget-app-root .donut-legend .dl-pct { width: 42px; text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+/* Interactive legend (dashboard "Where it went"). The row itself is the
+   button — on a phone the whole row is the tap target, and a name-only link
+   would be a 13px hit area. The li gives up its padding to the button so the
+   target fills the row rather than sitting inside it. */
+.budget-app-root .donut-legend--linked li { padding: 0; }
+.budget-app-root .donut-legend .dl-link {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; min-width: 0;
+  /* A <button> brings its own font, background, border and centring; the row
+     layout above is already right, so this resets rather than restyles. */
+  font: inherit; font-size: 13px; color: inherit; text-align: left;
+  background: none; border: 0; margin: 0; padding: 7px 0;
+  cursor: pointer; border-radius: 6px;
+}
+.budget-app-root .donut-legend .dl-link:hover .dl-name { color: var(--color-primary); }
+/* Opens the category's markdown note. Faint but always drawn — revealing it on
+   hover would put it out of reach on every touch device. */
+.budget-app-root .donut-legend .dl-note {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; margin-left: 6px;
+  background: none; border: 0; border-radius: 6px;
+  color: var(--ink-faint); cursor: pointer;
+}
+.budget-app-root .donut-legend .dl-note:hover { color: var(--color-primary); }
+.budget-app-root .donut-legend .dl-note .ico svg { width: 15px; height: 15px; }
+/* Fallbacks for iOS 15.0-15.3 live in the @supports block at the foot of this
+   file, where the parity guard can see them — not inline. */
+.budget-app-root .donut-legend .dl-link:focus-visible,
+.budget-app-root .donut-legend .dl-note:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
+/* Wedges drill through too. Pointer only — they are inside a role="img" svg,
+   so the legend buttons are the keyboard and screen-reader path. */
+.budget-app-root svg.donut .donut-slice { cursor: pointer; }
+.budget-app-root svg.donut .donut-slice:hover { fill-opacity: 0.82; }
+
 /* Under the net-worth stack the legend runs as chips, not rows — the bars
    above already carry the ranking, so a vertical list would repeat it. */
 .budget-app-root .donut-legend--inline { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 18px; }
@@ -1708,9 +1778,12 @@
   .budget-app-root .mini .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-link:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+  .budget-app-root .donut-legend .dl-link:focus,
+  .budget-app-root .donut-legend .dl-note:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
