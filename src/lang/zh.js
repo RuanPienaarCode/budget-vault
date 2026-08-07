@@ -234,11 +234,12 @@ module.exports = {
   'wiz.acct.balanceDesc': '可选 — 该账户当前的金额。',
   'wiz.acct.balanceHint': '可以使用最近一期对账单的期末余额，或银行 App 上显示的金额。余额是一份由你自己保持更新的快照 — 只导入最近的交易并不会让它出错 — 你随时可以在账户页面点击余额来修改它。',
 
-  'wiz.acctType.checking': '活期/支票账户',
-  'wiz.acctType.savings': '储蓄账户',
-  'wiz.acctType.credit_card': '信用卡',
-  'wiz.acctType.cash': '现金',
-  'wiz.acctType.investment': '投资',
+  'acctType.checking': '活期/支票账户',
+  'acctType.savings': '储蓄账户',
+  'acctType.credit_card': '信用卡',
+  'acctType.cash': '现金',
+  'acctType.investment': '投资',
+  'acctType.other': '其他',
 
   /* ---- finish ---- */
   'wiz.sum.folder': '文件夹',

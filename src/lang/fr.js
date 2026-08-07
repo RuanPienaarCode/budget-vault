@@ -237,11 +237,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Facultatif — ce qu\'il y a sur le compte en ce moment.',
   'wiz.acct.balanceHint': 'Utilisez le solde de clôture de votre dernier relevé, ou ce qu\'affiche l\'application de votre banque. Le solde est un instantané que vous tenez à jour vous-même — n\'importer que les transactions récentes ne le fausse jamais — et vous pouvez le changer à tout moment en touchant le solde sur la page Comptes.',
 
-  'wiz.acctType.checking': 'Compte courant',
-  'wiz.acctType.savings': 'Compte d\'épargne',
-  'wiz.acctType.credit_card': 'Carte de crédit',
-  'wiz.acctType.cash': 'Espèces',
-  'wiz.acctType.investment': 'Placement',
+  'acctType.checking': 'Compte courant',
+  'acctType.savings': 'Compte d\'épargne',
+  'acctType.credit_card': 'Carte de crédit',
+  'acctType.cash': 'Espèces',
+  'acctType.investment': 'Placement',
+  'acctType.other': 'Autre',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Dossier',

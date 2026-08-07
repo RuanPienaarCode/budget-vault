@@ -47,7 +47,7 @@ const STARTER_CATEGORIES = [
    vault written in one language reads back identically in another. Resolved on
    call rather than at module load — the language can change mid-wizard. */
 const ACCOUNT_TYPE_KEYS = ['checking', 'savings', 'credit_card', 'cash', 'investment'];
-const accountTypes = () => ACCOUNT_TYPE_KEYS.map(k => [k, i18n.t('wiz.acctType.' + k)]);
+const accountTypes = () => ACCOUNT_TYPE_KEYS.map(k => [k, i18n.t('acctType.' + k)]);
 
 /* The stored VALUE is the symbol; only the currency's NAME is translated, so a
    vault written in one language reads back identically in another. Resolved on

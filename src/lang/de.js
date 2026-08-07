@@ -232,11 +232,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Optional — was gerade auf dem Konto ist.',
   'wiz.acct.balanceHint': 'Nimm den Schlusssaldo deines letzten Auszugs, oder was deine Banking-App anzeigt. Der Kontostand ist eine Momentaufnahme, die du selbst aktuell hältst — nur die neuesten Transaktionen zu importieren bringt ihn nie durcheinander — und du kannst ihn jederzeit ändern, indem du auf der Konten-Seite auf den Kontostand tippst.',
 
-  'wiz.acctType.checking': 'Girokonto',
-  'wiz.acctType.savings': 'Sparkonto',
-  'wiz.acctType.credit_card': 'Kreditkarte',
-  'wiz.acctType.cash': 'Bargeld',
-  'wiz.acctType.investment': 'Anlage',
+  'acctType.checking': 'Girokonto',
+  'acctType.savings': 'Sparkonto',
+  'acctType.credit_card': 'Kreditkarte',
+  'acctType.cash': 'Bargeld',
+  'acctType.investment': 'Anlage',
+  'acctType.other': 'Sonstiges',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Ordner',
