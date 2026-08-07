@@ -1,7 +1,8 @@
 'use strict';
 /* Dashboard — hero card, spending-trend SVG, category split, budget-vs-actual. */
 
-const { el, icoEl, safeSeg } = require('../util');
+const { el, icoEl } = require('../dom');
+const { safeSeg } = require('../vault-path');
 const { TYPE_ORDER } = require('../constants');
 const { stalenessSummary } = require('../reconcile');
 const {

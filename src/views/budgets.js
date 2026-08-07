@@ -2,7 +2,8 @@
 /* Budget page — per-period category amounts, edited as a draft and saved to
    Budgets/<period>.md. */
 
-const { el, escMd, icoEl, patchFrontmatter } = require('../util');
+const { el, icoEl } = require('../dom');
+const { escMd, patchFrontmatter } = require('../markdown');
 const { TYPE_ORDER } = require('../constants');
 
 module.exports = function registerBudgets(ctx) {
@@ -106,6 +107,10 @@ module.exports = function registerBudgets(ctx) {
   // True when the budget view holds unsaved edits.
   function budgetDirty() { const b = $('#budSave'); return budDirty || (!!b && !b.disabled); }
   ctx.registerDirty(budgetDirty);
+  /* Not ctx.dirtyFlag: this page's dirty state is a draft-vs-file comparison,
+     not a boolean on S. The Save button still has to go back to disabled when
+     the vault is re-read, so it registers for that half on its own. */
+  ctx.registerSaveButton('#budSave');
 
   /* Totals across the whole draft — budgeted income, budgeted spend, and the
      actual spend so far. Read off the live draft (not S.budgets) so the strips

@@ -21,8 +21,10 @@ const assert = require('assert');
 const { stubObsidian, makeCtx } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { normalizeAmount, parseStatementDate, learnPattern, parseCsv,
-  detectHeaderlessColumns, detectStatementColumns, reconcileAmounts } = require('../src/util');
+const { normalizeAmount } = require('../src/amount');
+const { parseCsv } = require('../src/csv');
+const { parseStatementDate, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts } = require('../src/statement');
+const { learnPattern } = require('../src/rules');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -199,7 +201,7 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
 
 /* ---- isRealIsoDate: date-SHAPED is not the same as a date ---- */
 {
-  const { isRealIsoDate } = require('../src/util');
+  const { isRealIsoDate } = require('../src/dates');
   for (const good of ['2026-08-07', '2024-02-29', '2026-01-01', '2026-12-31']) {
     ok(isRealIsoDate(good), `${good} is a real date`);
   }
@@ -423,7 +425,7 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
     ctx.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
     return ctx.monthlyIncome(p).periods;
   };
-  // Every cycle length the settings will accept (util.js bands it 7..31).
+  // Every cycle length the settings will accept (dates.js bands it 7..31).
   for (let iv = 7; iv <= 31; iv++) {
     const n = seeded(iv);
     const months = (n * iv) / MONTH_DAYS;

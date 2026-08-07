@@ -33,7 +33,7 @@
 
    Pure: no vault, no DOM, no Obsidian. Tested directly.  */
 
-const { matchRule, autoCategorise } = require('./util');
+const { matchRule, autoCategorise } = require('./rules');
 
 /* rules: [{pattern, category}] in file order (order decides ties).
    descriptions: every transaction description in the vault, dupes welcome.

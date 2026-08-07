@@ -17,22 +17,17 @@
    tests/reconcile.test.cjs. `today` is injectable for the same reason: a test
    that depends on the wall clock passes in June and fails in July. */
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/* ISO_DATE and todayIso come from src/dates.js — also pure, so requiring it
+   here keeps this module's bare-node test working. A reconciliation is where a
+   local-vs-UTC "today" does its damage: the value is compared against statement
+   dates to decide which rows land after the balance was last confirmed, so an
+   hour's drift silently misfiles a day's transactions. */
+const { ISO_DATE, todayIso } = require('./dates');
 
 /* A balance nobody has confirmed in this long is treated as unverified. Long
    enough that a monthly statement cycle doesn't trip it, short enough that a
    figure quietly drifting for a quarter can't hide behind "recently updated". */
 const STALE_DAYS = 30;
-
-/* Today as a LOCAL calendar date. Deliberately not toISOString().slice(0,10),
-   which is UTC: at 01:00 in Johannesburg that returns yesterday, and this value
-   is compared against transaction dates — which are local calendar dates off a
-   bank statement — to decide which rows land after the balance was last
-   confirmed. An hour's drift there silently double-counts a day. */
-function todayIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 /* Whole days between an ISO date and today, or null if the value isn't a date
    this can reason about (blank, or a hand-typed "end of June"). */
@@ -107,4 +102,4 @@ function stalenessSummary(accounts, today) {
   return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
 }
 
-module.exports = { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile, stalenessSummary };
+module.exports = { STALE_DAYS, daysSince, isStale, reconcile, stalenessSummary };

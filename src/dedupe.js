@@ -178,5 +178,5 @@ function flagItems(items, index, label, range) {
 
 module.exports = {
   txKey, buildIndex, addToIndex, findNearDuplicate, flagItems,
-  descsLikelySame, normDesc, NEAR_DAYS, MIN_PREFIX,
+  descsLikelySame, normDesc, NEAR_DAYS,
 };

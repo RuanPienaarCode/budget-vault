@@ -23,14 +23,14 @@
 const assert = require('assert');
 const Module = require('module');
 
-// util.js imports `setIcon` from obsidian — stub it so this runs in bare node.
+// dom.js imports `setIcon` from obsidian — stub it so this runs in bare node.
 const origLoad = Module._load;
 Module._load = function (req, ...rest) {
   if (req === 'obsidian') return { setIcon() {}, normalizePath: p => p };
   return origLoad.call(this, req, ...rest);
 };
 
-/* Just enough DOM for util.js's `el`: attributes, listeners, children. */
+/* Just enough DOM for dom.js's `el`: attributes, listeners, children. */
 class FakeEl {
   constructor(tag) {
     this.tagName = tag.toUpperCase();
@@ -52,7 +52,7 @@ global.document = {
   createTextNode: text => ({ nodeType: 3, text }),
 };
 
-const { dateInput, keepScroll } = require('../src/util');
+const { dateInput, keepScroll } = require('../src/dom');
 
 let n = 0;
 const check = (label, fn) => { fn(); n++; if (process.env.VERBOSE) console.log('  ok', label); };

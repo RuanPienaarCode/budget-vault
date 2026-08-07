@@ -34,7 +34,8 @@ Module._load = function (request) {
   return origLoad.apply(this, arguments);
 };
 
-const { parseMdTable, unescMd, parseNum } = require('../src/util');
+const { parseNum } = require('../src/amount');
+const { parseMdTable, unescMd } = require('../src/markdown');
 const { SplitModal } = require('../src/modal');
 const registerTransactions = require('../src/views/transactions');
 
@@ -129,7 +130,7 @@ for (const [a, b, why] of [
 /* ---- 5. The shape a split leaves on disk ---- */
 // Drives the REAL serializer with the row set splitTransaction produces: the
 // parent kept + marked excluded, and the parts appended.
-const ctx = { S: {}, registerDirty() {}, provide(o) { Object.assign(ctx, o); } };
+const ctx = { S: {}, registerDirty() {}, registerSaveButton: () => () => {}, provide(o) { Object.assign(ctx, o); } };
 registerTransactions(ctx);
 const { serializeTxFile } = ctx;
 ok(typeof ctx.splitTransaction === 'function', 'splitTransaction must be exposed on ctx');

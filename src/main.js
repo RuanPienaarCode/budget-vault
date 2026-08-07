@@ -11,7 +11,7 @@
 
 const { Plugin, TFile, TFolder, Notice, normalizePath } = require('obsidian');
 const { VIEW_TYPE, DEFAULT_SETTINGS } = require('./constants');
-const { parseFrontmatter } = require('./util');
+const { parseFrontmatter } = require('./markdown');
 const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
 const { OnboardingWizard } = require('./onboarding');

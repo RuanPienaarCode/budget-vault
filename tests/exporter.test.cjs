@@ -30,22 +30,12 @@ let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
-/* The real csvCell from util.js, copied rather than imported: util.js pulls in
-   obsidian. Pinned against the original below so the copy cannot drift. */
-function csvCell(v) {
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-{
-  const fs = require('fs'), path = require('path');
-  const util = fs.readFileSync(path.join(__dirname, '..', 'src', 'util.js'), 'utf8');
-  const real = /function csvCell\(v\) \{([\s\S]*?)\n\}/.exec(util);
-  ok(real, 'csvCell still exists in util.js');
-  const mine = /function csvCell\(v\) \{([\s\S]*?)\n\}/.exec(csvCell.toString().replace(/^function csvCell/, 'function csvCell'));
-  eq(real[1].replace(/\s+/g, ' ').trim(), mine[1].replace(/\s+/g, ' ').trim(),
-    'the copy of csvCell in this test matches util.js — update both or neither');
-}
+/* The REAL csvCell, imported. This used to be a hand-copied duplicate pinned
+   against the original by regex-extracting it out of util.js — because util.js
+   pulled in obsidian and could not be required in bare node. Splitting util.js
+   left csvCell in a pure src/csv.js, so the duplicate and the machinery
+   guarding it both go: the assertions below now drive the shipped function. */
+const { csvCell } = require('../src/csv');
 
 const money = v => `R ${v < 0 ? '-' : ''}${Math.abs(v).toFixed(2)}`;
 
@@ -58,7 +48,7 @@ const ROWS = [
 
 /* ---- 1. formula injection is neutralised ---- */
 {
-  const csv = transactionsCsv(ROWS, csvCell);
+  const csv = transactionsCsv(ROWS);
   const line = csv.split('\n').find(l => l.includes('DEBIT ORDER REVERSAL'));
   ok(line.includes("'-DEBIT ORDER REVERSAL"), 'a description starting with - is prefixed so it cannot execute');
   ok(!/(^|,)-DEBIT/.test(line), 'and the bare form is not what lands in the cell');
@@ -66,7 +56,7 @@ const ROWS = [
 
 /* ---- 2. CSV amounts are raw numbers a spreadsheet can sum ---- */
 {
-  const csv = transactionsCsv(ROWS, csvCell);
+  const csv = transactionsCsv(ROWS);
   const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
   // amount is column 4 (Date, Description, Account, Category, Amount, …)
   const amounts = rows.map(r => r[4]);
@@ -82,13 +72,13 @@ const ROWS = [
 
 /* amountRaw wins when the loader could not strictly parse the cell. */
 {
-  const csv = transactionsCsv([{ ...ROWS[0], amount: 0, amountRaw: '1 234,56 CR' }], csvCell);
+  const csv = transactionsCsv([{ ...ROWS[0], amount: 0, amountRaw: '1 234,56 CR' }]);
   ok(csv.includes('1 234,56 CR'), 'an unparseable original amount is written back verbatim, not as 0.00');
 }
 
 /* ---- 3. excluded rows are exported, and marked ---- */
 {
-  const csv = transactionsCsv(ROWS, csvCell);
+  const csv = transactionsCsv(ROWS);
   ok(csv.includes('TRANSFER TO SAVINGS'), 'an excluded row still appears in the CSV');
   const line = csv.split('\n').find(l => l.includes('TRANSFER TO SAVINGS'));
   eq(line.split(',')[5], 'yes', 'and is marked excluded');
@@ -165,7 +155,7 @@ const ROWS = [
     { name: 'Salary', type: 'income', color: '#0ea5e9' },
     { name: 'Rent, and rates', type: 'expense', color: '#f43f5e' },
   ];
-  const csv = categoriesCsv(cats, csvCell);
+  const csv = categoriesCsv(cats);
   ok(csv.includes('"Rent, and rates"'), 'a comma in a category name is quoted');
   eq(csv.trim().split('\n').length, 4, 'header plus every category');
 
@@ -176,7 +166,7 @@ const ROWS = [
 
 /* ---- 9. empty input does not produce a broken file ---- */
 {
-  eq(transactionsCsv([], csvCell).trim().split('\n').length, 1, 'an empty export is a header and nothing else');
+  eq(transactionsCsv([]).trim().split('\n').length, 1, 'an empty export is a header and nothing else');
   ok(categoriesMarkdown([], 'x').includes('0 categories'), 'and says so in words');
 }
 

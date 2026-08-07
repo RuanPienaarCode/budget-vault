@@ -54,7 +54,7 @@ function stubObsidian() {
       return {
         setIcon() {},
         // Mirrors the real one closely enough for path tests: backslashes to
-        // slashes, collapsed and trimmed slashes, NFC. See src/util.js safeSeg
+        // slashes, collapsed and trimmed slashes, NFC. See src/vault-path.js safeSeg
         // for why the NFC step matters.
         normalizePath: p => String(p).replace(/\\/g, '/').replace(/\/+/g, '/')
           .replace(/^\/|\/$/g, '').normalize('NFC'),
@@ -133,6 +133,7 @@ function makeVault(files) {
 function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
   const vault = makeVault(files);
   const dirtyChecks = [];
+  const saveButtons = [];
   const toasts = [];
 
   // $ / $$ return inert stand-ins: the register* functions only touch the DOM
@@ -160,6 +161,23 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
     money: v => String(v),
     locale: () => require('../../src/locale').PROFILES.za,
     registerDirty: fn => dirtyChecks.push(fn),
+    /* Mirrors controller.js: a view registers the Save button it owns and gets
+       back the disable() it calls after a save. Tracked here so _saveButtons
+       can assert that every editable view registered one — that list is what
+       reloadFromDisk clears, and the whole point of the factory is that it can
+       no longer fall behind the views. */
+    registerSaveButton(sel) {
+      saveButtons.push(sel);
+      return () => { const b = ctx.$(sel); if (b) b.disabled = true; };
+    },
+    dirtyFlag(stateKey, saveSel) {
+      const disable = ctx.registerSaveButton(saveSel);
+      dirtyChecks.push(() => !!ctx.S[stateKey]);
+      return {
+        mark: () => { ctx.S[stateKey] = true; const b = ctx.$(saveSel); if (b) b.disabled = false; },
+        clear: () => { ctx.S[stateKey] = false; disable(); },
+      };
+    },
     provide(obj) {
       for (const k of Object.keys(obj)) {
         if (k in ctx) throw new Error(`ctx.${k} already defined`);
@@ -168,6 +186,7 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
     },
     _toasts: toasts,
     _dirty: () => dirtyChecks.some(fn => fn()),
+    _saveButtons: saveButtons,
   };
   return ctx;
 }

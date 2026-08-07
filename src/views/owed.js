@@ -1,15 +1,16 @@
 'use strict';
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
-const { el, dateInput, keepScroll, escMd, icoEl } = require('../util');
+const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { escMd } = require('../markdown');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
 
 module.exports = function registerOwed(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
-  const mark = () => { S.owedDirty = true; $('#owedSave').disabled = false; };
-  ctx.registerDirty(() => S.owedDirty);
+  const { mark, clear: clearDirty } = ctx.dirtyFlag('owedDirty', '#owedSave');
 
   /* What is still owed. The page used to offer `outstanding | paid` and nothing
      between, so a reader recovering R900 of R4 000 had to choose which lie to
@@ -30,9 +31,7 @@ module.exports = function registerOwed(ctx) {
     const outstanding = S.owed.filter(o => !isSettled(o)).reduce((s, o) => s + outstandingOf(o), 0);
     const back = S.owed.reduce((s, o) => s + Math.min(o.repaid || 0, o.amount || 0), 0)
       + S.owed.filter(o => o.status === 'paid' && !(o.repaid > 0)).reduce((s, o) => s + (o.amount || 0), 0);
-    const kpis = $('#owedKpis'); kpis.empty();
-    const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
-      el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
+    const tile = kpiTiles($('#owedKpis'));
     tile('Outstanding', money(outstanding), outstanding > 0 ? 'text-warning' : '');
     tile('Recovered', money(back), 'text-success');
     tile('Entries', String(S.owed.length));
@@ -108,8 +107,8 @@ module.exports = function registerOwed(ctx) {
         desc: `${money(o.amount)} lent · ${money(o.repaid || 0)} back so far.` },
     ]);
     if (!r) return;
-    const amount = parseFloat(String(r.amount).replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) return toast('Not a number', true);
+    const amount = normalizeAmount(r.amount);
+    if (amount === null || amount <= 0) return toast('Not a number', true);
     o.repaid = (o.repaid || 0) + amount;
     // Settling the last of it closes the entry, so "paid" stays something the
     // arithmetic concludes rather than a second thing to remember.
@@ -133,7 +132,7 @@ module.exports = function registerOwed(ctx) {
 
   async function saveOwed() {
     await writeFile('Owed Money.md', serializeOwed());
-    S.owedDirty = false; $('#owedSave').disabled = true;
+    clearDirty();
     toast('Saved Owed Money.md');
   }
 
@@ -143,10 +142,10 @@ module.exports = function registerOwed(ctx) {
       { key: 'amount', label: 'Amount', type: 'number', value: '0' },
     ]);
     if (!r || !r.person.trim()) return;
-    const amount = parseFloat(String(r.amount).replace(',', '.'));
-    if (isNaN(amount)) return toast('Not a number', true);
+    const amount = normalizeAmount(r.amount);
+    if (amount === null) return toast('Not a number', true);
     S.owed.push({ person: r.person.trim(), amount, description: '', due: '', status: 'outstanding', repaid: 0, lent: '' });
-    S.owedDirty = true; $('#owedSave').disabled = false; renderOwed();
+    mark(); renderOwed();
   }
 
   // serializeOwed is published so a round-trip test can drive the real one.

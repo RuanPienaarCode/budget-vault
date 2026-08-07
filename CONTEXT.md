@@ -88,6 +88,24 @@ but read directly by everything that reports growth or taxable earnings, since
 being excluded from a total was never the same as being invisible.
 _Avoid_: interest earned, investment income
 
+### Owning
+
+**Asset**:
+Something the household owns that is not an account — a house, a car, the
+contents of it, gold, a ring. Held on its own page rather than as an account,
+because it has no transactions, no institution and no balance to reconcile
+against: the only thing the vault knows about it is what somebody says it is
+worth. Counted in net worth alongside positive account balances.
+_Avoid_: possession, property, item, holding
+
+**Valuation**:
+What an asset would sell for, and the date that was last worked out. A stated
+balance for a thing that issues no statements — so its age is the only check
+there is, and it is shown on every row. Goes stale on a year's clock rather
+than the thirty days a bank balance does, because nobody re-values a house
+monthly and a rule that flagged every row forever would be ignored.
+_Avoid_: appraisal, market value, worth, estimate
+
 ### Balances
 
 **Stated balance**:

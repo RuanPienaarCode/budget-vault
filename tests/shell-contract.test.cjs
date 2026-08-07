@@ -130,4 +130,25 @@ eq(topLevelRelocated, [],
   'no table-internal or head-only element may sit at the top level of SHELL_HTML — ' +
   'the DOMParser mount in controller.js would relocate or drop it');
 
-console.log(`PASS — shell id contract + ctx namespace + DOMParser safety intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys).`);
+/* ---- 7. every Save button is registered for the reload reset ----
+   reloadFromDisk re-reads the vault and must put every Save button back to
+   disabled, or the button sits lit over edits the reload already discarded.
+   That list used to be written out by hand in controller.js and #txSave was
+   missing from it, so Transactions offered to save nothing. It is now built by
+   registration — ctx.dirtyFlag(key, sel) for the flag-backed views, bare
+   ctx.registerSaveButton(sel) for Budgets and Transactions, which track their
+   dirtiness some other way. Pinned so a new editable page cannot reintroduce
+   the same gap by forgetting to register. */
+const srcAll = walk(SRC).map(f => fs.readFileSync(f, 'utf8')).join('\n');
+const registeredSave = new Set([
+  ...[...srcAll.matchAll(/registerSaveButton\(\s*'#([\w-]+)'/g)].map(m => m[1]),
+  ...[...srcAll.matchAll(/dirtyFlag\(\s*'[\w-]+'\s*,\s*'#([\w-]+)'/g)].map(m => m[1]),
+]);
+// The shell's Save buttons: every id ending "Save" that is a <button>.
+const shellSaveIds = [...shell.matchAll(/<button[^>]*\bid="([\w-]*Save)"/g)].map(m => m[1]);
+ok(shellSaveIds.length >= 5, `expected the shell's Save buttons (found ${shellSaveIds.length})`);
+eq(shellSaveIds.filter(id => !registeredSave.has(id)), [],
+  'every Save button in shell.js must be registered via ctx.dirtyFlag or ' +
+  'ctx.registerSaveButton, or reloadFromDisk will leave it enabled over discarded edits');
+
+console.log(`PASS — shell id contract + ctx namespace + DOMParser safety intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys, ${shellSaveIds.length} save buttons).`);

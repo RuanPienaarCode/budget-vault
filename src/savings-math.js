@@ -52,6 +52,8 @@
    Pure — no DOM, no obsidian import. `typeOf` is injected so this module never
    has to know how categories are stored. */
 
+const { ISO_DATE } = require('./dates');
+
 /* Split one account's rows. `typeOf(categoryName)` returns the category's type
    or null. Rows are [{ date, amount, cat }] — the shape the loader produces. */
 function splitFlows(rows, typeOf, opts) {
@@ -147,7 +149,7 @@ function accountFlows(account, rows, typeOf, opts) {
    Returns null when there is not enough history to say anything honest. */
 function contributionRate(rows, typeOf, months, today) {
   if (!months || months < 1) return null;
-  const now = (today && /^\d{4}-\d{2}-\d{2}$/.test(today)) ? today : null;
+  const now = (today && ISO_DATE.test(today)) ? today : null;
   if (!now) return null;
   // Window ends at the last day of the PREVIOUS month.
   const [y, m] = now.split('-').map(Number);

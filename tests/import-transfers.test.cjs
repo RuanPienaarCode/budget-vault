@@ -12,7 +12,8 @@
    later from a budget that doesn't add up. Every case below is a way the match
    could be made loose.
 
-   counterpartyAccount is pure, but util.js imports `obsidian` for setIcon, so
+   counterpartyAccount is pure, and since the util.js split it lives in a pure
+   statement.js — the stub below is kept only for the other modules pulled in, so
    this uses the shared stub.
 
      node tests/import-transfers.test.cjs
@@ -20,7 +21,7 @@
 
 const assert = require('assert');
 require('./helpers/harness.cjs').stubObsidian();
-const { counterpartyAccount } = require('../src/util');
+const { counterpartyAccount } = require('../src/statement');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
