@@ -70,7 +70,7 @@ const PRESETS = [
     id: 'ocean',
     name: 'Ocean',
     light: {
-      primary: '#0c4a6e', primaryDark: '#082f49', accent: '#0891b2', gold: '#b45309',
+      primary: '#0c4a6e', primaryDark: '#082f49', accent: '#0891b2', gold: '#c2410c',
       surface: '#ffffff', bodyBg: '#eef2f6', bg1: '#ffffff',
       glass: 'rgba(255,255,255,.62)', glassHi: 'rgba(255,255,255,.8)',
       textPrimary: '#101720', textMuted: '#485566', textLight: '#5b697c',
@@ -78,7 +78,7 @@ const PRESETS = [
     },
     lightOverrides: { '--color-primary-light': '#dbeafe' },
     dark: {
-      primary: '#38bdf8', primaryDark: '#0284c7', accent: '#7dd3fc', gold: '#fbbf24',
+      primary: '#38bdf8', primaryDark: '#0284c7', accent: '#7dd3fc', gold: '#fb923c',
       surface: '#111a2e', bodyBg: '#03060e', bg1: '#070d1a',
       glass: 'rgba(17,28,50,.42)', glassHi: 'rgba(32,50,84,.42)',
       textPrimary: '#eef4ff', textMuted: '#adbcd6', textLight: '#74849e',
@@ -90,7 +90,7 @@ const PRESETS = [
     id: 'plum',
     name: 'Plum',
     light: {
-      primary: '#6b21a8', primaryDark: '#4c1d78', accent: '#9333ea', gold: '#b45309',
+      primary: '#6b21a8', primaryDark: '#4c1d78', accent: '#9333ea', gold: '#a16207',
       surface: '#ffffff', bodyBg: '#f2eef6', bg1: '#ffffff',
       glass: 'rgba(255,255,255,.62)', glassHi: 'rgba(255,255,255,.8)',
       textPrimary: '#17111e', textMuted: '#524661', textLight: '#655874',
@@ -98,7 +98,7 @@ const PRESETS = [
     },
     lightOverrides: { '--color-primary-light': '#f3e8ff' },
     dark: {
-      primary: '#c084fc', primaryDark: '#9333ea', accent: '#e9d5ff', gold: '#fbbf24',
+      primary: '#c084fc', primaryDark: '#9333ea', accent: '#e9d5ff', gold: '#fcd34d',
       surface: '#1b1430', bodyBg: '#08040e', bg1: '#0f0a1c',
       glass: 'rgba(27,20,48,.42)', glassHi: 'rgba(48,36,82,.42)',
       textPrimary: '#f6f0ff', textMuted: '#c3b4d8', textLight: '#877ca5',
@@ -110,7 +110,7 @@ const PRESETS = [
     id: 'slate',
     name: 'Slate',
     light: {
-      primary: '#334155', primaryDark: '#1e293b', accent: '#475569', gold: '#b45309',
+      primary: '#334155', primaryDark: '#1e293b', accent: '#475569', gold: '#92400e',
       surface: '#ffffff', bodyBg: '#eef0f3', bg1: '#ffffff',
       glass: 'rgba(255,255,255,.62)', glassHi: 'rgba(255,255,255,.8)',
       textPrimary: '#12151a', textMuted: '#4a5260', textLight: '#5d6674',
@@ -118,7 +118,7 @@ const PRESETS = [
     },
     lightOverrides: { '--color-primary-light': '#e2e8f0' },
     dark: {
-      primary: '#94a3b8', primaryDark: '#64748b', accent: '#cbd5e1', gold: '#fbbf24',
+      primary: '#94a3b8', primaryDark: '#64748b', accent: '#cbd5e1', gold: '#d4a373',
       surface: '#161a22', bodyBg: '#050609', bg1: '#0a0d13',
       glass: 'rgba(22,26,34,.42)', glassHi: 'rgba(40,48,62,.42)',
       textPrimary: '#f1f4f8', textMuted: '#b4bcc9', textLight: '#7a8392',
