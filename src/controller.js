@@ -4,7 +4,7 @@
    drawer, theme, dirty tracking, vault-change watcher and event wiring. */
 
 const { Notice } = require('obsidian');
-const { el, setIco, setInert } = require('./util');
+const { el, setIco, setInert } = require('./dom');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
@@ -19,6 +19,7 @@ const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
 const registerAccounts = require('./views/accounts');
 const registerSavings = require('./views/savings');
+const registerAssets = require('./views/assets');
 const registerDebts = require('./views/debts');
 const registerOwed = require('./views/owed');
 const registerServices = require('./views/services');
@@ -57,6 +58,8 @@ function mountApp(view) {
     budgetMeta: {},
     txFiles: {},               // 'label/YYYY-MM' -> {label, month, rows, dirty}
     rules: [],                 // {pattern, category}
+    assets: [],                // {name, type, value, valued, notes} — owned, but not an account
+    assetsDirty: false,
     debts: [],                 // {name, lender, type, balance, original, rate, payment, extra, start, category, status, notes}
     debtsDirty: false,
     owed: [],                  // {person, amount, description, due, status}
@@ -118,6 +121,36 @@ function mountApp(view) {
   const dirtyChecks = [];
   ctx.registerDirty = fn => dirtyChecks.push(fn);
 
+  /* The Save buttons that must go back to disabled when the vault is re-read.
+     Registered by the view that owns each one, for exactly the reason above:
+     the list used to be written out by hand in reloadFromDisk, and #txSave was
+     missing from it — so "Reload from disk" discarded transaction edits and
+     left Transactions' Save button lit over them, offering to save nothing.
+     Returns the view's own disable(), so the same registration also gives it
+     the call it makes after a successful save. */
+  const saveButtons = [];
+  ctx.registerSaveButton = sel => {
+    saveButtons.push(sel);
+    return () => { const b = $(sel); if (b) b.disabled = true; };
+  };
+  function disableSaveButtons() {
+    for (const sel of saveButtons) { const b = $(sel); if (b) b.disabled = true; }
+  }
+
+  /* The shape four of the five editable pages share: a boolean on S, a Save
+     button mirroring it, and a dirty predicate the file watcher reads. Three
+     halves of one fact, previously spelled out separately in each view (and in
+     reloadFromDisk). Budgets and Transactions keep their own predicates —
+     neither is backed by a plain flag — but still register their buttons. */
+  ctx.dirtyFlag = (stateKey, saveSel) => {
+    const disable = ctx.registerSaveButton(saveSel);
+    ctx.registerDirty(() => !!S[stateKey]);
+    return {
+      mark: () => { S[stateKey] = true; const b = $(saveSel); if (b) b.disabled = false; },
+      clear: () => { S[stateKey] = false; disable(); },
+    };
+  };
+
   /* Assigned BEFORE the register chain so view modules can destructure them
      like anything else. They used to be attached afterwards, which meant every
      module had to reach through `ctx.render()` late and there was an unwritten
@@ -139,6 +172,7 @@ function mountApp(view) {
   registerBudgets(ctx);
   registerAccounts(ctx);
   registerSavings(ctx);
+  registerAssets(ctx);
   registerDebts(ctx);
   registerOwed(ctx);
   registerServices(ctx);
@@ -167,7 +201,8 @@ function mountApp(view) {
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
-       savings: ctx.renderSavings, accounts: ctx.renderAccounts, debts: ctx.renderDebts, owed: ctx.renderOwed,
+       savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
+       debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
        tax: ctx.renderTax, loans: ctx.renderLoans, import: ctx.renderImport, connect: () => {} })[S.view]();
     /* A vault change can re-render underneath a locked gate. Real `inert` covers
@@ -266,10 +301,7 @@ function mountApp(view) {
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
     await ctx.loadVault();
-    for (const id of ['#budSave', '#debtSave', '#owedSave', '#svcSave', '#taxSave']) {
-      const b = $(id);
-      if (b) b.disabled = true;
-    }
+    disableSaveButtons();
   }
   ctx.reloadFromDisk = reloadFromDisk;
 
@@ -427,17 +459,43 @@ function mountApp(view) {
   view.registerEvent(app.workspace.on('css-change', applyTheme));
 
   /* ------------------------------- wiring -------------------------------- */
-  $('#openSettingsBtn').addEventListener('click', () => {
+  /* Three controls open this plugin's own settings tab — the topbar gear, the
+     avatar and the drawer link. One function so a change to how settings are
+     reached (a different tab id, a guard, a close-the-drawer-first step) lands
+     in one place rather than two of the three. */
+  function openPluginSettings() {
     app.setting.open();
     app.setting.openTabById('budget-app');
-  });
+  }
+
+  /* A drop target and its hidden <input type="file">, wired as one unit: click
+     the zone to open the picker, drag onto it to drop, and either way the file
+     goes to `handle`. Written out twice before — for the statement importer and
+     the tax-document uploader — with the input's value reset present in both
+     but easy to lose, and without it re-picking the SAME file fires no change
+     event at all, so the second attempt silently does nothing. */
+  function wireDropZone(zoneSel, inputSel, handle) {
+    const zone = $(zoneSel);
+    const input = $(inputSel);
+    zone.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => {
+      if (e.target.files[0]) handle(e.target.files[0]);
+      e.target.value = '';
+    });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
+    });
+  }
+
+  $('#openSettingsBtn').addEventListener('click', openPluginSettings);
   // Logo doubles as "home" — no-op until the vault has loaded, same guard the
   // drawer links use (there is no dashboard to show on the connect screen).
   $('#brandHome').addEventListener('click', () => { if (S.loaded) switchView('dashboard'); });
-  $('#topbarAvatar').addEventListener('click', () => {
-    app.setting.open();
-    app.setting.openTabById('budget-app');
-  });
+  $('#topbarAvatar').addEventListener('click', openPluginSettings);
   // One-tap import from any view: go to Import, then open the file picker in the
   // same gesture (iOS blocks a picker opened outside the user-gesture task).
   // A pending review is left alone — the user came back to finish it, not to
@@ -447,11 +505,7 @@ function mountApp(view) {
     switchView('import');
     if (!S.pendingImport) $('#fileInput').click();
   });
-  $('#pluginSettingsLink').addEventListener('click', () => {
-    closeDrawer();
-    app.setting.open();
-    app.setting.openTabById('budget-app');
-  });
+  $('#pluginSettingsLink').addEventListener('click', () => { closeDrawer(); openPluginSettings(); });
   // Switching period rebuilds the budget draft for the new period, discarding
   // any unsaved edits — so confirm first when the Budget view is dirty.
   async function changePeriod(next) {
@@ -493,6 +547,8 @@ function mountApp(view) {
   $('#budAddCat').addEventListener('click', ctx.addNewCategory);
   $('#acctAdd').addEventListener('click', ctx.addAccount);
   $('#savAdd').addEventListener('click', ctx.addAccount);
+  $('#assetSave').addEventListener('click', ctx.saveAssets);
+  $('#assetAdd').addEventListener('click', ctx.addAsset);
   $('#debtSave').addEventListener('click', ctx.saveDebts);
   $('#debtAdd').addEventListener('click', ctx.addDebt);
   // The planner's extra/method are a what-if, not saved state — recompute the
@@ -517,26 +573,10 @@ function mountApp(view) {
   $('#taxNewYear').addEventListener('click', ctx.newTaxYear);
   $('#taxStart').addEventListener('click', ctx.startTax);
   $('#taxYearSel').addEventListener('change', e => ctx.changeTaxYear(e.target.value));
-  const taxDrop = $('#taxDrop');
-  taxDrop.addEventListener('click', () => $('#taxFileInput').click());
-  $('#taxFileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleTaxFile(e.target.files[0]); e.target.value = ''; });
-  taxDrop.addEventListener('dragover', e => { e.preventDefault(); taxDrop.classList.add('dragover'); });
-  taxDrop.addEventListener('dragleave', () => taxDrop.classList.remove('dragover'));
-  taxDrop.addEventListener('drop', e => {
-    e.preventDefault(); taxDrop.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) ctx.handleTaxFile(e.dataTransfer.files[0]);
-  });
+  wireDropZone('#taxDrop', '#taxFileInput', f => ctx.handleTaxFile(f));
   $('#impCommit').addEventListener('click', ctx.commitImport);
   $('#impRemap').addEventListener('click', ctx.remapImport);
-  const drop = $('#drop');
-  drop.addEventListener('click', () => $('#fileInput').click());
-  $('#fileInput').addEventListener('change', e => { if (e.target.files[0]) ctx.handleStatementFile(e.target.files[0]); e.target.value = ''; });
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-  drop.addEventListener('drop', e => {
-    e.preventDefault(); drop.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) ctx.handleStatementFile(e.dataTransfer.files[0]);
-  });
+  wireDropZone('#drop', '#fileInput', f => ctx.handleStatementFile(f));
 
   return {
     start: async () => {

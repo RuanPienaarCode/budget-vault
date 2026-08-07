@@ -142,6 +142,42 @@ const MIXED = {
   ]),
 };
 
+/* A vault with an actual balance sheet, for the position band. Deliberately
+   spread across all four ledgers it reads — accounts (two of them savings and
+   investment), the Assets page, the Debt page and Owed Money — because the
+   band's whole claim is that it agrees with each of those pages.
+
+   The owed row is PART-recovered (2 000 lent, 500 back). That is the case a
+   second copy of the arithmetic gets wrong: it reports 2 000 still owed, which
+   is why outstandingOf lives in owed-math.js and not in two places. */
+const LEDGERS = {
+  [`${B}/Accounts/Savings.md`]: '---\ntype: savings\ntx_label: "Savings"\nbalance: 5000\n---\n',
+  [`${B}/Accounts/Invest.md`]: '---\ntype: investment\ntx_label: "Invest"\nbalance: 12000\n---\n',
+  [`${B}/Assets.md`]:
+    '---\nkind: assets\n---\n\n| Name | Type | Value | Valued | Notes |\n|---|---|---:|---|---|\n' +
+    '| House | property | 800000 | 2026-01-15 |  |\n',
+  [`${B}/Debts.md`]:
+    '---\nkind: debts\n---\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start | Category | Status | Notes |\n' +
+    '|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n' +
+    '| Bond | Bank | home loan | 40000 | 60000 | 9.5 | 1200 | 0 | 2020-01-01 | Housing | active |  |\n',
+  [`${B}/Owed Money.md`]:
+    '---\nkind: owed\n---\n\n| Person | Amount | Description | Due | Status | Repaid | Lent |\n|---|---:|---|---|---|---:|---|\n' +
+    '| Sam | 2000 | Car repair |  | outstanding | 500 | 2026-05-01 |\n',
+};
+const POSITION = { ...MIXED, ...LEDGERS };
+
+/* A credit-card account in the red AND a card row on the Debt page — the shape
+   worth.cardOverlap() exists to disclose. It deliberately does not guess which
+   is the duplicate: names are free text, so any matching rule would be wrong on
+   real data in both directions. */
+const OVERLAP = { ...POSITION,
+  [`${B}/Accounts/Visa.md`]: '---\ntype: credit_card\ntx_label: "Visa"\nbalance: -3000\n---\n',
+  [`${B}/Debts.md`]:
+    '---\nkind: debts\n---\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start | Category | Status | Notes |\n' +
+    '|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n' +
+    '| Visa | Bank | credit card | 3000 | 3000 | 21 | 500 | 0 | 2025-01-01 | Debt | active |  |\n',
+};
+
 /* Same period, but nothing is categorised at all — the shape where the donut
    is legitimately empty forever while the hero climbs on every import. */
 const ALL_UNCAT = {
@@ -159,18 +195,25 @@ const ALL_UNCAT = {
    not what anyone reading this file would assume. Add new cards here as they
    land. */
 const IDS = ['heroCard', 'dashStale', 'trendChart', 'trendSub', 'trendRange',
-  'dashSplit', 'dashSplitSub', 'dashBudget', 'dashBudgetSub'];
+  'dashSplit', 'dashSplitSub', 'dashBudget', 'dashBudgetSub',
+  'dashPositionCard', 'dashPositionKpis', 'dashPositionSub', 'dashPositionNote'];
 
-/* The four cards that own a container of their own and must survive each
-   other, with the marker proving each one really drew. The fixture's single
-   account carries no balance_updated, so the staleness card has something to
-   say rather than returning early. */
+/* Every card that owns a container of its own and must survive each other,
+   with the marker proving each one really drew. The fixture's single account
+   carries no balance_updated, so the staleness card has something to say
+   rather than returning early.
+
+   MIXED deliberately carries NO debts and a positive balance, so none of the
+   position tiles legitimately renders in `text-danger` — the happy-path sweep
+   below reads that class as "a card reported a failure", and a red Debt tile
+   would look identical to one. The red path gets its own fixture (POSITION). */
 const CARDS = [
   ['heroCard', 'hero-grid'],
   ['dashStale', 'kpi-caveat-txt'],
   ['trendChart', null],
   ['dashSplit', null],
   ['dashBudget', null],
+  ['dashPositionKpis', 'mini'],
 ];
 
 async function mount(files) {
@@ -200,6 +243,8 @@ async function mount(files) {
     eq(tagCount(nodes.get('trendChart'), 'SVG'), 1, 'trend card draws one svg');
     eq(tagCount(nodes.get('dashSplit'), 'SVG'), 1, 'donut card draws one svg');
     ok(tagCount(nodes.get('dashBudget'), 'TR') > 2, 'budget table draws rows');
+    eq(all(nodes.get('dashPositionKpis'), e => e._cls.has('mini')).length, 4,
+      'the position band draws its four tiles');
     for (const [id] of CARDS) {
       ok(!has(nodes.get(id), 'text-danger'), `${id} reports no failure on the happy path`);
     }
@@ -327,5 +372,106 @@ async function mount(files) {
     ok(!/uncategorised/.test(sub), `a clean period says nothing about uncategorised — got: ${sub}`);
   }
 
-  console.log(`PASS — dashboard cards fail independently, and the donut declares what it hides (${checks} assertions).`);
+  /* --------------- 6. the position band is NOT period-scoped ------------ *
+     The invariant the whole band rests on. Every other card here answers "what
+     happened in this period"; these four answer "what is true today", and they
+     sit under a period switcher that moves everything above them.
+
+     If a period value ever creeps into renderPosition, the band quietly becomes
+     a lie — and the symptom would be indistinguishable from a card that had
+     stopped updating, which is the exact misreading the guards at the top of
+     views/dashboard.js exist to prevent. Pinned by rendering the same vault at
+     two different periods and demanding the tiles come out byte-identical. */
+  {
+    const { ctx, S, nodes } = await mount(POSITION);
+    ctx.renderDashboard();
+    const july = nodes.get('dashPositionKpis').textContent;
+
+    S.period = '2026-06';
+    ctx.renderDashboard();
+    const june = nodes.get('dashPositionKpis').textContent;
+
+    eq(june, july, 'the position tiles must read identically in any period');
+    ok(/Where you stand|do not move with the period/.test(nodes.get('dashPositionSub').textContent),
+      'and the subtitle says so, so a reader is not left guessing');
+    // The hero, by contrast, MUST have moved — otherwise this test would pass
+    // just as happily against a dashboard that had stopped rendering at all.
+    ctx.renderDashboard();
+    ok(/20000|20 000/.test(nodes.get('heroCard').textContent),
+      'the period cards still track the period (control for the check above)');
+  }
+
+  /* --------- 7. the tiles agree with the pages they summarise ----------- *
+     A tile that disagrees with the page it links to is worse than no tile, so
+     the arithmetic is borrowed from worth() and owedSummary() rather than
+     recomputed. Asserted against the fixture's own figures. */
+  {
+    const { ctx, S, nodes } = await mount(POSITION);
+    ctx.renderDashboard();
+    const txt = nodes.get('dashPositionKpis').textContent;
+
+    const w = require('../src/worth').worth(S.accounts, S.debts, S.assets);
+    const o = require('../src/owed-math').owedSummary(S.owed);
+    // 100 cheque + 5 000 savings + 12 000 investment + 800 000 house = 817 100
+    // owed: 40 000 bond + 0 overdrawn = 40 000  →  net 777 100
+    eq(w.assets, 817100, 'fixture owns 817 100');
+    eq(w.liabilities, 40000, 'and owes 40 000');
+    eq(o.outstanding, 1500, 'with 1 500 still lent out (2 000 less a 500 repayment)');
+
+    ok(txt.includes('R 777100'), `net worth tile carries worth().net — got: ${txt}`);
+    ok(txt.includes('R -40000'), 'the debt tile is negated for display, like the Savings page');
+    ok(txt.includes('R 1500'), 'and owed-to-you is net of the part-payment, not the 2 000 lent');
+    ok(txt.includes('R 17000'), 'savings + investments are summed into one tile');
+    ok(/oldest out \d+ days/.test(txt), 'the owed tile reports age, not a due date');
+  }
+
+  /* --------- 8. a vault with no balance sheet gets no balance sheet ----- *
+     Four tiles reading R0.00 is not an empty state — it is a balance sheet
+     asserting the reader owns nothing, which on a fresh install is a statement
+     about the import being incomplete rather than about their finances. */
+  {
+    const BARE = { [`${B}/Settings.md`]: SETTINGS, ...CATS, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-03', 'Woolworths', 'Groceries', -1200]]) };
+    const { ctx, nodes } = await mount(BARE);
+    ctx.renderDashboard();
+    eq(all(nodes.get('dashPositionKpis'), e => e._cls.has('mini')).length, 0,
+      'no ledger, no tiles');
+    ok(nodes.get('dashPositionCard')._cls.has('hidden'), 'and the whole band stands down');
+    // The period cards above are unaffected — this vault still has spending.
+    ok(has(nodes.get('heroCard'), 'hero-grid'), 'while the period cards carry on');
+  }
+
+  /* --------- 9. the double-count caveat travels with the figure --------- *
+     A credit card can honestly live on the Accounts page OR the Debt page, and
+     nothing stops both. The Savings page discloses it; stating the same net
+     worth here without the same sentence would put two net-worth figures in the
+     app, one qualified and one not — and the unqualified one first. */
+  {
+    const { ctx, nodes } = await mount(OVERLAP);
+    ctx.renderDashboard();
+    const note = nodes.get('dashPositionNote').textContent;
+    ok(/counted twice/.test(note), `the overlap is disclosed — got: ${note}`);
+
+    // …and stays silent when there is nothing to disclose.
+    const { ctx: c2, nodes: n2 } = await mount(POSITION);
+    c2.renderDashboard();
+    eq(n2.get('dashPositionNote').textContent, '',
+      'a vault with no card overlap gets no line about one');
+  }
+
+  /* -------- 10. the staleness caveat now qualifies the right number ----- *
+     It used to sit under the hero, where it qualified four cards built entirely
+     from TRANSACTIONS — which never go stale and never depended on it. It now
+     sits inside the position band, under the net worth those balances are
+     summed into. */
+  {
+    const { ctx, nodes } = await mount(POSITION);
+    ctx.renderDashboard();
+    const txt = nodes.get('dashStale').textContent;
+    ok(/Built from .* nobody has confirmed recently/.test(txt),
+      `the caveat reads as provenance for the total above it — got: ${txt}`);
+    ok(/Review balances/.test(txt), 'and still offers the way to fix it');
+  }
+
+  console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, and the position band ignores the period (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -36,65 +36,8 @@ var require_constants = __commonJS((exports2, module2) => {
   module2.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions };
 });
 
-// src/util.js
-var require_util = __commonJS((exports2, module2) => {
-  var { setIcon } = require("obsidian");
-  var el = (tag, attrs = {}, ...kids) => {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "class")
-        n.className = v;
-      else if (k.startsWith("on"))
-        n.addEventListener(k.slice(2), v);
-      else if (v !== null && v !== undefined)
-        n.setAttribute(k, v);
-    }
-    for (const kid of kids.flat())
-      n.append(kid?.nodeType ? kid : document.createTextNode(kid ?? ""));
-    return n;
-  };
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-  function dateInput(value, attrs, commit) {
-    const v = (value ?? "").toString().trim();
-    const picker = v === "" || ISO_DATE.test(v);
-    return el("input", {
-      type: picker ? "date" : "text",
-      value: v,
-      ...picker ? {} : {
-        placeholder: "YYYY-MM-DD",
-        inputmode: "numeric",
-        autocomplete: "off",
-        autocorrect: "off",
-        autocapitalize: "off",
-        spellcheck: "false"
-      },
-      ...attrs,
-      onchange: (e) => commit(e.target.value.trim(), e)
-    });
-  }
-  function keepScroll(elm, rebuild) {
-    const box = elm.parentElement;
-    const left = box ? box.scrollLeft : 0;
-    rebuild();
-    if (box)
-      box.scrollLeft = left;
-  }
-  function setIco(elm, names) {
-    for (const n of Array.isArray(names) ? names : [names]) {
-      try {
-        setIcon(elm, n);
-      } catch (e) {}
-      if (elm.firstElementChild)
-        return;
-    }
-  }
-  function icoEl(names, cls) {
-    const s = document.createElement("span");
-    s.className = "ico" + (cls ? " " + cls : "");
-    s.setAttribute("aria-hidden", "true");
-    setIco(s, names);
-    return s;
-  }
+// src/markdown.js
+var require_markdown = __commonJS((exports2, module2) => {
   var escMd = (s) => (s ?? "").toString().replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>").trim();
   var unescMd = (s) => (s ?? "").replace(/<br>/g, `
 `).replace(/\\\|/g, "|").trim();
@@ -148,12 +91,6 @@ var require_util = __commonJS((exports2, module2) => {
     }
     return rows;
   }
-  function parseNum(s) {
-    const t = (s ?? "").toString().trim();
-    if (/^-?\d+(\.\d+)?$/.test(t))
-      return { ok: true, value: parseFloat(t) };
-    return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
-  }
   function patchFrontmatter(raw, updates) {
     const has = (k) => Object.prototype.hasOwnProperty.call(updates, k);
     if (!raw || !raw.trim()) {
@@ -190,364 +127,116 @@ var require_util = __commonJS((exports2, module2) => {
     return out.join(`
 `);
   }
-  function parseDelimited(text, delim) {
-    const rows = [];
-    let row = [], field = "", inQ = false;
-    for (let i = 0;i < text.length; i++) {
-      const ch = text[i];
-      if (inQ) {
-        if (ch === '"') {
-          if (text[i + 1] === '"') {
-            field += '"';
-            i++;
-          } else
-            inQ = false;
-        } else
-          field += ch;
-      } else if (ch === '"')
-        inQ = true;
-      else if (ch === delim) {
-        row.push(field);
-        field = "";
-      } else if (ch === `
-` || ch === "\r") {
-        if (ch === "\r" && text[i + 1] === `
-`)
-          i++;
-        row.push(field);
-        field = "";
-        if (row.length > 1 || row[0] !== "")
-          rows.push(row);
-        row = [];
-      } else
-        field += ch;
-    }
-    if (field !== "" || row.length) {
-      row.push(field);
-      rows.push(row);
-    }
-    return rows;
-  }
-  var parseCsv = (text) => parseDelimited(text, ",");
-  var DELIMS = [",", ";", "\t", "|"];
-  function sniffDelimiter(text) {
-    const sample = text.slice(0, 65536);
-    let best = ",", bestScore = 0;
-    for (const d of DELIMS) {
-      const counts = parseDelimited(sample, d).map((r) => r.length).filter((n) => n > 1);
-      if (!counts.length)
-        continue;
-      const freq = new Map;
-      for (const n of counts)
-        freq.set(n, (freq.get(n) || 0) + 1);
-      let mode = 0, agree = 0;
-      for (const [n, c] of freq)
-        if (c > agree) {
-          mode = n;
-          agree = c;
-        }
-      const score = agree * (mode - 1);
-      if (score > bestScore) {
-        bestScore = score;
-        best = d;
-      }
-    }
-    return best;
-  }
-  var parseStatement = (text) => parseDelimited(text, sniffDelimiter(text));
-  function decodeStatement(bytes) {
-    const b = bytes;
-    if (b.length >= 2 && b[0] === 255 && b[1] === 254)
-      return new TextDecoder("utf-16le").decode(b.subarray(2));
-    if (b.length >= 2 && b[0] === 254 && b[1] === 255)
-      return new TextDecoder("utf-16be").decode(b.subarray(2));
-    if (b.length >= 3 && b[0] === 239 && b[1] === 187 && b[2] === 191)
-      return new TextDecoder("utf-8").decode(b.subarray(3));
-    const head = b.subarray(0, 256);
-    let evenNul = 0, oddNul = 0;
-    for (let i = 0;i < head.length; i++)
-      if (head[i] === 0) {
-        if (i % 2)
-          oddNul++;
-        else
-          evenNul++;
-      }
-    if (head.length >= 8) {
-      if (oddNul > head.length / 4 && evenNul === 0)
-        return new TextDecoder("utf-16le").decode(b);
-      if (evenNul > head.length / 4 && oddNul === 0)
-        return new TextDecoder("utf-16be").decode(b);
-    }
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(b);
-    } catch (e) {
-      return new TextDecoder("windows-1252").decode(b);
-    }
-  }
-  function isoParts(y, mo, d) {
-    if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31)
-      return null;
-    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  }
-  var MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-  function parseStatementDate(raw, dayFirst = true) {
-    let s = (raw ?? "").toString().trim();
-    if (!s)
-      return null;
-    s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z|[+-]\d{2}:?\d{2})?$/i, "").trim();
-    let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-    if (m)
-      return isoParts(+m[1], +m[2], +m[3]);
-    m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
-    if (m) {
-      let d = dayFirst ? +m[1] : +m[2], mo = dayFirst ? +m[2] : +m[1];
-      if (mo > 12 && d <= 12) {
-        const t = d;
-        d = mo;
-        mo = t;
-      }
-      return isoParts(+m[3], mo, d);
-    }
-    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
-    if (m)
-      return isoParts(+m[1], +m[2], +m[3]);
-    m = s.match(/^(\d{1,2})[ -]?([A-Za-z]{3,})[ -]?(\d{4})$/);
-    if (m) {
-      const mo = MONTHS[m[2].slice(0, 3).toLowerCase()];
-      if (mo)
-        return isoParts(+m[3], mo, +m[1]);
-    }
-    const dt = new Date(s);
-    if (!isNaN(dt.getTime()))
-      return isoParts(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
-    return null;
-  }
-  function normalizeAmount(raw) {
-    let s = (raw ?? "").toString().trim();
-    if (!s)
-      return null;
-    let neg = false;
-    if (/^\(.*\)$/.test(s)) {
-      neg = true;
-      s = s.slice(1, -1).trim();
-    }
-    const marker = s.match(/(cr|dr)\.?\s*$/i);
-    if (marker) {
-      if (marker[1].toLowerCase() === "dr")
-        neg = true;
-      s = s.slice(0, marker.index).trim();
-    }
-    if (s.endsWith("-")) {
-      neg = true;
-      s = s.slice(0, -1).trim();
-    }
-    if (s.startsWith("-")) {
-      neg = true;
-      s = s.slice(1).trim();
-    }
-    if (s.startsWith("+"))
-      s = s.slice(1).trim();
-    s = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, "").replace(/[\s\u00A0\u202F']/g, "");
-    if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s))
-      s = s.replace(/\./g, "").replace(",", ".");
-    else
-      s = s.replace(/,/g, "");
-    if (!/^\d+(\.\d+)?$/.test(s))
-      return null;
-    const n = Number(s);
-    return neg ? -n : n;
-  }
-  function counterpartyAccount(desc, accounts, selfLabel) {
-    const runs = String(desc || "").match(/\d{4,}/g);
-    if (!runs)
-      return null;
-    for (const n of runs) {
-      for (const a of accounts || []) {
-        const num = String(a.account_number || "").trim();
-        if (!num || num !== n)
-          continue;
-        const label = a.tx_label || a.name;
-        if (selfLabel && label === selfLabel)
-          continue;
-        return a;
-      }
-    }
-    return null;
-  }
-  function reconcileAmounts(rows) {
-    const c = (v) => Math.round(v * 100);
-    const pts = (rows || []).filter((r) => r && r.amount != null && r.balance != null);
-    if (pts.length < 4)
-      return { verified: false, flip: false, order: null, pairs: Math.max(0, pts.length - 1), agreement: 0 };
-    let best = { verified: false, flip: false, order: null, pairs: pts.length - 1, agreement: 0 };
-    for (const order of ["fwd", "rev"]) {
-      for (const sign of [1, -1]) {
-        let agree = 0;
-        for (let i = 1;i < pts.length; i++) {
-          const prev = c(pts[i - 1].balance), bal = c(pts[i].balance);
-          const step = order === "fwd" ? sign * c(pts[i].amount) : -sign * c(pts[i - 1].amount);
-          if (bal - prev === step)
-            agree++;
-        }
-        if (agree > best.agreement)
-          best = { verified: false, flip: sign === -1, order, pairs: pts.length - 1, agreement: agree };
-      }
-    }
-    best.verified = best.agreement >= Math.ceil(best.pairs * 0.8);
-    return best;
-  }
-  function detectHeaderlessColumns(rows, dayFirst = true) {
-    const isDate = (v) => !!parseStatementDate(v, dayFirst);
-    const num = (v) => normalizeAmount(v);
-    const dataStart = (rows || []).findIndex((r) => r.length >= 3 && isDate(r[0]) && r.slice(1).some((c) => num(c) != null));
-    if (dataStart === -1)
-      return null;
-    const width = rows[dataStart].length;
-    const data = rows.slice(dataStart).filter((r) => r.length === width && isDate(r[0]));
-    if (data.length < 2)
-      return null;
-    let firstNum = width;
-    while (firstNum > 1 && data.every((r) => num(r[firstNum - 1]) != null))
-      firstNum--;
-    if (firstNum >= width)
-      return null;
-    let iAmount = width - 1, iBalance = -1;
-    if (width - firstNum >= 2) {
-      const bal = reconcileAmounts(data.map((r) => ({ amount: num(r[width - 2]), balance: num(r[width - 1]) })));
-      if (bal.verified) {
-        iAmount = width - 2;
-        iBalance = width - 1;
-      } else if (bal.pairs < 3 && data.some((r) => num(r[width - 2]) !== 0))
-        return null;
-    }
-    let iDesc = -1;
-    for (let c = iAmount - 1;c >= 1; c--) {
-      const vals = data.map((r) => (r[c] ?? "").toString().trim()).filter(Boolean);
-      if (!vals.length)
-        continue;
-      const text = vals.filter((v) => num(v) == null && !isDate(v)).length;
-      if (text > vals.length / 2) {
-        iDesc = c;
-        break;
-      }
-    }
-    if (iDesc === -1)
-      return null;
-    return { dataStart, iDate: 0, iDesc, iAmount, iBalance };
-  }
-  var DATE_COLS = [
-    "value date",
-    "date",
-    "posting date",
-    "post date",
-    "date posted",
-    "effective date",
-    "transaction date",
-    "trans date",
-    "txn date",
-    "process date",
-    "action date"
-  ];
-  var DESC_COLS = [
-    "description",
-    "title",
-    "narrative",
-    "narration",
-    "details",
-    "detail",
-    "particulars",
-    "transaction description",
-    "statement description",
-    "transaction detail",
-    "reference",
-    "payee",
-    "memo"
-  ];
-  var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "signed amount", "value"];
-  var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
-  var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
-  var BALANCE_COLS = ["balance", "running balance", "closing balance", "account balance", "balance (zar)"];
-  function detectStatementColumns(rows, dayFirst = true) {
-    const headerIdx = (rows || []).findIndex((r) => {
-      const low = r.map((c) => c.trim().toLowerCase());
-      const has = (names) => names.some((n) => low.includes(n));
-      return (has(DATE_COLS) || low.some((c) => c.includes("date"))) && (has(AMOUNT_COLS) || has(DEBIT_COLS) && has(CREDIT_COLS));
-    });
-    if (headerIdx !== -1) {
-      const low = rows[headerIdx].map((c) => c.trim().toLowerCase());
-      const col = (names) => {
-        for (const n of names) {
-          const i = low.indexOf(n);
-          if (i !== -1)
-            return i;
-        }
-        return -1;
-      };
-      let iDate = col(DATE_COLS);
-      if (iDate === -1)
-        iDate = low.findIndex((c) => c.includes("date"));
-      let iDesc = col(DESC_COLS);
-      if (iDesc === -1)
-        iDesc = low.findIndex((c) => c.includes("desc"));
-      let iBalance = col(BALANCE_COLS);
-      if (iBalance === -1)
-        iBalance = low.findIndex((c) => c.includes("balance"));
-      const iAmount = col(AMOUNT_COLS), iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
-      if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
-        return null;
-      return { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
-    }
-    const shape = detectHeaderlessColumns(rows, dayFirst);
-    if (!shape)
-      return null;
-    return { ...shape, iDebit: -1, iCredit: -1, iExtra: -1, headerIdx: -1 };
-  }
-  function learnPattern(desc) {
-    let s = (desc ?? "").toString().trim();
-    for (;; ) {
-      const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
-      if (!m)
-        break;
-      const w = m[2];
-      const digits = (w.match(/\d/g) || []).length;
-      const noise = /\*{2,}/.test(w) || /\d{4,}/.test(w) || digits > 0 && digits / w.length >= 0.4 || digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w);
-      if (!noise)
-        break;
-      s = m[1];
-    }
-    return s.length >= 4 ? s : (desc ?? "").toString().trim();
-  }
-  function prepareRules(rules) {
-    return (rules || []).map((r) => ({ p: (r.pattern ?? "").trim().toLowerCase(), category: r.category })).filter((r) => r.p);
-  }
-  function matchRule(desc, rules) {
-    const d = (desc ?? "").toString().trim().toLowerCase();
-    let best = null, bestLen = 0;
-    for (const r of rules) {
-      if (r.p === d)
-        return r;
-      if (r.p.length > bestLen && d.includes(r.p)) {
-        best = r;
-        bestLen = r.p.length;
-      }
-    }
-    return best;
-  }
-  function autoCategorise(desc, rules) {
-    const r = matchRule(desc, rules);
-    return r ? r.category : "";
-  }
-  var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-  function safeSeg(s) {
-    const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
-    return WIN_RESERVED.test(out) ? `${out}-` : out;
-  }
   var yamlStr = (v) => `"${String(v ?? "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
-  function csvCell(v) {
-    let s = String(v ?? "");
-    if (/^[=+\-@\t\r]/.test(s))
-      s = `'${s}`;
-    return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  module2.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr };
+});
+
+// src/dates.js
+var require_dates = __commonJS((exports2, module2) => {
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  function isoOf(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function todayIso() {
+    return isoOf(new Date);
+  }
+  function isoDayNumber(iso) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+  }
+  function isoFromDayNumber(n) {
+    const d = new Date(n * 86400000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
+  function isRealIsoDate(s) {
+    if (typeof s !== "string" || !ISO_DATE.test(s))
+      return false;
+    const [y, m, d] = s.split("-").map(Number);
+    const t = Date.UTC(y, m - 1, d);
+    if (!Number.isFinite(t))
+      return false;
+    const back = new Date(t);
+    return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
+  }
+  var MIN_PERIOD_DAYS = 7;
+  var MAX_PERIOD_DAYS = 31;
+  function periodDaysOrZero(v) {
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS)
+      return 0;
+    return n;
+  }
+  module2.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero };
+});
+
+// src/dom.js
+var require_dom = __commonJS((exports2, module2) => {
+  var { setIcon } = require("obsidian");
+  var { ISO_DATE } = require_dates();
+  var el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class")
+        n.className = v;
+      else if (k.startsWith("on"))
+        n.addEventListener(k.slice(2), v);
+      else if (v !== null && v !== undefined)
+        n.setAttribute(k, v);
+    }
+    for (const kid of kids.flat())
+      n.append(kid?.nodeType ? kid : document.createTextNode(kid ?? ""));
+    return n;
+  };
+  function dateInput(value, attrs, commit) {
+    const v = (value ?? "").toString().trim();
+    const picker = v === "" || ISO_DATE.test(v);
+    return el("input", {
+      type: picker ? "date" : "text",
+      value: v,
+      ...picker ? {} : {
+        placeholder: "YYYY-MM-DD",
+        inputmode: "numeric",
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        spellcheck: "false"
+      },
+      ...attrs,
+      onchange: (e) => commit(e.target.value.trim(), e)
+    });
+  }
+  function keepScroll(elm, rebuild) {
+    const box = elm.parentElement;
+    const left = box ? box.scrollLeft : 0;
+    rebuild();
+    if (box)
+      box.scrollLeft = left;
+  }
+  function setIco(elm, names) {
+    for (const n of Array.isArray(names) ? names : [names]) {
+      try {
+        setIcon(elm, n);
+      } catch (e) {}
+      if (elm.firstElementChild)
+        return;
+    }
+  }
+  function icoEl(names, cls) {
+    const s = document.createElement("span");
+    s.className = "ico" + (cls ? " " + cls : "");
+    s.setAttribute("aria-hidden", "true");
+    setIco(s, names);
+    return s;
+  }
+  function kpiTiles(container) {
+    container.empty();
+    return (label, value, cls, sub) => {
+      const t = el("div", { class: "mini" }, el("div", { class: "l" }, label), el("div", { class: `v num ${cls || ""}` }, value));
+      if (sub)
+        t.append(el("div", { class: "s" }, sub));
+      container.append(t);
+      return t;
+    };
   }
   var INERT_SUPPORTED = typeof HTMLElement !== "undefined" && "inert" in HTMLElement.prototype;
   var FOCUSABLE_SEL = "a[href],button,input,select,textarea,summary,[tabindex]";
@@ -582,44 +271,7 @@ var require_util = __commonJS((exports2, module2) => {
       }
     }
   }
-  function collapsePath(p) {
-    const out = [];
-    for (const seg of (p || "").split("/")) {
-      if (seg === "" || seg === ".")
-        continue;
-      if (seg === "..") {
-        if (!out.length)
-          return null;
-        out.pop();
-      } else
-        out.push(seg);
-    }
-    return out.join("/");
-  }
-  var MIN_PERIOD_DAYS = 7;
-  var MAX_PERIOD_DAYS = 31;
-  function periodDaysOrZero(v) {
-    const n = parseInt(v, 10);
-    if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS)
-      return 0;
-    return n;
-  }
-  function isoDayNumber(iso) {
-    const [y, m, d] = String(iso).split("-").map(Number);
-    return Math.round(Date.UTC(y, m - 1, d) / 86400000);
-  }
-  var ISO_DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
-  function isRealIsoDate(s) {
-    if (typeof s !== "string" || !ISO_DATE_SHAPE.test(s))
-      return false;
-    const [y, m, d] = s.split("-").map(Number);
-    const t = Date.UTC(y, m - 1, d);
-    if (!Number.isFinite(t))
-      return false;
-    const back = new Date(t);
-    return back.getUTCFullYear() === y && back.getUTCMonth() + 1 === m && back.getUTCDate() === d;
-  }
-  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, escMd, unescMd, parseFrontmatter, parseMdTable, parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts, counterpartyAccount, parseNum, patchFrontmatter, learnPattern, prepareRules, matchRule, autoCategorise, safeSeg, collapsePath, yamlStr, csvCell, setInert, periodDaysOrZero, isoDayNumber, isRealIsoDate };
+  module2.exports = { el, dateInput, keepScroll, setIco, icoEl, kpiTiles, setInert };
 });
 
 // src/shell.js
@@ -642,7 +294,7 @@ var require_shell = __commonJS((exports2, module2) => {
       <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Menu</div>
+    <div class="drawer-section-label">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
       <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
     </button>
@@ -651,9 +303,6 @@ var require_shell = __commonJS((exports2, module2) => {
     </button>
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
-    </button>
-    <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -665,6 +314,9 @@ var require_shell = __commonJS((exports2, module2) => {
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
     </button>
+    <button class="drawer-link" data-view="assets">
+      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span>Assets
+    </button>
     <button class="drawer-link" data-view="debts">
       <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
     </button>
@@ -673,6 +325,9 @@ var require_shell = __commonJS((exports2, module2) => {
     </button>
     <button class="drawer-link" data-view="services">
       <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+    </button>
+    <button class="drawer-link" data-view="tax">
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -741,8 +396,7 @@ var require_shell = __commonJS((exports2, module2) => {
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero" id="heroCard"></div>
-        <div class="kpi-caveat mb-4" id="dashStale"></div>
+        <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -780,6 +434,25 @@ var require_shell = __commonJS((exports2, module2) => {
           <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="dashBudget"></table></div>
           </div>
+        </div>
+        <!-- Position, not flow. Everything above this band moves when the period
+             changes; nothing in it does, which is why the subtitle says so — a
+             card that ignores the control above it reads as broken otherwise.
+
+             Deliberately NOT wrapped in a .card. Its tiles are .mini cards with
+             borders of their own, and every other mini-grid in the app (Savings,
+             Accounts, Debt, Owed, Assets, Services) sits bare on the page
+             background for exactly that reason. The heading it does need comes
+             from .section-h, which carries the card header's type scale without
+             the card's chrome or its 44px gutters. -->
+        <div class="mb-4" id="dashPositionCard">
+          <div class="section-h">
+            <h2>Where you stand</h2>
+            <div class="sub" id="dashPositionSub"></div>
+          </div>
+          <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
+          <div class="kpi-caveat" id="dashPositionNote"></div>
+          <div class="kpi-caveat" id="dashStale"></div>
         </div>
       </section>
 
@@ -950,6 +623,27 @@ var require_shell = __commonJS((exports2, module2) => {
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
+      </section>
+
+      <section id="view-assets" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Assets</h1>
+          <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
+        </div>
+        <div class="mini-grid mini-kpis-4" id="assetKpis"></div>
+        <div class="kpi-caveat mb-4" id="assetStale"></div>
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>What you own</h2><div class="sub">Edit a value or a valuation date, then save</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="assetAdd"><span class="ico" data-ico="plus"></span> New asset</button>
+              <button class="btn-gradient" id="assetSave" disabled>Save changes</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table table-hover" id="assetTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-debts" class="hidden">
@@ -1198,10 +892,57 @@ var require_shell = __commonJS((exports2, module2) => {
   module2.exports = { SHELL_HTML };
 });
 
+// src/amount.js
+var require_amount = __commonJS((exports2, module2) => {
+  function normalizeAmount(raw) {
+    let s = (raw ?? "").toString().trim();
+    if (!s)
+      return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) {
+      neg = true;
+      s = s.slice(1, -1).trim();
+    }
+    const marker = s.match(/(cr|dr)\.?\s*$/i);
+    if (marker) {
+      if (marker[1].toLowerCase() === "dr")
+        neg = true;
+      s = s.slice(0, marker.index).trim();
+    }
+    if (s.endsWith("-")) {
+      neg = true;
+      s = s.slice(0, -1).trim();
+    }
+    if (s.startsWith("-")) {
+      neg = true;
+      s = s.slice(1).trim();
+    }
+    if (s.startsWith("+"))
+      s = s.slice(1).trim();
+    s = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, "").replace(/[\s\u00A0\u202F']/g, "");
+    if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s))
+      s = s.replace(/\./g, "").replace(",", ".");
+    else
+      s = s.replace(/,/g, "");
+    if (!/^\d+(\.\d+)?$/.test(s))
+      return null;
+    const n = Number(s);
+    return neg ? -n : n;
+  }
+  function parseNum(s) {
+    const t = (s ?? "").toString().trim();
+    if (/^-?\d+(\.\d+)?$/.test(t))
+      return { ok: true, value: parseFloat(t) };
+    return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
+  }
+  module2.exports = { normalizeAmount, parseNum };
+});
+
 // src/modal.js
 var require_modal = __commonJS((exports2, module2) => {
   var { Modal, Setting } = require("obsidian");
-  var { el, normalizeAmount } = require_util();
+  var { el } = require_dom();
+  var { normalizeAmount } = require_amount();
 
   class FieldModal extends Modal {
     constructor(app, title, fields, resolve) {
@@ -1464,7 +1205,7 @@ var require_modal = __commonJS((exports2, module2) => {
   function askRulesCleanup(app, report) {
     return new Promise((res) => new RulesCleanupModal(app, report, res).open());
   }
-  module2.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
+  module2.exports = { askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
 });
 
 // src/locale.js
@@ -2043,10 +1784,34 @@ var require_locale = __commonJS((exports2, module2) => {
   module2.exports = { PROFILES, COUNTRY_ORDER, localeFor };
 });
 
+// src/vault-path.js
+var require_vault_path = __commonJS((exports2, module2) => {
+  var WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+  function safeSeg(s) {
+    const out = (s ?? "").toString().normalize("NFC").replace(/[\u00A0\u202F]/g, " ").replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "").replace(/[\x00-\x1F\x7F]/g, "").replace(/[\\/:*?"<>|]/g, "-").replace(/\.{2,}/g, "-").replace(/^\.+/, "").trim().replace(/[. ]+$/, "");
+    return WIN_RESERVED.test(out) ? `${out}-` : out;
+  }
+  function collapsePath(p) {
+    const out = [];
+    for (const seg of (p || "").split("/")) {
+      if (seg === "" || seg === ".")
+        continue;
+      if (seg === "..") {
+        if (!out.length)
+          return null;
+        out.pop();
+      } else
+        out.push(seg);
+    }
+    return out.join("/");
+  }
+  module2.exports = { safeSeg, collapsePath };
+});
+
 // src/io.js
 var require_io = __commonJS((exports2, module2) => {
   var { normalizePath, TFile, TFolder } = require("obsidian");
-  var { collapsePath } = require_util();
+  var { collapsePath } = require_vault_path();
   module2.exports = function registerIo(ctx) {
     const { vault, plugin } = ctx;
     const stampWrite = () => {
@@ -2154,14 +1919,10 @@ var require_io = __commonJS((exports2, module2) => {
 // src/period.js
 var require_period = __commonJS((exports2, module2) => {
   var { MONTHS } = require_constants();
-  var { safeSeg, periodDaysOrZero, isoDayNumber: dayNum, isRealIsoDate } = require_util();
+  var { periodDaysOrZero } = require_dates();
+  var { safeSeg } = require_vault_path();
+  var { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require_dates();
   var MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
-  var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
-  var DAY = 86400000;
-  function isoFromDayNum(n) {
-    const d = new Date(n * DAY);
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-  }
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function anchorDay() {
@@ -2194,17 +1955,13 @@ var require_period = __commonJS((exports2, module2) => {
       if (n === 1) {
         return { start: `${p}-01`, end: `${p}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}` };
       }
-      const sd = new Date(y, m - 2, n);
-      const ed = new Date(y, m - 1, n - 1);
-      const f = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      return { start: f(sd), end: f(ed) };
+      return { start: isoOf(new Date(y, m - 2, n)), end: isoOf(new Date(y, m - 1, n - 1)) };
     }
     function currentPeriod() {
       const now = new Date;
       const iv = intervalDays();
       if (iv) {
-        const today = dayNum(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
-        return isoFromDayNum(periodStartOnOrBefore(today, iv));
+        return isoFromDayNum(periodStartOnOrBefore(dayNum(isoOf(now)), iv));
       }
       let y = now.getFullYear(), m = now.getMonth() + 1;
       if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {
@@ -2406,11 +2163,95 @@ var require_period = __commonJS((exports2, module2) => {
   };
 });
 
+// src/csv.js
+var require_csv = __commonJS((exports2, module2) => {
+  function parseDelimited(text, delim) {
+    const rows = [];
+    let row = [], field = "", inQ = false;
+    for (let i = 0;i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else
+            inQ = false;
+        } else
+          field += ch;
+      } else if (ch === '"')
+        inQ = true;
+      else if (ch === delim) {
+        row.push(field);
+        field = "";
+      } else if (ch === `
+` || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === `
+`)
+          i++;
+        row.push(field);
+        field = "";
+        if (row.length > 1 || row[0] !== "")
+          rows.push(row);
+        row = [];
+      } else
+        field += ch;
+    }
+    if (field !== "" || row.length) {
+      row.push(field);
+      rows.push(row);
+    }
+    return rows;
+  }
+  var parseCsv = (text) => parseDelimited(text, ",");
+  var DELIMS = [",", ";", "\t", "|"];
+  function sniffDelimiter(text) {
+    const sample = text.slice(0, 65536);
+    let best = ",", bestScore = 0;
+    for (const d of DELIMS) {
+      const counts = parseDelimited(sample, d).map((r) => r.length).filter((n) => n > 1);
+      if (!counts.length)
+        continue;
+      const freq = new Map;
+      for (const n of counts)
+        freq.set(n, (freq.get(n) || 0) + 1);
+      let mode = 0, agree = 0;
+      for (const [n, c] of freq)
+        if (c > agree) {
+          mode = n;
+          agree = c;
+        }
+      const score = agree * (mode - 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = d;
+      }
+    }
+    return best;
+  }
+  function csvCell(v) {
+    let s = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(s))
+      s = `'${s}`;
+    return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  module2.exports = { parseDelimited, parseCsv, sniffDelimiter, csvCell };
+});
+
 // src/load.js
 var require_load = __commonJS((exports2, module2) => {
   var { TFile } = require("obsidian");
   var { TYPE_ORDER } = require_constants();
-  var { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero, isRealIsoDate } = require_util();
+  var { periodDaysOrZero } = require_dates();
+  var { parseNum, normalizeAmount } = require_amount();
+  var { parseFrontmatter, parseMdTable, unescMd } = require_markdown();
+  var { parseCsv } = require_csv();
+  var { safeSeg } = require_vault_path();
+  var { isRealIsoDate } = require_dates();
+  function fmNum(v) {
+    const s = (v ?? "").toString().trim();
+    return s ? normalizeAmount(s) : null;
+  }
   module2.exports = function registerLoad(ctx) {
     const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
     async function loadVault() {
@@ -2453,12 +2294,12 @@ var require_load = __commonJS((exports2, module2) => {
           ...((bal) => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || "0")),
           balance_updated: fm.balance_updated || "",
           in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? "").trim()),
-          credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
-          goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
+          credit_limit: fmNum(fm.credit_limit),
+          goal_amount: fmNum(fm.goal_amount),
           target_date: fm.target_date || "",
-          monthly_contribution: fm.monthly_contribution ? parseFloat(fm.monthly_contribution) : null,
-          total_invested: fm.total_invested ? parseFloat(fm.total_invested) : null,
-          starting_amount: fm.starting_amount ? parseFloat(fm.starting_amount) : null,
+          monthly_contribution: fmNum(fm.monthly_contribution),
+          total_invested: fmNum(fm.total_invested),
+          starting_amount: fmNum(fm.starting_amount),
           inception_date: fm.inception_date || "",
           tags: fm.tags || "",
           body
@@ -2561,6 +2402,22 @@ var require_load = __commonJS((exports2, module2) => {
             notes: unescMd(c[11] || "")
           });
         }
+      S.assets = [];
+      S.assetsDirty = false;
+      const assetTxt = await readFile("Assets.md");
+      S.assetsFm = assetTxt && parseFrontmatter(assetTxt).raw || "kind: assets";
+      if (assetTxt)
+        for (const c of parseMdTable(assetTxt).slice(1)) {
+          if (!c[0])
+            continue;
+          S.assets.push({
+            name: unescMd(c[0]),
+            type: unescMd(c[1] || "other"),
+            value: Math.max(0, parseNum(c[2] || "0").value || 0),
+            valued: (c[3] || "").trim(),
+            notes: unescMd(c[4] || "")
+          });
+        }
       S.services = [];
       S.servicesDirty = false;
       const svcTxt = await readFile("Services.md");
@@ -2599,14 +2456,7 @@ var require_load = __commonJS((exports2, module2) => {
           const t = (s || "").trim().toLowerCase().replace(/[-\s]/g, "");
           return t === "uploaded" ? "uploaded" : t === "n/a" || t === "na" ? "n/a" : "needed";
         };
-        const figAmount = (s) => {
-          const t = (s || "").toString().replace(/[^\d.,-]/g, "");
-          if (!t)
-            return 0;
-          const norm = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
-          const n = Number(norm);
-          return Number.isFinite(n) ? n : 0;
-        };
+        const figAmount = (s) => normalizeAmount(s) ?? 0;
         const signedNum = (v) => {
           if (v === undefined || v === null || v === "")
             return null;
@@ -2662,9 +2512,49 @@ var require_load = __commonJS((exports2, module2) => {
   };
 });
 
+// src/rules.js
+var require_rules = __commonJS((exports2, module2) => {
+  function learnPattern(desc) {
+    let s = (desc ?? "").toString().trim();
+    for (;; ) {
+      const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
+      if (!m)
+        break;
+      const w = m[2];
+      const digits = (w.match(/\d/g) || []).length;
+      const noise = /\*{2,}/.test(w) || /\d{4,}/.test(w) || digits > 0 && digits / w.length >= 0.4 || digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w);
+      if (!noise)
+        break;
+      s = m[1];
+    }
+    return s.length >= 4 ? s : (desc ?? "").toString().trim();
+  }
+  function prepareRules(rules) {
+    return (rules || []).map((r) => ({ p: (r.pattern ?? "").trim().toLowerCase(), category: r.category })).filter((r) => r.p);
+  }
+  function matchRule(desc, rules) {
+    const d = (desc ?? "").toString().trim().toLowerCase();
+    let best = null, bestLen = 0;
+    for (const r of rules) {
+      if (r.p === d)
+        return r;
+      if (r.p.length > bestLen && d.includes(r.p)) {
+        best = r;
+        bestLen = r.p.length;
+      }
+    }
+    return best;
+  }
+  function autoCategorise(desc, rules) {
+    const r = matchRule(desc, rules);
+    return r ? r.category : "";
+  }
+  module2.exports = { learnPattern, prepareRules, matchRule, autoCategorise };
+});
+
 // src/rule-cleanup.js
 var require_rule_cleanup = __commonJS((exports2, module2) => {
-  var { matchRule, autoCategorise } = require_util();
+  var { matchRule, autoCategorise } = require_rules();
   function analyseRules(rules, descriptions) {
     const all = rules || [];
     const prepared = [];
@@ -2744,8 +2634,13 @@ var require_rule_cleanup = __commonJS((exports2, module2) => {
 
 // src/categories.js
 var require_categories = __commonJS((exports2, module2) => {
-  var { el, parseFrontmatter, learnPattern, prepareRules, autoCategorise, safeSeg, yamlStr, csvCell } = require_util();
+  var { el } = require_dom();
+  var { parseFrontmatter, yamlStr } = require_markdown();
+  var { csvCell } = require_csv();
+  var { learnPattern, prepareRules, autoCategorise } = require_rules();
+  var { safeSeg } = require_vault_path();
   var { TYPE_ORDER } = require_constants();
+  var { todayIso } = require_dates();
   var { askFields, confirmModal, askRulesCleanup } = require_modal();
   var { analyseRules } = require_rule_cleanup();
   module2.exports = function registerCategories(ctx) {
@@ -2980,9 +2875,7 @@ Budget category of type **${type}**.
       const report = analyseRules(S.rules, descs);
       if (!await askRulesCleanup(app, report))
         return 0;
-      const d = new Date;
-      const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const backup = `Data/Categorisation Rules.pre-tidy-${stamp}.csv`;
+      const backup = `Data/Categorisation Rules.pre-tidy-${todayIso()}.csv`;
       if (!fileAt(backup)) {
         try {
           await writeFile(backup, rulesCsv(S.rules));
@@ -3003,12 +2896,8 @@ Budget category of type **${type}**.
 
 // src/reconcile.js
 var require_reconcile = __commonJS((exports2, module2) => {
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var { ISO_DATE, todayIso } = require_dates();
   var STALE_DAYS = 30;
-  function todayIso() {
-    const d = new Date;
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }
   function daysSince(iso, today) {
     if (!ISO_DATE.test(iso || ""))
       return null;
@@ -3054,12 +2943,98 @@ var require_reconcile = __commonJS((exports2, module2) => {
     }
     return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
   }
-  module2.exports = { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile, stalenessSummary };
+  module2.exports = { STALE_DAYS, daysSince, isStale, reconcile, stalenessSummary };
+});
+
+// src/worth.js
+var require_worth = __commonJS((exports2, module2) => {
+  function activeDebts(debts) {
+    return (debts || []).filter((d) => d && d.status !== "paid");
+  }
+  function assetTotal(assets) {
+    return (assets || []).reduce((t, a) => t + Math.max(0, a.value || 0), 0);
+  }
+  function worth(accounts, debts, assets) {
+    const list = accounts || [];
+    const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
+    const ownedAssets = assetTotal(assets);
+    const owned = ownedAccounts + ownedAssets;
+    const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
+    const active = activeDebts(debts);
+    const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
+    const liabilities = fromAccounts + fromDebts;
+    return {
+      assets: owned,
+      ownedAccounts,
+      ownedAssets,
+      liabilities,
+      fromAccounts,
+      fromDebts,
+      net: owned - liabilities,
+      active
+    };
+  }
+  function cardOverlap(accounts, debts) {
+    const cardAccounts = (accounts || []).filter((a) => a.type === "credit_card" && (a.balance || 0) < 0);
+    const cardDebts = activeDebts(debts).filter((d) => /credit\s*card/i.test(d.type || ""));
+    return cardAccounts.length && cardDebts.length ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length } : null;
+  }
+  function debtsByType(debts) {
+    const byType = new Map;
+    for (const d of activeDebts(debts)) {
+      if (!(d.balance > 0))
+        continue;
+      const k = (d.type || "").trim() || "other";
+      byType.set(k, (byType.get(k) || 0) + d.balance);
+    }
+    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  }
+  function assetsByType(assets) {
+    const byType = new Map;
+    for (const a of assets || []) {
+      if (!(a.value > 0))
+        continue;
+      const k = (a.type || "").trim() || "other";
+      byType.set(k, (byType.get(k) || 0) + a.value);
+    }
+    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  }
+  module2.exports = { worth, activeDebts, assetTotal, cardOverlap, debtsByType, assetsByType };
+});
+
+// src/owed-math.js
+var require_owed_math = __commonJS((exports2, module2) => {
+  var { daysSince } = require_reconcile();
+  function outstandingOf(o) {
+    return Math.max(0, (o.amount || 0) - (o.repaid || 0));
+  }
+  function isSettled(o) {
+    return o.status === "paid" || outstandingOf(o) === 0;
+  }
+  function owedSummary(owed, today) {
+    const list = owed || [];
+    let outstanding = 0, recovered = 0, open = 0, oldestDays = null;
+    for (const o of list) {
+      const settled = isSettled(o);
+      if (settled) {
+        recovered += o.repaid > 0 ? Math.min(o.repaid, o.amount || 0) : o.amount || 0;
+        continue;
+      }
+      open++;
+      outstanding += outstandingOf(o);
+      recovered += Math.min(o.repaid || 0, o.amount || 0);
+      const age = daysSince(o.lent, today);
+      if (age !== null && (oldestDays === null || age > oldestDays))
+        oldestDays = age;
+    }
+    return { outstanding, recovered, open, entries: list.length, oldestDays };
+  }
+  module2.exports = { outstandingOf, isSettled, owedSummary };
 });
 
 // src/chart.js
 var require_chart = __commonJS((exports2, module2) => {
-  var { el } = require_util();
+  var { el } = require_dom();
   var NS = "http://www.w3.org/2000/svg";
   function themeColors(root) {
     const css = getComputedStyle(root);
@@ -3243,7 +3218,6 @@ var require_chart = __commonJS((exports2, module2) => {
     return wrap;
   }
   module2.exports = {
-    NS,
     themeColors,
     createChart,
     scales,
@@ -3267,9 +3241,12 @@ var require_chart = __commonJS((exports2, module2) => {
 
 // src/views/dashboard.js
 var require_dashboard = __commonJS((exports2, module2) => {
-  var { el, icoEl, safeSeg } = require_util();
+  var { el, icoEl } = require_dom();
+  var { safeSeg } = require_vault_path();
   var { TYPE_ORDER } = require_constants();
   var { stalenessSummary } = require_reconcile();
+  var { worth, cardOverlap } = require_worth();
+  var { owedSummary } = require_owed_math();
   var {
     themeColors,
     createChart,
@@ -3309,10 +3286,88 @@ var require_dashboard = __commonJS((exports2, module2) => {
     const guardedSplit = () => guard("#dashSplit", "spending split", renderSplit);
     function renderDashboard() {
       guard("#heroCard", "summary", renderHero);
-      guard("#dashStale", "balance staleness", renderStale);
       guardedTrend();
       guardedSplit();
       guard("#dashBudget", "budget table", renderBudgetTable);
+      guard("#dashPositionKpis", "position summary", renderPosition);
+      guard("#dashPositionNote", "double-count note", renderOverlapNote);
+      guard("#dashStale", "balance staleness", renderStale);
+    }
+    const balanceOf = (type) => S.accounts.filter((a) => a.type === type).reduce((t, a) => t + (a.balance || 0), 0);
+    function posTile(grid, { label, value, cls, sub, view, say }) {
+      const btn = el("button", {
+        type: "button",
+        class: `v num ${cls || ""}`,
+        "aria-label": say,
+        onclick: () => ctx.switchView(view)
+      }, value);
+      const t = el("div", { class: "mini" }, el("div", { class: "l" }, label), btn);
+      if (sub)
+        t.append(el("div", { class: "s" }, sub));
+      grid.append(t);
+      return t;
+    }
+    function renderPosition() {
+      const grid = $("#dashPositionKpis");
+      grid.empty();
+      const card = $("#dashPositionCard");
+      const w = worth(S.accounts, S.debts, S.assets);
+      const owed = owedSummary(S.owed);
+      const savings = balanceOf("savings");
+      const invest = balanceOf("investment");
+      const hasLedger = w.assets > 0 || w.liabilities > 0 || owed.entries > 0 || savings > 0 || invest > 0;
+      const hasCaveat = stalenessSummary(S.accounts).stale > 0;
+      if (card)
+        card.classList.toggle("hidden", !hasLedger && !hasCaveat);
+      $("#dashPositionSub").textContent = hasLedger ? "As things stand today — these do not move with the period above" : "";
+      if (!hasLedger)
+        return;
+      posTile(grid, {
+        label: "Net worth",
+        value: money(w.net, 0),
+        cls: w.net >= 0 ? "grad-txt" : "text-danger",
+        sub: `${money(w.assets, 0)} owned · ${money(w.liabilities, 0)} owed`,
+        view: "savings",
+        say: `Net worth ${money(w.net)} — ${money(w.assets)} owned against ${money(w.liabilities)} owed. Open Savings and Investments.`
+      });
+      posTile(grid, {
+        label: "Debt",
+        value: money(-w.liabilities, 0),
+        cls: w.liabilities > 0 ? "text-danger" : "",
+        sub: w.fromDebts && w.fromAccounts ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page` : w.liabilities > 0 ? `${w.active.length} active` : "nothing owed",
+        view: "debts",
+        say: w.liabilities > 0 ? `Debt ${money(w.liabilities)} owed. Open the Debt page.` : "No debt owed. Open the Debt page."
+      });
+      posTile(grid, {
+        label: "Owed to you",
+        value: money(owed.outstanding, 0),
+        cls: owed.outstanding > 0 ? "text-warning" : "",
+        sub: owed.outstanding > 0 ? `${owed.open} outstanding${owed.oldestDays !== null ? ` · oldest out ${owed.oldestDays} days` : ""}` : owed.entries ? `${money(owed.recovered, 0)} recovered` : "nothing lent out",
+        view: "owed",
+        say: owed.outstanding > 0 ? `${money(owed.outstanding)} owed to you across ${owed.open} ${owed.open === 1 ? "entry" : "entries"}. Open Owed Money.` : "Nothing outstanding. Open Owed Money."
+      });
+      posTile(grid, {
+        label: "Savings & investments",
+        value: money(savings + invest, 0),
+        sub: `${money(savings, 0)} savings · ${money(invest, 0)} invested`,
+        view: "savings",
+        say: `${money(savings + invest)} in savings and investments. Open Savings and Investments.`
+      });
+    }
+    function renderOverlapNote() {
+      const wrap = $("#dashPositionNote");
+      wrap.empty();
+      const o = cardOverlap(S.accounts, S.debts);
+      if (!o)
+        return;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${o.cardAccounts} credit-card ${o.cardAccounts === 1 ? "account" : "accounts"} and ` + `${o.cardDebts} card ${o.cardDebts === 1 ? "debt" : "debts"} are tracked — if any card is in both, it is counted twice above.`));
+      const btn = el("button", {
+        type: "button",
+        class: "kpi-caveat-btn",
+        "aria-label": "Review tracked debts on the Debt page"
+      }, "Review debts");
+      btn.addEventListener("click", () => ctx.switchView("debts"));
+      wrap.append(btn);
     }
     function renderStale() {
       const wrap = $("#dashStale");
@@ -3320,8 +3375,10 @@ var require_dashboard = __commonJS((exports2, module2) => {
       const s = stalenessSummary(S.accounts);
       if (!s.stale)
         return;
-      const age = s.oldestDays === null ? "none carry a date" : `the oldest ${s.oldestDays} days ago`;
-      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${s.stale} of ${s.total} account balances unconfirmed — ${age}.`));
+      const age = s.oldestDays === null ? "none of them carry a date" : `the oldest ${s.oldestDays} days ago`;
+      const all = s.stale === s.total;
+      const line = all ? `Built from ${s.total === 1 ? "a balance" : `${s.total} balances`} nobody has confirmed recently` : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${line} — ${age}.`));
       const btn = el("button", {
         type: "button",
         class: "kpi-caveat-btn",
@@ -3645,34 +3702,35 @@ var require_dashboard = __commonJS((exports2, module2) => {
 
 // src/exporter.js
 var require_exporter = __commonJS((exports2, module2) => {
+  var { csvCell } = require_csv();
   var EXPORT_DIR = "Exports";
   function safeName(s) {
     const cleaned = String(s ?? "").replace(/[\\/:*?"<>|#^[\]]/g, "-").replace(/\s+/g, " ").trim();
     return /^\.+$/.test(cleaned) ? "export" : cleaned || "export";
   }
-  function amountCell(row, cell) {
+  function amountCell(row) {
     const v = row.amountRaw != null ? row.amountRaw : Number(row.amount || 0).toFixed(2);
-    return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : cell(v);
+    return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : csvCell(v);
   }
-  function transactionsCsv(rows, cell) {
+  function transactionsCsv(rows) {
     const head = ["Date", "Description", "Account", "Category", "Amount", "Excluded", "Note"];
     const body = rows.map((r) => [
-      cell(r.date),
-      cell(r.desc),
-      cell(r.label),
-      cell(r.cat || ""),
-      amountCell(r, cell),
-      cell(r.excluded ? "yes" : ""),
-      cell(r.note || "")
+      csvCell(r.date),
+      csvCell(r.desc),
+      csvCell(r.label),
+      csvCell(r.cat || ""),
+      amountCell(r),
+      csvCell(r.excluded ? "yes" : ""),
+      csvCell(r.note || "")
     ].join(","));
-    return [head.map(cell).join(","), ...body].join(`
+    return [head.map(csvCell).join(","), ...body].join(`
 `) + `
 `;
   }
-  function categoriesCsv(categories, cell) {
+  function categoriesCsv(categories) {
     const head = ["Name", "Type", "Colour"];
-    const body = (categories || []).map((c) => [c.name, c.type || "", c.color || ""].map(cell).join(","));
-    return [head.map(cell).join(","), ...body].join(`
+    const body = (categories || []).map((c) => [c.name, c.type || "", c.color || ""].map(csvCell).join(","));
+    return [head.map(csvCell).join(","), ...body].join(`
 `) + `
 `;
   }
@@ -3749,7 +3807,6 @@ var require_exporter = __commonJS((exports2, module2) => {
     EXPORT_DIR,
     safeName,
     escMd,
-    amountCell,
     transactionsCsv,
     categoriesCsv,
     transactionsMarkdown,
@@ -3760,12 +3817,17 @@ var require_exporter = __commonJS((exports2, module2) => {
 
 // src/views/transactions.js
 var require_transactions = __commonJS((exports2, module2) => {
-  var { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr, csvCell } = require_util();
+  var { el, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { escMd, patchFrontmatter, yamlStr } = require_markdown();
+  var { csvCell } = require_csv();
   var { askFields, askSplit } = require_modal();
   var { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require_exporter();
+  var { ISO_DATE, todayIso } = require_dates();
   module2.exports = function registerTransactions(ctx) {
     const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
+    const clearSaveButton = ctx.registerSaveButton("#txSave");
     const PAGE = 100;
     let shown = PAGE, shownFor = null;
     function filteredRows() {
@@ -3938,10 +4000,8 @@ var require_transactions = __commonJS((exports2, module2) => {
       ])].sort();
       if (!labels.length)
         return toast("Add an account first — every transaction belongs to one", true);
-      const now = new Date;
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
       const r = await askFields(app, "Add transaction", [
-        { key: "date", label: "Date", type: "date", value: today },
+        { key: "date", label: "Date", type: "date", value: todayIso() },
         { key: "desc", label: "Description", type: "text", placeholder: "e.g. Cash — vegetables at the market" },
         { key: "label", label: "Account", type: "select", options: labels, value: $("#txAccount").value || labels[0] },
         { key: "dir", label: "Direction", type: "select", value: "out", options: [
@@ -3958,7 +4018,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       if (!r)
         return;
       const date = r.date.trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+      if (!ISO_DATE.test(date))
         return toast("Date must be YYYY-MM-DD", true);
       const desc = r.desc.trim();
       if (!desc)
@@ -4001,7 +4061,7 @@ var require_transactions = __commonJS((exports2, module2) => {
         learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })));
         pendingLearns.clear();
       }
-      $("#txSave").disabled = true;
+      clearSaveButton();
       toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
     }
     async function exportTransactions() {
@@ -4024,9 +4084,9 @@ var require_transactions = __commonJS((exports2, module2) => {
       const generated = new Date().toISOString().slice(0, 16).replace("T", " ");
       let written;
       try {
-        written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, csvCell));
+        written = await writeVaultFile(paths.txCsv, transactionsCsv(rows));
         await writeVaultFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
-        await writeVaultFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+        await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
         await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
       } catch (e) {
         console.error("Budget: export failed", e);
@@ -4044,7 +4104,8 @@ var require_transactions = __commonJS((exports2, module2) => {
 
 // src/views/budgets.js
 var require_budgets = __commonJS((exports2, module2) => {
-  var { el, escMd, icoEl, patchFrontmatter } = require_util();
+  var { el, icoEl } = require_dom();
+  var { escMd, patchFrontmatter } = require_markdown();
   var { TYPE_ORDER } = require_constants();
   module2.exports = function registerBudgets(ctx) {
     const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
@@ -4126,6 +4187,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       return budDirty || !!b && !b.disabled;
     }
     ctx.registerDirty(budgetDirty);
+    ctx.registerSaveButton("#budSave");
     function budgetTotalsStrip() {
       const draft = budgetDraft();
       const sum = periodSummary(S.period);
@@ -4333,9 +4395,13 @@ var require_budgets = __commonJS((exports2, module2) => {
 
 // src/views/accounts.js
 var require_accounts = __commonJS((exports2, module2) => {
-  var { el, icoEl, patchFrontmatter, safeSeg, yamlStr } = require_util();
+  var { el, kpiTiles, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { patchFrontmatter, yamlStr } = require_markdown();
+  var { safeSeg } = require_vault_path();
   var { askFields } = require_modal();
-  var { ISO_DATE, STALE_DAYS, todayIso, daysSince, isStale, reconcile } = require_reconcile();
+  var { STALE_DAYS, daysSince, isStale, reconcile } = require_reconcile();
+  var { ISO_DATE, todayIso } = require_dates();
   module2.exports = function registerAccounts(ctx) {
     const {
       S,
@@ -4386,7 +4452,8 @@ var require_accounts = __commonJS((exports2, module2) => {
       const s = String(v ?? "").trim();
       if (!s)
         return null;
-      return parseFloat(s.replace(",", ".").replace(/[^\d.-]/g, ""));
+      const n = normalizeAmount(s);
+      return n === null ? NaN : n;
     }
     function periodActivity(labels) {
       let inAmt = 0, outAmt = 0, count = 0;
@@ -4574,15 +4641,11 @@ var require_accounts = __commonJS((exports2, module2) => {
           return true;
         return reconcile(a, e.rows).state === "drift";
       }).length;
-      const tile = (l, v, cls, sub) => {
-        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
-        if (sub)
-          t.append(el("div", { class: "s" }, sub));
-        wrap.append(t);
-      };
-      tile("Assets", money(assets), "text-success");
-      tile("Liabilities", money(liabilities), liabilities > 0 ? "text-danger" : "");
-      tile("Net worth", money(assets - liabilities), assets - liabilities >= 0 ? "grad-txt" : "text-danger");
+      const elsewhere = (S.assets || []).some((a) => a.value > 0) || (S.debts || []).some((d) => d.status !== "paid" && d.balance > 0);
+      const tile = kpiTiles(wrap);
+      tile("In credit", money(assets), "text-success");
+      tile("Overdrawn", money(liabilities), liabilities > 0 ? "text-danger" : "");
+      tile("Net worth", money(assets - liabilities), assets - liabilities >= 0 ? "grad-txt" : "text-danger", elsewhere ? "across these accounts only" : null);
       tile("Needs attention", String(attention), attention > 0 ? "text-warning" : "", attention > 0 ? "unverified or drifting balances" : "every balance checks out");
     }
     function accountTile(a, entry) {
@@ -4840,6 +4903,7 @@ Transactions are stored under \`Transactions/${name}/\` as monthly files.
 
 // src/savings-math.js
 var require_savings_math = __commonJS((exports2, module2) => {
+  var { ISO_DATE } = require_dates();
   function splitFlows(rows, typeOf, opts) {
     const from = opts && opts.from || "";
     const to = opts && opts.to || "";
@@ -4919,7 +4983,7 @@ var require_savings_math = __commonJS((exports2, module2) => {
   function contributionRate(rows, typeOf, months, today) {
     if (!months || months < 1)
       return null;
-    const now = today && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : null;
+    const now = today && ISO_DATE.test(today) ? today : null;
     if (!now)
       return null;
     const [y, m] = now.split("-").map(Number);
@@ -4936,45 +5000,15 @@ var require_savings_math = __commonJS((exports2, module2) => {
   module2.exports = { splitFlows, accountFlows, contributionRate };
 });
 
-// src/worth.js
-var require_worth = __commonJS((exports2, module2) => {
-  function activeDebts(debts) {
-    return (debts || []).filter((d) => d && d.status !== "paid");
-  }
-  function worth(accounts, debts) {
-    const list = accounts || [];
-    const assets = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
-    const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
-    const active = activeDebts(debts);
-    const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
-    const liabilities = fromAccounts + fromDebts;
-    return { assets, liabilities, fromAccounts, fromDebts, net: assets - liabilities, active };
-  }
-  function cardOverlap(accounts, debts) {
-    const cardAccounts = (accounts || []).filter((a) => a.type === "credit_card" && (a.balance || 0) < 0);
-    const cardDebts = activeDebts(debts).filter((d) => /credit\s*card/i.test(d.type || ""));
-    return cardAccounts.length && cardDebts.length ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length } : null;
-  }
-  function debtsByType(debts) {
-    const byType = new Map;
-    for (const d of activeDebts(debts)) {
-      if (!(d.balance > 0))
-        continue;
-      const k = (d.type || "").trim() || "other";
-      byType.set(k, (byType.get(k) || 0) + d.balance);
-    }
-    return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
-  }
-  module2.exports = { worth, activeDebts, cardOverlap, debtsByType };
-});
-
 // src/views/savings.js
 var require_savings = __commonJS((exports2, module2) => {
-  var { el, icoEl } = require_util();
+  var { el, kpiTiles, icoEl } = require_dom();
   var { themeColors, createChart, tip } = require_chart();
-  var { isStale, stalenessSummary, reconcile, todayIso } = require_reconcile();
+  var { isStale, stalenessSummary, reconcile } = require_reconcile();
+  var { todayIso } = require_dates();
   var { accountFlows } = require_savings_math();
-  var { worth, activeDebts, cardOverlap, debtsByType } = require_worth();
+  var { worth, activeDebts, cardOverlap, debtsByType, assetsByType } = require_worth();
+  var { daysSince } = require_reconcile();
   module2.exports = function registerSavings(ctx) {
     const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
     function renderSavings() {
@@ -4982,16 +5016,9 @@ var require_savings = __commonJS((exports2, module2) => {
       const investments = S.accounts.filter((a) => a.type === "investment");
       const totalSavings = savings.reduce((s, a) => s + a.balance, 0);
       const totalInvest = investments.reduce((s, a) => s + a.balance, 0);
-      const w = worth(S.accounts, S.debts);
+      const w = worth(S.accounts, S.debts, S.assets);
       const netWorth = w.net;
-      const kpis = $("#savingsKpis");
-      kpis.empty();
-      const tile = (l, v, cls, sub) => {
-        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
-        if (sub)
-          t.append(el("div", { class: "s" }, sub));
-        kpis.append(t);
-      };
+      const tile = kpiTiles($("#savingsKpis"));
       tile("Net worth", money(netWorth), netWorth >= 0 ? "grad-txt" : "text-danger");
       tile("Savings", money(totalSavings));
       tile("Investments", money(totalInvest));
@@ -5009,9 +5036,17 @@ var require_savings = __commonJS((exports2, module2) => {
       renderSavings();
       toast(`${a.name} reconciled to ${money(implied)}`);
     }
+    const ASSET_STALE_DAYS = 365;
+    function staleAssets() {
+      return (S.assets || []).filter((a) => {
+        const d = daysSince(a.valued);
+        return (d === null || d > ASSET_STALE_DAYS) && a.value > 0;
+      });
+    }
     function renderStaleNote() {
       const wrap = $("#savingsStale");
       wrap.empty();
+      renderAssetCaveat(wrap);
       const s = stalenessSummary(S.accounts);
       if (!s.stale)
         return;
@@ -5026,6 +5061,20 @@ var require_savings = __commonJS((exports2, module2) => {
       }, "Review balances");
       btn.addEventListener("click", () => ctx.switchView("accounts"));
       wrap.append(note, btn);
+    }
+    function renderAssetCaveat(wrap) {
+      const stale = staleAssets();
+      if (!stale.length)
+        return;
+      const owned = stale.reduce((t, a) => t + a.value, 0);
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${money(owned, 0)} of what you own was last valued over a year ago.`));
+      const btn = el("button", {
+        type: "button",
+        class: "kpi-caveat-btn",
+        "aria-label": "Review asset valuations on the Assets page"
+      }, "Review valuations");
+      btn.addEventListener("click", () => ctx.switchView("assets"));
+      wrap.append(btn);
     }
     function renderGoals() {
       const withGoals = S.accounts.filter((a) => a.goal_amount);
@@ -5125,6 +5174,12 @@ var require_savings = __commonJS((exports2, module2) => {
         if (neg < 0)
           debts.push({ label, amount: -neg, color });
       }
+      const ASSET_VARS = ["--color-accent", "--color-investment", "--color-info", "--ink-faint"];
+      const ASSET_FALLBACKS = ["#0d9488", "#6f42c1", "#0ea5e9", "#5f6779"];
+      assetsByType(S.assets).forEach((a, i) => {
+        const color = (css.getPropertyValue(ASSET_VARS[i % ASSET_VARS.length]) || "").trim() || ASSET_FALLBACKS[i % ASSET_FALLBACKS.length];
+        assets.push({ label: a.type, amount: a.amount, color, fromAssetPage: true });
+      });
       const DEBT_VARS = ["--color-warning", "--color-danger", "--color-investment", "--ink-faint"];
       const DEBT_FALLBACKS = ["#f5a524", "#f43f5e", "#6f42c1", "#5f6779"];
       debtsByType(S.debts).forEach((d, i) => {
@@ -5136,7 +5191,13 @@ var require_savings = __commonJS((exports2, module2) => {
       const net = totalAssets - totalDebts;
       const active = activeDebts(S.debts);
       const overlap = cardOverlap(S.accounts, S.debts);
-      $("#savingsWorthSub").textContent = overlap ? "Across your accounts and the Debt page · a credit card appears on both, so it may be counted twice" : active.length ? "Across your accounts and the Debt page" : "Across your accounts";
+      const ledgers = [
+        "your accounts",
+        ...S.assets && S.assets.some((a) => a.value > 0) ? ["the Assets page"] : [],
+        ...active.length ? ["the Debt page"] : []
+      ];
+      const across = ledgers.length > 1 ? `Across ${ledgers.slice(0, -1).join(", ")} and ${ledgers[ledgers.length - 1]}` : "Across your accounts";
+      $("#savingsWorthSub").textContent = overlap ? `${across} · a credit card appears on two of them, so it may be counted twice` : across;
       if (!totalAssets && !totalDebts) {
         wrap.append(el("p", { class: "text-muted", style: "margin:0" }, "Add a balance to any account and the split appears here."));
         return;
@@ -5219,8 +5280,199 @@ var require_savings = __commonJS((exports2, module2) => {
   };
 });
 
+// src/views/assets.js
+var require_assets = __commonJS((exports2, module2) => {
+  var { el, kpiTiles, dateInput, keepScroll, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { escMd } = require_markdown();
+  var { askFields } = require_modal();
+  var { daysSince } = require_reconcile();
+  var { todayIso } = require_dates();
+  var { assetTotal } = require_worth();
+  var ASSET_TYPES = [
+    "property",
+    "vehicle",
+    "household contents",
+    "jewellery",
+    "precious metals",
+    "electronics",
+    "collectibles",
+    "equipment",
+    "other"
+  ];
+  var VALUED_STALE_DAYS = 365;
+  module2.exports = function registerAssets(ctx) {
+    const { S, $, app, money, toast, writeFile } = ctx;
+    const { mark, clear: clearDirty } = ctx.dirtyFlag("assetsDirty", "#assetSave");
+    const isUnvalued = (a) => {
+      const d = daysSince(a.valued);
+      return d === null || d > VALUED_STALE_DAYS;
+    };
+    function valuedAge(a) {
+      const d = daysSince(a.valued);
+      if (d === null)
+        return a.valued ? null : "never valued";
+      if (d < 0)
+        return "valued ahead of today";
+      if (d < 31)
+        return d <= 1 ? "valued today" : `valued ${d} days ago`;
+      const months = Math.round(d / 30.44);
+      if (months < 18)
+        return `valued ${months} month${months === 1 ? "" : "s"} ago`;
+      const years = Math.round(d / 365.25);
+      return `valued ${years} year${years === 1 ? "" : "s"} ago`;
+    }
+    function renderAssetKpis() {
+      const total = assetTotal(S.assets);
+      const biggest = S.assets.length ? S.assets.reduce((b, a) => a.value > b.value ? a : b) : null;
+      const unvalued = S.assets.filter(isUnvalued).length;
+      const tile = kpiTiles($("#assetKpis"));
+      tile("Total value", money(total), total > 0 ? "text-success" : "");
+      tile("Items", String(S.assets.length));
+      tile("Largest", biggest ? money(biggest.value, 0) : "—", "", biggest ? biggest.name : null);
+      tile("Unvalued", String(unvalued), unvalued > 0 ? "text-warning" : "", unvalued > 0 ? "not valued in the last year" : "every value is current");
+    }
+    function renderAssetStale() {
+      const wrap = $("#assetStale");
+      wrap.empty();
+      const stale = S.assets.filter(isUnvalued);
+      if (!stale.length)
+        return;
+      const all = stale.length === S.assets.length;
+      const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
+      const subject = all ? S.assets.length === 1 ? "This value is" : "Every value here is" : `${stale.length} of ${S.assets.length} values are`;
+      wrap.append(el("div", { class: "kpi-caveat-txt" }, icoEl(["info", "alert-circle"]), `${subject} over a year old` + (share > 0.5 ? ` — and that is ${Math.round(share * 100)}% of the total.` : ".")));
+    }
+    function renderAssets(focusRow) {
+      renderAssetKpis();
+      renderAssetStale();
+      const t = $("#assetTable");
+      keepScroll(t, () => {
+        t.empty();
+        t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Item"), el("th", { scope: "col" }, "Kind"), el("th", { scope: "col", class: "num" }, "Value"), el("th", { scope: "col" }, "Valued"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
+        const body = el("tbody", {});
+        for (const a of S.assets) {
+          const age = valuedAge(a);
+          body.append(el("tr", {}, el("td", { style: "font-weight:600" }, a.name, ...age ? [el("div", { class: `asset-age${isUnvalued(a) ? " asset-age-old" : ""}` }, age)] : []), el("td", {}, el("select", {
+            class: "form-select form-select-sm",
+            "aria-label": `Kind of ${a.name}`,
+            onchange: (e) => {
+              a.type = e.target.value;
+              mark();
+              renderAssets();
+            }
+          }, ...a.type && !ASSET_TYPES.includes(a.type) ? [el("option", { value: a.type, selected: "" }, a.type)] : [], ...ASSET_TYPES.map((k) => el("option", { value: k, ...k === a.type ? { selected: "" } : {} }, k)))), el("td", { class: "num" }, el("input", {
+            type: "number",
+            step: "0.01",
+            min: "0",
+            class: "form-control form-control-sm",
+            value: a.value || "",
+            "aria-label": `Value of ${a.name}`,
+            onchange: (e) => {
+              a.value = Math.max(0, parseFloat(e.target.value) || 0);
+              mark();
+              renderAssetKpis();
+            }
+          })), el("td", {}, dateInput(a.valued, {
+            class: "form-control form-control-sm",
+            "aria-label": `Date ${a.name} was valued`
+          }, (v) => {
+            a.valued = v;
+            mark();
+            renderAssets();
+          })), el("td", {}, el("input", {
+            type: "text",
+            class: "form-control form-control-sm",
+            value: a.notes,
+            "aria-label": `Notes for ${a.name}`,
+            onchange: (e) => {
+              a.notes = e.target.value;
+              mark();
+            }
+          })), el("td", {}, el("button", {
+            class: "btn-ghost btn-ghost-sm",
+            "aria-label": `Remove ${a.name}`,
+            onclick: () => {
+              S.assets.splice(S.assets.indexOf(a), 1);
+              mark();
+              renderAssets();
+            }
+          }, "✕"))));
+        }
+        if (!S.assets.length) {
+          body.append(el("tr", {}, el("td", { colspan: "6", class: "text-muted" }, "Nothing listed yet. Add the house, the car, the contents, anything with a " + "resale value — net worth counts what you owe on them either way.")));
+        }
+        t.append(body);
+      });
+      if (focusRow !== undefined && focusRow >= 0) {
+        const sel = t.querySelectorAll("tbody select")[focusRow];
+        if (sel)
+          sel.focus();
+      }
+    }
+    function serializeAssets() {
+      const lines = [
+        "---",
+        ...(S.assetsFm || "kind: assets").split(`
+`),
+        "---",
+        "",
+        "# Assets",
+        "",
+        "What the household owns that is not an account — property, vehicles, contents,",
+        "jewellery, metals. `Value` is what it would sell for today and `Valued` is when",
+        "that was last worked out. Money owed against any of these lives on the Debt page.",
+        "",
+        "| Item | Kind | Value | Valued | Notes |",
+        "|------|------|------:|--------|-------|"
+      ];
+      for (const a of S.assets) {
+        lines.push(`| ${escMd(a.name)} | ${escMd(a.type)} | ${a.value.toFixed(2)} | ${escMd(a.valued)} | ${escMd(a.notes)} |`);
+      }
+      lines.push("");
+      return lines.join(`
+`);
+    }
+    async function saveAssets() {
+      await writeFile("Assets.md", serializeAssets());
+      clearDirty();
+      toast("Saved Assets.md");
+    }
+    async function addAsset() {
+      const r = await askFields(app, "New asset", [
+        { key: "name", label: "What is it?", type: "text", placeholder: "e.g. The house" },
+        { key: "type", label: "Kind", type: "select", value: "property", options: ASSET_TYPES },
+        { key: "value", label: "What would it sell for?", type: "number", value: "0" },
+        {
+          key: "valued",
+          label: "When was that worked out?",
+          type: "date",
+          value: todayIso(),
+          desc: "Left as today if you are typing a figure you already know."
+        }
+      ]);
+      if (!r || !r.name.trim())
+        return;
+      const value = normalizeAmount(r.value);
+      if (value === null)
+        return toast("Value must be a number", true);
+      S.assets.push({
+        name: r.name.trim(),
+        type: r.type || "other",
+        value: Math.max(0, value),
+        valued: (r.valued || "").trim(),
+        notes: ""
+      });
+      mark();
+      renderAssets();
+    }
+    ctx.provide({ renderAssets, saveAssets, addAsset, serializeAssets, VALUED_STALE_DAYS });
+  };
+});
+
 // src/debt-math.js
 var require_debt_math = __commonJS((exports2, module2) => {
+  var { ISO_DATE } = require_dates();
   var EPS = 0.005;
   var MAX_MONTHS = 600;
   var monthlyRate = (rate) => (Number(rate) || 0) / 100 / 12;
@@ -5324,7 +5576,7 @@ var require_debt_math = __commonJS((exports2, module2) => {
     const pay = (Number(d.payment) || 0) + (Number(d.extra) || 0);
     if (!original || pay <= 0)
       return null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.start || "") || !/^\d{4}-\d{2}-\d{2}$/.test(today || ""))
+    if (!ISO_DATE.test(d.start || "") || !ISO_DATE.test(today || ""))
       return null;
     const [sy, sm] = d.start.split("-").map(Number);
     const [ty, tm] = today.split("-").map(Number);
@@ -5344,16 +5596,18 @@ var require_debt_math = __commonJS((exports2, module2) => {
     }
     return { expected: b, months, paid, interest, settled: b <= EPS };
   }
-  module2.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance, MAX_MONTHS, EPS };
+  module2.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance };
 });
 
 // src/views/debts.js
 var require_debts = __commonJS((exports2, module2) => {
-  var { el, keepScroll, escMd, icoEl } = require_util();
+  var { el, kpiTiles, keepScroll, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { escMd } = require_markdown();
   var { askFields } = require_modal();
   var { MONTHS } = require_constants();
   var { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require_debt_math();
-  var { todayIso } = require_reconcile();
+  var { todayIso } = require_dates();
   var {
     themeColors,
     createChart,
@@ -5370,11 +5624,7 @@ var require_debts = __commonJS((exports2, module2) => {
   var DEBT_TYPES = ["credit card", "personal loan", "vehicle", "home loan", "student", "store account", "overdraft", "other"];
   module2.exports = function registerDebts(ctx) {
     const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod } = ctx;
-    const mark = () => {
-      S.debtsDirty = true;
-      $("#debtSave").disabled = false;
-    };
-    ctx.registerDirty(() => S.debtsDirty);
+    const { mark, clear: clearDirty } = ctx.dirtyFlag("debtsDirty", "#debtSave");
     const active = () => S.debts.filter((d) => d.status !== "paid").map((d, i) => ({ ...d, key: i }));
     const committed = (d) => (d.payment || 0) + (d.extra || 0);
     const planExtra = () => Math.max(0, parseFloat($("#debtExtra").value) || 0);
@@ -5389,14 +5639,7 @@ var require_debts = __commonJS((exports2, module2) => {
       const perMonth = list.reduce((s, d) => s + committed(d), 0);
       const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
       const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
-      const kpis = $("#debtKpis");
-      kpis.empty();
-      const tile = (l, v, cls, sub) => {
-        const t = el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v));
-        if (sub)
-          t.append(el("div", { class: "s" }, sub));
-        kpis.append(t);
-      };
+      const tile = kpiTiles($("#debtKpis"));
       tile("Total debt", money(total), total > 0 ? "text-danger" : "text-success", `${list.length} active · ${S.debts.length} tracked`);
       tile("Paying per month", money(perMonth), "", perMonth ? `${money(perMonth * 12, 0)} a year` : "nothing budgeted");
       tile("Interest this month", money(interest), interest > 0 ? "text-warning" : "", perMonth > 0 ? `${Math.round(interest / perMonth * 100)}% of your payments` : "");
@@ -5663,8 +5906,7 @@ var require_debts = __commonJS((exports2, module2) => {
     }
     async function saveDebts() {
       await writeFile("Debts.md", serializeDebts());
-      S.debtsDirty = false;
-      $("#debtSave").disabled = true;
+      clearDirty();
       toast("Saved Debts.md");
     }
     async function addDebt() {
@@ -5680,11 +5922,9 @@ var require_debts = __commonJS((exports2, module2) => {
       if (!r || !r.name.trim())
         return;
       const name = r.name.trim();
-      const num = (v) => parseFloat(String(v ?? "").replace(",", "."));
-      const balance = num(r.balance), rate = num(r.rate), payment = num(r.payment);
-      if ([balance, rate, payment].some(isNaN))
+      const balance = normalizeAmount(r.balance), rate = normalizeAmount(r.rate), payment = normalizeAmount(r.payment);
+      if ([balance, rate, payment].some((v) => v === null))
         return toast("Balance, rate and payment must be numbers", true);
-      const today = new Date;
       S.debts.push({
         name,
         lender: (r.lender || "").trim(),
@@ -5694,13 +5934,12 @@ var require_debts = __commonJS((exports2, module2) => {
         rate: Math.max(0, rate),
         payment: Math.max(0, payment),
         extra: 0,
-        start: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+        start: todayIso(),
         category: (r.category || "").trim(),
         status: "active",
         notes: ""
       });
-      S.debtsDirty = true;
-      $("#debtSave").disabled = false;
+      mark();
       renderDebts();
     }
     const PLAN_LINES = [
@@ -5782,27 +6021,21 @@ var require_debts = __commonJS((exports2, module2) => {
 
 // src/views/owed.js
 var require_owed = __commonJS((exports2, module2) => {
-  var { el, dateInput, keepScroll, escMd, icoEl } = require_util();
+  var { el, kpiTiles, dateInput, keepScroll, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { escMd } = require_markdown();
   var { askFields } = require_modal();
   var { daysSince } = require_reconcile();
+  var { outstandingOf, isSettled, owedSummary } = require_owed_math();
   module2.exports = function registerOwed(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
-    const mark = () => {
-      S.owedDirty = true;
-      $("#owedSave").disabled = false;
-    };
-    ctx.registerDirty(() => S.owedDirty);
-    const outstandingOf = (o) => Math.max(0, (o.amount || 0) - (o.repaid || 0));
-    const isSettled = (o) => o.status === "paid" || outstandingOf(o) === 0;
+    const { mark, clear: clearDirty } = ctx.dirtyFlag("owedDirty", "#owedSave");
     function renderOwedKpis() {
-      const outstanding = S.owed.filter((o) => !isSettled(o)).reduce((s, o) => s + outstandingOf(o), 0);
-      const back = S.owed.reduce((s, o) => s + Math.min(o.repaid || 0, o.amount || 0), 0) + S.owed.filter((o) => o.status === "paid" && !(o.repaid > 0)).reduce((s, o) => s + (o.amount || 0), 0);
-      const kpis = $("#owedKpis");
-      kpis.empty();
-      const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
-      tile("Outstanding", money(outstanding), outstanding > 0 ? "text-warning" : "");
-      tile("Recovered", money(back), "text-success");
-      tile("Entries", String(S.owed.length));
+      const s = owedSummary(S.owed);
+      const tile = kpiTiles($("#owedKpis"));
+      tile("Outstanding", money(s.outstanding), s.outstanding > 0 ? "text-warning" : "");
+      tile("Recovered", money(s.recovered), "text-success");
+      tile("Entries", String(s.entries));
     }
     function renderOwed(focusPerson) {
       renderOwedKpis();
@@ -5889,8 +6122,8 @@ var require_owed = __commonJS((exports2, module2) => {
       ]);
       if (!r)
         return;
-      const amount = parseFloat(String(r.amount).replace(",", "."));
-      if (isNaN(amount) || amount <= 0)
+      const amount = normalizeAmount(r.amount);
+      if (amount === null || amount <= 0)
         return toast("Not a number", true);
       o.repaid = (o.repaid || 0) + amount;
       if (outstandingOf(o) === 0)
@@ -5923,8 +6156,7 @@ var require_owed = __commonJS((exports2, module2) => {
     }
     async function saveOwed() {
       await writeFile("Owed Money.md", serializeOwed());
-      S.owedDirty = false;
-      $("#owedSave").disabled = true;
+      clearDirty();
       toast("Saved Owed Money.md");
     }
     async function addOwed() {
@@ -5934,12 +6166,11 @@ var require_owed = __commonJS((exports2, module2) => {
       ]);
       if (!r || !r.person.trim())
         return;
-      const amount = parseFloat(String(r.amount).replace(",", "."));
-      if (isNaN(amount))
+      const amount = normalizeAmount(r.amount);
+      if (amount === null)
         return toast("Not a number", true);
       S.owed.push({ person: r.person.trim(), amount, description: "", due: "", status: "outstanding", repaid: 0, lent: "" });
-      S.owedDirty = true;
-      $("#owedSave").disabled = false;
+      mark();
       renderOwed();
     }
     ctx.provide({ renderOwed, saveOwed, addOwed, serializeOwed });
@@ -5948,6 +6179,7 @@ var require_owed = __commonJS((exports2, module2) => {
 
 // src/recurring.js
 var require_recurring = __commonJS((exports2, module2) => {
+  var { ISO_DATE, isoDayNumber } = require_dates();
   var STOP = new Set([
     "the",
     "and",
@@ -6050,9 +6282,6 @@ var require_recurring = __commonJS((exports2, module2) => {
       tokens: toks
     };
   }
-  var DAY = 86400000;
-  var dayNum = (iso) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
-  var isoOf = (n) => new Date(n * DAY).toISOString().slice(0, 10);
   function nextExpected(stats, cycle) {
     if (!stats || !stats.last)
       return null;
@@ -6068,9 +6297,9 @@ var require_recurring = __commonJS((exports2, module2) => {
   function chargeStatus(stats, cycle, today) {
     if (!stats)
       return { state: "unseen", daysSince: null };
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(today || ""))
+    if (!ISO_DATE.test(today || ""))
       return { state: "active", daysSince: null };
-    const gap = dayNum(today) - dayNum(stats.last);
+    const gap = isoDayNumber(today) - isoDayNumber(stats.last);
     const cycleDays = cycle === "annual" ? 365 : 31;
     return { state: gap > cycleDays * 2 ? "overdue" : "active", daysSince: gap };
   }
@@ -6098,17 +6327,17 @@ var require_recurring = __commonJS((exports2, module2) => {
     chargeStats,
     nextExpected,
     chargeStatus,
-    comparePrice,
-    _dayNum: dayNum,
-    _isoOf: isoOf
+    comparePrice
   };
 });
 
 // src/views/services.js
 var require_services = __commonJS((exports2, module2) => {
-  var { el, dateInput, keepScroll, escMd, icoEl } = require_util();
+  var { el, kpiTiles, dateInput, keepScroll, icoEl } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { escMd } = require_markdown();
   var { askFields } = require_modal();
-  var { todayIso } = require_reconcile();
+  var { ISO_DATE, todayIso } = require_dates();
   var { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require_recurring();
   module2.exports = function registerServices(ctx) {
     const { S, $, app, money, toast, writeFile } = ctx;
@@ -6135,17 +6364,11 @@ var require_services = __commonJS((exports2, module2) => {
       }
       return out;
     }
-    const mark = () => {
-      S.servicesDirty = true;
-      $("#svcSave").disabled = false;
-    };
-    ctx.registerDirty(() => S.servicesDirty);
+    const { mark, clear: clearDirty } = ctx.dirtyFlag("servicesDirty", "#svcSave");
     function renderServicesKpis() {
       const active = S.services.filter((s) => s.active);
       const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
-      const kpis = $("#servicesKpis");
-      kpis.empty();
-      const tile = (l, v) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: "v num" }, v)));
+      const tile = kpiTiles($("#servicesKpis"));
       tile("Per month", money(perMonth));
       tile("Per year", money(perMonth * 12));
       tile("Active", String(active.length));
@@ -6300,8 +6523,7 @@ var require_services = __commonJS((exports2, module2) => {
     }
     async function saveServices() {
       await writeFile("Services.md", serializeServices());
-      S.servicesDirty = false;
-      $("#svcSave").disabled = true;
+      clearDirty();
       toast("Saved Services.md");
     }
     async function addService() {
@@ -6318,10 +6540,10 @@ var require_services = __commonJS((exports2, module2) => {
       ]);
       if (!r || !r.name.trim())
         return;
-      const amount = parseFloat(String(r.amount).replace(",", "."));
-      if (isNaN(amount))
+      const amount = normalizeAmount(r.amount);
+      if (amount === null)
         return toast("Not a number", true);
-      const next = /^\d{4}-\d{2}-\d{2}$/.test((r.next || "").trim()) ? r.next.trim() : "";
+      const next = ISO_DATE.test((r.next || "").trim()) ? r.next.trim() : "";
       S.services.push({
         name: r.name.trim(),
         provider: (r.provider || "").trim(),
@@ -6332,8 +6554,7 @@ var require_services = __commonJS((exports2, module2) => {
         active: true,
         notes: ""
       });
-      S.servicesDirty = true;
-      $("#svcSave").disabled = false;
+      mark();
       renderServices();
     }
     ctx.provide({ renderServices, saveServices, addService, serializeServices });
@@ -6342,7 +6563,9 @@ var require_services = __commonJS((exports2, module2) => {
 
 // src/views/tax.js
 var require_tax = __commonJS((exports2, module2) => {
-  var { el, dateInput, keepScroll, escMd, icoEl, safeSeg, patchFrontmatter, yamlStr } = require_util();
+  var { el, kpiTiles, dateInput, keepScroll, icoEl } = require_dom();
+  var { escMd, patchFrontmatter, yamlStr } = require_markdown();
+  var { safeSeg } = require_vault_path();
   var { askFields, confirmModal } = require_modal();
   module2.exports = function registerTax(ctx) {
     const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
@@ -6350,11 +6573,7 @@ var require_tax = __commonJS((exports2, module2) => {
       return locale().currentTaxYear(new Date);
     }
     const T = () => S.tax[S.taxYear];
-    const mark = () => {
-      S.taxDirty = true;
-      $("#taxSave").disabled = false;
-    };
-    ctx.registerDirty(() => S.taxDirty);
+    const { mark, clear: clearDirty } = ctx.dirtyFlag("taxDirty", "#taxSave");
     function disclaimer() {
       const a = locale().authority;
       return "This tracker is a personal checklist, not tax advice. Seeded steps, documents and " + `deadline dates are editable starting points that change from year to year — confirm anything ` + `important with ${a === "Tax" ? "your tax authority" : a} or a registered tax professional.`;
@@ -6419,9 +6638,7 @@ var require_tax = __commonJS((exports2, module2) => {
       return Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - today) / 86400000);
     }
     function renderTaxKpis(t) {
-      const kpis = $("#taxKpis");
-      kpis.empty();
-      const tile = (l, v, cls) => kpis.append(el("div", { class: "mini" }, el("div", { class: "l" }, l), el("div", { class: `v num ${cls || ""}` }, v)));
+      const tile = kpiTiles($("#taxKpis"));
       const d = daysTo(activeDeadline(t));
       tile("Deadline", d === null ? "—" : d < 0 ? `${-d} d overdue` : `${d} days`, d !== null && d < 0 ? "text-danger" : d !== null && d <= 30 ? "text-warning" : "");
       const steps = t.steps.filter((s) => s.status !== "n/a");
@@ -6945,8 +7162,7 @@ var require_tax = __commonJS((exports2, module2) => {
       if (!S.taxYear)
         return;
       await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
-      S.taxDirty = false;
-      $("#taxSave").disabled = true;
+      clearDirty();
       toast(`Saved Tax/${S.taxYear}.md`);
     }
     async function addTaxStep() {
@@ -7230,11 +7446,6 @@ var require_loan_math = __commonJS((exports2, module2) => {
     byYear,
     totalsFor,
     zaTransferDuty,
-    zaMortgageInitiationFee,
-    zaVehicleInitiationFee,
-    ZA_TRANSFER_DUTY,
-    ZA_SERVICE_FEE,
-    ZA_INIT_CAP,
     LOAN_PROFILES,
     GENERIC_LOAN_PROFILE,
     loanProfileFor
@@ -7243,7 +7454,7 @@ var require_loan_math = __commonJS((exports2, module2) => {
 
 // src/views/loans.js
 var require_loans = __commonJS((exports2, module2) => {
-  var { el } = require_util();
+  var { el } = require_dom();
   var { totalsFor, amortise, byYear, loanProfileFor } = require_loan_math();
   module2.exports = function registerLoans(ctx) {
     const { S, $, money } = ctx;
@@ -7537,6 +7748,234 @@ var require_loans = __commonJS((exports2, module2) => {
   };
 });
 
+// src/statement.js
+var require_statement = __commonJS((exports2, module2) => {
+  var { normalizeAmount } = require_amount();
+  var { parseDelimited, sniffDelimiter } = require_csv();
+  var parseStatement = (text) => parseDelimited(text, sniffDelimiter(text));
+  function decodeStatement(bytes) {
+    const b = bytes;
+    if (b.length >= 2 && b[0] === 255 && b[1] === 254)
+      return new TextDecoder("utf-16le").decode(b.subarray(2));
+    if (b.length >= 2 && b[0] === 254 && b[1] === 255)
+      return new TextDecoder("utf-16be").decode(b.subarray(2));
+    if (b.length >= 3 && b[0] === 239 && b[1] === 187 && b[2] === 191)
+      return new TextDecoder("utf-8").decode(b.subarray(3));
+    const head = b.subarray(0, 256);
+    let evenNul = 0, oddNul = 0;
+    for (let i = 0;i < head.length; i++)
+      if (head[i] === 0) {
+        if (i % 2)
+          oddNul++;
+        else
+          evenNul++;
+      }
+    if (head.length >= 8) {
+      if (oddNul > head.length / 4 && evenNul === 0)
+        return new TextDecoder("utf-16le").decode(b);
+      if (evenNul > head.length / 4 && oddNul === 0)
+        return new TextDecoder("utf-16be").decode(b);
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(b);
+    } catch (e) {
+      return new TextDecoder("windows-1252").decode(b);
+    }
+  }
+  function isoParts(y, mo, d) {
+    if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31)
+      return null;
+    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+  var MONTH_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  function parseStatementDate(raw, dayFirst = true) {
+    let s = (raw ?? "").toString().trim();
+    if (!s)
+      return null;
+    s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z|[+-]\d{2}:?\d{2})?$/i, "").trim();
+    let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+    if (m)
+      return isoParts(+m[1], +m[2], +m[3]);
+    m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (m) {
+      let d = dayFirst ? +m[1] : +m[2], mo = dayFirst ? +m[2] : +m[1];
+      if (mo > 12 && d <= 12) {
+        const t = d;
+        d = mo;
+        mo = t;
+      }
+      return isoParts(+m[3], mo, d);
+    }
+    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m)
+      return isoParts(+m[1], +m[2], +m[3]);
+    m = s.match(/^(\d{1,2})[ -]?([A-Za-z]{3,})[ -]?(\d{4})$/);
+    if (m) {
+      const mo = MONTH_NUM[m[2].slice(0, 3).toLowerCase()];
+      if (mo)
+        return isoParts(+m[3], mo, +m[1]);
+    }
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime()))
+      return isoParts(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    return null;
+  }
+  function counterpartyAccount(desc, accounts, selfLabel) {
+    const runs = String(desc || "").match(/\d{4,}/g);
+    if (!runs)
+      return null;
+    for (const n of runs) {
+      for (const a of accounts || []) {
+        const num = String(a.account_number || "").trim();
+        if (!num || num !== n)
+          continue;
+        const label = a.tx_label || a.name;
+        if (selfLabel && label === selfLabel)
+          continue;
+        return a;
+      }
+    }
+    return null;
+  }
+  function reconcileAmounts(rows) {
+    const c = (v) => Math.round(v * 100);
+    const pts = (rows || []).filter((r) => r && r.amount != null && r.balance != null);
+    if (pts.length < 4)
+      return { verified: false, flip: false, order: null, pairs: Math.max(0, pts.length - 1), agreement: 0 };
+    let best = { verified: false, flip: false, order: null, pairs: pts.length - 1, agreement: 0 };
+    for (const order of ["fwd", "rev"]) {
+      for (const sign of [1, -1]) {
+        let agree = 0;
+        for (let i = 1;i < pts.length; i++) {
+          const prev = c(pts[i - 1].balance), bal = c(pts[i].balance);
+          const step = order === "fwd" ? sign * c(pts[i].amount) : -sign * c(pts[i - 1].amount);
+          if (bal - prev === step)
+            agree++;
+        }
+        if (agree > best.agreement)
+          best = { verified: false, flip: sign === -1, order, pairs: pts.length - 1, agreement: agree };
+      }
+    }
+    best.verified = best.agreement >= Math.ceil(best.pairs * 0.8);
+    return best;
+  }
+  function detectHeaderlessColumns(rows, dayFirst = true) {
+    const isDate = (v) => !!parseStatementDate(v, dayFirst);
+    const num = (v) => normalizeAmount(v);
+    const dataStart = (rows || []).findIndex((r) => r.length >= 3 && isDate(r[0]) && r.slice(1).some((c) => num(c) != null));
+    if (dataStart === -1)
+      return null;
+    const width = rows[dataStart].length;
+    const data = rows.slice(dataStart).filter((r) => r.length === width && isDate(r[0]));
+    if (data.length < 2)
+      return null;
+    let firstNum = width;
+    while (firstNum > 1 && data.every((r) => num(r[firstNum - 1]) != null))
+      firstNum--;
+    if (firstNum >= width)
+      return null;
+    let iAmount = width - 1, iBalance = -1;
+    if (width - firstNum >= 2) {
+      const bal = reconcileAmounts(data.map((r) => ({ amount: num(r[width - 2]), balance: num(r[width - 1]) })));
+      if (bal.verified) {
+        iAmount = width - 2;
+        iBalance = width - 1;
+      } else if (bal.pairs < 3 && data.some((r) => num(r[width - 2]) !== 0))
+        return null;
+    }
+    let iDesc = -1;
+    for (let c = iAmount - 1;c >= 1; c--) {
+      const vals = data.map((r) => (r[c] ?? "").toString().trim()).filter(Boolean);
+      if (!vals.length)
+        continue;
+      const text = vals.filter((v) => num(v) == null && !isDate(v)).length;
+      if (text > vals.length / 2) {
+        iDesc = c;
+        break;
+      }
+    }
+    if (iDesc === -1)
+      return null;
+    return { dataStart, iDate: 0, iDesc, iAmount, iBalance };
+  }
+  var DATE_COLS = [
+    "value date",
+    "date",
+    "posting date",
+    "post date",
+    "date posted",
+    "effective date",
+    "transaction date",
+    "trans date",
+    "txn date",
+    "process date",
+    "action date"
+  ];
+  var DESC_COLS = [
+    "description",
+    "title",
+    "narrative",
+    "narration",
+    "details",
+    "detail",
+    "particulars",
+    "transaction description",
+    "statement description",
+    "transaction detail",
+    "reference",
+    "payee",
+    "memo"
+  ];
+  var AMOUNT_COLS = ["amount", "transaction amount", "amount (zar)", "signed amount", "value"];
+  var DEBIT_COLS = ["debit", "debits", "debit amount", "money out", "amount out", "withdrawal", "withdrawals", "paid out"];
+  var CREDIT_COLS = ["credit", "credits", "credit amount", "money in", "amount in", "deposit", "deposits", "paid in"];
+  var BALANCE_COLS = ["balance", "running balance", "closing balance", "account balance", "balance (zar)"];
+  function detectStatementColumns(rows, dayFirst = true) {
+    const headerIdx = (rows || []).findIndex((r) => {
+      const low = r.map((c) => c.trim().toLowerCase());
+      const has = (names) => names.some((n) => low.includes(n));
+      return (has(DATE_COLS) || low.some((c) => c.includes("date"))) && (has(AMOUNT_COLS) || has(DEBIT_COLS) && has(CREDIT_COLS));
+    });
+    if (headerIdx !== -1) {
+      const low = rows[headerIdx].map((c) => c.trim().toLowerCase());
+      const col = (names) => {
+        for (const n of names) {
+          const i = low.indexOf(n);
+          if (i !== -1)
+            return i;
+        }
+        return -1;
+      };
+      let iDate = col(DATE_COLS);
+      if (iDate === -1)
+        iDate = low.findIndex((c) => c.includes("date"));
+      let iDesc = col(DESC_COLS);
+      if (iDesc === -1)
+        iDesc = low.findIndex((c) => c.includes("desc"));
+      let iBalance = col(BALANCE_COLS);
+      if (iBalance === -1)
+        iBalance = low.findIndex((c) => c.includes("balance"));
+      const iAmount = col(AMOUNT_COLS), iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+      if (iDate === -1 || iDesc === -1 || iAmount === -1 && (iDebit === -1 || iCredit === -1))
+        return null;
+      return { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
+    }
+    const shape = detectHeaderlessColumns(rows, dayFirst);
+    if (!shape)
+      return null;
+    return { ...shape, iDebit: -1, iCredit: -1, iExtra: -1, headerIdx: -1 };
+  }
+  module2.exports = {
+    parseStatement,
+    decodeStatement,
+    parseStatementDate,
+    counterpartyAccount,
+    reconcileAmounts,
+    detectHeaderlessColumns,
+    detectStatementColumns
+  };
+});
+
 // src/dedupe.js
 var require_dedupe = __commonJS((exports2, module2) => {
   var NEAR_DAYS = 4;
@@ -7659,14 +8098,16 @@ var require_dedupe = __commonJS((exports2, module2) => {
     flagItems,
     descsLikelySame,
     normDesc,
-    NEAR_DAYS,
-    MIN_PREFIX
+    NEAR_DAYS
   };
 });
 
 // src/views/import.js
 var require_import = __commonJS((exports2, module2) => {
-  var { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, counterpartyAccount, prepareRules, autoCategorise } = require_util();
+  var { el } = require_dom();
+  var { normalizeAmount } = require_amount();
+  var { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, counterpartyAccount } = require_statement();
+  var { prepareRules, autoCategorise } = require_rules();
   var { buildIndex, addToIndex, flagItems } = require_dedupe();
   module2.exports = function registerImport(ctx) {
     const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
@@ -8063,7 +8504,7 @@ var require_import = __commonJS((exports2, module2) => {
 // src/controller.js
 var require_controller = __commonJS((exports2, module2) => {
   var { Notice } = require("obsidian");
-  var { el, setIco, setInert } = require_util();
+  var { el, setIco, setInert } = require_dom();
   var { SHELL_HTML } = require_shell();
   var { confirmModal } = require_modal();
   var { localeFor } = require_locale();
@@ -8077,6 +8518,7 @@ var require_controller = __commonJS((exports2, module2) => {
   var registerBudgets = require_budgets();
   var registerAccounts = require_accounts();
   var registerSavings = require_savings();
+  var registerAssets = require_assets();
   var registerDebts = require_debts();
   var registerOwed = require_owed();
   var registerServices = require_services();
@@ -8105,6 +8547,8 @@ var require_controller = __commonJS((exports2, module2) => {
       budgetMeta: {},
       txFiles: {},
       rules: [],
+      assets: [],
+      assetsDirty: false,
       debts: [],
       debtsDirty: false,
       owed: [],
@@ -8147,6 +8591,38 @@ var require_controller = __commonJS((exports2, module2) => {
     };
     const dirtyChecks = [];
     ctx.registerDirty = (fn) => dirtyChecks.push(fn);
+    const saveButtons = [];
+    ctx.registerSaveButton = (sel) => {
+      saveButtons.push(sel);
+      return () => {
+        const b = $(sel);
+        if (b)
+          b.disabled = true;
+      };
+    };
+    function disableSaveButtons() {
+      for (const sel of saveButtons) {
+        const b = $(sel);
+        if (b)
+          b.disabled = true;
+      }
+    }
+    ctx.dirtyFlag = (stateKey, saveSel) => {
+      const disable = ctx.registerSaveButton(saveSel);
+      ctx.registerDirty(() => !!S[stateKey]);
+      return {
+        mark: () => {
+          S[stateKey] = true;
+          const b = $(saveSel);
+          if (b)
+            b.disabled = false;
+        },
+        clear: () => {
+          S[stateKey] = false;
+          disable();
+        }
+      };
+    };
     ctx.switchView = (v) => switchView(v);
     ctx.render = () => render();
     registerIo(ctx);
@@ -8158,6 +8634,7 @@ var require_controller = __commonJS((exports2, module2) => {
     registerBudgets(ctx);
     registerAccounts(ctx);
     registerSavings(ctx);
+    registerAssets(ctx);
     registerDebts(ctx);
     registerOwed(ctx);
     registerServices(ctx);
@@ -8193,6 +8670,7 @@ var require_controller = __commonJS((exports2, module2) => {
         budgets: ctx.renderBudgets,
         savings: ctx.renderSavings,
         accounts: ctx.renderAccounts,
+        assets: ctx.renderAssets,
         debts: ctx.renderDebts,
         owed: ctx.renderOwed,
         services: ctx.renderServices,
@@ -8262,11 +8740,7 @@ var require_controller = __commonJS((exports2, module2) => {
       S.pendingImport = null;
       $("#importReview").classList.add("hidden");
       await ctx.loadVault();
-      for (const id of ["#budSave", "#debtSave", "#owedSave", "#svcSave", "#taxSave"]) {
-        const b = $(id);
-        if (b)
-          b.disabled = true;
-      }
+      disableSaveButtons();
     }
     ctx.reloadFromDisk = reloadFromDisk;
     async function connectVault() {
@@ -8374,18 +8848,37 @@ var require_controller = __commonJS((exports2, module2) => {
     view.registerEvent(vault.on("delete", onFsChange));
     view.registerEvent(vault.on("rename", onFsChange));
     view.registerEvent(app.workspace.on("css-change", applyTheme));
-    $("#openSettingsBtn").addEventListener("click", () => {
+    function openPluginSettings() {
       app.setting.open();
       app.setting.openTabById("budget-app");
-    });
+    }
+    function wireDropZone(zoneSel, inputSel, handle) {
+      const zone = $(zoneSel);
+      const input = $(inputSel);
+      zone.addEventListener("click", () => input.click());
+      input.addEventListener("change", (e) => {
+        if (e.target.files[0])
+          handle(e.target.files[0]);
+        e.target.value = "";
+      });
+      zone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        zone.classList.add("dragover");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.classList.remove("dragover");
+        if (e.dataTransfer.files[0])
+          handle(e.dataTransfer.files[0]);
+      });
+    }
+    $("#openSettingsBtn").addEventListener("click", openPluginSettings);
     $("#brandHome").addEventListener("click", () => {
       if (S.loaded)
         switchView("dashboard");
     });
-    $("#topbarAvatar").addEventListener("click", () => {
-      app.setting.open();
-      app.setting.openTabById("budget-app");
-    });
+    $("#topbarAvatar").addEventListener("click", openPluginSettings);
     $("#topbarImport").addEventListener("click", () => {
       if (!S.loaded)
         return;
@@ -8395,8 +8888,7 @@ var require_controller = __commonJS((exports2, module2) => {
     });
     $("#pluginSettingsLink").addEventListener("click", () => {
       closeDrawer();
-      app.setting.open();
-      app.setting.openTabById("budget-app");
+      openPluginSettings();
     });
     async function changePeriod(next) {
       if (S.view === "budgets" && ctx.budgetDirty()) {
@@ -8452,6 +8944,8 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#budAddCat").addEventListener("click", ctx.addNewCategory);
     $("#acctAdd").addEventListener("click", ctx.addAccount);
     $("#savAdd").addEventListener("click", ctx.addAccount);
+    $("#assetSave").addEventListener("click", ctx.saveAssets);
+    $("#assetAdd").addEventListener("click", ctx.addAsset);
     $("#debtSave").addEventListener("click", ctx.saveDebts);
     $("#debtAdd").addEventListener("click", ctx.addDebt);
     $("#debtExtra").addEventListener("input", ctx.replan);
@@ -8472,44 +8966,10 @@ var require_controller = __commonJS((exports2, module2) => {
     $("#taxNewYear").addEventListener("click", ctx.newTaxYear);
     $("#taxStart").addEventListener("click", ctx.startTax);
     $("#taxYearSel").addEventListener("change", (e) => ctx.changeTaxYear(e.target.value));
-    const taxDrop = $("#taxDrop");
-    taxDrop.addEventListener("click", () => $("#taxFileInput").click());
-    $("#taxFileInput").addEventListener("change", (e) => {
-      if (e.target.files[0])
-        ctx.handleTaxFile(e.target.files[0]);
-      e.target.value = "";
-    });
-    taxDrop.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      taxDrop.classList.add("dragover");
-    });
-    taxDrop.addEventListener("dragleave", () => taxDrop.classList.remove("dragover"));
-    taxDrop.addEventListener("drop", (e) => {
-      e.preventDefault();
-      taxDrop.classList.remove("dragover");
-      if (e.dataTransfer.files[0])
-        ctx.handleTaxFile(e.dataTransfer.files[0]);
-    });
+    wireDropZone("#taxDrop", "#taxFileInput", (f) => ctx.handleTaxFile(f));
     $("#impCommit").addEventListener("click", ctx.commitImport);
     $("#impRemap").addEventListener("click", ctx.remapImport);
-    const drop = $("#drop");
-    drop.addEventListener("click", () => $("#fileInput").click());
-    $("#fileInput").addEventListener("change", (e) => {
-      if (e.target.files[0])
-        ctx.handleStatementFile(e.target.files[0]);
-      e.target.value = "";
-    });
-    drop.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      drop.classList.add("dragover");
-    });
-    drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
-    drop.addEventListener("drop", (e) => {
-      e.preventDefault();
-      drop.classList.remove("dragover");
-      if (e.dataTransfer.files[0])
-        ctx.handleStatementFile(e.dataTransfer.files[0]);
-    });
+    wireDropZone("#drop", "#fileInput", (f) => ctx.handleStatementFile(f));
     return {
       start: async () => {
         applyTheme();
@@ -8618,7 +9078,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
   var { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require("obsidian");
   var { PROFILES, COUNTRY_ORDER, localeFor } = require_locale();
   var { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require_constants();
-  var { isoDayNumber, periodDaysOrZero, isRealIsoDate } = require_util();
+  var { periodDaysOrZero } = require_dates();
+  var { normalizeAmount } = require_amount();
+  var { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require_dates();
   var STARTER_CATEGORIES = [
     { name: "Salary", type: "income", color: "#22c55e" },
     { name: "Other income", type: "income", color: "#4ade80" },
@@ -8697,12 +9159,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
     return `${y}-${String(m).padStart(2, "0")}`;
   }
   function currentPeriodForCycle(days, anchor) {
-    const now = new Date;
-    const today = isoDayNumber(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+    const today = isoDayNumber(todayIso());
     const a = isoDayNumber(anchor);
-    const start = a + Math.floor((today - a) / days) * days;
-    const d = new Date(start * 86400000);
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    return isoFromDayNumber(a + Math.floor((today - a) / days) * days);
   }
   var safeFileName = (s) => s.replace(/[\\/:*?"<>|]/g, "-").trim();
 
@@ -8820,7 +9279,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
       const f = this.app.vault.getFileByPath(normalizePath(this.data.folder + "/Settings.md"));
       if (!f)
         return;
-      const { parseFrontmatter } = require_util();
+      const { parseFrontmatter } = require_markdown();
       const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
       const day = parseInt(fm.month_start_day, 10);
       if (day >= 1 && day <= 28)
@@ -9076,8 +9535,8 @@ var require_onboarding = __commonJS((exports2, module2) => {
       if (this.mode === "create") {
         rows.push(["Categories", `${this.data.cats.size} starter categories`]);
         rows.push(["First account", this.data.acctName.trim() || "—"]);
-        const bal = parseFloat(String(this.data.acctBalance).replace(",", ".").replace(/[^\d.-]/g, ""));
-        if (this.data.acctName.trim() && !isNaN(bal) && bal !== 0)
+        const bal = this.openingBalance();
+        if (this.data.acctName.trim() && bal !== 0)
           rows.push(["Opening balance", `${this.currencySymbol()} ${bal.toFixed(2)}`]);
       }
       c.createEl("p", {
@@ -9109,6 +9568,9 @@ var require_onboarding = __commonJS((exports2, module2) => {
     }
     currencySymbol() {
       return (this.data.currency === "__custom__" ? this.data.customCurrency.trim() : this.data.currency) || "R";
+    }
+    openingBalance() {
+      return normalizeAmount(this.data.acctBalance) ?? 0;
     }
     async writeIfAbsent(path, content) {
       const vault = this.app.vault;
@@ -9195,13 +9657,12 @@ Budget category of type **${cat.type}**.
           const acct = this.data.acctName.trim();
           if (acct) {
             const safe = safeFileName(acct);
-            const today = new Date;
-            const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-            const bal = parseFloat(String(this.data.acctBalance).replace(",", ".").replace(/[^\d.-]/g, ""));
+            const ymd = todayIso();
+            const bal = this.openingBalance();
             await this.writeIfAbsent(normalizePath(`${folder}/Accounts/${safe}.md`), `---
 type: ${this.data.acctType}
 ` + (this.data.acctInstitution.trim() ? `institution: ${this.data.acctInstitution.trim()}
-` : "") + `balance: ${(isNaN(bal) ? 0 : bal).toFixed(2)}
+` : "") + `balance: ${bal.toFixed(2)}
 balance_updated: ${ymd}
 tags: [finance, finance/budget, finance/budget/accounts]
 ---
@@ -9285,8 +9746,9 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require_constants();
   var { OnboardingWizard } = require_onboarding();
   var { PROFILES, COUNTRY_ORDER } = require_locale();
-  var { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require_util();
-  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  var { periodDaysOrZero } = require_dates();
+  var { yamlStr } = require_markdown();
+  var { ISO_DATE, isoDayNumber, isRealIsoDate } = require_dates();
   var MD_KEYS = new Set(["household", "month_start_day", "country", "currency", "period_days", "period_anchor"]);
   var PALETTE_DESC = "Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.";
   var MONTH_START_DESC = "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.";
@@ -9662,7 +10124,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
 // src/main.js
 var { Plugin, TFile, TFolder, Notice, normalizePath } = require("obsidian");
 var { VIEW_TYPE, DEFAULT_SETTINGS } = require_constants();
-var { parseFrontmatter } = require_util();
+var { parseFrontmatter } = require_markdown();
 var { BudgetView } = require_view();
 var { BudgetSettingTab } = require_settings_tab();
 var { OnboardingWizard } = require_onboarding();

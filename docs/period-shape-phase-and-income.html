@@ -366,8 +366,8 @@
       <table>
         <thead><tr><th>Rule</th><th>Home</th><th>Called by</th></tr></thead>
         <tbody>
-          <tr><td>Is this a real calendar date?</td><td><span class="path">util.js</span> <code>isRealIsoDate()</code></td><td>the loader, the period maths, both settings tabs, the setup wizard</td></tr>
-          <tr><td>Is this cycle length usable?</td><td><span class="path">util.js</span> <code>periodDaysOrZero()</code></td><td>the loader, the period maths, both settings tabs, the wizard</td></tr>
+          <tr><td>Is this a real calendar date?</td><td><span class="path">dates.js</span> <code>isRealIsoDate()</code></td><td>the loader, the period maths, both settings tabs, the setup wizard</td></tr>
+          <tr><td>Is this cycle length usable?</td><td><span class="path">dates.js</span> <code>periodDaysOrZero()</code></td><td>the loader, the period maths, both settings tabs, the wizard</td></tr>
           <tr><td>Can settings address this period name?</td><td><span class="path">period.js</span> <code>periodKeyValid()</code></td><td>the loader on every startup and reload</td></tr>
           <tr><td>Where does this period start and end?</td><td><span class="path">period.js</span> <code>periodRange()</code></td><td>every view that reads transactions</td></tr>
           <tr><td>What is a month’s income here?</td><td><span class="path">period.js</span> <code>monthlyIncome()</code></td><td>the Debt page’s debt-to-income ratio</td></tr>

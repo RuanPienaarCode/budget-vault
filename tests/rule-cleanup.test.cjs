@@ -32,7 +32,7 @@ const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { prepareRules, autoCategorise } = require('../src/util');
+const { prepareRules, autoCategorise } = require('../src/rules');
 const { analyseRules } = require('../src/rule-cleanup');
 
 let checks = 0;

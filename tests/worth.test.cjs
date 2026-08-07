@@ -13,7 +13,7 @@
 */
 
 const assert = require('assert');
-const { worth, activeDebts, cardOverlap, debtsByType } = require('../src/worth');
+const { worth, activeDebts, assetTotal, cardOverlap, debtsByType, assetsByType } = require('../src/worth');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -21,6 +21,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 
 const acct = (type, balance) => ({ type, balance });
 const debt = (type, balance, status) => ({ type, balance, status: status || 'active' });
+const asset = (type, value) => ({ type, value });
 
 /* ---- 1. the regression itself: a bond must not vanish ---- */
 {
@@ -45,7 +46,9 @@ const debt = (type, balance, status) => ({ type, balance, status: status || 'act
     acct('investment', 90000),
   ], [debt('vehicle', 120000), debt('personal loan', 30000)]);
 
-  eq(w.assets, 95250, 'positive balances only');
+  eq(w.assets, 95250, 'positive balances, and no asset page to add to them');
+  eq(w.ownedAccounts, 95250, 'attributed to the accounts');
+  eq(w.ownedAssets, 0, 'nothing from the asset page');
   eq(w.fromAccounts, 4200, 'the overdraft and the card, as positive magnitudes');
   eq(w.fromDebts, 150000, 'both debt rows');
   eq(w.liabilities, 154200, 'liabilities are the sum of the two ledgers');
@@ -117,6 +120,61 @@ const debt = (type, balance, status) => ({ type, balance, status: status || 'act
   eq(worth(undefined, undefined).net, 0, 'missing inputs behave as empty');
   eq(worth([{ type: 'other' }], [{ type: 'other', status: 'active' }]).net, 0,
     'a row with no balance contributes zero rather than NaN');
+  eq(worth([], [], [{ type: 'property' }]).net, 0, 'an asset with no value contributes zero, not NaN');
+}
+
+/* ---- 8. the mirror regression: a house must not vanish either ----
+   Net worth counted the bond in full and the house it bought not at all,
+   which is not a conservative estimate — it is the wrong sign. */
+{
+  const accounts = [acct('checking', 40000)];
+  const debts = [debt('home loan', 850000)];
+
+  const without = worth(accounts, debts);
+  eq(without.net, -810000, 'the bond alone drags net worth deep negative');
+
+  const with_ = worth(accounts, debts, [asset('property', 15000000)]);
+  eq(with_.ownedAssets, 15000000, 'the house is counted');
+  eq(with_.ownedAccounts, 40000, 'separately from the bank money');
+  eq(with_.assets, 15040000, 'and both make up what is owned');
+  eq(with_.liabilities, 850000, 'the bond is untouched — an asset never nets off a debt');
+  eq(with_.net, 14190000, 'so the household reads as solvent, which it is');
+}
+
+/* ---- 9. the three example assets, added one at a time ---- */
+{
+  const house = asset('property', 15000000);
+  const car = asset('vehicle', 70000);
+  const rings = asset('jewellery', 60000);
+  eq(assetTotal([house, car, rings]), 15130000, 'the asset page totals its own rows');
+  eq(assetTotal([]), 0, 'an empty asset page is worth nothing');
+  eq(assetTotal(undefined), 0, 'a vault with no Assets.md behaves as empty');
+  eq(worth([], [], [house, car, rings]).net, 15130000,
+    'with no accounts and no debts, net worth is exactly what is owned');
+}
+
+/* ---- 10. a negative value is a typo, not a liability ----
+   Same treatment as a negative debt-page balance: ignored rather than netted
+   off, where it would quietly shrink a real total without saying so. */
+{
+  const w = worth([], [], [asset('vehicle', -5000), asset('property', 2000000)]);
+  eq(w.ownedAssets, 2000000, 'the negative row is ignored, not subtracted');
+  eq(w.net, 2000000, 'so it cannot reduce what is owned');
+}
+
+/* ---- 11. chart grouping on the owned side ---- */
+{
+  const g = assetsByType([
+    asset('vehicle', 70000), asset('property', 15000000),
+    asset('vehicle', 180000), asset('collectibles', 0),
+    asset('electronics', -100),
+    { value: 5000 },
+  ]);
+  eq(g.length, 3, 'zero, negative and duplicate kinds collapse or drop');
+  eq(g[0], { type: 'property', amount: 15000000 }, 'largest first');
+  eq(g[1], { type: 'vehicle', amount: 250000 }, 'same kind sums');
+  eq(g[2], { type: 'other', amount: 5000 }, 'a missing kind is named rather than left empty');
+  eq(assetsByType(undefined), [], 'no asset page groups to nothing');
 }
 
 console.log(`worth.test.cjs — ${checks} checks OK`);

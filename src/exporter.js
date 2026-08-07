@@ -28,6 +28,14 @@
    not hidden — dropping them here would make an export disagree with the app it
    came from, and the reader would have no way to see why. */
 
+/* csvCell is imported, not injected. It used to be handed in as a `cell`
+   argument because it lived in util.js, which pulled in obsidian and would have
+   stopped this module running in bare node; the util.js split left it in a pure
+   src/csv.js, so the parameter was scaffolding for a constraint that no longer
+   exists. `money` further down is still injected, for a real reason: it is the
+   view's own locale-aware formatter, not a fixed escaping rule. */
+const { csvCell } = require('./csv');
+
 /* Where exports land. A folder of its own so an export is never mistaken for
    one of the vault's own data files, and so deleting the lot is one action. */
 const EXPORT_DIR = 'Exports';
@@ -47,11 +55,6 @@ function safeName(s) {
 
 /* ------------------------------- CSV ---------------------------------- */
 
-/* `cell` is util.js's csvCell, injected rather than imported: util.js pulls in
-   obsidian, which would stop this module running in bare node — and the
-   escaping rule (including the leading-quote guard that stops a description
-   beginning with = or + executing as a formula in Excel) is worth having in
-   exactly one place rather than reimplemented here. */
 /* Amounts do NOT go through csvCell, and this is the whole reason this function
    exists.
 
@@ -67,29 +70,29 @@ function safeName(s) {
    untrusted (amountRaw is the verbatim cell from a file the loader could not
    parse, and could hold anything at all) and gets the full csvCell treatment,
    formula guard included. */
-function amountCell(row, cell) {
+function amountCell(row) {
   const v = row.amountRaw != null ? row.amountRaw : Number(row.amount || 0).toFixed(2);
-  return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : cell(v);
+  return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : csvCell(v);
 }
 
-function transactionsCsv(rows, cell) {
+function transactionsCsv(rows) {
   const head = ['Date', 'Description', 'Account', 'Category', 'Amount', 'Excluded', 'Note'];
   const body = rows.map(r => [
-    cell(r.date),
-    cell(r.desc),
-    cell(r.label),
-    cell(r.cat || ''),
-    amountCell(r, cell),
-    cell(r.excluded ? 'yes' : ''),
-    cell(r.note || ''),
+    csvCell(r.date),
+    csvCell(r.desc),
+    csvCell(r.label),
+    csvCell(r.cat || ''),
+    amountCell(r),
+    csvCell(r.excluded ? 'yes' : ''),
+    csvCell(r.note || ''),
   ].join(','));
-  return [head.map(cell).join(','), ...body].join('\n') + '\n';
+  return [head.map(csvCell).join(','), ...body].join('\n') + '\n';
 }
 
-function categoriesCsv(categories, cell) {
+function categoriesCsv(categories) {
   const head = ['Name', 'Type', 'Colour'];
-  const body = (categories || []).map(c => [c.name, c.type || '', c.color || ''].map(cell).join(','));
-  return [head.map(cell).join(','), ...body].join('\n') + '\n';
+  const body = (categories || []).map(c => [c.name, c.type || '', c.color || ''].map(csvCell).join(','));
+  return [head.map(csvCell).join(','), ...body].join('\n') + '\n';
 }
 
 /* ----------------------------- Markdown -------------------------------- */
@@ -100,9 +103,9 @@ function escMd(s) {
   return String(s ?? '').replace(/\|/g, '\\|');
 }
 
-/* `money` is the view's own formatter, injected for the same reason `cell` is:
-   the export must read in the household's currency and separators, and that
-   lives on ctx rather than in a pure module. */
+/* `money` is the view's own formatter, injected because the export must read in
+   the household's currency and separators — and that is a runtime setting off
+   ctx, not something a pure module can know. */
 function transactionsMarkdown(rows, meta, money) {
   const { range, filters, generated } = meta;
   const included = rows.filter(r => !r.excluded);
@@ -190,5 +193,5 @@ function exportPaths(range, folder) {
 
 module.exports = {
   EXPORT_DIR, safeName, escMd,
-  amountCell, transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths,
+  transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths,
 };

@@ -7,12 +7,13 @@ const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obs
 const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
-const { yamlStr, periodDaysOrZero, isoDayNumber, isRealIsoDate } = require('./util');
+const { periodDaysOrZero } = require('./dates');
+const { yamlStr } = require('./markdown');
+const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
    types or a file stores must be a real calendar date, so those go through
    isRealIsoDate — 2026-13-45 is shaped like a date and is not one. */
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
    API binds a control to this.plugin.settings[key] by default, so these four

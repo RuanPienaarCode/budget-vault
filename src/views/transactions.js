@@ -2,9 +2,13 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, escMd, icoEl, patchFrontmatter, normalizeAmount, yamlStr, csvCell } = require('../util');
+const { el, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
+const { csvCell } = require('../csv');
 const { askFields, askSplit } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
+const { ISO_DATE, todayIso } = require('../dates');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
@@ -16,6 +20,13 @@ module.exports = function registerTransactions(ctx) {
      import review): desc → category, flushed to the rules CSV on save. A Map
      so re-picking the same transaction keeps only the final choice. */
   const pendingLearns = new Map();
+
+  /* Not ctx.dirtyFlag: dirtiness here is per transaction FILE (f.dirty), and
+     the matching predicate lives in controller.js alongside the import one.
+     Only the button half is registered — and this is the registration that was
+     missing when the reload list was written out by hand, which left Save lit
+     after a reload had already discarded the edits it was offering to save. */
+  const clearSaveButton = ctx.registerSaveButton('#txSave');
 
   /* Windowing state. `renderToken` changes whenever the FILTERS change, which
      is what resets the window — a plain re-render (a category edit, a reload)
@@ -223,10 +234,8 @@ module.exports = function registerTransactions(ctx) {
       ...S.accounts.map(a => a.tx_label || a.name),
       ...Object.values(S.txFiles).map(f => f.label)])].sort();
     if (!labels.length) return toast('Add an account first — every transaction belongs to one', true);
-    const now = new Date();
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const r = await askFields(app, 'Add transaction', [
-      { key: 'date', label: 'Date', type: 'date', value: today },
+      { key: 'date', label: 'Date', type: 'date', value: todayIso() },
       { key: 'desc', label: 'Description', type: 'text', placeholder: 'e.g. Cash — vegetables at the market' },
       { key: 'label', label: 'Account', type: 'select', options: labels, value: $('#txAccount').value || labels[0] },
       { key: 'dir', label: 'Direction', type: 'select', value: 'out', options: [
@@ -238,7 +247,7 @@ module.exports = function registerTransactions(ctx) {
     ]);
     if (!r) return;
     const date = r.date.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Date must be YYYY-MM-DD', true);
+    if (!ISO_DATE.test(date)) return toast('Date must be YYYY-MM-DD', true);
     const desc = r.desc.trim();
     if (!desc) return toast('Description is required', true);
     // txSegment, not safeSeg: the key below and the path further down must be
@@ -283,7 +292,7 @@ module.exports = function registerTransactions(ctx) {
       learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })));
       pendingLearns.clear();
     }
-    $('#txSave').disabled = true;
+    clearSaveButton();
     toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
   }
 
@@ -332,9 +341,9 @@ module.exports = function registerTransactions(ctx) {
     const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');
     let written;
     try {
-      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, csvCell));
+      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows));
       await writeVaultFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
-      await writeVaultFile(paths.catCsv, categoriesCsv(S.categories, csvCell));
+      await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {
       console.error('Budget: export failed', e);

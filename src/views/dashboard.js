@@ -1,9 +1,12 @@
 'use strict';
 /* Dashboard — hero card, spending-trend SVG, category split, budget-vs-actual. */
 
-const { el, icoEl, safeSeg } = require('../util');
+const { el, icoEl } = require('../dom');
+const { safeSeg } = require('../vault-path');
 const { TYPE_ORDER } = require('../constants');
 const { stalenessSummary } = require('../reconcile');
+const { worth, cardOverlap } = require('../worth');
+const { owedSummary } = require('../owed-math');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, distinctColors,
@@ -60,10 +63,151 @@ module.exports = function registerDashboard(ctx) {
 
   function renderDashboard() {
     guard('#heroCard', 'summary', renderHero);
-    guard('#dashStale', 'balance staleness', renderStale);
     guardedTrend();
     guardedSplit();
     guard('#dashBudget', 'budget table', renderBudgetTable);
+    /* Position last, and in this order: the tiles decide whether the card is
+       shown at all, so they run before the caveats that live inside it. Both
+       caveats keep their own guard — a throw computing net worth must not cost
+       the reader the sentence explaining that the balances are months old. */
+    guard('#dashPositionKpis', 'position summary', renderPosition);
+    guard('#dashPositionNote', 'double-count note', renderOverlapNote);
+    guard('#dashStale', 'balance staleness', renderStale);
+  }
+
+  /* ------------------------- where you stand ----------------------------
+     Position, not flow. Every other card on this page answers "what happened
+     in this period"; these four answer "what is true today", and they are the
+     only things here that do NOT move when the period changes.
+
+     That difference is the whole reason the band is labelled and sits below
+     the period cards rather than being sprinkled among them. A tile that holds
+     still while the control above it moves is indistinguishable from one that
+     has stopped updating — the same reading failure the card guards at the top
+     of this file were written for, arriving by a different route.
+
+     Every figure here is deliberately borrowed rather than recomputed:
+     worth() for the balance-sheet halves and owedSummary() for the lending
+     ledger, the same functions the Savings, Debt and Owed pages call. A tile
+     that disagrees with the page it links to is worse than no tile. */
+  const balanceOf = type => S.accounts.filter(a => a.type === type)
+    .reduce((t, a) => t + (a.balance || 0), 0);
+
+  /* A tile whose value is a button into the page that owns it. kpiTiles() is
+     not used here because its tiles are inert by design — these are summaries
+     of pages, and the summary has to be the way in. The aria-label carries the
+     whole sentence: read as-is a screen reader gets "Debt R124 000", then a
+     sub-line it has no way to connect back. */
+  function posTile(grid, { label, value, cls, sub, view, say }) {
+    const btn = el('button', {
+      type: 'button', class: `v num ${cls || ''}`,
+      'aria-label': say, onclick: () => ctx.switchView(view),
+    }, value);
+    const t = el('div', { class: 'mini' }, el('div', { class: 'l' }, label), btn);
+    if (sub) t.append(el('div', { class: 's' }, sub));
+    grid.append(t);
+    return t;
+  }
+
+  function renderPosition() {
+    const grid = $('#dashPositionKpis'); grid.empty();
+    const card = $('#dashPositionCard');
+
+    const w = worth(S.accounts, S.debts, S.assets);
+    const owed = owedSummary(S.owed);
+    const savings = balanceOf('savings');
+    const invest = balanceOf('investment');
+
+    /* A vault that has none of this yet gets no band at all. Four tiles reading
+       R0.00 is not an empty state, it is a balance sheet asserting that the
+       reader owns nothing — which on a fresh install is a statement about the
+       import being incomplete, not about their finances.
+
+       The card still appears for a vault with only stale balances and no
+       totals, because the caveat inside it is then the only thing on the page
+       telling them why every figure is zero. */
+    const hasLedger = w.assets > 0 || w.liabilities > 0 || owed.entries > 0 || savings > 0 || invest > 0;
+    const hasCaveat = stalenessSummary(S.accounts).stale > 0;
+    if (card) card.classList.toggle('hidden', !hasLedger && !hasCaveat);
+    $('#dashPositionSub').textContent = hasLedger
+      ? 'As things stand today — these do not move with the period above'
+      : '';
+    if (!hasLedger) return;
+
+    posTile(grid, {
+      label: 'Net worth', value: money(w.net, 0),
+      cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
+      sub: `${money(w.assets, 0)} owned · ${money(w.liabilities, 0)} owed`,
+      view: 'savings',
+      say: `Net worth ${money(w.net)} — ${money(w.assets)} owned against ${money(w.liabilities)} owed. Open Savings and Investments.`,
+    });
+
+    /* Negated for display, like the Savings page's Debt tile, and split by
+       ledger for the same reason it is there: an overdrawn cheque account and a
+       home loan are both "owed" and live in different files, so a single total
+       with no breakdown sends the reader to the wrong page to find it.
+
+       Deliberately NOT a debt-free date. That figure depends on the extra
+       payment and strategy the reader sets on the Debt page, which are inputs
+       to a form and not saved anywhere this card can read — so a copy here
+       would compute a different, later date and put two debt-free dates in one
+       app. The tile links there instead. */
+    posTile(grid, {
+      label: 'Debt', value: money(-w.liabilities, 0),
+      cls: w.liabilities > 0 ? 'text-danger' : '',
+      sub: w.fromDebts && w.fromAccounts
+        ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page`
+        : (w.liabilities > 0 ? `${w.active.length} active` : 'nothing owed'),
+      view: 'debts',
+      say: w.liabilities > 0
+        ? `Debt ${money(w.liabilities)} owed. Open the Debt page.`
+        : 'No debt owed. Open the Debt page.',
+    });
+
+    /* The one figure on this card that is money coming TOWARDS the household,
+       so it is never red — outstanding is a warning at most. Age rather than a
+       due date, for the reason owed-math.js sets out. */
+    posTile(grid, {
+      label: 'Owed to you', value: money(owed.outstanding, 0),
+      cls: owed.outstanding > 0 ? 'text-warning' : '',
+      sub: owed.outstanding > 0
+        ? `${owed.open} outstanding${owed.oldestDays !== null ? ` · oldest out ${owed.oldestDays} days` : ''}`
+        : (owed.entries ? `${money(owed.recovered, 0)} recovered` : 'nothing lent out'),
+      view: 'owed',
+      say: owed.outstanding > 0
+        ? `${money(owed.outstanding)} owed to you across ${owed.open} ${owed.open === 1 ? 'entry' : 'entries'}. Open Owed Money.`
+        : 'Nothing outstanding. Open Owed Money.',
+    });
+
+    /* Uncoloured, deliberately. The Savings page leaves its Savings and
+       Investments tiles plain and spends its colour on the two figures that
+       carry a verdict — net worth and debt — and this band has to read the same
+       way. Given green it becomes a second green number beside the gradient one,
+       and the eye stops being able to tell which of the four is the headline. */
+    posTile(grid, {
+      label: 'Savings & investments', value: money(savings + invest, 0),
+      sub: `${money(savings, 0)} savings · ${money(invest, 0)} invested`,
+      view: 'savings',
+      say: `${money(savings + invest)} in savings and investments. Open Savings and Investments.`,
+    });
+  }
+
+  /* A credit card can honestly be tracked as an account OR as a Debt-page row,
+     and nothing stops someone doing both — at which point the net worth printed
+     above counts it twice. The Savings page already discloses this; stating the
+     same total here without the same sentence would put two net-worth figures in
+     the app, one qualified and one not, and the unqualified one first. */
+  function renderOverlapNote() {
+    const wrap = $('#dashPositionNote'); wrap.empty();
+    const o = cardOverlap(S.accounts, S.debts);
+    if (!o) return;
+    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+      `${o.cardAccounts} credit-card ${o.cardAccounts === 1 ? 'account' : 'accounts'} and ` +
+      `${o.cardDebts} card ${o.cardDebts === 1 ? 'debt' : 'debts'} are tracked — if any card is in both, it is counted twice above.`));
+    const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+      'aria-label': 'Review tracked debts on the Debt page' }, 'Review debts');
+    btn.addEventListener('click', () => ctx.switchView('debts'));
+    wrap.append(btn);
   }
 
   /* Balances nobody has confirmed in a while.
@@ -73,14 +217,25 @@ module.exports = function registerDashboard(ctx) {
      against, fourteen of sixteen balances sat four months stale while the app
      said nothing anywhere the reader actually looks. This is the one line that
      closes the loop, and it is deliberately the quietest thing on the page:
-     it reports the AGE of a figure, not a problem with it. */
+     it reports the AGE of a figure, not a problem with it.
+
+     It used to sit under the hero, where it qualified four cards built entirely
+     out of TRANSACTIONS — which do not go stale and never depended on it. It
+     now sits inside the position band, under the net-worth figure those very
+     balances are summed into. Same sentence, finally next to the number it is
+     about, and phrased like the Savings page's copy for the same reason: this
+     is the provenance of the total above, not a notice about a different page. */
   function renderStale() {
     const wrap = $('#dashStale'); wrap.empty();
     const s = stalenessSummary(S.accounts);
     if (!s.stale) return;
-    const age = s.oldestDays === null ? 'none carry a date' : `the oldest ${s.oldestDays} days ago`;
+    const age = s.oldestDays === null ? 'none of them carry a date' : `the oldest ${s.oldestDays} days ago`;
+    const all = s.stale === s.total;
+    const line = all
+      ? `Built from ${s.total === 1 ? 'a balance' : `${s.total} balances`} nobody has confirmed recently`
+      : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${s.stale} of ${s.total} account balances unconfirmed — ${age}.`));
+      `${line} — ${age}.`));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
     btn.addEventListener('click', () => ctx.switchView('accounts'));

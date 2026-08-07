@@ -25,7 +25,7 @@ const assert = require('assert');
 const { stubObsidian, makeCtx } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { prepareRules, autoCategorise } = require('../src/util');
+const { prepareRules, autoCategorise } = require('../src/rules');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };

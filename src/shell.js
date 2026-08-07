@@ -21,7 +21,7 @@ const SHELL_HTML = `
       <button type="button" class="drawer-close" aria-label="Close menu" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
-    <div class="drawer-section-label">Menu</div>
+    <div class="drawer-section-label">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
       <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span>Dashboard
     </button>
@@ -30,9 +30,6 @@ const SHELL_HTML = `
     </button>
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span>Budget
-    </button>
-    <button class="drawer-link" data-view="tax">
-      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -44,6 +41,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span>Accounts
     </button>
+    <button class="drawer-link" data-view="assets">
+      <span class="di"><span class="ico" data-ico="gem|diamond"></span></span>Assets
+    </button>
     <button class="drawer-link" data-view="debts">
       <span class="di"><span class="ico" data-ico="credit-card"></span></span>Debt
     </button>
@@ -52,6 +52,9 @@ const SHELL_HTML = `
     </button>
     <button class="drawer-link" data-view="services">
       <span class="di"><span class="ico" data-ico="layers"></span></span>Services
+    </button>
+    <button class="drawer-link" data-view="tax">
+      <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span>Tax
     </button>
 
     <div class="drawer-divider"></div>
@@ -120,8 +123,7 @@ const SHELL_HTML = `
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title">Dashboard</h1>
         </div>
-        <div class="card hero" id="heroCard"></div>
-        <div class="kpi-caveat mb-4" id="dashStale"></div>
+        <div class="card hero mb-4" id="heroCard"></div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -159,6 +161,25 @@ const SHELL_HTML = `
           <div class="body-pad body-pad-tight">
             <div class="table-responsive"><table class="table" id="dashBudget"></table></div>
           </div>
+        </div>
+        <!-- Position, not flow. Everything above this band moves when the period
+             changes; nothing in it does, which is why the subtitle says so — a
+             card that ignores the control above it reads as broken otherwise.
+
+             Deliberately NOT wrapped in a .card. Its tiles are .mini cards with
+             borders of their own, and every other mini-grid in the app (Savings,
+             Accounts, Debt, Owed, Assets, Services) sits bare on the page
+             background for exactly that reason. The heading it does need comes
+             from .section-h, which carries the card header's type scale without
+             the card's chrome or its 44px gutters. -->
+        <div class="mb-4" id="dashPositionCard">
+          <div class="section-h">
+            <h2>Where you stand</h2>
+            <div class="sub" id="dashPositionSub"></div>
+          </div>
+          <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
+          <div class="kpi-caveat" id="dashPositionNote"></div>
+          <div class="kpi-caveat" id="dashStale"></div>
         </div>
       </section>
 
@@ -329,6 +350,27 @@ const SHELL_HTML = `
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
         </div>
         <div id="acctSections"></div>
+      </section>
+
+      <section id="view-assets" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title">Assets</h1>
+          <div class="sub-note">What the household owns outside its accounts · saved to <code>Assets.md</code></div>
+        </div>
+        <div class="mini-grid mini-kpis-4" id="assetKpis"></div>
+        <div class="kpi-caveat mb-4" id="assetStale"></div>
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>What you own</h2><div class="sub">Edit a value or a valuation date, then save</div></div>
+            <div class="row">
+              <button class="btn-ghost" id="assetAdd"><span class="ico" data-ico="plus"></span> New asset</button>
+              <button class="btn-gradient" id="assetSave" disabled>Save changes</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table table-hover" id="assetTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-debts" class="hidden">

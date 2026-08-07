@@ -2,8 +2,13 @@
 /* Category <select> builders + the create-category flow, shared by the
    Transactions table, Budget page and CSV import review. */
 
-const { el, parseFrontmatter, learnPattern, prepareRules, autoCategorise, safeSeg, yamlStr, csvCell } = require('./util');
+const { el } = require('./dom');
+const { parseFrontmatter, yamlStr } = require('./markdown');
+const { csvCell } = require('./csv');
+const { learnPattern, prepareRules, autoCategorise } = require('./rules');
+const { safeSeg } = require('./vault-path');
 const { TYPE_ORDER } = require('./constants');
+const { todayIso } = require('./dates');
 const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
 
@@ -269,9 +274,7 @@ module.exports = function registerCategories(ctx) {
        Johannesburg it names the backup after yesterday — which reads as an
        older file than it is at exactly the moment someone is looking for the
        newest one. */
-    const d = new Date();
-    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const backup = `Data/Categorisation Rules.pre-tidy-${stamp}.csv`;
+    const backup = `Data/Categorisation Rules.pre-tidy-${todayIso()}.csv`;
     /* Tidy twice in one day and the second run must NOT overwrite the first:
        the earlier file is the more complete snapshot — it predates both
        deletes — and rewriting it would trade the only full copy for a partial

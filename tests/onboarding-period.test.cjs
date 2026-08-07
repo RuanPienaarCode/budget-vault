@@ -20,7 +20,8 @@ stubObsidian();
 
 const { OnboardingWizard } = require('../src/onboarding');
 const { PERIOD_PRESETS } = require('../src/constants');
-const { parseFrontmatter, periodDaysOrZero } = require('../src/util');
+const { periodDaysOrZero } = require('../src/dates');
+const { parseFrontmatter } = require('../src/markdown');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };

@@ -2,9 +2,11 @@
 /* Services — recurring subscriptions grouped by budget category, saved to
    Services.md. */
 
-const { el, dateInput, keepScroll, escMd, icoEl } = require('../util');
+const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { escMd } = require('../markdown');
 const { askFields } = require('../modal');
-const { todayIso } = require('../reconcile');
+const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
 
 module.exports = function registerServices(ctx) {
@@ -43,8 +45,7 @@ module.exports = function registerServices(ctx) {
     }
     return out;
   }
-  const mark = () => { S.servicesDirty = true; $('#svcSave').disabled = false; };
-  ctx.registerDirty(() => S.servicesDirty);
+  const { mark, clear: clearDirty } = ctx.dirtyFlag('servicesDirty', '#svcSave');
 
   /* Split out so an edited amount can refresh the totals without rebuilding
      the row it was typed into — on a phone `change` fires on blur, so a full
@@ -53,9 +54,7 @@ module.exports = function registerServices(ctx) {
   function renderServicesKpis() {
     const active = S.services.filter(s => s.active);
     const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
-    const kpis = $('#servicesKpis'); kpis.empty();
-    const tile = (l, v) => kpis.append(el('div', { class: 'mini' },
-      el('div', { class: 'l' }, l), el('div', { class: 'v num' }, v)));
+    const tile = kpiTiles($('#servicesKpis'));
     tile('Per month', money(perMonth));
     tile('Per year', money(perMonth * 12));
     tile('Active', String(active.length));
@@ -184,7 +183,7 @@ module.exports = function registerServices(ctx) {
 
   async function saveServices() {
     await writeFile('Services.md', serializeServices());
-    S.servicesDirty = false; $('#svcSave').disabled = true;
+    clearDirty();
     toast('Saved Services.md');
   }
 
@@ -199,12 +198,12 @@ module.exports = function registerServices(ctx) {
       { key: 'category', label: 'Budget category', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
     ]);
     if (!r || !r.name.trim()) return;
-    const amount = parseFloat(String(r.amount).replace(',', '.'));
-    if (isNaN(amount)) return toast('Not a number', true);
-    const next = /^\d{4}-\d{2}-\d{2}$/.test((r.next || '').trim()) ? r.next.trim() : '';
+    const amount = normalizeAmount(r.amount);
+    if (amount === null) return toast('Not a number', true);
+    const next = ISO_DATE.test((r.next || '').trim()) ? r.next.trim() : '';
     S.services.push({ name: r.name.trim(), provider: (r.provider || '').trim(), amount,
       cycle: r.cycle === 'annual' ? 'annual' : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '' });
-    S.servicesDirty = true; $('#svcSave').disabled = false; renderServices();
+    mark(); renderServices();
   }
 
   ctx.provide({ renderServices, saveServices, addService, serializeServices });

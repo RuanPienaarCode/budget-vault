@@ -32,7 +32,7 @@
         too few to separate eight wedges. Nobody would see that coming from the
         preset's own definition, which looks like an ordinary muted grey.
 
-   Bare node: chart.js pulls in util.js, which imports `obsidian`. */
+   Bare node: chart.js pulls in dom.js, which imports `obsidian`. */
 
 const fs = require('fs');
 const path = require('path');
