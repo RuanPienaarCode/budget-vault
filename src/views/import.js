@@ -8,11 +8,14 @@
 
    Comma, semicolon, tab and pipe files all import: the delimiter is sniffed
    from the file, and the character encoding is read off its bytes rather than
-   assumed to be UTF-8. Both live in util.js so they are testable on their own,
+   assumed to be UTF-8. Both live in statement.js so they are testable on their own,
    and both are deliberately confined to FOREIGN files — the app's own CSVs are
    read by parseCsv, which is comma-only. */
 
-const { el, parseStatement, decodeStatement, parseStatementDate, normalizeAmount, detectStatementColumns, reconcileAmounts, counterpartyAccount, prepareRules, autoCategorise } = require('../util');
+const { el } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, counterpartyAccount } = require('../statement');
+const { prepareRules, autoCategorise } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 
 module.exports = function registerImport(ctx) {
@@ -57,7 +60,7 @@ module.exports = function registerImport(ctx) {
   async function handleStatementFile(file) {
     // Bytes, not file.text() — the encoding is read off the bytes rather than
     // assumed to be UTF-8, and the delimiter off the decoded text rather than
-    // assumed to be a comma. See decodeStatement / sniffDelimiter in util.js.
+    // assumed to be a comma. See decodeStatement in statement.js / sniffDelimiter in csv.js.
     const text = decodeStatement(new Uint8Array(await file.arrayBuffer()));
     const rows = parseStatement(text);
     if (!rows.length) return toast('Empty statement file', true);

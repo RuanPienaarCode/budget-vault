@@ -1,41 +1,33 @@
 'use strict';
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
-const { el, dateInput, keepScroll, escMd, icoEl } = require('../util');
+const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
+const { escMd } = require('../markdown');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
+/* The definitions of "outstanding" and "settled" now live in owed-math.js,
+   because the Dashboard's position band states an outstanding total too. Two
+   copies of this arithmetic in one app is exactly the drift worth.js exists to
+   prevent — a dashboard that forgot to net part-payments off would report a
+   half-recovered loan as still fully owed, on the screen read first. */
+const { outstandingOf, isSettled, owedSummary } = require('../owed-math');
 
 module.exports = function registerOwed(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
 
-  const mark = () => { S.owedDirty = true; $('#owedSave').disabled = false; };
-  ctx.registerDirty(() => S.owedDirty);
-
-  /* What is still owed. The page used to offer `outstanding | paid` and nothing
-     between, so a reader recovering R900 of R4 000 had to choose which lie to
-     tell — and on the vault this was built against every single entry was
-     marked paid while the transactions showed partial recovery.
-
-     "Paid" is now something the arithmetic can CONCLUDE. The explicit status is
-     still honoured, because money comes back in ways the vault never sees — cash,
-     a favour, a debt forgiven — and a reader who says it is settled is right. */
-  const outstandingOf = o => Math.max(0, (o.amount || 0) - (o.repaid || 0));
-  const isSettled = o => o.status === 'paid' || outstandingOf(o) === 0;
+  const { mark, clear: clearDirty } = ctx.dirtyFlag('owedDirty', '#owedSave');
 
   /* The only thing outside the table that reads a row, so an edited amount can
      refresh here without rebuilding the field being typed in. */
   function renderOwedKpis() {
-    // Outstanding is now net of part-payments, so it answers "how much is
-    // actually still out there" rather than "what did I originally lend".
-    const outstanding = S.owed.filter(o => !isSettled(o)).reduce((s, o) => s + outstandingOf(o), 0);
-    const back = S.owed.reduce((s, o) => s + Math.min(o.repaid || 0, o.amount || 0), 0)
-      + S.owed.filter(o => o.status === 'paid' && !(o.repaid > 0)).reduce((s, o) => s + (o.amount || 0), 0);
-    const kpis = $('#owedKpis'); kpis.empty();
-    const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
-      el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
-    tile('Outstanding', money(outstanding), outstanding > 0 ? 'text-warning' : '');
-    tile('Recovered', money(back), 'text-success');
-    tile('Entries', String(S.owed.length));
+    // Outstanding is net of part-payments, so it answers "how much is actually
+    // still out there" rather than "what did I originally lend".
+    const s = owedSummary(S.owed);
+    const tile = kpiTiles($('#owedKpis'));
+    tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning' : '');
+    tile('Recovered', money(s.recovered), 'text-success');
+    tile('Entries', String(s.entries));
   }
 
   /* focusPerson: after a rebuild, put focus back on that row's status pill.
@@ -108,8 +100,8 @@ module.exports = function registerOwed(ctx) {
         desc: `${money(o.amount)} lent · ${money(o.repaid || 0)} back so far.` },
     ]);
     if (!r) return;
-    const amount = parseFloat(String(r.amount).replace(',', '.'));
-    if (isNaN(amount) || amount <= 0) return toast('Not a number', true);
+    const amount = normalizeAmount(r.amount);
+    if (amount === null || amount <= 0) return toast('Not a number', true);
     o.repaid = (o.repaid || 0) + amount;
     // Settling the last of it closes the entry, so "paid" stays something the
     // arithmetic concludes rather than a second thing to remember.
@@ -133,7 +125,7 @@ module.exports = function registerOwed(ctx) {
 
   async function saveOwed() {
     await writeFile('Owed Money.md', serializeOwed());
-    S.owedDirty = false; $('#owedSave').disabled = true;
+    clearDirty();
     toast('Saved Owed Money.md');
   }
 
@@ -143,10 +135,10 @@ module.exports = function registerOwed(ctx) {
       { key: 'amount', label: 'Amount', type: 'number', value: '0' },
     ]);
     if (!r || !r.person.trim()) return;
-    const amount = parseFloat(String(r.amount).replace(',', '.'));
-    if (isNaN(amount)) return toast('Not a number', true);
+    const amount = normalizeAmount(r.amount);
+    if (amount === null) return toast('Not a number', true);
     S.owed.push({ person: r.person.trim(), amount, description: '', due: '', status: 'outstanding', repaid: 0, lent: '' });
-    S.owedDirty = true; $('#owedSave').disabled = false; renderOwed();
+    mark(); renderOwed();
   }
 
   // serializeOwed is published so a round-trip test can drive the real one.

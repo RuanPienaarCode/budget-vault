@@ -13,7 +13,7 @@
    same lifetime as S, so a value typed here survives switching to another view
    and back, and is gone on reload, which is what a scratchpad should do. */
 
-const { el } = require('../util');
+const { el } = require('../dom');
 const { totalsFor, amortise, byYear, loanProfileFor } = require('../loan-math');
 
 module.exports = function registerLoans(ctx) {

@@ -3,7 +3,8 @@
    Obsidian) does not support. One modal can collect several fields at once. */
 
 const { Modal, Setting } = require('obsidian');
-const { el, normalizeAmount } = require('./util');
+const { el } = require('./dom');
+const { normalizeAmount } = require('./amount');
 
 class FieldModal extends Modal {
   constructor(app, title, fields, resolve) {
@@ -321,4 +322,9 @@ function askRulesCleanup(app, report) {
   return new Promise(res => new RulesCleanupModal(app, report, res).open());
 }
 
-module.exports = { FieldModal, askFields, ConfirmModal, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
+/* The ask* wrappers are the interface: each opens its Modal and resolves with
+   the reader's answer, so a caller never has to remember to .open() one or to
+   hand it a callback. FieldModal and ConfirmModal had no caller outside this
+   file — SplitModal and RulesCleanupModal stay exported because their tests
+   drive the class directly. */
+module.exports = { askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };

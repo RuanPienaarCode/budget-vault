@@ -23,8 +23,8 @@ const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { parseCsv, parseDelimited, sniffDelimiter, parseStatement, decodeStatement,
-  detectStatementColumns } = require('../src/util');
+const { parseCsv, parseDelimited, sniffDelimiter } = require('../src/csv');
+const { parseStatement, decodeStatement, detectStatementColumns } = require('../src/statement');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };

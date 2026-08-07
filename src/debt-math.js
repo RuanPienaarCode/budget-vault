@@ -13,6 +13,8 @@
    18.5%), compounded monthly — how a lender quotes it and how it is stored in
    Debts.md. Amounts are positive numbers; a balance is what is still owed. */
 
+const { ISO_DATE } = require('./dates');
+
 /* Below this, a balance is settled. Floating-point interest leaves fractions
    of a cent behind, and comparing to exactly 0 makes the loop run to the cap. */
 const EPS = 0.005;
@@ -176,7 +178,7 @@ function expectedBalance(debt, today) {
   const original = Number(d.original) || 0;
   const pay = (Number(d.payment) || 0) + (Number(d.extra) || 0);
   if (!original || pay <= 0) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(today || '')) return null;
+  if (!ISO_DATE.test(d.start || '') || !ISO_DATE.test(today || '')) return null;
 
   const [sy, sm] = d.start.split('-').map(Number);
   const [ty, tm] = today.split('-').map(Number);
@@ -195,4 +197,6 @@ function expectedBalance(debt, today) {
   return { expected: b, months, paid, interest, settled: b <= EPS };
 }
 
-module.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance, MAX_MONTHS, EPS };
+// MAX_MONTHS and EPS are tuning constants for the functions above, not part of
+// the contract — every caller goes through amortise/simulate, which apply them.
+module.exports = { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance };

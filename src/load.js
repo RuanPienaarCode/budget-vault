@@ -3,7 +3,23 @@
 
 const { TFile } = require('obsidian');
 const { TYPE_ORDER } = require('./constants');
-const { parseFrontmatter, parseMdTable, parseCsv, unescMd, parseNum, safeSeg, periodDaysOrZero, isRealIsoDate } = require('./util');
+const { periodDaysOrZero } = require('./dates');
+const { parseNum, normalizeAmount } = require('./amount');
+const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
+const { parseCsv } = require('./csv');
+const { safeSeg } = require('./vault-path');
+const { isRealIsoDate } = require('./dates');
+
+/* An optional numeric frontmatter key: absent or blank → null ("not set"),
+   anything normalizeAmount can read → that number, anything it cannot → null.
+   Deliberately NOT parseNum: its fallback resolves an unreadable cell to 0,
+   which for a savings goal or a credit limit is a figure the file never
+   claimed. Here "I could not read this" has to stay distinguishable from
+   "the user wrote zero", because the writers skip null and keep the line. */
+function fmNum(v) {
+  const s = (v ?? '').toString().trim();
+  return s ? normalizeAmount(s) : null;
+}
 
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
@@ -79,12 +95,18 @@ module.exports = function registerLoad(ctx) {
         // the cheque account is budgeted as normal; only the arriving leg here
         // is suppressed, which is what stops it being counted twice.
         in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()),
-        credit_limit: fm.credit_limit ? parseFloat(fm.credit_limit) : null,
-        goal_amount: fm.goal_amount ? parseFloat(fm.goal_amount) : null,
+        /* Same parseNum reasoning as `balance` above, and for the same reason:
+           every one of these is hand-editable and every one is WRITTEN BACK by
+           saveAccount's FM_WRITERS. parseFloat reads "15,000" as 15 and
+           "1.234,56" as 1.234, and the next edit to any field on the account
+           serialises that back over the user's own figure — silent destruction
+           of a number nobody was even editing. */
+        credit_limit: fmNum(fm.credit_limit),
+        goal_amount: fmNum(fm.goal_amount),
         target_date: fm.target_date || '',
-        monthly_contribution: fm.monthly_contribution ? parseFloat(fm.monthly_contribution) : null,
-        total_invested: fm.total_invested ? parseFloat(fm.total_invested) : null,
-        starting_amount: fm.starting_amount ? parseFloat(fm.starting_amount) : null,
+        monthly_contribution: fmNum(fm.monthly_contribution),
+        total_invested: fmNum(fm.total_invested),
+        starting_amount: fmNum(fm.starting_amount),
         inception_date: fm.inception_date || '',
         tags: fm.tags || '',
         body,
@@ -186,6 +208,27 @@ module.exports = function registerLoad(ctx) {
       });
     }
 
+    /* Assets — what the household owns that is not an account. Every column
+       after Name is optional and every one of them is additive, so an
+       Assets.md written by hand with nothing but a name and a value loads. */
+    S.assets = []; S.assetsDirty = false;
+    const assetTxt = await readFile('Assets.md');
+    S.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
+    if (assetTxt) for (const c of parseMdTable(assetTxt).slice(1)) {
+      if (!c[0]) continue;
+      S.assets.push({
+        name: unescMd(c[0]), type: unescMd(c[1] || 'other'),
+        // parseNum, not parseFloat, for the reason spelled out on the debt
+        // balances above: a hand-typed "15 000 000" read as 15 would be
+        // written straight back over a figure nobody was editing. No *Raw
+        // write-back though — like a debt balance this is arithmetic input,
+        // so a cell the strict parser rejects falls back to 0 and is
+        // rewritten canonically rather than preserved verbatim.
+        value: Math.max(0, parseNum(c[2] || '0').value || 0),
+        valued: (c[3] || '').trim(), notes: unescMd(c[4] || ''),
+      });
+    }
+
     S.services = []; S.servicesDirty = false;
     const svcTxt = await readFile('Services.md');
     S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
@@ -218,18 +261,14 @@ module.exports = function registerLoad(ctx) {
         const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
         return t === 'uploaded' ? 'uploaded' : (t === 'n/a' || t === 'na') ? 'n/a' : 'needed';
       };
-      // Figures are written as raw numbers, but a hand-edited file may carry a
-      // currency symbol or either separator convention — coerce rather than
-      // throw, mirroring how stepStatus falls back instead of failing.
-      const figAmount = s => {
-        const t = (s || '').toString().replace(/[^\d.,-]/g, '');
-        if (!t) return 0;
-        const norm = t.lastIndexOf(',') > t.lastIndexOf('.')
-          ? t.replace(/\./g, '').replace(',', '.')   // 1.234,56 / 1 234,56
-          : t.replace(/,/g, '');                     // 1,234.56 / 1234.56
-        const n = Number(norm);
-        return Number.isFinite(n) ? n : 0;
-      };
+      /* Figures are written as raw numbers, but a hand-edited file may carry a
+         currency symbol or either separator convention — coerce rather than
+         throw, mirroring how stepStatus falls back instead of failing.
+         normalizeAmount is the same reader the statement importer and every
+         other hand-editable amount goes through; this used to be a fourth
+         private copy of that logic, with a test that asserted against its own
+         mirror of it rather than against the shipped function. */
+      const figAmount = s => normalizeAmount(s) ?? 0;
       const signedNum = v => {
         if (v === undefined || v === null || v === '') return null;
         const n = Number(String(v).replace(/[^\d.-]/g, ''));

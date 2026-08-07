@@ -26,7 +26,7 @@ lets a household paid every ten days work without anyone having invented a name 
 Storing a number lets a hand-edited `Settings.md` express far more nonsense than an enum
 could — `period_days: 1`, `400`, `-14`, `banana`. So:
 
-- `periodDaysOrZero` in `util.js` bands it to 7–31 and is applied by the **loader**, on the
+- `periodDaysOrZero` in `dates.js` bands it to 7–31 and is applied by the **loader**, on the
   way in, so the stored setting and the running one can never disagree. A settings control
   reading `S.settings.period_days` describes the cycle the app is actually running.
 - Out-of-band values become `0` — the payday month — never the nearest legal number.

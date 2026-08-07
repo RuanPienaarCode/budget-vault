@@ -6,7 +6,9 @@
    profile in locale.js (Settings.md `country`, default South Africa / SARS).
    Edit seeded sources to match your own banks, providers and income. */
 
-const { el, dateInput, keepScroll, escMd, icoEl, safeSeg, patchFrontmatter, yamlStr } = require('../util');
+const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
+const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 
 module.exports = function registerTax(ctx) {
@@ -17,8 +19,7 @@ module.exports = function registerTax(ctx) {
     return locale().currentTaxYear(new Date());
   }
   const T = () => S.tax[S.taxYear];
-  const mark = () => { S.taxDirty = true; $('#taxSave').disabled = false; };
-  ctx.registerDirty(() => S.taxDirty);
+  const { mark, clear: clearDirty } = ctx.dirtyFlag('taxDirty', '#taxSave');
 
   /* Shown on the empty card and in the Season card. The seeded steps, docs and
      deadline dates are country-profile defaults, not authoritative guidance. */
@@ -97,9 +98,7 @@ module.exports = function registerTax(ctx) {
   }
 
   function renderTaxKpis(t) {
-    const kpis = $('#taxKpis'); kpis.empty();
-    const tile = (l, v, cls) => kpis.append(el('div', { class: 'mini' },
-      el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v)));
+    const tile = kpiTiles($('#taxKpis'));
 
     const d = daysTo(activeDeadline(t));
     tile('Deadline', d === null ? '—' : d < 0 ? `${-d} d overdue` : `${d} days`,
@@ -595,7 +594,7 @@ module.exports = function registerTax(ctx) {
   async function saveTax() {
     if (!S.taxYear) return;
     await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
-    S.taxDirty = false; $('#taxSave').disabled = true;
+    clearDirty();
     toast(`Saved Tax/${S.taxYear}.md`);
   }
 

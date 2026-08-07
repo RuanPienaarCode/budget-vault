@@ -32,7 +32,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 class FakeEl {
   constructor(tag, o = {}) {
     this.tagName = String(tag).toUpperCase();
-    // util.js el() branches on nodeType to tell an element child from a string.
+    // dom.js el() branches on nodeType to tell an element child from a string.
     // Without it every nested element is wrapped as a text node and the whole
     // structure flattens — which is exactly how this stub failed first time.
     this.nodeType = 1;

@@ -5,7 +5,7 @@
    surface: a transaction written to disk must parse back to the exact same
    record. This test drives the REAL serializer (transactions.js `serializeTxFile`,
    reached through its register(ctx) factory) and parses its output with the SAME
-   util primitives the loader uses, then asserts field-for-field equality — with
+   markdown primitives the loader uses, then asserts field-for-field equality — with
    adversarial values (pipes, newlines, unicode, decimal-comma amounts, empties)
    that are exactly what breaks naive markdown-table writers.
 
@@ -35,7 +35,10 @@ Module._load = function (request, parent, isMain) {
   return origLoad.apply(this, arguments);
 };
 
-const { escMd, unescMd, parseMdTable, parseNum, parseFrontmatter, safeSeg, yamlStr, csvCell, parseCsv } = require('../src/util');
+const { parseNum } = require('../src/amount');
+const { escMd, unescMd, parseMdTable, parseFrontmatter, yamlStr } = require('../src/markdown');
+const { csvCell, parseCsv } = require('../src/csv');
+const { safeSeg } = require('../src/vault-path');
 const registerTransactions = require('../src/views/transactions');
 
 let checks = 0;
@@ -64,7 +67,7 @@ for (const n of [-123.45, 0, 1000, -0.01, 999999.99, 42]) {
 // NOTE: this file guards the serializer against a MIRROR of the loader (below).
 // tests/vault-roundtrip.test.cjs drives the real loadVault instead and is the
 // stronger guarantee; this one stays for the focused escaping/amount cases.
-const ctx = { S: {}, registerDirty() {}, provide(o) { Object.assign(ctx, o); } };
+const ctx = { S: {}, registerDirty() {}, registerSaveButton: () => () => {}, provide(o) { Object.assign(ctx, o); } };
 registerTransactions(ctx);                 // no calls at register time; only defines fns
 const { serializeTxFile } = ctx;
 ok(typeof serializeTxFile === 'function', 'serializeTxFile must be exposed on ctx');

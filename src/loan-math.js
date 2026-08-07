@@ -217,7 +217,9 @@ function loanProfileFor(code) {
 
 module.exports = {
   monthlyPayment, amortise, byYear, totalsFor,
-  zaTransferDuty, zaMortgageInitiationFee, zaVehicleInitiationFee,
-  ZA_TRANSFER_DUTY, ZA_SERVICE_FEE, ZA_INIT_CAP,
+  // The ZA fee tables and their helpers are reached through LOAN_PROFILES, which
+  // is how a non-ZA profile gets to substitute its own — exporting them by name
+  // as well offered a second, country-specific path that nothing used.
+  zaTransferDuty,
   LOAN_PROFILES, GENERIC_LOAN_PROFILE, loanProfileFor,
 };

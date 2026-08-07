@@ -21,6 +21,15 @@
   --color-danger-light:  #fff1f2;
   --color-warning:       #f59e0b;
   --color-warning-light: #fffbeb;
+  /* The same warning, dark enough to be READ as body text on a light surface.
+     --color-warning is a fill: it is correct behind a badge and behind a bar,
+     and it measures 2.15:1 against the light palette's white — under AA's 4.5
+     and under the 3.0 even large text needs. Nothing is wrong with the amber;
+     what is wrong is using a fill colour as ink. Kept as its own token rather
+     than by darkening --color-warning, which would dull every badge and bar in
+     the app to fix a text problem. The dark block below points it straight back
+     at the fill, where the amber already measures 8.3:1. */
+  --color-warning-ink:   #9a5c09;   /* AA on --surface (5.4:1) and on the card (4.9:1); the fill amber was 2.2:1 */
   --color-info:          #0ea5e9;
   --color-info-light:    #f0f9ff;
 
@@ -97,6 +106,9 @@
   --color-success-light: rgba(34,197,94,0.12);
   --color-danger-light:  rgba(244,63,94,0.12);
   --color-warning-light: rgba(245,158,11,0.12);
+  /* On a dark surface the fill amber is already 8.3:1 as text, and the darkened
+     light-mode ink would be the unreadable one. Point it back at the fill. */
+  --color-warning-ink:   var(--color-warning);
   --color-info-light:    rgba(14,165,233,0.12);
 
   --bg-0:              #04050b;
@@ -312,6 +324,17 @@
   --interactive-hover: var(--surface);
   --dropdown-background-hover: var(--surface);
   --text-normal: var(--text-primary);
+  /* Obsidian paints an <input type="date">'s "/" separators and its empty
+     mm/dd/yyyy placeholder from these two, both defaulting to --text-faint ->
+     --color-base-50 — a HOST greyscale token that differs between .theme-light
+     and .theme-dark. Everything else about the field was already redirected
+     above, so on a mismatched pair (plugin light under a dark Obsidian, or the
+     reverse) the box, border and typed value followed the plugin while the
+     slashes and placeholder digits stayed in the host's theme — host grey on
+     the plugin's white. Every date field in the app has always had this; the
+     Assets page's Valued column is just the newest place to notice it. */
+  --input-placeholder-color: var(--text-light);
+  --input-date-separator: var(--text-light);
   --checkbox-color: var(--color-primary);
   --checkbox-color-hover: var(--color-primary-dark);
   --checkbox-border-color: var(--border-color);
@@ -572,6 +595,11 @@
      below so their titles align with card content instead of hugging the edge. */
   .budget-app-root .main-content { padding: 1rem 0; }
   .budget-app-root .financial-period-banner { padding-left: 20px; padding-right: 20px; }
+  /* Same reasoning as the banner directly above: a section label sits loose in
+     the now-gutterless main-content, so it has to carry its own side inset or
+     the heading hugs the screen edge while the tiles it labels — full-bleed
+     cards with their own inner padding — do not. */
+  .budget-app-root .section-h { padding-left: 20px; padding-right: 20px; }
 }
 
 .budget-app-root .financial-period-banner {
@@ -648,6 +676,16 @@
 }
 .budget-app-root .card-h h2 { font-size: 18px; font-weight: 600; letter-spacing: .2px; margin: 0; color: var(--text-primary); }
 .budget-app-root .card-h .sub { font-size: 13px; color: var(--ink-faint); letter-spacing: .3px; margin-top: 5px; }
+/* A page-level section label — the card header's exact type scale without the
+   card. The dashboard's position band needs a heading (it has to say what it is
+   and that it ignores the period), but its tiles are bordered .mini cards
+   already: wrapping them in a .card would be the only double border in the app,
+   and every other mini-grid sits bare on the page background. Zero side padding
+   so the h2 lines up with the tile edges below it, not with a card's gutter. */
+.budget-app-root .section-h { margin-bottom: 14px; }
+.budget-app-root .section-h h2 { font-size: 18px; font-weight: 600; letter-spacing: .2px; margin: 0; color: var(--text-primary); }
+.budget-app-root .section-h .sub { font-size: 13px; color: var(--ink-faint); letter-spacing: .3px; margin-top: 5px; }
+.budget-app-root .section-h .sub:empty { display: none; }
 .budget-app-root .body-pad { padding: 20px 44px 40px; }
 /* Table-bearing card bodies want narrower side gutters than the 44px default
    so wide tables get more room. Was an inline style per card; moved to a class
@@ -982,6 +1020,14 @@
 .budget-app-root .mini-kpis-3 { grid-template-columns: repeat(3, 1fr); }
 .budget-app-root .mini-kpis-5 .v, .budget-app-root .mini-kpis-4 .v, .budget-app-root .mini-kpis-3 .v { cursor: default; }
 .budget-app-root .mini-kpis-5 .v:hover, .budget-app-root .mini-kpis-4 .v:hover, .budget-app-root .mini-kpis-3 .v:hover { text-decoration: none; }
+/* …except where the tiles are drill-throughs. The dashboard's position band is
+   a fixed 4-up grid whose values ARE buttons into the Debt, Owed and Savings
+   pages, so the pointer and underline the rules above just turned off have to
+   come back. Same specificity as those rules (three classes), so this MUST stay
+   below them — order is what decides it. Named like .donut-legend--linked, the
+   other place a summary row doubles as navigation. */
+.budget-app-root .mini-grid--linked .v { cursor: pointer; }
+.budget-app-root .mini-grid--linked .v:hover { text-decoration: underline; }
 .budget-app-root .mini .v small { font-size: 15px; color: var(--ink-faint); font-weight: 500; }
 @media (max-width: 1100px) { .budget-app-root .mini-kpis-5 { grid-template-columns: repeat(3, 1fr); } }
 /* -3 had no step between its base and the 640px single-column rule, so it held
@@ -1085,6 +1131,38 @@
 /* Owed Money — how long the money has been out, and the per-row actions. */
 .budget-app-root .owed-age { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 2px; }
 .budget-app-root .owed-acts { display: inline-flex; gap: 4px; }
+
+/* Assets — how old the valuation under each item's name is. Warning-coloured
+   past a year rather than hidden: an out-of-date figure is still the best one
+   anybody has, it just should not read as freshly measured. */
+.budget-app-root .asset-age { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 2px; }
+/* --color-warning-ink, not --color-warning: at 11px/500 this is the smallest,
+   lightest text in the row, and it is the ONE line the feature exists to
+   surface. The fill amber renders it less legible than the fresh valuations
+   beside it, which is precisely backwards. */
+.budget-app-root .asset-age-old { color: var(--color-warning-ink); }
+
+/* The Assets table sizes its columns in CSS rather than by a fixed pixel width
+   on each control. Measured on the built page, the inline widths this replaces
+   left 32–50px of dead space in EVERY column — 256px of a 1078px table — so
+   each header label floated away from the data beneath it and the Notes field
+   clipped its text while a quarter of the row sat empty.
+
+   min-width, not width: the columns share whatever room a desktop pane has,
+   and on a phone the table still grows past the viewport and scrolls inside
+   .table-responsive, exactly as Owed Money, Debt and Services already do.
+   Scoped to #assetTable so no other page's column rhythm moves. */
+.budget-app-root #assetTable { width: 100%; }
+.budget-app-root #assetTable th:nth-child(1), .budget-app-root #assetTable td:nth-child(1) { min-width: 150px; }
+.budget-app-root #assetTable th:nth-child(2), .budget-app-root #assetTable td:nth-child(2) { min-width: 150px; }
+.budget-app-root #assetTable th:nth-child(3), .budget-app-root #assetTable td:nth-child(3) { min-width: 120px; }
+.budget-app-root #assetTable th:nth-child(4), .budget-app-root #assetTable td:nth-child(4) { min-width: 140px; }
+.budget-app-root #assetTable th:nth-child(5), .budget-app-root #assetTable td:nth-child(5) { min-width: 170px; }
+/* The remove button is furniture, not data — it takes the narrowest column the
+   table can give it instead of an equal share of the surplus. */
+.budget-app-root #assetTable th:last-child, .budget-app-root #assetTable td:last-child { width: 1%; white-space: nowrap; }
+.budget-app-root #assetTable td .form-control,
+.budget-app-root #assetTable td .form-select { width: 100%; }
 
 /* Debt — where the amortisation schedule says the balance should be. */
 .budget-app-root .debt-implied { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 3px; cursor: help; }
@@ -1658,6 +1736,7 @@
   /* Banners sit loose in the now-gutterless main-content, so they carry
      their own side padding to stay clear of the screen edge. */
   .budget-app-root .financial-period-banner { padding: 0.25rem 14px 0.9rem; margin-bottom: 0.25rem; }
+  .budget-app-root .section-h { padding-left: 14px; padding-right: 14px; }
 
   /* Table cells are the biggest win — 1rem each side across every column. */
   .budget-app-root .table thead th { padding: 0.6rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.04em; }

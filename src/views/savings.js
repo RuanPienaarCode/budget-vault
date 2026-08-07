@@ -1,11 +1,13 @@
 'use strict';
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
-const { el, icoEl } = require('../util');
+const { el, kpiTiles, icoEl } = require('../dom');
 const { themeColors, createChart, tip } = require('../chart');
-const { isStale, stalenessSummary, reconcile, todayIso } = require('../reconcile');
+const { isStale, stalenessSummary, reconcile } = require('../reconcile');
+const { todayIso } = require('../dates');
 const { accountFlows } = require('../savings-math');
-const { worth, activeDebts, cardOverlap, debtsByType } = require('../worth');
+const { worth, activeDebts, cardOverlap, debtsByType, assetsByType } = require('../worth');
+const { daysSince } = require('../reconcile');
 
 module.exports = function registerSavings(ctx) {
   const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
@@ -15,16 +17,10 @@ module.exports = function registerSavings(ctx) {
     const investments = S.accounts.filter(a => a.type === 'investment');
     const totalSavings = savings.reduce((s, a) => s + a.balance, 0);
     const totalInvest = investments.reduce((s, a) => s + a.balance, 0);
-    const w = worth(S.accounts, S.debts);
+    const w = worth(S.accounts, S.debts, S.assets);
     const netWorth = w.net;
 
-    const kpis = $('#savingsKpis'); kpis.empty();
-    const tile = (l, v, cls, sub) => {
-      const t = el('div', { class: 'mini' },
-        el('div', { class: 'l' }, l), el('div', { class: `v num ${cls || ''}` }, v));
-      if (sub) t.append(el('div', { class: 's' }, sub));
-      kpis.append(t);
-    };
+    const tile = kpiTiles($('#savingsKpis'));
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger');
     tile('Savings', money(totalSavings));
     tile('Investments', money(totalInvest));
@@ -64,8 +60,22 @@ module.exports = function registerSavings(ctx) {
      Deliberately a caveat rather than a warning, and never a reason to hide the
      figure: an old balance is still the best answer anyone has. It just should
      not be printed in gradient text as though it were measured this morning. */
+  /* An asset value goes stale on a year's clock, not the 30 days a bank
+     balance does — see the header of views/assets.js. Reported as its own line
+     rather than folded into the account count above: the two say "unconfirmed"
+     about different lengths of time, and one sentence covering both would be
+     true of neither. */
+  const ASSET_STALE_DAYS = 365;
+  function staleAssets() {
+    return (S.assets || []).filter(a => {
+      const d = daysSince(a.valued);
+      return (d === null || d > ASSET_STALE_DAYS) && a.value > 0;
+    });
+  }
+
   function renderStaleNote() {
     const wrap = $('#savingsStale'); wrap.empty();
+    renderAssetCaveat(wrap);
     const s = stalenessSummary(S.accounts);
     if (!s.stale) return;
 
@@ -85,6 +95,21 @@ module.exports = function registerSavings(ctx) {
       'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
     btn.addEventListener('click', () => ctx.switchView('accounts'));
     wrap.append(note, btn);
+  }
+
+  /* Named separately from the balances caveat and shown before it, because an
+     out-of-date house valuation is usually the single largest input to the
+     figure printed above and the reader should meet it first. */
+  function renderAssetCaveat(wrap) {
+    const stale = staleAssets();
+    if (!stale.length) return;
+    const owned = stale.reduce((t, a) => t + a.value, 0);
+    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+      `${money(owned, 0)} of what you own was last valued over a year ago.`));
+    const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+      'aria-label': 'Review asset valuations on the Assets page' }, 'Review valuations');
+    btn.addEventListener('click', () => ctx.switchView('assets'));
+    wrap.append(btn);
   }
 
   function renderGoals() {
@@ -250,6 +275,20 @@ module.exports = function registerSavings(ctx) {
       if (neg < 0) debts.push({ label, amount: -neg, color });
     }
 
+    /* Assets-page rows, grouped by their own kind — the house, the car and the
+       ring as three named blocks rather than one anonymous slab. Colours walk a
+       fixed list for the same reason the debt colours below do. Deliberately
+       appended AFTER the accounts so the bar reads bank money first and
+       possessions second: the two are not equally liquid, and a chart that
+       leads with a house implies you could spend it this week. */
+    const ASSET_VARS = ['--color-accent', '--color-investment', '--color-info', '--ink-faint'];
+    const ASSET_FALLBACKS = ['#0d9488', '#6f42c1', '#0ea5e9', '#5f6779'];
+    assetsByType(S.assets).forEach((a, i) => {
+      const color = (css.getPropertyValue(ASSET_VARS[i % ASSET_VARS.length]) || '').trim()
+        || ASSET_FALLBACKS[i % ASSET_FALLBACKS.length];
+      assets.push({ label: a.type, amount: a.amount, color, fromAssetPage: true });
+    });
+
     /* Debt-page rows, grouped by their own type so a bond and a car loan are
        tellable apart rather than merged into one anonymous block. Colours walk
        a fixed list so the same debt type keeps the same colour between renders
@@ -269,9 +308,18 @@ module.exports = function registerSavings(ctx) {
 
     const active = activeDebts(S.debts);
     const overlap = cardOverlap(S.accounts, S.debts);
+    // Name every ledger the bar is drawn from. The subtitle is not a
+    // disclosure — the figures are all actually IN the chart — but a reader
+    // who cannot tell which pages fed it has no way to check it.
+    const ledgers = ['your accounts',
+      ...(S.assets && S.assets.some(a => a.value > 0) ? ['the Assets page'] : []),
+      ...(active.length ? ['the Debt page'] : [])];
+    const across = ledgers.length > 1
+      ? `Across ${ledgers.slice(0, -1).join(', ')} and ${ledgers[ledgers.length - 1]}`
+      : 'Across your accounts';
     $('#savingsWorthSub').textContent = overlap
-      ? 'Across your accounts and the Debt page · a credit card appears on both, so it may be counted twice'
-      : (active.length ? 'Across your accounts and the Debt page' : 'Across your accounts');
+      ? `${across} · a credit card appears on two of them, so it may be counted twice`
+      : across;
 
     if (!totalAssets && !totalDebts) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
