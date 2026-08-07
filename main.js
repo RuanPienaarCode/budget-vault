@@ -1215,7 +1215,95 @@ var require_modal = __commonJS((exports2, module2) => {
   function askRulesCleanup(app, report) {
     return new Promise((res) => new RulesCleanupModal(app, report, res).open());
   }
-  module2.exports = { askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
+
+  class BudgetResliceModal extends Modal {
+    constructor(app, plan, opts, resolve) {
+      super(app);
+      this.plan = plan;
+      this.money = opts.money || ((n) => String(n));
+      this.sourceLabel = opts.sourceLabel || "";
+      this.resolve = resolve;
+      this.answer = null;
+      this.accepted = new Set;
+    }
+    onOpen() {
+      const { rows, oldDays, dstDays, factor } = this.plan;
+      this.titleEl.setText("Bring the amounts across");
+      const c = this.contentEl;
+      if (!rows.length) {
+        c.append(el("p", { class: "budget-tidy-lead" }, "That budget has no amounts to bring across."));
+        new Setting(c).addButton((b) => b.setButtonText("Close").setCta().onClick(() => this.close()));
+        return;
+      }
+      c.append(el("p", { class: "budget-tidy-lead" }, factor ? `Budgets/${this.sourceLabel}.md ran ${oldDays} days; this period runs ${dstDays}. ` + `Each suggestion below is the old amount × ${dstDays}/${oldDays} — a flat pro-rata, ` + "which is right for something like groceries and wrong for a rent or a subscription " + "that costs the same whatever the period length. Tick the lines where scaling is the " + "right answer; set the others yourself afterwards." : `Budgets/${this.sourceLabel}.md is the only budget saved under its length, so how long ` + "its periods ran cannot be worked out from their names — and nothing in the file " + "records it. These are the old amounts UNCHANGED, not re-sliced. Tick any that happen " + "to be right for this period."));
+      const list = el("div", { class: "budget-tidy-list budget-reslice-list" });
+      const boxes = [];
+      for (const r of rows) {
+        const cb = el("input", { type: "checkbox" });
+        cb.checked = false;
+        cb.addEventListener("change", () => {
+          if (cb.checked)
+            this.accepted.add(r.category);
+          else
+            this.accepted.delete(r.category);
+          sync();
+        });
+        boxes.push({ cb, row: r });
+        const to = r.scaled ? r.suggested : r.oldAmount;
+        list.append(el("label", { class: "budget-tidy-row budget-reslice-row" }, cb, el("div", { class: "budget-reslice-cat" }, r.category), el("div", { class: "budget-reslice-nums" }, el("span", { class: "budget-reslice-old" }, this.money(r.oldAmount)), el("span", { class: "budget-reslice-arrow" }, " → "), el("span", { class: "budget-reslice-new" }, this.money(to))), r.hasExisting ? el("div", { class: "budget-tidy-why" }, `already set to ${this.money(r.existing)} for this period — ticking this replaces it`) : null));
+      }
+      c.append(list);
+      const all = el("button", { class: "btn btn-ghost", type: "button" }, "Accept all");
+      all.addEventListener("click", () => {
+        const turnOn = this.accepted.size < rows.length;
+        for (const { cb, row } of boxes) {
+          cb.checked = turnOn;
+          if (turnOn)
+            this.accepted.add(row.category);
+          else
+            this.accepted.delete(row.category);
+        }
+        sync();
+      });
+      c.append(el("div", { class: "budget-reslice-bulk" }, all));
+      let applyBtn = null;
+      const sync = () => {
+        const n = this.accepted.size;
+        all.textContent = n === rows.length ? "Clear all" : "Accept all";
+        if (applyBtn) {
+          applyBtn.setDisabled(n === 0);
+          applyBtn.setButtonText(n ? `Bring ${n} ${n === 1 ? "amount" : "amounts"} across` : "Nothing accepted yet");
+        }
+      };
+      new Setting(c).addButton((b) => b.setButtonText("Cancel").onClick(() => this.close())).addButton((b) => {
+        applyBtn = b;
+        b.setCta().onClick(() => {
+          if (!this.accepted.size)
+            return;
+          this.answer = rows.filter((r) => this.accepted.has(r.category)).map((r) => ({ category: r.category, amount: r.scaled ? r.suggested : r.oldAmount, notes: r.notes }));
+          this.close();
+        });
+        sync();
+      });
+    }
+    onClose() {
+      this.contentEl.empty();
+      this.resolve(this.answer);
+    }
+  }
+  function askBudgetReslice(app, plan, opts) {
+    return new Promise((res) => new BudgetResliceModal(app, plan, opts || {}, res).open());
+  }
+  module2.exports = {
+    askFields,
+    confirmModal,
+    SplitModal,
+    askSplit,
+    RulesCleanupModal,
+    askRulesCleanup,
+    BudgetResliceModal,
+    askBudgetReslice
+  };
 });
 
 // src/locale.js
@@ -1932,7 +2020,7 @@ var require_period = __commonJS((exports2, module2) => {
   var { periodDaysOrZero } = require_dates();
   var { safeSeg } = require_vault_path();
   var { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require_dates();
-  var MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+  var MONTH_KEY = /^(?:0[1-9]\d{2}|[1-9]\d{3})-(0[1-9]|1[0-2])$/;
   module2.exports = function registerPeriod(ctx) {
     const { S } = ctx;
     function anchorDay() {
@@ -4112,13 +4200,59 @@ var require_transactions = __commonJS((exports2, module2) => {
   };
 });
 
+// src/reslice.js
+var require_reslice = __commonJS((exports2, module2) => {
+  var { ISO_DATE, isoDayNumber } = require_dates();
+  function inferIntervalFromKeys(keys) {
+    const days = (keys || []).filter((k) => typeof k === "string" && ISO_DATE.test(k)).map(isoDayNumber).sort((a, b) => a - b);
+    let best = null;
+    for (let i = 1;i < days.length; i++) {
+      const gap = days[i] - days[i - 1];
+      if (gap > 0 && (best === null || gap < best))
+        best = gap;
+    }
+    return best;
+  }
+  function roundCents(n) {
+    const s = n < 0 ? -1 : 1;
+    return s * Math.round(Math.abs(n) * 100) / 100;
+  }
+  function resliceBudget({ rows, oldDays, dstDays, existingByCategory = {} }) {
+    const known = Number.isFinite(oldDays) && oldDays > 0 && Number.isFinite(dstDays) && dstDays > 0;
+    const factor = known ? dstDays / oldDays : null;
+    return {
+      oldDays: known ? oldDays : null,
+      dstDays: Number.isFinite(dstDays) && dstDays > 0 ? dstDays : null,
+      factor,
+      rows: (rows || []).map((r) => {
+        const old = Number(r.amount) || 0;
+        const existing = Number(existingByCategory[r.category]) || 0;
+        return {
+          category: r.category,
+          type: r.type,
+          notes: r.notes || "",
+          oldAmount: old,
+          suggested: known ? roundCents(old * factor) : null,
+          scaled: known,
+          existing,
+          hasExisting: existing !== 0
+        };
+      })
+    };
+  }
+  module2.exports = { inferIntervalFromKeys, resliceBudget, roundCents };
+});
+
 // src/views/budgets.js
 var require_budgets = __commonJS((exports2, module2) => {
   var { el, icoEl } = require_dom();
   var { escMd, patchFrontmatter } = require_markdown();
   var { TYPE_ORDER } = require_constants();
+  var { askBudgetReslice } = require_modal();
+  var { inferIntervalFromKeys, resliceBudget } = require_reslice();
+  var { ISO_DATE, isoDayNumber } = require_dates();
   module2.exports = function registerBudgets(ctx) {
-    const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
+    const { S, $, app, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory } = ctx;
     function otherShapeBudgets() {
       return Object.keys(S.budgets).filter((k) => !periodKeyValid(k) && (S.budgets[k] || []).length).sort();
     }
@@ -4141,6 +4275,60 @@ var require_budgets = __commonJS((exports2, module2) => {
         type: "button",
         onclick: () => bringOverFrom(newest)
       }, `Bring over the categories and notes from ${newest}`));
+      box.append(el("button", {
+        class: "btn btn-ghost",
+        type: "button",
+        onclick: () => resliceFrom(newest)
+      }, "Bring the amounts across too…"));
+    }
+    function currentPeriodDays() {
+      const iv = intervalDays();
+      if (iv)
+        return iv;
+      const r = periodRange(S.period);
+      return isoDayNumber(r.end) - isoDayNumber(r.start) + 1;
+    }
+    function strandedPeriodDays(key, others) {
+      if (ISO_DATE.test(key))
+        return inferIntervalFromKeys(others);
+      const r = periodRange(key);
+      return isoDayNumber(r.end) - isoDayNumber(r.start) + 1;
+    }
+    async function resliceFrom(key) {
+      const src = S.budgets[key] || [];
+      if (!src.length)
+        return toast("That budget is empty", true);
+      const draft = budgetDraft();
+      const existingByCategory = {};
+      for (const d of draft)
+        if (d.amount)
+          existingByCategory[d.category] = d.amount;
+      const plan = resliceBudget({
+        rows: src,
+        oldDays: strandedPeriodDays(key, otherShapeBudgets()),
+        dstDays: currentPeriodDays(),
+        existingByCategory
+      });
+      const accepted = await askBudgetReslice(app, plan, { money, sourceLabel: key });
+      if (!accepted || !accepted.length)
+        return;
+      for (const a of accepted) {
+        let d = draft.find((x) => x.category === a.category);
+        if (!d) {
+          const from = src.find((r) => r.category === a.category) || {};
+          d = { category: a.category, type: from.type, amount: 0, notes: "" };
+          draft.push(d);
+        }
+        d.amount = a.amount;
+        d.amountRaw = null;
+        d.inFile = true;
+        if (!(d.notes && d.notes.trim()) && a.notes)
+          d.notes = a.notes;
+      }
+      budDirty = true;
+      $("#budSave").disabled = false;
+      renderBudgets();
+      toast(`Brought ${accepted.length} ${accepted.length === 1 ? "amount" : "amounts"} across — check them, then save`);
     }
     function carryStructure(src, draft) {
       let brought = 0;
@@ -9830,6 +10018,13 @@ var require_settings_tab = __commonJS((exports2, module2) => {
   var PALETTE_DESC = "Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.";
   var MONTH_START_DESC = "Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.";
   var PERIOD_LENGTH_DESC = "How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.";
+  var PERIOD_LENGTH_NO_ANCHOR = " Periods are running monthly: set a last payday below to start the cycle.";
+  function periodNeedsAnchor(md) {
+    return !!periodDaysOrZero(md?.period_days) && !isRealIsoDate((md?.period_anchor ?? "").toString().trim());
+  }
+  function periodLengthDesc(md) {
+    return periodNeedsAnchor(md) ? PERIOD_LENGTH_DESC + PERIOD_LENGTH_NO_ANCHOR : PERIOD_LENGTH_DESC;
+  }
   var PERIOD_ANCHOR_DESC = "When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.";
   var FEEDBACK_DESC = "Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.";
   var SUPPORT_DESC = "Budget Vault is free and always will be. If you'd like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.";
@@ -9910,7 +10105,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
           }, 800);
         });
       });
-      new Setting(containerEl).setName("Period length").setDesc(PERIOD_LENGTH_DESC).addDropdown((d) => {
+      new Setting(containerEl).setName("Period length").setDesc(periodLengthDesc(md)).addDropdown((d) => {
         const cur = periodDaysOrZero(md.period_days);
         for (const [days, label] of Object.entries(periodLengthOptions(cur)))
           d.addOption(days, label);
@@ -9940,6 +10135,8 @@ var require_settings_tab = __commonJS((exports2, module2) => {
             await this.warnIfAnchorReslices(md, next);
             await this.plugin.updateBudgetSettingsMd("period_anchor", next);
             this.plugin.reloadViews();
+            if (periodNeedsAnchor(md) !== periodNeedsAnchor({ ...md, period_anchor: next }))
+              this.display();
           }, 800);
         });
       });
@@ -10151,7 +10348,7 @@ var require_settings_tab = __commonJS((exports2, module2) => {
         },
         {
           name: "Period length",
-          desc: PERIOD_LENGTH_DESC,
+          desc: periodLengthDesc(this.mdSettings()),
           control: {
             type: "dropdown",
             key: "period_days",

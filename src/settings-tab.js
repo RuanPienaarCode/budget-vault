@@ -24,6 +24,31 @@ const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 
 const PALETTE_DESC = 'Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.';
 const MONTH_START_DESC = 'Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.';
 const PERIOD_LENGTH_DESC = 'How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.';
+const PERIOD_LENGTH_NO_ANCHOR = ' Periods are running monthly: set a last payday below to start the cycle.';
+
+/* A cycle length with no usable anchor. The loader drops BOTH keys in that
+   pairing (src/load.js), so the vault runs payday months — but the control
+   reads Settings.md through mdSettings(), not the loaded state, so it goes on
+   showing "Every 2 weeks" from the file. The value is deliberately left alone:
+   periodLengthOptions() exists so a hand-set length still appears truthfully
+   rather than being snapped to a preset behind the user's back, and forcing the
+   control to 0 would contradict the file they edit. So the description carries
+   the correction instead.
+
+   Only reachable by hand-editing Settings.md — the pickers can't produce it —
+   but until this existed the only warning fired on CHANGING the dropdown, so
+   someone opening settings on an already-broken file saw nothing at all. */
+function periodNeedsAnchor(md) {
+  return !!periodDaysOrZero(md?.period_days)
+    && !isRealIsoDate(((md?.period_anchor ?? '').toString().trim()));
+}
+
+/* Shared by both tabs so the warning can never appear on one and not the other
+   — tests/settings-parity.test.cjs pins that neither side may inline the bare
+   constant instead. */
+function periodLengthDesc(md) {
+  return periodNeedsAnchor(md) ? PERIOD_LENGTH_DESC + PERIOD_LENGTH_NO_ANCHOR : PERIOD_LENGTH_DESC;
+}
 const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
 const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
 const SUPPORT_DESC = 'Budget Vault is free and always will be. If you\'d like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.';
@@ -178,7 +203,7 @@ class BudgetSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Period length')
-      .setDesc(PERIOD_LENGTH_DESC)
+      .setDesc(periodLengthDesc(md))
       .addDropdown(d => {
         const cur = periodDaysOrZero(md.period_days);
         for (const [days, label] of Object.entries(periodLengthOptions(cur))) d.addOption(days, label);
@@ -212,6 +237,13 @@ class BudgetSettingTab extends PluginSettingTab {
             await this.warnIfAnchorReslices(md, next);
             await this.plugin.updateBudgetSettingsMd('period_anchor', next);
             this.plugin.reloadViews();
+            /* Period length's description is derived from this value, so fixing
+               the anchor here has to redraw it — otherwise the tab goes on
+               claiming periods are monthly after they stopped being. Only when
+               the warning actually flips: display() rebuilds the whole tab, and
+               doing that on every keystroke-settled edit would yank the focus
+               out of this very field. */
+            if (periodNeedsAnchor(md) !== periodNeedsAnchor({ ...md, period_anchor: next })) this.display();
           }, 800);
         });
       });
@@ -474,7 +506,7 @@ class BudgetSettingTab extends PluginSettingTab {
       },
       {
         name: 'Period length',
-        desc: PERIOD_LENGTH_DESC,
+        desc: periodLengthDesc(this.mdSettings()),
         control: {
           type: 'dropdown', key: 'period_days', defaultValue: '0',
           options: periodLengthOptions(periodDaysOrZero(this.mdSettings().period_days)),

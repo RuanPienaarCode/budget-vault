@@ -197,6 +197,19 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   ok(!monthly.periodKeyValid('2026-00'), 'nor a zeroth one');
   ok(monthly.periodKeyValid('2026-01') && monthly.periodKeyValid('2026-12'),
     'while January and December are exactly as addressable as before');
+
+  /* And a real YEAR, for the same reason one step up. Date.UTC maps years 0–99
+     onto 1900–1999, so '0000-01' passed a bare \d{4} and then resolved to a
+     window starting 1899-12-23 — a period the name never claimed. isRealIsoDate
+     already rejects that relocation by round-trip; the month key must agree,
+     or a shape it refuses as a date stays reachable as a month. */
+  ok(!monthly.periodKeyValid('0000-01'), 'year zero would resolve into the 1800s');
+  ok(!monthly.periodKeyValid('0050-01'), 'nor does a two-digit year mean the year 50');
+  ok(!monthly.periodKeyValid('0099-12'), 'the last year Date relocates is still refused');
+  eq(monthly.periodRange('0000-01'), { start: '1899-12-23', end: '1900-01-22' },
+    'the damage the guard prevents: periodRange computes unconditionally, so the name has to be refused upstream');
+  ok(monthly.periodKeyValid('0100-01'), 'while 0100 is the first year Date leaves alone');
+  ok(monthly.periodKeyValid('9999-12'), 'and the far end stays addressable');
 }
 
 /* ---- isRealIsoDate: date-SHAPED is not the same as a date ---- */

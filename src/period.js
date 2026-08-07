@@ -38,8 +38,14 @@ const { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFr
 
 /* Month 01–12, not any two digits: '2026-13' is date-SHAPED but not a month,
    and Date's rollover turned it into a real 31-day window titled "undefined
-   2026" that the arrows would happily walk into. */
-const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+   2026" that the arrows would happily walk into.
+
+   Year 0100–9999 for the same reason one step up. Date.UTC maps years 0–99 onto
+   1900–1999, so '0000-01' passed a bare \d{4} and then resolved to a window
+   starting 1899-12-23 — a period the name never claimed. That is the same
+   relocation isRealIsoDate rejects by round-trip, and the two must agree: a
+   month key it would refuse as a date must not be reachable as a month. */
+const MONTH_KEY = /^(?:0[1-9]\d{2}|[1-9]\d{3})-(0[1-9]|1[0-2])$/;
 
 /* Whole-day arithmetic in UTC (dayNum / isoFromDayNum, from src/dates.js).
    Local-time date maths would drift by a day across a DST boundary — a period
