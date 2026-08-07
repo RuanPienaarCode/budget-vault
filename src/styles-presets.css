@@ -30,6 +30,10 @@
   --border-color:        rgba(15,23,32,.09);
   --line-soft:           rgba(15,23,32,.055);
   --focus-ring:          rgba(6,95,70,0.20);
+  --glow-accent-rgb:     110,231,183;
+  --glow-primary-rgb:    16,185,129;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       13,148,136;
 }
 .budget-app-root.bud-palette-vault-green.bud-dark {
   --color-primary:       #10b981;
@@ -74,6 +78,10 @@
   --border-color:        rgba(12,26,40,.09);
   --line-soft:           rgba(12,26,40,.055);
   --focus-ring:          rgba(12,74,110,0.20);
+  --glow-accent-rgb:     125,211,252;
+  --glow-primary-rgb:    56,189,248;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       8,145,178;
 }
 .budget-app-root.bud-palette-ocean.bud-dark {
   --color-primary:       #38bdf8;
@@ -118,6 +126,10 @@
   --border-color:        rgba(26,15,34,.09);
   --line-soft:           rgba(26,15,34,.055);
   --focus-ring:          rgba(107,33,168,0.20);
+  --glow-accent-rgb:     233,213,255;
+  --glow-primary-rgb:    192,132,252;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       147,51,234;
 }
 .budget-app-root.bud-palette-plum.bud-dark {
   --color-primary:       #c084fc;
@@ -162,6 +174,10 @@
   --border-color:        rgba(15,20,28,.09);
   --line-soft:           rgba(15,20,28,.055);
   --focus-ring:          rgba(51,65,85,0.20);
+  --glow-accent-rgb:     203,213,225;
+  --glow-primary-rgb:    148,163,184;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       71,85,105;
 }
 .budget-app-root.bud-palette-slate.bud-dark {
   --color-primary:       #94a3b8;

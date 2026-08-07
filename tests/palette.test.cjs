@@ -182,7 +182,41 @@ function norm(v) {
   }
 }
 
-/* ---- 5. the generated stylesheet on disk is current ----
+/* ---- 5. the ambient glow follows the palette ----
+
+   The washes behind the app and the splash gate were painted in literal
+   emerald, mint and gold, in BOTH themes, so every palette but Vault Green
+   drew its own colours over a green background. They are tokens now, and these
+   assertions are what stop a literal creeping back: the first would otherwise
+   pass silently forever the moment someone pasted an rgba() into a new
+   gradient, and the last catches the subtler failure where the tokens exist but
+   every palette resolves them to the same colour. */
+{
+  const BRAND_LITERAL = /rgba\(\s*(110,\s*231,\s*183|16,\s*185,\s*129|251,\s*191,\s*36|13,\s*148,\s*136)/g;
+  /* The palette blocks at the top legitimately state brand colours — that is
+     their job. Everything after them must reach for a token instead. */
+  const afterPalette = baseCss.slice(baseCss.indexOf('.budget-app-root.bud-dark'));
+  const body = afterPalette.slice(afterPalette.indexOf('}'));
+  eq(body.match(BRAND_LITERAL) || [], [],
+    'no hardcoded brand colour outside the palette blocks — use a --glow-*-rgb token');
+
+  const GLOW = ['--glow-accent-rgb', '--glow-primary-rgb', '--glow-gold-rgb', '--glow-deep-rgb'];
+  const hand = tokensOf(baseCss, '.budget-app-root');
+  for (const t of GLOW) ok(t in hand, `the base palette declares ${t}`);
+
+  const generated = fs.readFileSync(path.join(root, 'src', 'styles-presets.css'), 'utf8');
+  const perPalette = PRESETS.map(p => {
+    const block = tokensOf(generated, `.budget-app-root.bud-palette-${p.id}`);
+    for (const t of GLOW) ok(t in block, `${p.id} emits ${t}`);
+    return block['--glow-primary-rgb'];
+  });
+  eq(new Set(perPalette).size, PRESETS.length,
+    'every palette glows in its own colour — identical values would mean the wash ignores the palette');
+  eq(perPalette[PRESETS.findIndex(p => p.id === 'vault-green')], '16,185,129',
+    'and Vault Green still glows the emerald it always did');
+}
+
+/* ---- 6. the generated stylesheet on disk is current ----
    build.sh regenerates it, but a stale file committed by hand would ship a
    palette that no longer matches its seeds. */
 {

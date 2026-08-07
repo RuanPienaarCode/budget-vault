@@ -21,7 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { derive } = require('./palette.cjs');
+const { derive, glowTokens } = require('./palette.cjs');
 const { PRESETS } = require('./presets.cjs');
 
 const OUT = path.join(__dirname, '..', 'src', 'styles-presets.css');
@@ -29,7 +29,13 @@ const OUT = path.join(__dirname, '..', 'src', 'styles-presets.css');
 function blockFor(preset, mode) {
   const seeds = preset[mode];
   const overrides = preset[mode === 'light' ? 'lightOverrides' : 'darkOverrides'] || {};
-  const tokens = derive(seeds, mode, overrides);
+  /* Glow tokens ride along in the light block only — its selector matches the
+     root with or without .bud-dark, so they apply in both modes. They are
+     mode-invariant by design (see glowTokens), and emitting them twice would
+     invite the two copies to drift. */
+  const tokens = mode === 'light'
+    ? { ...derive(seeds, mode, overrides), ...glowTokens(preset) }
+    : derive(seeds, mode, overrides);
   const sel = mode === 'light'
     ? `.budget-app-root.bud-palette-${preset.id}`
     : `.budget-app-root.bud-palette-${preset.id}.bud-dark`;

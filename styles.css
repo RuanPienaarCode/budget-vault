@@ -53,6 +53,22 @@
      green from a superseded palette that matched neither theme's primary. */
   --focus-ring: rgba(6, 95, 70, 0.20);
 
+  /* Ambient glow channels, as bare "r,g,b" so each call site picks its own
+     alpha: rgba(var(--glow-primary-rgb), .15). Set once and NOT overridden in
+     the dark block — the washes are painted in the same colours under both
+     themes, which is how the shipped design has always worked: a colour chosen
+     to read on black is what survives being laid over a light page at 13%,
+     where the light-mode brand colours go muddy.
+
+     These three are the DARK palette's mint, emerald and gold; --glow-deep is
+     the LIGHT palette's teal, used by the splash gate's lower wash as a depth
+     cue against its upper one. A palette regenerates all four from its own
+     seeds, so the background follows the palette instead of staying green. */
+  --glow-accent-rgb:  110,231,183;
+  --glow-primary-rgb: 16,185,129;
+  --glow-gold-rgb:    251,191,36;
+  --glow-deep-rgb:    13,148,136;
+
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.05);
   --shadow-md: 0 18px 50px -28px rgb(15 23 32 / 0.28);
   --radius:    14px;
@@ -123,9 +139,9 @@
   z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(1300px 900px at 8% -12%, rgba(110,231,183,.13), transparent 58%),
-    radial-gradient(1200px 1000px at 112% 4%, rgba(16,185,129,.15), transparent 56%),
-    radial-gradient(1100px 1100px at 55% 132%, rgba(251,191,36,.06), transparent 60%),
+    radial-gradient(1300px 900px at 8% -12%, rgba(var(--glow-accent-rgb),.13), transparent 58%),
+    radial-gradient(1200px 1000px at 112% 4%, rgba(var(--glow-primary-rgb),.15), transparent 56%),
+    radial-gradient(1100px 1100px at 55% 132%, rgba(var(--glow-gold-rgb),.06), transparent 60%),
     linear-gradient(180deg, var(--bg-1), var(--bg-0));
 }
 .budget-app-root::after {
@@ -1751,7 +1767,7 @@
      scrolled content readable through the bar — legibility beats the glass. */
   .budget-app-root .topbar { background-color: var(--body-bg); }
 
-  .budget-app-root .brand-logo { box-shadow: 0 6px 20px -6px rgba(16, 185, 129, .55); }
+  .budget-app-root .brand-logo { box-shadow: 0 6px 20px -6px rgba(var(--glow-primary-rgb), .55); }
 
   /* Gradients collapse to their solid mid-tone. */
   .budget-app-root .legend i.legend-dash {
@@ -1869,14 +1885,14 @@
 }
 .budget-app-root .splash-gate::before {
   background-image:
-    radial-gradient(38% 42% at 22% 26%, rgba(110,231,183,.30), transparent 62%),
-    radial-gradient(42% 40% at 78% 22%, rgba(16,185,129,.26), transparent 60%);
+    radial-gradient(38% 42% at 22% 26%, rgba(var(--glow-accent-rgb),.30), transparent 62%),
+    radial-gradient(42% 40% at 78% 22%, rgba(var(--glow-primary-rgb),.26), transparent 60%);
   animation: splash-drift-a 26s ease-in-out infinite;
 }
 .budget-app-root .splash-gate::after {
   background-image:
-    radial-gradient(40% 38% at 68% 74%, rgba(13,148,136,.24), transparent 62%),
-    radial-gradient(34% 34% at 26% 80%, rgba(251,191,36,.16), transparent 62%);
+    radial-gradient(40% 38% at 68% 74%, rgba(var(--glow-deep-rgb),.24), transparent 62%),
+    radial-gradient(34% 34% at 26% 80%, rgba(var(--glow-gold-rgb),.16), transparent 62%);
   animation: splash-drift-b 34s ease-in-out infinite;
 }
 /* Light mode carries the same hues at lower strength — the tints are mixed
@@ -1917,7 +1933,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
-  box-shadow: 0 18px 44px -18px rgba(16,185,129,.7);
+  box-shadow: 0 18px 44px -18px rgba(var(--glow-primary-rgb),.7);
   color: #fff;
 }
 .budget-app-root .splash-logo .ico svg { width: 40px; height: 40px; }
@@ -1973,6 +1989,10 @@
   --border-color:        rgba(15,23,32,.09);
   --line-soft:           rgba(15,23,32,.055);
   --focus-ring:          rgba(6,95,70,0.20);
+  --glow-accent-rgb:     110,231,183;
+  --glow-primary-rgb:    16,185,129;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       13,148,136;
 }
 .budget-app-root.bud-palette-vault-green.bud-dark {
   --color-primary:       #10b981;
@@ -2017,6 +2037,10 @@
   --border-color:        rgba(12,26,40,.09);
   --line-soft:           rgba(12,26,40,.055);
   --focus-ring:          rgba(12,74,110,0.20);
+  --glow-accent-rgb:     125,211,252;
+  --glow-primary-rgb:    56,189,248;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       8,145,178;
 }
 .budget-app-root.bud-palette-ocean.bud-dark {
   --color-primary:       #38bdf8;
@@ -2061,6 +2085,10 @@
   --border-color:        rgba(26,15,34,.09);
   --line-soft:           rgba(26,15,34,.055);
   --focus-ring:          rgba(107,33,168,0.20);
+  --glow-accent-rgb:     233,213,255;
+  --glow-primary-rgb:    192,132,252;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       147,51,234;
 }
 .budget-app-root.bud-palette-plum.bud-dark {
   --color-primary:       #c084fc;
@@ -2105,6 +2133,10 @@
   --border-color:        rgba(15,20,28,.09);
   --line-soft:           rgba(15,20,28,.055);
   --focus-ring:          rgba(51,65,85,0.20);
+  --glow-accent-rgb:     203,213,225;
+  --glow-primary-rgb:    148,163,184;
+  --glow-gold-rgb:       251,191,36;
+  --glow-deep-rgb:       71,85,105;
 }
 .budget-app-root.bud-palette-slate.bud-dark {
   --color-primary:       #94a3b8;
