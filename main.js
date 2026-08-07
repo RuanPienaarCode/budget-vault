@@ -305,11 +305,12 @@ var require_en = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "Current balance",
     "wiz.acct.balanceDesc": "Optional — what's in the account right now.",
     "wiz.acct.balanceHint": "Use your latest statement's closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page.",
-    "wiz.acctType.checking": "Cheque / current account",
-    "wiz.acctType.savings": "Savings account",
-    "wiz.acctType.credit_card": "Credit card",
-    "wiz.acctType.cash": "Cash",
-    "wiz.acctType.investment": "Investment",
+    "acctType.checking": "Cheque / current account",
+    "acctType.savings": "Savings account",
+    "acctType.credit_card": "Credit card",
+    "acctType.cash": "Cash",
+    "acctType.investment": "Investment",
+    "acctType.other": "Other",
     "wiz.sum.folder": "Folder",
     "wiz.sum.name": "Name",
     "wiz.sum.language": "Language",
@@ -333,7 +334,109 @@ var require_en = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen.",
     "wiz.done.connected": "Connected to your budget folder.",
     "wiz.done.created": "Budget folder created — welcome!",
-    "wiz.failed": "Setup failed: {error}"
+    "wiz.failed": "Setup failed: {error}",
+    "bud.shape.title": "Your other budgets are still here",
+    "bud.shape.body": {
+      one: "{count} budget file is saved under a different period length — it is Budgets/{newest}.md. It stays in your vault, and it comes back as soon as you set the period length back. Amounts start blank here because this period isn't the same length as that one was.",
+      other: "{count} budget files are saved under a different period length — the most recent is Budgets/{newest}.md. They stay in your vault, and they come back as soon as you set the period length back. Amounts start blank here because this period isn't the same length as those were."
+    },
+    "bud.shape.bring": "Bring over the categories and notes from {newest}",
+    "bud.shape.empty": "That budget is empty",
+    "bud.shape.brought": {
+      one: "Brought over {count} category — set the amount for this period",
+      other: "Brought over {count} categories — set the amounts for this period"
+    },
+    "bud.shape.allHere": "Every category from that budget is already here",
+    "bud.total.income": "Total income",
+    "bud.total.incomeNote": "{amount} received so far",
+    "bud.total.budgeted": "Total budgeted",
+    "bud.total.budgetedNote": "{pct}% of budgeted income",
+    "bud.total.over": "Over-budgeted",
+    "bud.total.overNote": "budgeted beyond income",
+    "bud.total.left": "Left to budget",
+    "bud.total.leftNote": "income not yet allocated",
+    "bud.total.spent": "Total spent",
+    "bud.total.spentNote": "{pct}% of budget used",
+    "bud.col.category": "Category",
+    "bud.col.type": "Type",
+    "bud.col.amount": "Amount",
+    "bud.col.actual": "Actual so far",
+    "bud.col.notes": "Notes",
+    "bud.remaining.over": "{amount} over",
+    "bud.remaining.left": "{amount} left",
+    "bud.aria.amount": "Budget amount for {category}",
+    "bud.aria.notes": "Notes for {category}",
+    "bud.aria.clear": "Clear budget for {category}",
+    "bud.title.clear": "Clear this category from the period file",
+    "bud.aria.delete": "Delete category {category}",
+    "bud.title.delete": "Delete this category everywhere",
+    "bud.saved": "Budget saved to Budgets/{period}.md",
+    "bud.copy.none": "No budget found for the previous period",
+    "bud.copy.done": {
+      one: "Copied {count} category from the previous period",
+      other: "Copied {count} categories from the previous period"
+    },
+    "bud.copy.nothing": "Nothing to copy — every category already has a value",
+    "tx.wholeHistory": "Whole history",
+    "tx.allAccounts": "All accounts",
+    "tx.allCategories": "All categories",
+    "tx.uncategorised": "Uncategorised",
+    "tx.count.window": "{shown} of {total} rows",
+    "tx.count.all": { one: "{count} row", other: "{count} rows" },
+    "tx.col.date": "Date",
+    "tx.col.desc": "Description",
+    "tx.col.account": "Account",
+    "tx.col.category": "Category",
+    "tx.col.amount": "Amount",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Note",
+    "tx.col.split": "Split",
+    "tx.aria.category": "Category for {date} {desc}",
+    "tx.aria.exclude": "Exclude {desc} from budget totals",
+    "tx.aria.note": "Note for {date} {desc}",
+    "tx.aria.split": "Split {date} {desc} into categories",
+    "tx.title.split": "Split into categories",
+    "tx.none": "No transactions match.",
+    "tx.showMore": "Show {n} more of {remaining} remaining",
+    "tx.split.zero": "A zero-amount line has nothing to split",
+    "tx.split.excluded": "This line is already excluded — untick it first",
+    "tx.split.marker": "Split into {n}",
+    "tx.split.done": "Split into {n} — review, then Save changes",
+    "tx.add.noAccount": "Add an account first — every transaction belongs to one",
+    "tx.add.title": "Add transaction",
+    "tx.field.date": "Date",
+    "tx.field.desc": "Description",
+    "tx.field.descPlaceholder": "e.g. Cash — vegetables at the market",
+    "tx.field.account": "Account",
+    "tx.field.direction": "Direction",
+    "tx.dir.out": "Money out",
+    "tx.dir.in": "Money in",
+    "tx.field.amount": "Amount",
+    "tx.field.amountDesc": "Always positive — direction sets the sign",
+    "tx.field.category": "Category",
+    "tx.field.none": "— none —",
+    "tx.field.note": "Note",
+    "tx.field.notePlaceholder": "optional",
+    "tx.err.date": "Date must be YYYY-MM-DD",
+    "tx.err.desc": "Description is required",
+    "tx.err.account": "Invalid account name",
+    "tx.err.amount": "Amount must be a number other than 0",
+    "tx.err.save": "Could not save the transaction ({error})",
+    "tx.saved": { one: "Saved {count} file", other: "Saved {count} files" },
+    "tx.savedLearned": { one: " · learned {count} new rule", other: " · learned {count} new rules" },
+    "tx.export.dirty": "Save your changes first — an export of unsaved edits would not match the vault",
+    "tx.export.empty": "Nothing to export — no rows match the current filters",
+    "tx.export.title": "Export transactions",
+    "tx.export.folder": "Save to folder",
+    "tx.export.desc": {
+      one: "Vault folder for the export. {count} row ({range}) plus {cats} categories, as CSV and markdown.",
+      other: "Vault folder for the export. {count} rows ({range}) plus {cats} categories, as CSV and markdown."
+    },
+    "tx.export.failed": "Could not write the export — check the folder name",
+    "tx.export.done": {
+      one: "Exported {count} row and {cats} categories to {path}/",
+      other: "Exported {count} rows and {cats} categories to {path}/"
+    }
   };
 });
 
@@ -511,11 +614,12 @@ var require_af = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "Huidige saldo",
     "wiz.acct.balanceDesc": "Opsioneel — wat tans in die rekening is.",
     "wiz.acct.balanceHint": "Gebruik jou jongste staat se sluitingsaldo, of wat ook al jou bankprogram wys. Die saldo is 'n momentopname wat jy self op datum hou — om net onlangse transaksies in te voer, gooi dit nooit uit nie — en jy kan dit enige tyd verander deur op die saldo op die Rekeninge-bladsy te tik.",
-    "wiz.acctType.checking": "Tjek-/lopende rekening",
-    "wiz.acctType.savings": "Spaarrekening",
-    "wiz.acctType.credit_card": "Kredietkaart",
-    "wiz.acctType.cash": "Kontant",
-    "wiz.acctType.investment": "Belegging",
+    "acctType.checking": "Tjek-/lopende rekening",
+    "acctType.savings": "Spaarrekening",
+    "acctType.credit_card": "Kredietkaart",
+    "acctType.cash": "Kontant",
+    "acctType.investment": "Belegging",
+    "acctType.other": "Ander",
     "wiz.sum.folder": "Vouer",
     "wiz.sum.name": "Naam",
     "wiz.sum.language": "Taal",
@@ -539,7 +643,109 @@ var require_af = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Jou begroting maak agter 'n tik-om-in-te-gaan privaatheidskerm oop, sodat niks sigbaar is as iemand vlugtig na jou kluis kyk nie. Skakel dit af by Instellings → Budget Vault → Privaatheidskerm.",
     "wiz.done.connected": "Gekoppel aan jou begrotingsvouer.",
     "wiz.done.created": "Begrotingsvouer geskep — welkom!",
-    "wiz.failed": "Opstelling het misluk: {error}"
+    "wiz.failed": "Opstelling het misluk: {error}",
+    "bud.shape.title": "Jou ander begrotings is steeds hier",
+    "bud.shape.body": {
+      one: "{count} begrotingslêer is onder 'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.",
+      other: "{count} begrotingslêers is onder 'n ander tydperklengte gestoor — die jongste is Budgets/{newest}.md. Hulle bly in jou kluis, en hulle kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie."
+    },
+    "bud.shape.bring": "Bring die kategorieë en notas van {newest} oor",
+    "bud.shape.empty": "Daardie begroting is leeg",
+    "bud.shape.brought": {
+      one: "{count} kategorie oorgebring — stel die bedrag vir hierdie tydperk",
+      other: "{count} kategorieë oorgebring — stel die bedrae vir hierdie tydperk"
+    },
+    "bud.shape.allHere": "Elke kategorie uit daardie begroting is reeds hier",
+    "bud.total.income": "Totale inkomste",
+    "bud.total.incomeNote": "{amount} tot dusver ontvang",
+    "bud.total.budgeted": "Totaal begroot",
+    "bud.total.budgetedNote": "{pct}% van begrote inkomste",
+    "bud.total.over": "Oorbegroot",
+    "bud.total.overNote": "meer begroot as inkomste",
+    "bud.total.left": "Nog te begroot",
+    "bud.total.leftNote": "inkomste nog nie toegewys nie",
+    "bud.total.spent": "Totaal bestee",
+    "bud.total.spentNote": "{pct}% van begroting gebruik",
+    "bud.col.category": "Kategorie",
+    "bud.col.type": "Tipe",
+    "bud.col.amount": "Bedrag",
+    "bud.col.actual": "Werklik tot dusver",
+    "bud.col.notes": "Notas",
+    "bud.remaining.over": "{amount} oor die begroting",
+    "bud.remaining.left": "{amount} oor",
+    "bud.aria.amount": "Begrotingsbedrag vir {category}",
+    "bud.aria.notes": "Notas vir {category}",
+    "bud.aria.clear": "Maak begroting vir {category} skoon",
+    "bud.title.clear": "Verwyder hierdie kategorie uit die tydperklêer",
+    "bud.aria.delete": "Skrap kategorie {category}",
+    "bud.title.delete": "Skrap hierdie kategorie oral",
+    "bud.saved": "Begroting gestoor na Budgets/{period}.md",
+    "bud.copy.none": "Geen begroting vir die vorige tydperk gevind nie",
+    "bud.copy.done": {
+      one: "{count} kategorie uit die vorige tydperk gekopieer",
+      other: "{count} kategorieë uit die vorige tydperk gekopieer"
+    },
+    "bud.copy.nothing": "Niks om te kopieer nie — elke kategorie het reeds 'n waarde",
+    "tx.wholeHistory": "Hele geskiedenis",
+    "tx.allAccounts": "Alle rekeninge",
+    "tx.allCategories": "Alle kategorieë",
+    "tx.uncategorised": "Ongekategoriseer",
+    "tx.count.window": "{shown} van {total} rye",
+    "tx.count.all": { one: "{count} ry", other: "{count} rye" },
+    "tx.col.date": "Datum",
+    "tx.col.desc": "Beskrywing",
+    "tx.col.account": "Rekening",
+    "tx.col.category": "Kategorie",
+    "tx.col.amount": "Bedrag",
+    "tx.col.excl": "Uitgesl.",
+    "tx.col.note": "Nota",
+    "tx.col.split": "Verdeel",
+    "tx.aria.category": "Kategorie vir {date} {desc}",
+    "tx.aria.exclude": "Sluit {desc} uit begrotingstotale uit",
+    "tx.aria.note": "Nota vir {date} {desc}",
+    "tx.aria.split": "Verdeel {date} {desc} in kategorieë",
+    "tx.title.split": "Verdeel in kategorieë",
+    "tx.none": "Geen transaksies pas nie.",
+    "tx.showMore": "Wys {n} meer van {remaining} wat oorbly",
+    "tx.split.zero": "'n Reël met 'n nulbedrag het niks om te verdeel nie",
+    "tx.split.excluded": "Hierdie reël is reeds uitgesluit — ontmerk dit eers",
+    "tx.split.marker": "Verdeel in {n}",
+    "tx.split.done": "Verdeel in {n} — gaan na, en stoor dan die veranderinge",
+    "tx.add.noAccount": "Voeg eers 'n rekening by — elke transaksie hoort by een",
+    "tx.add.title": "Voeg transaksie by",
+    "tx.field.date": "Datum",
+    "tx.field.desc": "Beskrywing",
+    "tx.field.descPlaceholder": "bv. Kontant — groente by die mark",
+    "tx.field.account": "Rekening",
+    "tx.field.direction": "Rigting",
+    "tx.dir.out": "Geld uit",
+    "tx.dir.in": "Geld in",
+    "tx.field.amount": "Bedrag",
+    "tx.field.amountDesc": "Altyd positief — die rigting bepaal die teken",
+    "tx.field.category": "Kategorie",
+    "tx.field.none": "— geen —",
+    "tx.field.note": "Nota",
+    "tx.field.notePlaceholder": "opsioneel",
+    "tx.err.date": "Datum moet JJJJ-MM-DD wees",
+    "tx.err.desc": "Beskrywing is verpligtend",
+    "tx.err.account": "Ongeldige rekeningnaam",
+    "tx.err.amount": "Bedrag moet 'n getal anders as 0 wees",
+    "tx.err.save": "Kon nie die transaksie stoor nie ({error})",
+    "tx.saved": { one: "{count} lêer gestoor", other: "{count} lêers gestoor" },
+    "tx.savedLearned": { one: " · {count} nuwe reël geleer", other: " · {count} nuwe reëls geleer" },
+    "tx.export.dirty": "Stoor eers jou veranderinge — 'n uitvoer van ongestoorde wysigings sal nie by die kluis pas nie",
+    "tx.export.empty": "Niks om uit te voer nie — geen rye pas by die huidige filters nie",
+    "tx.export.title": "Voer transaksies uit",
+    "tx.export.folder": "Stoor na vouer",
+    "tx.export.desc": {
+      one: "Kluisvouer vir die uitvoer. {count} ry ({range}) plus {cats} kategorieë, as CSV en markdown.",
+      other: "Kluisvouer vir die uitvoer. {count} rye ({range}) plus {cats} kategorieë, as CSV en markdown."
+    },
+    "tx.export.failed": "Kon nie die uitvoer skryf nie — kyk na die vouernaam",
+    "tx.export.done": {
+      one: "{count} ry en {cats} kategorieë na {path}/ uitgevoer",
+      other: "{count} rye en {cats} kategorieë na {path}/ uitgevoer"
+    }
   };
 });
 
@@ -717,11 +923,12 @@ var require_de = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "Aktueller Kontostand",
     "wiz.acct.balanceDesc": "Optional — was gerade auf dem Konto ist.",
     "wiz.acct.balanceHint": "Nimm den Schlusssaldo deines letzten Auszugs, oder was deine Banking-App anzeigt. Der Kontostand ist eine Momentaufnahme, die du selbst aktuell hältst — nur die neuesten Transaktionen zu importieren bringt ihn nie durcheinander — und du kannst ihn jederzeit ändern, indem du auf der Konten-Seite auf den Kontostand tippst.",
-    "wiz.acctType.checking": "Girokonto",
-    "wiz.acctType.savings": "Sparkonto",
-    "wiz.acctType.credit_card": "Kreditkarte",
-    "wiz.acctType.cash": "Bargeld",
-    "wiz.acctType.investment": "Anlage",
+    "acctType.checking": "Girokonto",
+    "acctType.savings": "Sparkonto",
+    "acctType.credit_card": "Kreditkarte",
+    "acctType.cash": "Bargeld",
+    "acctType.investment": "Anlage",
+    "acctType.other": "Sonstiges",
     "wiz.sum.folder": "Ordner",
     "wiz.sum.name": "Name",
     "wiz.sum.language": "Sprache",
@@ -745,7 +952,109 @@ var require_de = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Dein Budget öffnet sich hinter einem Datenschutz-Startbildschirm zum Antippen, damit nichts zu sehen ist, wenn jemand kurz auf deinen Vault schaut. Abschalten unter Einstellungen → Budget Vault → Datenschutz-Startbildschirm.",
     "wiz.done.connected": "Mit deinem Budget-Ordner verbunden.",
     "wiz.done.created": "Budget-Ordner angelegt — willkommen!",
-    "wiz.failed": "Einrichtung fehlgeschlagen: {error}"
+    "wiz.failed": "Einrichtung fehlgeschlagen: {error}",
+    "bud.shape.title": "Deine anderen Budgets sind noch da",
+    "bud.shape.body": {
+      one: "{count} Budgetdatei ist unter einer anderen Zeitraumlänge gespeichert — es ist Budgets/{newest}.md. Sie bleibt in deinem Vault und ist wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jener.",
+      other: "{count} Budgetdateien sind unter einer anderen Zeitraumlänge gespeichert — die neueste ist Budgets/{newest}.md. Sie bleiben in deinem Vault und sind wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jene."
+    },
+    "bud.shape.bring": "Kategorien und Notizen aus {newest} übernehmen",
+    "bud.shape.empty": "Dieses Budget ist leer",
+    "bud.shape.brought": {
+      one: "{count} Kategorie übernommen — setze den Betrag für diesen Zeitraum",
+      other: "{count} Kategorien übernommen — setze die Beträge für diesen Zeitraum"
+    },
+    "bud.shape.allHere": "Jede Kategorie aus diesem Budget ist bereits hier",
+    "bud.total.income": "Einnahmen gesamt",
+    "bud.total.incomeNote": "{amount} bisher erhalten",
+    "bud.total.budgeted": "Budgetiert gesamt",
+    "bud.total.budgetedNote": "{pct}% der budgetierten Einnahmen",
+    "bud.total.over": "Überbudgetiert",
+    "bud.total.overNote": "mehr budgetiert als eingenommen",
+    "bud.total.left": "Noch zu budgetieren",
+    "bud.total.leftNote": "Einnahmen noch nicht zugeteilt",
+    "bud.total.spent": "Ausgegeben gesamt",
+    "bud.total.spentNote": "{pct}% des Budgets verbraucht",
+    "bud.col.category": "Kategorie",
+    "bud.col.type": "Art",
+    "bud.col.amount": "Betrag",
+    "bud.col.actual": "Tatsächlich bisher",
+    "bud.col.notes": "Notizen",
+    "bud.remaining.over": "{amount} darüber",
+    "bud.remaining.left": "{amount} übrig",
+    "bud.aria.amount": "Budgetbetrag für {category}",
+    "bud.aria.notes": "Notizen zu {category}",
+    "bud.aria.clear": "Budget für {category} leeren",
+    "bud.title.clear": "Diese Kategorie aus der Zeitraumdatei entfernen",
+    "bud.aria.delete": "Kategorie {category} löschen",
+    "bud.title.delete": "Diese Kategorie überall löschen",
+    "bud.saved": "Budget gespeichert unter Budgets/{period}.md",
+    "bud.copy.none": "Kein Budget für den vorherigen Zeitraum gefunden",
+    "bud.copy.done": {
+      one: "{count} Kategorie aus dem vorherigen Zeitraum kopiert",
+      other: "{count} Kategorien aus dem vorherigen Zeitraum kopiert"
+    },
+    "bud.copy.nothing": "Nichts zu kopieren — jede Kategorie hat bereits einen Wert",
+    "tx.wholeHistory": "Gesamte Historie",
+    "tx.allAccounts": "Alle Konten",
+    "tx.allCategories": "Alle Kategorien",
+    "tx.uncategorised": "Ohne Kategorie",
+    "tx.count.window": "{shown} von {total} Zeilen",
+    "tx.count.all": { one: "{count} Zeile", other: "{count} Zeilen" },
+    "tx.col.date": "Datum",
+    "tx.col.desc": "Beschreibung",
+    "tx.col.account": "Konto",
+    "tx.col.category": "Kategorie",
+    "tx.col.amount": "Betrag",
+    "tx.col.excl": "Ausg.",
+    "tx.col.note": "Notiz",
+    "tx.col.split": "Aufteilen",
+    "tx.aria.category": "Kategorie für {date} {desc}",
+    "tx.aria.exclude": "{desc} aus den Budgetsummen ausschließen",
+    "tx.aria.note": "Notiz zu {date} {desc}",
+    "tx.aria.split": "{date} {desc} auf Kategorien aufteilen",
+    "tx.title.split": "Auf Kategorien aufteilen",
+    "tx.none": "Keine Transaktionen passen.",
+    "tx.showMore": "{n} weitere von {remaining} verbleibenden anzeigen",
+    "tx.split.zero": "Eine Zeile mit dem Betrag 0 hat nichts aufzuteilen",
+    "tx.split.excluded": "Diese Zeile ist bereits ausgeschlossen — hake sie zuerst ab",
+    "tx.split.marker": "Aufgeteilt auf {n}",
+    "tx.split.done": "Auf {n} aufgeteilt — prüfen, dann Änderungen speichern",
+    "tx.add.noAccount": "Lege zuerst ein Konto an — jede Transaktion gehört zu einem",
+    "tx.add.title": "Transaktion hinzufügen",
+    "tx.field.date": "Datum",
+    "tx.field.desc": "Beschreibung",
+    "tx.field.descPlaceholder": "z. B. Bargeld — Gemüse auf dem Markt",
+    "tx.field.account": "Konto",
+    "tx.field.direction": "Richtung",
+    "tx.dir.out": "Geld raus",
+    "tx.dir.in": "Geld rein",
+    "tx.field.amount": "Betrag",
+    "tx.field.amountDesc": "Immer positiv — die Richtung setzt das Vorzeichen",
+    "tx.field.category": "Kategorie",
+    "tx.field.none": "— keine —",
+    "tx.field.note": "Notiz",
+    "tx.field.notePlaceholder": "optional",
+    "tx.err.date": "Das Datum muss JJJJ-MM-TT sein",
+    "tx.err.desc": "Eine Beschreibung ist erforderlich",
+    "tx.err.account": "Ungültiger Kontoname",
+    "tx.err.amount": "Der Betrag muss eine Zahl ungleich 0 sein",
+    "tx.err.save": "Die Transaktion konnte nicht gespeichert werden ({error})",
+    "tx.saved": { one: "{count} Datei gespeichert", other: "{count} Dateien gespeichert" },
+    "tx.savedLearned": { one: " · {count} neue Regel gelernt", other: " · {count} neue Regeln gelernt" },
+    "tx.export.dirty": "Speichere zuerst deine Änderungen — ein Export ungespeicherter Bearbeitungen würde nicht zum Vault passen",
+    "tx.export.empty": "Nichts zu exportieren — keine Zeile passt zu den aktuellen Filtern",
+    "tx.export.title": "Transaktionen exportieren",
+    "tx.export.folder": "In Ordner speichern",
+    "tx.export.desc": {
+      one: "Vault-Ordner für den Export. {count} Zeile ({range}) plus {cats} Kategorien, als CSV und Markdown.",
+      other: "Vault-Ordner für den Export. {count} Zeilen ({range}) plus {cats} Kategorien, als CSV und Markdown."
+    },
+    "tx.export.failed": "Der Export konnte nicht geschrieben werden — prüfe den Ordnernamen",
+    "tx.export.done": {
+      one: "{count} Zeile und {cats} Kategorien nach {path}/ exportiert",
+      other: "{count} Zeilen und {cats} Kategorien nach {path}/ exportiert"
+    }
   };
 });
 
@@ -923,11 +1232,12 @@ var require_es = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "Saldo actual",
     "wiz.acct.balanceDesc": "Opcional — lo que hay en la cuenta ahora mismo.",
     "wiz.acct.balanceHint": "Usa el saldo de cierre de tu último extracto, o lo que muestre la app de tu banco. El saldo es una instantánea que mantienes al día tú mismo — importar solo transacciones recientes nunca lo descuadra — y puedes cambiarlo cuando quieras tocando el saldo en la página Cuentas.",
-    "wiz.acctType.checking": "Cuenta corriente",
-    "wiz.acctType.savings": "Cuenta de ahorro",
-    "wiz.acctType.credit_card": "Tarjeta de crédito",
-    "wiz.acctType.cash": "Efectivo",
-    "wiz.acctType.investment": "Inversión",
+    "acctType.checking": "Cuenta corriente",
+    "acctType.savings": "Cuenta de ahorro",
+    "acctType.credit_card": "Tarjeta de crédito",
+    "acctType.cash": "Efectivo",
+    "acctType.investment": "Inversión",
+    "acctType.other": "Otra",
     "wiz.sum.folder": "Carpeta",
     "wiz.sum.name": "Nombre",
     "wiz.sum.language": "Idioma",
@@ -951,7 +1261,109 @@ var require_es = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Tu presupuesto se abre tras una pantalla de privacidad que requiere un toque, así que no queda nada a la vista si alguien echa un vistazo a tu bóveda. Desactívala en Ajustes → Budget Vault → Pantalla de privacidad.",
     "wiz.done.connected": "Conectado a tu carpeta de presupuesto.",
     "wiz.done.created": "Carpeta de presupuesto creada — ¡bienvenido!",
-    "wiz.failed": "La configuración falló: {error}"
+    "wiz.failed": "La configuración falló: {error}",
+    "bud.shape.title": "Tus otros presupuestos siguen aquí",
+    "bud.shape.body": {
+      one: "{count} archivo de presupuesto está guardado con otra duración de periodo — es Budgets/{newest}.md. Permanece en tu bóveda y vuelve en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquel.",
+      other: "{count} archivos de presupuesto están guardados con otra duración de periodo — el más reciente es Budgets/{newest}.md. Permanecen en tu bóveda y vuelven en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquellos."
+    },
+    "bud.shape.bring": "Traer las categorías y notas de {newest}",
+    "bud.shape.empty": "Ese presupuesto está vacío",
+    "bud.shape.brought": {
+      one: "Se trajo {count} categoría — pon el importe para este periodo",
+      other: "Se trajeron {count} categorías — pon los importes para este periodo"
+    },
+    "bud.shape.allHere": "Todas las categorías de ese presupuesto ya están aquí",
+    "bud.total.income": "Ingresos totales",
+    "bud.total.incomeNote": "{amount} recibido hasta ahora",
+    "bud.total.budgeted": "Total presupuestado",
+    "bud.total.budgetedNote": "{pct}% de los ingresos presupuestados",
+    "bud.total.over": "Presupuestado de más",
+    "bud.total.overNote": "presupuestado por encima de los ingresos",
+    "bud.total.left": "Por presupuestar",
+    "bud.total.leftNote": "ingresos aún sin asignar",
+    "bud.total.spent": "Total gastado",
+    "bud.total.spentNote": "{pct}% del presupuesto usado",
+    "bud.col.category": "Categoría",
+    "bud.col.type": "Tipo",
+    "bud.col.amount": "Importe",
+    "bud.col.actual": "Real hasta ahora",
+    "bud.col.notes": "Notas",
+    "bud.remaining.over": "{amount} de más",
+    "bud.remaining.left": "{amount} restante",
+    "bud.aria.amount": "Importe presupuestado para {category}",
+    "bud.aria.notes": "Notas de {category}",
+    "bud.aria.clear": "Vaciar el presupuesto de {category}",
+    "bud.title.clear": "Quitar esta categoría del archivo del periodo",
+    "bud.aria.delete": "Eliminar la categoría {category}",
+    "bud.title.delete": "Eliminar esta categoría en todas partes",
+    "bud.saved": "Presupuesto guardado en Budgets/{period}.md",
+    "bud.copy.none": "No se encontró presupuesto del periodo anterior",
+    "bud.copy.done": {
+      one: "Copiada {count} categoría del periodo anterior",
+      other: "Copiadas {count} categorías del periodo anterior"
+    },
+    "bud.copy.nothing": "Nada que copiar — todas las categorías ya tienen un valor",
+    "tx.wholeHistory": "Todo el historial",
+    "tx.allAccounts": "Todas las cuentas",
+    "tx.allCategories": "Todas las categorías",
+    "tx.uncategorised": "Sin categoría",
+    "tx.count.window": "{shown} de {total} filas",
+    "tx.count.all": { one: "{count} fila", other: "{count} filas" },
+    "tx.col.date": "Fecha",
+    "tx.col.desc": "Descripción",
+    "tx.col.account": "Cuenta",
+    "tx.col.category": "Categoría",
+    "tx.col.amount": "Importe",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Nota",
+    "tx.col.split": "Dividir",
+    "tx.aria.category": "Categoría de {date} {desc}",
+    "tx.aria.exclude": "Excluir {desc} de los totales del presupuesto",
+    "tx.aria.note": "Nota de {date} {desc}",
+    "tx.aria.split": "Dividir {date} {desc} en categorías",
+    "tx.title.split": "Dividir en categorías",
+    "tx.none": "Ninguna transacción coincide.",
+    "tx.showMore": "Mostrar {n} más de {remaining} restantes",
+    "tx.split.zero": "Una línea con importe cero no tiene nada que dividir",
+    "tx.split.excluded": "Esta línea ya está excluida — desmárcala primero",
+    "tx.split.marker": "Dividida en {n}",
+    "tx.split.done": "Dividida en {n} — revisa y luego guarda los cambios",
+    "tx.add.noAccount": "Añade una cuenta primero — cada transacción pertenece a una",
+    "tx.add.title": "Añadir transacción",
+    "tx.field.date": "Fecha",
+    "tx.field.desc": "Descripción",
+    "tx.field.descPlaceholder": "p. ej. Efectivo — verduras en el mercado",
+    "tx.field.account": "Cuenta",
+    "tx.field.direction": "Dirección",
+    "tx.dir.out": "Dinero que sale",
+    "tx.dir.in": "Dinero que entra",
+    "tx.field.amount": "Importe",
+    "tx.field.amountDesc": "Siempre positivo — la dirección pone el signo",
+    "tx.field.category": "Categoría",
+    "tx.field.none": "— ninguna —",
+    "tx.field.note": "Nota",
+    "tx.field.notePlaceholder": "opcional",
+    "tx.err.date": "La fecha debe ser AAAA-MM-DD",
+    "tx.err.desc": "La descripción es obligatoria",
+    "tx.err.account": "Nombre de cuenta no válido",
+    "tx.err.amount": "El importe debe ser un número distinto de 0",
+    "tx.err.save": "No se pudo guardar la transacción ({error})",
+    "tx.saved": { one: "{count} archivo guardado", other: "{count} archivos guardados" },
+    "tx.savedLearned": { one: " · aprendida {count} regla nueva", other: " · aprendidas {count} reglas nuevas" },
+    "tx.export.dirty": "Guarda tus cambios primero — una exportación con ediciones sin guardar no coincidiría con la bóveda",
+    "tx.export.empty": "Nada que exportar — ninguna fila coincide con los filtros actuales",
+    "tx.export.title": "Exportar transacciones",
+    "tx.export.folder": "Guardar en la carpeta",
+    "tx.export.desc": {
+      one: "Carpeta de la bóveda para la exportación. {count} fila ({range}) más {cats} categorías, como CSV y markdown.",
+      other: "Carpeta de la bóveda para la exportación. {count} filas ({range}) más {cats} categorías, como CSV y markdown."
+    },
+    "tx.export.failed": "No se pudo escribir la exportación — revisa el nombre de la carpeta",
+    "tx.export.done": {
+      one: "Exportada {count} fila y {cats} categorías a {path}/",
+      other: "Exportadas {count} filas y {cats} categorías a {path}/"
+    }
   };
 });
 
@@ -1129,11 +1541,12 @@ var require_fr = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "Solde actuel",
     "wiz.acct.balanceDesc": "Facultatif — ce qu'il y a sur le compte en ce moment.",
     "wiz.acct.balanceHint": "Utilisez le solde de clôture de votre dernier relevé, ou ce qu'affiche l'application de votre banque. Le solde est un instantané que vous tenez à jour vous-même — n'importer que les transactions récentes ne le fausse jamais — et vous pouvez le changer à tout moment en touchant le solde sur la page Comptes.",
-    "wiz.acctType.checking": "Compte courant",
-    "wiz.acctType.savings": "Compte d'épargne",
-    "wiz.acctType.credit_card": "Carte de crédit",
-    "wiz.acctType.cash": "Espèces",
-    "wiz.acctType.investment": "Placement",
+    "acctType.checking": "Compte courant",
+    "acctType.savings": "Compte d'épargne",
+    "acctType.credit_card": "Carte de crédit",
+    "acctType.cash": "Espèces",
+    "acctType.investment": "Placement",
+    "acctType.other": "Autre",
     "wiz.sum.folder": "Dossier",
     "wiz.sum.name": "Nom",
     "wiz.sum.language": "Langue",
@@ -1157,7 +1570,109 @@ var require_fr = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "Votre budget s'ouvre derrière un écran de confidentialité à toucher, ainsi rien n'est visible si quelqu'un jette un œil à votre coffre. Désactivez-le dans Paramètres → Budget Vault → Écran de confidentialité.",
     "wiz.done.connected": "Connecté à votre dossier de budget.",
     "wiz.done.created": "Dossier de budget créé — bienvenue !",
-    "wiz.failed": "Échec de la configuration : {error}"
+    "wiz.failed": "Échec de la configuration : {error}",
+    "bud.shape.title": "Vos autres budgets sont toujours là",
+    "bud.shape.body": {
+      one: "{count} fichier de budget est enregistré sous une autre durée de période — il s'agit de Budgets/{newest}.md. Il reste dans votre coffre et revient dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n'a pas la même durée que celle-là.",
+      other: "{count} fichiers de budget sont enregistrés sous une autre durée de période — le plus récent est Budgets/{newest}.md. Ils restent dans votre coffre et reviennent dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n'a pas la même durée que celles-là."
+    },
+    "bud.shape.bring": "Reprendre les catégories et les notes de {newest}",
+    "bud.shape.empty": "Ce budget est vide",
+    "bud.shape.brought": {
+      one: "{count} catégorie reprise — indiquez le montant pour cette période",
+      other: "{count} catégories reprises — indiquez les montants pour cette période"
+    },
+    "bud.shape.allHere": "Toutes les catégories de ce budget sont déjà ici",
+    "bud.total.income": "Revenus totaux",
+    "bud.total.incomeNote": "{amount} reçu jusqu'ici",
+    "bud.total.budgeted": "Total budgété",
+    "bud.total.budgetedNote": "{pct}% des revenus budgétés",
+    "bud.total.over": "Sur-budgété",
+    "bud.total.overNote": "budgété au-delà des revenus",
+    "bud.total.left": "Reste à budgéter",
+    "bud.total.leftNote": "revenus pas encore affectés",
+    "bud.total.spent": "Total dépensé",
+    "bud.total.spentNote": "{pct}% du budget utilisé",
+    "bud.col.category": "Catégorie",
+    "bud.col.type": "Type",
+    "bud.col.amount": "Montant",
+    "bud.col.actual": "Réel à ce jour",
+    "bud.col.notes": "Notes",
+    "bud.remaining.over": "{amount} de dépassement",
+    "bud.remaining.left": "{amount} restant",
+    "bud.aria.amount": "Montant budgété pour {category}",
+    "bud.aria.notes": "Notes de {category}",
+    "bud.aria.clear": "Vider le budget de {category}",
+    "bud.title.clear": "Retirer cette catégorie du fichier de la période",
+    "bud.aria.delete": "Supprimer la catégorie {category}",
+    "bud.title.delete": "Supprimer cette catégorie partout",
+    "bud.saved": "Budget enregistré dans Budgets/{period}.md",
+    "bud.copy.none": "Aucun budget trouvé pour la période précédente",
+    "bud.copy.done": {
+      one: "{count} catégorie copiée depuis la période précédente",
+      other: "{count} catégories copiées depuis la période précédente"
+    },
+    "bud.copy.nothing": "Rien à copier — chaque catégorie a déjà une valeur",
+    "tx.wholeHistory": "Tout l'historique",
+    "tx.allAccounts": "Tous les comptes",
+    "tx.allCategories": "Toutes les catégories",
+    "tx.uncategorised": "Sans catégorie",
+    "tx.count.window": "{shown} sur {total} lignes",
+    "tx.count.all": { one: "{count} ligne", other: "{count} lignes" },
+    "tx.col.date": "Date",
+    "tx.col.desc": "Description",
+    "tx.col.account": "Compte",
+    "tx.col.category": "Catégorie",
+    "tx.col.amount": "Montant",
+    "tx.col.excl": "Excl.",
+    "tx.col.note": "Note",
+    "tx.col.split": "Répartir",
+    "tx.aria.category": "Catégorie pour {date} {desc}",
+    "tx.aria.exclude": "Exclure {desc} des totaux du budget",
+    "tx.aria.note": "Note pour {date} {desc}",
+    "tx.aria.split": "Répartir {date} {desc} en catégories",
+    "tx.title.split": "Répartir en catégories",
+    "tx.none": "Aucune transaction ne correspond.",
+    "tx.showMore": "Afficher {n} de plus sur {remaining} restantes",
+    "tx.split.zero": "Une ligne à zéro n'a rien à répartir",
+    "tx.split.excluded": "Cette ligne est déjà exclue — décochez-la d'abord",
+    "tx.split.marker": "Répartie en {n}",
+    "tx.split.done": "Répartie en {n} — vérifiez, puis enregistrez les modifications",
+    "tx.add.noAccount": "Ajoutez d'abord un compte — chaque transaction appartient à un compte",
+    "tx.add.title": "Ajouter une transaction",
+    "tx.field.date": "Date",
+    "tx.field.desc": "Description",
+    "tx.field.descPlaceholder": "par ex. Espèces — légumes au marché",
+    "tx.field.account": "Compte",
+    "tx.field.direction": "Sens",
+    "tx.dir.out": "Argent sortant",
+    "tx.dir.in": "Argent entrant",
+    "tx.field.amount": "Montant",
+    "tx.field.amountDesc": "Toujours positif — le sens donne le signe",
+    "tx.field.category": "Catégorie",
+    "tx.field.none": "— aucune —",
+    "tx.field.note": "Note",
+    "tx.field.notePlaceholder": "facultatif",
+    "tx.err.date": "La date doit être au format AAAA-MM-JJ",
+    "tx.err.desc": "La description est obligatoire",
+    "tx.err.account": "Nom de compte invalide",
+    "tx.err.amount": "Le montant doit être un nombre différent de 0",
+    "tx.err.save": "Impossible d'enregistrer la transaction ({error})",
+    "tx.saved": { one: "{count} fichier enregistré", other: "{count} fichiers enregistrés" },
+    "tx.savedLearned": { one: " · {count} nouvelle règle apprise", other: " · {count} nouvelles règles apprises" },
+    "tx.export.dirty": "Enregistrez d'abord vos modifications — un export de modifications non enregistrées ne correspondrait pas au coffre",
+    "tx.export.empty": "Rien à exporter — aucune ligne ne correspond aux filtres actuels",
+    "tx.export.title": "Exporter les transactions",
+    "tx.export.folder": "Enregistrer dans le dossier",
+    "tx.export.desc": {
+      one: "Dossier du coffre pour l'export. {count} ligne ({range}) plus {cats} catégories, en CSV et markdown.",
+      other: "Dossier du coffre pour l'export. {count} lignes ({range}) plus {cats} catégories, en CSV et markdown."
+    },
+    "tx.export.failed": "Impossible d'écrire l'export — vérifiez le nom du dossier",
+    "tx.export.done": {
+      one: "{count} ligne et {cats} catégories exportées vers {path}/",
+      other: "{count} lignes et {cats} catégories exportées vers {path}/"
+    }
   };
 });
 
@@ -1333,11 +1848,12 @@ var require_ja = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "現在の残高",
     "wiz.acct.balanceDesc": "任意 — 現在その口座にある金額です。",
     "wiz.acct.balanceHint": "直近の明細の期末残高か、銀行アプリに表示されている金額を使ってください。残高はご自身で最新に保つスナップショットです — 最近の取引だけを取り込んでもずれることはありません — 口座ページで残高をタップすればいつでも変更できます。",
-    "wiz.acctType.checking": "普通預金・当座預金口座",
-    "wiz.acctType.savings": "貯蓄口座",
-    "wiz.acctType.credit_card": "クレジットカード",
-    "wiz.acctType.cash": "現金",
-    "wiz.acctType.investment": "投資",
+    "acctType.checking": "普通預金・当座預金口座",
+    "acctType.savings": "貯蓄口座",
+    "acctType.credit_card": "クレジットカード",
+    "acctType.cash": "現金",
+    "acctType.investment": "投資",
+    "acctType.other": "その他",
     "wiz.sum.folder": "フォルダ",
     "wiz.sum.name": "名前",
     "wiz.sum.language": "言語",
@@ -1360,7 +1876,104 @@ var require_ja = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "予算はタップして入るプライバシー画面の後ろで開くので、誰かが保管庫をちらりと見ても中身は表示されません。設定 → Budget Vault → プライバシー画面 でオフにできます。",
     "wiz.done.connected": "予算フォルダに接続しました。",
     "wiz.done.created": "予算フォルダを作成しました — ようこそ！",
-    "wiz.failed": "セットアップに失敗しました: {error}"
+    "wiz.failed": "セットアップに失敗しました: {error}",
+    "bud.shape.title": "他の予算はそのまま残っています",
+    "bud.shape.body": {
+      other: "別の期間の長さで保存された予算ファイルが {count} 件あります — 最新のものは Budgets/{newest}.md です。保管庫にはそのまま残っており、期間の長さを元に戻せばまた表示されます。この期間はそれらとは長さが違うため、金額は空の状態から始まります。"
+    },
+    "bud.shape.bring": "{newest} からカテゴリとメモを引き継ぐ",
+    "bud.shape.empty": "その予算は空です",
+    "bud.shape.brought": {
+      other: "カテゴリを {count} 件引き継ぎました — この期間の金額を設定してください"
+    },
+    "bud.shape.allHere": "その予算のカテゴリはすべてすでにここにあります",
+    "bud.total.income": "収入合計",
+    "bud.total.incomeNote": "これまでに {amount} を受け取りました",
+    "bud.total.budgeted": "予算合計",
+    "bud.total.budgetedNote": "予算収入の {pct}%",
+    "bud.total.over": "予算超過",
+    "bud.total.overNote": "収入を超えて予算を組んでいます",
+    "bud.total.left": "未配分",
+    "bud.total.leftNote": "まだ配分していない収入",
+    "bud.total.spent": "支出合計",
+    "bud.total.spentNote": "予算の {pct}% を使用",
+    "bud.col.category": "カテゴリ",
+    "bud.col.type": "種類",
+    "bud.col.amount": "金額",
+    "bud.col.actual": "実績",
+    "bud.col.notes": "メモ",
+    "bud.remaining.over": "{amount} 超過",
+    "bud.remaining.left": "残り {amount}",
+    "bud.aria.amount": "{category} の予算額",
+    "bud.aria.notes": "{category} のメモ",
+    "bud.aria.clear": "{category} の予算を消去",
+    "bud.title.clear": "この期間のファイルからこのカテゴリを外す",
+    "bud.aria.delete": "カテゴリ {category} を削除",
+    "bud.title.delete": "このカテゴリをすべての場所から削除",
+    "bud.saved": "予算を Budgets/{period}.md に保存しました",
+    "bud.copy.none": "前の期間の予算が見つかりません",
+    "bud.copy.done": {
+      other: "前の期間から {count} 件のカテゴリをコピーしました"
+    },
+    "bud.copy.nothing": "コピーするものがありません — すべてのカテゴリにすでに値があります",
+    "tx.wholeHistory": "全期間",
+    "tx.allAccounts": "すべての口座",
+    "tx.allCategories": "すべてのカテゴリ",
+    "tx.uncategorised": "カテゴリなし",
+    "tx.count.window": "{total} 行中 {shown} 行",
+    "tx.count.all": { other: "{count} 行" },
+    "tx.col.date": "日付",
+    "tx.col.desc": "摘要",
+    "tx.col.account": "口座",
+    "tx.col.category": "カテゴリ",
+    "tx.col.amount": "金額",
+    "tx.col.excl": "除外",
+    "tx.col.note": "メモ",
+    "tx.col.split": "分割",
+    "tx.aria.category": "{date} {desc} のカテゴリ",
+    "tx.aria.exclude": "{desc} を予算の合計から除外",
+    "tx.aria.note": "{date} {desc} のメモ",
+    "tx.aria.split": "{date} {desc} をカテゴリに分割",
+    "tx.title.split": "カテゴリに分割",
+    "tx.none": "該当する取引はありません。",
+    "tx.showMore": "残り {remaining} 件のうち {n} 件を表示",
+    "tx.split.zero": "金額が 0 の行には分割するものがありません",
+    "tx.split.excluded": "この行はすでに除外されています — まずチェックを外してください",
+    "tx.split.marker": "{n} 件に分割",
+    "tx.split.done": "{n} 件に分割しました — 確認してから変更を保存してください",
+    "tx.add.noAccount": "先に口座を追加してください — 取引は必ずいずれかの口座に属します",
+    "tx.add.title": "取引を追加",
+    "tx.field.date": "日付",
+    "tx.field.desc": "摘要",
+    "tx.field.descPlaceholder": "例: 現金 — 市場で野菜",
+    "tx.field.account": "口座",
+    "tx.field.direction": "入出金",
+    "tx.dir.out": "出金",
+    "tx.dir.in": "入金",
+    "tx.field.amount": "金額",
+    "tx.field.amountDesc": "常に正の数で — 符号は入出金の向きで決まります",
+    "tx.field.category": "カテゴリ",
+    "tx.field.none": "— なし —",
+    "tx.field.note": "メモ",
+    "tx.field.notePlaceholder": "任意",
+    "tx.err.date": "日付は YYYY-MM-DD 形式で入力してください",
+    "tx.err.desc": "摘要は必須です",
+    "tx.err.account": "口座名が正しくありません",
+    "tx.err.amount": "金額は 0 以外の数値にしてください",
+    "tx.err.save": "取引を保存できませんでした（{error}）",
+    "tx.saved": { other: "{count} 件のファイルを保存しました" },
+    "tx.savedLearned": { other: " · 新しいルールを {count} 件学習しました" },
+    "tx.export.dirty": "先に変更を保存してください — 未保存の編集を書き出すと保管庫の内容と一致しません",
+    "tx.export.empty": "書き出すものがありません — 現在の絞り込みに該当する行がありません",
+    "tx.export.title": "取引を書き出す",
+    "tx.export.folder": "保存先フォルダ",
+    "tx.export.desc": {
+      other: "書き出し先の保管庫内フォルダ。{count} 行（{range}）とカテゴリ {cats} 件を、CSV とマークダウンで書き出します。"
+    },
+    "tx.export.failed": "書き出しに失敗しました — フォルダ名を確認してください",
+    "tx.export.done": {
+      other: "{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました"
+    }
   };
 });
 
@@ -1536,11 +2149,12 @@ var require_zh = __commonJS((exports2, module2) => {
     "wiz.acct.balance": "当前余额",
     "wiz.acct.balanceDesc": "可选 — 该账户当前的金额。",
     "wiz.acct.balanceHint": "可以使用最近一期对账单的期末余额，或银行 App 上显示的金额。余额是一份由你自己保持更新的快照 — 只导入最近的交易并不会让它出错 — 你随时可以在账户页面点击余额来修改它。",
-    "wiz.acctType.checking": "活期/支票账户",
-    "wiz.acctType.savings": "储蓄账户",
-    "wiz.acctType.credit_card": "信用卡",
-    "wiz.acctType.cash": "现金",
-    "wiz.acctType.investment": "投资",
+    "acctType.checking": "活期/支票账户",
+    "acctType.savings": "储蓄账户",
+    "acctType.credit_card": "信用卡",
+    "acctType.cash": "现金",
+    "acctType.investment": "投资",
+    "acctType.other": "其他",
     "wiz.sum.folder": "文件夹",
     "wiz.sum.name": "名称",
     "wiz.sum.language": "语言",
@@ -1563,7 +2177,104 @@ var require_zh = __commonJS((exports2, module2) => {
     "wiz.finish.privacy": "你的预算会在一个需要点击进入的隐私屏后面打开，这样别人瞥一眼你的仓库也看不到任何内容。可在「设置 → Budget Vault → 隐私启动屏」中关闭。",
     "wiz.done.connected": "已连接到你的预算文件夹。",
     "wiz.done.created": "预算文件夹已创建 — 欢迎！",
-    "wiz.failed": "设置失败: {error}"
+    "wiz.failed": "设置失败: {error}",
+    "bud.shape.title": "你的其他预算都还在",
+    "bud.shape.body": {
+      other: "有 {count} 个预算文件保存在另一种周期长度下 — 最新的是 Budgets/{newest}.md。它们仍保留在你的仓库中，只要把周期长度改回去就会重新出现。这里的金额从空白开始，因为本周期与那些周期的长度不同。"
+    },
+    "bud.shape.bring": "从 {newest} 带入分类和备注",
+    "bud.shape.empty": "那份预算是空的",
+    "bud.shape.brought": {
+      other: "已带入 {count} 个分类 — 请为本周期填上金额"
+    },
+    "bud.shape.allHere": "那份预算中的分类都已经在这里了",
+    "bud.total.income": "收入合计",
+    "bud.total.incomeNote": "目前已收到 {amount}",
+    "bud.total.budgeted": "预算合计",
+    "bud.total.budgetedNote": "占预算收入的 {pct}%",
+    "bud.total.over": "超出预算",
+    "bud.total.overNote": "预算超过了收入",
+    "bud.total.left": "待分配",
+    "bud.total.leftNote": "尚未分配的收入",
+    "bud.total.spent": "支出合计",
+    "bud.total.spentNote": "已用预算的 {pct}%",
+    "bud.col.category": "分类",
+    "bud.col.type": "类型",
+    "bud.col.amount": "金额",
+    "bud.col.actual": "实际已发生",
+    "bud.col.notes": "备注",
+    "bud.remaining.over": "超出 {amount}",
+    "bud.remaining.left": "剩余 {amount}",
+    "bud.aria.amount": "{category} 的预算金额",
+    "bud.aria.notes": "{category} 的备注",
+    "bud.aria.clear": "清除 {category} 的预算",
+    "bud.title.clear": "把这个分类从本周期的文件中移除",
+    "bud.aria.delete": "删除分类 {category}",
+    "bud.title.delete": "在所有位置删除这个分类",
+    "bud.saved": "预算已保存到 Budgets/{period}.md",
+    "bud.copy.none": "找不到上一周期的预算",
+    "bud.copy.done": {
+      other: "已从上一周期复制 {count} 个分类"
+    },
+    "bud.copy.nothing": "没有可复制的内容 — 每个分类都已有数值",
+    "tx.wholeHistory": "全部历史",
+    "tx.allAccounts": "所有账户",
+    "tx.allCategories": "所有分类",
+    "tx.uncategorised": "未分类",
+    "tx.count.window": "共 {total} 行，显示 {shown} 行",
+    "tx.count.all": { other: "{count} 行" },
+    "tx.col.date": "日期",
+    "tx.col.desc": "摘要",
+    "tx.col.account": "账户",
+    "tx.col.category": "分类",
+    "tx.col.amount": "金额",
+    "tx.col.excl": "排除",
+    "tx.col.note": "备注",
+    "tx.col.split": "拆分",
+    "tx.aria.category": "{date} {desc} 的分类",
+    "tx.aria.exclude": "把 {desc} 从预算合计中排除",
+    "tx.aria.note": "{date} {desc} 的备注",
+    "tx.aria.split": "把 {date} {desc} 拆分到多个分类",
+    "tx.title.split": "拆分到多个分类",
+    "tx.none": "没有符合条件的交易。",
+    "tx.showMore": "在剩余的 {remaining} 行中再显示 {n} 行",
+    "tx.split.zero": "金额为零的行没有可拆分的内容",
+    "tx.split.excluded": "这一行已被排除 — 请先取消勾选",
+    "tx.split.marker": "拆分为 {n} 笔",
+    "tx.split.done": "已拆分为 {n} 笔 — 请检查后保存更改",
+    "tx.add.noAccount": "请先添加一个账户 — 每笔交易都要归属于某个账户",
+    "tx.add.title": "添加交易",
+    "tx.field.date": "日期",
+    "tx.field.desc": "摘要",
+    "tx.field.descPlaceholder": "例如：现金 — 在市场买菜",
+    "tx.field.account": "账户",
+    "tx.field.direction": "收支方向",
+    "tx.dir.out": "支出",
+    "tx.dir.in": "收入",
+    "tx.field.amount": "金额",
+    "tx.field.amountDesc": "始终填正数 — 正负由收支方向决定",
+    "tx.field.category": "分类",
+    "tx.field.none": "— 无 —",
+    "tx.field.note": "备注",
+    "tx.field.notePlaceholder": "选填",
+    "tx.err.date": "日期必须为 YYYY-MM-DD",
+    "tx.err.desc": "摘要为必填项",
+    "tx.err.account": "账户名称无效",
+    "tx.err.amount": "金额必须是不等于 0 的数字",
+    "tx.err.save": "无法保存该交易（{error}）",
+    "tx.saved": { other: "已保存 {count} 个文件" },
+    "tx.savedLearned": { other: " · 学习了 {count} 条新规则" },
+    "tx.export.dirty": "请先保存更改 — 导出未保存的编辑将与仓库内容不一致",
+    "tx.export.empty": "没有可导出的内容 — 当前筛选条件下没有匹配的行",
+    "tx.export.title": "导出交易",
+    "tx.export.folder": "保存到文件夹",
+    "tx.export.desc": {
+      other: "导出目标在仓库中的文件夹。{count} 行（{range}）以及 {cats} 个分类，导出为 CSV 和 markdown。"
+    },
+    "tx.export.failed": "无法写入导出文件 — 请检查文件夹名称",
+    "tx.export.done": {
+      other: "已把 {count} 行和 {cats} 个分类导出到 {path}/"
+    }
   };
 });
 
@@ -5410,6 +6121,7 @@ var require_transactions = __commonJS((exports2, module2) => {
   var { askFields, askSplit } = require_modal();
   var { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require_exporter();
   var { ISO_DATE, todayIso } = require_dates();
+  var i18n = require_i18n();
   module2.exports = function registerTransactions(ctx) {
     const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
     const pendingLearns = new Map;
@@ -5440,12 +6152,12 @@ var require_transactions = __commonJS((exports2, module2) => {
       return {
         rows,
         token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
-        range: whole ? "Whole history" : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+        range: whole ? i18n.t("tx.wholeHistory") : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
         filters
       };
     }
     function renderTransactions() {
-      $("#txSubNote").textContent = $("#txWholeHistory").checked ? "Whole history" : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+      $("#txSubNote").textContent = $("#txWholeHistory").checked ? i18n.t("tx.wholeHistory") : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
       const syncOptions = (sel, values, fixed) => {
         const current = [...sel.options].slice(fixed.length).map((o) => o.value);
         if (current.length === values.length && current.every((v, i) => v === values[i]))
@@ -5458,8 +6170,8 @@ var require_transactions = __commonJS((exports2, module2) => {
           sel.append(el("option", { value: v }, v));
         sel.value = [...sel.options].some((o) => o.value === keep) ? keep : "";
       };
-      syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", "All accounts"]]);
-      syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", "All categories"], ["__none__", "Uncategorised"]]);
+      syncOptions($("#txAccount"), [...new Set(Object.values(S.txFiles).map((f) => f.label))].sort(), [["", i18n.t("tx.allAccounts")]]);
+      syncOptions($("#txCategory"), S.categories.map((c) => c.name), [["", i18n.t("tx.allCategories")], ["__none__", i18n.t("tx.uncategorised")]]);
       const { rows: filtered, token: renderToken } = filteredRows();
       let list = filtered;
       const total = list.length;
@@ -5468,11 +6180,11 @@ var require_transactions = __commonJS((exports2, module2) => {
         shownFor = renderToken;
       }
       const visible = list.slice(0, shown);
-      $("#txCount").textContent = total > visible.length ? `${visible.length} of ${total} rows` : `${total} rows`;
+      $("#txCount").textContent = total > visible.length ? i18n.t("tx.count.window", { shown: visible.length, total }) : i18n.t("tx.count.all", { count: total });
       list = visible;
       const t = $("#txTable");
       t.empty();
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Date"), el("th", { scope: "col" }, "Description"), el("th", { scope: "col" }, "Account"), el("th", { scope: "col" }, "Category"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col" }, "Excl."), el("th", { scope: "col" }, "Note"), el("th", { scope: "col" }, el("span", { class: "sr-only" }, "Split")))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, i18n.t("tx.col.date")), el("th", { scope: "col" }, i18n.t("tx.col.desc")), el("th", { scope: "col" }, i18n.t("tx.col.account")), el("th", { scope: "col" }, i18n.t("tx.col.category")), el("th", { scope: "col", class: "num" }, i18n.t("tx.col.amount")), el("th", { scope: "col" }, i18n.t("tx.col.excl")), el("th", { scope: "col" }, i18n.t("tx.col.note")), el("th", { scope: "col" }, el("span", { class: "sr-only" }, i18n.t("tx.col.split"))))));
       const body = el("tbody", {});
       for (const item of list) {
         const r = item._row;
@@ -5487,9 +6199,9 @@ var require_transactions = __commonJS((exports2, module2) => {
           else
             pendingLearns.delete(r.desc);
           mark();
-        }, `Category for ${r.date} ${r.desc}`)), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", {
+        }, i18n.t("tx.aria.category", { date: r.date, desc: r.desc }))), el("td", { class: `num${r.amount >= 0 ? " text-success" : ""}`, style: "white-space:nowrap;font-weight:600" }, money(r.amount)), el("td", {}, el("input", {
           type: "checkbox",
-          "aria-label": `Exclude ${r.desc} from budget totals`,
+          "aria-label": i18n.t("tx.aria.exclude", { desc: r.desc }),
           ...r.excluded ? { checked: "" } : {},
           onchange: (e) => {
             r.excluded = e.target.checked;
@@ -5500,7 +6212,7 @@ var require_transactions = __commonJS((exports2, module2) => {
           class: "form-control form-control-sm",
           value: r.note,
           style: "width:130px",
-          "aria-label": `Note for ${r.date} ${r.desc}`,
+          "aria-label": i18n.t("tx.aria.note", { date: r.date, desc: r.desc }),
           onchange: (e) => {
             r.note = e.target.value;
             mark();
@@ -5508,9 +6220,9 @@ var require_transactions = __commonJS((exports2, module2) => {
         })), el("td", {}, splitButton(item))));
       }
       if (!list.length)
-        body.append(el("tr", {}, el("td", { colspan: "8", class: "text-muted" }, "No transactions match.")));
+        body.append(el("tr", {}, el("td", { colspan: "8", class: "text-muted" }, i18n.t("tx.none"))));
       if (total > list.length) {
-        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
+        const more = el("button", { class: "btn-ghost", style: "width:100%;padding:0.6rem" }, i18n.t("tx.showMore", { n: Math.min(PAGE, total - list.length), remaining: total - list.length }));
         more.addEventListener("click", () => {
           shown += PAGE;
           renderTransactions();
@@ -5524,8 +6236,8 @@ var require_transactions = __commonJS((exports2, module2) => {
       const b = el("button", {
         type: "button",
         class: "btn-ghost btn-ghost-sm",
-        "aria-label": `Split ${r.date} ${r.desc} into categories`,
-        title: "Split into categories"
+        "aria-label": i18n.t("tx.aria.split", { date: r.date, desc: r.desc }),
+        title: i18n.t("tx.title.split")
       }, icoEl(["split", "git-fork", "scissors"]));
       b.addEventListener("click", () => splitTransaction(item));
       return b;
@@ -5533,9 +6245,9 @@ var require_transactions = __commonJS((exports2, module2) => {
     async function splitTransaction(item) {
       const r = item._row;
       if (!r.amount)
-        return toast("A zero-amount line has nothing to split", true);
+        return toast(i18n.t("tx.split.zero"), true);
       if (r.excluded)
-        return toast("This line is already excluded — untick it first", true);
+        return toast(i18n.t("tx.split.excluded"), true);
       const parts = await askSplit(app, {
         tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
         categories: S.categories.map((c) => c.name),
@@ -5552,13 +6264,13 @@ var require_transactions = __commonJS((exports2, module2) => {
         note: p.note
       }));
       r.excluded = true;
-      const marker = `Split into ${rows.length}`;
+      const marker = i18n.t("tx.split.marker", { n: rows.length });
       r.note = r.note ? `${r.note} · ${marker}` : marker;
       item._file.rows.push(...rows);
       item._file.dirty = true;
       $("#txSave").disabled = false;
       renderTransactions();
-      toast(`Split into ${rows.length} — review, then Save changes`);
+      toast(i18n.t("tx.split.done", { n: rows.length }));
     }
     function serializeTxFile(f) {
       const fm = patchFrontmatter(f.fmRaw || "", { account: yamlStr(f.label), month: f.month });
@@ -5585,36 +6297,36 @@ var require_transactions = __commonJS((exports2, module2) => {
         ...Object.values(S.txFiles).map((f) => f.label)
       ])].sort();
       if (!labels.length)
-        return toast("Add an account first — every transaction belongs to one", true);
-      const r = await askFields(app, "Add transaction", [
-        { key: "date", label: "Date", type: "date", value: todayIso() },
-        { key: "desc", label: "Description", type: "text", placeholder: "e.g. Cash — vegetables at the market" },
-        { key: "label", label: "Account", type: "select", options: labels, value: $("#txAccount").value || labels[0] },
-        { key: "dir", label: "Direction", type: "select", value: "out", options: [
-          { value: "out", label: "Money out" },
-          { value: "in", label: "Money in" }
+        return toast(i18n.t("tx.add.noAccount"), true);
+      const r = await askFields(app, i18n.t("tx.add.title"), [
+        { key: "date", label: i18n.t("tx.field.date"), type: "date", value: todayIso() },
+        { key: "desc", label: i18n.t("tx.field.desc"), type: "text", placeholder: i18n.t("tx.field.descPlaceholder") },
+        { key: "label", label: i18n.t("tx.field.account"), type: "select", options: labels, value: $("#txAccount").value || labels[0] },
+        { key: "dir", label: i18n.t("tx.field.direction"), type: "select", value: "out", options: [
+          { value: "out", label: i18n.t("tx.dir.out") },
+          { value: "in", label: i18n.t("tx.dir.in") }
         ] },
-        { key: "amount", label: "Amount", type: "number", placeholder: "0.00", desc: "Always positive — direction sets the sign" },
-        { key: "cat", label: "Category", type: "select", options: [
-          { value: "", label: "— none —" },
+        { key: "amount", label: i18n.t("tx.field.amount"), type: "number", placeholder: "0.00", desc: i18n.t("tx.field.amountDesc") },
+        { key: "cat", label: i18n.t("tx.field.category"), type: "select", options: [
+          { value: "", label: i18n.t("tx.field.none") },
           ...S.categories.map((c) => ({ value: c.name, label: c.name }))
         ], value: "" },
-        { key: "note", label: "Note", type: "text", placeholder: "optional" }
+        { key: "note", label: i18n.t("tx.field.note"), type: "text", placeholder: i18n.t("tx.field.notePlaceholder") }
       ]);
       if (!r)
         return;
       const date = r.date.trim();
       if (!ISO_DATE.test(date))
-        return toast("Date must be YYYY-MM-DD", true);
+        return toast(i18n.t("tx.err.date"), true);
       const desc = r.desc.trim();
       if (!desc)
-        return toast("Description is required", true);
+        return toast(i18n.t("tx.err.desc"), true);
       const label = txSegment(r.label);
       if (!label)
-        return toast("Invalid account name", true);
+        return toast(i18n.t("tx.err.account"), true);
       let amount = normalizeAmount(r.amount);
       if (amount == null || amount === 0)
-        return toast("Amount must be a number other than 0", true);
+        return toast(i18n.t("tx.err.amount"), true);
       amount = parseFloat((r.dir === "in" ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
       const month = date.slice(0, 7);
       const key = `${label}/${month}`;
@@ -5625,7 +6337,7 @@ var require_transactions = __commonJS((exports2, module2) => {
       try {
         await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
       } catch (err) {
-        return toast(`Could not save the transaction (${err.message || err})`, true);
+        return toast(i18n.t("tx.err.save", { error: err.message || err }), true);
       }
       if (!S.txFiles[key])
         S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
@@ -5648,19 +6360,19 @@ var require_transactions = __commonJS((exports2, module2) => {
         pendingLearns.clear();
       }
       clearSaveButton();
-      toast(`Saved ${n} file${n === 1 ? "" : "s"}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? "" : "s"}` : ""));
+      toast(i18n.t("tx.saved", { count: n }) + (learned ? i18n.t("tx.savedLearned", { count: learned }) : ""));
     }
     async function exportTransactions() {
       if (Object.values(S.txFiles).some((f) => f.dirty)) {
-        return toast("Save your changes first — an export of unsaved edits would not match the vault", true);
+        return toast(i18n.t("tx.export.dirty"), true);
       }
       const { rows, range, filters } = filteredRows();
       if (!rows.length)
-        return toast("Nothing to export — no rows match the current filters", true);
-      const answer = await askFields(app, "Export transactions", [{
+        return toast(i18n.t("tx.export.empty"), true);
+      const answer = await askFields(app, i18n.t("tx.export.title"), [{
         key: "folder",
-        label: "Save to folder",
-        desc: `Vault folder for the export. ${rows.length} row${rows.length === 1 ? "" : "s"} (${range}) plus ${S.categories.length} categories, as CSV and markdown.`,
+        label: i18n.t("tx.export.folder"),
+        desc: i18n.t("tx.export.desc", { count: rows.length, range, cats: S.categories.length }),
         value: plugin.settings.exportFolder || "Exports",
         placeholder: "Exports"
       }]);
@@ -5676,13 +6388,13 @@ var require_transactions = __commonJS((exports2, module2) => {
         await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
       } catch (e) {
         console.error("Budget: export failed", e);
-        return toast("Could not write the export — check the folder name", true);
+        return toast(i18n.t("tx.export.failed"), true);
       }
       if (plugin.settings.exportFolder !== paths.dir) {
         plugin.settings.exportFolder = paths.dir;
         await plugin.saveSettings();
       }
-      toast(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} and ${S.categories.length} categories to ${written.split("/").slice(0, -1).join("/")}/`);
+      toast(i18n.t("tx.export.done", { count: rows.length, cats: S.categories.length, path: written.split("/").slice(0, -1).join("/") }));
     }
     ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
   };
@@ -5693,6 +6405,7 @@ var require_budgets = __commonJS((exports2, module2) => {
   var { el, icoEl } = require_dom();
   var { escMd, patchFrontmatter } = require_markdown();
   var { TYPE_ORDER } = require_constants();
+  var i18n = require_i18n();
   module2.exports = function registerBudgets(ctx) {
     const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
     function otherShapeBudgets() {
@@ -5710,13 +6423,13 @@ var require_budgets = __commonJS((exports2, module2) => {
       box.classList.remove("hidden");
       const newest = others[others.length - 1];
       const n = others.length;
-      box.append(el("div", { class: "bud-shape-note-t" }, "Your other budgets are still here"));
-      box.append(el("p", {}, `${n} budget ${n === 1 ? "file is" : "files are"} saved under a different period length — ` + `the most recent is Budgets/${newest}.md. They stay in your vault, and they come back ` + `as soon as you set the period length back. Amounts start blank here because this period ` + `isn't the same length as those were.`));
+      box.append(el("div", { class: "bud-shape-note-t" }, i18n.t("bud.shape.title")));
+      box.append(el("p", {}, i18n.t("bud.shape.body", { count: n, newest })));
       box.append(el("button", {
         class: "btn btn-ghost",
         type: "button",
         onclick: () => bringOverFrom(newest)
-      }, `Bring over the categories and notes from ${newest}`));
+      }, i18n.t("bud.shape.bring", { newest })));
     }
     function carryStructure(src, draft) {
       let brought = 0;
@@ -5738,14 +6451,14 @@ var require_budgets = __commonJS((exports2, module2) => {
     function bringOverFrom(key) {
       const src = S.budgets[key] || [];
       if (!src.length)
-        return toast("That budget is empty", true);
+        return toast(i18n.t("bud.shape.empty"), true);
       const brought = carryStructure(src, budgetDraft());
       if (brought) {
         budDirty = true;
         $("#budSave").disabled = false;
       }
       renderBudgets();
-      toast(brought ? `Brought over ${brought} ${brought === 1 ? "category" : "categories"} — set the amounts for this period` : "Every category from that budget is already here");
+      toast(brought ? i18n.t("bud.shape.brought", { count: brought }) : i18n.t("bud.shape.allHere"));
     }
     let budDraft = null, budDraftPeriod = null;
     let budDirty = false;
@@ -5788,19 +6501,28 @@ var require_budgets = __commonJS((exports2, module2) => {
       const usedPct = budgeted > 0 ? Math.round(sum.spend / budgeted * 100) : null;
       const unallocated = income - budgeted;
       return [
-        { label: "Total income", value: money(income), grad: true, note: `${money(sum.income)} received so far` },
-        { label: "Total budgeted", value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : "" },
         {
-          label: unallocated < 0 ? "Over-budgeted" : "Left to budget",
-          value: money(Math.abs(unallocated)),
-          over: unallocated < 0,
-          note: unallocated < 0 ? "budgeted beyond income" : income > 0 ? "income not yet allocated" : ""
+          label: i18n.t("bud.total.income"),
+          value: money(income),
+          grad: true,
+          note: i18n.t("bud.total.incomeNote", { amount: money(sum.income) })
         },
         {
-          label: "Total spent",
+          label: i18n.t("bud.total.budgeted"),
+          value: money(budgeted),
+          note: allocPct !== null ? i18n.t("bud.total.budgetedNote", { pct: allocPct }) : ""
+        },
+        {
+          label: i18n.t(unallocated < 0 ? "bud.total.over" : "bud.total.left"),
+          value: money(Math.abs(unallocated)),
+          over: unallocated < 0,
+          note: unallocated < 0 ? i18n.t("bud.total.overNote") : income > 0 ? i18n.t("bud.total.leftNote") : ""
+        },
+        {
+          label: i18n.t("bud.total.spent"),
           value: money(sum.spend),
           over: budgeted > 0 && sum.spend > budgeted,
-          note: usedPct !== null ? `${usedPct}% of budget used` : ""
+          note: usedPct !== null ? i18n.t("bud.total.spentNote", { pct: usedPct }) : ""
         }
       ];
     }
@@ -5823,7 +6545,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       const sum = periodSummary(S.period);
       const t = $("#budTable");
       t.empty();
-      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Category"), el("th", { scope: "col" }, "Type"), el("th", { scope: "col", class: "num" }, "Amount"), el("th", { scope: "col", class: "num" }, "Actual so far"), el("th", { scope: "col" }, "Notes"), el("th", { scope: "col" }, ""))));
+      t.append(el("thead", {}, el("tr", {}, el("th", { scope: "col" }, i18n.t("bud.col.category")), el("th", { scope: "col" }, i18n.t("bud.col.type")), el("th", { scope: "col", class: "num" }, i18n.t("bud.col.amount")), el("th", { scope: "col", class: "num" }, i18n.t("bud.col.actual")), el("th", { scope: "col" }, i18n.t("bud.col.notes")), el("th", { scope: "col" }, ""))));
       const body = el("tbody", {});
       const mark = () => {
         budDirty = true;
@@ -5848,7 +6570,7 @@ var require_budgets = __commonJS((exports2, module2) => {
           }
           const rem = d.amount - actual;
           const over = rem < 0 && d.type !== "income";
-          remainingEl.textContent = over ? `${money(-rem)} over` : `${money(rem)} left`;
+          remainingEl.textContent = over ? i18n.t("bud.remaining.over", { amount: money(-rem) }) : i18n.t("bud.remaining.left", { amount: money(rem) });
           remainingEl.className = "bud-remaining" + (over ? " over" : "");
         };
         updateRemaining();
@@ -5857,7 +6579,7 @@ var require_budgets = __commonJS((exports2, module2) => {
           step: "0.01",
           class: "form-control form-control-sm",
           value: d.amount || "",
-          "aria-label": `Budget amount for ${d.category}`,
+          "aria-label": i18n.t("bud.aria.amount", { category: d.category }),
           onchange: (e) => {
             d.amount = parseFloat(e.target.value) || 0;
             d.amountRaw = null;
@@ -5870,19 +6592,19 @@ var require_budgets = __commonJS((exports2, module2) => {
           class: "form-control form-control-sm",
           value: d.notes,
           style: "width:230px",
-          "aria-label": `Notes for ${d.category}`,
+          "aria-label": i18n.t("bud.aria.notes", { category: d.category }),
           onchange: (e) => {
             d.notes = e.target.value;
             mark();
           }
-        })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Clear budget for ${d.category}`, title: "Clear this category from the period file", onclick: () => {
+        })), el("td", { style: "white-space:nowrap" }, d.inFile ? el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": i18n.t("bud.aria.clear", { category: d.category }), title: i18n.t("bud.title.clear"), onclick: () => {
           d.amount = 0;
           d.amountRaw = null;
           d.notes = "";
           d.inFile = false;
           mark();
           renderBudgets();
-        } }, "✕") : "", el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": `Delete category ${d.category}`, title: "Delete this category everywhere", onclick: async () => {
+        } }, "✕") : "", el("button", { class: "btn-ghost btn-ghost-sm", "aria-label": i18n.t("bud.aria.delete", { category: d.category }), title: i18n.t("bud.title.delete"), onclick: async () => {
           if (await promptDeleteCategory(d.category)) {
             const draft2 = budgetDraft();
             const i = draft2.indexOf(d);
@@ -5931,12 +6653,12 @@ var require_budgets = __commonJS((exports2, module2) => {
 `));
       budDirty = false;
       $("#budSave").disabled = true;
-      toast(`Budget saved to Budgets/${S.period}.md`);
+      toast(i18n.t("bud.saved", { period: S.period }));
     }
     function copyPreviousBudget() {
       const prev = S.budgets[shiftPeriod(S.period, -1)];
       if (!prev || !prev.length)
-        return toast("No budget found for the previous period", true);
+        return toast(i18n.t("bud.copy.none"), true);
       const draft = budgetDraft();
       let copied = 0;
       for (const r of prev) {
@@ -5957,7 +6679,7 @@ var require_budgets = __commonJS((exports2, module2) => {
       if (copied)
         $("#budSave").disabled = false;
       renderBudgets();
-      toast(copied ? `Copied ${copied} categories from the previous period` : "Nothing to copy — every category already has a value");
+      toast(copied ? i18n.t("bud.copy.done", { count: copied }) : i18n.t("bud.copy.nothing"));
     }
     async function addNewCategory() {
       const cat = await promptCreateCategory();
@@ -10649,7 +11371,10 @@ var require_controller = __commonJS((exports2, module2) => {
         await connectVault();
       },
       applyTheme,
-      applyLanguage: () => applyDom(root),
+      applyLanguage: () => {
+        applyDom(root);
+        render();
+      },
       applyPrivacyLock: () => {
         if (plugin.settings.privacyLock)
           lockGate();
@@ -10762,7 +11487,7 @@ var require_onboarding = __commonJS((exports2, module2) => {
     { name: "Transfer between accounts", type: "transfer", color: "#888888" }
   ];
   var ACCOUNT_TYPE_KEYS = ["checking", "savings", "credit_card", "cash", "investment"];
-  var accountTypes = () => ACCOUNT_TYPE_KEYS.map((k) => [k, i18n.t("wiz.acctType." + k)]);
+  var accountTypes = () => ACCOUNT_TYPE_KEYS.map((k) => [k, i18n.t("acctType." + k)]);
   var CURRENCY_KEYS = [["R", "rand"], ["$", "dollar"], ["€", "euro"], ["£", "pound"], ["__custom__", "other"]];
   var currencies = () => CURRENCY_KEYS.map(([sym, k]) => [sym, i18n.t("wiz.ccy." + k)]);
   var typeLabel = (type) => i18n.t("wiz.type." + type);

@@ -3,6 +3,32 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.9.0 — 2026-08-07
+
+### Added
+
+- **The Budget and Transactions pages are translated.** Both now read in
+  whichever of the seven languages you have chosen — the totals tiles, the
+  table headers, the live "left / over" line under each amount, the filters and
+  row counts, the add-transaction dialog, the split flow, the export flow, and
+  every screen-reader label along the way.
+
+  Date hints are localised properly rather than shared: German asks for
+  JJJJ-MM-TT, French for AAAA-MM-JJ. Counts agree with their own language too —
+  Spanish gives "Copiada 1 categoría" against "Copiadas 7 categorías".
+
+### Fixed
+
+- **Changing the language now updates the page you are looking at, not just the
+  menu around it.** 1.8.1 re-translated the app's frame; the pages themselves
+  were still redrawn from their old text until you switched away and back.
+
+### Notes
+
+- Ten pages are still English — Tax, Accounts, Debt, the Dashboard, Loan
+  Calculators, Import, Savings, Assets, Services and Owed Money — along with
+  most settings descriptions and the Tax view's country checklists.
+
 ## 1.8.1 — 2026-08-07
 
 ### Fixed

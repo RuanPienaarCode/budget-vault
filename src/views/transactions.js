@@ -9,6 +9,8 @@ const { csvCell } = require('../csv');
 const { askFields, askSplit } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 const { ISO_DATE, todayIso } = require('../dates');
+/* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
+const i18n = require('../i18n');
 
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
@@ -70,13 +72,13 @@ module.exports = function registerTransactions(ctx) {
     return {
       rows,
       token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
-      range: whole ? 'Whole history' : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+      range: whole ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
       filters,
     };
   }
 
   function renderTransactions() {
-    $('#txSubNote').textContent = $('#txWholeHistory').checked ? 'Whole history' : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+    $('#txSubNote').textContent = $('#txWholeHistory').checked ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     /* Rebuild these on CONTENT, not option count. Comparing counts meant a
        rename on another device (one label out, one in) left the select showing
        a name that no longer matches anything — the table then reads "0 rows"
@@ -93,9 +95,9 @@ module.exports = function registerTransactions(ctx) {
       sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
     };
     syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
-      [['', 'All accounts']]);
+      [['', i18n.t('tx.allAccounts')]]);
     syncOptions($('#txCategory'), S.categories.map(c => c.name),
-      [['', 'All categories'], ['__none__', 'Uncategorised']]);
+      [['', i18n.t('tx.allCategories')], ['__none__', i18n.t('tx.uncategorised')]]);
     const { rows: filtered, token: renderToken } = filteredRows();
     let list = filtered;
     /* Window the table. The old shape sliced to 800 and built every one: ~13,600
@@ -107,14 +109,14 @@ module.exports = function registerTransactions(ctx) {
     if (shownFor !== renderToken) { shown = PAGE; shownFor = renderToken; }
     const visible = list.slice(0, shown);
     $('#txCount').textContent = total > visible.length
-      ? `${visible.length} of ${total} rows`
-      : `${total} rows`;
+      ? i18n.t('tx.count.window', { shown: visible.length, total })
+      : i18n.t('tx.count.all', { count: total });
     list = visible;
     const t = $('#txTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Date'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col' }, 'Account'),
-      el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Excl.'), el('th', { scope: 'col' }, 'Note'),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Split')))));
+      el('th', { scope: 'col' }, i18n.t('tx.col.date')), el('th', { scope: 'col' }, i18n.t('tx.col.desc')), el('th', { scope: 'col' }, i18n.t('tx.col.account')),
+      el('th', { scope: 'col' }, i18n.t('tx.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('tx.col.amount')), el('th', { scope: 'col' }, i18n.t('tx.col.excl')), el('th', { scope: 'col' }, i18n.t('tx.col.note')),
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.split'))))));
     const body = el('tbody', {});
     for (const item of list) {
       const r = item._row;
@@ -130,19 +132,19 @@ module.exports = function registerTransactions(ctx) {
           r.cat = v;
           if (v) pendingLearns.set(r.desc, v); else pendingLearns.delete(r.desc);
           mark();
-        }, `Category for ${r.date} ${r.desc}`)),
+        }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
         el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(r.amount)),
-        el('td', {}, el('input', { type: 'checkbox', 'aria-label': `Exclude ${r.desc} from budget totals`,
+        el('td', {}, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
           ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
-          'aria-label': `Note for ${r.date} ${r.desc}`,
+          'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
         el('td', {}, splitButton(item))));
     }
-    if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, 'No transactions match.')));
+    if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
       const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
-        `Show ${Math.min(PAGE, total - list.length)} more of ${total - list.length} remaining`);
+        i18n.t('tx.showMore', { n: Math.min(PAGE, total - list.length), remaining: total - list.length }));
       more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
       body.append(el('tr', {}, el('td', { colspan: '8', style: 'padding:0' }, more)));
     }
@@ -170,7 +172,7 @@ module.exports = function registerTransactions(ctx) {
     const r = item._row;
     const b = el('button', {
       type: 'button', class: 'btn-ghost btn-ghost-sm',
-      'aria-label': `Split ${r.date} ${r.desc} into categories`, title: 'Split into categories',
+      'aria-label': i18n.t('tx.aria.split', { date: r.date, desc: r.desc }), title: i18n.t('tx.title.split'),
     }, icoEl(['split', 'git-fork', 'scissors']));
     b.addEventListener('click', () => splitTransaction(item));
     return b;
@@ -178,8 +180,8 @@ module.exports = function registerTransactions(ctx) {
 
   async function splitTransaction(item) {
     const r = item._row;
-    if (!r.amount) return toast('A zero-amount line has nothing to split', true);
-    if (r.excluded) return toast('This line is already excluded — untick it first', true);
+    if (!r.amount) return toast(i18n.t('tx.split.zero'), true);
+    if (r.excluded) return toast(i18n.t('tx.split.excluded'), true);
     const parts = await askSplit(app, {
       tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
       categories: S.categories.map(c => c.name),
@@ -196,7 +198,7 @@ module.exports = function registerTransactions(ctx) {
       date: r.date, desc: r.desc, cat: p.cat, amount: p.amount, excluded: false, note: p.note,
     }));
     r.excluded = true;
-    const marker = `Split into ${rows.length}`;
+    const marker = i18n.t('tx.split.marker', { n: rows.length });
     r.note = r.note ? `${r.note} · ${marker}` : marker;
     // Same file: every part shares the parent's date, so it shares its month.
     item._file.rows.push(...rows);
@@ -206,7 +208,7 @@ module.exports = function registerTransactions(ctx) {
        with different categories, so learning from them would teach the
        auto-categoriser a rule that contradicts itself on every import. */
     renderTransactions();
-    toast(`Split into ${rows.length} — review, then Save changes`);
+    toast(i18n.t('tx.split.done', { n: rows.length }));
   }
 
   function serializeTxFile(f) {
@@ -233,29 +235,29 @@ module.exports = function registerTransactions(ctx) {
     const labels = [...new Set([
       ...S.accounts.map(a => a.tx_label || a.name),
       ...Object.values(S.txFiles).map(f => f.label)])].sort();
-    if (!labels.length) return toast('Add an account first — every transaction belongs to one', true);
-    const r = await askFields(app, 'Add transaction', [
-      { key: 'date', label: 'Date', type: 'date', value: todayIso() },
-      { key: 'desc', label: 'Description', type: 'text', placeholder: 'e.g. Cash — vegetables at the market' },
-      { key: 'label', label: 'Account', type: 'select', options: labels, value: $('#txAccount').value || labels[0] },
-      { key: 'dir', label: 'Direction', type: 'select', value: 'out', options: [
-        { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }] },
-      { key: 'amount', label: 'Amount', type: 'number', placeholder: '0.00', desc: 'Always positive — direction sets the sign' },
-      { key: 'cat', label: 'Category', type: 'select', options: [
-        { value: '', label: '— none —' }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: '' },
-      { key: 'note', label: 'Note', type: 'text', placeholder: 'optional' },
+    if (!labels.length) return toast(i18n.t('tx.add.noAccount'), true);
+    const r = await askFields(app, i18n.t('tx.add.title'), [
+      { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: todayIso() },
+      { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder') },
+      { key: 'label', label: i18n.t('tx.field.account'), type: 'select', options: labels, value: $('#txAccount').value || labels[0] },
+      { key: 'dir', label: i18n.t('tx.field.direction'), type: 'select', value: 'out', options: [
+        { value: 'out', label: i18n.t('tx.dir.out') }, { value: 'in', label: i18n.t('tx.dir.in') }] },
+      { key: 'amount', label: i18n.t('tx.field.amount'), type: 'number', placeholder: '0.00', desc: i18n.t('tx.field.amountDesc') },
+      { key: 'cat', label: i18n.t('tx.field.category'), type: 'select', options: [
+        { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: '' },
+      { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder') },
     ]);
     if (!r) return;
     const date = r.date.trim();
-    if (!ISO_DATE.test(date)) return toast('Date must be YYYY-MM-DD', true);
+    if (!ISO_DATE.test(date)) return toast(i18n.t('tx.err.date'), true);
     const desc = r.desc.trim();
-    if (!desc) return toast('Description is required', true);
+    if (!desc) return toast(i18n.t('tx.err.desc'), true);
     // txSegment, not safeSeg: the key below and the path further down must be
     // the same string, and an existing folder keeps its on-disk name.
     const label = txSegment(r.label);
-    if (!label) return toast('Invalid account name', true);
+    if (!label) return toast(i18n.t('tx.err.account'), true);
     let amount = normalizeAmount(r.amount);
-    if (amount == null || amount === 0) return toast('Amount must be a number other than 0', true);
+    if (amount == null || amount === 0) return toast(i18n.t('tx.err.amount'), true);
     amount = parseFloat((r.dir === 'in' ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
 
     const month = date.slice(0, 7);
@@ -272,7 +274,7 @@ module.exports = function registerTransactions(ctx) {
     try {
       await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
     } catch (err) {
-      return toast(`Could not save the transaction (${err.message || err})`, true);
+      return toast(i18n.t('tx.err.save', { error: err.message || err }), true);
     }
     if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
     S.txFiles[key].rows.push(row);
@@ -293,7 +295,7 @@ module.exports = function registerTransactions(ctx) {
       pendingLearns.clear();
     }
     clearSaveButton();
-    toast(`Saved ${n} file${n === 1 ? '' : 's'}` + (learned ? ` · learned ${learned} new rule${learned === 1 ? '' : 's'}` : ''));
+    toast(i18n.t('tx.saved', { count: n }) + (learned ? i18n.t('tx.savedLearned', { count: learned }) : ''));
   }
 
   /* Write the current selection out as four files: CSV for a spreadsheet,
@@ -312,10 +314,10 @@ module.exports = function registerTransactions(ctx) {
      with nothing to explain it. */
   async function exportTransactions() {
     if (Object.values(S.txFiles).some(f => f.dirty)) {
-      return toast('Save your changes first — an export of unsaved edits would not match the vault', true);
+      return toast(i18n.t('tx.export.dirty'), true);
     }
     const { rows, range, filters } = filteredRows();
-    if (!rows.length) return toast('Nothing to export — no rows match the current filters', true);
+    if (!rows.length) return toast(i18n.t('tx.export.empty'), true);
 
     /* Ask where, every time, with last time's answer prefilled.
 
@@ -328,10 +330,10 @@ module.exports = function registerTransactions(ctx) {
        Asked rather than assumed even when the answer is remembered: an export
        overwrites whatever it wrote last time, and a silent overwrite of a file
        someone has since edited is not something a toast can undo. */
-    const answer = await askFields(app, 'Export transactions', [{
+    const answer = await askFields(app, i18n.t('tx.export.title'), [{
       key: 'folder',
-      label: 'Save to folder',
-      desc: `Vault folder for the export. ${rows.length} row${rows.length === 1 ? '' : 's'} (${range}) plus ${S.categories.length} categories, as CSV and markdown.`,
+      label: i18n.t('tx.export.folder'),
+      desc: i18n.t('tx.export.desc', { count: rows.length, range, cats: S.categories.length }),
       value: plugin.settings.exportFolder || 'Exports',
       placeholder: 'Exports',
     }]);
@@ -347,7 +349,7 @@ module.exports = function registerTransactions(ctx) {
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {
       console.error('Budget: export failed', e);
-      return toast('Could not write the export — check the folder name', true);
+      return toast(i18n.t('tx.export.failed'), true);
     }
     /* Remembered only after a write actually succeeded. Storing the typed value
        up front would leave a destination that failed prefilled as the default
@@ -356,7 +358,7 @@ module.exports = function registerTransactions(ctx) {
       plugin.settings.exportFolder = paths.dir;
       await plugin.saveSettings();
     }
-    toast(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'} and ${S.categories.length} categories to ${written.split('/').slice(0, -1).join('/')}/`);
+    toast(i18n.t('tx.export.done', { count: rows.length, cats: S.categories.length, path: written.split('/').slice(0, -1).join('/') }));
   }
 
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });

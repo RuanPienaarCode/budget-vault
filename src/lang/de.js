@@ -232,11 +232,12 @@ module.exports = {
   'wiz.acct.balanceDesc': 'Optional — was gerade auf dem Konto ist.',
   'wiz.acct.balanceHint': 'Nimm den Schlusssaldo deines letzten Auszugs, oder was deine Banking-App anzeigt. Der Kontostand ist eine Momentaufnahme, die du selbst aktuell hältst — nur die neuesten Transaktionen zu importieren bringt ihn nie durcheinander — und du kannst ihn jederzeit ändern, indem du auf der Konten-Seite auf den Kontostand tippst.',
 
-  'wiz.acctType.checking': 'Girokonto',
-  'wiz.acctType.savings': 'Sparkonto',
-  'wiz.acctType.credit_card': 'Kreditkarte',
-  'wiz.acctType.cash': 'Bargeld',
-  'wiz.acctType.investment': 'Anlage',
+  'acctType.checking': 'Girokonto',
+  'acctType.savings': 'Sparkonto',
+  'acctType.credit_card': 'Kreditkarte',
+  'acctType.cash': 'Bargeld',
+  'acctType.investment': 'Anlage',
+  'acctType.other': 'Sonstiges',
 
   /* ---- finish ---- */
   'wiz.sum.folder': 'Ordner',
@@ -264,4 +265,125 @@ module.exports = {
   'wiz.done.connected': 'Mit deinem Budget-Ordner verbunden.',
   'wiz.done.created': 'Budget-Ordner angelegt — willkommen!',
   'wiz.failed': 'Einrichtung fehlgeschlagen: {error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': 'Deine anderen Budgets sind noch da',
+  'bud.shape.body': {
+    one: '{count} Budgetdatei ist unter einer anderen Zeitraumlänge gespeichert — es ist Budgets/{newest}.md. Sie bleibt in deinem Vault und ist wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jener.',
+    other: '{count} Budgetdateien sind unter einer anderen Zeitraumlänge gespeichert — die neueste ist Budgets/{newest}.md. Sie bleiben in deinem Vault und sind wieder da, sobald du die Zeitraumlänge zurückstellst. Die Beträge beginnen hier leer, weil dieser Zeitraum nicht dieselbe Länge hat wie jene.',
+  },
+  'bud.shape.bring': 'Kategorien und Notizen aus {newest} übernehmen',
+  'bud.shape.empty': 'Dieses Budget ist leer',
+  'bud.shape.brought': {
+    one: '{count} Kategorie übernommen — setze den Betrag für diesen Zeitraum',
+    other: '{count} Kategorien übernommen — setze die Beträge für diesen Zeitraum',
+  },
+  'bud.shape.allHere': 'Jede Kategorie aus diesem Budget ist bereits hier',
+
+  'bud.total.income': 'Einnahmen gesamt',
+  'bud.total.incomeNote': '{amount} bisher erhalten',
+  'bud.total.budgeted': 'Budgetiert gesamt',
+  'bud.total.budgetedNote': '{pct}% der budgetierten Einnahmen',
+  'bud.total.over': 'Überbudgetiert',
+  'bud.total.overNote': 'mehr budgetiert als eingenommen',
+  'bud.total.left': 'Noch zu budgetieren',
+  'bud.total.leftNote': 'Einnahmen noch nicht zugeteilt',
+  'bud.total.spent': 'Ausgegeben gesamt',
+  'bud.total.spentNote': '{pct}% des Budgets verbraucht',
+
+  'bud.col.category': 'Kategorie',
+  'bud.col.type': 'Art',
+  'bud.col.amount': 'Betrag',
+  'bud.col.actual': 'Tatsächlich bisher',
+  'bud.col.notes': 'Notizen',
+
+  'bud.remaining.over': '{amount} darüber',
+  'bud.remaining.left': '{amount} übrig',
+
+  'bud.aria.amount': 'Budgetbetrag für {category}',
+  'bud.aria.notes': 'Notizen zu {category}',
+  'bud.aria.clear': 'Budget für {category} leeren',
+  'bud.title.clear': 'Diese Kategorie aus der Zeitraumdatei entfernen',
+  'bud.aria.delete': 'Kategorie {category} löschen',
+  'bud.title.delete': 'Diese Kategorie überall löschen',
+
+  'bud.saved': 'Budget gespeichert unter Budgets/{period}.md',
+  'bud.copy.none': 'Kein Budget für den vorherigen Zeitraum gefunden',
+  'bud.copy.done': {
+    one: '{count} Kategorie aus dem vorherigen Zeitraum kopiert',
+    other: '{count} Kategorien aus dem vorherigen Zeitraum kopiert',
+  },
+  'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
+
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': 'Gesamte Historie',
+  'tx.allAccounts': 'Alle Konten',
+  'tx.allCategories': 'Alle Kategorien',
+  'tx.uncategorised': 'Ohne Kategorie',
+  'tx.count.window': '{shown} von {total} Zeilen',
+  'tx.count.all': { one: '{count} Zeile', other: '{count} Zeilen' },
+
+  'tx.col.date': 'Datum',
+  'tx.col.desc': 'Beschreibung',
+  'tx.col.account': 'Konto',
+  'tx.col.category': 'Kategorie',
+  'tx.col.amount': 'Betrag',
+  'tx.col.excl': 'Ausg.',
+  'tx.col.note': 'Notiz',
+  'tx.col.split': 'Aufteilen',
+
+  'tx.aria.category': 'Kategorie für {date} {desc}',
+  'tx.aria.exclude': '{desc} aus den Budgetsummen ausschließen',
+  'tx.aria.note': 'Notiz zu {date} {desc}',
+  'tx.aria.split': '{date} {desc} auf Kategorien aufteilen',
+  'tx.title.split': 'Auf Kategorien aufteilen',
+
+  'tx.none': 'Keine Transaktionen passen.',
+  'tx.showMore': '{n} weitere von {remaining} verbleibenden anzeigen',
+
+  'tx.split.zero': 'Eine Zeile mit dem Betrag 0 hat nichts aufzuteilen',
+  'tx.split.excluded': 'Diese Zeile ist bereits ausgeschlossen — hake sie zuerst ab',
+  'tx.split.marker': 'Aufgeteilt auf {n}',
+  'tx.split.done': 'Auf {n} aufgeteilt — prüfen, dann Änderungen speichern',
+
+  'tx.add.noAccount': 'Lege zuerst ein Konto an — jede Transaktion gehört zu einem',
+  'tx.add.title': 'Transaktion hinzufügen',
+  'tx.field.date': 'Datum',
+  'tx.field.desc': 'Beschreibung',
+  'tx.field.descPlaceholder': 'z. B. Bargeld — Gemüse auf dem Markt',
+  'tx.field.account': 'Konto',
+  'tx.field.direction': 'Richtung',
+  'tx.dir.out': 'Geld raus',
+  'tx.dir.in': 'Geld rein',
+  'tx.field.amount': 'Betrag',
+  'tx.field.amountDesc': 'Immer positiv — die Richtung setzt das Vorzeichen',
+  'tx.field.category': 'Kategorie',
+  'tx.field.none': '— keine —',
+  'tx.field.note': 'Notiz',
+  'tx.field.notePlaceholder': 'optional',
+
+  'tx.err.date': 'Das Datum muss JJJJ-MM-TT sein',
+  'tx.err.desc': 'Eine Beschreibung ist erforderlich',
+  'tx.err.account': 'Ungültiger Kontoname',
+  'tx.err.amount': 'Der Betrag muss eine Zahl ungleich 0 sein',
+  'tx.err.save': 'Die Transaktion konnte nicht gespeichert werden ({error})',
+
+  'tx.saved': { one: '{count} Datei gespeichert', other: '{count} Dateien gespeichert' },
+  'tx.savedLearned': { one: ' · {count} neue Regel gelernt', other: ' · {count} neue Regeln gelernt' },
+
+  'tx.export.dirty': 'Speichere zuerst deine Änderungen — ein Export ungespeicherter Bearbeitungen würde nicht zum Vault passen',
+  'tx.export.empty': 'Nichts zu exportieren — keine Zeile passt zu den aktuellen Filtern',
+  'tx.export.title': 'Transaktionen exportieren',
+  'tx.export.folder': 'In Ordner speichern',
+  'tx.export.desc': {
+    one: 'Vault-Ordner für den Export. {count} Zeile ({range}) plus {cats} Kategorien, als CSV und Markdown.',
+    other: 'Vault-Ordner für den Export. {count} Zeilen ({range}) plus {cats} Kategorien, als CSV und Markdown.',
+  },
+  'tx.export.failed': 'Der Export konnte nicht geschrieben werden — prüfe den Ordnernamen',
+  'tx.export.done': {
+    one: '{count} Zeile und {cats} Kategorien nach {path}/ exportiert',
+    other: '{count} Zeilen und {cats} Kategorien nach {path}/ exportiert',
+  },
+
 };
