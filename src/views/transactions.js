@@ -77,23 +77,42 @@ module.exports = function registerTransactions(ctx) {
     };
   }
 
+  /* Rebuild these on CONTENT, not option count. Comparing counts meant a
+     rename on another device (one label out, one in) left the select showing
+     a name that no longer matches anything — the table then reads "0 rows"
+     with no explanation and no way back short of reopening the view.
+     The previous selection is re-applied, and falls back to "all" if the
+     value it pointed at is gone.
+
+     The skip-check has to look at the FIXED labels as well as the dynamic
+     values, and that is not a refinement — it is the whole reason a language
+     change used to leave this select behind. "All accounts" / "All categories"
+     / "Uncategorised" are the only translated options here; the rest are
+     account and category names, which a language switch does not touch. So
+     comparing values alone made the guard hold on exactly the render that
+     needed to run, and the filters kept the old language until something
+     unrelated renamed a category. Every other page looked translated, which is
+     what made it read as "some pages don't switch" rather than as a stale
+     select.
+
+     Published on ctx so a test can drive the REAL function — same reason
+     accounts.js publishes accountReconcile. Nothing else on ctx calls it. */
+  function syncOptions(sel, values, fixed) {
+    const opts = [...sel.options];
+    const current = opts.slice(fixed.length).map(o => o.value);
+    const labels = opts.slice(0, fixed.length).map(o => o.textContent);
+    const sameValues = current.length === values.length && current.every((v, i) => v === values[i]);
+    const sameLabels = labels.length === fixed.length && fixed.every(([, l], i) => labels[i] === l);
+    if (sameValues && sameLabels) return;
+    const keep = sel.value;
+    sel.empty();
+    for (const [value, label] of fixed) sel.append(el('option', { value }, label));
+    for (const v of values) sel.append(el('option', { value: v }, v));
+    sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
+  }
+
   function renderTransactions() {
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
-    /* Rebuild these on CONTENT, not option count. Comparing counts meant a
-       rename on another device (one label out, one in) left the select showing
-       a name that no longer matches anything — the table then reads "0 rows"
-       with no explanation and no way back short of reopening the view.
-       The previous selection is re-applied, and falls back to "all" if the
-       value it pointed at is gone. */
-    const syncOptions = (sel, values, fixed) => {
-      const current = [...sel.options].slice(fixed.length).map(o => o.value);
-      if (current.length === values.length && current.every((v, i) => v === values[i])) return;
-      const keep = sel.value;
-      sel.empty();
-      for (const [value, label] of fixed) sel.append(el('option', { value }, label));
-      for (const v of values) sel.append(el('option', { value: v }, v));
-      sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
-    };
     syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
       [['', i18n.t('tx.allAccounts')]]);
     syncOptions($('#txCategory'), S.categories.map(c => c.name),
@@ -361,5 +380,5 @@ module.exports = function registerTransactions(ctx) {
     toast(i18n.t('tx.export.done', { count: rows.length, cats: S.categories.length, path: written.split('/').slice(0, -1).join('/') }));
   }
 
-  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions });
+  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions, syncOptions });
 };

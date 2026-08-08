@@ -552,8 +552,16 @@ function mountApp(view) {
   $('#budSave').addEventListener('click', ctx.saveBudget);
   $('#budCopyPrev').addEventListener('click', ctx.copyPreviousBudget);
   $('#budAddCat').addEventListener('click', ctx.addNewCategory);
-  $('#acctAdd').addEventListener('click', ctx.addAccount);
-  $('#savAdd').addEventListener('click', ctx.addAccount);
+  /* Wrapped rather than passed by reference: addAccount now takes a defaults
+     object, and a bare listener would hand it the MouseEvent. */
+  $('#acctAdd').addEventListener('click', () => ctx.addAccount());
+  $('#savAdd').addEventListener('click', () => ctx.addAccount());
+  /* Creating an account is reachable from Transactions and from the import
+     review, not only from the two pages that list accounts — every path that
+     asks the reader to PICK one has to offer making one, or an empty vault
+     dead-ends on "add an account first" with no account page in sight.
+     `checking` because both of those screens are about bank statements. */
+  $('#txNewAccount').addEventListener('click', () => ctx.addAccount({ type: 'checking' }));
   $('#assetSave').addEventListener('click', ctx.saveAssets);
   $('#assetAdd').addEventListener('click', ctx.addAsset);
   $('#debtSave').addEventListener('click', ctx.saveDebts);

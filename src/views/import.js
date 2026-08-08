@@ -322,6 +322,23 @@ module.exports = function registerImport(ctx) {
     if (!p.label && labels.length) p.label = accSel.value;
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
 
+    /* The statement is already parsed and on screen by the time anyone notices
+       it belongs to an account this vault has never had — and on a fresh vault
+       the select above is EMPTY, so "Import rows" could only ever answer "pick
+       an account first". Make one from here and land the rows in it.
+
+       Assigned rather than addEventListener'd, matching the select above: this
+       function re-runs on every account switch and every "show more", and a
+       listener added each time would open one dialog per render. */
+    $('#impNewAccount').onclick = async () => {
+      const acct = await ctx.addAccount({ type: 'checking' });
+      if (!acct) return;                       // cancelled or rejected — leave the review alone
+      // The folder transactions live under, which is what p.label means — not
+      // the account's display name. Same resolution the select's options use.
+      p.label = acct.tx_label || acct.name;
+      renderImportReview();
+    };
+
     // Canonicalise through txSegment — the same resolver commitImport writes
     // with, and the same string dedupIndex keyed by. Probing with the raw label
     // (or with a differently-sanitised one) would miss duplicates and re-import

@@ -221,6 +221,7 @@ const SHELL_HTML = `
             <div class="row">
               <span id="txCount" class="count-note"></span>
               <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
+              <button class="btn-ghost" id="txNewAccount"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
               <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="shell.tx.add">Add transaction</span></button>
               <button class="btn-gradient" id="txSave" disabled data-i18n="shell.saveChanges">Save changes</button>
             </div>
@@ -359,7 +360,7 @@ const SHELL_HTML = `
           <div class="card-h" style="align-items:center">
             <div><h2>Goals</h2><div class="sub">Progress toward each target</div></div>
             <div class="row">
-              <button class="btn-ghost" id="savAdd"><span class="ico" data-ico="plus"></span> New account</button>
+              <button class="btn-ghost" id="savAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
             </div>
           </div>
           <div class="body-pad" id="savingsGoals"></div>
@@ -374,7 +375,7 @@ const SHELL_HTML = `
         </div>
         <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
         <div class="row mb-4" style="justify-content:flex-end">
-          <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> New account</button>
+          <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
         </div>
         <div id="acctSections"></div>
       </section>
@@ -629,6 +630,7 @@ const SHELL_HTML = `
             <div class="row">
               <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
               <select id="impAccount" class="form-select form-select-sm"></select>
+              <button class="btn-ghost" id="impNewAccount" title="Create an account for these rows to land in"><span class="ico" data-ico="plus"></span> New account</button>
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
                 <input type="checkbox" id="impRemember" checked> remember new categorisations
               </label>

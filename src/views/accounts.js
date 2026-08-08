@@ -460,12 +460,26 @@ module.exports = function registerAccounts(ctx) {
     a.fmRaw = lines.slice(1, -1).join('\n');
   }
 
-  /* Create an account file + its in-memory record. Reachable from both the
-     Accounts page and Savings & Investments. */
-  async function addAccount() {
+  /* Create an account file + its in-memory record. Reachable from the Accounts
+     page, Savings & Investments, the Transactions toolbar and the import review.
+
+     Returns the account it created, or null if the user cancelled or the form
+     failed validation. The import review needs that return value: it selects
+     the new account as the destination for the rows on screen, and inferring
+     "did one get made" from S.accounts.length would credit this call for an
+     account a sync from another device happened to land mid-dialog.
+
+     `defaults.type` preselects the kind of account, because the two callers
+     that pass it are both about bank statements, where `savings` is the wrong
+     first guess. Validated rather than trusted — the same function is wired
+     straight to click handlers elsewhere, and a MouseEvent's own `.type` is
+     the string 'click', which would silently land in the select as a type no
+     group on this page renders. */
+  async function addAccount(defaults) {
+    const preType = defaults && ACCT_TYPES.includes(defaults.type) ? defaults.type : 'savings';
     const r = await askFields(app, i18n.t('acct.new.title'), [
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
-      { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: 'savings' },
+      { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: 'e.g. Easy Equities' },
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
       { key: 'goal_amount', label: i18n.t('acct.field.goalOpt'), type: 'number',
@@ -477,21 +491,21 @@ module.exports = function registerAccounts(ctx) {
           { value: 'no', label: i18n.t('acct.counts.no') }],
         desc: i18n.t('acct.field.countsDesc') },
     ]);
-    if (!r) return;
+    if (!r) return null;
 
     // The loader takes an account's name from its FILENAME, and saveAccount
     // writes back to `Accounts/<name>.md` — so the name held in memory has to be
     // the sanitised path segment. Store anything else and the first balance edit
     // would write to a different file than the one created here.
     const name = safeSeg(r.name);
-    if (!name) return toast(i18n.t('acct.err.nameRequired'), true);
-    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) return toast(i18n.t('acct.err.exists'), true);
-    if (!ACCT_TYPES.includes(r.type)) return toast(i18n.t('acct.err.type'), true);
+    if (!name) { toast(i18n.t('acct.err.nameRequired'), true); return null; }
+    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { toast(i18n.t('acct.err.exists'), true); return null; }
+    if (!ACCT_TYPES.includes(r.type)) { toast(i18n.t('acct.err.type'), true); return null; }
 
     const balance = parseAmount(r.balance) ?? 0;
     const goal = parseAmount(r.goal_amount);
     const invested = parseAmount(r.total_invested);
-    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) return toast(i18n.t('acct.err.nan'), true);
+    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) { toast(i18n.t('acct.err.nan'), true); return null; }
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),
@@ -512,8 +526,9 @@ module.exports = function registerAccounts(ctx) {
     await ensureFolder(relPath(`Transactions/${name}`));
     S.accounts.push(acct);
     S.accounts.sort((a, b) => a.name.localeCompare(b.name));
-    ctx.render();   // not renderAccounts — Savings & Investments has this button too
+    ctx.render();   // not renderAccounts — three other pages have this button too
     toast(`Created Accounts/${name}.md`);
+    return acct;
   }
 
   // accountReconcile is published so a test can drive the REAL arithmetic — the
