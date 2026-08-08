@@ -3,6 +3,27 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.8 — 2026-08-08
+
+### Changed
+
+- **The build is now declared where it can be verified.** Obsidian's community
+  scorecard checks a release by cloning the source and rebuilding it, then
+  comparing the result to the published `main.js`. This repository had no
+  `package.json` and no lockfile — the build was a shell script calling `bun` —
+  so there was no build the check could run, and it reported the release as
+  unverifiable.
+
+  The bundle is now built by `esbuild`, pinned in `package-lock.json` and
+  declared in `package.json`, with `build.sh` reduced to a wrapper so the local
+  build and the verified build cannot drift. A clean clone rebuilds `main.js`
+  byte-identically.
+
+  `main.js` is about 7% larger than before (514KB to 549KB) because esbuild
+  minifies less aggressively than bun. Nothing about what the plugin does has
+  changed, and the syntax floor is unchanged — the bundle still targets the
+  Safari 15 engine that older iPhones run.
+
 ## 1.11.7 — 2026-08-08
 
 ### Fixed
