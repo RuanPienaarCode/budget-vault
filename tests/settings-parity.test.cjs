@@ -45,8 +45,16 @@ const imperative = src.slice(0, split);
 const declarative = src.slice(split);
 
 /* ---- 1. same setting names on both sides ---- */
+/* Matches BOTH an inline literal and a translated name:
+     .setName('Country')            -> 'Country'
+     .setName(i18n.t('settings.language.name')) -> 'settings.language.name'
+   Without the optional `i18n.t(` the translated settings would match on
+   NEITHER side — absent from both, therefore "consistent", and this check would
+   go quietly blind exactly as the tab gets translated. Comparing the key is as
+   good as comparing the English: the two halves must name the same key, and
+   tests/i18n.test.cjs separately pins that the key exists. */
 const names = text => new Set(
-  [...text.matchAll(/(?:\.setName\(|\bname:\s*)'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/\\'/g, "'")));
+  [...text.matchAll(/(?:\.setName\(|\bname:\s*)(?:i18n\.t\()?'((?:[^'\\]|\\.)*)'/g)].map(m => m[1].replace(/\\'/g, "'")));
 const impNames = names(imperative);
 const decNames = names(declarative);
 
@@ -61,7 +69,7 @@ const mdKeys = new Set(
   [...src.matchAll(/const MD_KEYS = new Set\(\[([^\]]*)\]\)/g)]
     .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])));
 eq([...mdKeys].sort(),
-  ['country', 'currency', 'household', 'month_start_day', 'period_anchor', 'period_days'],
+  ['country', 'currency', 'household', 'language', 'month_start_day', 'period_anchor', 'period_days'],
   'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');

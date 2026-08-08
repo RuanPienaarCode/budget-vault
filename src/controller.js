@@ -8,6 +8,7 @@ const { el, setIco, setInert } = require('./dom');
 const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
+const { applyDom } = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const registerIo = require('./io');
@@ -43,6 +44,12 @@ function mountApp(view) {
   root.empty();
   const parsed = new DOMParser().parseFromString(SHELL_HTML, 'text/html');
   while (parsed.body.firstChild) root.appendChild(parsed.body.firstChild);
+  /* The shell ships its English text inline and carries data-i18n attributes
+     beside it, so this pass is a no-op in English and the markup stays readable
+     as markup. Runs BEFORE the icon pass purely so a data-i18n element can
+     never be handed an already-resolved icon to overwrite — no element carries
+     both today, and this keeps that cheap to maintain. */
+  applyDom(root);
   root.querySelectorAll('span[data-ico]').forEach(sp => setIco(sp, sp.getAttribute('data-ico').split('|')));
 
   const $ = s => root.querySelector(s);
@@ -51,7 +58,7 @@ function mountApp(view) {
   /* ------------------------------- state -------------------------------- */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', period_days: 0, period_anchor: '' },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '' },
     categories: [],            // {name, type, color}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
@@ -606,6 +613,28 @@ function mountApp(view) {
       await connectVault();
     },
     applyTheme,
+    /* The shell is translated ONCE, at mount, by the applyDom() call up in
+       mountApp. Changing the language therefore did nothing to a view that was
+       already open: the setting was written, the live language moved, the data
+       reloaded — and the drawer, top bar and page titles went on showing
+       whatever language they were mounted in, until the view was closed and
+       reopened. Which reads, entirely reasonably, as "I changed it and nothing
+       happened".
+
+       Re-running applyDom over the mounted root fixes that: every translated
+       element still carries its data-i18n attribute (the pass reads them, it
+       does not consume them), so the shell can be re-translated in place as
+       many times as the language changes. Same shape as applyTheme and
+       applyPrivacyLock above — a settings change that has to act on open views
+       immediately rather than at the next mount. */
+    /* Two halves, because the interface is built two different ways. The shell
+       is static markup translated in place by applyDom; the view bodies are
+       rebuilt from scratch by render(), which picks up the new language simply
+       by running again. render() rather than reload(): the strings do not come
+       from the vault, and reload() DECLINES when there are unsaved edits —
+       which would leave someone who changed the language mid-edit looking at
+       the old one with no idea why. */
+    applyLanguage: () => { applyDom(root); render(); },
     /* Toggling the setting acts on open views immediately: switching it off
        lifts a gate the user is currently staring at (rather than stranding
        them behind it), switching it on covers the numbers right away. */

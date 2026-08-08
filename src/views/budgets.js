@@ -8,6 +8,9 @@ const { TYPE_ORDER } = require('../constants');
 const { askBudgetReslice } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
+/* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
+   so a bare `t` from i18n would be shadowed inside renderBudgets(). */
+const i18n = require('../i18n');
 
 module.exports = function registerBudgets(ctx) {
   const { S, $, app, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory } = ctx;
@@ -36,20 +39,16 @@ module.exports = function registerBudgets(ctx) {
     box.classList.remove('hidden');
     const newest = others[others.length - 1];
     const n = others.length;
-    box.append(el('div', { class: 'bud-shape-note-t' }, 'Your other budgets are still here'));
-    box.append(el('p', {},
-      `${n} budget ${n === 1 ? 'file is' : 'files are'} saved under a different period length — ` +
-      `the most recent is Budgets/${newest}.md. They stay in your vault, and they come back ` +
-      `as soon as you set the period length back. Amounts start blank here because this period ` +
-      `isn't the same length as those were.`));
+    box.append(el('div', { class: 'bud-shape-note-t' }, i18n.t('bud.shape.title')));
+    box.append(el('p', {}, i18n.t('bud.shape.body', { count: n, newest })));
     box.append(el('button', {
       class: 'btn btn-ghost', type: 'button',
       onclick: () => bringOverFrom(newest),
-    }, `Bring over the categories and notes from ${newest}`));
+    }, i18n.t('bud.shape.bring', { newest })));
     box.append(el('button', {
       class: 'btn btn-ghost', type: 'button',
       onclick: () => resliceFrom(newest),
-    }, 'Bring the amounts across too…'));
+    }, i18n.t('bud.shape.bringAmounts')));
   }
 
   /* How many days the CURRENT period runs — the denominator's partner in the
@@ -84,7 +83,7 @@ module.exports = function registerBudgets(ctx) {
      navigating away, like any other unsaved edit. */
   async function resliceFrom(key) {
     const src = S.budgets[key] || [];
-    if (!src.length) return toast('That budget is empty', true);
+    if (!src.length) return toast(i18n.t('bud.shape.empty'), true);
     const draft = budgetDraft();
     const existingByCategory = {};
     for (const d of draft) if (d.amount) existingByCategory[d.category] = d.amount;
@@ -113,7 +112,7 @@ module.exports = function registerBudgets(ctx) {
     budDirty = true;
     $('#budSave').disabled = false;
     renderBudgets();
-    toast(`Brought ${accepted.length} ${accepted.length === 1 ? 'amount' : 'amounts'} across — check them, then save`);
+    toast(i18n.t('bud.shape.broughtAmounts', { count: accepted.length }));
   }
   /* Carries structure, never amounts — kept pure and separate from the button
      so the promise in that last clause is actually testable. Halving a monthly
@@ -138,13 +137,13 @@ module.exports = function registerBudgets(ctx) {
   }
   function bringOverFrom(key) {
     const src = S.budgets[key] || [];
-    if (!src.length) return toast('That budget is empty', true);
+    if (!src.length) return toast(i18n.t('bud.shape.empty'), true);
     const brought = carryStructure(src, budgetDraft());
     if (brought) { budDirty = true; $('#budSave').disabled = false; }
     renderBudgets();
     toast(brought
-      ? `Brought over ${brought} ${brought === 1 ? 'category' : 'categories'} — set the amounts for this period`
-      : 'Every category from that budget is already here');
+      ? i18n.t('bud.shape.brought', { count: brought })
+      : i18n.t('bud.shape.allHere'));
   }
 
   let budDraft = null, budDraftPeriod = null;
@@ -201,13 +200,16 @@ module.exports = function registerBudgets(ctx) {
        which is the one figure here that deserves red. */
     const unallocated = income - budgeted;
     return [
-      { label: 'Total income', value: money(income), grad: true, note: `${money(sum.income)} received so far` },
-      { label: 'Total budgeted', value: money(budgeted), note: allocPct !== null ? `${allocPct}% of budgeted income` : '' },
-      { label: unallocated < 0 ? 'Over-budgeted' : 'Left to budget', value: money(Math.abs(unallocated)),
+      { label: i18n.t('bud.total.income'), value: money(income), grad: true,
+        note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },
+      { label: i18n.t('bud.total.budgeted'), value: money(budgeted),
+        note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
+      { label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
         over: unallocated < 0,
-        note: unallocated < 0 ? 'budgeted beyond income' : (income > 0 ? 'income not yet allocated' : '') },
-      { label: 'Total spent', value: money(sum.spend), over: budgeted > 0 && sum.spend > budgeted,
-        note: usedPct !== null ? `${usedPct}% of budget used` : '' },
+        note: unallocated < 0 ? i18n.t('bud.total.overNote')
+          : (income > 0 ? i18n.t('bud.total.leftNote') : '') },
+      { label: i18n.t('bud.total.spent'), value: money(sum.spend), over: budgeted > 0 && sum.spend > budgeted,
+        note: usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '' },
     ];
   }
 
@@ -235,8 +237,8 @@ module.exports = function registerBudgets(ctx) {
     const sum = periodSummary(S.period);
     const t = $('#budTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Type'),
-      el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col', class: 'num' }, 'Actual so far'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
+      el('th', { scope: 'col' }, i18n.t('bud.col.category')), el('th', { scope: 'col' }, i18n.t('bud.col.type')),
+      el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.amount')), el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.actual')), el('th', { scope: 'col' }, i18n.t('bud.col.notes')), el('th', { scope: 'col' }, ''))));
     const body = el('tbody', {});
     const mark = () => { budDirty = true; $('#budSave').disabled = false; };
     const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
@@ -253,7 +255,9 @@ module.exports = function registerBudgets(ctx) {
         if (!d.amount) { remainingEl.textContent = ''; remainingEl.className = 'bud-remaining'; return; }
         const rem = d.amount - actual;
         const over = rem < 0 && d.type !== 'income';
-        remainingEl.textContent = over ? `${money(-rem)} over` : `${money(rem)} left`;
+        remainingEl.textContent = over
+          ? i18n.t('bud.remaining.over', { amount: money(-rem) })
+          : i18n.t('bud.remaining.left', { amount: money(rem) });
         remainingEl.className = 'bud-remaining' + (over ? ' over' : '');
       };
       updateRemaining();
@@ -262,16 +266,16 @@ module.exports = function registerBudgets(ctx) {
         el('td', {}, typeBadge(d.type)),
         el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
           el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
-            'aria-label': `Budget amount for ${d.category}`, onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); renderBudgetTotals(); } }),
+            'aria-label': i18n.t('bud.aria.amount', { category: d.category }), onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); renderBudgetTotals(); } }),
           remainingEl)),
         el('td', { class: `num${overActual ? ' text-danger' : ' text-muted'}`, style: 'white-space:nowrap' }, money(actual)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
-          'aria-label': `Notes for ${d.category}`, onchange: e => { d.notes = e.target.value; mark(); } })),
+          'aria-label': i18n.t('bud.aria.notes', { category: d.category }), onchange: e => { d.notes = e.target.value; mark(); } })),
         el('td', { style: 'white-space:nowrap' },
           d.inFile
-            ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Clear budget for ${d.category}`, title: 'Clear this category from the period file', onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
+            ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
             : '',
-          el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Delete category ${d.category}`, title: 'Delete this category everywhere', onclick: async () => {
+          el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
             if (await promptDeleteCategory(d.category)) {
               const draft = budgetDraft();
               const i = draft.indexOf(d);
@@ -321,12 +325,12 @@ module.exports = function registerBudgets(ctx) {
     await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
     budDirty = false;
     $('#budSave').disabled = true;
-    toast(`Budget saved to Budgets/${S.period}.md`);
+    toast(i18n.t('bud.saved', { period: S.period }));
   }
 
   function copyPreviousBudget() {
     const prev = S.budgets[shiftPeriod(S.period, -1)];
-    if (!prev || !prev.length) return toast('No budget found for the previous period', true);
+    if (!prev || !prev.length) return toast(i18n.t('bud.copy.none'), true);
     const draft = budgetDraft();
     let copied = 0;
     for (const r of prev) {
@@ -341,7 +345,7 @@ module.exports = function registerBudgets(ctx) {
     }
     if (copied) $('#budSave').disabled = false;
     renderBudgets();
-    toast(copied ? `Copied ${copied} categories from the previous period` : 'Nothing to copy — every category already has a value');
+    toast(copied ? i18n.t('bud.copy.done', { count: copied }) : i18n.t('bud.copy.nothing'));
   }
 
   async function addNewCategory() {

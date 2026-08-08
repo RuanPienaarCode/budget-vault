@@ -7,6 +7,11 @@
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
+/* Namespace import for the same reason settings-tab.js uses one: this file
+   binds `t` as a parameter in several `.addText(t => …)` callbacks, so a bare
+   `t` from i18n would be silently shadowed inside exactly those callbacks. */
+const i18n = require('./i18n');
+const { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
 const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
@@ -38,49 +43,27 @@ const STARTER_CATEGORIES = [
   { name: 'Transfer between accounts', type: 'transfer', color: '#888888' },
 ];
 
-const ACCOUNT_TYPES = [
-  ['checking', 'Cheque / current account'],
-  ['savings', 'Savings account'],
-  ['credit_card', 'Credit card'],
-  ['cash', 'Cash'],
-  ['investment', 'Investment'],
-];
+/* The stored VALUE is the key on the left; only the label is translated, so a
+   vault written in one language reads back identically in another. Resolved on
+   call rather than at module load — the language can change mid-wizard. */
+const ACCOUNT_TYPE_KEYS = ['checking', 'savings', 'credit_card', 'cash', 'investment'];
+const accountTypes = () => ACCOUNT_TYPE_KEYS.map(k => [k, i18n.t('acctType.' + k)]);
 
-const CURRENCIES = [
-  ['R', 'R — South African Rand'],
-  ['$', '$ — Dollar'],
-  ['€', '€ — Euro'],
-  ['£', '£ — Pound'],
-  ['__custom__', 'Other…'],
-];
+/* The stored VALUE is the symbol; only the currency's NAME is translated, so a
+   vault written in one language reads back identically in another. Resolved on
+   call, like accountTypes() — the language can change mid-wizard. */
+const CURRENCY_KEYS = [['R', 'rand'], ['$', 'dollar'], ['\u20ac', 'euro'], ['\u00a3', 'pound'], ['__custom__', 'other']];
+const currencies = () => CURRENCY_KEYS.map(([sym, k]) => [sym, i18n.t('wiz.ccy.' + k)]);
 
 /* Plain-English headings for the category step. The starter pack is grouped
    under these rather than listed flat with a type tag per row: twenty ticked
    checkboxes in one run is a wall, and the type is the thing that tells a new
    user why "Savings" and "Groceries" are not the same kind of line. */
-const TYPE_LABELS = {
-  income: 'Income', expense: 'Everyday expenses', debt: 'Debt repayments',
-  services: 'Services & subscriptions', insurance: 'Insurance', giving: 'Giving',
-  savings: 'Savings', investment: 'Investments', luxuries: 'Nice-to-haves',
-  transfer: 'Transfers',
-};
+const typeLabel = type => i18n.t('wiz.type.' + type);
 
 /* Every step past the welcome screen gets a name. "Step 3 of 7" on its own
    tells the user how far they are but not what they are being asked. */
-const STEP_TITLES = {
-  folder: 'Where your budget lives',
-  name: 'What should we call you?',
-  country: 'Country & currency',
-  period: 'Your budget period',
-  categories: 'Your budget categories',
-  account: 'Your first account',
-  finish: 'Ready to go',
-};
-
-const ordinal = n => {
-  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
+const stepTitle = step => i18n.t('wiz.step.' + step);
 /* "2026-08" -> "Aug 2026", for the worked examples on the period step. */
 const monthLabel = period => {
   const [y, m] = period.split('-');
@@ -118,6 +101,12 @@ class OnboardingWizard extends Modal {
       folder: plugin.settings.budgetFolder || 'Finances/Budget',
       name: '',
       country: 'za',
+      /* Interface language — an axis of its own, NOT derived from country (see
+         the header of i18n.js). Starts from Obsidian's own display language
+         rather than from `country`, so a German-speaking user in South Africa
+         gets a German interface and South African tax handling, and neither
+         choice drags the other with it. */
+      language: i18n.defaultLanguage(),
       /* Shape and phase, exactly as Settings.md stores them — NOT a three-way
          "calendar | payday | cycle" mode. A calendar month is not a third kind
          of period; it is a payday month whose start day happens to be the 1st,
@@ -145,7 +134,13 @@ class OnboardingWizard extends Modal {
   }
 
   onOpen() {
-    this.titleEl.setText('Set up Budget Vault');
+    /* Apply the language BEFORE the first render. On a first run nothing has
+       read Settings.md yet (there is none), so without this the wizard would
+       draw itself in whatever language was last set — while its own picker
+       showed the user's actual language selected. Cheap, and it keeps the
+       picker and the text it governs from ever disagreeing. */
+    setLanguage(this.data.language);
+    this.titleEl.setText(i18n.t('wiz.title'));
     this.renderStep();
   }
   onClose() {
@@ -157,7 +152,7 @@ class OnboardingWizard extends Modal {
     // leave `onboarded` alone and ask again next launch. Past the welcome
     // screen it IS a choice: take it, and say where the wizard lives.
     if (this.stepIdx === 0) return;
-    new Notice('Setup skipped — you can run it again from Settings → Budget Vault → Run setup wizard, or the command palette.', 8000);
+    new Notice(i18n.t('wiz.skipped'), 8000);
     this.plugin.settings.onboarded = true;
     this.plugin.saveSettings();
   }
@@ -174,8 +169,8 @@ class OnboardingWizard extends Modal {
     const step = steps[this.stepIdx];
     // The welcome screen isn't a "step" in the user's mind — no counter there.
     if (step !== 'welcome') {
-      c.createDiv({ cls: 'budget-onb-step', text: `Step ${this.stepIdx} of ${steps.length - 1}` });
-      c.createEl('h3', { cls: 'budget-onb-title', text: STEP_TITLES[step] });
+      c.createDiv({ cls: 'budget-onb-step', text: i18n.t('wiz.stepOf', { n: this.stepIdx, total: steps.length - 1 }) });
+      c.createEl('h3', { cls: 'budget-onb-title', text: stepTitle(step) });
     }
     this['render_' + step](c);
     if (err) c.createDiv({ cls: 'budget-onb-error', text: err });
@@ -185,11 +180,11 @@ class OnboardingWizard extends Modal {
     // Cancel first so the CSS can push it to the far left: wedged between Back
     // and Next it is a mis-tap away from leaving the wizard, on a phone, with
     // both hands busy.
-    nav.addButton(b => b.setButtonText('Cancel').onClick(() => this.close()));
-    if (this.stepIdx > 0) nav.addButton(b => b.setButtonText('Back').onClick(() => { this.stepIdx--; this.renderStep(); }));
+    nav.addButton(b => b.setButtonText(i18n.t('wiz.cancel')).onClick(() => this.close()));
+    if (this.stepIdx > 0) nav.addButton(b => b.setButtonText(i18n.t('wiz.back')).onClick(() => { this.stepIdx--; this.renderStep(); }));
     nav.addButton(b => b
-      .setButtonText(step === 'finish' ? (this.mode === 'connect' ? 'Connect budget' : 'Create my budget')
-        : step === 'welcome' ? 'Let\'s go!' : 'Next')
+      .setButtonText(step === 'finish' ? i18n.t(this.mode === 'connect' ? 'wiz.connectBtn' : 'wiz.createBtn')
+        : step === 'welcome' ? i18n.t('wiz.letsGo') : i18n.t('wiz.next'))
       .setCta()
       .onClick(() => this.next()));
   }
@@ -203,7 +198,7 @@ class OnboardingWizard extends Modal {
     const step = this.steps()[this.stepIdx];
     if (step === 'folder') {
       const folder = normalizePath((this.data.folder || '').trim());
-      if (!folder || folder === '/') { this.fail('Enter a folder path for the budget — for example Finances/Budget.'); return; }
+      if (!folder || folder === '/') { this.fail(i18n.t('wiz.err.folder')); return; }
       this.data.folder = folder;
       const wasConnect = this.mode === 'connect';
       this.mode = this.detectExisting(folder) ? 'connect' : 'create';
@@ -213,17 +208,17 @@ class OnboardingWizard extends Modal {
       if (!periodDaysOrZero(this.data.periodDays)) {
         const d = Number(this.data.payday);
         if (!Number.isInteger(d) || d < 1 || d > 28) {
-          this.fail('The month start day must be from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.'); return;
+          this.fail(i18n.t('wiz.err.monthStart')); return;
         }
       } else if (!isRealIsoDate(this.data.periodAnchor)) {
         // An interval with no anchor has nothing to count from — the loader
         // drops both keys and quietly hands back monthly periods, which is a
         // confusing thing to discover after finishing a wizard that asked.
-        this.fail('Enter the date you were last paid — every pay cycle is counted from it, so without it the budget falls back to monthly periods.'); return;
+        this.fail(i18n.t('wiz.err.anchor')); return;
       }
     }
     if (step === 'country' && this.data.currency === '__custom__' && !this.data.customCurrency.trim()) {
-      this.fail('Enter a currency symbol, or pick one from the list above.'); return;
+      this.fail(i18n.t('wiz.err.currency')); return;
     }
     if (step === 'finish') { await this.apply(); return; }
     this.stepIdx++;
@@ -255,8 +250,15 @@ class OnboardingWizard extends Modal {
     if (fm.country && PROFILES[fm.country.toString().trim().toLowerCase()]) {
       this.data.country = fm.country.toString().trim().toLowerCase();
     }
+    // Absent stays as the Obsidian-derived default rather than snapping to
+    // English: a vault predating this setting has no opinion, and Obsidian's
+    // own language is the better guess than the fallback. Applied as well as
+    // stored — this runs when an existing budget is adopted, and the rest of
+    // the wizard should immediately be in that vault's language.
+    if (fm.language) this.data.language = i18n.resolveLanguage(fm.language);
+    setLanguage(this.data.language);
     if (fm.currency) {
-      if (CURRENCIES.some(([v]) => v === fm.currency)) this.data.currency = fm.currency;
+      if (CURRENCY_KEYS.some(([v]) => v === fm.currency)) this.data.currency = fm.currency;
       else { this.data.currency = '__custom__'; this.data.customCurrency = fm.currency; }
     }
     if (fm.household) this.data.name = fm.household;
@@ -264,32 +266,32 @@ class OnboardingWizard extends Modal {
 
   /* -------------------------------- steps -------------------------------- */
   render_welcome(c) {
-    c.createEl('h2', { text: 'Welcome to Budget Vault!' });
-    c.createEl('p', { text: 'Your whole budget, living right here in your vault as plain markdown — no accounts, no cloud, no one else\'s server. If your vault syncs to your phone, your budget rides along for free.' });
+    c.createEl('h2', { text: i18n.t('wiz.welcome.title') });
+    c.createEl('p', { text: i18n.t('wiz.welcome.intro') });
     const intro = c.createEl('p');
-    intro.createEl('b', { text: 'Here\'s the plan — this wizard sets you up:' });
+    intro.createEl('b', { text: i18n.t('wiz.welcome.planLead') });
     const setup = c.createEl('ol', { cls: 'budget-onb-journey' });
     for (const t of [
-      'Choose your budget folder — we scaffold the whole structure for you',
-      'Pick your country & currency — so amounts, dates and tax stuff look right',
-      'Tell us when you get paid — your budget periods run from payday, if you like',
-      'Choose your budget categories — tick the ones that fit your life',
-      'Add your first account — and what\'s in it right now',
+      i18n.t('wiz.welcome.plan1'),
+      i18n.t('wiz.welcome.plan2'),
+      i18n.t('wiz.welcome.plan3'),
+      i18n.t('wiz.welcome.plan4'),
+      i18n.t('wiz.welcome.plan5'),
     ]) setup.createEl('li', { text: t });
     const then = c.createEl('p');
-    then.createEl('b', { text: 'Then the fun starts in the app:' });
+    then.createEl('b', { text: i18n.t('wiz.welcome.thenLead') });
     const inApp = c.createEl('ol', { cls: 'budget-onb-journey' });
     for (const t of [
-      'Set your budget — give every category a number to aim for',
-      'Import your bank\'s CSV — transactions sort themselves as you teach it',
-      'Add new categories anytime — your budget grows with you',
-      'Review as you go — the dashboard shows exactly where the money went',
+      i18n.t('wiz.welcome.app1'),
+      i18n.t('wiz.welcome.app2'),
+      i18n.t('wiz.welcome.app3'),
+      i18n.t('wiz.welcome.app4'),
     ]) inApp.createEl('li', { text: t });
-    c.createEl('p', { text: 'About two minutes of setup. You can change any of it later. Ready?' });
+    c.createEl('p', { text: i18n.t('wiz.welcome.close') });
   }
 
   render_folder(c) {
-    c.createEl('p', { text: 'Everything lives as plain markdown files inside one folder of your vault.' });
+    c.createEl('p', { text: i18n.t('wiz.folder.hint') });
     /* Built before the field so the field's onChange can paint it, appended
        after so it reads underneath. Live feedback matters here: this is the
        first thing a new user types, by hand, often on a phone, and a typo
@@ -299,15 +301,15 @@ class OnboardingWizard extends Modal {
     hint.className = 'budget-onb-hint';
     const paint = () => {
       const raw = (this.data.folder || '').trim();
-      if (!raw || raw === '/') { hint.textContent = 'Enter a folder path — for example Finances/Budget.'; return; }
+      if (!raw || raw === '/') { hint.textContent = i18n.t('wiz.folder.blank'); return; }
       const f = normalizePath(raw);
-      if (this.detectExisting(f)) hint.textContent = `Found an existing budget in "${f}" — the wizard will connect to it rather than create new files.`;
-      else if (this.app.vault.getFolderByPath(f)) hint.textContent = `"${f}" already exists — the budget files will be added inside it.`;
-      else hint.textContent = `"${f}" doesn't exist yet — it will be created for you.`;
+      if (this.detectExisting(f)) hint.textContent = i18n.t('wiz.folder.found', { folder: f });
+      else if (this.app.vault.getFolderByPath(f)) hint.textContent = i18n.t('wiz.folder.exists', { folder: f });
+      else hint.textContent = i18n.t('wiz.folder.willCreate', { folder: f });
     };
     new Setting(c)
-      .setName('Budget folder')
-      .setDesc('Where the categories, accounts, budgets and transactions are kept.')
+      .setName(i18n.t('wiz.folder.name'))
+      .setDesc(i18n.t('wiz.folder.desc'))
       .addText(t => t
         .setPlaceholder('Finances/Budget')
         .setValue(this.data.folder)
@@ -320,31 +322,51 @@ class OnboardingWizard extends Modal {
     if (this.mode === 'connect') {
       c.createDiv({
         cls: 'budget-onb-callout',
-        text: `Found an existing budget in "${this.data.folder}" — connecting to it instead of creating new files. Your categories, accounts and transactions are left exactly as they are; the remaining steps only confirm the settings kept in its Settings.md.`,
+        text: i18n.t('wiz.folder.connected', { folder: this.data.folder }),
       });
     }
     new Setting(c)
-      .setName('Your name or nickname')
-      .setDesc('Shown in the dashboard greeting and the top bar. Leave blank to skip.')
+      .setName(i18n.t('wiz.name.name'))
+      .setDesc(i18n.t('wiz.name.desc'))
       .addText(t => t
-        .setPlaceholder('e.g. Alex, or The Smiths')
+        .setPlaceholder(i18n.t('wiz.name.placeholder'))
         .setValue(this.data.name)
         .onChange(v => { this.data.name = v; }));
   }
 
   /* Country and currency together: the country picks the currency, so splitting
      them meant the wizard asked the same question twice in a row and the second
-     screen had to apologise for the first. */
+     screen had to apologise for the first.
+
+     Language sits FIRST on the same screen, because it governs everything the
+     wizard says after it — but it is not a fourth thing the country decides.
+     Country and language are separate axes on purpose, which is why changing
+     the dropdown below leaves this one alone. */
   render_country(c) {
     new Setting(c)
-      .setName('Country')
-      .setDesc('Sets amount formatting, the date order used when reading bank statements, and the Tax view\'s return checklist for your country\'s tax authority.')
+      .setName(i18n.t('settings.language.name'))
+      .setDesc(i18n.t('wiz.language.desc'))
+      .addDropdown(d => {
+        for (const id of LANGUAGE_ORDER) d.addOption(id, LANGUAGE_NAMES[id]);
+        d.setValue(i18n.resolveLanguage(this.data.language));
+        d.onChange(v => {
+          this.data.language = v;
+          // Apply immediately so the rest of the wizard — and the summary on
+          // the final step — is already in the chosen language, rather than
+          // only taking effect once the budget is created.
+          setLanguage(v);
+          this.renderStep();
+        });
+      });
+    new Setting(c)
+      .setName(i18n.t('settings.country.name'))
+      .setDesc(i18n.t('wiz.country.desc'))
       .addDropdown(d => {
         for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
         d.setValue(this.data.country);
         d.onChange(v => {
           this.data.country = v;
-          this.data.currency = CURRENCIES.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : '__custom__';
+          this.data.currency = CURRENCY_KEYS.some(([cv]) => cv === PROFILES[v].currency) ? PROFILES[v].currency : '__custom__';
           if (this.data.currency === '__custom__') this.data.customCurrency = PROFILES[v].currency;
           // Re-render so the currency control below actually shows the country's
           // currency. Without this the two controls silently disagree, and the
@@ -353,18 +375,18 @@ class OnboardingWizard extends Modal {
         });
       });
     new Setting(c)
-      .setName('Currency symbol')
-      .setDesc('Shown before every amount. Starts from your country — change it if you budget in something else.')
+      .setName(i18n.t('settings.currency.name'))
+      .setDesc(i18n.t('wiz.currency.desc'))
       .addDropdown(d => {
-        for (const [v, label] of CURRENCIES) d.addOption(v, label);
+        for (const [v, label] of currencies()) d.addOption(v, label);
         d.setValue(this.data.currency);
         d.onChange(v => { this.data.currency = v; this.renderStep(); });
       });
     if (this.data.currency === '__custom__') {
       new Setting(c)
-        .setName('Custom symbol')
+        .setName(i18n.t('wiz.currency.custom'))
         .addText(t => t
-          .setPlaceholder('e.g. CHF')
+          .setPlaceholder(i18n.t('wiz.currency.customPlaceholder'))
           .setValue(this.data.customCurrency)
           .onChange(v => { this.data.customCurrency = v; }));
     }
@@ -378,8 +400,8 @@ class OnboardingWizard extends Modal {
   render_period(c) {
     const days = periodDaysOrZero(this.data.periodDays);
     new Setting(c)
-      .setName('How often are you paid?')
-      .setDesc('Monthly periods are named by month and start on the day you choose below. The others line up with a pay cycle instead, counted from your last payday.')
+      .setName(i18n.t('wiz.period.howOften'))
+      .setDesc(i18n.t('wiz.period.howOftenDesc'))
       .addDropdown(d => {
         // periodLengthOptions, not PERIOD_PRESETS: re-running the wizard over a
         // vault whose Settings.md was hand-set to, say, 10 days must SHOW that
@@ -399,16 +421,20 @@ class OnboardingWizard extends Modal {
       const paint = () => {
         const d = parseInt(this.data.payday, 10);
         if (!(d >= 1 && d <= 28)) {
-          hint.textContent = 'Pick a day from 1 to 28. Not every month has a 29th, 30th or 31st, so if you are paid on the last day of the month, use 28.';
+          hint.textContent = i18n.t('wiz.period.badDay');
           return;
         }
+        /* Day numbers go through i18n.day(), never a bare English "25th" —
+           German wants "25.", Japanese "25日", Spanish a plain "25". */
         hint.textContent = d === 1
-          ? `An ordinary calendar month: each period runs from the 1st to the end of the month, and is named after that month. Right now you are in ${monthLabel(currentPeriodFor(1))}.`
-          : `Each period runs from the ${ordinal(d)} to the ${ordinal(d - 1)} of the next month, and is named after the month it ends in. Right now you are in ${monthLabel(currentPeriodFor(d))}.`;
+          ? i18n.t('wiz.period.calendarEg', { first: i18n.day(1), month: monthLabel(currentPeriodFor(1)) })
+          : i18n.t('wiz.period.paydayEg', {
+            start: i18n.day(d), end: i18n.day(d - 1), month: monthLabel(currentPeriodFor(d)),
+          });
       };
       new Setting(c)
-        .setName('Which day does your budget month start?')
-        .setDesc('Usually your payday. Choose 1 for an ordinary calendar month. (1–28)')
+        .setName(i18n.t('wiz.period.startDay'))
+        .setDesc(i18n.t('wiz.period.startDayDesc'))
         .addText(t => {
           t.inputEl.type = 'number';
           t.inputEl.min = '1';
@@ -426,10 +452,10 @@ class OnboardingWizard extends Modal {
       hint.className = 'budget-onb-hint';
       const paint = () => {
         if (!isRealIsoDate(this.data.periodAnchor)) {
-          hint.textContent = 'Enter the date you were last paid and the periods are worked out from there.';
+          hint.textContent = i18n.t('wiz.period.anchorBlank');
           return;
         }
-        hint.textContent = `Counting from there, the period you are in right now started on ${currentPeriodForCycle(days, this.data.periodAnchor)}. Budget files are named by that start date.`;
+        hint.textContent = i18n.t('wiz.period.anchorEg', { date: currentPeriodForCycle(days, this.data.periodAnchor) });
       };
       /* Deliberately blank rather than pre-filled with today or the most recent
          Friday. Nobody re-examines a date the app already filled in, so a
@@ -438,8 +464,8 @@ class OnboardingWizard extends Modal {
          The wizard also runs before any transactions exist, so there is no
          history to infer a real payday from. */
       new Setting(c)
-        .setName('When were you last paid?')
-        .setDesc('Any recent payday will do — only where it falls within the cycle matters, so an earlier or later one gives the same periods.')
+        .setName(i18n.t('wiz.period.anchorName'))
+        .setDesc(i18n.t('wiz.period.anchorDesc'))
         .addText(t => {
           t.inputEl.type = 'date';
           t.setValue(this.data.periodAnchor);
@@ -451,12 +477,14 @@ class OnboardingWizard extends Modal {
   }
 
   render_categories(c) {
-    c.createEl('p', { text: 'Start with a set of budget categories — untick any you don\'t want. You can add, rename or recolour them later, so nothing here is final.' });
+    c.createEl('p', { text: i18n.t('wiz.cats.intro') });
 
     const boxes = [];
     const bar = c.createDiv({ cls: 'budget-onb-catbar' });
     const count = bar.createEl('span', { cls: 'budget-onb-catcount' });
-    const paintCount = () => { count.textContent = `${this.data.cats.size} of ${STARTER_CATEGORIES.length} selected`; };
+    const paintCount = () => {
+      count.textContent = i18n.t('wiz.cats.selected', { count: this.data.cats.size, total: STARTER_CATEGORIES.length });
+    };
     const setAll = on => {
       for (const { cb, cat } of boxes) {
         cb.checked = on;
@@ -464,9 +492,9 @@ class OnboardingWizard extends Modal {
       }
       paintCount();
     };
-    bar.createEl('button', { text: 'Select all', cls: 'budget-onb-catbtn', attr: { type: 'button' } })
+    bar.createEl('button', { text: i18n.t('wiz.cats.selectAll'), cls: 'budget-onb-catbtn', attr: { type: 'button' } })
       .addEventListener('click', () => setAll(true));
-    bar.createEl('button', { text: 'Select none', cls: 'budget-onb-catbtn', attr: { type: 'button' } })
+    bar.createEl('button', { text: i18n.t('wiz.cats.selectNone'), cls: 'budget-onb-catbtn', attr: { type: 'button' } })
       .addEventListener('click', () => setAll(false));
 
     // Grouped by type, in the app's own type order. The colour swatch is the
@@ -474,7 +502,7 @@ class OnboardingWizard extends Modal {
     for (const type of TYPE_ORDER) {
       const inType = STARTER_CATEGORIES.filter(x => x.type === type);
       if (!inType.length) continue;
-      c.createDiv({ cls: 'budget-onb-cat-group', text: TYPE_LABELS[type] || type });
+      c.createDiv({ cls: 'budget-onb-cat-group', text: typeLabel(type) });
       const grid = c.createDiv({ cls: 'budget-onb-cats' });
       for (const cat of inType) {
         const label = grid.createEl('label');
@@ -493,17 +521,17 @@ class OnboardingWizard extends Modal {
   }
 
   render_account(c) {
-    c.createEl('p', { text: 'Transactions are stored per account. Add your main account now, or leave the name blank to skip — you can add accounts any time.' });
+    c.createEl('p', { text: i18n.t('wiz.acct.intro') });
     new Setting(c)
-      .setName('Account name')
+      .setName(i18n.t('wiz.acct.name'))
       .addText(t => t
-        .setPlaceholder('e.g. Cheque account')
+        .setPlaceholder(i18n.t('wiz.acct.namePlaceholder'))
         .setValue(this.data.acctName)
         .onChange(v => { this.data.acctName = v; }));
     new Setting(c)
-      .setName('Type')
+      .setName(i18n.t('wiz.acct.type'))
       .addDropdown(d => {
-        for (const [v, label] of ACCOUNT_TYPES) d.addOption(v, label);
+        for (const [v, label] of accountTypes()) d.addOption(v, label);
         d.setValue(this.data.acctType);
         d.onChange(v => { this.data.acctType = v; });
       });
@@ -514,8 +542,8 @@ class OnboardingWizard extends Modal {
         .setValue(this.data.acctInstitution)
         .onChange(v => { this.data.acctInstitution = v; }));
     new Setting(c)
-      .setName('Current balance')
-      .setDesc('Optional — what\'s in the account right now.')
+      .setName(i18n.t('wiz.acct.balance'))
+      .setDesc(i18n.t('wiz.acct.balanceDesc'))
       .addText(t => {
         t.inputEl.type = 'number';
         t.inputEl.step = '0.01';
@@ -523,31 +551,33 @@ class OnboardingWizard extends Modal {
           .setValue(this.data.acctBalance)
           .onChange(v => { this.data.acctBalance = v; });
       });
-    c.createDiv({ cls: 'budget-onb-hint', text: 'Use your latest statement\'s closing balance, or whatever your banking app shows. The balance is a snapshot you keep up to date yourself — importing only recent transactions never throws it off — and you can change it any time by tapping the balance on the Accounts page.' });
+    c.createDiv({ cls: 'budget-onb-hint', text: i18n.t('wiz.acct.balanceHint') });
   }
 
   render_finish(c) {
     const day = this.monthStartDay();
     const cd = this.cycleDays();
     const rows = [
-      ['Folder', this.data.folder],
-      ['Name', this.data.name.trim() || '—'],
-      ['Country', localeFor(this.data.country).label],
-      ['Budget period', cd
-        ? `${PERIOD_PRESETS[cd] || `Every ${cd} days`}, counted from ${this.data.periodAnchor}`
-        : day === 1 ? 'Monthly (calendar month)' : `Monthly, starting on the ${ordinal(day)}`],
-      ['Currency', this.currencySymbol()],
+      [i18n.t('wiz.sum.folder'), this.data.folder],
+      [i18n.t('wiz.sum.name'), this.data.name.trim() || '—'],
+      [i18n.t('wiz.sum.language'), LANGUAGE_NAMES[i18n.resolveLanguage(this.data.language)]],
+      [i18n.t('wiz.sum.country'), localeFor(this.data.country).label],
+      [i18n.t('wiz.sum.period'), cd
+        ? i18n.t('wiz.sum.cycleFrom', {
+          preset: PERIOD_PRESETS[cd] || `Every ${cd} days`, date: this.data.periodAnchor,
+        })
+        : day === 1 ? i18n.t('wiz.sum.monthlyCalendar')
+          : i18n.t('wiz.sum.monthlyOn', { day: i18n.day(day) })],
+      [i18n.t('wiz.sum.currency'), this.currencySymbol()],
     ];
     if (this.mode === 'create') {
-      rows.push(['Categories', `${this.data.cats.size} starter categories`]);
-      rows.push(['First account', this.data.acctName.trim() || '—']);
+      rows.push([i18n.t('wiz.sum.categories'), i18n.t('wiz.sum.catCount', { count: this.data.cats.size })]);
+      rows.push([i18n.t('wiz.sum.account'), this.data.acctName.trim() || '—']);
       const bal = this.openingBalance();
-      if (this.data.acctName.trim() && bal !== 0) rows.push(['Opening balance', `${this.currencySymbol()} ${bal.toFixed(2)}`]);
+      if (this.data.acctName.trim() && bal !== 0) rows.push([i18n.t('wiz.sum.opening'), `${this.currencySymbol()} ${bal.toFixed(2)}`]);
     }
     c.createEl('p', {
-      text: this.mode === 'connect'
-        ? 'Connecting to the existing budget folder and saving these settings into its Settings.md:'
-        : 'This will create the budget folder with Settings.md, your categories, the first budget file and empty Owed Money / Services files:',
+      text: i18n.t(this.mode === 'connect' ? 'wiz.finish.connectLead' : 'wiz.finish.createLead'),
     });
     const ul = c.createEl('ul');
     for (const [k, v] of rows) {
@@ -560,9 +590,9 @@ class OnboardingWizard extends Modal {
        about the privacy splash — otherwise the very first thing after finishing
        setup is an unexplained lock screen. */
     const next = c.createEl('p');
-    next.createEl('b', { text: 'What to do next: ' });
-    next.appendText('give your categories an amount on the Budgets page, then import your bank\'s CSV on the Transactions page.');
-    c.createDiv({ cls: 'budget-onb-hint', text: 'Your budget opens behind a tap-to-enter privacy screen, so nothing is on show if someone glances at your vault. Turn it off in Settings → Budget Vault → Privacy splash screen.' });
+    next.createEl('b', { text: i18n.t('wiz.finish.nextLead') });
+    next.appendText(i18n.t('wiz.finish.nextBody'));
+    c.createDiv({ cls: 'budget-onb-hint', text: i18n.t('wiz.finish.privacy') });
   }
 
   /* -------------------------------- apply --------------------------------- */
@@ -639,6 +669,7 @@ class OnboardingWizard extends Modal {
         await p.updateBudgetSettingsMd('period_anchor', this.cycleAnchor());
         await p.updateBudgetSettingsMd('currency', `"${cur.replace(/"/g, '')}"`);
         await p.updateBudgetSettingsMd('country', this.data.country);
+        await p.updateBudgetSettingsMd('language', i18n.resolveLanguage(this.data.language));
         if (name) await p.updateBudgetSettingsMd('household', `"${name.replace(/"/g, '')}"`);
       } else {
         for (const sub of ['Categories', 'Accounts', 'Budgets', 'Transactions', 'Tax', 'Data']) {
@@ -648,6 +679,7 @@ class OnboardingWizard extends Modal {
           `---\nmonth_start_day: ${day}\n` +
           (this.cycleDays() ? `period_days: ${this.cycleDays()}\nperiod_anchor: ${this.cycleAnchor()}\n` : '') +
           `currency: "${cur.replace(/"/g, '')}"\ncountry: ${this.data.country}\n` +
+          `language: ${i18n.resolveLanguage(this.data.language)}\n` +
           (name ? `household: "${name.replace(/"/g, '')}"\n` : '') +
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
@@ -657,6 +689,7 @@ class OnboardingWizard extends Modal {
             : '') +
           `- **currency** — symbol shown before every amount in the Budget Vault plugin.\n` +
           `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).\n` +
+          `- **language** — the language the app is written in (${LANGUAGE_ORDER.join(', ')}). Separate from country: neither decides the other.\n` +
           `- **household** — name shown in the dashboard greeting.\n\n` +
           `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
@@ -703,11 +736,11 @@ class OnboardingWizard extends Modal {
       await p.saveSettings();
       this.finished = true;
       this.close();
-      new Notice(this.mode === 'connect' ? 'Connected to your budget folder.' : 'Budget folder created — welcome!');
+      new Notice(i18n.t(this.mode === 'connect' ? 'wiz.done.connected' : 'wiz.done.created'));
       p.reloadViews();
       await p.activateView();
     } catch (e) {
-      new Notice('Setup failed: ' + (e.message || e), 8000);
+      new Notice(i18n.t('wiz.failed', { error: e.message || e }), 8000);
     }
   }
 }

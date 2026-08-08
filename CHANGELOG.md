@@ -3,6 +3,188 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.1 — 2026-08-07
+
+### Fixed
+
+- **Two German strings told you to do the opposite of what they meant.** The
+  category step of the setup wizard and the split-transaction warning both said
+  *abhaken* — to tick — where the instruction is to **un**tick. Anyone following
+  them literally selected every category they had just been told to remove.
+
+- **Grammar across the seven language tables.** Afrikaans had a clause with no
+  verb ("waarheen die geld is"), a promise that never finished ("gratis en sal
+  altyd wees"), and a plural sentence that referred back to its subject in the
+  singular. German had "davon aus gezählt" twice, which is not German. Spanish
+  paired a perfect tense with *hace tiempo* in a way that does not parse.
+
+- **Words that were the wrong word.** Afrikaans used *hardloop* — to jog — for
+  running the setup wizard. Spanish used *debido* ("due to") for money owed,
+  against the *adeudado* used everywhere else. French listed loan tools as
+  *calculateurs* rather than *simulateurs de prêt*.
+
+- **Two labels read as nouns instead of verbs.** On the account form, Spanish
+  "Cuenta para el presupuesto" and French "Compte dans le budget" both read as
+  *account*, not *counts*. They now read as the setting they are.
+
+- **Counts no longer disagree with their nouns.** Seven strings interpolated a
+  number without a singular form, so a single item read "1 dae", "1 jours",
+  "1 Tagen", "1 días" — and in English, "over the last 1 periods". Each is now
+  a plural entry with its own singular, and the views pass the count that
+  selects between them.
+
+### Changed
+
+- **Two sentences carried two independent counts each**, which no plural rule
+  can agree with at once. Both were reworded so each number follows a label
+  rather than preceding a noun that has to match it.
+
+- The debt breakdown on the dashboard read "{amount} accounts" because it
+  interpolates money into a slot the wording treated as a count. It now reads
+  "{amount} on accounts".
+
+- Spanish and French page names dropped English Title Case — "Dinero adeudado",
+  "Sommes dues", "Épargne et placements" — with every in-sentence reference to
+  those names updated to match.
+
+- Typographic consistency per language: straight quotes in English and
+  Afrikaans, full-width colons and parentheses in Chinese, question marks rather
+  than full stops on Japanese questions.
+
+## 1.11.0 — 2026-08-07
+
+### Added
+
+- **The Accounts page is translated.** Group headings, account types, the four
+  summary tiles, every card — balance, badges, activity line, the
+  reconciliation prompt and its "Use this" button — plus the edit and new-account
+  forms with all their field descriptions and validation messages.
+
+  Account types now come from one shared set of labels rather than a second copy
+  kept beside the setup wizard's, so the same account cannot read as one thing
+  when you create it and another when you edit it.
+
+### Changed
+
+- **The Afrikaans reads like Afrikaans now.** A batch of phrases had been
+  translated word by word, which is accurate on each word and wrong as a
+  sentence — "Where it went" had become "Waarheen dit is", which is not
+  something anyone would say. It now reads "Waar dit gegaan het", and fifteen
+  others were rewritten the same way: "dated ahead" no longer comes out as
+  "vorentoe gedateer", stale balances are "bereken uit" rather than "gebou uit",
+  and "oudste {n} dae uit" became "oudste al {n} dae uitstaande".
+
+- **The plugin is a quarter smaller and starts faster**, on the phone most of
+  all. The shipped bundle is built minified from now on: 679KB down to 504KB.
+  Nothing about what the plugin does has changed — the missing 175KB was source
+  comments and indentation, written for people reading the code and parsed by
+  the browser engine on every single load anyway.
+
+### Internal
+
+- A bundle-level smoke test now guards that build. Every other test reads the
+  source files directly, so all of them would pass just as happily against a
+  bundle that was mangled into uselessness — the new one loads the built
+  `main.js` itself and checks it still exports a working plugin.
+
+### Notes
+
+- Eight pages are still English: Tax, Debt, Loan Calculators, Import, Savings,
+  Assets, Services and Owed Money.
+
+## 1.10.0 — 2026-08-07
+
+### Added
+
+- **The Dashboard is translated.** The greeting, the big remaining figure and
+  its label, the income/budgeted/spent column, the percentages, the budget
+  table, the "where you stand" tiles, the trend and split cards and every
+  screen-reader description behind them.
+
+- **Card headings across the whole app now translate too.** "Spending Trend",
+  "Where it went", "Budget vs Actual", "Where you stand", the chart legend, the
+  Transactions filters and buttons, and the Budget page's own header row were
+  written into the app's fixed markup and had been missed — so they stayed
+  English on every page regardless of the language. They no longer do.
+
+### Notes
+
+- Nine pages are still English: Tax, Accounts, Debt, Loan Calculators, Import,
+  Savings, Assets, Services and Owed Money. Their card headings are translated;
+  their contents are not yet.
+
+## 1.9.0 — 2026-08-07
+
+### Added
+
+- **The Budget and Transactions pages are translated.** Both now read in
+  whichever of the seven languages you have chosen — the totals tiles, the
+  table headers, the live "left / over" line under each amount, the filters and
+  row counts, the add-transaction dialog, the split flow, the export flow, and
+  every screen-reader label along the way.
+
+  Date hints are localised properly rather than shared: German asks for
+  JJJJ-MM-TT, French for AAAA-MM-JJ. Counts agree with their own language too —
+  Spanish gives "Copiada 1 categoría" against "Copiadas 7 categorías".
+
+### Fixed
+
+- **Changing the language now updates the page you are looking at, not just the
+  menu around it.** 1.8.1 re-translated the app's frame; the pages themselves
+  were still redrawn from their old text until you switched away and back.
+
+### Notes
+
+- Ten pages are still English — Tax, Accounts, Debt, the Dashboard, Loan
+  Calculators, Import, Savings, Assets, Services and Owed Money — along with
+  most settings descriptions and the Tax view's country checklists.
+
+## 1.8.1 — 2026-08-07
+
+### Fixed
+
+- **Changing the language now changes the language.** In 1.8.0, picking a new
+  one in settings wrote the setting and did nothing you could see: the budget
+  view is translated once when it opens, so a view that was already open kept
+  the language it opened in until you closed and reopened it. It now
+  re-translates in place, immediately, as often as you change it.
+
+  What this covers is the app's frame — the menu, the page titles, the top bar
+  and the welcome screen. The pages themselves, most of the settings
+  descriptions and the Tax view's country checklists are still English; they are
+  the next piece of work, not part of this fix.
+
+## 1.8.0 — 2026-08-07
+
+### Added
+
+- **Budget Vault speaks seven languages.** English, Afrikaans, German, Spanish,
+  French, Japanese and Chinese. Pick yours under Settings → Budget Vault →
+  Language, or on the first screen of the setup wizard, which is translated too.
+
+  Language is its own setting, deliberately separate from Country. Where you
+  live decides how your money is formatted, which date order your bank statements
+  use and which tax authority's checklist the Tax view shows. It does not decide
+  what language you want to read. Someone in Germany can run the app in English,
+  and someone in South Africa can run it in German with South African tax
+  handling intact — neither choice drags the other with it.
+
+  If you have never set it, the app follows Obsidian's own display language and
+  falls back to English. Afrikaans is the one exception: Obsidian does not offer
+  it, so it has to be chosen here.
+
+  Your own words are never touched. Category names, account names, notes and
+  every file in your budget folder stay exactly as you wrote them — this
+  translates the app, not your budget.
+
+### Notes
+
+- Japanese and Chinese are a first pass. The structure is right, but if a
+  financial term reads oddly to a native speaker, the feedback form is the place
+  to say so.
+- The views, the settings descriptions and the Tax view's country checklists are
+  still English for now.
+
 ## 1.7.1 — 2026-08-07
 
 ### Changed

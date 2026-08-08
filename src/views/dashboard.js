@@ -4,6 +4,8 @@
 const { el, icoEl } = require('../dom');
 const { safeSeg } = require('../vault-path');
 const { TYPE_ORDER } = require('../constants');
+/* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
+const i18n = require('../i18n');
 const { stalenessSummary } = require('../reconcile');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
@@ -44,7 +46,7 @@ module.exports = function registerDashboard(ctx) {
         const box = $(sel);
         if (!box) return;
         box.empty();
-        const msg = `Could not draw the ${label} — ${e?.message || e}`;
+        const msg = i18n.t('dash.err.render', { label, error: e?.message || e });
         // A <p> dropped straight into a <table> is not rendered by any engine,
         // so the one table target gets a row instead.
         box.append(box.tagName === 'TABLE'
@@ -130,16 +132,16 @@ module.exports = function registerDashboard(ctx) {
     const hasCaveat = stalenessSummary(S.accounts).stale > 0;
     if (card) card.classList.toggle('hidden', !hasLedger && !hasCaveat);
     $('#dashPositionSub').textContent = hasLedger
-      ? 'As things stand today — these do not move with the period above'
+      ? i18n.t('dash.pos.sub')
       : '';
     if (!hasLedger) return;
 
     posTile(grid, {
-      label: 'Net worth', value: money(w.net, 0),
+      label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0),
       cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
-      sub: `${money(w.assets, 0)} owned · ${money(w.liabilities, 0)} owed`,
+      sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) }),
       view: 'savings',
-      say: `Net worth ${money(w.net)} — ${money(w.assets)} owned against ${money(w.liabilities)} owed. Open Savings and Investments.`,
+      say: i18n.t('dash.pos.netWorthSay', { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) }),
     });
 
     /* Negated for display, like the Savings page's Debt tile, and split by
@@ -153,30 +155,31 @@ module.exports = function registerDashboard(ctx) {
        would compute a different, later date and put two debt-free dates in one
        app. The tile links there instead. */
     posTile(grid, {
-      label: 'Debt', value: money(-w.liabilities, 0),
+      label: i18n.t('dash.pos.debt'), value: money(-w.liabilities, 0),
       cls: w.liabilities > 0 ? 'text-danger' : '',
       sub: w.fromDebts && w.fromAccounts
-        ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page`
-        : (w.liabilities > 0 ? `${w.active.length} active` : 'nothing owed'),
+        ? i18n.t('dash.pos.debtSplit', { accounts: money(w.fromAccounts, 0), debts: money(w.fromDebts, 0) })
+        : (w.liabilities > 0 ? i18n.t('dash.pos.debtActive', { count: w.active.length }) : i18n.t('dash.pos.debtNone')),
       view: 'debts',
       say: w.liabilities > 0
-        ? `Debt ${money(w.liabilities)} owed. Open the Debt page.`
-        : 'No debt owed. Open the Debt page.',
+        ? i18n.t('dash.pos.debtSay', { amount: money(w.liabilities) })
+        : i18n.t('dash.pos.debtSayNone'),
     });
 
     /* The one figure on this card that is money coming TOWARDS the household,
        so it is never red — outstanding is a warning at most. Age rather than a
        due date, for the reason owed-math.js sets out. */
     posTile(grid, {
-      label: 'Owed to you', value: money(owed.outstanding, 0),
+      label: i18n.t('dash.pos.owed'), value: money(owed.outstanding, 0),
       cls: owed.outstanding > 0 ? 'text-warning' : '',
       sub: owed.outstanding > 0
-        ? `${owed.open} outstanding${owed.oldestDays !== null ? ` · oldest out ${owed.oldestDays} days` : ''}`
-        : (owed.entries ? `${money(owed.recovered, 0)} recovered` : 'nothing lent out'),
+        ? i18n.t('dash.pos.owedOpen', { count: owed.open })
+          + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
+        : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')),
       view: 'owed',
       say: owed.outstanding > 0
-        ? `${money(owed.outstanding)} owed to you across ${owed.open} ${owed.open === 1 ? 'entry' : 'entries'}. Open Owed Money.`
-        : 'Nothing outstanding. Open Owed Money.',
+        ? i18n.t('dash.pos.owedSay', { amount: money(owed.outstanding), count: owed.open })
+        : i18n.t('dash.pos.owedSayNone'),
     });
 
     /* Uncoloured, deliberately. The Savings page leaves its Savings and
@@ -185,10 +188,10 @@ module.exports = function registerDashboard(ctx) {
        way. Given green it becomes a second green number beside the gradient one,
        and the eye stops being able to tell which of the four is the headline. */
     posTile(grid, {
-      label: 'Savings & investments', value: money(savings + invest, 0),
-      sub: `${money(savings, 0)} savings · ${money(invest, 0)} invested`,
+      label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0),
+      sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) }),
       view: 'savings',
-      say: `${money(savings + invest)} in savings and investments. Open Savings and Investments.`,
+      say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) }),
     });
   }
 
@@ -202,10 +205,9 @@ module.exports = function registerDashboard(ctx) {
     const o = cardOverlap(S.accounts, S.debts);
     if (!o) return;
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${o.cardAccounts} credit-card ${o.cardAccounts === 1 ? 'account' : 'accounts'} and ` +
-      `${o.cardDebts} card ${o.cardDebts === 1 ? 'debt' : 'debts'} are tracked — if any card is in both, it is counted twice above.`));
+      i18n.t('dash.overlap', { accounts: o.cardAccounts, debts: o.cardDebts })));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-      'aria-label': 'Review tracked debts on the Debt page' }, 'Review debts');
+      'aria-label': i18n.t('dash.overlap.aria') }, i18n.t('dash.overlap.btn'));
     btn.addEventListener('click', () => ctx.switchView('debts'));
     wrap.append(btn);
   }
@@ -229,15 +231,15 @@ module.exports = function registerDashboard(ctx) {
     const wrap = $('#dashStale'); wrap.empty();
     const s = stalenessSummary(S.accounts);
     if (!s.stale) return;
-    const age = s.oldestDays === null ? 'none of them carry a date' : `the oldest ${s.oldestDays} days ago`;
+    const age = s.oldestDays === null ? i18n.t('dash.stale.noDate') : i18n.t('dash.stale.oldest', { days: s.oldestDays, count: s.oldestDays });
     const all = s.stale === s.total;
     const line = all
-      ? `Built from ${s.total === 1 ? 'a balance' : `${s.total} balances`} nobody has confirmed recently`
-      : `Built from ${s.stale} of ${s.total} balances nobody has confirmed recently`;
+      ? i18n.t('dash.stale.all', { count: s.total })
+      : i18n.t('dash.stale.some', { stale: s.stale, total: s.total });
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${line} — ${age}.`));
+      i18n.t('dash.stale.line', { line, age })));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-      'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
+      'aria-label': i18n.t('dash.stale.aria') }, i18n.t('dash.stale.btn'));
     btn.addEventListener('click', () => ctx.switchView('accounts'));
     wrap.append(btn);
   }
@@ -266,29 +268,29 @@ module.exports = function registerDashboard(ctx) {
     if (markPct !== null) meter.append(el('span', { class: 'hero-mark', style: `left:${markPct}%`, 'aria-hidden': 'true' }));
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, 'Total Income')),
+        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
         el('div', {}, el('div', { class: 'sv grad-txt' }, money(sum.income)))),
       el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, 'Budgeted')),
+        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.budgeted'))),
         el('div', {}, el('div', { class: 'sv' }, money(bud.spend)),
-          budgetedPct !== null ? el('div', { class: 'st' }, `${budgetedPct}% allocated`) : '')),
+          budgetedPct !== null ? el('div', { class: 'st' }, i18n.t('dash.stat.allocated', { pct: budgetedPct })) : '')),
       el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, 'Total Spent')),
+        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
         el('div', {}, el('div', { class: 'sv' }, money(sum.spend)),
-          usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, `${usedPct}% used`)) : '')));
+          usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
     if (sum.uncategorised > 0) statCol.append(
       el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, 'Uncategorised')),
+        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.uncategorised'))),
         el('div', {}, el('div', { class: 'sv', style: 'color: var(--color-warning)' }, String(sum.uncategorised)),
-          el('div', { class: 'st' }, 'review in Transactions'))));
+          el('div', { class: 'st' }, i18n.t('dash.stat.review')))));
     const hour = new Date().getHours();
-    const greeting = hour < 5 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const greeting = i18n.t(hour < 5 ? 'dash.greet.evening' : hour < 12 ? 'dash.greet.morning' : hour < 18 ? 'dash.greet.afternoon' : 'dash.greet.evening');
     hero.append(el('div', { class: 'hero-grid' },
       el('div', {},
-        S.settings.household ? el('div', { class: 'hero-greet' }, `${greeting}, ${S.settings.household}`) : '',
-        el('div', { class: 'hero-lbl' }, heroNegative ? 'Overspent this period' : 'Remaining this period'),
+        S.settings.household ? el('div', { class: 'hero-greet' }, i18n.t('dash.greet.line', { greeting, name: S.settings.household })) : '',
+        el('div', { class: 'hero-lbl' }, i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
         heroNum,
-        el('div', { class: 'hero-sub' }, el('b', {}, money(sum.spend)), ' spent of ', el('b', {}, money(bud.spend)), ' budgeted'),
+        el('div', { class: 'hero-sub' }, i18n.t('dash.hero.sub', { spent: money(sum.spend), budgeted: money(bud.spend) })),
         meter),
       statCol));
   }
@@ -298,8 +300,8 @@ module.exports = function registerDashboard(ctx) {
     const t = $('#dashBudget'); t.empty();
     $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col', class: 'num' }, 'Budget'), el('th', { scope: 'col', class: 'num' }, 'Spent'),
-      el('th', { scope: 'col', style: 'width:26%' }, ''), el('th', { scope: 'col', class: 'num' }, 'Remaining'))));
+      el('th', { scope: 'col' }, i18n.t('dash.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.budget')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.spent')),
+      el('th', { scope: 'col', style: 'width:26%' }, ''), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.remaining')))));
     const body = el('tbody', {});
     const budget = S.budgets[S.period] || [];
     const rows = new Map();
@@ -332,7 +334,7 @@ module.exports = function registerDashboard(ctx) {
         el('td', {}, bar),
         el('td', { class: `num${over ? ' text-danger' : ''}` }, r.budget ? money(remaining) : '')));
     }
-    if (!sorted.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No budget or transactions in this period yet.')));
+    if (!sorted.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
   }
 
@@ -393,7 +395,7 @@ module.exports = function registerDashboard(ctx) {
     pills.append(rangePills({
       ranges: historicalRanges(),
       value: range.key,
-      label: 'Spending trend range',
+      label: i18n.t('dash.trend.range'),
       onPick: async key => {
         plugin.settings.chartTrendRange = key;
         await plugin.saveSettings();
@@ -404,12 +406,12 @@ module.exports = function registerDashboard(ctx) {
     /* Say when the range was cut short, rather than letting a "1Y" pill sit
        above six months of chart with nothing to explain the difference. */
     const clamped = periods.length < want;
-    $('#trendSub').textContent = `Spent vs budget · ${periods.length} period${periods.length === 1 ? '' : 's'}` +
-      (clamped ? ` · all the history imported so far` : '');
+    $('#trendSub').textContent = i18n.t('dash.trend.sub', { count: periods.length })
+      + (clamped ? i18n.t('dash.trend.clamped') : '');
 
     if (data.length < 2) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
-        'Import a second period of transactions and the trend line starts here.'));
+        i18n.t('dash.trend.empty')));
       return;
     }
 
@@ -420,7 +422,7 @@ module.exports = function registerDashboard(ctx) {
     const over = d => d.budget > 0 && d.spent > d.budget;
     const { svg, add } = createChart({
       w: W, h: H,
-      label: `Spent, budgeted and income over the last ${data.length} periods`,
+      label: i18n.t('dash.trend.aria', { count: data.length }),
     });
 
     const fill = areaGradient(add, 'trendSpentArea', c.success);
@@ -513,7 +515,7 @@ module.exports = function registerDashboard(ctx) {
        indistinguishable from a chart that has stopped updating — and gets
        reported as one. Net, not gross, to match how the slices treat a refund. */
     const uncat = -Math.min(0, sum.byCat[''] || 0);
-    const uncatNote = uncat > 0 ? ` · ${money(uncat)} uncategorised, not shown` : '';
+    const uncatNote = uncat > 0 ? i18n.t('dash.split.uncatNote', { amount: money(uncat) }) : '';
 
     const total = spend.reduce((t, x) => t + x.amount, 0);
     $('#dashSplitSub').textContent = (total > 0
@@ -523,8 +525,8 @@ module.exports = function registerDashboard(ctx) {
     if (!total) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         uncat > 0
-          ? `${money(uncat)} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.`
-          : 'Nothing categorised as spending in this period yet.'));
+          ? i18n.t('dash.split.onlyUncat', { amount: money(uncat) })
+          : i18n.t('dash.split.empty')));
       return;
     }
 
@@ -559,7 +561,7 @@ module.exports = function registerDashboard(ctx) {
     const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
     const { svg, add } = createChart({
       w: W, h: H, cls: 'donut',
-      label: `Spending split for ${periodMonthName(S.period)}: ` +
+      label: i18n.t('dash.split.aria', { month: periodMonthName(S.period) }) +
         shown.map(x => `${x.cat} ${Math.round((x.amount / total) * 100)}%`).join(', '),
     });
 
@@ -609,12 +611,12 @@ module.exports = function registerDashboard(ctx) {
            reader gets "Groceries 4 200 32", three unlabelled fragments. */
         el('button', {
           type: 'button', class: 'dl-link',
-          'aria-label': `${x.cat}: ${money(x.amount)}, ${pct}% of spending — show transactions`,
+          'aria-label': i18n.t('dash.split.sliceAria', { cat: x.cat, amount: money(x.amount), pct }),
           onclick: () => openCategory(x.cat),
         }, face()),
         el('button', {
           type: 'button', class: 'dl-note',
-          'aria-label': `Open the ${x.cat} category note`,
+          'aria-label': i18n.t('dash.split.noteAria', { cat: x.cat }),
           title: 'Open category note',
           onclick: () => openCategoryFile(x.cat),
           /* An ARRAY, not the 'a|b' string the shell's data-ico attributes
@@ -654,7 +656,7 @@ module.exports = function registerDashboard(ctx) {
      other, and opening in place would close the app the reader is using. */
   async function openCategoryFile(cat) {
     const file = fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
-    if (!file) return toast(`No category note found for "${cat}"`, true);
+    if (!file) return toast(i18n.t('dash.split.noteMissing', { cat }), true);
     await app.workspace.getLeaf('tab').openFile(file);
   }
 

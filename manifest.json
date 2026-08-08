@@ -1,9 +1,9 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.7.1",
+  "version": "1.11.2",
   "minAppVersion": "1.8.0",
-  "description": "Your budget, stored as plain files on your own devices. No account, no server, no telemetry — nothing ever leaves your vault.",
+  "description": "Track your budget, spending, debt and savings as plain files in your own vault. Import bank statements, see where your money goes, and read it all in seven languages. No account, no server — nothing ever leaves your device.",
   "author": "Ruan Pienaar",
   "fundingUrl": "https://paypal.me/ruanpienaar86",
   "isDesktopOnly": false

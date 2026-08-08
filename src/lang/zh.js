@@ -1,0 +1,579 @@
+'use strict';
+/* 中文 (Simplified Chinese).
+
+   Checked against src/lang/en.js at build time — same key set, no more, no
+   fewer. Add a string to en.js first, then translate it here.
+
+   Conventions used throughout:
+     - "Budget Vault" is the product name and stays untranslated. 仓库 is the
+       vault, matching Obsidian's own Chinese locale.
+     - Chinese has ONE noun form: a count never changes the wording. So plural
+       entries carry only `other`, and i18n.js never asks this language for
+       `one` (see ONE_FORM). A 1-vs-many split would produce text a native
+       reader finds wrong, not merely clumsy.
+     - Measure words matter: files are 个 here rather than a bare number.
+     - Corner brackets 「」 are used for in-sentence quoting.
+     - YYYY-MM-DD is left as-is; it is the form Chinese interfaces show for an
+       ISO date, unlike the localised JJJJ-MM-TT of German. */
+
+module.exports = {
+  /* ------------------------------- splash -------------------------------- */
+  'splash.sub': '你的私人预算，安全地保存在你的仓库中。',
+  'splash.enter': '进入预算',
+
+  /* -------------------------------- drawer -------------------------------- */
+  'nav.menu': '菜单',
+  'nav.close': '关闭菜单',
+  'nav.section.budget': '预算',
+  'nav.section.accounts': '账户',
+  'nav.section.tools': '工具',
+
+  'nav.dashboard': '仪表板',
+  'nav.transactions': '交易',
+  'nav.budgets': '预算',
+  'nav.savings': '储蓄与投资',
+  'nav.accounts': '账户',
+  'nav.assets': '资产',
+  'nav.debts': '债务',
+  'nav.owed': '应收款项',
+  'nav.services': '服务',
+  'nav.tax': '税务',
+  'nav.loans': '贷款计算器',
+  'nav.import': '导入 CSV',
+  'nav.reload': '从磁盘重新加载',
+  'nav.pluginSettings': '插件设置',
+
+  /* -------------------------------- topbar -------------------------------- */
+  'topbar.nav': '预算导航',
+  'topbar.mainMenu': '主菜单',
+  'topbar.openMenu': '打开导航菜单',
+  'topbar.home': '前往仪表板',
+  'topbar.brandSub': 'Obsidian 仓库预算',
+  'topbar.periodNav': '周期导航',
+  'topbar.prevPeriod': '上一周期',
+  'topbar.currentPeriod': '跳到当前周期',
+  'topbar.nextPeriod': '下一周期',
+  'topbar.import': '导入 CSV',
+  'topbar.importTitle': '导入银行对账单 CSV',
+  'topbar.settings': '打开预算设置',
+
+  /* ------------------------------- settings -------------------------------- */
+  'settings.folder.name': '预算文件夹',
+  'settings.folder.desc': '存放 Categories/、Accounts/、Budgets/、Transactions/、Settings.md 等内容的文件夹在仓库中的路径。',
+
+  'settings.theme.name': '主题',
+  'settings.theme.desc': '跟随 Obsidian 的浅色/深色模式，或强制使用 Airy Glass 的深色或浅色配色。',
+  'settings.theme.auto': '跟随 Obsidian',
+  'settings.theme.dark': '始终深色',
+  'settings.theme.light': '始终浅色',
+
+  'settings.palette.name': '配色方案',
+  'settings.palette.desc': '预算界面使用的颜色。每套配色都有各自的浅色和深色版本，因此与上面的主题设置相互独立。',
+
+  'settings.wizard.name': '设置向导',
+  'settings.wizard.desc': '重新运行首次启动向导 — 文件夹、名称、预算周期、货币、初始文件。',
+  'settings.wizard.button': '运行设置向导',
+
+  'settings.startup.name': '启动时打开',
+  'settings.startup.desc': 'Obsidian 启动时自动打开预算视图。',
+
+  'settings.privacy.name': '隐私启动屏',
+  'settings.privacy.desc': '在你点击「进入预算」之前用启动屏遮住预算 — 打开时如此，Obsidian 每次切到后台后也是如此。在你点击之前不会从仓库读取任何内容。',
+
+  'settings.feedback.name': '发送反馈',
+  'settings.feedback.desc': '报告缺陷、反映问题或提出功能建议。会在浏览器中打开一个 Google 表单 — 不会附带或发送你预算中的任何内容。',
+  'settings.feedback.button': '打开反馈表单',
+
+  'settings.support.name': '支持 Budget Vault',
+  'settings.support.desc': 'Budget Vault 是免费的，并且会一直免费。如果你想表达谢意，这会在浏览器中打开 PayPal — 完全自愿，无论如何插件都不会有任何变化。',
+  'settings.support.button': '送上一份谢意',
+
+  'settings.data.name': '预算数据',
+  'settings.data.desc': '保存在预算文件夹内的 Settings.md 中，因此在每台设备上都生效。',
+
+  'settings.household.name': '名称 / 家庭',
+  'settings.household.desc': '显示在仪表板的问候语和顶部栏中。留空则不显示。',
+  'settings.household.placeholder': '留空则不显示',
+
+  'settings.monthStart.name': '每月起始日',
+  'settings.monthStart.desc': '每个财务周期开始的日期 — 通常是你的发薪日。选择 1 表示普通的自然月。1–28。',
+  'settings.monthStart.invalid': '请选择 1 到 28 之间的某一天。',
+
+  'settings.periodLength.name': '周期长度',
+  'settings.periodLength.desc': '每个预算周期的长度。「每月」使用上面的每月起始日。其他选项则从下面的日期开始计算，把周期与发薪周期对齐。',
+
+  'settings.anchor.name': '上次发薪日',
+  'settings.anchor.desc': '你上一次领薪是什么时候？任何近期的发薪日都可以 — 只有它落在周期中的哪一天才有影响，因此早一些或晚一些结果相同。当周期长度为每月时会被忽略。',
+  'settings.anchor.invalid': '请使用真实日期，格式为 YYYY-MM-DD，例如 2026-08-07。',
+
+  'settings.country.name': '国家/地区',
+  'settings.country.desc': '决定金额格式、银行对账单的日期顺序，以及税务视图的清单（针对你所在国家/地区的税务机关）。已有的纳税年度会保留其数据 — 只有标签和新年度的初始值会变化。与下面的界面语言相互独立。',
+
+  'settings.language.name': '语言',
+  'settings.language.desc': '界面所使用的语言。与上面的国家/地区相互独立 — 住在哪里并不决定你想读什么。默认跟随 Obsidian 自身的显示语言，没有对应语言时回退到英语。你自己写的预算内容 — 分类名称、备注、账户名称 — 永远不会被翻译。',
+
+  'settings.currency.name': '货币符号',
+  'settings.currency.desc': '显示在每个金额之前，例如 R。',
+  'settings.currency.invalid': '请输入货币符号。',
+
+  /* ------------------------- settings notices ------------------------------ */
+  /* One form only — see the header. */
+  'settings.budgetsKept': {
+    other: '预算：你现有的 {count} 个预算文件仍保留在仓库中。它们无法在当前的周期长度下显示，但只要改回原来的设置就会立即恢复。',
+  },
+  'settings.anchorReslices': {
+    other: '预算：这会移动每一个周期的边界。以日期命名的 {count} 个预算文件将不再匹配 — 它们仍保留在你的仓库中，把这个日期改回 {prev} 就会立即恢复。',
+  },
+  'settings.dateNotReal': '预算：「{value}」不是日期 — 请使用日期选择器，或输入 YYYY-MM-DD。',
+
+  /* ============================ setup wizard ============================== */
+  'wiz.title': '设置 Budget Vault',
+  'wiz.stepOf': '第 {n} 步，共 {total} 步',
+  'wiz.cancel': '取消',
+  'wiz.back': '上一步',
+  'wiz.next': '下一步',
+  'wiz.letsGo': '开始吧！',
+  'wiz.connectBtn': '连接预算',
+  'wiz.createBtn': '创建我的预算',
+  'wiz.skipped': '已跳过设置 — 你可以随时从「设置 → Budget Vault → 运行设置向导」或命令面板重新运行。',
+
+  'wiz.step.folder': '预算存放的位置',
+  'wiz.step.name': '我们怎么称呼你？',
+  'wiz.step.country': '语言、国家/地区与货币',
+  'wiz.step.period': '你的预算周期',
+  'wiz.step.categories': '你的预算分类',
+  'wiz.step.account': '你的第一个账户',
+  'wiz.step.finish': '准备就绪',
+
+  'wiz.err.folder': '请输入预算的文件夹路径 — 例如 Finances/Budget。',
+  'wiz.err.monthStart': '每月起始日必须在 1 到 28 之间。并非每个月都有 29、30 或 31 日，因此如果你在月末发薪，请使用 28。',
+  'wiz.err.anchor': '请输入你上次领薪的日期 — 每个发薪周期都从这里开始计算，缺少它预算就会退回到按月周期。',
+  'wiz.err.currency': '请输入货币符号，或从上面的列表中选择一个。',
+
+  /* ---- welcome ---- */
+  'wiz.welcome.title': '欢迎使用 Budget Vault！',
+  'wiz.welcome.intro': '你的整份预算，就以纯 markdown 的形式存放在这个仓库里 — 无需账号、不上云、也不经过别人的服务器。如果你的仓库会同步到手机，预算也会一并带上。',
+  'wiz.welcome.planLead': '计划是这样的 — 这个向导会帮你准备好：',
+  'wiz.welcome.plan1': '选择预算文件夹 — 整个结构由我们为你搭建',
+  'wiz.welcome.plan2': '选择语言、国家/地区与货币 — 让界面读起来顺畅，金额、日期和税务也都正确',
+  'wiz.welcome.plan3': '告诉我们你的发薪时间 — 如果你愿意，预算周期可以从发薪日开始',
+  'wiz.welcome.plan4': '选择预算分类 — 勾选适合你生活的那些',
+  'wiz.welcome.plan5': '添加第一个账户 — 以及它当前的余额',
+  'wiz.welcome.thenLead': '接下来就是应用里有意思的部分了：',
+  'wiz.welcome.app1': '设定预算 — 给每个分类一个努力的目标金额',
+  'wiz.welcome.app2': '导入银行 CSV — 你教得越多，交易就越会自动归类',
+  'wiz.welcome.app3': '随时添加新分类 — 预算会跟着你一起成长',
+  'wiz.welcome.app4': '边走边回顾 — 仪表板会清楚地显示钱花到哪里去了',
+  'wiz.welcome.close': '大约两分钟即可设置完成。之后随时都能修改。准备好了吗？',
+
+  /* ---- folder ---- */
+  'wiz.folder.hint': '所有内容都以纯 markdown 文件的形式存放在仓库的一个文件夹里。',
+  'wiz.folder.blank': '请输入文件夹路径 — 例如 Finances/Budget。',
+  'wiz.folder.found': '在「{folder}」中找到了已有的预算 — 向导会连接到它，而不是创建新文件。',
+  'wiz.folder.exists': '「{folder}」已存在 — 预算文件将添加到其中。',
+  'wiz.folder.willCreate': '「{folder}」尚不存在 — 我们会为你创建。',
+  'wiz.folder.name': '预算文件夹',
+  'wiz.folder.desc': '存放分类、账户、预算和交易的位置。',
+  'wiz.folder.connected': '在「{folder}」中找到了已有的预算 — 我们会连接到它，而不是创建新文件。你的分类、账户和交易都会原样保留；接下来的步骤只是确认其 Settings.md 中保存的设置。',
+
+  /* ---- name ---- */
+  'wiz.name.name': '你的名字或昵称',
+  'wiz.name.desc': '显示在仪表板的问候语和顶部栏中。留空即可跳过。',
+  'wiz.name.placeholder': '例如：小明，或者「张家」',
+
+  /* ---- language / country / currency ---- */
+  'wiz.language.desc': '应用界面使用的语言。与下面的国家/地区相互独立 — 住在哪里并不决定你想读什么。你自己写的预算内容永远不会被翻译。',
+  'wiz.country.desc': '决定金额格式、读取银行对账单时的日期顺序，以及税务视图中针对你所在国家/地区税务机关的申报清单。',
+  'wiz.currency.desc': '显示在每个金额之前。默认取自你的国家/地区 — 如果你用其他货币记账，请自行更改。',
+  'wiz.currency.custom': '自定义符号',
+  'wiz.currency.customPlaceholder': '例如：CHF',
+
+  /* Currency NAMES for the wizard dropdown; the stored value is the symbol. */
+  'wiz.ccy.rand': 'R — 南非兰特',
+  'wiz.ccy.dollar': '$ — 美元',
+  'wiz.ccy.euro': '€ — 欧元',
+  'wiz.ccy.pound': '£ — 英镑',
+  'wiz.ccy.other': '其他…',
+
+  /* ---- period ---- */
+  'wiz.period.howOften': '你多久领一次薪？',
+  'wiz.period.howOftenDesc': '按月的周期以月份命名，并从你在下面选择的日期开始。其他选项则从上次发薪日算起，与发薪周期对齐。',
+  'wiz.period.startDay': '你的预算月从哪一天开始？',
+  'wiz.period.startDayDesc': '通常是你的发薪日。选择 1 表示普通的自然月。（1–28）',
+  'wiz.period.badDay': '请选择 1 到 28 之间的某一天。并非每个月都有 29、30 或 31 日，因此如果你在月末发薪，请使用 28。',
+  'wiz.period.calendarEg': '普通的自然月：每个周期从 {first} 到月末，并以该月份命名。你现在处于 {month}。',
+  'wiz.period.paydayEg': '每个周期从 {start} 到次月 {end}，并以结束所在的月份命名。你现在处于 {month}。',
+  'wiz.period.anchorBlank': '输入你上次领薪的日期，周期就会据此推算出来。',
+  'wiz.period.anchorEg': '从那天算起，你当前所处的周期开始于 {date}。预算文件会以该起始日期命名。',
+  'wiz.period.anchorName': '你上一次领薪是什么时候？',
+  'wiz.period.anchorDesc': '任何近期的发薪日都可以 — 只有它落在周期中的位置才有影响，因此早一些或晚一些得到的周期相同。',
+
+  /* ---- categories ---- */
+  'wiz.cats.intro': '先从一组预算分类开始 — 不需要的可以取消勾选。之后还能添加、重命名或改颜色，所以这里没有什么是定死的。',
+  'wiz.cats.selected': '已选择 {count} / {total}',
+  'wiz.cats.selectAll': '全选',
+  'wiz.cats.selectNone': '全不选',
+
+  'wiz.type.income': '收入',
+  'wiz.type.expense': '日常开支',
+  'wiz.type.debt': '偿还债务',
+  'wiz.type.services': '服务与订阅',
+  'wiz.type.insurance': '保险',
+  'wiz.type.giving': '捐赠',
+  'wiz.type.savings': '储蓄',
+  'wiz.type.investment': '投资',
+  'wiz.type.luxuries': '锦上添花',
+  'wiz.type.transfer': '转账',
+
+  /* ---- first account ---- */
+  'wiz.acct.intro': '交易按账户分别存放。现在添加你的主要账户，或把名称留空以跳过 — 你随时都可以添加账户。',
+  'wiz.acct.name': '账户名称',
+  'wiz.acct.namePlaceholder': '例如：活期账户',
+  'wiz.acct.type': '类型',
+  'wiz.acct.balance': '当前余额',
+  'wiz.acct.balanceDesc': '可选 — 该账户当前的金额。',
+  'wiz.acct.balanceHint': '可以使用最近一期对账单的期末余额，或银行 App 上显示的金额。余额是一份由你自己保持更新的快照 — 只导入最近的交易并不会让它出错 — 你随时可以在账户页面点击余额来修改它。',
+
+  'acctType.checking': '活期/支票账户',
+  'acctType.savings': '储蓄账户',
+  'acctType.credit_card': '信用卡',
+  'acctType.cash': '现金',
+  'acctType.investment': '投资',
+  'acctType.other': '其他',
+
+  /* ---- finish ---- */
+  'wiz.sum.folder': '文件夹',
+  'wiz.sum.name': '名称',
+  'wiz.sum.language': '语言',
+  'wiz.sum.country': '国家/地区',
+  'wiz.sum.period': '预算周期',
+  'wiz.sum.currency': '货币',
+  'wiz.sum.categories': '分类',
+  'wiz.sum.account': '第一个账户',
+  'wiz.sum.opening': '期初余额',
+  'wiz.sum.catCount': {
+    other: '{count} 个初始分类',
+  },
+  'wiz.sum.monthlyCalendar': '按月（自然月）',
+  'wiz.sum.monthlyOn': '按月，从 {day} 开始',
+  'wiz.sum.cycleFrom': '{preset}，自 {date} 起算',
+  'wiz.finish.connectLead': '将连接到已有的预算文件夹，并把这些设置保存到它的 Settings.md 中：',
+  'wiz.finish.createLead': '这会创建预算文件夹，并生成 Settings.md、你的分类、第一个预算文件，以及空的 Owed Money / Services 文件：',
+  'wiz.finish.nextLead': '接下来该做什么：',
+  'wiz.finish.nextBody': '先在预算页面为各个分类填上金额，然后在交易页面导入银行的 CSV。',
+  'wiz.finish.privacy': '你的预算会在一个需要点击进入的隐私屏后面打开，这样别人瞥一眼你的仓库也看不到任何内容。可在「设置 → Budget Vault → 隐私启动屏」中关闭。',
+
+  'wiz.done.connected': '已连接到你的预算文件夹。',
+  'wiz.done.created': '预算文件夹已创建 — 欢迎！',
+  'wiz.failed': '设置失败：{error}',
+
+  /* ============================== Budget page ============================= */
+  'bud.shape.title': '你的其他预算都还在',
+  'bud.shape.body': {
+    other: '有 {count} 个预算文件保存在另一种周期长度下 — 最新的是 Budgets/{newest}.md。它们仍保留在你的仓库中，只要把周期长度改回去就会重新出现。这里的金额从空白开始，因为本周期与那些周期的长度不同。',
+  },
+  'bud.shape.bring': '从 {newest} 带入分类和备注',
+  'bud.shape.empty': '那份预算是空的',
+  'bud.shape.brought': {
+    other: '已带入 {count} 个分类 — 请为本周期填上金额',
+  },
+  'bud.shape.allHere': '那份预算中的分类都已经在这里了',
+  'bud.shape.bringAmounts': '也把金额带过来…',
+  'bud.shape.broughtAmounts': {
+    other: '已带入 {count} 笔金额 — 请核对后再保存',
+  },
+
+  'bud.total.income': '收入合计',
+  'bud.total.incomeNote': '目前已收到 {amount}',
+  'bud.total.budgeted': '预算合计',
+  'bud.total.budgetedNote': '占预算收入的 {pct}%',
+  'bud.total.over': '超出预算',
+  'bud.total.overNote': '预算超过了收入',
+  'bud.total.left': '待分配',
+  'bud.total.leftNote': '尚未分配的收入',
+  'bud.total.spent': '支出合计',
+  'bud.total.spentNote': '已用预算的 {pct}%',
+
+  'bud.col.category': '分类',
+  'bud.col.type': '类型',
+  'bud.col.amount': '金额',
+  'bud.col.actual': '实际已发生',
+  'bud.col.notes': '备注',
+
+  'bud.remaining.over': '超出 {amount}',
+  'bud.remaining.left': '剩余 {amount}',
+
+  'bud.aria.amount': '{category} 的预算金额',
+  'bud.aria.notes': '{category} 的备注',
+  'bud.aria.clear': '清除 {category} 的预算',
+  'bud.title.clear': '把这个分类从本周期的文件中移除',
+  'bud.aria.delete': '删除分类 {category}',
+  'bud.title.delete': '在所有位置删除这个分类',
+
+  'bud.saved': '预算已保存到 Budgets/{period}.md',
+  'bud.copy.none': '找不到上一周期的预算',
+  'bud.copy.done': {
+    other: '已从上一周期复制 {count} 个分类',
+  },
+  'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
+
+
+  /* =========================== Transactions page ========================== */
+  'tx.wholeHistory': '全部历史',
+  'tx.allAccounts': '所有账户',
+  'tx.allCategories': '所有分类',
+  'tx.uncategorised': '未分类',
+  'tx.count.window': { other: '共 {total} 行，显示 {shown} 行' },
+  'tx.count.all': { other: '{count} 行' },
+
+  'tx.col.date': '日期',
+  'tx.col.desc': '摘要',
+  'tx.col.account': '账户',
+  'tx.col.category': '分类',
+  'tx.col.amount': '金额',
+  'tx.col.excl': '排除',
+  'tx.col.note': '备注',
+  'tx.col.split': '拆分',
+
+  'tx.aria.category': '{date} {desc} 的分类',
+  'tx.aria.exclude': '把 {desc} 从预算合计中排除',
+  'tx.aria.note': '{date} {desc} 的备注',
+  'tx.aria.split': '把 {date} {desc} 拆分到多个分类',
+  'tx.title.split': '拆分到多个分类',
+
+  'tx.none': '没有符合条件的交易。',
+  'tx.showMore': { other: '在剩余的 {remaining} 行中再显示 {n} 行' },
+
+  'tx.split.zero': '金额为零的行没有可拆分的内容',
+  'tx.split.excluded': '这一行已被排除 — 请先取消勾选',
+  'tx.split.marker': '拆分为 {n} 笔',
+  'tx.split.done': '已拆分为 {n} 笔 — 请检查后保存更改',
+
+  'tx.add.noAccount': '请先添加一个账户 — 每笔交易都要归属于某个账户',
+  'tx.add.title': '添加交易',
+  'tx.field.date': '日期',
+  'tx.field.desc': '摘要',
+  'tx.field.descPlaceholder': '例如：现金 — 在市场买菜',
+  'tx.field.account': '账户',
+  'tx.field.direction': '收支方向',
+  'tx.dir.out': '支出',
+  'tx.dir.in': '收入',
+  'tx.field.amount': '金额',
+  'tx.field.amountDesc': '始终填正数 — 正负由收支方向决定',
+  'tx.field.category': '分类',
+  'tx.field.none': '— 无 —',
+  'tx.field.note': '备注',
+  'tx.field.notePlaceholder': '选填',
+
+  'tx.err.date': '日期必须为 YYYY-MM-DD',
+  'tx.err.desc': '摘要为必填项',
+  'tx.err.account': '账户名称无效',
+  'tx.err.amount': '金额必须是不等于 0 的数字',
+  'tx.err.save': '无法保存该交易（{error}）',
+
+  'tx.saved': { other: '已保存 {count} 个文件' },
+  'tx.savedLearned': { other: ' · 学习了 {count} 条新规则' },
+
+  'tx.export.dirty': '请先保存更改 — 导出未保存的编辑将与仓库内容不一致',
+  'tx.export.empty': '没有可导出的内容 — 当前筛选条件下没有匹配的行',
+  'tx.export.title': '导出交易',
+  'tx.export.folder': '保存到文件夹',
+  'tx.export.desc': {
+    other: '导出目标在仓库中的文件夹。{count} 行（{range}）以及 {cats} 个分类，导出为 CSV 和 markdown。',
+  },
+  'tx.export.failed': '无法写入导出文件 — 请检查文件夹名称',
+  'tx.export.done': {
+    other: '已把 {count} 行和 {cats} 个分类导出到 {path}/',
+  },
+
+
+  /* ============================= Accounts page ============================ */
+  'acct.group.bank': '银行账户',
+  'acct.group.savings': '储蓄',
+  'acct.group.investments': '投资',
+  'acct.group.other': '其他',
+  'acct.group.count': { other: '{count} 个账户' },
+
+  'acct.noteMissing': '找不到 Accounts/{name}.md',
+  'acct.balance.title': '更新余额 — {name}',
+  'acct.balance.field': '新余额',
+  'acct.balance.updated': '已更新 {name} 的余额',
+  'acct.reconciled': '已把 {name} 对账为 {amount}',
+  'acct.err.nan': '不是数字',
+  'acct.err.type': '类型无效',
+  'acct.err.notNumber': '{field} 不是数字',
+  'acct.err.nameRequired': '账户名称为必填项',
+  'acct.err.exists': '该账户已存在',
+
+  'acct.edit.title': '编辑账户 — {name}',
+  'acct.new.title': '新建账户',
+  'acct.field.name': '账户名称',
+  'acct.field.type': '类型',
+  'acct.field.institution': '开户机构',
+  'acct.field.number': '账号',
+  'acct.field.numberDesc': '用于在导入时把下载的对账单与这个账户对应起来。',
+  'acct.field.folder': '交易文件夹',
+  'acct.field.folderDesc': '留空则使用「{name}」。只有当 Transactions/ 下的文件夹名称不同时才需要填写。',
+  'acct.field.counts': '计入预算',
+  'acct.counts.yes': '是 — 普通支出账户',
+  'acct.counts.no': '否 — 投资或储蓄账户',
+  'acct.field.countsDesc': '如果这个账户的利息不算家庭收入、投入也不算家庭支出，请选择「否」。它的交易仍会导入，并显示在交易页面。',
+  'acct.field.limit': '信用额度',
+  'acct.field.limitDesc': '在信用卡上显示额度使用条。',
+  'acct.field.balance': '当前余额',
+  'acct.field.goal': '储蓄目标',
+  'acct.field.goalOpt': '储蓄目标（选填）',
+  'acct.field.goalOptDesc': '在「储蓄与投资」页面显示进度条。',
+  'acct.field.goalDate': '目标日期',
+  'acct.field.monthly': '每月投入',
+  'acct.field.invested': '累计投入',
+  'acct.field.investedOpt': '累计投入（选填）',
+  'acct.field.investedDesc': '你投入的金额，以便据此显示增长。',
+  'acct.field.starting': '起始金额',
+  'acct.field.opened': '开户日期',
+
+  'acct.budget.on': '{name} 重新计入预算',
+  'acct.budget.off': '{name} 不再计入预算合计',
+
+  'acct.creditUsed': '已用额度',
+  'acct.creditOf': '{limit} 中已用 {used}',
+  'acct.overLimit': '超出额度 {amount}',
+  'acct.utilised': '已用 {pct}% · 可用 {available}',
+
+  'acct.kpi.inCredit': '正余额',
+  'acct.kpi.overdrawn': '透支',
+  'acct.kpi.netWorth': '净资产',
+  'acct.kpi.netWorthNote': '仅限这些账户',
+  'acct.kpi.attention': '需要留意',
+  'acct.kpi.attentionNote': '未核实或有偏差的余额',
+  'acct.kpi.allGood': '每个余额都对得上',
+
+  'acct.aria.showTx': '显示 {name} 的交易',
+  'acct.aria.balance': '{name} 的余额 {amount} — 点击可更新',
+  'acct.limitSuffix': ' · 额度 {amount}',
+  'acct.monthlySuffix': ' · {amount}/月',
+
+  'acct.badge.notInBudget': '不计入预算',
+  'acct.badge.noTx': '没有交易',
+  'acct.badge.asOf': '截至 {date}',
+  'acct.badge.neverConfirmed': '从未确认',
+  'acct.badge.unconfirmed': { other: '已 {count} 天未确认' },
+
+  'acct.act.in': ' 收入 · ',
+  'acct.act.out': ' 支出 · ',
+  'acct.act.count': { other: '{month} 有 {count} 笔交易' },
+
+  'acct.recon.since': { other: '此后有 {count} 笔交易 · 推算为 ' },
+  'acct.recon.pending': { other: ' · 其中 {count} 笔日期在未来，尚未计入' },
+  'acct.recon.useThis': '采用',
+  'acct.aria.useThis': '把 {name} 的余额设为 {amount}',
+  'acct.recon.matches': '与你的交易一致',
+  'acct.recon.upToDate': { other: '已是最新 · {count} 笔交易日期在未来' },
+  'acct.recon.setDate': '设置一个余额日期，就能与你的交易核对',
+
+  'acct.foot.updated': '{date} 更新',
+  'acct.foot.noDate': '没有余额日期',
+  'acct.aria.exclude': '不再把 {name} 计入预算合计',
+  'acct.aria.include': '重新把 {name} 计入预算合计',
+  'acct.btn.exclude': '从预算中排除',
+  'acct.btn.include': '计入预算',
+  'acct.aria.edit': '编辑 {name}',
+  'acct.btn.edit': '编辑',
+  'acct.aria.openNote': '打开 {name} 的笔记',
+  'acct.btn.openNote': '打开笔记',
+  'acct.empty': '还没有账户。使用上方的「新建账户」来添加银行账户、储蓄或投资。',
+
+
+  /* ===================== shell chrome + Dashboard page ==================== */
+  'shell.connect.title': '找不到预算文件夹',
+  'shell.connect.btn': '打开插件设置…',
+  'shell.saveChanges': '保存更改',
+  'shell.dash.trend': '支出趋势',
+  'shell.dash.trendSub': '支出与预算对比',
+  'shell.dash.split': '钱花到哪里',
+  'shell.dash.vsActual': '预算与实际',
+  'shell.dash.position': '你的状况',
+  'shell.legend.spent': '支出',
+  'shell.legend.over': '超出预算',
+  'shell.legend.income': '收入',
+  'shell.legend.budget': '预算',
+  'shell.tx.search': '搜索摘要…',
+  'shell.tx.wholeHistory': '全部历史',
+  'shell.tx.export': '导出',
+  'shell.tx.add': '添加交易',
+  'shell.bud.title': '分类预算',
+  'shell.bud.copyPrev': '复制上一周期',
+  'shell.bud.save': '保存预算',
+
+  'dash.greet.morning': '早上好',
+  'dash.greet.afternoon': '下午好',
+  'dash.greet.evening': '晚上好',
+  'dash.greet.line': '{greeting}，{name}',
+  'dash.hero.remaining': '本周期剩余',
+  'dash.hero.overspent': '本周期超支',
+  'dash.hero.sub': '预算 {budgeted}，已花 {spent}',
+  'dash.stat.income': '收入合计',
+  'dash.stat.budgeted': '预算',
+  'dash.stat.spent': '支出合计',
+  'dash.stat.uncategorised': '未分类',
+  'dash.stat.allocated': '已分配 {pct}%',
+  'dash.stat.used': '已用 {pct}%',
+  'dash.stat.review': '在交易页面查看',
+
+  'dash.col.category': '分类',
+  'dash.col.budget': '预算',
+  'dash.col.spent': '支出',
+  'dash.col.remaining': '剩余',
+  'dash.table.empty': '本周期还没有预算或交易。',
+
+  'dash.pos.sub': '截至今日 — 这些数字不随上方的周期变动',
+  'dash.pos.netWorth': '净资产',
+  'dash.pos.netWorthSub': '资产 {owned} · 负债 {owed}',
+  'dash.pos.netWorthSay': '净资产 {net} — 资产 {owned}，负债 {owed}。打开储蓄与投资。',
+  'dash.pos.debt': '债务',
+  'dash.pos.debtSplit': '账户 {accounts} · 债务页面 {debts}',
+  'dash.pos.debtActive': { other: '{count} 笔在还' },
+  'dash.pos.debtNone': '没有欠款',
+  'dash.pos.debtSay': '债务 {amount}。打开债务页面。',
+  'dash.pos.debtSayNone': '没有债务。打开债务页面。',
+  'dash.pos.owed': '别人欠你',
+  'dash.pos.owedOpen': { other: '{count} 笔未收' },
+  'dash.pos.owedOldest': { other: ' · 最早的已过 {days} 天' },
+  'dash.pos.owedRecovered': '已收回 {amount}',
+  'dash.pos.owedNone': '没有借出',
+  'dash.pos.owedSay': {
+    other: '{count} 笔合计 {amount} 尚未收回。打开应收款项。',
+  },
+  'dash.pos.owedSayNone': '没有未收款项。打开应收款项。',
+  'dash.pos.savings': '储蓄与投资',
+  'dash.pos.savingsSub': '储蓄 {savings} · 投资 {invested}',
+  'dash.pos.savingsSay': '储蓄与投资共 {amount}。打开储蓄与投资。',
+
+  'dash.overlap': '已记录的信用卡账户：{accounts} · 信用卡债务：{debts} — 如果同一张卡两边都有，上面会重复计算。',
+  'dash.overlap.btn': '查看债务',
+  'dash.overlap.aria': '在债务页面查看已记录的债务',
+  'dash.stale.noDate': '它们都没有日期',
+  'dash.stale.oldest': { other: '最早的是 {days} 天前' },
+  'dash.stale.all': { other: '基于 {count} 个近期无人确认的余额' },
+  'dash.stale.some': '{total} 个余额中，有 {stale} 个近期无人确认',
+  'dash.stale.line': '{line} — {age}。',
+  'dash.stale.btn': '查看余额',
+  'dash.stale.aria': '在账户页面查看账户余额',
+
+  'dash.trend.range': '支出趋势的时间范围',
+  'dash.trend.sub': { other: '支出与预算 · {count} 个周期' },
+  'dash.trend.clamped': ' · 目前已导入的全部历史',
+  'dash.trend.empty': '再导入一个周期的交易，趋势线就会从这里开始。',
+  'dash.trend.aria': { other: '最近 {count} 个周期的支出、预算与收入' },
+
+  'dash.split.uncatNote': ' · 未分类 {amount}，未显示',
+  'dash.split.onlyUncat': '本周期支出了 {amount}，但还没有任何一笔被归类 — 在交易页面设置分类后，这里就会显示占比。',
+  'dash.split.empty': '本周期还没有被归为支出的内容。',
+  'dash.split.aria': '{month} 的支出占比：',
+  'dash.split.sliceAria': '{cat}：{amount}，占支出的 {pct}% — 显示交易',
+  'dash.split.noteAria': '打开 {cat} 的分类笔记',
+  'dash.split.noteMissing': '找不到「{cat}」的分类笔记',
+
+  'dash.err.render': '无法绘制{label} — {error}',
+
+};

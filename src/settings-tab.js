@@ -7,6 +7,12 @@ const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obs
 const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
+/* Namespace import, not `const { t }`: this codebase already binds `t` as a
+   parameter name in 22 places (`.addText(t => …)`, `el('tr', …)` neighbours in
+   the views), so a bare `t` would be shadowed exactly where translation is most
+   needed, silently and without a runtime error. `i18n.t(...)` cannot be. */
+const i18n = require('./i18n');
+const { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
 const { periodDaysOrZero } = require('./dates');
 const { yamlStr } = require('./markdown');
 const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
@@ -16,9 +22,16 @@ const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
    isRealIsoDate — 2026-13-45 is shaped like a date and is not one. */
 
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
-   API binds a control to this.plugin.settings[key] by default, so these four
+   API binds a control to this.plugin.settings[key] by default, so these
    route through the getControlValue/setControlValue overrides instead. */
-const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'currency', 'period_days', 'period_anchor']);
+const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'language', 'currency', 'period_days', 'period_anchor']);
+
+/* Language dropdown options, as {id: nativeName}. Built off LANGUAGE_ORDER —
+   itself derived from the tables that actually ship — so the dropdown can never
+   offer a language with no strings behind it, the same way palette.test.cjs
+   stops PALETTE_PRESETS offering a palette with no CSS behind it. */
+const languageOptions = () =>
+  Object.fromEntries(LANGUAGE_ORDER.map(id => [id, LANGUAGE_NAMES[id]]));
 
 /* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
 const PALETTE_DESC = 'Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.';
@@ -160,6 +173,11 @@ class BudgetSettingTab extends PluginSettingTab {
   }
   async renderMdSettings(containerEl) {
     const md = await this.plugin.readBudgetSettingsMd();
+    /* The settings tab can be opened before any budget view has ever loaded, so
+       it cannot rely on load.js having set the language. Set it here off the
+       file we have just read — otherwise the one screen carrying the language
+       picker is the one screen guaranteed to render in the wrong language. */
+    setLanguage(md.language || i18n.defaultLanguage());
 
     new Setting(containerEl)
       .setName('Name / household')
@@ -231,7 +249,7 @@ class BudgetSettingTab extends PluginSettingTab {
           this._anchorTimer = setTimeout(async () => {
             const next = v.trim();
             if (next && !isRealIsoDate(next)) {
-              new Notice(`Budget: "${next}" is not a date — use the picker, or type YYYY-MM-DD.`, 6000);
+              new Notice(i18n.t('settings.dateNotReal', { value: next }), 6000);
               return;
             }
             await this.warnIfAnchorReslices(md, next);
@@ -258,6 +276,29 @@ class BudgetSettingTab extends PluginSettingTab {
         d.onChange(async v => {
           await this.plugin.updateBudgetSettingsMd('country', v);
           this.plugin.reloadViews();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName(i18n.t('settings.language.name'))
+      .setDesc(i18n.t('settings.language.desc'))
+      .addDropdown(d => {
+        for (const [id, label] of Object.entries(languageOptions())) d.addOption(id, label);
+        d.setValue(i18n.resolveLanguage(md.language ?? i18n.defaultLanguage()));
+        d.onChange(async v => {
+          // Set the live language BEFORE the write so the redraw below is
+          // already in the new language — the settings tab is the one screen
+          // guaranteed to be open when this changes, so leaving it in the old
+          // language until the next open reads as if nothing happened.
+          setLanguage(v);
+          await this.plugin.updateBudgetSettingsMd('language', v);
+          // Re-translate any OPEN budget view. reloadViews() re-reads the vault
+          // but does not re-mount, and the shell is translated at mount — so
+          // without this the drawer and page titles sit in the old language
+          // until the view is closed and reopened.
+          this.plugin.forEachView(ctl => ctl.applyLanguage());
+          this.plugin.reloadViews();
+          this.display();
         });
       });
 
@@ -339,9 +380,7 @@ class BudgetSettingTab extends PluginSettingTab {
   noticeBudgetsKept(before, after) {
     const n = this.strandedBudgetCount(before, after);
     if (!n) return;
-    new Notice(
-      `Budget: your ${n} existing budget ${n === 1 ? 'file stays' : 'files stay'} in the vault. ` +
-      `They can't be shown at this period length, and they come straight back if you change it back.`, 10000);
+    new Notice(i18n.t('settings.budgetsKept', { count: n }), 10000);
   }
   monthBudgetCount() {
     const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
@@ -362,10 +401,7 @@ class BudgetSettingTab extends PluginSettingTab {
     if ((isoDayNumber(next) - isoDayNumber(prev)) % days === 0) return;
     const n = this.datedBudgetCount();
     if (!n) return;
-    new Notice(
-      `Budget: this shifts every period boundary. ${n} budget ${n === 1 ? 'file' : 'files'} ` +
-      `named by date will stop matching — they stay in your vault, and setting this date ` +
-      `back to ${prev} brings them straight back.`, 12000);
+    new Notice(i18n.t('settings.anchorReslices', { count: n, prev }), 12000);
   }
 
   /* Obsidian's own warning for a missing binding points here: override these
@@ -385,6 +421,10 @@ class BudgetSettingTab extends PluginSettingTab {
       const c = (md.country ?? 'za').toString().trim().toLowerCase();
       return PROFILES[c] ? c : 'za';
     }
+    // Absent means "follow Obsidian" rather than a stored 'en' — the control
+    // has to show what the app is actually running, which for an untouched
+    // vault is Obsidian's own display language, not English.
+    if (key === 'language') return i18n.resolveLanguage(md.language ?? i18n.defaultLanguage());
     return undefined;
   }
   async setControlValue(key, value) {
@@ -417,13 +457,25 @@ class BudgetSettingTab extends PluginSettingTab {
       : key === 'period_days' ? String(periodDaysOrZero(value))
       : key === 'period_anchor' ? String(value).trim()
       : key === 'country' ? String(value)
+      : key === 'language' ? i18n.resolveLanguage(value)
       : null;
     if (raw === null) return;
+    // Same ordering as display()'s dropdown: the live language moves before the
+    // write, so whatever redraws next is already in the new language.
+    if (key === 'language') setLanguage(raw);
     await this.plugin.updateBudgetSettingsMd(key, raw);
+    // Same as display()'s dropdown: re-translate open views in place, because
+    // reloadViews() re-reads the vault without re-mounting the shell.
+    if (key === 'language') this.plugin.forEachView(ctl => ctl.applyLanguage());
     this.plugin.reloadViews();
   }
 
   getSettingDefinitions() {
+    /* Same reason renderMdSettings() does it, via the synchronous cache read
+       this half is restricted to: the names and descriptions below are
+       translated at call time, so the language has to be current before the
+       list is built. */
+    setLanguage(this.mdSettings().language || i18n.defaultLanguage());
     return [
       {
         name: 'Budget folder',
@@ -529,6 +581,14 @@ class BudgetSettingTab extends PluginSettingTab {
         control: {
           type: 'dropdown', key: 'country', defaultValue: 'za',
           options: Object.fromEntries(COUNTRY_ORDER.map(code => [code, PROFILES[code].label])),
+        },
+      },
+      {
+        name: i18n.t('settings.language.name'),
+        desc: i18n.t('settings.language.desc'),
+        control: {
+          type: 'dropdown', key: 'language', defaultValue: i18n.defaultLanguage(),
+          options: languageOptions(),
         },
       },
       {
