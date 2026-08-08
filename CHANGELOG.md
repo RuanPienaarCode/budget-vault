@@ -3,6 +3,69 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.5 — 2026-08-08
+
+### Fixed
+
+- **The community scorecard could not verify the build.** It reported "release
+  build could not be verified against the private source repository" — the scan
+  clones the source to rebuild it, and the repository was briefly private while
+  the licence was being settled. Attestations kept passing throughout, which is
+  what made the finding confusing: the provenance was never in doubt, only the
+  clone. The repository is public again, and this release exists to trigger a
+  fresh scan, because the finding does not clear on its own when visibility
+  changes back — it is pinned to the scan that failed.
+
+  No functional change. The code is identical to 1.11.4.
+
+## 1.11.4 — 2026-08-08
+
+### Added
+
+- **An account can be made from wherever one is asked for.** Creating an account
+  used to live only on Accounts and Savings & Investments, so an empty vault
+  dead-ended on "add an account first" with no account page in sight. The
+  Transactions toolbar and the import review now offer it too, and the import
+  review selects the new account as the destination for the rows on screen.
+
+### Fixed
+
+- **The Transactions filters follow the language.** Switching language left
+  "All accounts", "All categories" and "Uncategorised" in the previous one.
+  The filter selects are deliberately not rebuilt when their contents already
+  match — a blind rebuild drops the reader's current selection — but the check
+  compared only the account and category names, which a language switch does
+  not touch. It therefore held on exactly the render that had to run.
+
+## 1.11.3 — 2026-08-08
+
+### Fixed
+
+- **A period name could name a century nobody meant**, and the tab described a
+  cycle it was not running.
+
+### Changed
+
+- The store description now promises the screens that are actually translated
+  rather than all of them, and says what the app does instead of only what it
+  does not do.
+
+## 1.11.2 — 2026-08-07
+
+### Changed
+
+- **Relicensed to PolyForm Noncommercial 1.0.0** — free for any personal use,
+  commercial use not permitted. A NOTICE file records the change.
+
+  Releases up to and including 1.11.1 were published under the MIT licence and
+  remain available under it; a licence already granted cannot be withdrawn from
+  copies already distributed. The change applies going forward.
+
+  PolyForm Noncommercial is not an OSI-approved licence — by definition, since
+  a noncommercial restriction is not open source — so GitHub reports NOASSERTION
+  and the directory review warns "no recognized license". That is the standing
+  cost of the choice, not a defect.
+
 ## 1.11.1 — 2026-08-07
 
 ### Fixed
