@@ -18,11 +18,22 @@ All notable changes to Budget Vault. Versions match the plugin version in
 
 ### Fixed
 
-- **Publishes a current version for the community listing to pick up.** Cut
-  alongside re-publishing the directory submission, so the review has a fresh
-  release event to attach to rather than the snapshot it was pinned to.
+- **Publishes a current version for the community listing to pick up.** The
+  manifest had moved to 1.11.7 with no matching release, which Obsidian reports
+  as "no release matches your manifest version" and which blocks scanning and
+  distribution entirely.
 
   No functional change. The code is identical to 1.11.4.
+
+### Changed
+
+- **Relicensed back to the MIT licence.** Budget Vault is free to use, modify
+  and redistribute, including commercially. This reverses the PolyForm
+  Noncommercial change made in 1.11.2; releases 1.11.2 through 1.11.6 remain
+  under PolyForm Noncommercial, and this applies from 1.11.7 onward.
+
+  MIT is a licence GitHub recognises, so this also clears the directory
+  review's "the repository does not have a recognized license" finding.
 
 ## 1.11.6 — 2026-08-08
 
