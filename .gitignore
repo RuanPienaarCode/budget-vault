@@ -16,3 +16,6 @@ _preview/
 
 # OS noise
 .DS_Store
+
+# npm build deps — the bundle is committed, its inputs are not
+node_modules/
