@@ -1,6 +1,6 @@
 # Budget Vault
 
-![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-green)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.0-7c3aed)
 ![Mobile ready](https://img.shields.io/badge/mobile-iOS%20%26%20Android-blue)
 
@@ -108,7 +108,7 @@ Budget Vault is free and always will be. If it's useful to you and you'd like to
 
 ## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE) © Ruan Pienaar
+[MIT License](LICENSE) © Ruan Pienaar
 
-Free for personal and other noncommercial use — use it, change it, share it.
-Commercial use is not granted; get in touch if you need a commercial licence.
+Use it, change it, share it — personally or commercially. Just keep the
+copyright and permission notice with any substantial portion of it.

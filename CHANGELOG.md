@@ -5,6 +5,17 @@ All notable changes to Budget Vault. Versions match the plugin version in
 
 ## 1.11.7 — 2026-08-08
 
+### Changed
+
+- **Relicensed to the MIT License.** The PolyForm Noncommercial experiment ran
+  for one day and is over. Noncommercial and "recognised by GitHub" are
+  mutually exclusive — every noncommercial licence reports NOASSERTION, and
+  neither a different noncommercial licence nor a Commons Clause rider on MIT
+  changes that. MIT is recognised, at the cost of permitting commercial use.
+
+  Releases 1.11.2 through 1.11.6 stay PolyForm Noncommercial for anyone
+  holding those copies; MIT applies from 1.11.7 onward. See NOTICE.
+
 ### Fixed
 
 - **Publishes a current version for the community listing to pick up.** Cut
