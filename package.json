@@ -1,0 +1,17 @@
+{
+  "name": "budget-vault",
+  "version": "1.11.7",
+  "description": "Track your budget, spending, debt and savings as plain files in your own vault.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "test": "node scripts/run-tests.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

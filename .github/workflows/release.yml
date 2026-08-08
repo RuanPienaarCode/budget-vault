@@ -26,20 +26,24 @@ jobs:
       - uses: actions/checkout@v7
 
       # main.js is a committed build artifact and this workflow publishes the
-      # COMMITTED file — so a src/ change released without running ./build.sh
-      # would ship a stale bundle with nothing to catch it. Rebuild and diff.
-      # build.sh also runs the guard tests, which otherwise only ever run on a
-      # developer's machine.
-      # Pinned deliberately: the check below is a BYTE comparison, so a floating
-      # "latest" would fail the release whenever bun changes its output — a false
-      # alarm that looks identical to a real stale bundle. Bump this in the same
-      # commit as any local bun upgrade.
-      - uses: oven-sh/setup-bun@v2
+      # COMMITTED file — so a src/ change released without rebuilding would ship
+      # a stale bundle with nothing to catch it. Rebuild and diff.
+      #
+      # `npm ci`, not `npm install`: it installs EXACTLY package-lock.json. That
+      # is what makes the rebuild reproducible, and it is the same path
+      # Obsidian's scorecard takes when it clones this repo to verify the
+      # release build against the published main.js. The bundler version is
+      # pinned in the lockfile, so the byte comparison below cannot be broken by
+      # a floating upgrade — a false alarm that would look identical to a real
+      # stale bundle.
+      - uses: actions/setup-node@v4
         with:
-          bun-version: "1.2.17"
+          node-version: "22"
+          cache: "npm"
 
       - name: Rebuild and verify the committed bundle is current
         run: |
+          npm ci
           ./build.sh
           if ! git diff --exit-code -- main.js; then
             echo "main.js does not match src/ — run ./build.sh and commit the result." >&2
