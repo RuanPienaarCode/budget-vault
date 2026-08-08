@@ -3,6 +3,26 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.6 — 2026-08-08
+
+### Fixed
+
+- **Re-fires the community scorecard's build verification.** The HIGH finding
+  ("release build could not be verified against the private source repository")
+  is pinned to the scan that produced it and only clears on a new release event.
+  Two earlier attempts were spent before the underlying state was actually
+  sound: 1.11.4 landed while the repository was private again, and 1.11.5 was
+  cut while seven release tags still pointed at commits a history rewrite had
+  orphaned, so a clone could not reach the source those releases were built
+  from.
+
+  Both are fixed now — the repository answers 200 to an anonymous request, every
+  tag from 1.7.1 onward matches the commit its release was built and attested
+  from, and 1.11.5 was confirmed to rebuild byte-identical to its published
+  `main.js` from a clean anonymous clone.
+
+  No functional change. The code is identical to 1.11.4.
+
 ## 1.11.5 — 2026-08-08
 
 ### Fixed
