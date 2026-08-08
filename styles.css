@@ -1735,8 +1735,31 @@
 .budget-tidy-empty { font-style: italic; opacity: .7; font-weight: 500; }
 .budget-tidy-why { font-size: 12px; opacity: .68; margin-top: 1px; overflow-wrap: anywhere; }
 .budget-tidy-hint { margin-top: 10px; font-size: 12px; line-height: 1.45; opacity: .65; }
+
+/* Re-slice rows reuse the tidy list's box and separators — same modal furniture,
+   one fewer thing to keep in step. The row itself is a <label> so the whole
+   line is a hit target for its checkbox, which on a phone is the difference
+   between accepting thirty lines and giving up on the third. */
+.budget-reslice-row {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; cursor: pointer;
+}
+.budget-reslice-row input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+.budget-reslice-cat { flex: 1 1 auto; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+/* Tabular figures so the old and new columns line up down the list — a column
+   of amounts that jitters is materially harder to scan for the one that looks
+   wrong, which is the entire job being asked of the reader here. */
+.budget-reslice-nums { flex: 0 0 auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.budget-reslice-old { opacity: .6; text-decoration: line-through; }
+.budget-reslice-arrow { opacity: .5; }
+.budget-reslice-new { font-weight: 600; }
+.budget-reslice-row .budget-tidy-why { flex: 1 1 100%; margin-left: 26px; }
+.budget-reslice-bulk { display: flex; justify-content: flex-end; margin-top: 8px; }
 @media (max-width: 480px) {
   .budget-tidy-list { max-height: 40vh; }
+  /* The amounts drop under the category rather than squeezing beside it — at
+     320px the two columns collide and the new figure wraps mid-number. */
+  .budget-reslice-cat { flex: 1 1 100%; }
+  .budget-reslice-nums { margin-left: 26px; }
 }
 @media (max-width: 480px) {
   .budget-split-part { flex-wrap: wrap; }

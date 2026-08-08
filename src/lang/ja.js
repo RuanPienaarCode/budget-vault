@@ -278,6 +278,10 @@ module.exports = {
     other: 'カテゴリを {count} 件引き継ぎました — この期間の金額を設定してください',
   },
   'bud.shape.allHere': 'その予算のカテゴリはすべてすでにここにあります',
+  'bud.shape.bringAmounts': '金額も引き継ぐ…',
+  'bud.shape.broughtAmounts': {
+    other: '金額を {count} 件引き継ぎました — 確認してから保存してください',
+  },
 
   'bud.total.income': '収入合計',
   'bud.total.incomeNote': 'これまでに {amount} を受け取りました',

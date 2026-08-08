@@ -280,6 +280,11 @@ module.exports = {
     other: 'Se trajeron {count} categorías — pon los importes para este periodo',
   },
   'bud.shape.allHere': 'Todas las categorías de ese presupuesto ya están aquí',
+  'bud.shape.bringAmounts': 'Traer también los importes…',
+  'bud.shape.broughtAmounts': {
+    one: 'Se trajo {count} importe — revísalo y luego guarda',
+    other: 'Se trajeron {count} importes — revísalos y luego guarda',
+  },
 
   'bud.total.income': 'Ingresos totales',
   'bud.total.incomeNote': '{amount} recibido hasta ahora',

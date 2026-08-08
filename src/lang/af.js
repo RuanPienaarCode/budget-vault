@@ -278,6 +278,11 @@ module.exports = {
     other: '{count} kategorieë oorgebring — stel die bedrae vir hierdie tydperk',
   },
   'bud.shape.allHere': 'Elke kategorie uit daardie begroting is reeds hier',
+  'bud.shape.bringAmounts': 'Bring die bedrae ook oor…',
+  'bud.shape.broughtAmounts': {
+    one: '{count} bedrag oorgebring — kyk daarna en stoor dan',
+    other: '{count} bedrae oorgebring — kyk daarna en stoor dan',
+  },
 
   'bud.total.income': 'Totale inkomste',
   'bud.total.incomeNote': '{amount} tot dusver ontvang',

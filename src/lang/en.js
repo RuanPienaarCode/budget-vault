@@ -290,6 +290,11 @@ module.exports = {
     other: 'Brought over {count} categories — set the amounts for this period',
   },
   'bud.shape.allHere': 'Every category from that budget is already here',
+  'bud.shape.bringAmounts': 'Bring the amounts across too…',
+  'bud.shape.broughtAmounts': {
+    one: 'Brought {count} amount across — check it, then save',
+    other: 'Brought {count} amounts across — check them, then save',
+  },
 
   'bud.total.income': 'Total income',
   'bud.total.incomeNote': '{amount} received so far',

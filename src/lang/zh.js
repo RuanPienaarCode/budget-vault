@@ -278,6 +278,10 @@ module.exports = {
     other: '已带入 {count} 个分类 — 请为本周期填上金额',
   },
   'bud.shape.allHere': '那份预算中的分类都已经在这里了',
+  'bud.shape.bringAmounts': '也把金额带过来…',
+  'bud.shape.broughtAmounts': {
+    other: '已带入 {count} 笔金额 — 请核对后再保存',
+  },
 
   'bud.total.income': '收入合计',
   'bud.total.incomeNote': '目前已收到 {amount}',

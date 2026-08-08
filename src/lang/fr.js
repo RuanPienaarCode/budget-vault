@@ -284,6 +284,11 @@ module.exports = {
     other: '{count} catégories reprises — indiquez les montants pour cette période',
   },
   'bud.shape.allHere': 'Toutes les catégories de ce budget sont déjà ici',
+  'bud.shape.bringAmounts': 'Reprendre aussi les montants…',
+  'bud.shape.broughtAmounts': {
+    one: '{count} montant repris — vérifiez-le, puis enregistrez',
+    other: '{count} montants repris — vérifiez-les, puis enregistrez',
+  },
 
   'bud.total.income': 'Revenus totaux',
   'bud.total.incomeNote': '{amount} reçu jusqu\'ici',

@@ -9,13 +9,15 @@
    in the other is invisible to whoever is on the other version, with nothing at
    runtime to complain.
 
-   Four invariants, pinned so the drift becomes a build failure:
+   Five invariants, pinned so the drift becomes a build failure:
 
      1. both paths cover the same set of setting names
      2. every declarative control key is either a plugin-data key or a
         Settings.md key routed through the get/setControlValue overrides
      3. every MD_KEY is actually handled in both overrides
      4. getSettingDefinitions() stays cheap — no await, no vault read
+     5. a description that has to react to the file's state is derived on both
+        sides, not inlined as the bare constant on one of them
 
    Pure text analysis — no Obsidian, no DOM.
      node tests/settings-parity.test.cjs
@@ -98,5 +100,30 @@ ok(!/\bawait\b/.test(defsBody), 'getSettingDefinitions() must not await — it r
 ok(!/readBudgetSettingsMd|vault\.(read|cachedRead)/.test(defsBody),
   'getSettingDefinitions() must not read the vault — use mdSettings() (metadataCache) instead');
 ok(/metadataCache/.test(src), 'mdSettings() reads frontmatter from metadataCache, not the vault');
+
+/* ---- 5. state-dependent descriptions are derived on BOTH sides ---- */
+/* Period length's description carries a warning when Settings.md names a cycle
+   length with no usable anchor — the app runs payday months in that pairing, so
+   a description that just states what the dropdown says would be describing a
+   cycle the app is not running. It is computed by periodLengthDesc(), and the
+   failure mode this pins is one half keeping the derived call while the other
+   reverts to the bare constant: the two tabs would then disagree about whether
+   to warn, and only the users on the other side of the 1.13 line would see it.
+   Check 1 cannot catch that — the setting NAME is present either way.
+
+   Anchored on the CALL SITE, not the bare name: periodLengthDesc is DEFINED
+   above display(), so it falls inside the imperative slice and a loose
+   /periodLengthDesc\(/ would match its own definition and pass even after
+   display() reverted to the constant. */
+for (const [label, half, call] of [
+  ['display()', imperative, /\.setDesc\(periodLengthDesc\(/],
+  ['getSettingDefinitions()', declarative, /\bdesc:\s*periodLengthDesc\(/],
+]) {
+  ok(call.test(half),
+    `${label} must derive the Period length description via periodLengthDesc(), not inline PERIOD_LENGTH_DESC`);
+  ok(!/(?:setDesc\(|desc:\s*)PERIOD_LENGTH_DESC\b/.test(half),
+    `${label} uses the bare PERIOD_LENGTH_DESC — the no-anchor warning would never appear on that tab`);
+}
+ok(/function periodLengthDesc\(/.test(src), 'periodLengthDesc() is defined once and shared by both halves');
 
 console.log(`PASS — settings tab parity: ${impNames.size} settings declared both ways (${checks} checks).`);

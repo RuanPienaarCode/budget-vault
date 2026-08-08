@@ -279,6 +279,11 @@ module.exports = {
     other: '{count} Kategorien übernommen — setze die Beträge für diesen Zeitraum',
   },
   'bud.shape.allHere': 'Jede Kategorie aus diesem Budget ist bereits hier',
+  'bud.shape.bringAmounts': 'Auch die Beträge übernehmen…',
+  'bud.shape.broughtAmounts': {
+    one: '{count} Betrag übernommen — prüfe ihn und speichere dann',
+    other: '{count} Beträge übernommen — prüfe sie und speichere dann',
+  },
 
   'bud.total.income': 'Einnahmen gesamt',
   'bud.total.incomeNote': '{amount} bisher erhalten',

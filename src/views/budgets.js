@@ -5,12 +5,15 @@
 const { el, icoEl } = require('../dom');
 const { escMd, patchFrontmatter } = require('../markdown');
 const { TYPE_ORDER } = require('../constants');
+const { askBudgetReslice } = require('../modal');
+const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
+const { ISO_DATE, isoDayNumber } = require('../dates');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, promptCreateCategory, promptDeleteCategory } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -42,6 +45,74 @@ module.exports = function registerBudgets(ctx) {
       class: 'btn btn-ghost', type: 'button',
       onclick: () => bringOverFrom(newest),
     }, i18n.t('bud.shape.bring', { newest })));
+    box.append(el('button', {
+      class: 'btn btn-ghost', type: 'button',
+      onclick: () => resliceFrom(newest),
+    }, i18n.t('bud.shape.bringAmounts')));
+  }
+
+  /* How many days the CURRENT period runs — the denominator's partner in the
+     pro-rata. An interval cycle knows its own length; a payday month has to be
+     measured, because "a month" is 28 to 31 days and scaling by the wrong one
+     puts every suggestion out by up to 10%. */
+  function currentPeriodDays() {
+    const iv = intervalDays();
+    if (iv) return iv;
+    const r = periodRange(S.period);
+    return isoDayNumber(r.end) - isoDayNumber(r.start) + 1;
+  }
+  /* How many days the STRANDED periods ran.
+
+     A month-named file can be measured the same way — periodRange falls to its
+     month branch for a YYYY-MM key even while an interval is running, so it
+     still describes the payday month that key names. A date-named file cannot:
+     its length was the cycle in force when it was written, which nothing
+     records, so it is inferred from the spacing of its siblings and comes back
+     null when there is only one. periodRange is NOT asked about a date key —
+     under a monthly setting it would read '2026-08-07' as August and answer
+     with a month. */
+  function strandedPeriodDays(key, others) {
+    if (ISO_DATE.test(key)) return inferIntervalFromKeys(others);
+    const r = periodRange(key);
+    return isoDayNumber(r.end) - isoDayNumber(r.start) + 1;
+  }
+
+  /* The amounts half of the offer above. Writes nothing to disk: accepted rows
+     land in the draft and the Save button lights up, so a re-slice is still one
+     more deliberate act away from the vault — and is discarded by simply
+     navigating away, like any other unsaved edit. */
+  async function resliceFrom(key) {
+    const src = S.budgets[key] || [];
+    if (!src.length) return toast(i18n.t('bud.shape.empty'), true);
+    const draft = budgetDraft();
+    const existingByCategory = {};
+    for (const d of draft) if (d.amount) existingByCategory[d.category] = d.amount;
+    const plan = resliceBudget({
+      rows: src,
+      oldDays: strandedPeriodDays(key, otherShapeBudgets()),
+      dstDays: currentPeriodDays(),
+      existingByCategory,
+    });
+    const accepted = await askBudgetReslice(app, plan, { money, sourceLabel: key });
+    if (!accepted || !accepted.length) return;
+    for (const a of accepted) {
+      let d = draft.find(x => x.category === a.category);
+      if (!d) {
+        const from = src.find(r => r.category === a.category) || {};
+        d = { category: a.category, type: from.type, amount: 0, notes: '' };
+        draft.push(d);
+      }
+      d.amount = a.amount;
+      // The loader's "could not parse, write back verbatim" flag belongs to the
+      // figure it was read with. This is a number we just computed.
+      d.amountRaw = null;
+      d.inFile = true;
+      if (!(d.notes && d.notes.trim()) && a.notes) d.notes = a.notes;
+    }
+    budDirty = true;
+    $('#budSave').disabled = false;
+    renderBudgets();
+    toast(i18n.t('bud.shape.broughtAmounts', { count: accepted.length }));
   }
   /* Carries structure, never amounts — kept pure and separate from the button
      so the promise in that last clause is actually testable. Halving a monthly

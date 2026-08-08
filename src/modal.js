@@ -322,9 +322,126 @@ function askRulesCleanup(app, report) {
   return new Promise(res => new RulesCleanupModal(app, report, res).open());
 }
 
+/* Bring a stranded budget's AMOUNTS across, one accepted line at a time.
+
+   The sibling of the "bring over the categories and notes" button, and the
+   reason that button says "categories and notes": a scaled figure is a guess,
+   and a guess that arrives without anyone looking at it is indistinguishable
+   from a number the user chose. So every row starts UNTICKED and shows its
+   arithmetic — old amount, the naive pro-rata, and the factor in the lead — and
+   the button counts what has actually been accepted.
+
+   "Accept all" exists because thirty categories is a lot of clicking, and it is
+   not the thing the issue warned against: every figure it ticks is already on
+   screen next to the old one. What must never exist is a path that writes them
+   without showing them. */
+class BudgetResliceModal extends Modal {
+  constructor(app, plan, opts, resolve) {
+    super(app);
+    this.plan = plan;
+    this.money = opts.money || (n => String(n));
+    this.sourceLabel = opts.sourceLabel || '';
+    this.resolve = resolve;
+    this.answer = null;
+    this.accepted = new Set();
+  }
+
+  onOpen() {
+    const { rows, oldDays, dstDays, factor } = this.plan;
+    this.titleEl.setText('Bring the amounts across');
+    const c = this.contentEl;
+
+    if (!rows.length) {
+      c.append(el('p', { class: 'budget-tidy-lead' }, 'That budget has no amounts to bring across.'));
+      new Setting(c).addButton(b => b.setButtonText('Close').setCta().onClick(() => this.close()));
+      return;
+    }
+
+    c.append(el('p', { class: 'budget-tidy-lead' }, factor
+      ? `Budgets/${this.sourceLabel}.md ran ${oldDays} days; this period runs ${dstDays}. `
+        + `Each suggestion below is the old amount × ${dstDays}/${oldDays} — a flat pro-rata, `
+        + 'which is right for something like groceries and wrong for a rent or a subscription '
+        + 'that costs the same whatever the period length. Tick the lines where scaling is the '
+        + 'right answer; set the others yourself afterwards.'
+      : `Budgets/${this.sourceLabel}.md is the only budget saved under its length, so how long `
+        + 'its periods ran cannot be worked out from their names — and nothing in the file '
+        + 'records it. These are the old amounts UNCHANGED, not re-sliced. Tick any that happen '
+        + 'to be right for this period.'));
+
+    const list = el('div', { class: 'budget-tidy-list budget-reslice-list' });
+    const boxes = [];
+    for (const r of rows) {
+      const cb = el('input', { type: 'checkbox' });
+      cb.checked = false;
+      cb.addEventListener('change', () => {
+        if (cb.checked) this.accepted.add(r.category); else this.accepted.delete(r.category);
+        sync();
+      });
+      boxes.push({ cb, row: r });
+      const to = r.scaled ? r.suggested : r.oldAmount;
+      list.append(el('label', { class: 'budget-tidy-row budget-reslice-row' },
+        cb,
+        el('div', { class: 'budget-reslice-cat' }, r.category),
+        el('div', { class: 'budget-reslice-nums' },
+          el('span', { class: 'budget-reslice-old' }, this.money(r.oldAmount)),
+          el('span', { class: 'budget-reslice-arrow' }, ' → '),
+          el('span', { class: 'budget-reslice-new' }, this.money(to))),
+        r.hasExisting
+          ? el('div', { class: 'budget-tidy-why' },
+            `already set to ${this.money(r.existing)} for this period — ticking this replaces it`)
+          : null));
+    }
+    c.append(list);
+
+    const all = el('button', { class: 'btn btn-ghost', type: 'button' }, 'Accept all');
+    all.addEventListener('click', () => {
+      const turnOn = this.accepted.size < rows.length;
+      for (const { cb, row } of boxes) {
+        cb.checked = turnOn;
+        if (turnOn) this.accepted.add(row.category); else this.accepted.delete(row.category);
+      }
+      sync();
+    });
+    c.append(el('div', { class: 'budget-reslice-bulk' }, all));
+
+    let applyBtn = null;
+    const sync = () => {
+      const n = this.accepted.size;
+      all.textContent = n === rows.length ? 'Clear all' : 'Accept all';
+      if (applyBtn) {
+        applyBtn.setDisabled(n === 0);
+        applyBtn.setButtonText(n ? `Bring ${n} ${n === 1 ? 'amount' : 'amounts'} across` : 'Nothing accepted yet');
+      }
+    };
+
+    new Setting(c)
+      .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
+      .addButton(b => {
+        applyBtn = b;
+        b.setCta().onClick(() => {
+          if (!this.accepted.size) return;
+          this.answer = rows
+            .filter(r => this.accepted.has(r.category))
+            .map(r => ({ category: r.category, amount: r.scaled ? r.suggested : r.oldAmount, notes: r.notes }));
+          this.close();
+        });
+        sync();
+      });
+  }
+
+  onClose() { this.contentEl.empty(); this.resolve(this.answer); }
+}
+
+function askBudgetReslice(app, plan, opts) {
+  return new Promise(res => new BudgetResliceModal(app, plan, opts || {}, res).open());
+}
+
 /* The ask* wrappers are the interface: each opens its Modal and resolves with
    the reader's answer, so a caller never has to remember to .open() one or to
    hand it a callback. FieldModal and ConfirmModal had no caller outside this
    file — SplitModal and RulesCleanupModal stay exported because their tests
    drive the class directly. */
-module.exports = { askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup };
+module.exports = {
+  askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup,
+  BudgetResliceModal, askBudgetReslice,
+};
