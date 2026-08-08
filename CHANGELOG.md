@@ -3,6 +3,16 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.7 — 2026-08-08
+
+### Fixed
+
+- **Publishes a current version for the community listing to pick up.** Cut
+  alongside re-publishing the directory submission, so the review has a fresh
+  release event to attach to rather than the snapshot it was pinned to.
+
+  No functional change. The code is identical to 1.11.4.
+
 ## 1.11.6 — 2026-08-08
 
 ### Fixed
