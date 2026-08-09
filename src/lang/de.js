@@ -592,6 +592,8 @@ module.exports = {
     one: 'Ausgegeben, budgetiert und Einnahmen über den letzten {count} Zeitraum',
     other: 'Ausgegeben, budgetiert und Einnahmen über die letzten {count} Zeiträume',
   },
+  'dash.trend.tip.over': '{amount} über Budget',
+  'dash.trend.tip.under': '{amount} unter Budget',
 
   'dash.split.uncatNote': ' · {amount} ohne Kategorie, nicht gezeigt',
   'dash.split.onlyUncat': '{amount} sind in diesem Zeitraum abgeflossen, davon ist aber noch nichts kategorisiert — setze Kategorien unter Transaktionen, dann erscheint die Aufteilung hier.',

@@ -591,6 +591,8 @@ module.exports = {
     one: 'Bestee, begroot en inkomste oor die laaste {count} tydperk',
     other: 'Bestee, begroot en inkomste oor die laaste {count} tydperke',
   },
+  'dash.trend.tip.over': '{amount} oor begroting',
+  'dash.trend.tip.under': '{amount} onder begroting',
 
   'dash.split.uncatNote': ' · {amount} ongekategoriseer, nie gewys nie',
   'dash.split.onlyUncat': '{amount} het hierdie tydperk uitgegaan, maar niks daarvan is nog gekategoriseer nie — stel kategorieë in Transaksies, dan verskyn die verdeling hier.',

@@ -11,7 +11,7 @@ const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
-  linePath, areaPath, areaGradient, arcPath, tip, distinctColors,
+  linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
   historicalRanges, rangeFor, rangePills,
 } = require('../chart');
 
@@ -447,36 +447,154 @@ module.exports = function registerDashboard(ctx) {
     });
 
     /* Segment by segment rather than one polyline, so a period that broke its
-       budget colours only the legs touching it. */
+       budget colours only the legs touching it. Kept in a list so the two legs
+       touching a focused point can thicken without the rest of the line
+       moving — see focusAt below. */
+    const segs = [];
     for (let i = 1; i < data.length; i++) {
-      add('line', {
+      segs.push(add('line', {
+        class: 'trend-seg',
         x1: s.x(i - 1), y1: s.y(data[i - 1].spent), x2: s.x(i), y2: s.y(data[i].spent),
         stroke: over(data[i - 1]) || over(data[i]) ? c.danger : c.success,
         'stroke-width': '2.5', 'stroke-linecap': 'round',
-      });
+      }));
     }
 
     /* Past a dozen points the dots merge into a bead chain and stop being
        readable — a year of weekly periods is 52 of them. The line carries the
-       shape on its own from there. */
-    const dots = data.length <= 12;
-    data.forEach((d, i) => {
-      const node = dots
-        ? add('circle', {
-            cx: s.x(i), cy: s.y(d.spent), r: '5',
-            fill: c.hole, stroke: over(d) ? c.danger : c.success, 'stroke-width': '2.5',
-          })
-        /* No dot to hang a tooltip on, so an invisible full-height hit strip
-           keeps every period reachable by touch and hover. */
-        : add('rect', {
-            x: s.x(i) - s.innerW / (data.length * 2), y: s.padT,
-            width: s.innerW / data.length, height: s.innerH, fill: 'transparent',
-          });
-      tip(add, node, `${d.label}: ${money(d.spent)} spent · ${money(d.budget)} budgeted · ${money(d.income)} in`);
+       shape on its own from there, and the focus marks below still land on
+       every period whether or not it wears a dot. */
+    if (data.length <= 12) {
+      data.forEach((d, i) => add('circle', {
+        cx: s.x(i), cy: s.y(d.spent), r: '5',
+        fill: c.hole, stroke: over(d) ? c.danger : c.success, 'stroke-width': '2.5',
+      }));
+    }
+
+    /* ------------------------- the focused period -------------------------
+       Built ONCE and moved, never rebuilt: a pointermove fires many times a
+       second, and adding and removing five nodes each time is the difference
+       between a chart that tracks the finger and one that lags behind it.
+       Inert to the pointer, or the marks would sit between the finger and the
+       chart they are marking. Hidden at rest by CSS, on .is-focus. */
+    const focusG = add('g', { class: 'trend-focus', 'pointer-events': 'none' });
+    const cross = add('line', {
+      y1: s.padT, y2: s.baseline, stroke: 'currentColor', 'stroke-opacity': '0.28',
+      'stroke-width': '1.5', 'stroke-dasharray': '3 4',
+    }, focusG);
+    const halo = add('circle', { r: '11', 'fill-opacity': '0.18' }, focusG);
+    const budgetMark = add('circle', { r: '3.5', fill: 'currentColor', 'fill-opacity': '0.5' }, focusG);
+    const incomeMark = add('circle', { r: '4', fill: c.info }, focusG);
+    const spentMark = add('circle', { r: '6', fill: c.hole, 'stroke-width': '3' }, focusG);
+
+    /* The readout is HTML rather than SVG text: the chart is drawn into a fixed
+       1000-unit viewBox and scaled by CSS, so SVG text at font-size 13 renders
+       at about 4px once the card is phone-width. HTML sits outside that scaling
+       and stays legible at any size. */
+    const tipBox = el('div', { class: 'trend-tip', role: 'status' });
+    const tipHead = el('div', { class: 'trend-tip-head' });
+    const tipRow = (cls, name) => {
+      const swatch = el('i', { class: `trend-tip-dot ${cls}` });
+      const val = el('span', { class: 'trend-tip-val num' });
+      return {
+        node: el('div', { class: 'trend-tip-row' },
+          swatch, el('span', { class: 'trend-tip-name' }, name), val),
+        swatch, val,
+      };
+    };
+    /* The legend above the chart names these three series. Reusing its keys is
+       not laziness — a readout that called them anything else would be a
+       second, subtly different vocabulary for the same three lines. */
+    const rSpent = tipRow('is-spent', i18n.t('shell.legend.spent'));
+    const rBudget = tipRow('is-budget', i18n.t('shell.legend.budget'));
+    const rIncome = tipRow('is-income', i18n.t('shell.legend.income'));
+    const tipDelta = el('div', { class: 'trend-tip-delta' });
+    tipBox.append(tipHead, rSpent.node, rBudget.node, rIncome.node, tipDelta);
+
+    function focusAt(i) {
+      const d = data[i];
+      const x = s.x(i), y = s.y(d.spent);
+      const bad = over(d);
+      const key = bad ? c.danger : c.success;
+
+      cross.setAttribute('x1', x); cross.setAttribute('x2', x);
+      halo.setAttribute('cx', x); halo.setAttribute('cy', y); halo.setAttribute('fill', key);
+      spentMark.setAttribute('cx', x); spentMark.setAttribute('cy', y);
+      spentMark.setAttribute('stroke', key);
+      incomeMark.setAttribute('cx', x); incomeMark.setAttribute('cy', s.y(d.income));
+      /* A period with no budget set has no budget point to mark — s.y(0) would
+         park a dot on the baseline that reads as "budgeted nothing" rather than
+         "nothing budgeted". */
+      budgetMark.setAttribute('cx', x); budgetMark.setAttribute('cy', s.y(d.budget));
+      budgetMark.setAttribute('opacity', d.budget > 0 ? '1' : '0');
+
+      svg.classList.add('is-focus');
+      /* Only the legs TOUCHING the point thicken. Brightening the whole line
+         would say "this series", when what is being pointed at is one period. */
+      segs.forEach((n, k) => n.classList.toggle('is-on', k === i - 1 || k === i));
+
+      tipHead.textContent = d.label;
+      rSpent.val.textContent = money(d.spent);
+      rSpent.swatch.classList.toggle('is-over', bad);
+      rIncome.val.textContent = money(d.income);
+      rBudget.val.textContent = money(d.budget);
+      rBudget.node.classList.toggle('hidden', !(d.budget > 0));
+      const gap = d.budget - d.spent;
+      tipDelta.textContent = d.budget > 0
+        ? i18n.t(bad ? 'dash.trend.tip.over' : 'dash.trend.tip.under', { amount: money(Math.abs(gap)) })
+        : '';
+      tipDelta.classList.toggle('is-over', bad);
+
+      /* Placed in PERCENT of the wrap rather than in pixels, which is what lets
+         this skip a second measurement: the svg is width:100% height:auto over
+         a fixed viewBox, so a point's x is exactly x/W of the wrap's width
+         however wide the card happens to be.
+
+         Both edges get their own anchoring. Centred on the first point the box
+         hangs off the left of the card, and on the last point off the right —
+         on a phone that is most of the readout gone. It stops being centred on
+         the point there; the crosshair is what says which period this is. */
+      const px = (x / W) * 100;
+      const low = y < H * 0.42;              // near the top: flip below the point
+      tipBox.style.left = `${px}%`;
+      tipBox.style.top = `${(y / H) * 100}%`;
+      tipBox.style.transform =
+        `translate(${px < 16 ? '0%' : px > 84 ? '-100%' : '-50%'}, ${low ? '0' : '-100%'})`;
+      tipBox.classList.toggle('is-below', low);
+      tipBox.classList.add('is-on');
+    }
+
+    function clearFocus() {
+      svg.classList.remove('is-focus');
+      for (const n of segs) n.classList.remove('is-on');
+      tipBox.classList.remove('is-on');
+    }
+
+    const wired = trackPoints({
+      svg, w: W, xs: data.map((d, i) => s.x(i)), onFocus: focusAt, onClear: clearFocus,
     });
 
+    /* Only where the readout could not be wired at all. An engine with no
+       PointerEvent gets what it always got: a native <title> per period, on an
+       invisible full-height strip so there is something to hold that is bigger
+       than a dot. Assembled from the same three legend labels as the readout
+       rather than from a sentence of its own — this used to be hardcoded
+       English, which no amount of switching the interface language fixed. */
+    if (!wired) {
+      data.forEach((d, i) => {
+        const hit = add('rect', {
+          x: s.x(i) - s.innerW / (data.length * 2), y: s.padT,
+          width: s.innerW / data.length, height: s.innerH, fill: 'transparent',
+        });
+        tip(add, hit, `${d.label} — `
+          + `${i18n.t('shell.legend.spent')} ${money(d.spent)}`
+          + ` · ${i18n.t('shell.legend.budget')} ${money(d.budget)}`
+          + ` · ${i18n.t('shell.legend.income')} ${money(d.income)}`);
+      });
+    }
+
     axisLabels(add, s, data.map(d => d.label), H);
-    wrap.append(svg);
+    wrap.append(svg, tipBox);
   }
 
   /* --------------------------- category split ---------------------------

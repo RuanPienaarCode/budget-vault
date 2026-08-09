@@ -565,6 +565,8 @@ module.exports = {
   'dash.trend.clamped': ' · これまでに取り込んだ全期間',
   'dash.trend.empty': '2 つ目の期間の取引を取り込むと、ここから推移線が始まります。',
   'dash.trend.aria': { other: '直近 {count} 期間の支出・予算・収入' },
+  'dash.trend.tip.over': '予算を {amount} 超過',
+  'dash.trend.tip.under': '予算より {amount} 少ない',
 
   'dash.split.uncatNote': ' · カテゴリなし {amount} は未表示',
   'dash.split.onlyUncat': 'この期間に {amount} が出ていますが、まだどれもカテゴリ分けされていません — 取引ページでカテゴリを設定すると、ここに内訳が表示されます。',

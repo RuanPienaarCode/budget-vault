@@ -1514,8 +1514,82 @@
 .budget-app-root #connect-card { max-width: 640px; margin: 8vh auto 0; text-align: center; }
 .budget-app-root #connect-card .body-pad { padding-top: 10px; }
 .budget-app-root #connect-card p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
-.budget-app-root .trend-svg-wrap { width: 100%; }
+/* Positioned so the trend readout below can be placed against the chart rather
+   than against the page. */
+.budget-app-root .trend-svg-wrap { width: 100%; position: relative; }
 .budget-app-root .trend-svg-wrap svg { width: 100%; height: auto; display: block; }
+
+/* --------------------- spending trend: the focused period -----------------
+   The chart is inspectable: pointer, finger or arrow keys pick a period, and
+   these are what say which one. Everything here is driven by classes toggled in
+   renderTrend — the geometry is set on the SVG nodes themselves, because it is
+   in viewBox units and CSS has no business knowing them.
+
+   Note the chart takes a tab stop (it is keyboard-scrubbable), so it needs a
+   focus ring like any other control. The iOS 15.0-15.3 fallback for it lives in
+   the @supports block at the foot of this file, where the guard test can see
+   it — not inline. */
+.budget-app-root .trend-svg-wrap svg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
+
+/* Only the two legs touching the focused point thicken. CSS beats the
+   presentation attribute the segment carries, so the resting width stays with
+   the drawing code and the hover state stays here. */
+.budget-app-root .trend-seg { transition: stroke-width .14s ease; }
+.budget-app-root svg.is-focus .trend-seg.is-on { stroke-width: 4.5; }
+
+/* Built with the chart and moved, never rebuilt — so it has to be invisible
+   until a period is actually picked. visibility, not display: a `display:none`
+   node still costs a reflow when it comes back, and this comes back on every
+   pointermove. */
+.budget-app-root .trend-focus { opacity: 0; visibility: hidden; transition: opacity .12s ease; }
+.budget-app-root svg.is-focus .trend-focus { opacity: 1; visibility: visible; }
+
+/* Anchored from JS in percent of the chart, so it lands on the point at any
+   card width without a second measurement. */
+.budget-app-root .trend-tip {
+  position: absolute; left: 0; top: 0;
+  margin-top: -14px;
+  z-index: 3;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  pointer-events: none;                  /* never eats the chart's own pointer */
+  opacity: 0; visibility: hidden;
+  transition: opacity .14s ease;
+}
+/* Flipped under the point when the point sits too near the top of the card to
+   have a readout above it. */
+.budget-app-root .trend-tip.is-below { margin-top: 14px; }
+.budget-app-root .trend-tip.is-on { opacity: 1; visibility: visible; }
+.budget-app-root .trend-tip-head {
+  font-size: 12.5px; font-weight: 650; color: var(--text-primary); margin-bottom: 5px;
+}
+.budget-app-root .trend-tip-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 1.5px 0; }
+.budget-app-root .trend-tip-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.budget-app-root .trend-tip-dot.is-spent { background: var(--color-success); }
+.budget-app-root .trend-tip-dot.is-spent.is-over { background: var(--color-danger); }
+.budget-app-root .trend-tip-dot.is-income { background: var(--color-info); }
+/* The budget series is a dashed rule on the chart, so its swatch is a rule too
+   rather than a fourth dot the reader has to map back to a line. */
+.budget-app-root .trend-tip-dot.is-budget { height: 2px; border-radius: 1px; background: var(--text-muted); opacity: .6; }
+.budget-app-root .trend-tip-name { color: var(--text-muted); }
+/* The figures keep their own column, so three rows read as a small table
+   instead of three ragged sentences. */
+.budget-app-root .trend-tip-val { margin-left: auto; padding-left: 14px; color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.budget-app-root .trend-tip-delta { font-size: 11.5px; color: var(--text-muted); margin-top: 5px; }
+.budget-app-root .trend-tip-delta:empty { display: none; }
+.budget-app-root .trend-tip-delta.is-over { color: var(--color-danger); }
+
+/* All decoration — the readout still appears and still carries every figure,
+   it just stops fading and the line stops easing. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .trend-seg,
+  .budget-app-root .trend-focus,
+  .budget-app-root .trend-tip { transition: none; }
+}
 
 /* ---------------------------------------------------------------------------
    Charts — range control, donut + legend, net-worth stack.
@@ -1981,6 +2055,7 @@
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .mini .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .trend-svg-wrap svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .svc-next-hint:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
