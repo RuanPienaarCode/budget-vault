@@ -602,6 +602,49 @@ module.exports = {
   'dash.split.noteAria': 'Maak die {cat}-kategorienota oop',
   'dash.split.noteMissing': 'Geen kategorienota vir "{cat}" gevind nie',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': 'Wat oor is',
+  'dash.left.sub': 'Voor hierdie tydperk op {date} eindig',
+  'dash.left.cash': 'in jou rekeninge',
+  'dash.left.committed': 'nog verbind',
+  'dash.left.free': 'werklik beskikbaar',
+  'dash.left.short': 'kort',
+  'dash.left.counted': {
+    one: '{count} rekening',
+    other: '{count} rekeninge',
+  },
+  'dash.left.unconfirmed': '{count} onbevestig',
+  'dash.left.undated': '{count} sonder saldodatum',
+  'dash.left.orders': {
+    one: '{count} debietorder',
+    other: '{count} debietorders',
+  },
+  'dash.left.instalments': {
+    one: '{count} skuldpaaiement',
+    other: '{count} skuldpaaiemente',
+  },
+  'dash.left.none': 'niks geskeduleer nie',
+  'dash.left.days': {
+    one: '{count} dag',
+    other: '{count} dae',
+  },
+  'dash.left.perDay': '{amount}/dag',
+  'dash.left.barAria': 'Van {cash} is {committed} verbind en {free} beskikbaar',
+  'dash.left.whatsCounted': 'Wat as verbind getel word',
+  'dash.left.expected': 'verwag {date}',
+  'dash.left.thisPeriod': 'betaalbaar hierdie tydperk',
+  'dash.left.lastCharged': 'laas gehef {amount}',
+  'dash.left.asListed': 'soos gelys, geen heffingsgeskiedenis nie',
+  'dash.left.contracted': 'gekontrakteerde paaiement',
+  'dash.left.source': 'Bedrae is wat werklik laas gehef is, nie die syfer wat op die Dienste-bladsy getik is nie. Dit lees net uit jou Dienste-lys en Skuld-bladsy — ’n herhalende heffing op nie een van die twee nie word hier getel.',
+  'dash.split.colCat': 'Kategorie',
+  'dash.split.colSpent': 'Bestee',
+  'dash.split.colChange': 'Verandering',
+  'dash.split.new': 'nuut',
+  'dash.split.r1m': 'Verlede maand',
+  'dash.split.rPrev': 'Vorige',
+  'dash.split.rangeAria': 'Vergelykingstydperk',
+
   'dash.err.render': 'Kon nie die {label} teken nie — {error}',
 
 };

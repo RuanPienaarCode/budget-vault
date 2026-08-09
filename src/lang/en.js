@@ -616,6 +616,49 @@ module.exports = {
   'dash.split.noteAria': 'Open the {cat} category note',
   'dash.split.noteMissing': 'No category note found for "{cat}"',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': 'What\'s left',
+  'dash.left.sub': 'Before this period ends on {date}',
+  'dash.left.cash': 'in your accounts',
+  'dash.left.committed': 'still committed',
+  'dash.left.free': 'actually free',
+  'dash.left.short': 'short',
+  'dash.left.counted': {
+    one: '{count} account',
+    other: '{count} accounts',
+  },
+  'dash.left.unconfirmed': '{count} unconfirmed',
+  'dash.left.undated': '{count} with no balance date',
+  'dash.left.orders': {
+    one: '{count} debit order',
+    other: '{count} debit orders',
+  },
+  'dash.left.instalments': {
+    one: '{count} debt instalment',
+    other: '{count} debt instalments',
+  },
+  'dash.left.none': 'nothing scheduled',
+  'dash.left.days': {
+    one: '{count} day',
+    other: '{count} days',
+  },
+  'dash.left.perDay': '{amount}/day',
+  'dash.left.barAria': 'Of {cash}, {committed} is committed and {free} is free',
+  'dash.left.whatsCounted': 'What\'s counted as committed',
+  'dash.left.expected': 'expected {date}',
+  'dash.left.thisPeriod': 'due this period',
+  'dash.left.lastCharged': 'last charged {amount}',
+  'dash.left.asListed': 'as listed, no charge history',
+  'dash.left.contracted': 'contracted instalment',
+  'dash.left.source': 'Amounts are what was last actually charged, not the figure typed on the Services page. Read from your Services list and Debt page only — a recurring charge on neither is not counted here.',
+  'dash.split.colCat': 'Category',
+  'dash.split.colSpent': 'Spent',
+  'dash.split.colChange': 'Change',
+  'dash.split.new': 'new',
+  'dash.split.r1m': 'Last month',
+  'dash.split.rPrev': 'Prev',
+  'dash.split.rangeAria': 'Comparison range',
+
   'dash.err.render': 'Could not draw the {label} — {error}',
 
 };

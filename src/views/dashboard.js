@@ -6,7 +6,9 @@ const { safeSeg } = require('../vault-path');
 const { TYPE_ORDER } = require('../constants');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
-const { stalenessSummary } = require('../reconcile');
+const { stalenessSummary, reconcile, isStale } = require('../reconcile');
+const { whatsLeft } = require('../committed');
+const { todayIso } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const {
@@ -16,7 +18,7 @@ const {
 } = require('../chart');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType, accountIndex } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -65,6 +67,7 @@ module.exports = function registerDashboard(ctx) {
 
   function renderDashboard() {
     guard('#heroCard', 'summary', renderHero);
+    guard('#leftBody', "what's left", renderLeft);
     guardedTrend();
     guardedSplit();
     guard('#dashBudget', 'budget table', renderBudgetTable);
@@ -75,6 +78,128 @@ module.exports = function registerDashboard(ctx) {
     guard('#dashPositionKpis', 'position summary', renderPosition);
     guard('#dashPositionNote', 'double-count note', renderOverlapNote);
     guard('#dashStale', 'balance staleness', renderStale);
+  }
+
+  /* --------------------------- what's left ------------------------------
+     The hero above says how much BUDGET is left. This says how much MONEY is —
+     what the accounts hold, less the charges already scheduled against them
+     before the period ends. See src/committed.js for the six rules that decide
+     whether the middle figure can be trusted; this function only renders them.
+
+     The card hides itself when there is nothing honest to show. A vault with no
+     confirmed balance and no recurring charges would otherwise get three zeroes
+     and a per-day rate of nothing, which reads as a broken card rather than an
+     empty one. */
+  function renderLeft() {
+    const card = $('#leftCard');
+    const body = $('#leftBody'); body.empty();
+    const { start, end } = periodRange(S.period);
+
+    /* Implied balances, not stated ones — reconcile() is what turns a claim
+       with an age into what the account should read right now. `dated` is what
+       separates "this account holds nothing" from "nobody has said". */
+    const idx = accountIndex();
+    const accounts = S.accounts.map(a => {
+      const rows = (idx.get(a) || {}).rows || [];
+      const rec = reconcile(a, rows);
+      return {
+        name: a.name,
+        inBudget: a.in_budget !== false,
+        dated: rec.state !== 'no-date',
+        implied: rec.state === 'drift' ? rec.implied : a.balance,
+      };
+    });
+
+    const rows = [];
+    for (const f of Object.values(S.txFiles)) for (const r of f.rows) rows.push(r);
+
+    const L = whatsLeft({
+      accounts, services: S.services, debts: S.debts, rows,
+      periodStart: start, periodEnd: end, today: todayIso(),
+    });
+
+    /* Nothing to say: no confirmed cash AND nothing scheduled. classList, not
+       Obsidian's addClass/removeClass — those are host extensions to
+       HTMLElement, and every other card here toggles the plain way. */
+    const nothing = !L.cashKnown && !L.items.length;
+    if (card) card.classList.toggle('hidden', nothing);
+    if (nothing) return;
+
+    const sub = $('#leftSub');
+    if (sub) sub.textContent = i18n.t('dash.left.sub', { date: periodShortLabel(end) });
+
+    const fig = (cls, value, label, meta) => el('div', { class: `left-fig ${cls}` },
+      el('div', { class: 'lv num' }, value),
+      el('div', { class: 'll' }, label),
+      meta ? el('div', { class: 'lm' }, meta) : '');
+
+    /* Three independent facts about the cash figure, each only shown when it
+       has something to say: how many accounts it counted, how many of those
+       carry a balance nobody has confirmed lately, and how many could not be
+       counted at all because their balance has no date to measure from. */
+    const staleCount = S.accounts.filter(a => a.in_budget !== false && isStale(a.balance_updated)).length;
+    const cashParts = [];
+    const counted = accounts.filter(a => a.inBudget && a.dated).length;
+    cashParts.push(i18n.t('dash.left.counted', { count: counted }));
+    if (staleCount) cashParts.push(i18n.t('dash.left.unconfirmed', { count: staleCount }));
+    if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
+
+    const comParts = [];
+    if (L.counts.service) comParts.push(i18n.t('dash.left.orders', { count: L.counts.service }));
+    if (L.counts.debt) comParts.push(i18n.t('dash.left.instalments', { count: L.counts.debt }));
+
+    const freeParts = [];
+    if (L.days !== null) freeParts.push(i18n.t('dash.left.days', { count: L.days }));
+    if (L.perDay) freeParts.push(i18n.t('dash.left.perDay', { amount: money(L.perDay, 0) }));
+
+    const grid = el('div', { class: 'left-grid' },
+      fig('is-cash', L.cashKnown ? money(L.cash, 0) : '—',
+        i18n.t('dash.left.cash'), cashParts.join(' · ')),
+      el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−'),
+      fig('is-committed', money(L.committed, 0),
+        i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')),
+      el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
+      /* "Short", never a negative amount of free money — a minus sign in front
+         of a figure labelled "actually free" is a sentence that means nothing. */
+      fig(L.short ? 'is-short' : 'is-free', money(Math.abs(L.free), 0),
+        i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
+    body.append(grid);
+
+    /* The bar only means something when there is cash to divide. */
+    if (L.cashKnown && L.cash > 0) {
+      const comPct = Math.min(100, (L.committed / L.cash) * 100);
+      body.append(el('div', {
+        class: 'left-bar', role: 'img',
+        'aria-label': i18n.t('dash.left.barAria', {
+          cash: money(L.cash), committed: money(L.committed), free: money(Math.abs(L.free)),
+        }),
+      },
+      el('i', { class: 'b-com', style: `width:${comPct.toFixed(2)}%` }),
+      el('i', { class: 'b-free', style: `width:${(100 - comPct).toFixed(2)}%` })));
+    }
+
+    /* The disclosure is part of the feature, not a courtesy. A card asserting a
+       committed figure with no way to check it is the Services page again — a
+       number nobody could audit, on a page that quietly died of it. */
+    if (L.items.length) {
+      const list = el('table', { class: 'left-disc' });
+      for (const it of L.items) {
+        const when = it.due
+          ? i18n.t('dash.left.expected', { date: it.due })
+          : i18n.t('dash.left.thisPeriod');
+        const src = it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
+          : it.basis === 'stated' ? i18n.t('dash.left.asListed')
+            : i18n.t('dash.left.contracted');
+        list.append(el('tr', {},
+          el('td', {}, el('div', { class: 'dn' }, it.name),
+            el('div', { class: 'dd' }, [it.detail, when, src].filter(Boolean).join(' · '))),
+          el('td', { class: 'da num' }, money(it.amount, 0))));
+      }
+      const det = el('details', { class: 'left-open' },
+        el('summary', {}, i18n.t('dash.left.whatsCounted')), list,
+        el('p', { class: 'left-src' }, i18n.t('dash.left.source')));
+      body.append(det);
+    }
   }
 
   /* ------------------------- where you stand ----------------------------
@@ -607,9 +732,83 @@ module.exports = function registerDashboard(ctx) {
     return S.categories.find(c => c.name === name)?.color || '#888';
   }
 
+  /* Ranges offered by "Where it went". A LOCAL list, deliberately not
+     historicalRanges() from chart.js: that table feeds the trend chart too, and
+     adding a 1-month entry to it would put a 1M pill on a chart that plots one
+     point per period and cannot usefully draw a single one. */
+  const SPLIT_RANGES = [
+    { key: '1m', label: i18n.t('dash.split.r1m'), periods: 1 },
+    { key: '3m', label: '3M', periods: 3 },
+    { key: '6m', label: '6M', periods: 6 },
+    { key: '1y', label: '1Y', periods: 12 },
+  ];
+
+  /* Spend per category, averaged over the N periods BEFORE the one on screen.
+     Returns null when there is not a single completed period to compare with —
+     a first-month vault gets the donut it has always had rather than a column
+     of "new" against nothing. */
+  function compareBaseline() {
+    const key = plugin.settings.splitCompareRange || '3m';
+    const r = SPLIT_RANGES.find(x => x.key === key) || SPLIT_RANGES[1];
+    const totals = {};
+    let counted = 0;
+    for (let i = 1; i <= r.periods; i++) {
+      const p = shiftPeriod(S.period, -i);
+      const sum = periodSummary(p);
+      /* A period with no transactions at all is not a zero-spend period, it is
+         a period the vault does not cover — averaging it in would halve every
+         figure for every month before the data starts. */
+      if (!sum.count) continue;
+      counted++;
+      for (const [cat, amt] of Object.entries(sum.byCat)) {
+        const type = catType(cat);
+        if (!cat || type === 'income' || type === 'transfer') continue;
+        if (amt >= 0) continue;
+        totals[cat] = (totals[cat] || 0) + -amt;
+      }
+    }
+    if (!counted) return null;
+    return { totals, counted, label: r.periods === 1 ? i18n.t('dash.split.rPrev') : `${r.periods}M` };
+  }
+
+  /* One category's change against the baseline, with the three guards that stop
+     the column becoming noise a reader learns to ignore. */
+  function compareCell(cat, now, base) {
+    const avg = base.totals[cat] === undefined ? null : base.totals[cat] / base.counted;
+    if (avg === null || avg <= 0) {
+      return { baseText: '—', text: i18n.t('dash.split.new'), cls: 'is-new' };
+    }
+    const diff = now - avg;
+    /* DEADBAND: under a few percent, print the figure but give it no colour.
+       Colouring a 1% move teaches the reader that the colour carries no
+       information, which costs the 31% row its impact. */
+    const cls = Math.abs(diff) / avg < 0.03 ? 'is-flat' : (diff > 0 ? 'is-up' : 'is-down');
+    /* SMALL BASE: R20 -> R60 is +200% and means nothing. Below a floor, show
+       the rands that actually moved instead. */
+    const floor = Math.max(100, periodSummary(S.period).spend * 0.02);
+    const text = avg < floor
+      ? `${diff >= 0 ? '+' : '−'}${money(Math.abs(diff), 0)}`
+      : `${diff >= 0 ? '+' : '−'}${Math.abs(Math.round((diff / avg) * 100))}%`;
+    return { baseText: money(avg, 0), text, cls };
+  }
+
   function renderSplit() {
     const wrap = $('#dashSplit'); wrap.empty();
     const sum = periodSummary(S.period);
+
+    /* Rebuilt here rather than once at registration, so the active pill follows
+       a language change and a range picked on another render. */
+    const pills = $('#splitRange');
+    if (pills) { pills.empty(); pills.append(rangePills({
+      ranges: SPLIT_RANGES,
+      value: plugin.settings.splitCompareRange || '3m',
+      label: i18n.t('dash.split.rangeAria'),
+      onPick: async k => {
+        plugin.settings.splitCompareRange = k;
+        await plugin.saveSettings();
+        guardedSplit();
+      },
+    })); }
 
     /* byCat holds signed amounts and every type. Spending is the negative side
        of the non-income, non-transfer categories — a refund inside a category
@@ -710,16 +909,39 @@ module.exports = function registerDashboard(ctx) {
       fill: 'currentColor', 'font-family': 'inherit',
     }).textContent = money(total, 0);
 
+    /* What this period is measured AGAINST. Averaged over COMPLETED periods
+       only — folding the running period into its own baseline makes every
+       category read green for the first three weeks of every period, because a
+       part-period is being compared with full ones. That figure would be
+       reassuring, wrong, and wrong in the direction that stops people looking. */
+    const base = compareBaseline();
+
     const legend = el('ul', { class: 'donut-legend donut-legend--linked' });
+    if (base) legend.append(el('li', { class: 'donut-legend-head' },
+      el('i', { style: 'background:transparent' }),
+      el('span', { class: 'dl-name' }, i18n.t('dash.split.colCat')),
+      el('span', { class: 'dl-val' }, i18n.t('dash.split.colSpent')),
+      el('span', { class: 'dl-pct' }, '%'),
+      el('span', { class: 'dl-base' }, base.label),
+      el('span', { class: 'dl-delta' }, i18n.t('dash.split.colChange'))));
     for (const x of shown) {
       const pct = Math.round((x.amount / total) * 100);
       /* Rebuilt per row rather than shared: these are appended into either a
          plain <li> or a <button>, and a node can only live in one of them. */
+      /* "Other" gets no comparison: it is a bucket whose membership changes
+         between periods, so its average measures a different set of categories
+         each time. A change figure there would be arithmetic without meaning —
+         the same reason the row has no drill-through. */
+      const cmp = base && !x.other ? compareCell(x.cat, x.amount, base) : null;
       const face = () => [
         el('i', { style: `background:${x.color}` }),
         el('span', { class: 'dl-name' }, x.cat),
         el('span', { class: 'dl-val num' }, money(x.amount, 0)),
         el('span', { class: 'dl-pct num' }, `${pct}%`),
+        ...(base ? [
+          el('span', { class: 'dl-base num' }, cmp ? cmp.baseText : '—'),
+          el('span', { class: `dl-delta num ${cmp ? cmp.cls : 'is-flat'}` }, cmp ? cmp.text : '—'),
+        ] : []),
       ];
       /* "Other" is a bucket of categories, so neither action has a single
          target to point at — it stays an inert row. */

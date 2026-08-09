@@ -608,6 +608,49 @@ module.exports = {
   'dash.split.noteAria': 'Ouvrir la note de la catégorie {cat}',
   'dash.split.noteMissing': 'Aucune note de catégorie trouvée pour « {cat} »',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': 'Ce qu’il reste',
+  'dash.left.sub': 'Avant la fin de cette période, le {date}',
+  'dash.left.cash': 'sur tes comptes',
+  'dash.left.committed': 'encore engagé',
+  'dash.left.free': 'vraiment libre',
+  'dash.left.short': 'manquant',
+  'dash.left.counted': {
+    one: '{count} compte',
+    other: '{count} comptes',
+  },
+  'dash.left.unconfirmed': '{count} non confirmé',
+  'dash.left.undated': '{count} sans date de solde',
+  'dash.left.orders': {
+    one: '{count} prélèvement',
+    other: '{count} prélèvements',
+  },
+  'dash.left.instalments': {
+    one: '{count} mensualité de dette',
+    other: '{count} mensualités de dette',
+  },
+  'dash.left.none': 'rien de prévu',
+  'dash.left.days': {
+    one: '{count} jour',
+    other: '{count} jours',
+  },
+  'dash.left.perDay': '{amount}/jour',
+  'dash.left.barAria': 'Sur {cash}, {committed} est engagé et {free} est libre',
+  'dash.left.whatsCounted': 'Ce qui compte comme engagé',
+  'dash.left.expected': 'prévu le {date}',
+  'dash.left.thisPeriod': 'dû cette période',
+  'dash.left.lastCharged': 'dernier prélèvement {amount}',
+  'dash.left.asListed': 'tel qu’indiqué, sans historique',
+  'dash.left.contracted': 'mensualité contractuelle',
+  'dash.left.source': 'Les montants correspondent à ce qui a réellement été prélevé, pas au chiffre saisi sur la page Services. Lus uniquement depuis ta liste de Services et la page Dettes — un prélèvement récurrent absent des deux n’est pas compté ici.',
+  'dash.split.colCat': 'Catégorie',
+  'dash.split.colSpent': 'Dépensé',
+  'dash.split.colChange': 'Écart',
+  'dash.split.new': 'nouveau',
+  'dash.split.r1m': 'Mois dernier',
+  'dash.split.rPrev': 'Préc.',
+  'dash.split.rangeAria': 'Période de comparaison',
+
   'dash.err.render': 'Impossible de dessiner {label} — {error}',
 
 };

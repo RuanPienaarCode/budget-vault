@@ -144,6 +144,20 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title" data-i18n="nav.dashboard">Dashboard</h1>
         </div>
         <div class="card hero mb-4" id="heroCard"></div>
+        <!-- What's left. Directly below the hero because it answers the question
+             the hero's number is mistaken for: the hero says how much BUDGET is
+             left, this says how much MONEY is. Hidden until there is a figure
+             worth showing — an empty vault gets no card rather than three
+             zeroes. -->
+        <div class="card mb-4 hidden" id="leftCard">
+          <div class="card-h">
+            <div>
+              <h2 data-i18n="shell.dash.left">What's left</h2>
+              <div class="sub" id="leftSub"></div>
+            </div>
+          </div>
+          <div class="body-pad" id="leftBody"></div>
+        </div>
         <div class="card mb-4">
           <div class="card-h">
             <div>
@@ -168,6 +182,7 @@ const SHELL_HTML = `
               <h2 data-i18n="shell.dash.split">Where it went</h2>
               <div class="sub" id="dashSplitSub"></div>
             </div>
+            <div class="card-h-controls"><div id="splitRange"></div></div>
           </div>
           <div class="body-pad"><div class="donut-wrap" id="dashSplit"></div></div>
         </div>

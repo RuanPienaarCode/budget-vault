@@ -603,6 +603,49 @@ module.exports = {
   'dash.split.noteAria': 'Notiz zur Kategorie {cat} öffnen',
   'dash.split.noteMissing': 'Keine Kategorienotiz für „{cat}“ gefunden',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': 'Was übrig bleibt',
+  'dash.left.sub': 'Bevor dieser Zeitraum am {date} endet',
+  'dash.left.cash': 'auf deinen Konten',
+  'dash.left.committed': 'noch fest eingeplant',
+  'dash.left.free': 'wirklich frei',
+  'dash.left.short': 'zu wenig',
+  'dash.left.counted': {
+    one: '{count} Konto',
+    other: '{count} Konten',
+  },
+  'dash.left.unconfirmed': '{count} unbestätigt',
+  'dash.left.undated': '{count} ohne Saldodatum',
+  'dash.left.orders': {
+    one: '{count} Lastschrift',
+    other: '{count} Lastschriften',
+  },
+  'dash.left.instalments': {
+    one: '{count} Kreditrate',
+    other: '{count} Kreditraten',
+  },
+  'dash.left.none': 'nichts geplant',
+  'dash.left.days': {
+    one: '{count} Tag',
+    other: '{count} Tage',
+  },
+  'dash.left.perDay': '{amount}/Tag',
+  'dash.left.barAria': 'Von {cash} sind {committed} fest eingeplant und {free} frei',
+  'dash.left.whatsCounted': 'Was als fest eingeplant zählt',
+  'dash.left.expected': 'erwartet am {date}',
+  'dash.left.thisPeriod': 'in diesem Zeitraum fällig',
+  'dash.left.lastCharged': 'zuletzt abgebucht {amount}',
+  'dash.left.asListed': 'wie eingetragen, ohne Abbuchungsverlauf',
+  'dash.left.contracted': 'vertragliche Rate',
+  'dash.left.source': 'Die Beträge sind das, was zuletzt tatsächlich abgebucht wurde, nicht die auf der Seite „Dienste“ eingetragene Zahl. Gelesen wird nur aus deiner Dienste-Liste und der Schulden-Seite — eine wiederkehrende Abbuchung, die auf keiner von beiden steht, zählt hier nicht.',
+  'dash.split.colCat': 'Kategorie',
+  'dash.split.colSpent': 'Ausgegeben',
+  'dash.split.colChange': 'Änderung',
+  'dash.split.new': 'neu',
+  'dash.split.r1m': 'Letzter Monat',
+  'dash.split.rPrev': 'Vorher',
+  'dash.split.rangeAria': 'Vergleichszeitraum',
+
   'dash.err.render': 'Die Karte {label} konnte nicht gezeichnet werden — {error}',
 
 };

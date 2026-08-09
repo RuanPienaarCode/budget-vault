@@ -604,6 +604,49 @@ module.exports = {
   'dash.split.noteAria': 'Abrir la nota de la categoría {cat}',
   'dash.split.noteMissing': 'No se encontró nota de categoría para «{cat}»',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': 'Lo que queda',
+  'dash.left.sub': 'Antes de que este período termine el {date}',
+  'dash.left.cash': 'en tus cuentas',
+  'dash.left.committed': 'aún comprometido',
+  'dash.left.free': 'realmente libre',
+  'dash.left.short': 'falta',
+  'dash.left.counted': {
+    one: '{count} cuenta',
+    other: '{count} cuentas',
+  },
+  'dash.left.unconfirmed': '{count} sin confirmar',
+  'dash.left.undated': '{count} sin fecha de saldo',
+  'dash.left.orders': {
+    one: '{count} domiciliación',
+    other: '{count} domiciliaciones',
+  },
+  'dash.left.instalments': {
+    one: '{count} cuota de deuda',
+    other: '{count} cuotas de deuda',
+  },
+  'dash.left.none': 'nada programado',
+  'dash.left.days': {
+    one: '{count} día',
+    other: '{count} días',
+  },
+  'dash.left.perDay': '{amount}/día',
+  'dash.left.barAria': 'De {cash}, {committed} está comprometido y {free} está libre',
+  'dash.left.whatsCounted': 'Qué cuenta como comprometido',
+  'dash.left.expected': 'previsto el {date}',
+  'dash.left.thisPeriod': 'a pagar en este período',
+  'dash.left.lastCharged': 'último cargo {amount}',
+  'dash.left.asListed': 'según la lista, sin historial de cargos',
+  'dash.left.contracted': 'cuota contratada',
+  'dash.left.source': 'Los importes son lo que se cobró realmente la última vez, no la cifra escrita en la página Servicios. Solo se leen de tu lista de Servicios y de la página Deudas — un cargo recurrente que no esté en ninguna de las dos no se cuenta aquí.',
+  'dash.split.colCat': 'Categoría',
+  'dash.split.colSpent': 'Gastado',
+  'dash.split.colChange': 'Cambio',
+  'dash.split.new': 'nuevo',
+  'dash.split.r1m': 'Mes pasado',
+  'dash.split.rPrev': 'Anterior',
+  'dash.split.rangeAria': 'Período de comparación',
+
   'dash.err.render': 'No se pudo dibujar {label} — {error}',
 
 };
