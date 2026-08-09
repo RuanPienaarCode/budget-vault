@@ -9,6 +9,7 @@ const { csvCell } = require('../csv');
 const { askFields, askSplit } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 const { ISO_DATE, todayIso } = require('../dates');
+const { applySplit, splitRole } = require('../tx-role');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
 
@@ -208,17 +209,12 @@ module.exports = function registerTransactions(ctx) {
     });
     if (!parts) return;
 
-    /* amountRaw is the loader's "I could not strictly parse this cell, write it
-       back verbatim" flag. The parent keeps its own (it is unchanged on disk
-       apart from the Excluded column); the parts are new numbers we computed,
-       so they must not inherit it or they would serialise as the parent's
-       amount. */
-    const rows = parts.map(p => ({
-      date: r.date, desc: r.desc, cat: p.cat, amount: p.amount, excluded: false, note: p.note,
-    }));
-    r.excluded = true;
-    const marker = i18n.t('tx.split.marker', { n: rows.length });
-    r.note = r.note ? `${r.note} · ${marker}` : marker;
+    /* Both roles are assigned in applySplit, and deliberately not here: the
+       parent must come out excluded AND marked. `excluded` keeps it out of the
+       budget totals; the role keeps it out of the ACCOUNT totals, which read
+       excluded rows on purpose. Setting only the first counted every split
+       charge twice in every implied balance — see src/tx-role.js. */
+    const rows = applySplit(r, parts, i18n.t('tx.split.marker', { n: parts.length }));
     // Same file: every part shares the parent's date, so it shares its month.
     item._file.rows.push(...rows);
     item._file.dirty = true;
@@ -235,13 +231,30 @@ module.exports = function registerTransactions(ctx) {
     // the account label + month. amountRaw !== null means the loader could not
     // strictly parse that cell — write it back verbatim rather than corrupting it.
     const fm = patchFrontmatter(f.fmRaw || '', { account: yamlStr(f.label), month: f.month });
+    /* The Split column is written ONLY into files that contain a split. Adding
+       it unconditionally would rewrite every transaction file in the vault with
+       an empty seventh column the first time anything saved — a diff in every
+       month of every account, in a folder the user reads and syncs, to record
+       nothing. A file with no split keeps the exact six-column shape it has
+       always had. */
+    // splitRole, not the raw value: the loader accepts only the two known roles,
+    // so writing anything else would put a cell on disk that vanishes on the
+    // next load — a write that does not round-trip. It also means the cell can
+    // never need escaping, because there are only ever two strings it can hold.
+    const roleOf = r => splitRole(r.split);
+    const hasSplit = f.rows.some(r => roleOf(r));
     const lines = ['---', fm, '---', '',
-      '| Date | Description | Category | Amount | Excluded | Note |',
-      '|------|-------------|----------|-------:|----------|------|'];
+      hasSplit
+        ? '| Date | Description | Category | Amount | Excluded | Note | Split |'
+        : '| Date | Description | Category | Amount | Excluded | Note |',
+      hasSplit
+        ? '|------|-------------|----------|-------:|----------|------|-------|'
+        : '|------|-------------|----------|-------:|----------|------|'];
     f.rows.sort((a, b) => a.date.localeCompare(b.date));
     for (const r of f.rows) {
       const amt = r.amountRaw != null ? r.amountRaw : r.amount.toFixed(2);
-      lines.push(`| ${r.date} | ${escMd(r.desc)} | ${escMd(r.cat)} | ${amt} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} |`);
+      const cells = `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.cat)} | ${amt} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} |`;
+      lines.push(hasSplit ? `${cells} ${roleOf(r)} |` : cells);
     }
     lines.push('');
     return lines.join('\n');

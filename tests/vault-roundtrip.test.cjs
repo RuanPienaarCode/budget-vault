@@ -47,6 +47,15 @@ const FILES = {
 
   [`${B}/Transactions/FNB Cheque/2026-07.md`]: `---\n${TX_FM}\n---\n\n| Date | Description | Category | Amount | Excluded | Note |\n|---|---|---|---:|---|---|\n| 2026-07-01 | Woolworths Gardens | Groceries | -249.99 |  |  |\n| 2026-07-02 | PnP \\| Sandton | Groceries | -1000.00 | yes | split \\| two cards |\n| 2026-07-03 | café ¥ 个人所得税 |  | 42000.50 |  | multi<br>line |\n| 2026-07-04 | Legacy cell | Groceries | 1 234,56 |  |  |\n`,
 
+  /* A month that HAS been split, so the seventh column goes through the real
+     loader rather than a mirror of it pasted into a test. July above is the
+     control: it must come back out with six columns and no Split cell.
+
+     Note the row above whose NOTE says "split | two cards" and whose Split
+     cell is empty — a word in a note has never meant a role, and this is what
+     stops a future reader deciding it does. */
+  [`${B}/Transactions/FNB Cheque/2026-08.md`]: `---\naccount: "FNB Cheque"\nmonth: 2026-08\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n| 2026-08-04 | Virgin Active | Gym | -600.00 |  |  |  |\n| 2026-08-07 | Checkers Hyper | Groceries | -1000.00 | yes | Split into 3 | parent |\n| 2026-08-07 | Checkers Hyper | Groceries | -600.00 |  |  | part |\n| 2026-08-07 | Checkers Hyper | Household | -280.00 |  |  | part |\n| 2026-08-07 | Checkers Hyper | Pharmacy | -120.00 |  |  | part |\n`,
+
   [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status |\n|---|---:|---|---|---|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding |\n| Léa | 40.00 | multi<br>line | | paid |\n',
 
   [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n',
@@ -116,10 +125,20 @@ const FILES = {
   const noneSet = S.accounts.find(a => a.name === 'FNB Cheque');
   eq(noneSet.credit_limit, null, 'an absent optional number is null, not NaN');
 
-  eq(Object.keys(S.txFiles).length, 1, 'one transactions file');
+  eq(Object.keys(S.txFiles).length, 2, 'two transactions files');
   const txKey = 'FNB Cheque/2026-07';
+  const splitKey = 'FNB Cheque/2026-08';
   ok(S.txFiles[txKey], 'txFiles must be keyed by folder name + month');
   eq(S.txFiles[txKey].rows.length, 4, 'all four rows load');
+
+  /* The Split column, read by the REAL loader. */
+  eq(S.txFiles[txKey].rows.map(r => r.split), ['', '', '', ''],
+    'a six-column file gives every row an empty role, including one whose note says "split"');
+  eq(S.txFiles[splitKey].rows.map(r => r.split), ['', 'parent', 'part', 'part', 'part'],
+    'the roles load off disk in row order');
+  const splitRows = S.txFiles[splitKey].rows;
+  eq(splitRows.filter(r => r.split === 'part').reduce((s, r) => s + r.amount, 0), -1000,
+    'the parts loaded off disk sum to the parent loaded off disk');
   eq(S.owed.length, 2, 'both owed rows load');
   eq(S.services.length, 2, 'both services load');
   eq(S.debts.length, 2, 'both debts load');
@@ -165,6 +184,7 @@ const FILES = {
 
   const rewritten = { ...FILES };
   rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`] = ctx.serializeTxFile(S.txFiles[txKey]);
+  rewritten[`${B}/Transactions/FNB Cheque/2026-08.md`] = ctx.serializeTxFile(S.txFiles[splitKey]);
   rewritten[`${B}/Debts.md`] = ctx.serializeDebts();
   rewritten[`${B}/Owed Money.md`] = ctx.serializeOwed();
   rewritten[`${B}/Services.md`] = ctx.serializeServices();
@@ -179,6 +199,16 @@ const FILES = {
   const strip = rows => rows.map(r => ({ ...r }));
   eq(strip(S2.txFiles[txKey].rows), strip(S.txFiles[txKey].rows),
     'every transaction field must survive serialize → load unchanged');
+  eq(strip(S2.txFiles[splitKey].rows), strip(S.txFiles[splitKey].rows),
+    'a split file survives serialize → load with both roles intact');
+
+  /* The column is written where it means something and nowhere else. Asserted
+     on the REWRITTEN text, because the cost this avoids is a diff in every
+     month of every account in a folder the reader syncs and reads. */
+  ok(!/\| Split \|/.test(rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`]),
+    'a month with no split is written back with its original six columns');
+  ok(/\| Split \|/.test(rewritten[`${B}/Transactions/FNB Cheque/2026-08.md`]),
+    'a month with a split keeps the seventh column');
   eq(S2.owed, S.owed, 'owed rows must survive the round-trip');
   eq(S2.services, S.services, 'services rows must survive the round-trip');
   eq(S2.debts, S.debts, 'debt rows must survive the round-trip');

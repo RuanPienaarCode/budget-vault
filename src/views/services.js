@@ -8,6 +8,7 @@ const { escMd } = require('../markdown');
 const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
+const { isSplitPart } = require('../tx-role');
 
 module.exports = function registerServices(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
@@ -27,7 +28,12 @@ module.exports = function registerServices(ctx) {
      per service. */
   function chargeIndex() {
     const rows = [];
-    for (const f of Object.values(S.txFiles)) for (const r of f.rows) rows.push(r);
+    /* Parts are skipped, parents are kept: this is asking what the MERCHANT
+       charged, and a split is the reader slicing one charge into categories
+       after the fact. Feeding both would show a subscription being billed twice
+       a month, and — worse, because it is silent — would drag the median of the
+       last three charges that comparePrice() and nextExpected() are built on. */
+    for (const f of Object.values(S.txFiles)) for (const r of f.rows) if (!isSplitPart(r)) rows.push(r);
     const today = todayIso();
     const out = new Map();
     for (const s of S.services) {

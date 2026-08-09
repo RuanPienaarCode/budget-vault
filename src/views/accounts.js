@@ -14,6 +14,7 @@ const { askFields } = require('../modal');
    module, because Savings, Services and Debt all need to make the same argument
    about a hand-typed figure. Behaviour on this page is unchanged. */
 const { STALE_DAYS, daysSince, isStale, reconcile } = require('../reconcile');
+const { supersededBySplit } = require('../tx-role');
 const { ISO_DATE, todayIso } = require('../dates');
 
 module.exports = function registerAccounts(ctx) {
@@ -78,11 +79,19 @@ module.exports = function registerAccounts(ctx) {
 
   /* Money in / out for the period the header is showing. Separate from the
      reconciliation window on purpose — one answers "is this figure right", the
-     other "what happened this month". */
+     other "what happened this month".
+
+     Counts excluded rows deliberately, like reconcile() and for the same
+     reason: an internal transfer is out of the budget but it did leave this
+     account, and a card reporting "what happened" that omits it is describing
+     a month that did not occur. Which is exactly why a split parent has to go
+     — its parts are in the same list, so it would be counted, and counted
+     twice. */
   function periodActivity(labels) {
     let inAmt = 0, outAmt = 0, count = 0;
     for (const t of txInPeriod(S.period)) {
       if (!labels.has(t.label)) continue;
+      if (supersededBySplit(t)) continue;
       count++;
       if (t.amount >= 0) inAmt += t.amount; else outAmt += -t.amount;
     }

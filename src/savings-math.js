@@ -49,10 +49,17 @@
    is right, and has nothing to do with whether it entered the account. Skipping
    them would report every fund as having received nothing, ever.
 
+   A split PARENT is the one row that does not count, and for the same reason
+   the rest do: its parts are in this list too, carrying the same money under
+   finer categories, so honouring the rule above without this exception counts
+   the contribution twice. Skipped by role, not by `excluded` — see
+   src/tx-role.js.
+
    Pure — no DOM, no obsidian import. `typeOf` is injected so this module never
    has to know how categories are stored. */
 
 const { ISO_DATE } = require('./dates');
+const { supersededBySplit } = require('./tx-role');
 
 /* Split one account's rows. `typeOf(categoryName)` returns the category's type
    or null. Rows are [{ date, amount, cat }] — the shape the loader produces. */
@@ -63,6 +70,7 @@ function splitFlows(rows, typeOf, opts) {
   const growthCategories = new Map();
   for (const r of rows || []) {
     if (!r || typeof r.amount !== 'number' || !r.amount) continue;
+    if (supersededBySplit(r)) continue;   // its parts are in this same list
     if (from && r.date < from) continue;
     if (to && r.date > to) continue;
     count++;
