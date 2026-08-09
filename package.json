@@ -1,6 +1,6 @@
 {
   "name": "budget-vault",
-  "version": "1.11.8",
+  "version": "1.11.9",
   "description": "Track your budget, spending, debt and savings as plain files in your own vault.",
   "private": true,
   "license": "MIT",
