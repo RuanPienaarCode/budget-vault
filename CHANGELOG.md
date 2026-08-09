@@ -3,6 +3,43 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.11 — 2026-08-09
+
+### Added
+
+- **"What's left" — a new card on the Dashboard, directly below the hero.** The
+  hero tells you how much *budget* is left. On day 3 of a period that reads like
+  a fortune, while the medical aid, the bond and four debit orders have not gone
+  off yet. This card tells you how much *money* is left: what your accounts
+  hold, less the charges already scheduled against them before the period ends,
+  and what that leaves you per day for the days remaining.
+
+  It counts only charges it can stand behind. A charge that has already gone off
+  this period is spending, not a commitment, so it is not counted again — and the
+  card names what it left out. Amounts are what was really charged last time, not
+  the figure typed on the Services page. Your budget targets are deliberately not
+  included: a budget is an intention, not a debit order. And a charge it cannot
+  place a date on is not claimed at all, so a weekly budget period never asserts
+  a monthly instalment it has no way to date.
+
+  Cash is what your accounts *should* read right now given everything recorded
+  since you last confirmed a balance — and an account whose balance carries no
+  date is named rather than quietly counted as empty. Open **What's counted as
+  committed** to see every charge behind the figure, when it is expected, and
+  where its amount came from.
+
+- **"Where it went" now says how this period compares.** Pick a range — last
+  month, 3, 6 or 12 months — and each category gains two columns: what it
+  averaged over that range, and how far this period has moved from it. Up is
+  red, down is green.
+
+  The average covers *completed* periods only. Including the period you are
+  standing in would compare a part-month against full ones and paint everything
+  green for the first three weeks of every month. A category with too small a
+  base shows the rands that moved rather than a percentage that would be
+  arithmetically true and practically meaningless, anything within 3% carries no
+  colour at all, and a category with no history reads "new" rather than "+100%".
+
 ## 1.11.10 — 2026-08-09
 
 ### Added
