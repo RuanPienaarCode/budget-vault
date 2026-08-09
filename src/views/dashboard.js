@@ -107,6 +107,12 @@ module.exports = function registerDashboard(ctx) {
         inBudget: a.in_budget !== false,
         dated: rec.state !== 'no-date',
         implied: rec.state === 'drift' ? rec.implied : a.balance,
+        /* Rule 7 and the owed line are decided inside committed.js, not here —
+           this only hands over what they need to decide with. */
+        type: a.type,
+        settleMonthly: !!a.settle_monthly,
+        settleDay: a.settle_day || 0,
+        institution: a.institution || '',
       };
     });
 
@@ -121,7 +127,7 @@ module.exports = function registerDashboard(ctx) {
     /* Nothing to say: no confirmed cash AND nothing scheduled. classList, not
        Obsidian's addClass/removeClass — those are host extensions to
        HTMLElement, and every other card here toggles the plain way. */
-    const nothing = !L.cashKnown && !L.items.length;
+    const nothing = !L.cashKnown && !L.items.length && !L.owed;
     if (card) card.classList.toggle('hidden', nothing);
     if (nothing) return;
 
@@ -139,14 +145,19 @@ module.exports = function registerDashboard(ctx) {
        counted at all because their balance has no date to measure from. */
     const staleCount = S.accounts.filter(a => a.in_budget !== false && isStale(a.balance_updated)).length;
     const cashParts = [];
-    const counted = accounts.filter(a => a.inBudget && a.dated).length;
-    cashParts.push(i18n.t('dash.left.counted', { count: counted }));
+    /* whatsLeft's own count, not a second one computed here. The old local
+       recount said "in budget AND dated" while the figure above it summed only
+       what was positive, so the two disagreed on exactly the account that
+       contributed nothing — which is the class of drift the reconcile() sharing
+       further down this file exists to stop. */
+    cashParts.push(i18n.t('dash.left.counted', { count: L.countedAccounts }));
     if (staleCount) cashParts.push(i18n.t('dash.left.unconfirmed', { count: staleCount }));
     if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
 
     const comParts = [];
     if (L.counts.service) comParts.push(i18n.t('dash.left.orders', { count: L.counts.service }));
     if (L.counts.debt) comParts.push(i18n.t('dash.left.instalments', { count: L.counts.debt }));
+    if (L.counts.card) comParts.push(i18n.t('dash.left.cards', { count: L.counts.card }));
 
     const freeParts = [];
     if (L.days !== null) freeParts.push(i18n.t('dash.left.days', { count: L.days }));
@@ -178,6 +189,20 @@ module.exports = function registerDashboard(ctx) {
       el('i', { class: 'b-free', style: `width:${(100 - comPct).toFixed(2)}%` })));
     }
 
+    /* What is owed on cards, stated beside the figures rather than inside them.
+       Every number above this line is unchanged by it — that is the point. A
+       reader who spends on a card and settles it later was being shown what the
+       cheque account holds with no mention of what is already claimed against
+       it, which is how "actually free" came to sit beside five figures of card
+       balance and say nothing. */
+    if (L.owed > 0) {
+      const line = L.owedCards.length === 1
+        ? i18n.t('dash.left.owedCard', { amount: money(L.owed, 0), name: L.owedCards[0] })
+        : i18n.t('dash.left.owedCards', { amount: money(L.owed, 0), count: L.owedCards.length });
+      body.append(el('div', { class: 'kpi-caveat-txt left-owed' },
+        icoEl(['info', 'alert-circle']), line));
+    }
+
     /* The disclosure is part of the feature, not a courtesy. A card asserting a
        committed figure with no way to check it is the Services page again — a
        number nobody could audit, on a page that quietly died of it. */
@@ -189,7 +214,8 @@ module.exports = function registerDashboard(ctx) {
           : i18n.t('dash.left.thisPeriod');
         const src = it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
           : it.basis === 'stated' ? i18n.t('dash.left.asListed')
-            : i18n.t('dash.left.contracted');
+            : it.basis === 'settled' ? i18n.t('dash.left.settledInFull')
+              : i18n.t('dash.left.contracted');
         list.append(el('tr', {},
           el('td', {}, el('div', { class: 'dn' }, it.name),
             el('div', { class: 'dd' }, [it.detail, when, src].filter(Boolean).join(' · '))),

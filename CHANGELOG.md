@@ -3,6 +3,46 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.14 — 2026-08-09
+
+### Added
+
+- **"What's left" now says what you owe on your credit cards.** The card
+  answers how much money is free before the period ends, and it was building
+  that answer out of your cheque account alone. Spend on a card and settle it
+  later — for the points, or the interest-free weeks — and the cheque balance
+  it reads is money already claimed by a card sitting in another account the
+  card never looked at. On the vault this was found in, it reported R 53
+  actually free beside R 17,011 outstanding on a credit card, and said nothing.
+
+  A line beneath the figures now states the outstanding total and names the
+  card. Deliberately a sentence rather than arithmetic: **cash, committed and
+  free are all unchanged by it.** Folding a card balance into cash would report
+  money the household does not have; folding it into *committed* would claim it
+  leaves the cheque account before the period ends, which for a card topped up
+  several times a month cannot be placed — and asserting what cannot be placed
+  is the one thing this module's rules forbid. So the figures stay honest and
+  the missing fact goes on screen next to them.
+
+  It uses the implied balance, so a settlement made since you last confirmed
+  the balance is already taken off, and it stays quiet for a card in credit, an
+  undated balance, or an account you have excluded from the budget.
+
+- **A credit card you clear in full each month can now count as committed.**
+  Opt in per account with `settle_monthly: true` in the account note, and the
+  outstanding balance is treated as a charge still to come rather than as a
+  card you revolve — it appears in "What's counted" with the rest. Off by
+  default, because a card genuinely carried at interest belongs on the Debt
+  page and must keep behaving like one.
+
+### Fixed
+
+- **"N accounts" under the cash figure no longer counts accounts that put
+  nothing into it.** The count incremented before the balance was tested, so a
+  credit card at −R 8,874 — which contributes nothing to spendable cash, by
+  design — still padded the line printed directly beneath the total it formed
+  no part of. It now describes what the figure is actually made of.
+
 ## 1.11.13 — 2026-08-09
 
 ### Fixed

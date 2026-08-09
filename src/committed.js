@@ -12,7 +12,7 @@
    reconcile.js already knows what an account should read right now. This is the
    arithmetic that puts the three together.
 
-   SIX RULES, and the second one is the one the card lives or dies by.
+   SEVEN RULES, and the second one is the one the card lives or dies by.
 
    1. Cash is the IMPLIED balance, never the stated one. A stated balance is a
       claim with an age; the caller passes implied figures in. An account whose
@@ -41,6 +41,13 @@
 
    6. Nothing is asserted that cannot be placed. A charge whose date cannot be
       worked out is not silently assumed to fall inside the window.
+
+   7. A card you settle in full is a commitment, not a debt. The money is
+      already spent; it just has not left the cheque account yet. Counting the
+      cheque account at face value while the card sits at -R8,874 reports money
+      that is already owed to Discovery. This is opt-in per account
+      (`settle_monthly`), because a card someone genuinely revolves at interest
+      is a Debt-page row and must keep behaving like one.
 
    Pure — no DOM, no obsidian import — so tests/committed.test.cjs drives it in
    bare node, and `today` is injected rather than read off the clock. */
@@ -84,20 +91,32 @@ function nextOnDay(from, d) {
 /* What the household can actually spend right now.
 
    Only accounts that are IN the budget, and only positive balances. A credit
-   card sitting at −R8,400 is a debt the Debt page owns; adding it here would
-   net a liability against cash and report money the household does not have.
+   card sitting at −R8,874 is not negative cash — netting a liability against
+   cash here would report money the household does not have. When the card is
+   settled monthly it comes back as a COMMITMENT instead, which is where it
+   belongs; see cardCommitments below.
+
+   Long-term money is kept out by `budget: false` on the account, which is the
+   mechanism this app already has for it. There is deliberately no second,
+   type-based rule layered on top: two overlapping ways to exclude the same
+   account is how a reader ends up unable to explain their own total.
 
    `implied` is what reconcile() worked out; `dated` says whether the stated
    balance carried a date it could be measured from. Undated accounts are
-   counted as unknown and named, never folded in at zero. */
+   counted as unknown and named, never folded in at zero.
+
+   `counted` is accounts that actually CONTRIBUTED to the figure. It used to
+   increment before the positive check, so a card at −R8,874 padded the "N
+   accounts counted" line printed under a cash total it formed no part of. The
+   line sits beneath the cash figure and so describes what that figure is made
+   of — an account holding nothing added nothing to it. */
 function cashOnHand(accounts) {
   let cash = 0, counted = 0;
   const unknown = [];
   for (const a of accounts || []) {
     if (!a || a.inBudget === false) continue;
     if (!a.dated) { unknown.push(a.name); continue; }
-    counted++;
-    if (a.implied > 0) cash += a.implied;
+    if (a.implied > 0) { cash += a.implied; counted++; }
   }
   return { cash, counted, unknown };
 }
@@ -188,6 +207,76 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays }) {
   return out;
 }
 
+/* Credit cards the household settles in full before interest (rule 7).
+
+   The amount is the card's own OUTSTANDING balance, which makes this
+   self-correcting in a way the other two commitments are not: there is no
+   prediction to get wrong and no rule-2 problem to solve. If the settlement has
+   already been paid, the implied balance is at or near zero and there is
+   nothing left to claim. If it has not, the balance IS what is still to leave
+   the cheque account. `implied` rather than stated, so a payment made since the
+   balance was last confirmed has already been taken off.
+
+   Deliberately NOT subject to the WHOLE_MONTH_DAYS guard that debts carry. That
+   guard exists because a monthly instalment cannot be placed inside a 7-day
+   window without inventing a date. This is not a prediction about a future
+   charge — the money is owed right now, today, in every window. `settle_day`
+   refines WHEN if the household has told us; its absence changes nothing about
+   whether. */
+function cardCommitments({ accounts, from, to }) {
+  const out = [];
+  for (const a of accounts || []) {
+    if (!a || a.inBudget === false || !a.settleMonthly || !a.dated) continue;
+    const owed = a.implied < 0 ? -a.implied : 0;
+    if (!owed) continue;
+
+    /* A stated settlement day only ever narrows the claim. Falling outside the
+       window means the balance is not due before the period ends, so it is not
+       this period's problem. */
+    const due = a.settleDay ? nextOnDay(from, a.settleDay) : null;
+    if (due && due > to) continue;
+
+    out.push({
+      kind: 'card',
+      name: a.name,
+      detail: a.institution || '',
+      due,
+      amount: owed,
+      basis: 'settled',
+    });
+  }
+  return out;
+}
+
+/* What is owed on credit cards — STATED, never folded in.
+
+   This is the third answer, and it exists because the other two are both wrong
+   on their own. Counting a card balance as negative cash reports money the
+   household does not have. Counting it as a commitment claims it leaves the
+   cheque account before the period ends, which for a card topped up several
+   times a month cannot be placed and so falls foul of rule 6. Saying nothing —
+   what this card did until now — reports "R53 actually free" beside R17,011 of
+   money already spent.
+
+   So it is reported next to the figures rather than inside them: a sentence,
+   not arithmetic. Nothing above it moves, the reader can still add up every
+   number on the card, and the one fact that was missing is on screen.
+
+   Cards only. An overdrawn cheque account is already visible as the cash it
+   failed to contribute; a card is invisible precisely because it is a separate
+   account nobody looks at. `implied`, so a settlement made since the balance
+   was last confirmed has already come off. */
+function cardsOwed(accounts) {
+  let owed = 0;
+  const cards = [];
+  for (const a of accounts || []) {
+    if (!a || a.inBudget === false || !a.dated) continue;
+    if (String(a.type || '').trim().toLowerCase() !== 'credit_card') continue;
+    if (a.implied < 0) { owed += -a.implied; cards.push(a.name); }
+  }
+  return { owed, cards };
+}
+
 /* ------------------------------ the card -------------------------------- */
 
 /* Everything the "What's left" card renders.
@@ -211,11 +300,13 @@ function whatsLeft({ accounts, services, debts, rows, periodStart, periodEnd, to
   const from = now && now > periodStart ? now : periodStart;
 
   const { cash, counted, unknown } = cashOnHand(accounts);
+  const { owed, cards } = cardsOwed(accounts);
 
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
   const items = [
     ...serviceCommitments({ services, rows, from, to, periodStart }),
     ...debtCommitments({ debts, rows, from, to, periodStart, periodDays }),
+    ...cardCommitments({ accounts, from, to }),
   ].sort((a, b) => (b.amount - a.amount));
 
   const committed = items.reduce((s, i) => s + i.amount, 0);
@@ -225,7 +316,12 @@ function whatsLeft({ accounts, services, debts, rows, periodStart, periodEnd, to
   return {
     cash,
     cashKnown: counted > 0,
+    countedAccounts: counted,
     unknownAccounts: unknown,
+    /* Reported beside the figures, deliberately absent from every one of them:
+       cash, committed and free are all unchanged by this. */
+    owed,
+    owedCards: cards,
     committed,
     items,
     free,
@@ -235,6 +331,7 @@ function whatsLeft({ accounts, services, debts, rows, periodStart, periodEnd, to
     counts: {
       service: items.filter(i => i.kind === 'service').length,
       debt: items.filter(i => i.kind === 'debt').length,
+      card: items.filter(i => i.kind === 'card').length,
     },
   };
 }
@@ -249,5 +346,6 @@ function daysBetween(a, b) {
 }
 
 module.exports = {
-  WHOLE_MONTH_DAYS, nextOnDay, cashOnHand, serviceCommitments, debtCommitments, whatsLeft,
+  WHOLE_MONTH_DAYS, nextOnDay,
+  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
 };

@@ -599,17 +599,23 @@ module.exports = {
   'dash.left.instalments': {
     other: '{count} 笔还款',
   },
+  'dash.left.cards': {
+    other: '{count} 笔信用卡还款',
+  },
   'dash.left.none': '没有预定支出',
   'dash.left.days': {
     other: '还有 {count} 天',
   },
   'dash.left.perDay': '每天 {amount}',
   'dash.left.barAria': '{cash} 中，{committed} 已被占用，{free} 可用',
+  'dash.left.owedCard': '{name} 尚欠 {amount} — 已经花掉，且未从上方任何数字中扣除。',
+  'dash.left.owedCards': '{count} 张信用卡共欠 {amount} — 已经花掉，且未从上方任何数字中扣除。',
   'dash.left.whatsCounted': '哪些算作尚未扣除',
   'dash.left.expected': '预计 {date}',
   'dash.left.thisPeriod': '本期应付',
   'dash.left.lastCharged': '上次扣款 {amount}',
   'dash.left.asListed': '按列表填写，无扣款记录',
+  'dash.left.settledInFull': '全额结清，当前余额',
   'dash.left.contracted': '合同约定还款额',
   'dash.left.source': '金额取自实际最后一次扣款，而不是你在“订阅服务”页面填写的数字。只读取你的订阅服务列表和负债页面 — 两者都没有的定期扣款不会计入这里。',
   'dash.split.colCat': '类别',

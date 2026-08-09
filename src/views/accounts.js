@@ -453,6 +453,12 @@ module.exports = function registerAccounts(ctx) {
     lines.push(`balance: ${a.balance.toFixed(2)}`);
     if (a.balance_updated) lines.push(`balance_updated: ${a.balance_updated}`);
     if (!a.in_budget) lines.push('budget: false');
+    /* Opt-in, so only a set value is written — an absent key is the default and
+       materialising it here would freeze today's default into the file. The
+       fmRaw patch branch above preserves these without help; this branch
+       rebuilds from the model, so it has to name them. */
+    if (a.settle_monthly) lines.push('settle_monthly: true');
+    if (a.settle_day) lines.push(`settle_day: ${a.settle_day}`);
     if (a.credit_limit) lines.push(`credit_limit: ${a.credit_limit.toFixed(2)}`);
     if (a.goal_amount) lines.push(`goal_amount: ${a.goal_amount.toFixed(2)}`);
     if (a.target_date) lines.push(`target_date: ${a.target_date}`);

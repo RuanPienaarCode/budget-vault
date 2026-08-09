@@ -599,17 +599,23 @@ module.exports = {
   'dash.left.instalments': {
     other: '返済 {count} 件',
   },
+  'dash.left.cards': {
+    other: 'カード清算 {count} 件',
+  },
   'dash.left.none': '予定なし',
   'dash.left.days': {
     other: '残り {count} 日',
   },
   'dash.left.perDay': '1日あたり {amount}',
   'dash.left.barAria': '{cash} のうち {committed} が支払い予定、{free} が使えます',
+  'dash.left.owedCard': '{name} に {amount} の未払いがあります — 支出済みで、上のどの金額からも差し引かれていません。',
+  'dash.left.owedCards': 'クレジットカード {count} 枚に {amount} の未払いがあります — 支出済みで、上のどの金額からも差し引かれていません。',
   'dash.left.whatsCounted': '支払い予定に数えたもの',
   'dash.left.expected': '{date} 予定',
   'dash.left.thisPeriod': 'この期間に支払い',
   'dash.left.lastCharged': '前回の請求 {amount}',
   'dash.left.asListed': '記載どおり（請求履歴なし）',
+  'dash.left.settledInFull': '全額清算、現在の残高',
   'dash.left.contracted': '契約上の返済額',
   'dash.left.source': '金額は実際に最後に請求された額であり、サービス画面に入力した数字ではありません。サービス一覧と負債ページのみを読み取ります。どちらにも無い定期的な請求はここには数えません。',
   'dash.split.colCat': 'カテゴリ',

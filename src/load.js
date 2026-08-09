@@ -23,6 +23,20 @@ function fmNum(v) {
   return s ? normalizeAmount(s) : null;
 }
 
+/* An optional BOOLEAN frontmatter key, tri-state for the same reason fmNum is:
+   absent → undefined ("not set, decide by the default"), written → true/false.
+   Collapsing absent to false would turn every account in every existing vault
+   into an explicit opt-out on upgrade, which is precisely the silent figure
+   change a default is supposed to avoid. Anything unreadable is treated as
+   unset rather than as false, so a typo cannot quietly exclude an account. */
+function fmBool(v) {
+  const s = (v ?? '').toString().trim().toLowerCase();
+  if (!s) return undefined;
+  if (/^(true|yes|on|1)$/.test(s)) return true;
+  if (/^(false|no|off|0)$/.test(s)) return false;
+  return undefined;
+}
+
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
 
@@ -104,6 +118,12 @@ module.exports = function registerLoad(ctx) {
         // the cheque account is budgeted as normal; only the arriving leg here
         // is suppressed, which is what stops it being counted twice.
         in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()),
+        /* A card the household clears in full before interest. Its outstanding
+           balance is money already spent that has not left the cheque account
+           yet, so it counts as committed rather than as negative cash.
+           `settle_day` narrows WHEN; it is optional and only ever narrows. */
+        settle_monthly: /^(true|yes|on|1)$/i.test(String(fm.settle_monthly ?? '').trim()),
+        settle_day: fmNum(fm.settle_day),
         /* Same parseNum reasoning as `balance` above, and for the same reason:
            every one of these is hand-editable and every one is WRITTEN BACK by
            saveAccount's FM_WRITERS. parseFloat reads "15,000" as 15 and
