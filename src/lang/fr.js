@@ -589,6 +589,7 @@ module.exports = {
   'dash.stale.btn': 'Vérifier les soldes',
   'dash.stale.aria': 'Vérifier les soldes des comptes sur la page Comptes',
 
+  'dash.range.all': 'Tout',
   'dash.trend.range': 'Plage de la tendance des dépenses',
   'dash.trend.sub': { one: 'Dépensé vs budget · {count} période', other: 'Dépensé vs budget · {count} périodes' },
   'dash.trend.clamped': ' · tout l\'historique importé jusqu\'ici',
@@ -650,6 +651,10 @@ module.exports = {
   'dash.split.r1m': 'Mois dernier',
   'dash.split.rPrev': 'Préc.',
   'dash.split.rangeAria': 'Période de comparaison',
+  'dash.split.likeForLike': {
+    one: 'Cette période a {count} jour, la colonne {range} ne compte donc que le premier jour de chaque période précédente. À périmètre égal — ce n\'est pas la moyenne d\'une période complète.',
+    other: 'Cette période a {count} jours, la colonne {range} ne compte donc que les {count} premiers jours de chaque période précédente. À périmètre égal — ce n\'est pas la moyenne d\'une période complète.',
+  },
 
   'dash.err.render': 'Impossible de dessiner {label} — {error}',
 

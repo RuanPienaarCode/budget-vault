@@ -3,6 +3,48 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Added
+
+- **The Dashboard's range pills now follow the size of your vault.** "Spending
+  Trend" and "Where it went" each offered 3M, 6M and 1Y and stopped there — the
+  same menu whether the vault held eight months or eight years. Past a year of
+  imported history both gain **All**; past five years both gain **5Y** as well.
+
+  Each is earned rather than fixed, because a pill that draws the same picture
+  as the one beside it is a control that appears to be broken. On three years of
+  statements a five-year range, an all-time range and a 1Y range clamped to the
+  data are the same chart three times over — so 5Y stays hidden until there is
+  more than five years to tell it apart from All, and All stays hidden until
+  there is more than a year to tell it apart from 1Y. Under a year, neither
+  appears and nothing changes.
+
+  Picking All draws every period the vault holds and drops the "all the history
+  imported so far" note, which existed to explain a shortfall All does not have.
+  A range you had selected that the vault no longer earns — 5Y after the oldest
+  statements are removed — falls back rather than leaving a chart on a span with
+  no pill lit to say so.
+
+### Changed
+
+- **"Where it went" compares like-for-like while a period is still running.**
+  Nine days of August were being measured against three whole Julys: every
+  category that bills late in the month showed a large green fall, every
+  category that bills on the 1st showed a rise, and both figures were reporting
+  nothing but today's date. The card said spending was down 39% on food in a
+  month that had barely started. Each earlier period is now counted only as far
+  into itself as this one has run, and the card says so underneath.
+
+- **The change column speaks in rands, not percentages.** It used to print a
+  percentage above a size threshold and rands below it, which put two units in
+  one column with an invisible rule choosing between them — a category could
+  switch unit between months without changing its own behaviour, and a reader
+  who wanted to know what "−39%" cost them had to work it out themselves. The
+  proportion is not lost: the baseline sits in the column immediately to its
+  left. The baseline column also now carries the same wording as the pill above
+  it, rather than deriving "12M" over a pill that reads "1Y".
+
 ## 1.11.11 — 2026-08-09
 
 ### Added

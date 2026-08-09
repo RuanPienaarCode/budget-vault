@@ -594,6 +594,9 @@ module.exports = {
   'dash.stale.btn': 'Review balances',
   'dash.stale.aria': 'Review account balances on the Accounts page',
 
+  /* The pill for "every period this vault holds". Sits beside 3M/6M/1Y/5Y, so
+     it has to stay about that short in every language. */
+  'dash.range.all': 'All',
   'dash.trend.range': 'Spending trend range',
   'dash.trend.sub': { one: 'Spent vs budget · {count} period', other: 'Spent vs budget · {count} periods' },
   'dash.trend.clamped': ' · all the history imported so far',
@@ -658,6 +661,10 @@ module.exports = {
   'dash.split.r1m': 'Last month',
   'dash.split.rPrev': 'Prev',
   'dash.split.rangeAria': 'Comparison range',
+  'dash.split.likeForLike': {
+    one: 'This period is {count} day old, so the {range} column counts only the first day of each earlier period. Like-for-like — it is not a full-period average.',
+    other: 'This period is {count} days old, so the {range} column counts only the first {count} days of each earlier period. Like-for-like — it is not a full-period average.',
+  },
 
   'dash.err.render': 'Could not draw the {label} — {error}',
 

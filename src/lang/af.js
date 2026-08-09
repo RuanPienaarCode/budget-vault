@@ -583,6 +583,7 @@ module.exports = {
   'dash.stale.btn': 'Gaan saldo\'s na',
   'dash.stale.aria': 'Gaan rekeningsaldo\'s op die Rekeninge-bladsy na',
 
+  'dash.range.all': 'Alles',
   'dash.trend.range': 'Reeks vir die bestedingstendens',
   'dash.trend.sub': { one: 'Bestee teenoor begroot · {count} tydperk', other: 'Bestee teenoor begroot · {count} tydperke' },
   'dash.trend.clamped': ' · al die geskiedenis wat tot dusver ingevoer is',
@@ -644,6 +645,10 @@ module.exports = {
   'dash.split.r1m': 'Verlede maand',
   'dash.split.rPrev': 'Vorige',
   'dash.split.rangeAria': 'Vergelykingstydperk',
+  'dash.split.likeForLike': {
+    one: 'Hierdie tydperk is {count} dag oud, dus tel die {range}-kolom net die eerste dag van elke vroeëre tydperk. Appels met appels — dit is nie \'n volle tydperk se gemiddeld nie.',
+    other: 'Hierdie tydperk is {count} dae oud, dus tel die {range}-kolom net die eerste {count} dae van elke vroeëre tydperk. Appels met appels — dit is nie \'n volle tydperk se gemiddeld nie.',
+  },
 
   'dash.err.render': 'Kon nie die {label} teken nie — {error}',
 

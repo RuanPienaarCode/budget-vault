@@ -560,6 +560,7 @@ module.exports = {
   'dash.stale.btn': '查看余额',
   'dash.stale.aria': '在账户页面查看账户余额',
 
+  'dash.range.all': '全部',
   'dash.trend.range': '支出趋势的时间范围',
   'dash.trend.sub': { other: '支出与预算 · {count} 个周期' },
   'dash.trend.clamped': ' · 目前已导入的全部历史',
@@ -614,6 +615,9 @@ module.exports = {
   'dash.split.r1m': '上个月',
   'dash.split.rPrev': '上期',
   'dash.split.rangeAria': '比较区间',
+  'dash.split.likeForLike': {
+    other: '本期才过了 {count} 天，因此 {range} 列只统计此前每期的前 {count} 天。这是同口径比较，并非整期平均值。',
+  },
 
   'dash.err.render': '无法绘制{label} — {error}',
 

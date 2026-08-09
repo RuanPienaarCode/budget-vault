@@ -584,6 +584,7 @@ module.exports = {
   'dash.stale.btn': 'Kontostände prüfen',
   'dash.stale.aria': 'Kontostände auf der Konten-Seite prüfen',
 
+  'dash.range.all': 'Gesamt',
   'dash.trend.range': 'Zeitraum des Ausgabentrends',
   'dash.trend.sub': { one: 'Ausgegeben vs. Budget · {count} Zeitraum', other: 'Ausgegeben vs. Budget · {count} Zeiträume' },
   'dash.trend.clamped': ' · die gesamte bisher importierte Historie',
@@ -645,6 +646,10 @@ module.exports = {
   'dash.split.r1m': 'Letzter Monat',
   'dash.split.rPrev': 'Vorher',
   'dash.split.rangeAria': 'Vergleichszeitraum',
+  'dash.split.likeForLike': {
+    one: 'Dieser Zeitraum ist {count} Tag alt, daher zählt die Spalte {range} nur den ersten Tag jedes früheren Zeitraums. Gleiches mit Gleichem — kein Durchschnitt eines vollen Zeitraums.',
+    other: 'Dieser Zeitraum ist {count} Tage alt, daher zählt die Spalte {range} nur die ersten {count} Tage jedes früheren Zeitraums. Gleiches mit Gleichem — kein Durchschnitt eines vollen Zeitraums.',
+  },
 
   'dash.err.render': 'Die Karte {label} konnte nicht gezeichnet werden — {error}',
 

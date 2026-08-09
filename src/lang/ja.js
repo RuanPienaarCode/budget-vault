@@ -560,6 +560,7 @@ module.exports = {
   'dash.stale.btn': '残高を確認',
   'dash.stale.aria': '口座ページで口座残高を確認',
 
+  'dash.range.all': '全期間',
   'dash.trend.range': '支出推移の期間',
   'dash.trend.sub': { other: '支出と予算 · {count} 期間' },
   'dash.trend.clamped': ' · これまでに取り込んだ全期間',
@@ -614,6 +615,9 @@ module.exports = {
   'dash.split.r1m': '先月',
   'dash.split.rPrev': '前期',
   'dash.split.rangeAria': '比較期間',
+  'dash.split.likeForLike': {
+    other: 'この期間はまだ {count} 日目のため、{range} 列は過去の各期間の最初の {count} 日分だけを集計しています。同じ条件での比較であり、期間全体の平均ではありません。',
+  },
 
   'dash.err.render': '{label} を描画できませんでした — {error}',
 

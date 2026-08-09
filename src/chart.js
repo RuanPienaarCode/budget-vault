@@ -404,12 +404,34 @@ const RANGES = [
   { key: '3m',  label: '3M',  months: 3,   historical: true },
   { key: '6m',  label: '6M',  months: 6,   historical: true },
   { key: '1y',  label: '1Y',  months: 12,  historical: true },
-  { key: '5y',  label: '5Y',  months: 60,  historical: false },
+  { key: '5y',  label: '5Y',  months: 60,  historical: true },
   { key: '10y', label: '10Y', months: 120, historical: false },
 ];
 
-const historicalRanges = () => RANGES.filter(r => r.historical);
 const rangeFor = key => RANGES.find(r => r.key === key);
+
+/* The historical ranges worth OFFERING for `span` months of imported history.
+
+   The long ranges are earned, not fixed. A pill has to draw something the pill
+   beside it does not, or it is a control that appears to do nothing: on two
+   years of statements, 5Y and All and 1Y-clamped are the same picture three
+   times over, and a reader who clicks between them learns only that the chart
+   is unresponsive.
+
+   So: 3M/6M/1Y always — they are the questions asked of a vault of any size.
+   5Y once there is more than five years to distinguish it from All. All once
+   there is more than a year, which is the point at which "everything" stops
+   being a synonym for 1Y. Under a year, neither appears, and the flat-zero
+   history the old comment warned about is never drawn.
+
+   All carries `months: span` rather than Infinity so the caller can size its
+   request in the same unit as every other range; the caller is still expected
+   to stop at the earliest month it actually holds. */
+function historicalRanges(span = 0, allLabel = 'All') {
+  const out = RANGES.filter(r => r.historical && (r.months <= 12 || span > r.months));
+  if (span > 12) out.push({ key: 'all', label: allLabel, months: span, historical: true });
+  return out;
+}
 
 /* Segmented pill control. Returns the element; the caller mounts it.
 

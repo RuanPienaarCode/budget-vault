@@ -8,7 +8,7 @@ const { TYPE_ORDER } = require('../constants');
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft } = require('../committed');
-const { todayIso } = require('../dates');
+const { todayIso, isoDayNumber, isoFromDayNumber } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const {
@@ -18,7 +18,7 @@ const {
 } = require('../chart');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, catType, accountIndex } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, accountIndex } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -501,13 +501,41 @@ module.exports = function registerDashboard(ctx) {
     return out.reverse();
   }
 
-  const trendRange = () => rangeFor(plugin.settings.chartTrendRange) || rangeFor('6m');
+  /* Calendar months of history the vault actually holds, counting the month on
+     screen. This is what decides whether a long range is worth offering at all:
+     the pills describe the data, not a fixed menu the data has to live up to. */
+  function historySpan() {
+    const earliest = earliestDataMonth();
+    if (!earliest) return 0;
+    const now = periodRange(S.period).end.slice(0, 7);
+    if (now < earliest) return 0;
+    const [ey, em] = earliest.split('-').map(Number);
+    const [ny, nm] = now.split('-').map(Number);
+    return (ny - ey) * 12 + (nm - em) + 1;
+  }
+
+  const trendRanges = () => historicalRanges(historySpan(), i18n.t('dash.range.all'));
+
+  /* The saved range is only honoured while it is still on offer. A vault that
+     had five years and then had its oldest statements removed must not sit on a
+     5Y pill that is no longer drawn — the chart would keep the old span with no
+     control showing which one is active. */
+  const trendRange = (ranges = trendRanges()) =>
+    ranges.find(r => r.key === plugin.settings.chartTrendRange)
+    || ranges.find(r => r.key === '6m')
+    || ranges[0]
+    || rangeFor('6m');
 
   function renderTrend() {
     const wrap = $('#trendChart'); wrap.empty();
 
-    const range = trendRange();
-    const want = periodsForMonths(range.months);
+    const ranges = trendRanges();
+    const range = trendRange(ranges);
+    /* "All" asks for everything and lets trendPeriods stop itself at the
+       earliest imported month, so it is given a couple of periods of headroom:
+       a pay cycle that is not a calendar month rounds its month count short,
+       and the oldest period would otherwise be the one that falls off. */
+    const want = periodsForMonths(range.months) + (range.key === 'all' ? 2 : 0);
     const periods = trendPeriods(want);
     const data = periods.map(p => {
       const sum = periodSummary(p);
@@ -518,7 +546,7 @@ module.exports = function registerDashboard(ctx) {
        one can never disagree with the series actually drawn below. */
     const pills = $('#trendRange'); pills.empty();
     pills.append(rangePills({
-      ranges: historicalRanges(),
+      ranges,
       value: range.key,
       label: i18n.t('dash.trend.range'),
       onPick: async key => {
@@ -529,8 +557,10 @@ module.exports = function registerDashboard(ctx) {
     }));
 
     /* Say when the range was cut short, rather than letting a "1Y" pill sit
-       above six months of chart with nothing to explain the difference. */
-    const clamped = periods.length < want;
+       above six months of chart with nothing to explain the difference. "All"
+       is exempt: it asked for exactly what it got, and a note explaining that
+       the history stops where the history stops explains nothing. */
+    const clamped = range.key !== 'all' && periods.length < want;
     $('#trendSub').textContent = i18n.t('dash.trend.sub', { count: periods.length })
       + (clamped ? i18n.t('dash.trend.clamped') : '');
 
@@ -735,60 +765,184 @@ module.exports = function registerDashboard(ctx) {
   /* Ranges offered by "Where it went". A LOCAL list, deliberately not
      historicalRanges() from chart.js: that table feeds the trend chart too, and
      adding a 1-month entry to it would put a 1M pill on a chart that plots one
-     point per period and cannot usefully draw a single one. */
-  const SPLIT_RANGES = [
-    { key: '1m', label: i18n.t('dash.split.r1m'), periods: 1 },
-    { key: '3m', label: '3M', periods: 3 },
-    { key: '6m', label: '6M', periods: 6 },
-    { key: '1y', label: '1Y', periods: 12 },
-  ];
+     point per period and cannot usefully draw a single one.
+
+     The long end is earned exactly as the trend's is, and for the same reason:
+     on three years of statements a five-year average and an all-time average
+     are the same column printed twice, and a reader switching between them
+     learns only that the control does nothing. So All appears past a year of
+     history and 5Y only past five.
+
+     `periods` really is periods here, not months. This card averages PAY
+     CYCLES — on a weekly cycle "3M" has always meant the three cycles before
+     this one — so the fixed entries stay literal counts and only All, which
+     means "as far back as the vault goes", is converted from the span. */
+  const splitRanges = () => {
+    const span = historySpan();
+    const out = [
+      { key: '1m', label: i18n.t('dash.split.r1m'), periods: 1 },
+      { key: '3m', label: '3M', periods: 3 },
+      { key: '6m', label: '6M', periods: 6 },
+      { key: '1y', label: '1Y', periods: 12 },
+    ];
+    if (span > 60) out.push({ key: '5y', label: '5Y', periods: 60 });
+    if (span > 12) out.push({ key: 'all', label: i18n.t('dash.range.all'), periods: periodsForMonths(span) + 2 });
+    return out;
+  };
+
+  /* Same rule as the trend's: a saved range is honoured only while it is still
+     on offer, so a vault whose oldest statements are removed cannot sit on an
+     All baseline with no pill lit to say so. */
+  const splitRange = (ranges = splitRanges()) =>
+    ranges.find(r => r.key === plugin.settings.splitCompareRange)
+    || ranges.find(r => r.key === '3m')
+    || ranges[0];
+
+  /* How much of the period ON SCREEN has actually happened yet, or null when it
+     is finished and the question does not arise.
+
+     This is the number the comparison column was missing. Nine days of August
+     were being measured against three whole Julys: every category that bills
+     late in the month showed a large green fall, every category that bills on
+     the 1st showed a rise, and both figures were reporting nothing but today's
+     date. The card said spending was down 39% on food in a month that had
+     barely started. Same trap monthlyIncome() already sidesteps in period.js —
+     a part-period cannot be read against whole ones.
+
+     The last day of a running period counts as complete: by then the capped
+     window IS the whole period, so there is nothing left to explain. */
+  function elapsedDays() {
+    if (S.period !== currentPeriod()) return null;
+    const { start, end } = periodRange(S.period);
+    const today = todayIso();
+    if (today >= end) return null;
+    return Math.max(1, isoDayNumber(today) - isoDayNumber(start) + 1);
+  }
+
+  /* Spend per category for one period, twice over: the whole period, and only
+     its first `days` (which is the same thing when days is null, or when the
+     window runs past the period's own end — a 31-day month compared against a
+     30-day one caps at 30).
+
+     Filtering mirrors periodSummary() exactly — the per-row veto, the
+     per-account one, transfers dropped, income dropped, and NET per category so
+     a refund nets off rather than counting as spend. A baseline built by
+     different rules than the figure it is subtracted from is not a comparison.
+
+     `count` deliberately ignores the cap. It answers "does the vault cover this
+     period at all", and a month whose data starts on the 20th still happened —
+     counting only the capped rows would drop it from the average entirely. */
+  function periodSpend(p, days) {
+    const skip = nonBudgetLabels();
+    let cut = null;
+    if (days !== null) {
+      const { start, end } = periodRange(p);
+      const c = isoFromDayNumber(isoDayNumber(start) + days - 1);
+      if (c < end) cut = c;
+    }
+    const net = {}, netPart = {};
+    let count = 0;
+    for (const t of txInPeriod(p)) {
+      if (t.excluded || skip.has(t.label)) continue;
+      count++;
+      if (catType(t.cat) === 'transfer') continue;
+      const k = t.cat || '';
+      net[k] = (net[k] || 0) + t.amount;
+      if (!cut || t.date <= cut) netPart[k] = (netPart[k] || 0) + t.amount;
+    }
+    const spendOf = m => {
+      const out = {};
+      for (const [cat, amt] of Object.entries(m)) {
+        const type = catType(cat);
+        if (!cat || type === 'income' || type === 'transfer' || amt >= 0) continue;
+        out[cat] = -amt;
+      }
+      return out;
+    };
+    return { count, whole: spendOf(net), part: spendOf(netPart) };
+  }
 
   /* Spend per category, averaged over the N periods BEFORE the one on screen.
      Returns null when there is not a single completed period to compare with —
      a first-month vault gets the donut it has always had rather than a column
-     of "new" against nothing. */
+     of "new" against nothing.
+
+     TWO totals, because they answer different questions. `totals` is the
+     like-for-like baseline the change column subtracts from, measured over the
+     same elapsed window as the period on screen. `full` is the whole of each
+     period, and its only job is deciding whether a category is genuinely NEW or
+     has merely not billed yet this month — without it, every category that
+     charges after the 9th would be announced as new for the first week of
+     every period. */
   function compareBaseline() {
-    const key = plugin.settings.splitCompareRange || '3m';
-    const r = SPLIT_RANGES.find(x => x.key === key) || SPLIT_RANGES[1];
-    const totals = {};
+    const r = splitRange();
+    const days = elapsedDays();
+    const totals = {}, full = {};
     let counted = 0;
     for (let i = 1; i <= r.periods; i++) {
       const p = shiftPeriod(S.period, -i);
-      const sum = periodSummary(p);
+      const sum = periodSpend(p, days);
       /* A period with no transactions at all is not a zero-spend period, it is
          a period the vault does not cover — averaging it in would halve every
          figure for every month before the data starts. */
       if (!sum.count) continue;
       counted++;
-      for (const [cat, amt] of Object.entries(sum.byCat)) {
-        const type = catType(cat);
-        if (!cat || type === 'income' || type === 'transfer') continue;
-        if (amt >= 0) continue;
-        totals[cat] = (totals[cat] || 0) + -amt;
-      }
+      for (const [cat, amt] of Object.entries(sum.whole)) full[cat] = (full[cat] || 0) + amt;
+      for (const [cat, amt] of Object.entries(sum.part)) totals[cat] = (totals[cat] || 0) + amt;
     }
     if (!counted) return null;
-    return { totals, counted, label: r.periods === 1 ? i18n.t('dash.split.rPrev') : `${r.periods}M` };
+    /* Below this a move gets no colour whatever proportion it works out to: a
+       R40 swing inside a R40 000 month is noise, and colouring noise teaches
+       the reader that the colour carries no information — which is what costs
+       the R2 000 row its impact. Taken from the period rather than hardcoded,
+       so it means the same thing in every currency the plugin formats. */
+    const floor = periodSummary(S.period).spend * 0.0025;
+    /* The column header is the pill's own wording, not a count derived from it.
+       Deriving it printed "12M" above a pill reading "1Y" — the same range
+       named two ways a few pixels apart — and there is no wording of "60M" or
+       "all of it" that a derived count could have got right at all. */
+    return {
+      totals, full, counted, floor, days,
+      label: r.key === '1m' ? i18n.t('dash.split.rPrev') : r.label,
+    };
   }
 
-  /* One category's change against the baseline, with the three guards that stop
-     the column becoming noise a reader learns to ignore. */
+  /* One category's change against the baseline, in RANDS — the same unit as
+     every other figure on this card.
+
+     It used to print a percentage above a size threshold and rands below it,
+     which put two units in one column with an invisible rule choosing between
+     them. The rule was relative to the period's own total, so a category could
+     switch unit between months without changing its own behaviour, no row could
+     be read against the one above it, and a reader who wanted to know what
+     "−39%" cost them had to do the arithmetic themselves. The percentage is not
+     lost: the baseline sits in the column immediately to the left, which is
+     where the proportion can be seen without being asserted. */
   function compareCell(cat, now, base) {
-    const avg = base.totals[cat] === undefined ? null : base.totals[cat] / base.counted;
-    if (avg === null || avg <= 0) {
+    /* Nothing in this category anywhere in the window — genuinely new.
+       Deliberately NOT the same test as a baseline of zero: a category that
+       normally bills on the 20th has a zero baseline on the 9th, and comparing
+       against it is a real comparison ("you have spent this already, and you
+       usually haven't yet"), not a missing one. */
+    if (!(base.full[cat] > 0)) {
       return { baseText: '—', text: i18n.t('dash.split.new'), cls: 'is-new' };
     }
-    const diff = now - avg;
-    /* DEADBAND: under a few percent, print the figure but give it no colour.
-       Colouring a 1% move teaches the reader that the colour carries no
-       information, which costs the 31% row its impact. */
-    const cls = Math.abs(diff) / avg < 0.03 ? 'is-flat' : (diff > 0 ? 'is-up' : 'is-down');
-    /* SMALL BASE: R20 -> R60 is +200% and means nothing. Below a floor, show
-       the rands that actually moved instead. */
-    const floor = Math.max(100, periodSummary(S.period).spend * 0.02);
-    const text = avg < floor
-      ? `${diff >= 0 ? '+' : '−'}${money(Math.abs(diff), 0)}`
-      : `${diff >= 0 ? '+' : '−'}${Math.abs(Math.round((diff / avg) * 100))}%`;
+    const avg = (base.totals[cat] || 0) / base.counted;
+    /* Both sides rounded BEFORE subtracting, so the change really is the
+       difference between the two figures printed beside it. Rounding after
+       instead is what let a row read R915 against R636 and call it +R278. */
+    const r = v => Number(v.toFixed(0));
+    const diff = r(now) - r(avg);
+    /* DEADBAND, both ways. A move earns a colour only when it is worth noticing
+       as a proportion of what this category usually costs AND worth noticing as
+       money. Either test alone mislabels: 3% of a large category is a real sum,
+       and 40% of a tiny one is not. */
+    const cls = Math.abs(diff) < base.floor || Math.abs(diff) < r(avg) * 0.03
+      ? 'is-flat'
+      : (diff > 0 ? 'is-up' : 'is-down');
+    const text = diff === 0
+      ? money(0, 0)
+      : `${diff > 0 ? '+' : '−'}${money(Math.abs(diff), 0)}`;
     return { baseText: money(avg, 0), text, cls };
   }
 
@@ -797,11 +951,13 @@ module.exports = function registerDashboard(ctx) {
     const sum = periodSummary(S.period);
 
     /* Rebuilt here rather than once at registration, so the active pill follows
-       a language change and a range picked on another render. */
+       a language change, a range picked on another render, and a vault that has
+       just grown past a year of history. */
     const pills = $('#splitRange');
+    const ranges = splitRanges();
     if (pills) { pills.empty(); pills.append(rangePills({
-      ranges: SPLIT_RANGES,
-      value: plugin.settings.splitCompareRange || '3m',
+      ranges,
+      value: splitRange(ranges).key,
       label: i18n.t('dash.split.rangeAria'),
       onPick: async k => {
         plugin.settings.splitCompareRange = k;
@@ -966,6 +1122,16 @@ module.exports = function registerDashboard(ctx) {
         }, icoEl(['file-text', 'file']))));
     }
     wrap.append(svg, legend);
+
+    /* Say out loud that the baseline is a part-month, because the column no
+       longer reads as a typical one and a reader who assumed it did would think
+       their spending had collapsed. Only while the period is running: once it
+       is complete the two columns compare whole periods and there is nothing
+       left to explain. */
+    if (base && base.days !== null) {
+      wrap.append(el('p', { class: 'donut-note' },
+        i18n.t('dash.split.likeForLike', { count: base.days, range: base.label })));
+    }
   }
 
   /* ---------------------- category drill-through ------------------------

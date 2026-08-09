@@ -585,6 +585,7 @@ module.exports = {
   'dash.stale.btn': 'Revisar saldos',
   'dash.stale.aria': 'Revisar los saldos de las cuentas en la página Cuentas',
 
+  'dash.range.all': 'Todo',
   'dash.trend.range': 'Rango de la tendencia de gasto',
   'dash.trend.sub': { one: 'Gastado frente a presupuesto · {count} periodo', other: 'Gastado frente a presupuesto · {count} periodos' },
   'dash.trend.clamped': ' · todo el historial importado hasta ahora',
@@ -646,6 +647,10 @@ module.exports = {
   'dash.split.r1m': 'Mes pasado',
   'dash.split.rPrev': 'Anterior',
   'dash.split.rangeAria': 'Período de comparación',
+  'dash.split.likeForLike': {
+    one: 'Este período tiene {count} día, así que la columna {range} cuenta solo el primer día de cada período anterior. Comparación equivalente — no es el promedio de un período completo.',
+    other: 'Este período tiene {count} días, así que la columna {range} cuenta solo los primeros {count} días de cada período anterior. Comparación equivalente — no es el promedio de un período completo.',
+  },
 
   'dash.err.render': 'No se pudo dibujar {label} — {error}',
 

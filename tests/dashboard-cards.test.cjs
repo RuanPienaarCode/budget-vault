@@ -188,6 +188,98 @@ const ALL_UNCAT = {
   ]),
 };
 
+/* A vault built to catch the two things the comparison column got wrong.
+
+   Three complete months, each with the SAME four spending shapes, so every
+   baseline is exact and any movement in the change column comes from the month
+   on screen rather than from arithmetic drift:
+
+     Rent    10 000 on the 1st          — bills before the window opens
+     Food     300 on the 3rd, 7th,      — spread through the month
+              12th, 20th and 27th
+     Late   2 000 on the 25th           — bills AFTER a 9-day window closes
+     Early    400 on the 20th           — same, but paid early this month
+     Phone  636,40 on the 1st           — chosen for its cents; see below
+
+   August is the running month and the clock is pinned to the 9th, which is
+   what makes it a test rather than a coincidence. Nine days of August against
+   three whole Julys is exactly the comparison that shipped, and it reported
+   Late as −100% and Food as −40% while nothing at all had gone wrong. */
+const CMP_CATS = {
+  [`${B}/Categories/Rent.md`]: '---\ntype: expense\ncolor: "#e74c3c"\n---\n',
+  [`${B}/Categories/Food.md`]: '---\ntype: expense\ncolor: "#3498db"\n---\n',
+  [`${B}/Categories/Late.md`]: '---\ntype: expense\ncolor: "#9b59b6"\n---\n',
+  [`${B}/Categories/Early.md`]: '---\ntype: expense\ncolor: "#f39c12"\n---\n',
+  [`${B}/Categories/Phone.md`]: '---\ntype: expense\ncolor: "#1abc9c"\n---\n',
+  [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#27ae60"\n---\n',
+};
+const settledMonth = m => txFile([
+  [`2026-${m}-01`, 'Landlord', 'Rent', -10000],
+  [`2026-${m}-01`, 'Telco', 'Phone', -636.40],
+  [`2026-${m}-03`, 'Shop', 'Food', -300],
+  [`2026-${m}-07`, 'Shop', 'Food', -300],
+  [`2026-${m}-12`, 'Shop', 'Food', -300],
+  [`2026-${m}-20`, 'Shop', 'Food', -300],
+  [`2026-${m}-20`, 'Gym', 'Early', -400],
+  [`2026-${m}-25`, 'Insurer', 'Late', -2000],
+  [`2026-${m}-25`, 'Payday', 'Salary', 20000],
+  [`2026-${m}-27`, 'Shop', 'Food', -300],
+]);
+const COMPARE = {
+  [`${B}/Settings.md`]: SETTINGS, ...CMP_CATS, ...ACCOUNT,
+  [`${B}/Transactions/Cheque/2026-05.md`]: settledMonth('05'),
+  [`${B}/Transactions/Cheque/2026-06.md`]: settledMonth('06'),
+  [`${B}/Transactions/Cheque/2026-07.md`]: settledMonth('07'),
+  /* August, nine days in. Rent has risen, food is genuinely ahead of its own
+     first nine days, the gym was paid on the 3rd instead of the 20th, and the
+     insurer has not billed yet — which is not a saving, it is the 9th. */
+  [`${B}/Transactions/Cheque/2026-08.md`]: txFile([
+    ['2026-08-01', 'Landlord', 'Rent', -11800],
+    ['2026-08-02', 'Telco', 'Phone', -914.60],
+    ['2026-08-02', 'Shop', 'Food', -300],
+    ['2026-08-03', 'Gym', 'Early', -400],
+    ['2026-08-04', 'Shop', 'Food', -300],
+    ['2026-08-08', 'Shop', 'Food', -300],
+  ]),
+};
+
+/* The clock, pinned. currentPeriod() and todayIso() both read `new Date()`,
+   and the whole part-period question is "what day is it" — a suite that let
+   the real date through would assert something different every morning and
+   pass or fail on the calendar. Subclassed rather than replaced so every
+   OTHER use of Date in the loader and the period maths still works: only the
+   no-argument constructor and now() are answered from the fixed instant. */
+const RealDate = Date;
+function atDate(iso, fn) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const fixed = () => new RealDate(y, m - 1, d, 12, 0, 0);
+  class FakeDate extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(fixed().getTime()); }
+    static now() { return fixed().getTime(); }
+  }
+  global.Date = FakeDate;
+  return Promise.resolve().then(fn).finally(() => { global.Date = RealDate; });
+}
+
+/* category name -> { val, base, delta, cls }, read off the rendered legend
+   rather than off the functions that built it — the column is a reading
+   problem, so the assertions have to be about what reaches the screen. */
+function legendRows(node) {
+  const out = new Map();
+  for (const li of all(node, e => e.tagName === 'LI')) {
+    if (li._cls.has('donut-legend-head')) continue;
+    const pick = cls => (all(li, e => e._cls.has(cls))[0] || {}).textContent;
+    const name = pick('dl-name');
+    if (name === undefined) continue;
+    const d = all(li, e => e._cls.has('dl-delta'))[0];
+    out.set(name, {
+      val: pick('dl-val'), base: pick('dl-base'), delta: d && d.textContent,
+      cls: d && [...d._cls].find(c => c.startsWith('is-')),
+    });
+  }
+  return out;
+}
+
 /* ------------------------------- mounting ------------------------------- */
 /* Every card container renderDashboard touches. A card missing from here still
    "passes" — its guard catches the null and the suite stays green — so the
@@ -217,10 +309,10 @@ const CARDS = [
   ['dashPositionKpis', 'mini'],
 ];
 
-async function mount(files) {
+async function mount(files, period = '2026-07') {
   const ctx = makeCtx(files);
   const S = await loadInto(ctx);            // real io + period + load
-  S.period = '2026-07';
+  S.period = period;
 
   const nodes = new Map(IDS.map(id => [id, new FakeEl(id === 'dashBudget' ? 'table' : 'div')]));
   ctx.$ = sel => nodes.get(sel.slice(1)) || null;
@@ -481,5 +573,90 @@ async function mount(files) {
     ok(/Review balances/.test(txt), 'and still offers the way to fix it');
   }
 
-  console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, and the position band ignores the period (${checks} assertions).`);
+  /* ------- 11. the comparison column measures spending, not the date ---- *
+     Two bugs, one column.
+
+     A part-month was being read against whole months. On the 9th of August the
+     card announced a 39% fall in food and a 56% fall in medical costs, and both
+     figures were reporting nothing but the calendar — the money simply had not
+     been spent YET. The baseline is now the same elapsed window of each earlier
+     period, so a comparison is a comparison.
+
+     And the unit switched per row. Above a size threshold the column printed a
+     percentage, below it rands, with the threshold set against the period's own
+     total — so a category could change unit month to month without changing its
+     own behaviour, and a reader who wanted to know what "−39%" cost had to work
+     it out. Rands throughout now; the baseline beside it carries the scale. */
+  await atDate('2026-08-09', async () => {
+    const { ctx, nodes } = await mount(COMPARE, '2026-08');
+    ctx.plugin.settings.splitCompareRange = '3m';
+    ctx.renderDashboard();
+    const rows = legendRows(nodes.get('dashSplit'));
+
+    /* The bill that has not arrived yet. Against whole months this read
+       "−100%" — a saving of two thousand rand that had not happened. Against
+       the first nine days of each earlier month it reads as what it is: by this
+       point in the month, this category normally costs nothing, and it has. */
+    eq(rows.get('Late'), undefined,
+      'a category with nothing spent yet is not a slice of this period at all');
+
+    /* Spent EARLY instead. Same 400 every month, but on the 3rd rather than the
+       20th, so against the same nine days it is genuinely ahead — a real
+       signal, and one whole-month averaging erased to "0%". */
+    const early = rows.get('Early');
+    eq(early.base, 'R 0', 'by day 9 this category has historically cost nothing');
+    eq(early.delta, '+R 400', 'so paying it early this month IS the change');
+    eq(early.cls, 'is-up', 'and it is a rise, not a new category');
+
+    /* Food, the row that shipped as "−39%". Five charges a month, two of them
+       inside the first nine days: 600 is the honest baseline, not 1 500. */
+    const food = rows.get('Food');
+    eq(food.val, 'R 900', 'nine days of August');
+    eq(food.base, 'R 600', 'against the same nine days of May, June and July');
+    eq(food.delta, '+R 300', 'which is a rise — the old column called it a 39% fall');
+    eq(food.cls, 'is-up', 'and colours it accordingly');
+
+    /* Rent bills on the 1st, so it was the ONE row the old comparison got
+       right. It has to keep being right. */
+    eq(rows.get('Rent').base, 'R 10000', 'a first-of-the-month bill is fully inside any window');
+    eq(rows.get('Rent').delta, '+R 1800', 'and its rise is unaffected by the fix');
+
+    /* Rounding, in the order that makes the row add up. R 915 − R 636 is R 279
+       on screen; subtracting first and rounding after printed R 278 beside two
+       figures that plainly differ by 279. */
+    const phone = rows.get('Phone');
+    eq([phone.val, phone.base, phone.delta], ['R 915', 'R 636', '+R 279'],
+      'the change is the difference between the two figures printed beside it');
+
+    /* One unit, every row — the actual complaint. */
+    for (const [cat, r] of rows) {
+      ok(!/%/.test(r.delta || ''), `${cat}'s change is an amount, not a percentage`);
+    }
+
+    /* And the baseline column says it is a part-month, because it no longer
+       reads as a typical one. */
+    const note = nodes.get('dashSplit').textContent;
+    ok(/9 days old/.test(note) && /first 9 days/.test(note),
+      `the running period declares its window — got: ${note}`);
+  });
+
+  /* A period that has FINISHED compares whole against whole, and says nothing
+     about windows — there is no caveat left to make. */
+  await atDate('2026-08-09', async () => {
+    const { ctx, nodes } = await mount(COMPARE, '2026-07');
+    ctx.plugin.settings.splitCompareRange = '3m';
+    ctx.renderDashboard();
+    const rows = legendRows(nodes.get('dashSplit'));
+
+    eq(rows.get('Food').base, 'R 1500', 'a complete period is measured against complete ones');
+    eq(rows.get('Late').base, 'R 2000', 'including the bills that land late in the month');
+    for (const cat of ['Food', 'Late', 'Rent', 'Early']) {
+      eq(rows.get(cat).delta, 'R 0', `${cat} spent exactly its own average`);
+      eq(rows.get(cat).cls, 'is-flat', `so ${cat} gets no colour`);
+    }
+    ok(!/days old/.test(nodes.get('dashSplit').textContent),
+      'and a finished period explains no window');
+  });
+
+  console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, the position band ignores the period, and the comparison column measures spending rather than the date (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

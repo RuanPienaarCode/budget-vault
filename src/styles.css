@@ -1744,7 +1744,10 @@
    donut to include income and these two colours invert their meaning with
    nothing to catch it. */
 .budget-app-root .donut-legend .dl-base { width: 66px; text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-.budget-app-root .donut-legend .dl-delta { width: 62px; text-align: right; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Wider than it was, because the change is now an amount rather than a
+   percentage — "−R 2 681" needs the room "−39%" did not, and wrapping it would
+   put half a figure on its own line. */
+.budget-app-root .donut-legend .dl-delta { width: 84px; text-align: right; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .budget-app-root .donut-legend .dl-delta.is-up { color: var(--color-danger); }
 .budget-app-root .donut-legend .dl-delta.is-down { color: var(--color-success); }
 /* Inside the deadband, and for a bucket with no single history: a figure, but
@@ -1761,7 +1764,24 @@
    absent. The two comparison columns stay: they are the new information. */
 @media (max-width: 560px) {
   .budget-app-root .donut-legend .dl-pct { display: none; }
-  .budget-app-root .donut-legend .dl-base { width: 60px; }
+  .budget-app-root .donut-legend .dl-base { width: 58px; }
+  /* 76px is the floor, not a preference: "−R 12 000" measures exactly that at
+     this size, and a change column that ellipsises its own figure is worse
+     than no column. The row buys it back out of the gaps instead — the four
+     between the swatch and the last figure are the only slack left, and the
+     category name is what would otherwise pay. */
+  .budget-app-root .donut-legend .dl-delta { width: 76px; }
+  .budget-app-root .donut-legend li,
+  .budget-app-root .donut-legend .dl-link { gap: 7px; }
+  .budget-app-root .donut-legend .dl-note { margin-left: 0; }
+}
+/* Why the baseline column is a part-month while the period is still running.
+   A full-width flex row so it lands UNDER the donut and the legend rather than
+   beside them — .donut-wrap is a wrap-enabled flex container, and a note that
+   became a third column would be unreadable at any width. */
+.budget-app-root .donut-note {
+  flex: 1 1 100%; margin: 14px 0 0; font-size: 11.5px; line-height: 1.5;
+  color: var(--ink-faint);
 }
 /* Interactive legend (dashboard "Where it went"). The row itself is the
    button — on a phone the whole row is the tap target, and a name-only link
