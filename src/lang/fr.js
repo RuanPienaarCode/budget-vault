@@ -597,6 +597,8 @@ module.exports = {
     one: 'Dépensé, budgété et revenus sur {count} période',
     other: 'Dépensé, budgété et revenus sur les {count} dernières périodes',
   },
+  'dash.trend.tip.over': '{amount} au-dessus du budget',
+  'dash.trend.tip.under': '{amount} en dessous du budget',
 
   'dash.split.uncatNote': ' · {amount} sans catégorie, non affiché',
   'dash.split.onlyUncat': '{amount} sont sortis sur cette période, mais rien n\'est encore catégorisé — mettez des catégories dans Transactions et la répartition apparaîtra ici.',

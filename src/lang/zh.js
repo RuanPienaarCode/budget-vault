@@ -565,6 +565,8 @@ module.exports = {
   'dash.trend.clamped': ' · 目前已导入的全部历史',
   'dash.trend.empty': '再导入一个周期的交易，趋势线就会从这里开始。',
   'dash.trend.aria': { other: '最近 {count} 个周期的支出、预算与收入' },
+  'dash.trend.tip.over': '超出预算 {amount}',
+  'dash.trend.tip.under': '低于预算 {amount}',
 
   'dash.split.uncatNote': ' · 未分类 {amount}，未显示',
   'dash.split.onlyUncat': '本周期支出了 {amount}，但还没有任何一笔被归类 — 在交易页面设置分类后，这里就会显示占比。',

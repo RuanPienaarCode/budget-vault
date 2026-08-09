@@ -295,6 +295,98 @@ function tip(add, node, text) {
   add('title', {}, node).textContent = text;
 }
 
+/* ----------------------------- point tracking ---------------------------- */
+
+/* Turns pointer and keyboard input over a chart into "the reader is inspecting
+   point i". It decides WHICH point only — what a focused point looks like is
+   the calling chart's business, because a line chart, a donut and a bar row all
+   answer that differently.
+
+   `xs` is the viewBox x of every point, in order, and `w` the viewBox width.
+   Returns true when it wired itself up, false when the engine has no
+   PointerEvent — the caller uses that to decide whether to fall back to the
+   native <title> tooltips. Both must never be present at once: two tooltips for
+   one point is worse than either.
+
+   The whole-chart handler replaces per-point hit shapes deliberately. A dot is
+   5 units across in a 1000-unit viewBox — three or four pixels on a phone —
+   and no finger has ever hit one. Anywhere in the chart resolves to the nearest
+   point instead. */
+function trackPoints({ svg, w, xs, onFocus, onClear }) {
+  const count = xs.length;
+  if (!count || typeof window === 'undefined'
+      || typeof window.PointerEvent !== 'function') return false;
+
+  let at = -1;
+  let down = false;
+
+  const go = i => {
+    const n = i < 0 ? 0 : i > count - 1 ? count - 1 : i;
+    if (n === at) return;
+    at = n;
+    onFocus(n);
+  };
+  const clear = () => {
+    down = false;
+    if (at === -1) return;
+    at = -1;
+    onClear();
+  };
+
+  /* getBoundingClientRect at POINTER TIME. That is not the hidden-tab
+     measurement this file forbids at the top: a pointer event over the chart is
+     the one moment the chart is guaranteed to be laid out and on screen. The
+     zero-width guard is still there, because a pointer event can arrive on the
+     same frame a pane is being torn down. */
+  const seek = e => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    const vx = ((e.clientX - r.left) / r.width) * w;
+    let best = 0;
+    for (let i = 1; i < count; i++) {
+      if (Math.abs(xs[i] - vx) < Math.abs(xs[best] - vx)) best = i;
+    }
+    go(best);
+  };
+
+  const fine = e => e.pointerType === 'mouse' || e.pointerType === 'pen';
+
+  svg.addEventListener('pointerdown', e => { down = true; seek(e); });
+  svg.addEventListener('pointermove', e => { if (down || fine(e)) seek(e); });
+
+  /* A finger keeps the readout only while it is down — a tooltip left standing
+     after the touch ends sits over the chart with nothing on a phone to dismiss
+     it. pointercancel is the one that matters most: it is what a touch fires
+     when the gesture turns out to be a page scroll, and without it every scroll
+     past the chart would leave a readout behind. Nothing here calls
+     preventDefault, so that scroll is never blocked in the first place. */
+  svg.addEventListener('pointerup', e => { down = false; if (!fine(e)) clear(); });
+  svg.addEventListener('pointercancel', clear);
+  svg.addEventListener('pointerleave', clear);
+
+  /* createChart marks every chart role="img", which collapses it to a single
+     node for a screen reader: the aria-label carries the totals, and the
+     per-point figures are reachable by pointer only. Arrow keys walk the same
+     readout, so they are reachable without one. Entering from the end because
+     the newest period is the one a reader is nearly always after. */
+  svg.setAttribute('tabindex', '0');
+  svg.addEventListener('focus', () => { if (at === -1) go(count - 1); });
+  svg.addEventListener('blur', clear);
+  svg.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      go((at === -1 ? count : at) + (e.key === 'ArrowLeft' ? -1 : 1));
+    } else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(count - 1);
+    else if (e.key === 'Escape') clear();
+    else return;
+    // Only once a key we actually handled has been handled — otherwise this
+    // would swallow Tab and trap focus on the chart.
+    e.preventDefault();
+  });
+
+  return true;
+}
+
 /* -------------------------------- ranges ------------------------------- */
 
 /* Time ranges offered by the chart controls.
@@ -341,7 +433,7 @@ function rangePills({ ranges, value, onPick, label }) {
 
 module.exports = {
   themeColors, createChart, scales, gridlines, axisLabels,
-  linePath, areaPath, areaGradient, arcPath, tip,
+  linePath, areaPath, areaGradient, arcPath, tip, trackPoints,
   SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,
 };

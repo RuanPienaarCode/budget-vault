@@ -602,6 +602,11 @@ module.exports = {
     one: 'Spent, budgeted and income over the last {count} period',
     other: 'Spent, budgeted and income over the last {count} periods',
   },
+  /* The trend chart is history: every point but the last is a closed period, so
+     these read as a verdict on it rather than as the Budgets page's "left",
+     which is about a period still being spent. */
+  'dash.trend.tip.over': '{amount} over budget',
+  'dash.trend.tip.under': '{amount} under budget',
 
   'dash.split.uncatNote': ' · {amount} uncategorised, not shown',
   'dash.split.onlyUncat': '{amount} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.',

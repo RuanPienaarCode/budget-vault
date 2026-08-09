@@ -593,6 +593,8 @@ module.exports = {
     one: 'Gastado, presupuestado e ingresos en {count} periodo',
     other: 'Gastado, presupuestado e ingresos en los últimos {count} periodos',
   },
+  'dash.trend.tip.over': '{amount} por encima del presupuesto',
+  'dash.trend.tip.under': '{amount} por debajo del presupuesto',
 
   'dash.split.uncatNote': ' · {amount} sin categoría, no mostrado',
   'dash.split.onlyUncat': 'Salieron {amount} en este periodo, pero nada está categorizado todavía — pon categorías en Transacciones y el reparto aparecerá aquí.',
