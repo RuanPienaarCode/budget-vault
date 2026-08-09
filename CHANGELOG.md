@@ -3,6 +3,53 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+- **A split transaction is no longer counted twice against your account
+  balance.** Splitting a charge keeps the row the bank actually printed, marks
+  it excluded, and adds the parts beneath it. But "excluded" only ever meant
+  *out of your income and spending totals* — anything measuring the **account**
+  rather than the budget reads excluded rows on purpose, because an internal
+  transfer is out of the budget and the money still left the bank.
+
+  So everything that correctly refused to skip excluded rows was, by that same
+  refusal, adding split parents to its totals. A R1,000 grocery charge split
+  into R600 and R400 moved the implied balance by R2,000. The Accounts page then
+  reported drift that did not exist and offered **Use this** on a figure short
+  by the whole charge — and accepting it stamps today's date, which is exactly
+  what stops those rows counting again, so the wrong balance became permanent
+  and silent.
+
+  Four figures were affected, none of them in your budget totals: the implied
+  balance on Accounts and on Savings & Investments, the "in / out / N
+  transactions" line on an account card, and derived contributions, growth and
+  withdrawals on a savings account.
+
+  A split parent now carries a role of its own alongside the Excluded tick, so
+  the two meanings stop sharing one cell. It takes both, deliberately: a split
+  stays reversible by hand, and unticking Excluded in the markdown has to bring
+  the row back everywhere at once rather than in half the app.
+
+  Two smaller faults went with it: a split subscription charge counted as two
+  charges by the Services page, dragging the price it reports and the next
+  billing date it derives, and the importer indexed the parts as though a
+  statement had carried them, so a genuine later transaction matching a part
+  could be flagged a duplicate and dropped.
+
+  **If you have split a transaction and accepted an implied balance since,**
+  that account's balance may be understated by the split amount. The stamp
+  removes the evidence, so nothing can correct it after the fact — confirm the
+  balance against your bank once and it is right from there on.
+
+### Changed
+
+- **Transaction files gain a `Split` column — but only the ones with a split in
+  them.** Appended at the end, so a file written before it existed loads
+  unchanged. A month with no split keeps the exact six-column shape it has
+  always had rather than gaining an empty column that records nothing.
+
 ## 1.11.8 — 2026-08-08
 
 ### Changed

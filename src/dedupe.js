@@ -34,6 +34,8 @@
    day apart ("Intl payment fee MUSICCO" / "…APPLE.COM/BILL", both -1.20)
    would collide on their shared 14-character prefix. */
 
+const { isSplitPart } = require('./tx-role');
+
 /* Window the bank actually needs: pending→settled has never been observed
    beyond 2 days in this vault's four years of statements; 4 is slack. */
 const NEAR_DAYS = 4;
@@ -87,13 +89,24 @@ function daysApart(a, b) {
 
    Bucket entries carry a unique `id` because duplicate rows share a key, and
    the near pass consumes candidates individually — keying consumption by the
-   string would let one absorbed row block its identical twin. */
+   string would let one absorbed row block its identical twin.
+
+   Split PARTS are left out, and the parent is what stands for the charge —
+   which is the whole reason a split keeps its parent rather than deleting it.
+   A part is a slice the reader drew after the fact; no statement ever carried
+   that line, so indexing one lets it absorb a genuine future transaction that
+   happens to share its date, description and amount. That is the same silent,
+   permanent data loss the counting above exists to prevent, arriving by a
+   different door. */
 function buildIndex(txFiles) {
   const exact = new Map();
   const byAmount = new Map();
   const index = { exact, byAmount, seq: 0 };
   for (const f of Object.values(txFiles || {})) {
-    for (const r of f.rows || []) addToIndex(index, r.date, r.desc, r.amount, f.label);
+    for (const r of f.rows || []) {
+      if (isSplitPart(r)) continue;
+      addToIndex(index, r.date, r.desc, r.amount, f.label);
+    }
   }
   return index;
 }

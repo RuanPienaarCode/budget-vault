@@ -10,6 +10,7 @@ const { parseCsv } = require('./csv');
 const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
+const { splitRole } = require('./tx-role');
 
 /* An optional numeric frontmatter key: absent or blank → null ("not set"),
    anything normalizeAmount can read → that number, anything it cannot → null.
@@ -159,9 +160,15 @@ module.exports = function registerLoad(ctx) {
         label: acct.name, month, dirty: false, fmRaw: raw,
         rows: rows.slice(1).map(c => {
           const amt = parseNum(c[3]);
+          /* c[6] is the Split column, added after these files started being
+             written — absent on every row of every file that predates it,
+             which splitRole reads as '' exactly as it reads a blank cell. That
+             is what makes this column safe to append to a positional parser:
+             a short row yields undefined rather than shifting anything. */
           return { date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]),
             amount: amt.value, amountRaw: amt.ok ? null : amt.raw,
-            excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || '') };
+            excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || ''),
+            split: splitRole(c[6]) };
         }),
       };
     });

@@ -23,6 +23,7 @@
    dates to decide which rows land after the balance was last confirmed, so an
    hour's drift silently misfiles a day's transactions. */
 const { ISO_DATE, todayIso } = require('./dates');
+const { supersededBySplit } = require('./tx-role');
 
 /* A balance nobody has confirmed in this long is treated as unverified. Long
    enough that a monthly statement cycle doesn't trip it, short enough that a
@@ -65,6 +66,13 @@ function isStale(iso, today) {
    thing — an excluded transaction is vetoed from income and spend totals, not
    hidden from everything.
 
+   The ONE exception is a split parent, and it is the exception precisely
+   because of the rule above. A split keeps the bank's own row, marks it
+   excluded, and adds parts that sum back to it — so a reader honouring the
+   rule counts that charge twice and reports an implied balance short by the
+   whole amount. It is skipped by ROLE rather than by `excluded`, because those
+   two now mean different things: see src/tx-role.js.
+
    States:
      no-tx    nothing to check against
      no-date  a balance with no readable date — can't place the window
@@ -77,6 +85,7 @@ function reconcile(a, rows, today) {
   const now = ISO_DATE.test(today || '') ? today : todayIso();
   const since = [], ahead = [];
   for (const r of rows) {
+    if (supersededBySplit(r)) continue;   // its parts are in this same list
     if (r.date <= a.balance_updated) continue;
     (r.date > now ? ahead : since).push(r);
   }
