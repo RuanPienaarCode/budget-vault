@@ -1,6 +1,6 @@
 # Budget Vault
 
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green)
 ![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.0-7c3aed)
 ![Mobile ready](https://img.shields.io/badge/mobile-iOS%20%26%20Android-blue)
 
@@ -108,7 +108,13 @@ Budget Vault is free and always will be. If it's useful to you and you'd like to
 
 ## License
 
-[MIT License](LICENSE) © Ruan Pienaar
+[GNU Affero General Public License v3.0](LICENSE) © Ruan Pienaar
 
-Use it, change it, share it — personally or commercially. Just keep the
-copyright and permission notice with any substantial portion of it.
+Use it, change it, share it — personally or commercially, free of charge. The
+condition is reciprocity: if you distribute a modified version, or run one where
+other people can use it over a network, those people get its source under this
+same licence.
+
+Releases up to and including 1.11.11 were published under the MIT licence and
+stay MIT for anyone holding a copy of them. See [NOTICE](NOTICE) for the full
+licence history.

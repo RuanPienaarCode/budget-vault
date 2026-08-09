@@ -45,6 +45,14 @@ All notable changes to Budget Vault. Versions match the plugin version in
   left. The baseline column also now carries the same wording as the pill above
   it, rather than deriving "12M" over a pill that reads "1Y".
 
+- **Relicensed to the GNU Affero General Public License v3.** Budget Vault stays
+  free to use, change and share, personally or commercially. What changes is
+  reciprocity: a modified version that is distributed — or that other people are
+  given access to over a network — must reach those people under this same
+  licence, with its source. Releases up to and including 1.11.11 were published
+  under MIT and remain MIT for anyone holding a copy of them; a licence already
+  granted cannot be withdrawn. `NOTICE` carries the full history.
+
 ## 1.11.11 — 2026-08-09
 
 ### Added
