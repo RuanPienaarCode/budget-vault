@@ -195,7 +195,8 @@ const ALL_UNCAT = {
    not what anyone reading this file would assume. Add new cards here as they
    land. */
 const IDS = ['heroCard', 'dashStale', 'trendChart', 'trendSub', 'trendRange',
-  'dashSplit', 'dashSplitSub', 'dashBudget', 'dashBudgetSub',
+  'leftCard', 'leftBody', 'leftSub',
+  'dashSplit', 'dashSplitSub', 'splitRange', 'dashBudget', 'dashBudgetSub',
   'dashPositionCard', 'dashPositionKpis', 'dashPositionSub', 'dashPositionNote'];
 
 /* Every card that owns a container of its own and must survive each other,
@@ -239,6 +240,13 @@ async function mount(files) {
     ctx.renderDashboard();
 
     ok(has(nodes.get('heroCard'), 'hero-grid'), 'hero card draws');
+    /* The what's-left card is conditional by design — it hides rather than
+       showing three zeroes — so the contract is that it DECIDES, without
+       throwing, and says so through the hidden class either way. Its
+       arithmetic is covered in tests/committed.test.cjs. */
+    ok(!has(nodes.get('leftBody'), 'text-danger'), "what's left reports no failure");
+    ok(typeof nodes.get('leftCard')._cls.has('hidden') === 'boolean',
+      "what's left decided whether it has anything to show");
     ok(has(nodes.get('dashStale'), 'kpi-caveat-txt'), 'staleness card draws');
     eq(tagCount(nodes.get('trendChart'), 'SVG'), 1, 'trend card draws one svg');
     eq(tagCount(nodes.get('dashSplit'), 'SVG'), 1, 'donut card draws one svg');

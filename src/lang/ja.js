@@ -576,6 +576,45 @@ module.exports = {
   'dash.split.noteAria': '{cat} のカテゴリノートを開く',
   'dash.split.noteMissing': '「{cat}」のカテゴリノートが見つかりません',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': '残りはいくら',
+  'dash.left.sub': 'この期間が {date} に終わるまで',
+  'dash.left.cash': '口座にある額',
+  'dash.left.committed': '支払い予定',
+  'dash.left.free': '実際に使える額',
+  'dash.left.short': '不足',
+  'dash.left.counted': {
+    other: '{count} 口座',
+  },
+  'dash.left.unconfirmed': '{count} 件未確認',
+  'dash.left.undated': '{count} 件は残高の日付なし',
+  'dash.left.orders': {
+    other: '口座振替 {count} 件',
+  },
+  'dash.left.instalments': {
+    other: '返済 {count} 件',
+  },
+  'dash.left.none': '予定なし',
+  'dash.left.days': {
+    other: '残り {count} 日',
+  },
+  'dash.left.perDay': '1日あたり {amount}',
+  'dash.left.barAria': '{cash} のうち {committed} が支払い予定、{free} が使えます',
+  'dash.left.whatsCounted': '支払い予定に数えたもの',
+  'dash.left.expected': '{date} 予定',
+  'dash.left.thisPeriod': 'この期間に支払い',
+  'dash.left.lastCharged': '前回の請求 {amount}',
+  'dash.left.asListed': '記載どおり（請求履歴なし）',
+  'dash.left.contracted': '契約上の返済額',
+  'dash.left.source': '金額は実際に最後に請求された額であり、サービス画面に入力した数字ではありません。サービス一覧と負債ページのみを読み取ります。どちらにも無い定期的な請求はここには数えません。',
+  'dash.split.colCat': 'カテゴリ',
+  'dash.split.colSpent': '支出',
+  'dash.split.colChange': '増減',
+  'dash.split.new': '新規',
+  'dash.split.r1m': '先月',
+  'dash.split.rPrev': '前期',
+  'dash.split.rangeAria': '比較期間',
+
   'dash.err.render': '{label} を描画できませんでした — {error}',
 
 };

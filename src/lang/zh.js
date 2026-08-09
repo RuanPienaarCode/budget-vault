@@ -576,6 +576,45 @@ module.exports = {
   'dash.split.noteAria': '打开 {cat} 的分类笔记',
   'dash.split.noteMissing': '找不到「{cat}」的分类笔记',
 
+  /* --------------------- what's left + comparison ------------------- */
+  'shell.dash.left': '还剩多少',
+  'dash.left.sub': '在本期于 {date} 结束之前',
+  'dash.left.cash': '账户余额',
+  'dash.left.committed': '尚未扣除',
+  'dash.left.free': '实际可用',
+  'dash.left.short': '缺口',
+  'dash.left.counted': {
+    other: '{count} 个账户',
+  },
+  'dash.left.unconfirmed': '{count} 个未确认',
+  'dash.left.undated': '{count} 个没有余额日期',
+  'dash.left.orders': {
+    other: '{count} 笔代扣',
+  },
+  'dash.left.instalments': {
+    other: '{count} 笔还款',
+  },
+  'dash.left.none': '没有预定支出',
+  'dash.left.days': {
+    other: '还有 {count} 天',
+  },
+  'dash.left.perDay': '每天 {amount}',
+  'dash.left.barAria': '{cash} 中，{committed} 已被占用，{free} 可用',
+  'dash.left.whatsCounted': '哪些算作尚未扣除',
+  'dash.left.expected': '预计 {date}',
+  'dash.left.thisPeriod': '本期应付',
+  'dash.left.lastCharged': '上次扣款 {amount}',
+  'dash.left.asListed': '按列表填写，无扣款记录',
+  'dash.left.contracted': '合同约定还款额',
+  'dash.left.source': '金额取自实际最后一次扣款，而不是你在“订阅服务”页面填写的数字。只读取你的订阅服务列表和负债页面 — 两者都没有的定期扣款不会计入这里。',
+  'dash.split.colCat': '类别',
+  'dash.split.colSpent': '支出',
+  'dash.split.colChange': '变化',
+  'dash.split.new': '新增',
+  'dash.split.r1m': '上个月',
+  'dash.split.rPrev': '上期',
+  'dash.split.rangeAria': '比较区间',
+
   'dash.err.render': '无法绘制{label} — {error}',
 
 };

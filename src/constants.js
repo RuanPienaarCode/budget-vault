@@ -51,6 +51,12 @@ const DEFAULT_SETTINGS = {
   exportFolder: 'Exports',
   chartTrendRange: '6m',
   chartDebtRange: '5y',
+  /* Which window "Where it went" measures this period against. Its own key
+     rather than sharing chartTrendRange: the trend plots one point per period
+     and cannot usefully draw a single one, so it has no 1M pill — and a shared
+     key would put one there. Same plugin-data-not-Settings.md reasoning as the
+     two above. */
+  splitCompareRange: '3m',
 };
 
 /* Public feedback form — bug reports and feature requests. Opened in the
