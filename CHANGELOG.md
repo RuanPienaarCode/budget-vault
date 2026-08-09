@@ -3,6 +3,38 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.10 — 2026-08-09
+
+### Added
+
+- **The Spending Trend chart can now be inspected.** Pointing at it names the
+  period and its three figures, and marks the point being described: a dashed
+  crosshair, an enlarged spent dot haloed in that period's own colour — red
+  where it broke its budget — small markers on the income and budget lines, and
+  the two line legs either side thickened.
+
+  Hover, touch-and-drag and the arrow keys all drive the same readout, which
+  carries Spent, Budget and Income against the chart legend's own labels and
+  closes on how far under or over budget the period landed. A period with no
+  budget set simply drops that row rather than claiming a budget of zero.
+
+  The whole chart is now one hit area resolving to the nearest point, replacing
+  the tooltip hung off each dot. A dot is five units across in a thousand-unit
+  drawing — about four pixels on a phone — and reaching one with a finger was
+  never realistic. The readout is placed as a fraction of the chart rather than
+  in pixels, so it lands on the point at any card width, anchors inward at the
+  first and last periods instead of hanging off the edge, and flips below the
+  point when the point sits too near the top of the card to have room above it.
+
+  Because the chart takes a tab stop now, it also answers the keyboard: arrows
+  walk period by period, Home and End jump to either end, Escape dismisses.
+
+### Fixed
+
+- The pointer tooltip on the trend chart was written in English regardless of
+  the interface language. It now uses the same translated labels as the legend
+  above the chart.
+
 ## 1.11.9 — 2026-08-09
 
 ### Fixed
