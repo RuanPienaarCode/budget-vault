@@ -66,7 +66,7 @@ const { supersededBySplit } = require('./tx-role');
 function splitFlows(rows, typeOf, opts) {
   const from = (opts && opts.from) || '';
   const to = (opts && opts.to) || '';
-  let contributions = 0, growth = 0, withdrawals = 0, count = 0;
+  let contributions = 0, growth = 0, withdrawals = 0, count = 0, first = null;
   const growthCategories = new Map();
   for (const r of rows || []) {
     if (!r || typeof r.amount !== 'number' || !r.amount) continue;
@@ -74,6 +74,11 @@ function splitFlows(rows, typeOf, opts) {
     if (from && r.date < from) continue;
     if (to && r.date > to) continue;
     count++;
+    /* The earliest row that actually COUNTED, reported here rather than
+       recomputed by callers — the filtering above (usable amount, split parent,
+       window) is the whole reason a caller cannot just take rows[0], and a
+       second copy of these four conditions is how the two would drift. */
+    if (first === null || r.date < first) first = r.date;
     if (r.amount < 0) { withdrawals += -r.amount; continue; }
     const t = typeOf ? typeOf(r.cat) : null;
     if (t === 'income') {
@@ -85,7 +90,7 @@ function splitFlows(rows, typeOf, opts) {
     }
   }
   return {
-    contributions, growth, withdrawals, count,
+    contributions, growth, withdrawals, count, first,
     net: contributions + growth - withdrawals,
     growthCategories: [...growthCategories]
       .sort((a, b) => b[1] - a[1])
@@ -169,7 +174,31 @@ function contributionRate(rows, typeOf, months, today) {
 
   const f = splitFlows(rows, typeOf, { from, to });
   if (!f.count) return null;
-  return { perMonth: f.contributions / months, months, from, to, total: f.contributions };
+
+  /* Divide by the months the account was actually AROUND for, not by the months
+     that were asked for. A fund opened in June, measured over a six-month
+     window, was reporting a third of its real monthly rate — and this figure
+     exists to be checked against a stated monthly_contribution, so understating
+     it by two thirds manufactures a shortfall that is not there. Leading empty
+     months are dropped for exactly the reason monthlyIncome() drops them in
+     period.js: a vault has no history from before it existed, and silence it was
+     never around for is not a month of contributing nothing.
+
+     Only LEADING ones. A gap in the middle of the window is real silence and
+     still counts, which is why this measures from the first counted row rather
+     than from a count of non-empty months.
+
+     `months` is the denominator, so a caller printing it beside `perMonth` stays
+     truthful; `requested` keeps the window that was asked for. */
+  const [ey, em] = to.split('-').map(Number);
+  const [fy, fm] = f.first.split('-').map(Number);
+  const covered = Math.max(1, Math.min(months, (ey - fy) * 12 + (em - fm) + 1));
+  return {
+    perMonth: f.contributions / covered,
+    months: covered, requested: months,
+    from: covered === months ? from : `${String(fy).padStart(4, '0')}-${String(fm).padStart(2, '0')}-01`,
+    to, total: f.contributions,
+  };
 }
 
 module.exports = { splitFlows, accountFlows, contributionRate };

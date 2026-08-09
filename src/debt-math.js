@@ -180,9 +180,24 @@ function expectedBalance(debt, today) {
   if (!original || pay <= 0) return null;
   if (!ISO_DATE.test(d.start || '') || !ISO_DATE.test(today || '')) return null;
 
-  const [sy, sm] = d.start.split('-').map(Number);
-  const [ty, tm] = today.split('-').map(Number);
-  const months = (ty - sy) * 12 + (tm - sm);
+  const [sy, sm, sd] = d.start.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  /* WHOLE months elapsed, floored on the day of the month.
+
+     A difference of month indices alone counts any part-month as a full one, so
+     a debt starting on the 31st and read on the 1st was charged a whole month of
+     interest AND credited a whole instalment for a single day. The instalment is
+     the larger of the two, so the error runs in the flattering direction — the
+     one this module's header already refuses to take on the interest ordering,
+     arriving by a different route. Only completed months count.
+
+     The billing day is clamped to a short month's last day, the same way
+     nextOnDay() does it in committed.js: an agreement running on the 31st is
+     debited on the 28th in February, and treating that month as incomplete
+     would swing the error the other way and report a debt LARGER than it is. */
+  const lastDay = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  const billDay = Math.min(sd, lastDay);
+  const months = (ty - sy) * 12 + (tm - sm) - (td < billDay ? 1 : 0);
   if (months <= 0) return null;
 
   const r = monthlyRate(d.rate);

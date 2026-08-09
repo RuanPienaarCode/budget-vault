@@ -162,7 +162,20 @@ module.exports = function registerImport(ctx) {
        A file that doesn't prove itself is imported UNCHANGED and flagged in the
        review; silent correction on a guess is the one outcome to avoid. */
     const rec = iBalance !== -1 ? reconcileAmounts(ledger) : null;
-    if (rec && rec.verified && rec.flip && iAmount !== -1) for (const it of items) it.amount = -it.amount;
+    const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
+    if (flipped) for (const it of items) it.amount = -it.amount;
+    /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
+       `verified && flip` means the file only reconciles with every amount
+       negated — so the balance column has just proved that what the header calls
+       "money out" is money in. Not auto-correcting that is deliberate (the sign
+       came from a column NAME, so a disagreement means the mapping is wrong, not
+       the arithmetic), but the verdict was then dropped on the floor: with
+       `flipped` false and `verified` true the review fell through to "Amounts
+       check out against this statement's own balance column" — the reassuring
+       message, on the one file that had just failed. That is precisely the
+       plausible-wrong-number outcome this whole reconciliation exists to
+       prevent, arriving through the one branch that does not correct it. */
+    const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
     /* The file's own date span. The near-duplicate pass treats "this row is no
        longer in the statement" as evidence it settled and was rewritten, so it
        may only reason about vault rows the statement actually covers. */
@@ -172,7 +185,7 @@ module.exports = function registerImport(ctx) {
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
     S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name,
-      reconcile: rec ? { ...rec, flipped: rec.verified && rec.flip && iAmount !== -1 } : null,
+      reconcile: rec ? { ...rec, flipped, inverted } : null,
       // Kept so "Columns wrong?" can reopen the mapper on the SAME file without
       // asking the user to find and drop it again.
       rows, map, file };
@@ -371,12 +384,14 @@ module.exports = function registerImport(ctx) {
     const recEl = $('#impReconcile');
     recEl.empty();
     recEl.classList.toggle('hidden', !rec);
-    recEl.classList.toggle('imp-reconcile-warn', !!rec && !rec.verified);
+    recEl.classList.toggle('imp-reconcile-warn', !!rec && (!rec.verified || rec.inverted));
     if (rec) recEl.textContent = rec.flipped
       ? 'This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below.'
-      : rec.verified
-        ? 'Amounts check out against this statement’s own balance column.'
-        : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
+      : rec.inverted
+        ? 'This statement’s balance column says the money-in and money-out columns are the wrong way round — every amount below has the opposite sign to what the balances imply. Nothing has been corrected, because the signs came from the column names: open “Columns wrong?” and swap them before importing.'
+        : rec.verified
+          ? 'Amounts check out against this statement’s own balance column.'
+          : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
 
     /* Say where these rows are going to land BEFORE they land. An account
        flagged `budget: false` still imports and still shows in Transactions,

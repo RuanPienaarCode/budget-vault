@@ -80,8 +80,22 @@ function isStale(iso, today) {
      pending  nothing has moved, but rows are dated ahead
      drift    money has moved; `implied` is what it would read */
 function reconcile(a, rows, today) {
-  if (!rows || !rows.length) return { state: 'no-tx' };
+  /* The DATE is checked before the rows, and the order is load-bearing.
+
+     Tested the other way round, an account with a stated balance, no
+     `balance_updated` and no imported transactions returned 'no-tx' and never
+     reached the date test at all. The Dashboard's "What's left" card derives
+     `dated` from exactly this state, so that account was treated as a confirmed
+     balance and its full figure counted as spendable cash — which is the one
+     thing committed.js's first rule says must never happen ("An account whose
+     balance has no readable date cannot be placed at all and is COUNTED AS
+     UNKNOWN rather than as zero"). The shape is common: a cash wallet, a
+     just-added account, anything nothing imports into.
+
+     'no-date' is the more fundamental answer of the two — without a date there
+     is no window to place, whether or not there are rows to place in it. */
   if (!ISO_DATE.test(a.balance_updated || '')) return { state: 'no-date' };
+  if (!rows || !rows.length) return { state: 'no-tx' };
   const now = ISO_DATE.test(today || '') ? today : todayIso();
   const since = [], ahead = [];
   for (const r of rows) {

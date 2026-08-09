@@ -153,4 +153,26 @@ const noIncome = za.figureChecks(original, 2026, { assessment: 'assessed', asses
 ok(Array.isArray(noIncome) && !/[Aa]ssessed taxable income/.test(textOf(noIncome)),
   'a missing assessed-income figure is silent, not a crash');
 
+/* Capital gains: the EXCESS over the exclusion is not what reaches taxable
+   income — an individual's inclusion rate is 40%. The old wording asserted the
+   whole excess, overstating it two and a half times. The thresholds either side
+   of it are "defaults to verify"; a stated relationship being wrong is not
+   something that disclaimer covers. */
+{
+  const cgt = za.figureChecks([{ code: '4250', description: 'Capital gain', source: 'Broker', amount: 100000 }], 2026, {});
+  const msg = cgt.find(m => /[Cc]apital gains/.test(m.text));
+  ok(msg && !msg.ok, 'gains above the exclusion still warn');
+  ok(/40% inclusion rate/.test(msg.text), 'and the message names the inclusion rate');
+  // R100 000 of gains: R60 000 over the exclusion, of which R24 000 is taxable.
+  const flat = msg.text.replace(/\s/g, ' ');
+  ok(/exclusion by R60 000/.test(flat), 'the excess is named, as an excess');
+  ok(/R24 000[.,]00 feeds into taxable income/.test(flat),
+    'and the 40%-inclusion figure is the one called taxable income');
+  ok(!/R60 000[.,]00 feeds into taxable income/.test(flat),
+    'never the raw excess - the old wording overstated it two and a half times');
+
+  const under = za.figureChecks([{ code: '4250', description: 'Capital gain', source: 'Broker', amount: 30000 }], 2026, {});
+  ok(under.some(m => m.ok && /under the/.test(m.text)), 'gains inside the exclusion are still reported as clear');
+}
+
 console.log(`PASS — tax figures round-trip + za checks intact (${checks} assertions).`);

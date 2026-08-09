@@ -533,6 +533,7 @@ module.exports = {
   'dash.pos.debt': '债务',
   'dash.pos.debtSplit': '账户 {accounts} · 债务页面 {debts}',
   'dash.pos.debtActive': { other: '{count} 笔在还' },
+  'dash.pos.debtAccounts': { other: '全部在 {count} 个账户' },
   'dash.pos.debtNone': '没有欠款',
   'dash.pos.debtSay': '债务 {amount}。打开债务页面。',
   'dash.pos.debtSayNone': '没有债务。打开债务页面。',
@@ -557,6 +558,8 @@ module.exports = {
   'dash.stale.all': { other: '基于 {count} 个近期无人确认的余额' },
   'dash.stale.some': '{total} 个余额中，有 {stale} 个近期无人确认',
   'dash.stale.line': '{line} — {age}。',
+  'dash.stale.driftUp': ' 此后的交易显示多出 {amount}。',
+  'dash.stale.driftDown': ' 此后的交易显示少了 {amount}。',
   'dash.stale.btn': '查看余额',
   'dash.stale.aria': '在账户页面查看账户余额',
 
@@ -570,6 +573,7 @@ module.exports = {
   'dash.trend.tip.under': '低于预算 {amount}',
 
   'dash.split.uncatNote': ' · 未分类 {amount}，未显示',
+  'dash.split.nettedNote': ' · 已抵扣退款 {amount}',
   'dash.split.onlyUncat': '本周期支出了 {amount}，但还没有任何一笔被归类 — 在交易页面设置分类后，这里就会显示占比。',
   'dash.split.empty': '本周期还没有被归为支出的内容。',
   'dash.split.aria': '{month} 的支出占比：',

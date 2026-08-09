@@ -557,6 +557,11 @@ module.exports = {
   'dash.pos.debt': 'Debt',
   'dash.pos.debtSplit': '{accounts} on accounts · {debts} on the debt page',
   'dash.pos.debtActive': { one: '{count} active', other: '{count} active' },
+  /* Everything owed sits on ACCOUNTS — an overdrawn cheque account, a card in
+     the red — and nothing on the Debt page. Says which ledger the figure came
+     from, because quoting a count of debt-page rows here printed "0 active"
+     under a real amount. */
+  'dash.pos.debtAccounts': { one: 'all on {count} account', other: 'all on {count} accounts' },
   'dash.pos.debtNone': 'nothing owed',
   'dash.pos.debtSay': 'Debt {amount} owed. Open the Debt page.',
   'dash.pos.debtSayNone': 'No debt owed. Open the Debt page.',
@@ -591,6 +596,10 @@ module.exports = {
   'dash.stale.all': { one: 'Built from a balance nobody has confirmed recently', other: 'Built from {count} balances nobody has confirmed recently' },
   'dash.stale.some': 'Built from {stale} of {total} balances nobody has confirmed recently',
   'dash.stale.line': '{line} — {age}.',
+  /* Appended to the line above. How far the imported transactions have already
+     moved those balances, so "old" carries a size rather than only an age. */
+  'dash.stale.driftUp': ' Transactions since then imply {amount} more.',
+  'dash.stale.driftDown': ' Transactions since then imply {amount} less.',
   'dash.stale.btn': 'Review balances',
   'dash.stale.aria': 'Review account balances on the Accounts page',
 
@@ -612,6 +621,9 @@ module.exports = {
   'dash.trend.tip.under': '{amount} under budget',
 
   'dash.split.uncatNote': ' · {amount} uncategorised, not shown',
+  /* The other half of the difference between this donut and "Total Spent":
+     refunds and credits that shrank a slice instead of drawing one. */
+  'dash.split.nettedNote': ' · {amount} in refunds netted off',
   'dash.split.onlyUncat': '{amount} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.',
   'dash.split.empty': 'Nothing categorised as spending in this period yet.',
   'dash.split.aria': 'Spending split for {month}: ',

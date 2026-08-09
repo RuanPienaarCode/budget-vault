@@ -98,6 +98,51 @@ function debtsByType(debts) {
   return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
 }
 
+/* Every account, grouped for the composition chart, split by SIGN — the known
+   types first in the order given, then any type the vault actually carries that
+   the caller's list does not know about.
+
+   That second half is the whole reason this is not a filter in the view. The
+   chart used to walk a fixed list of six types while `worth()` above counted
+   every account by sign, so an account whose file says `type: tfsa` — or
+   `type: Savings` with a capital S, which is the same bug wearing a hat — was
+   inside the net-worth tile and absent from the chart beneath it. Measured: one
+   R80 000 account of an unlisted type put "Net worth R740 000" in the tile and
+   "Net worth R660 000" in the chart's own label, on one screen, with nothing
+   saying which was wrong. `load.js` only defaults the type when the key is
+   ABSENT, so a present-but-unrecognised value reaches here verbatim, and a
+   vault whose files a person could have written by hand will produce them.
+
+   Unlisted types keep their OWN name rather than being folded into "other":
+   this is the same choice debtsByType and assetsByType already make, and
+   renaming a reader's own label to make a chart tidy is the kind of quiet
+   correction this app does not do.
+
+   `known` marks which groups came from the caller's list, so it can pair them
+   with their fixed labels and colours and colour-walk the rest. */
+function accountGroups(accounts, knownTypes) {
+  const known = knownTypes || [];
+  const order = new Map(known.map((t, i) => [t, i]));
+  const owned = new Map(), owed = new Map();
+  for (const a of accounts || []) {
+    const t = (a && typeof a.type === 'string' && a.type.trim()) || 'other';
+    const bal = (a && a.balance) || 0;
+    if (bal > 0) owned.set(t, (owned.get(t) || 0) + bal);
+    else if (bal < 0) owed.set(t, (owed.get(t) || 0) - bal);
+  }
+  /* Known types in the caller's order, then the rest largest first — an
+     ordering the vault's own contents decide, so it cannot be forgotten. */
+  const sort = m => [...m]
+    .filter(([, amount]) => amount > 0)
+    .sort((a, b) => {
+      const ai = order.has(a[0]) ? order.get(a[0]) : Infinity;
+      const bi = order.has(b[0]) ? order.get(b[0]) : Infinity;
+      return ai !== bi ? ai - bi : b[1] - a[1];
+    })
+    .map(([type, amount]) => ({ type, amount, known: order.has(type) }));
+  return { owned: sort(owned), owed: sort(owed) };
+}
+
 /* The same grouping for the owned side, so the house, the car and the ring are
    three named blocks in the chart rather than one anonymous "possessions"
    slab. Zero and negative values drop for the same reason they do above. */
@@ -111,4 +156,6 @@ function assetsByType(assets) {
   return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
 }
 
-module.exports = { worth, activeDebts, assetTotal, cardOverlap, debtsByType, assetsByType };
+module.exports = {
+  worth, activeDebts, assetTotal, cardOverlap, accountGroups, debtsByType, assetsByType,
+};

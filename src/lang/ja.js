@@ -533,6 +533,7 @@ module.exports = {
   'dash.pos.debt': '負債',
   'dash.pos.debtSplit': '口座 {accounts} · 負債ページ {debts}',
   'dash.pos.debtActive': { other: '{count} 件が有効' },
+  'dash.pos.debtAccounts': { other: 'すべて {count} 件の口座' },
   'dash.pos.debtNone': '負債なし',
   'dash.pos.debtSay': '負債 {amount}。負債ページを開きます。',
   'dash.pos.debtSayNone': '負債はありません。負債ページを開きます。',
@@ -557,6 +558,8 @@ module.exports = {
   'dash.stale.all': { other: '最近だれも確認していない残高 {count} 件から算出' },
   'dash.stale.some': '{total} 件中 {stale} 件の、最近だれも確認していない残高から算出',
   'dash.stale.line': '{line} — {age}。',
+  'dash.stale.driftUp': ' その後の取引では {amount} 多くなります。',
+  'dash.stale.driftDown': ' その後の取引では {amount} 少なくなります。',
   'dash.stale.btn': '残高を確認',
   'dash.stale.aria': '口座ページで口座残高を確認',
 
@@ -570,6 +573,7 @@ module.exports = {
   'dash.trend.tip.under': '予算より {amount} 少ない',
 
   'dash.split.uncatNote': ' · カテゴリなし {amount} は未表示',
+  'dash.split.nettedNote': ' · 返金 {amount} を相殺',
   'dash.split.onlyUncat': 'この期間に {amount} が出ていますが、まだどれもカテゴリ分けされていません — 取引ページでカテゴリを設定すると、ここに内訳が表示されます。',
   'dash.split.empty': 'この期間にはまだ支出としてカテゴリ分けされたものがありません。',
   'dash.split.aria': '{month} の支出内訳: ',

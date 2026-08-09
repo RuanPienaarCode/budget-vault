@@ -27,12 +27,34 @@ function normalizeAmount(raw) {
   const marker = s.match(/(cr|dr)\.?\s*$/i);
   if (marker) { if (marker[1].toLowerCase() === 'dr') neg = true; s = s.slice(0, marker.index).trim(); }
   if (s.endsWith('-')) { neg = true; s = s.slice(0, -1).trim(); }
-  if (s.startsWith('-')) { neg = true; s = s.slice(1).trim(); }
-  if (s.startsWith('+')) s = s.slice(1).trim();
-  s = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, '').replace(/[\s\u00A0\u202F']/g, '');
+  /* Sign, symbol, sign - because banks write it both ways round. "-R100" puts
+     the minus outside the symbol and "R-100" puts it inside, and a single pass
+     can only catch one of them: stripping the sign first leaves "R-100" as
+     "-100" AFTER the symbol goes, which fails the final numeric test and comes
+     back as null - which parseNum then serves to every total as ZERO. A missing
+     sign is a wrong number; a missing amount is a wrong number wearing an empty
+     cell.
+
+     The second pass runs ONLY where a symbol was actually removed, and that
+     condition is the whole guard. Run unconditionally it also accepts "--100"
+     and "+-100" as -100, because each pass sees a fresh leading sign - turning
+     junk into a confident number, which is the one thing this file exists to
+     refuse. A doubled sign is not a format any bank writes; it is a damaged
+     cell, and null is the honest answer. */
+  const sign = () => {
+    if (s.startsWith('-')) { neg = true; s = s.slice(1).trim(); return true; }
+    if (s.startsWith('+')) { s = s.slice(1).trim(); return true; }
+    return false;
+  };
+  sign();
+  const bare = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, '');
+  if (bare !== s) { s = bare; sign(); }
+  s = s.replace(/[\s\u00A0\u202F']/g, '');
   if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');  // decimal comma
   else s = s.replace(/,/g, '');                                                       // thousands comma
-  if (!/^\d+(\.\d+)?$/.test(s)) return null;
+  // A bare ".50" is a real cell (some exports drop the leading zero), and it
+  // must parse rather than fall to null and be served as zero by parseNum.
+  if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(s)) return null;
   const n = Number(s);
   return neg ? -n : n;
 }

@@ -548,6 +548,7 @@ module.exports = {
   'dash.pos.debt': 'Deuda',
   'dash.pos.debtSplit': '{accounts} en cuentas · {debts} en la página de deudas',
   'dash.pos.debtActive': { one: '{count} activa', other: '{count} activas' },
+  'dash.pos.debtAccounts': { one: 'todo en {count} cuenta', other: 'todo en {count} cuentas' },
   'dash.pos.debtNone': 'nada adeudado',
   'dash.pos.debtSay': 'Deuda de {amount}. Abre la página Deudas.',
   'dash.pos.debtSayNone': 'Sin deudas. Abre la página Deudas.',
@@ -582,6 +583,8 @@ module.exports = {
   'dash.stale.all': { one: 'Construido a partir de un saldo que nadie ha confirmado últimamente', other: 'Construido a partir de {count} saldos que nadie ha confirmado últimamente' },
   'dash.stale.some': 'Construido a partir de {stale} de {total} saldos que nadie ha confirmado últimamente',
   'dash.stale.line': '{line} — {age}.',
+  'dash.stale.driftUp': ' Los movimientos desde entonces implican {amount} más.',
+  'dash.stale.driftDown': ' Los movimientos desde entonces implican {amount} menos.',
   'dash.stale.btn': 'Revisar saldos',
   'dash.stale.aria': 'Revisar los saldos de las cuentas en la página Cuentas',
 
@@ -598,6 +601,7 @@ module.exports = {
   'dash.trend.tip.under': '{amount} por debajo del presupuesto',
 
   'dash.split.uncatNote': ' · {amount} sin categoría, no mostrado',
+  'dash.split.nettedNote': ' · {amount} en reembolsos descontados',
   'dash.split.onlyUncat': 'Salieron {amount} en este periodo, pero nada está categorizado todavía — pon categorías en Transacciones y el reparto aparecerá aquí.',
   'dash.split.empty': 'Aún no hay nada categorizado como gasto en este periodo.',
   'dash.split.aria': 'Reparto del gasto de {month}: ',

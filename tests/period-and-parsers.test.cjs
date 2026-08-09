@@ -21,7 +21,7 @@ const assert = require('assert');
 const { stubObsidian, makeCtx } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { normalizeAmount } = require('../src/amount');
+const { normalizeAmount, parseNum } = require('../src/amount');
 const { parseCsv } = require('../src/csv');
 const { parseStatementDate, detectHeaderlessColumns, detectStatementColumns, reconcileAmounts } = require('../src/statement');
 const { learnPattern } = require('../src/rules');
@@ -547,10 +547,38 @@ for (const [cell, want, why] of [
   ['   ', null, 'whitespace is null'],
   ['abc', null, 'junk is null'],
   ['R', null, 'a bare currency symbol is null'],
+  /* The minus goes INSIDE the symbol as often as outside it, and a single
+     sign pass could only catch one: "R-100" survived the strip as "-100",
+     failed the numeric test and came back null — which parseNum then serves to
+     every total as ZERO. A dropped sign is a wrong number; a dropped amount is
+     a wrong number wearing an empty cell. */
+  ['-R100', -100, 'minus outside the symbol'],
+  ['R-100', -100, 'minus inside the symbol'],
+  ['R -100', -100, 'and with a space between them'],
+  ['$-50.25', -50.25, 'the same, in another currency'],
+  ['ZAR-1 234,56', -1234.56, 'and through a word symbol with a decimal comma'],
+  ['R+100', 100, 'an explicit plus inside the symbol is still positive'],
+  ['.5', 0.5, 'a leading-dot decimal is a real cell, not junk'],
+  ['-.75', -0.75, 'signed, too'],
+  ['.', null, 'but a bare dot is still nothing'],
+  ['-', null, 'and so is a bare sign'],
+  /* The trap the second sign pass sets if it runs unconditionally: each pass
+     sees a fresh leading sign, so a damaged cell becomes a confident number.
+     A doubled sign is not a format any bank writes. */
+  ['--100', null, 'a doubled minus is junk, not -100'],
+  ['+-100', null, 'and so is a plus followed by a minus'],
+  ['-+100', null, 'in either order'],
+  ['++100', null, 'or doubled the other way'],
+  ['R--100', null, 'including behind a currency symbol'],
+  ['R-', null, 'a symbol and a sign with no digits is nothing'],
+  ['-R', null, 'either way round'],
 ]) {
   eq(normalizeAmount(cell), want, `normalizeAmount(${JSON.stringify(cell)}) — ${why}`);
 }
 ok(normalizeAmount('1 234,56') !== 1, 'a decimal-comma cell must never collapse to its leading digit');
+// The failure mode that makes the above matter: parseNum's fallback is what
+// reaches the totals, and it turns a null into a plausible, silent zero.
+eq(parseNum('R-100').value, -100, 'parseNum carries the sign through rather than falling back to zero');
 
 /* ======================== parseStatementDate ============================ */
 for (const [cell, dayFirst, want, why] of [

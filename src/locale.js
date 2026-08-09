@@ -189,7 +189,15 @@ const PROFILES = {
 
       const gains = sumCodes(figures, '4250');
       if (gains > 40000) {
-        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(40000)} annual exclusion — ${fmt(gains - 40000)} feeds into taxable income.` });
+        /* The EXCESS is not what reaches taxable income — an individual's
+           inclusion rate is 40%, so R100 000 of gains puts R24 000 into taxable
+           income, not R60 000. Stating the excess as though it were the taxable
+           amount overstated it by two and a half times, and unlike the
+           thresholds either side of it that is not a figure the page's
+           "defaults to verify" disclaimer covers: the numbers going stale is one
+           thing, a stated relationship being wrong is another. */
+        const excess = gains - 40000;
+        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(40000)} annual exclusion by ${fmt(excess)} — at the 40% inclusion rate for individuals, about ${fmt(excess * 0.4)} feeds into taxable income.` });
       } else if (gains > 0) {
         msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(40000)} annual exclusion.` });
       }

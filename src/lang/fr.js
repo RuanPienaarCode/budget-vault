@@ -552,6 +552,7 @@ module.exports = {
   'dash.pos.debt': 'Dettes',
   'dash.pos.debtSplit': '{accounts} sur des comptes · {debts} sur la page Dettes',
   'dash.pos.debtActive': { one: '{count} active', other: '{count} actives' },
+  'dash.pos.debtAccounts': { one: 'tout sur {count} compte', other: 'tout sur {count} comptes' },
   'dash.pos.debtNone': 'rien de dû',
   'dash.pos.debtSay': 'Dettes de {amount}. Ouvrir la page Dettes.',
   'dash.pos.debtSayNone': 'Aucune dette. Ouvrir la page Dettes.',
@@ -586,6 +587,8 @@ module.exports = {
   'dash.stale.all': { one: 'Construit à partir d\'un solde que personne n\'a confirmé récemment', other: 'Construit à partir de {count} soldes que personne n\'a confirmés récemment' },
   'dash.stale.some': 'Construit à partir de {stale} soldes sur {total} que personne n\'a confirmés récemment',
   'dash.stale.line': '{line} — {age}.',
+  'dash.stale.driftUp': ' Les opérations depuis impliquent {amount} de plus.',
+  'dash.stale.driftDown': ' Les opérations depuis impliquent {amount} de moins.',
   'dash.stale.btn': 'Vérifier les soldes',
   'dash.stale.aria': 'Vérifier les soldes des comptes sur la page Comptes',
 
@@ -602,6 +605,7 @@ module.exports = {
   'dash.trend.tip.under': '{amount} en dessous du budget',
 
   'dash.split.uncatNote': ' · {amount} sans catégorie, non affiché',
+  'dash.split.nettedNote': ' · {amount} de remboursements déduits',
   'dash.split.onlyUncat': '{amount} sont sortis sur cette période, mais rien n\'est encore catégorisé — mettez des catégories dans Transactions et la répartition apparaîtra ici.',
   'dash.split.empty': 'Rien n\'est encore catégorisé comme dépense sur cette période.',
   'dash.split.aria': 'Répartition des dépenses pour {month} : ',

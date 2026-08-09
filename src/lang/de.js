@@ -547,6 +547,7 @@ module.exports = {
   'dash.pos.debt': 'Schulden',
   'dash.pos.debtSplit': '{accounts} auf Konten · {debts} auf der Schulden-Seite',
   'dash.pos.debtActive': { one: '{count} aktiv', other: '{count} aktiv' },
+  'dash.pos.debtAccounts': { one: 'alles auf {count} Konto', other: 'alles auf {count} Konten' },
   'dash.pos.debtNone': 'nichts geschuldet',
   'dash.pos.debtSay': 'Schulden {amount}. Die Schulden-Seite öffnen.',
   'dash.pos.debtSayNone': 'Keine Schulden. Die Schulden-Seite öffnen.',
@@ -581,6 +582,8 @@ module.exports = {
   'dash.stale.all': { one: 'Gebildet aus einem Kontostand, den niemand kürzlich bestätigt hat', other: 'Gebildet aus {count} Kontoständen, die niemand kürzlich bestätigt hat' },
   'dash.stale.some': 'Gebildet aus {stale} von {total} Kontoständen, die niemand kürzlich bestätigt hat',
   'dash.stale.line': '{line} — {age}.',
+  'dash.stale.driftUp': ' Buchungen seitdem ergeben {amount} mehr.',
+  'dash.stale.driftDown': ' Buchungen seitdem ergeben {amount} weniger.',
   'dash.stale.btn': 'Kontostände prüfen',
   'dash.stale.aria': 'Kontostände auf der Konten-Seite prüfen',
 
@@ -597,6 +600,7 @@ module.exports = {
   'dash.trend.tip.under': '{amount} unter Budget',
 
   'dash.split.uncatNote': ' · {amount} ohne Kategorie, nicht gezeigt',
+  'dash.split.nettedNote': ' · {amount} an Erstattungen verrechnet',
   'dash.split.onlyUncat': '{amount} sind in diesem Zeitraum abgeflossen, davon ist aber noch nichts kategorisiert — setze Kategorien unter Transaktionen, dann erscheint die Aufteilung hier.',
   'dash.split.empty': 'In diesem Zeitraum ist noch nichts als Ausgabe kategorisiert.',
   'dash.split.aria': 'Ausgabenaufteilung für {month}: ',

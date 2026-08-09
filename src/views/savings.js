@@ -6,7 +6,7 @@ const { themeColors, createChart, tip, parseColor } = require('../chart');
 const { isStale, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows } = require('../savings-math');
-const { worth, activeDebts, cardOverlap, debtsByType, assetsByType } = require('../worth');
+const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
 
 /* Bumped once per composition chart drawn, to keep its clipPath and gradient
@@ -172,24 +172,52 @@ module.exports = function registerSavings(ctx) {
 
         if (flows.basis === 'derived') {
           const g = flows.growth;
-          const line = el('div', { class: 's2' },
-            `in ${money(flows.contributions, 0)} · `,
-            el('span', { class: `num ${g >= 0 ? 'text-success' : 'text-danger'}` },
+          const line = el('div', { class: 's2' }, `in ${money(flows.contributions, 0)}`);
+          /* A zero growth figure is NOT a measurement of zero growth — it means
+             nothing in this account posted a transaction the vault could read as
+             growth. A unit trust normally posts none at all: the market moves,
+             the balance is retyped, and no row is ever written. Printing "▲ R0"
+             in green against that claims the fund went nowhere, which on the
+             page named after these accounts is the worst place to guess. So the
+             chip appears only when there is something to report. */
+          if (g) {
+            line.append(' · ', el('span', { class: `num ${g >= 0 ? 'text-success' : 'text-danger'}` },
               `${g >= 0 ? '▲' : '▼'} ${money(Math.abs(g), 0)}`));
+          }
           if (flows.withdrawals) line.append(` · out ${money(flows.withdrawals, 0)}`);
           card.append(line);
+
+          /* And say so outright where the silence is most likely to mislead.
+             Only for investments, and only when no growth was recorded at all —
+             a savings account crediting monthly interest has a real figure
+             above and needs no explanation of one it does not have. */
+          if (a.type === 'investment' && !g) {
+            card.append(el('div', { class: 's2 s2-caveat',
+              title: 'Growth only appears here when the account posts it as a transaction the vault can read. '
+                + 'A fund whose value moves with the market posts nothing, so its growth is inside the balance '
+                + 'you typed rather than in this line.' },
+            'no growth recorded — it is inside the balance, not measured here'));
+          }
           /* Growth is recognised by category TYPE, and income the household
              EARNED and then deposited here is income-type too — counselling
              fees paid into a savings account, a salary routed straight to it.
              Neither is growth: the household put that money in, the account did
              not earn it. Nothing in the data tells the two apart.
 
-             So where more than one category fed the figure, they are named ON
-             the card rather than in a tooltip. On the vault this was built
-             against, one account's growth was 41% counselling income — an
-             error big enough that hiding it behind a hover would have been the
-             same silent overstatement this whole change set out to end. */
-          if (flows.growthCategories.length > 1) {
+             So the categories are named ON the card rather than in a tooltip.
+             On the vault this was built against, one account's growth was 41%
+             counselling income — an error big enough that hiding it behind a
+             hover would have been the same silent overstatement this whole
+             change set out to end.
+
+             Named whenever ANY category fed the figure, including a single one.
+             Gating this at "more than one" withheld the disclosure in precisely
+             the case that needs it most: where one category IS the whole figure,
+             a wrong one makes the growth 100% wrong rather than 41% wrong — the
+             card read "▲ R9 000" of consulting fees with nothing beside it. A
+             redundant "growth from Interest R120" on the honest account is a
+             cheap price for closing that. */
+          if (flows.growthCategories.length) {
             card.append(el('div', { class: 's2 s2-caveat',
               title: 'Anything here that is not interest or dividends is really a contribution. '
                 + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.' },
@@ -222,6 +250,23 @@ module.exports = function registerSavings(ctx) {
           btn.addEventListener('click', () => acceptImplied(a, rec.implied));
           line.append(btn);
           card.append(line);
+          /* On a fund the implied figure is a FLOOR, not a correction, and the
+             difference is the growth. An account confirmed at R200 000 that has
+             taken three R2 000 debit orders since implies R206 000 — while the
+             real balance, market included, is R214 000. Accepting that offer
+             quietly writes off R8 000 and stamps the result as confirmed.
+
+             The button stays: a fixed deposit that posts its interest as a real
+             transaction reconciles exactly, and taking the offer away from those
+             accounts to protect the others helps nobody. What it gets is the one
+             sentence that stops it reading as a correction. */
+          if (a.type === 'investment') {
+            card.append(el('div', { class: 's2 s2-caveat',
+              title: 'The implied figure adds up recorded movements only. Growth that never posted a '
+                + 'transaction is not in it, so on a market-linked fund this figure is a floor rather '
+                + 'than a correction — take it only if your provider agrees.' },
+            'implied from recorded movements only — growth is not in it'));
+          }
         } else if (rec.state === 'clean') {
           card.append(el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt text-success' }, 'Matches your transactions')));
@@ -263,22 +308,47 @@ module.exports = function registerSavings(ctx) {
     ['other', 'Other', '--ink-faint', '#5f6779'],
   ];
 
+  /* Colours for a type this list has never heard of — walked in order so the
+     same unlisted type keeps the same colour between renders, exactly as the
+     debt and asset walks below do. */
+  const EXTRA_VARS = ['--color-warning', '--color-investment', '--color-info', '--ink-faint'];
+  const EXTRA_FALLBACKS = ['#f5a524', '#6f42c1', '#0ea5e9', '#5f6779'];
+
   function renderWorth() {
     const wrap = $('#savingsWorth'); wrap.empty();
     const css = getComputedStyle(root);
     const c = themeColors(root);
 
     /* Split by SIGN, not by type: a cheque account overdrawn is a liability
-       however it is labelled, and a credit card in credit is an asset. */
-    const assets = [], debts = [];
-    for (const [type, label, varName, fallback] of WORTH_TYPES) {
-      const color = (css.getPropertyValue(varName) || '').trim() || fallback;
-      const inType = S.accounts.filter(a => a.type === type);
-      const pos = inType.reduce((t, a) => t + Math.max(0, a.balance), 0);
-      const neg = inType.reduce((t, a) => t + Math.min(0, a.balance), 0);
-      if (pos > 0) assets.push({ label, amount: pos, color });
-      if (neg < 0) debts.push({ label, amount: -neg, color });
-    }
+       however it is labelled, and a credit card in credit is an asset.
+
+       The grouping itself is worth.js's, not a filter written here, because a
+       filter written here is what let an account of an unlisted type sit inside
+       the net-worth tile and be absent from this chart — two net worths on one
+       screen. Every account the vault holds now reaches a segment; a type this
+       file has no label for keeps its own name and takes a walked colour. */
+    const meta = new Map(WORTH_TYPES.map(([type, label, varName, fallback]) => [type, {
+      label, color: (css.getPropertyValue(varName) || '').trim() || fallback,
+    }]));
+    /* Memoised BY TYPE, not by position in the walk. One unlisted type can
+       reach both bars at once — two `tfsa` accounts, one in credit and one
+       overdrawn — and drawing the same type in two colours on one chart says
+       they are two different things. */
+    const extraColors = new Map();
+    const colorFor = type => {
+      if (!extraColors.has(type)) {
+        const i = extraColors.size;
+        extraColors.set(type, (css.getPropertyValue(EXTRA_VARS[i % EXTRA_VARS.length]) || '').trim()
+          || EXTRA_FALLBACKS[i % EXTRA_FALLBACKS.length]);
+      }
+      return extraColors.get(type);
+    };
+    const segFor = g => (g.known
+      ? { label: meta.get(g.type).label, amount: g.amount, color: meta.get(g.type).color }
+      : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: colorFor(g.type) });
+    const groups = accountGroups(S.accounts, WORTH_TYPES.map(([type]) => type));
+    const assets = groups.owned.map(segFor);
+    const debts = groups.owed.map(segFor);
 
     /* Assets-page rows, grouped by their own kind — the house, the car and the
        ring as three named blocks rather than one anonymous slab. Colours walk a

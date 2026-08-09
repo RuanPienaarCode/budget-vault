@@ -108,8 +108,21 @@ const ZA_TRANSFER_DUTY = [
 function zaTransferDuty(price) {
   const v = Number(price) || 0;
   if (v <= 0) return 0;
-  for (const [from, to, base, rate] of ZA_TRANSFER_DUTY) {
-    if (v <= to) return base + (v - from) * rate;
+  for (let i = 0; i < ZA_TRANSFER_DUTY.length; i++) {
+    const [from, to, base, rate] = ZA_TRANSFER_DUTY[i];
+    if (v > to) continue;
+    const duty = base + (v - from) * rate;
+    /* Never more than the next bracket's own published starting figure.
+
+       The R2 the comment above describes is not only a rounding curiosity: it
+       makes the raw table non-monotonic at the seam. Compounding the 11% band up
+       to R12 100 500 gives R1 103 785, while SARS publishes R1 103 783 as the
+       13% band's base — so duty FELL by two rand as the price rose by one, which
+       reads as a bug to anyone who finds it and is indefensible in a figure
+       labelled "exact arithmetic on the published table". Clamping to the next
+       base keeps the published numbers authoritative and the curve rising. */
+    const next = ZA_TRANSFER_DUTY[i + 1];
+    return next ? Math.min(duty, next[2]) : duty;
   }
   return 0;
 }
@@ -135,7 +148,15 @@ function zaMortgageInitiationFee(loanAmount) {
 function zaVehicleInitiationFee(financeAmount) {
   const a = Number(financeAmount) || 0;
   if (a <= 0) return 0;
-  return Math.round(Math.min(a * 0.01, ZA_INIT_CAP));
+  /* Capped EX VAT and grossed up afterwards, exactly like the mortgage fee
+     above. Comparing the ex-VAT 1% against the VAT-INCLUSIVE cap and returning
+     it raw mixed two bases in one expression: every sub-cap amount came back
+     without VAT while the cap itself carried it, so the same R200 000 read as
+     R2 000 here and R6 563 on the mortgage path. The 1% rate is still market
+     convention rather than a published formula (see above) — the VAT treatment
+     is not, and the two fees must at least agree about what they include. */
+  const exVat = Math.min(a * 0.01, ZA_INIT_CAP_EX_VAT);
+  return Math.round(exVat * ZA_VAT);
 }
 
 /* NCA monthly service-fee cap. */

@@ -243,7 +243,7 @@ module.exports = function registerPeriod(ctx) {
     // Transactions still lists every row, so nothing goes invisible.
     const skip = nonBudgetLabels();
     const tx = txInPeriod(p).filter(t => !t.excluded && !skip.has(t.label));
-    let income = 0, spend = 0, uncategorised = 0;
+    let income = 0, spend = 0, uncategorised = 0, uncatSpend = 0;
     const byCat = {};
     for (const t of tx) {
       const type = catType(t.cat);
@@ -251,9 +251,16 @@ module.exports = function registerPeriod(ctx) {
       if (type === 'transfer') continue;
       byCat[t.cat || ''] = (byCat[t.cat || ''] || 0) + t.amount;
       if (type === 'income') income += t.amount;
-      else if (t.amount < 0) spend += -t.amount;
+      else if (t.amount < 0) { spend += -t.amount; if (!t.cat) uncatSpend += -t.amount; }
     }
-    return { income, spend, uncategorised, byCat, count: tx.length };
+    /* `uncatSpend` is the GROSS outgoing half of the uncategorised bucket, and
+       it is deliberately not derivable from byCat[''], which is a NET figure. A
+       period holding R16 895 of uncategorised payments and R21 440 of
+       uncategorised deposits nets POSITIVE, so byCat[''] reports nothing while
+       `spend` above has already counted the whole R16 895. The Dashboard's
+       donut discloses what it left out by subtracting from `spend`, so it needs
+       the same half of the bucket that `spend` counted — see renderSplit. */
+    return { income, spend, uncategorised, uncatSpend, byCat, count: tx.length };
   }
   /* A monthly income figure, for the one page that has to talk in months no
      matter what the period length is (Debt — an instalment is quoted monthly,

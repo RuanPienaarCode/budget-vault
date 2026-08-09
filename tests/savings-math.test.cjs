@@ -174,4 +174,34 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
   eq(accountFlows(undefined, [], typeOf).basis, 'none', 'missing account does not throw');
 }
 
+/* ---- 11. a rate is divided by the months the account was actually around for ----
+   Dividing by the whole requested window reported a fund opened in June at a
+   third of its real monthly rate over a six-month window — and this figure
+   exists to be checked against a stated monthly_contribution, so understating it
+   manufactures a shortfall that is not there. */
+{
+  // One R1 000 contribution, in the LAST month of a six-month window.
+  const late = [row('2026-07-10', 1000, '')];
+  const r = contributionRate(late, typeOf, 6, '2026-08-07');
+  eq(r.months, 1, 'only the month the account has existed for is in the denominator');
+  eq(r.requested, 6, 'while the window that was asked for is still reported');
+  eq(r.perMonth, 1000, 'so the rate is the real one, not a sixth of it');
+  eq(r.from, '2026-07-01', 'and the window says where it actually starts');
+
+  // A gap in the MIDDLE is real silence and still counts.
+  const gap = [row('2026-02-10', 1000, ''), row('2026-07-10', 1000, '')];
+  const g = contributionRate(gap, typeOf, 6, '2026-08-07');
+  eq(g.months, 6, 'silence inside the window is not trimmed');
+  eq(g.perMonth, 2000 / 6, 'so the months of nothing drag the average down, correctly');
+
+  // The full-history case is unchanged.
+  eq(contributionRate([row('2026-02-10', 600, ''), row('2026-07-10', 600, '')], typeOf, 6, '2026-08-07').from,
+    '2026-02-01', 'a window covered from its first month keeps the window it asked for');
+
+  // splitFlows reports the first row that actually counted, so nobody has to
+  // re-derive the filtering to find it.
+  eq(splitFlows(gap, typeOf).first, '2026-02-10', 'the earliest counted row is reported');
+  eq(splitFlows([], typeOf).first, null, 'and is null when nothing counted');
+}
+
 console.log(`savings-math.test.cjs — ${checks} checks OK`);

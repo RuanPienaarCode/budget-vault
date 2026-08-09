@@ -136,4 +136,23 @@ const row = (date, amount, extra) => ({ date, amount, ...extra });
   eq(stalenessSummary(undefined, TODAY).total, 0, 'missing accounts behaves as none');
 }
 
+/* ---- an undated balance is undated whether or not it has rows ----
+   The Dashboard's "What's left" card reads `state !== 'no-date'` as "this
+   balance can be placed", and committed.js's first rule says an unplaceable one
+   must be counted as UNKNOWN rather than spent. Checked the other way round, an
+   account with no transactions returned 'no-tx' and never reached the date test,
+   so a wallet nobody had ever confirmed was folded into the cash figure at its
+   full stated value. The order of these two guards is the fix. */
+{
+  eq(reconcile(acct(5000, ''), [], TODAY).state, 'no-date',
+    'no date and no rows is a DATING failure, not an empty-history one');
+  eq(reconcile(acct(5000, ''), null, TODAY).state, 'no-date',
+    'and missing rows behaves the same way');
+  eq(reconcile(acct(5000, 'end of June'), [], TODAY).state, 'no-date',
+    'a hand-typed date this cannot read is no date at all');
+  // The dated cases are unmoved: a real date with nothing to check is still 'no-tx'.
+  eq(reconcile(acct(5000, TODAY), [], TODAY).state, 'no-tx',
+    'a confirmed balance with no transactions still has nothing to check against');
+}
+
 console.log(`reconcile.test.cjs — ${checks} checks OK`);

@@ -658,5 +658,268 @@ async function mount(files, period = '2026-07') {
       'and a finished period explains no window');
   });
 
-  console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, the position band ignores the period, and the comparison column measures spending rather than the date (${checks} assertions).`);
+  /* ===================================================================== *
+     12–17. Six figures that were arithmetically right and read wrong.
+
+     Every one of these was found by loading a real vault and asking whether
+     the numbers on one screen agreed with each other. None of them threw, none
+     of them was caught by a total, and each one is the kind of quiet
+     disagreement that teaches a reader the page cannot be trusted — which is
+     the expensive failure, because it is never reported as a bug.
+     ===================================================================== */
+
+  /* -------- 12. the Debt tile names the ledger it actually read --------- *
+     `w.fromDebts && w.fromAccounts` asked only whether BOTH ledgers were in
+     play, and otherwise fell through to a count of DEBT-PAGE rows. So a vault
+     whose only liability is an overdrawn account printed that account's
+     balance under the words "0 active" — a tile stating a debt and denying it
+     in the same breath. Measured on a real vault: R8 874 on a credit card,
+     nothing on the Debt page at all. */
+  {
+    /* MIXED carries no Debts.md, so this is the accounts-only shape exactly. */
+    const CARD_ONLY = { ...MIXED,
+      [`${B}/Accounts/Visa.md`]: '---\ntype: credit_card\ntx_label: "Visa"\nbalance: -3000\n---\n' };
+    const { ctx, nodes } = await mount(CARD_ONLY);
+    ctx.renderDashboard();
+    const txt = nodes.get('dashPositionKpis').textContent;
+    ok(/all on 1 account/.test(txt), `debt on accounts alone says so — got: ${txt}`);
+    ok(!/0 active/.test(txt), 'and never denies the figure printed above it');
+  }
+  {
+    /* Debt page only — the branch that was already right, pinned so the new
+       three-way test cannot quietly swallow it. */
+    const { ctx, nodes } = await mount(POSITION);
+    ctx.renderDashboard();
+    const txt = nodes.get('dashPositionKpis').textContent;
+    ok(/1 active/.test(txt), `a debt-page row is still counted as one — got: ${txt}`);
+    ok(!/all on/.test(txt), 'and is not described as sitting on an account');
+  }
+  {
+    /* Both ledgers — still the split sentence, which names both figures. */
+    const { ctx, nodes } = await mount(OVERLAP);
+    ctx.renderDashboard();
+    ok(/on accounts · .* on the debt page/.test(nodes.get('dashPositionKpis').textContent),
+      'both ledgers in play still get the split');
+  }
+
+  /* ----- 13. the donut accounts for the WHOLE gap to "Total Spent" ------ *
+     The note used to disclose the uncategorised half only, and to disclose it
+     NET. Two ways that goes silent while the figures disagree:
+
+       a refund inside an expense category shrinks a slice without being
+       uncategorised at all; and
+
+       a period holding more uncategorised money IN than OUT nets positive, so
+       `-Math.min(0, …)` clamped the note to zero — on a real vault, R16 895
+       out against R21 440 in, printing nothing while the two figures sat
+       R17 195 apart.
+
+     The note is now measured against `spend` itself, so it covers the whole
+     difference by construction rather than by a rule that has to be kept in
+     step with the slices. */
+  {
+    const GAP = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-06.md`]: txFile([['2026-06-05', 'Shop', 'Groceries', -800]]),
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-03', 'Woolworths', 'Groceries', -1200],
+        ['2026-07-06', 'Refund', 'Groceries', 200],       // shrinks a slice, is not uncategorised
+        ['2026-07-11', 'EFT 4471', '', -500],             // uncategorised out
+        ['2026-07-12', 'EFT 4472', '', 900],              // …and more back in, so the bucket nets POSITIVE
+      ]),
+    };
+    const { ctx, nodes } = await mount(GAP);
+    ctx.renderDashboard();
+    const sub = nodes.get('dashSplitSub').textContent;
+    ok(/R 500\.00 uncategorised, not shown/.test(sub),
+      `the uncategorised half is the GROSS outflow, not the net — got: ${sub}`);
+    ok(/R 200\.00 in refunds netted off/.test(sub),
+      `and the refund half is named too — got: ${sub}`);
+    /* The point of the whole card: donut + everything it declared == the hero. */
+    const sum = ctx.periodSummary('2026-07');
+    eq(sum.spend, 1700, 'hero counts both outgoing rows gross');
+    eq(sum.uncatSpend, 500, 'and periodSummary reports the outgoing half of the bucket separately');
+    const shown = 1000;                       // Groceries: 1200 out, 200 back
+    eq(shown + 500 + 200, sum.spend, 'donut + what it declared leaves nothing unexplained');
+  }
+
+  /* --- 14. spend nobody budgeted for is not a blank Remaining cell ------ *
+     The cell was written only when there was a budget to subtract from, so
+     spending in a category with no budget row showed "—", a full bar and an
+     EMPTY Remaining — which reads as "nothing to report" when the truth is
+     that it is over budget by the whole amount. Three such rows on the vault
+     this was found on came to R995, and they are exactly why the column did
+     not add up to the figure in the hero. */
+  {
+    const UNBUDGETED = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-03', 'Woolworths', 'Groceries', -1200],
+        ['2026-07-08', 'Uber', 'Transport', -300],
+        ['2026-07-09', 'Payday', 'Salary', 5000],
+      ]),
+    };
+    /* Salary is income with no budget row: it must NOT be reported as overspend. */
+    const { ctx, nodes } = await mount(UNBUDGETED);
+    ctx.renderDashboard();
+    const cells = new Map();
+    for (const tr of all(nodes.get('dashBudget'), e => e.tagName === 'TR')) {
+      const tds = tr.children.filter(c => c.tagName === 'TD');
+      if (tds.length === 5) cells.set(tds[0].textContent.trim(), { budget: tds[1].textContent, rem: tds[4] });
+    }
+    eq(cells.get('Salary').budget, '—', 'income here carries no budget either');
+    eq(cells.get('Salary').rem.textContent, '',
+      'but beating an income target is not overspending, so it stays blank');
+    eq(cells.get('Groceries').rem.textContent, 'R 3800.00', 'a budgeted row is unchanged');
+  }
+  {
+    /* And an unbudgeted EXPENSE now states the shortfall, in red. */
+    const OVERSPEND = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT,
+      [`${B}/Budgets/2026-07.md`]:
+        '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 |  |\n',
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-03', 'Woolworths', 'Groceries', -1200],
+        ['2026-07-08', 'Uber', 'Transport', -300],       // budgeted nowhere
+      ]),
+    };
+    const { ctx, nodes } = await mount(OVERSPEND);
+    ctx.renderDashboard();
+    for (const tr of all(nodes.get('dashBudget'), e => e.tagName === 'TR')) {
+      const tds = tr.children.filter(c => c.tagName === 'TD');
+      if (tds.length === 5 && tds[0].textContent.trim() === 'Transport') {
+        eq(tds[4].textContent, 'R -300.00', 'unbudgeted spend is short by the whole amount');
+        ok(tds[4]._cls.has('text-danger'), 'and says so in red');
+        ok(has(tr, 'bg-danger'), 'with a bar that agrees with the cell beside it');
+      }
+    }
+  }
+
+  /* ------ 15. the trend budgets no month that was never budgeted -------- *
+     budgetTotals returns 0 for a period with no budget file, and the dashed
+     line was drawn straight through it — landing on the baseline, which reads
+     as "you budgeted nothing" when what happened is that nothing was budgeted.
+     On the vault this was found on, a 1Y range covered four such months and
+     the line visibly collapsed into the floor across them. The focus dot
+     already refused to mark those points; the line was the last thing still
+     asserting the zero. */
+  {
+    const GAPPY = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT,
+      /* May and July budgeted, June deliberately not — so a single line would
+         have to dive to the floor and climb back out. */
+      [`${B}/Budgets/2026-05.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 |  |\n',
+      [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 |  |\n',
+      [`${B}/Transactions/Cheque/2026-05.md`]: txFile([['2026-05-05', 'Shop', 'Groceries', -800]]),
+      [`${B}/Transactions/Cheque/2026-06.md`]: txFile([['2026-06-05', 'Shop', 'Groceries', -900]]),
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-05', 'Shop', 'Groceries', -700]]),
+    };
+    const { ctx, nodes } = await mount(GAPPY);
+    ctx.renderDashboard();
+    const svg = nodes.get('trendChart').children.find(c => c.tagName === 'SVG');
+    const dashed = all(svg, e => e.tagName === 'POLYLINE' && e.attrs['stroke-dasharray']);
+    eq(dashed.length, 0,
+      'two budgeted months either side of an unbudgeted one share no line');
+    const marks = all(svg, e => e.tagName === 'CIRCLE' && e.attrs['fill-opacity'] === '0.28');
+    eq(marks.length, 2, 'each lone budgeted period is still marked');
+  }
+  {
+    /* Consecutive budgeted periods DO join up — the fix must not shred a line
+       that was always correct. */
+    const RUN = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT,
+      [`${B}/Budgets/2026-06.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 |  |\n',
+      [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 4000.00 |  |\n',
+      [`${B}/Transactions/Cheque/2026-06.md`]: txFile([['2026-06-05', 'Shop', 'Groceries', -900]]),
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-05', 'Shop', 'Groceries', -700]]),
+    };
+    const { ctx, nodes } = await mount(RUN);
+    ctx.renderDashboard();
+    const svg = nodes.get('trendChart').children.find(c => c.tagName === 'SVG');
+    const dashed = all(svg, e => e.tagName === 'POLYLINE' && e.attrs['stroke-dasharray']);
+    eq(dashed.length, 1, 'an unbroken run is still one line');
+    eq(dashed[0].attrs.points.split(' ').length, 2, 'through both of its points');
+  }
+
+  /* ---- 16. "% allocated" is not a function of what day it is today ----- *
+     The denominator was the income that had LANDED so far. Early in a running
+     period that is a part-month figure, so the line said nothing about the
+     budget and everything about the date — and read as settled, because
+     nothing in it says when it was measured. A single small invoice arriving
+     before the salary printed "19252% allocated". */
+  await atDate('2026-07-02', async () => {
+    const RUNNING = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,   // BUDGET names no income
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-01', 'Small invoice', 'Salary', 255],                 // the salary has not landed
+        ['2026-07-02', 'Woolworths', 'Groceries', -400],
+      ]),
+    };
+    const { ctx, nodes } = await mount(RUNNING);
+    ctx.renderDashboard();
+    const txt = nodes.get('heroCard').textContent;
+    ok(!/allocated/.test(txt),
+      `a running period with no budgeted income has no honest denominator — got: ${txt}`);
+  });
+  await atDate('2026-08-15', async () => {
+    /* The same period, FINISHED. Its actual income no longer moves, so it is a
+       fair denominator again and the line comes back. */
+    const DONE = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-25', 'Payday', 'Salary', 12000],
+        ['2026-07-03', 'Woolworths', 'Groceries', -400],
+      ]),
+    };
+    const { ctx, nodes } = await mount(DONE, '2026-07');
+    ctx.renderDashboard();
+    ok(/50% allocated/.test(nodes.get('heroCard').textContent),
+      'a finished period states its own share: 6 000 budgeted against 12 000 earned');
+  });
+  await atDate('2026-07-02', async () => {
+    /* And a budget that DOES name its income keeps the figure all period,
+       because the denominator no longer moves. */
+    const WITH_INCOME = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT,
+      [`${B}/Budgets/2026-07.md`]:
+        '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n' +
+        '| Groceries | expense | 5000.00 |  |\n| Salary | income | 10000.00 |  |\n',
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-01', 'Small invoice', 'Salary', 255]]),
+    };
+    const { ctx, nodes } = await mount(WITH_INCOME);
+    ctx.renderDashboard();
+    ok(/50% allocated/.test(nodes.get('heroCard').textContent),
+      'budgeted income is the denominator, so day 1 reads the same as day 31');
+  });
+
+  /* ---- 17. "old" carries a size, not only an age ----------------------- *
+     The tiles quote what the account files SAY, deliberately — they have to
+     agree with the Savings and Debt pages, which state the same figures. But
+     the caveat under them said only that a balance was old, which leaves the
+     reader no way to tell whether that matters by a rand or by twenty
+     thousand. On the vault this was found on it was twenty thousand, sitting
+     under a net worth stated to the cent. */
+  await atDate('2026-07-20', async () => {
+    const DRIFTED = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS,
+      [`${B}/Accounts/Cheque.md`]:
+        '---\ntype: checking\ntx_label: "Cheque"\nbalance: 1000\nbalance_updated: 2026-05-01\n---\n',
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-10', 'Payday', 'Salary', 4000]]),
+    };
+    const { ctx, nodes } = await mount(DRIFTED);
+    ctx.renderDashboard();
+    const txt = nodes.get('dashStale').textContent;
+    ok(/imply R 4 ?000 more/.test(txt.replace(/ /g, ' ')),
+      `the caveat sizes the drift it is warning about — got: ${txt}`);
+  });
+  {
+    /* A vault whose balances have not moved says nothing extra — the sentence
+       is about a difference, and there isn't one. */
+    const { ctx, nodes } = await mount(POSITION);
+    ctx.renderDashboard();
+    ok(!/imply/.test(nodes.get('dashStale').textContent),
+      'no drift, no drift sentence');
+  }
+
+  console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, the position band ignores the period, the comparison column measures spending rather than the date, and six figures that read wrong now agree with each other (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

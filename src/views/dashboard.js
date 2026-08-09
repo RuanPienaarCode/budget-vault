@@ -279,12 +279,23 @@ module.exports = function registerDashboard(ctx) {
        to a form and not saved anywhere this card can read — so a copy here
        would compute a different, later date and put two debt-free dates in one
        app. The tile links there instead. */
+    /* Which ledger the figure above actually came from. The old test asked only
+       whether BOTH were in play and otherwise fell through to a count of
+       debt-page rows — so a vault whose only liability is an overdrawn account
+       printed the account's balance under the words "0 active", a tile stating
+       a debt and denying it in the same breath. That is this vault: R8 874 on a
+       credit-card account, nothing on the Debt page at all. Each ledger now
+       gets its own sentence, and the count quoted is always a count of the
+       thing the figure was built from. */
+    const owedAccounts = S.accounts.filter(a => (a.balance || 0) < 0).length;
     posTile(grid, {
       label: i18n.t('dash.pos.debt'), value: money(-w.liabilities, 0),
       cls: w.liabilities > 0 ? 'text-danger' : '',
       sub: w.fromDebts && w.fromAccounts
         ? i18n.t('dash.pos.debtSplit', { accounts: money(w.fromAccounts, 0), debts: money(w.fromDebts, 0) })
-        : (w.liabilities > 0 ? i18n.t('dash.pos.debtActive', { count: w.active.length }) : i18n.t('dash.pos.debtNone')),
+        : w.fromDebts > 0 ? i18n.t('dash.pos.debtActive', { count: w.active.length })
+          : w.fromAccounts > 0 ? i18n.t('dash.pos.debtAccounts', { count: owedAccounts })
+            : i18n.t('dash.pos.debtNone'),
       view: 'debts',
       say: w.liabilities > 0
         ? i18n.t('dash.pos.debtSay', { amount: money(w.liabilities) })
@@ -361,8 +372,32 @@ module.exports = function registerDashboard(ctx) {
     const line = all
       ? i18n.t('dash.stale.all', { count: s.total })
       : i18n.t('dash.stale.some', { stale: s.stale, total: s.total });
+    /* How far the transactions have ALREADY moved those balances.
+       Saying a figure is old leaves the reader no way to judge whether that
+       matters by a rand or by twenty thousand — on the vault this was written
+       against it was twenty thousand, sitting under a net worth stated to the
+       cent. The tiles keep quoting what the files SAY, deliberately: they have
+       to agree with the Savings and Debt pages, which state the same figures,
+       and a tile that silently reconciles itself is a third answer. So the
+       correction is disclosed rather than applied.
+
+       Summing reconcile()'s own delta, not a private recount, so this cannot
+       drift from the "what's left" card that reconciles the same accounts. It
+       is the exact move in NET worth because worth() splits accounts by sign
+       and nets them straight back: the owned and owed halves both shift, and
+       what survives is the sum of the deltas. */
+    const idx = accountIndex();
+    let drift = 0;
+    for (const a of S.accounts) {
+      const rec = reconcile(a, (idx.get(a) || {}).rows || []);
+      if (rec.state === 'drift') drift += rec.delta;
+    }
+    /* Below a whole currency unit there is nothing to report but rounding. */
+    const driftNote = Math.abs(drift) >= 1
+      ? i18n.t(drift > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: money(Math.abs(drift), 0) })
+      : '';
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      i18n.t('dash.stale.line', { line, age })));
+      i18n.t('dash.stale.line', { line, age }) + driftNote));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': i18n.t('dash.stale.aria') }, i18n.t('dash.stale.btn'));
     btn.addEventListener('click', () => ctx.switchView('accounts'));
@@ -381,7 +416,27 @@ module.exports = function registerDashboard(ctx) {
     const meterMax = Math.max(sum.spend, bud.spend, 1);
     const fillPct = Math.min(100, (sum.spend / meterMax) * 100).toFixed(2);
     const markPct = bud.spend > 0 ? ((bud.spend / meterMax) * 100).toFixed(2) : null;
-    const budgetedPct = sum.income > 0 ? Math.round((bud.spend / sum.income) * 100) : null;
+    /* Against the income the BUDGET states, not the income that happens to have
+       landed so far.
+
+       A running period's actual income is a part-month figure, so dividing a
+       whole period's budget by it says nothing about the budget and everything
+       about today's date. On this vault a R255 invoice arriving before the
+       salary would have printed "19252% allocated" — and it read as a settled
+       fact, because nothing in the line says which day it was measured on. The
+       budgeted figure is the same on day 1 as on day 31, which is what a
+       percentage of an intention should be.
+
+       Actual income stands in only where the budget names none AND the period
+       is FINISHED, where it is a whole figure and no longer moves. A running
+       period with no income budgeted has no honest denominator at all, so it
+       gets no percentage — the same choice perDay makes on the last day of a
+       period, and budgetMark makes for a period nobody budgeted for. Five of
+       this vault's eight budget files carry no income row, so this branch is
+       the normal one, not the corner. */
+    const incomeBase = bud.income > 0 ? bud.income
+      : (S.period === currentPeriod() ? 0 : sum.income);
+    const budgetedPct = incomeBase > 0 ? Math.round((bud.spend / incomeBase) * 100) : null;
     const usedPct = bud.spend > 0 ? Math.round((sum.spend / bud.spend) * 100) : null;
 
     const hero = $('#heroCard'); hero.empty();
@@ -448,8 +503,15 @@ module.exports = function registerDashboard(ctx) {
       }
       const pct = r.budget > 0 ? Math.min(100, (r.actual / r.budget) * 100) : (r.actual > 0 ? 100 : 0);
       const over = r.budget > 0 && r.actual > r.budget;
+      /* Spending in a category nobody budgeted for is over budget by the whole
+         amount, and it used to be the one kind of overspend this table said
+         nothing about: the Remaining cell was left blank whenever there was no
+         budget to subtract from. Three such rows on this vault came to R995,
+         which is why the column did not add up to the figure in the hero. A
+         blank cell reads as "nothing to report" — the opposite of the truth. */
+      const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
       const near = !over && r.budget > 0 && r.actual / r.budget >= 0.85;
-      const barCls = r.type === 'income' ? '' : over ? ' bg-danger' : near ? ' bg-warning' : '';
+      const barCls = r.type === 'income' ? '' : (over || unbudgeted) ? ' bg-danger' : near ? ' bg-warning' : '';
       const remaining = r.budget - r.actual;
       const bar = el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${barCls}`, style: `width:${pct}%` }));
       body.append(el('tr', {},
@@ -457,7 +519,8 @@ module.exports = function registerDashboard(ctx) {
         el('td', { class: 'num' }, r.budget ? money(r.budget) : '—'),
         el('td', { class: 'num' }, money(r.actual)),
         el('td', {}, bar),
-        el('td', { class: `num${over ? ' text-danger' : ''}` }, r.budget ? money(remaining) : '')));
+        el('td', { class: `num${over || unbudgeted ? ' text-danger' : ''}` },
+          (r.budget || unbudgeted) ? money(remaining) : '')));
     }
     if (!sorted.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
@@ -586,11 +649,39 @@ module.exports = function registerDashboard(ctx) {
     const spentPts = data.map((d, i) => [s.x(i), s.y(d.spent)]);
     add('path', { d: areaPath(spentPts, s.baseline), fill });
 
-    add('polyline', {
-      points: data.map((d, i) => `${s.x(i)},${s.y(d.budget)}`).join(' '),
-      fill: 'none', stroke: 'currentColor', 'stroke-opacity': '0.28',
-      'stroke-width': '1.5', 'stroke-dasharray': '5 6', 'stroke-linecap': 'round',
+    /* One dashed run per unbroken stretch of BUDGETED periods, never a single
+       line across the lot.
+
+       A period with no budget file returns 0 from budgetTotals, and drawing
+       that lands the line on the baseline — which reads as "you budgeted
+       nothing", when what happened is that nothing was budgeted. On this vault
+       a 1Y range covers four such months and the line visibly collapsed into
+       the floor across them. The focus dot below already refuses to mark those
+       points (see budgetMark) and the readout already hides the budget row for
+       them; the line was the last thing still asserting the zero. Breaking the
+       run also stops a straight leg being drawn ACROSS the gap, which would
+       invent a budget for every month it passed over. */
+    const budgetLine = { stroke: 'currentColor', 'stroke-opacity': '0.28', 'stroke-width': '1.5' };
+    let run = [];
+    const flushBudgetRun = () => {
+      if (run.length > 1) {
+        add('polyline', {
+          points: run.map(pt => pt.join(',')).join(' '), fill: 'none',
+          ...budgetLine, 'stroke-dasharray': '5 6', 'stroke-linecap': 'round',
+        });
+      } else if (run.length === 1) {
+        /* A budgeted period sitting alone between two unbudgeted ones has no
+           leg to be drawn as. It still gets a mark, or the one month someone
+           did set a budget for would be the only one the chart never mentions. */
+        add('circle', { cx: run[0][0], cy: run[0][1], r: '2', fill: 'currentColor', 'fill-opacity': '0.28' });
+      }
+      run = [];
+    };
+    data.forEach((d, i) => {
+      if (d.budget > 0) run.push([s.x(i), s.y(d.budget)]);
+      else flushBudgetRun();
     });
+    flushBudgetRun();
 
     /* Income sits above spend in a healthy period, so it is drawn before the
        spend line and thinner — it is context for the spend line, not a rival
@@ -978,22 +1069,38 @@ module.exports = function registerDashboard(ctx) {
     }
     spend.sort((a, b) => b.amount - a.amount);
 
-    /* Uncategorised rows land in byCat under the empty-string key and are
-       skipped above — a gap in the data is not a place the money went, and it
-       has no colour, no budget and nothing to drill into. But it must not be
-       SILENT. The hero's "Total Spent" counts uncategorised spending and this
-       donut does not, so the two disagree by exactly this much with nothing on
-       screen to say why. A reader who then categorises nothing sees the number
-       above move on every import while the donut below it sits still, which is
-       indistinguishable from a chart that has stopped updating — and gets
-       reported as one. Net, not gross, to match how the slices treat a refund. */
-    const uncat = -Math.min(0, sum.byCat[''] || 0);
-    const uncatNote = uncat > 0 ? i18n.t('dash.split.uncatNote', { amount: money(uncat) }) : '';
-
     const total = spend.reduce((t, x) => t + x.amount, 0);
+
+    /* ------------------ what this donut does NOT show --------------------
+       The hero's "Total Spent" counts every outgoing row gross. This donut
+       leaves uncategorised rows out entirely — a gap in the data is not a
+       place the money went, and it has no colour, no budget and nothing to
+       drill into — and it NETS a refund off inside its category, because a
+       slice is where money ended up. Both are the right call for a donut and
+       both make it smaller than the figure above it, so both have to be said
+       out loud or the two disagree with nothing on screen to say why. A reader
+       who then categorises nothing watches the number above move on every
+       import while the donut below sits still, which is indistinguishable from
+       a chart that has stopped updating — and gets reported as one.
+
+       Measured against `spend` rather than derived independently, so the note
+       accounts for the WHOLE difference by construction and cannot fall behind
+       a change to either figure. It used to state the uncategorised half only,
+       and to state it NET: a period holding R16 895 of uncategorised payments
+       against R21 440 of uncategorised deposits nets positive, so the note said
+       nothing at all while the two figures sat R17 195 apart. Rounding is the
+       only thing left under a currency unit, so that is where it goes quiet. */
+    const notShown = Math.max(0, sum.spend - total);
+    const uncat = Math.min(sum.uncatSpend || 0, notShown);
+    const netted = notShown - uncat;
+    const parts = [];
+    if (uncat >= 1) parts.push(i18n.t('dash.split.uncatNote', { amount: money(uncat) }));
+    if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted) }));
+    const gapNote = parts.join('');
+
     $('#dashSplitSub').textContent = (total > 0
       ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? 'y' : 'ies'} · ${periodMonthName(S.period)}`
-      : periodMonthName(S.period)) + uncatNote;
+      : periodMonthName(S.period)) + gapNote;
 
     if (!total) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },

@@ -546,6 +546,7 @@ module.exports = {
   'dash.pos.debt': 'Skuld',
   'dash.pos.debtSplit': '{accounts} op rekeninge · {debts} op die skuldbladsy',
   'dash.pos.debtActive': { one: '{count} aktief', other: '{count} aktief' },
+  'dash.pos.debtAccounts': { one: 'alles op {count} rekening', other: 'alles op {count} rekeninge' },
   'dash.pos.debtNone': 'niks verskuldig nie',
   'dash.pos.debtSay': 'Skuld {amount} verskuldig. Maak die Skuld-bladsy oop.',
   'dash.pos.debtSayNone': 'Geen skuld verskuldig nie. Maak die Skuld-bladsy oop.',
@@ -580,6 +581,8 @@ module.exports = {
   'dash.stale.all': { one: 'Bereken uit \'n saldo wat niemand onlangs bevestig het nie', other: 'Bereken uit {count} saldo\'s wat niemand onlangs bevestig het nie' },
   'dash.stale.some': 'Bereken uit {stale} van {total} saldo\'s wat niemand onlangs bevestig het nie',
   'dash.stale.line': '{line} — {age}.',
+  'dash.stale.driftUp': ' Transaksies sedertdien impliseer {amount} meer.',
+  'dash.stale.driftDown': ' Transaksies sedertdien impliseer {amount} minder.',
   'dash.stale.btn': 'Gaan saldo\'s na',
   'dash.stale.aria': 'Gaan rekeningsaldo\'s op die Rekeninge-bladsy na',
 
@@ -596,6 +599,7 @@ module.exports = {
   'dash.trend.tip.under': '{amount} onder begroting',
 
   'dash.split.uncatNote': ' · {amount} ongekategoriseer, nie gewys nie',
+  'dash.split.nettedNote': ' · {amount} aan terugbetalings verreken',
   'dash.split.onlyUncat': '{amount} het hierdie tydperk uitgegaan, maar niks daarvan is nog gekategoriseer nie — stel kategorieë in Transaksies, dan verskyn die verdeling hier.',
   'dash.split.empty': 'Nog niks in hierdie tydperk as besteding gekategoriseer nie.',
   'dash.split.aria': 'Bestedingsverdeling vir {month}: ',

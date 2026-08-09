@@ -215,4 +215,20 @@ const svc = (name, provider, amount, cycle, category) =>
     'which the single-description view would have got wrong');
 }
 
+/* ---- a billing day is a whole day ----
+   `median` averages the two middle values on an even count, which is right for
+   an amount and wrong for a date: charges on the 10th and the 21st gave day
+   15.5, and the Services tooltip rendered it verbatim as "Billed around day
+   15.5". Rounded at the source; the amount medians stay untouched. */
+{
+  const s = chargeStats([chg('2026-05-10', 100, 'GYM'), chg('2026-06-21', 100, 'GYM')]);
+  eq(s.day, 16, 'an even number of charges still reports a whole day of the month');
+  ok(Number.isInteger(s.day), 'always');
+  eq(chargeStats([chg('2026-05-10', 100, 'GYM'), chg('2026-06-20', 100, 'GYM')]).day, 15,
+    'and an exact midpoint is unmoved by the rounding');
+  // The amount median must NOT be rounded — a price has cents.
+  eq(chargeStats([chg('2026-05-10', 100.25, 'X'), chg('2026-06-10', 100.75, 'X')]).median, 100.5,
+    'amounts keep their cents');
+}
+
 console.log(`recurring.test.cjs — ${checks} checks OK`);

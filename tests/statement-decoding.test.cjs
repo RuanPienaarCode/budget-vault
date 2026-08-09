@@ -24,7 +24,7 @@ const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
 
 const { parseCsv, parseDelimited, sniffDelimiter } = require('../src/csv');
-const { parseStatement, decodeStatement, detectStatementColumns } = require('../src/statement');
+const { parseStatement, decodeStatement, detectStatementColumns, reconcileAmounts } = require('../src/statement');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -250,4 +250,42 @@ function utf16(s, { le = true, bom = false } = {}) {
   eq(rows[2][1], 'MÜLLER DROGERIE', 'including the row that motivated the encoding work');
 }
 
+
+/* ---- a file can prove its own signs are INVERTED, not merely unproven ----
+
+   reconcileAmounts returns { verified: true, flip: true } when a statement
+   reconciles ONLY if every amount is negated. On a single signed Amount column
+   the importer acts on that and corrects the file. On a Debit/Credit PAIR it
+   deliberately does not - the sign came from a column NAME, so a disagreement
+   means the mapping is wrong rather than the arithmetic - and the verdict used
+   to be dropped on the floor: the review fell through to "Amounts check out
+   against this statement's own balance column", the reassuring message, on the
+   one file that had just failed. views/import.js now keys an `inverted` warning
+   off exactly this pair of flags, so they are pinned here. */
+{
+  // True movements -150 -200 +300 -100 -50 from an opening 1000; the amounts
+  // below carry the OPPOSITE sign, as a swapped Money-In/Money-Out pair would.
+  const inverted = reconcileAmounts([
+    { amount:  150, balance: 850 },
+    { amount:  200, balance: 650 },
+    { amount: -300, balance: 950 },
+    { amount:  100, balance: 850 },
+    { amount:   50, balance: 800 },
+  ]);
+  ok(inverted.verified, 'a consistently inverted file still RECONCILES');
+  ok(inverted.flip, 'and says so - it only balances with every sign negated');
+  eq(inverted.agreement, 4, 'on every pair, not merely most of them');
+
+  // The same movements with the signs the app expects must verify WITHOUT a flip,
+  // or the new warning would fire on correctly-read files.
+  const straight = reconcileAmounts([
+    { amount: -150, balance: 850 },
+    { amount: -200, balance: 650 },
+    { amount:  300, balance: 950 },
+    { amount: -100, balance: 850 },
+    { amount:  -50, balance: 800 },
+  ]);
+  ok(straight.verified && !straight.flip,
+    'so a correctly-signed file is never mistaken for an inverted one');
+}
 console.log(`statement-decoding.test.cjs — ${checks} checks passed`);

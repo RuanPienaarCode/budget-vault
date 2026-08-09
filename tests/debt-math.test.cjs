@@ -232,4 +232,45 @@ console.log(`PASS — debt amortisation, strategy simulation and formatting (${c
   eq(expectedBalance({ original: 1000, payment: 100, start: '2027-01-01' }, '2026-08-01'), null, 'starts in the future');
   eq(expectedBalance({ original: 1000, payment: 100, start: '2026-08-01' }, '2026-08-01'), null, 'no months elapsed yet');
   eq(expectedBalance(null, '2026-08-01'), null, 'missing debt does not throw');
+
+  /* WHOLE months only, floored on the day of the month.
+
+     Counting a difference of month indices treated any part-month as a full
+     one, so a debt starting on the 31st and read on the 1st was credited a whole
+     instalment for one day. The instalment outweighs the month of interest, so
+     the error flattered the reader — the direction this module's header already
+     refuses to take on the interest ordering. */
+  const late = { original: 100000, rate: 12, payment: 2000, start: '2026-01-31' };
+  eq(expectedBalance(late, '2026-02-01'), null,
+    'one day is not a month, however far the month NUMBER moved');
+  eq(expectedBalance(late, '2026-02-28').months, 1,
+    'but a 31st agreement bills on the 28th in February — clamped, not withheld');
+
+  const mid = { original: 100000, rate: 12, payment: 2000, start: '2026-01-15' };
+  eq(expectedBalance(mid, '2026-02-14'), null, 'the day before the instalment day, nothing has been paid');
+  eq(expectedBalance(mid, '2026-02-15').months, 1, 'on the day itself, one month has run');
+  eq(expectedBalance(mid, '2026-04-14').months, 2, 'and it keeps flooring on the day, not the month');
+
+  // The plain case is unchanged: whole months from the 1st still count as before.
+  eq(expectedBalance({ original: 100000, rate: 12, payment: 2000, start: '2026-01-01' }, '2026-04-01').months, 3,
+    'a first-of-the-month agreement is unaffected');
+}
+
+/* ---- a stalled plan's series RISES above its opening balance ----
+   The precondition behind the payoff curve's scaling in views/debts.js. That
+   chart used to take its y-axis maximum from series[0], on the assumption that
+   a plan starts at its highest point — true for every plan that clears, and
+   false for exactly the case this module was written to report honestly. The
+   line was then drawn hundreds of units above a 260-unit viewBox and vanished,
+   which reads as a broken chart rather than a diverging plan. Pinned here
+   because the assumption lives in the chart but the fact lives in the model. */
+{
+  const stalled = simulate([{ key: 'x', name: 'Card', balance: 10000, rate: 30, payment: 100 }], {});
+  ok(!stalled.settled, 'a payment below the monthly interest never clears');
+  eq(stalled.stalled, ['Card'], 'and is named as stalled');
+  const peak = Math.max(...stalled.series);
+  ok(peak > stalled.series[0],
+    'so its series RISES — series[0] is not the maximum, and an axis scaled to it clips the line away');
+  ok(stalled.series[60] > stalled.series[0] * 2,
+    'and it has already more than doubled inside the first five years on screen');
 }

@@ -69,11 +69,18 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(t.totalInterest, 95940, 'total interest');
 
   const p = L.loanProfileFor('za');
-  eq(p.vehicleInitiationFee(finance), 3150, 'vehicle initiation fee');
+  /* INCLUDING VAT (1% of R315 000 = R3 150, grossed up at 15%), like the
+     mortgage initiation fee and like what the lender actually debits. This was
+     3150 while the function capped an ex-VAT 1% against a VAT-inclusive cap and
+     returned it raw — two bases in one expression, and the same amount read
+     R2 000 here against R6 563 on the mortgage path. */
+  eq(p.vehicleInitiationFee(finance), 3622, 'vehicle initiation fee, VAT included');
+  eq(p.vehicleInitiationFee(10000000), Math.round(5707 * 1.15),
+    'and it caps at the same NCA maximum the mortgage fee does');
   eq(p.serviceFee * 60, 4470, 'service fees over the term');
 
   // Total cost of ownership INCLUDES the deposit — it is money spent on the car.
-  eq(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60, 453560,
+  eq(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60, 454032,
     'total cost of ownership');
 }
 
@@ -118,6 +125,25 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
     prev = d;
   }
   checks++;
+
+  /* Again at every SEAM, one rand at a time. The R25 000 stride above steps
+     from R12 100 000 straight to R12 125 000 and jumps clean over the only
+     place the table actually dipped: compounding the 11% band to the top of
+     bracket 5 gives R1 103 785, while SARS publishes R1 103 783 as bracket 6's
+     base — so duty fell by two rand as the price rose by one. Real, invisible
+     to a coarse sweep, and indefensible in a figure the file calls exact
+     arithmetic on the published table. */
+  for (const seam of [1210000, 1663800, 2329300, 3149000, 12100500]) {
+    let p2 = -1;
+    for (let v = seam - 3; v <= seam + 3; v++) {
+      const d = L.zaTransferDuty(v);
+      assert.ok(d >= p2, `transfer duty dipped crossing the seam at R${seam} (at R${v})`);
+      p2 = d;
+    }
+    checks++;
+  }
+  near(L.zaTransferDuty(12100500), 1103783, 0.01,
+    'and the top seam lands exactly on the published base, not two rand above it');
 }
 
 /* ---- countries without a cost profile still get the calculator ---- */

@@ -525,7 +525,22 @@ module.exports = function registerDebts(ctx) {
 
     const W = 1000, H = 260;
     const at = (series, m) => series[Math.min(m, series.length - 1)] ?? 0;
-    const max = Math.max(1, ...lines.map(l => l.series[0])) * 1.08;
+    /* Scaled to the tallest point actually PLOTTED, not to the opening balance.
+
+       Every plan that clears starts at its highest point, so series[0] looked
+       like the maximum — but a plan whose payment sits at or below the monthly
+       interest GROWS, which is exactly the `stalled` case debt-math.js exists to
+       report honestly. Those lines ran off the top of a chart scaled to the
+       opening figure and simply vanished: s.y() has no ceiling, so the path was
+       drawn hundreds of thousands of units above the viewBox. R10 000 at 30%
+       against R100 a month reaches R16.3 BILLION inside the 600-month cap. The
+       card beside it says in words that the debt never clears; the chart showed
+       a missing line, which reads as a broken chart rather than a diverging
+       plan. Measured across the visible span only, so a long tail beyond the
+       range cannot flatten the part being looked at. */
+    const peak = Math.max(...lines.flatMap(l =>
+      Array.from({ length: span + 1 }, (_, m) => at(l.series, m))));
+    const max = Math.max(1, peak) * 1.08;
     const s = scales({ w: W, h: H, count: span + 1, max, padB: 34 });
     const { svg, add } = createChart({
       w: W, h: H,

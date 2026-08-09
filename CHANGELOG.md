@@ -3,6 +3,83 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.13 — 2026-08-09
+
+### Fixed
+
+A pass over every figure the plugin asserts — the arithmetic modules and the
+screens that render them. Nothing here changes how anything looks; it changes
+what several numbers actually say.
+
+- **The Dashboard's spending figures now reconcile with each other.** "Total
+  Spent" counts every outgoing row; the donut below it leaves uncategorised rows
+  out and nets a refund off inside its category. Both are right for what they
+  are, and both make the donut smaller than the figure above it — with nothing
+  on screen to say why. The donut now declares the whole difference: what was
+  uncategorised and not shown, and how much was refunds netted off. The two
+  figures tie to the cent on every period.
+
+- **An account whose balance you have never dated is no longer counted as
+  spendable cash.** "What's left" is built on what your accounts *should* read
+  now, and an undated balance cannot be placed at all — the card says so for
+  accounts that have transactions. An account with a stated balance and no
+  imported transactions slipped past that check and had its full figure counted
+  as cash. It is now named as unconfirmed, like any other undated balance.
+
+- **A minus sign inside a currency symbol is no longer read as zero.** A cell
+  written `R-100` (rather than `-R100`) failed to parse, and an unparseable
+  amount falls back to **0** — a wrong number that looks like an empty cell.
+  Both spellings now read correctly, in every currency, and a bare `.50` parses
+  too. A damaged cell like `--100` is still refused rather than guessed at.
+
+- **A statement whose money-in and money-out columns are the wrong way round is
+  now flagged.** Every import is checked against the statement's own running
+  balance. When that check *disproves* the columns, the amounts are deliberately
+  not auto-corrected — the signs came from the column names, so the mapping is
+  what is wrong. But the review screen was showing "amounts check out" on
+  exactly those files. It now says the columns look swapped and points at
+  "Columns wrong?".
+
+- **The debt payoff curve no longer loses a plan that never clears.** The chart
+  was scaled to the opening balance, on the assumption that a plan starts at its
+  highest point. A payment at or below the monthly interest makes the balance
+  *rise*, so that line was drawn off the top of the chart and vanished — which
+  reads as a broken chart rather than a debt going the wrong way. It now scales
+  to the tallest point on screen.
+
+- **The Debt page's projected balance no longer counts a part-month as a whole
+  one.** A debt starting on the 31st and read on the 1st was credited a full
+  instalment for one day elapsed, reporting the debt smaller than it is. Only
+  completed months count now, with a short month billing on its last day.
+
+- **The Savings page's monthly-contribution rate divides by the months the
+  account has actually existed**, not by the months asked for. A fund opened
+  part-way through the window was reporting a fraction of its real rate, and
+  that figure is there to be checked against what you said you contribute. A gap
+  in the middle of the window still counts — that silence is real.
+
+- **A subscription's billing day is a whole day.** An even number of recorded
+  charges could report "billed around day 15.5".
+
+- **Loan calculator: the vehicle initiation fee now includes VAT**, like the
+  mortgage one and like what a lender actually debits — it was capped against a
+  VAT-inclusive maximum but returned without VAT. **Transfer duty** no longer
+  dips by two rand at the top bracket boundary, where paying more for a house
+  briefly cost less in duty.
+
+- **The tax page's capital-gains check no longer overstates what is taxable.**
+  Gains above the annual exclusion are subject to a 40% inclusion rate for
+  individuals; the message was presenting the whole excess as taxable income,
+  overstating it two and a half times.
+
+- **Smaller Dashboard corrections.** The Debt tile no longer reads "0 active"
+  while showing a balance. Categories you spent in but never budgeted for now
+  show what they cost in the Remaining column instead of a blank cell. The trend
+  chart's budget line breaks across months you never budgeted rather than
+  claiming you budgeted nothing. The "% allocated" figure is measured against
+  budgeted income rather than income that happens to have landed so far. The
+  staleness note now says how far behind your balances are.
+
 ## 1.11.12 — 2026-08-09
 
 ### Added

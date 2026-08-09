@@ -99,7 +99,12 @@ function chargeStats(charges) {
     first: sorted[0].date,
     last: sorted[sorted.length - 1].date,
     lastAmount: Math.abs(sorted[sorted.length - 1].amount),
-    day: median(days),
+    /* Rounded, unlike every other median here. This one is a DAY OF THE MONTH,
+       and on an even number of charges the plain median averages the two middle
+       values — so charges on the 10th and the 21st reported day 15.5, which the
+       Services tooltip rendered verbatim as "Billed around day 15.5". The amount
+       medians must stay unrounded; a date cannot be half a day. */
+    day: Math.round(median(days)),
     early, late,
     drift: (early && late) ? (late - early) / early : null,
   };
