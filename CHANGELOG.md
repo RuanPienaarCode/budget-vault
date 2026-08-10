@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.16 — 2026-08-10
+
+### Fixed
+
+- **"What's left" was naming the wrong end date for the period.** It read
+  "Before this period ends on Aug 26" while the header at the top of the same
+  screen read "Jul 23 – Aug 22, 2026". The 26 was the *year* — the subtitle was
+  built with the trend chart's axis label, where "Aug 26" correctly means August
+  2026, and handed it a date instead of a period. It now names the day, and the
+  two agree.
+
 ## 1.11.15 — 2026-08-10
 
 ### Added

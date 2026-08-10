@@ -18,7 +18,7 @@ const {
 } = require('../chart');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, accountIndex } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, accountIndex } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -143,7 +143,7 @@ module.exports = function registerDashboard(ctx) {
     if (nothing) return;
 
     const sub = $('#leftSub');
-    if (sub) sub.textContent = i18n.t('dash.left.sub', { date: periodShortLabel(end) });
+    if (sub) sub.textContent = i18n.t('dash.left.sub', { date: dayLabel(end) });
 
     const fig = (cls, value, label, meta) => el('div', { class: `left-fig ${cls}` },
       el('div', { class: 'lv num' }, value),

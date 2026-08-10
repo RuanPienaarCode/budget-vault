@@ -173,9 +173,19 @@ module.exports = function registerPeriod(ctx) {
     }
     return `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`;
   }
+  /* "Aug 22" — a real calendar DAY, for a full 'YYYY-MM-DD'.
+
+     Deliberately not periodShortLabel, which takes a period KEY and renders the
+     YEAR as its second half: 'Aug 26' there means August 2026 and is right on a
+     trend axis. Handed an end DATE it still printed 'Aug 26', so a period ending
+     on the 22nd announced itself as ending on the 26th — six inches below a
+     header reading "Jul 23 – Aug 22, 2026". Two labels, two jobs; the mistake
+     was reaching for the axis one to name a day. */
+  const dayLabel = d => `${MONTHS[parseInt(d.slice(5, 7), 10) - 1]} ${parseInt(d.slice(8), 10)}`;
+
   function periodTitle(p) {
     const { start, end } = periodRange(p);
-    const f = d => `${MONTHS[parseInt(d.slice(5, 7), 10) - 1]} ${parseInt(d.slice(8), 10)}`;
+    const f = dayLabel;
     const sy = start.slice(0, 4), ey = end.slice(0, 4);
     if (sy === ey) return `${f(start)} – ${f(end)}, ${ey}`;
     return `${f(start)}, ${sy} – ${f(end)}, ${ey}`;
@@ -357,7 +367,7 @@ module.exports = function registerPeriod(ctx) {
   }
 
   ctx.provide({
-    periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel,
+    periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
     txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, nonBudgetLabels,
     intervalDays, periodKeyValid,
   });

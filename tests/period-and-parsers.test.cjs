@@ -57,6 +57,21 @@ function periodCtx(monthStartDay, txFiles = {}) {
   eq(shiftPeriod('2026-06', -18), '2024-12', 'multi-year shifts roll correctly');
 
   eq(periodMonthName('2026-08'), 'August 2026', 'a period is named for the month it ENDS in');
+
+  /* Two labels, two jobs, and the difference is a DAY versus a YEAR.
+
+     periodShortLabel takes a period KEY and renders the year as its second half
+     — 'Aug 26' means August 2026, which is what a trend axis wants. Handed the
+     period's END DATE it still printed 'Aug 26', so a period ending on the 22nd
+     told the reader it ended on the 26th, directly under a header reading
+     "Jul 23 – Aug 22, 2026". dayLabel names the day. */
+  const { dayLabel, periodShortLabel: shortLabel } = periodCtx(23);
+  eq(dayLabel('2026-08-22'), 'Aug 22', 'dayLabel names the DAY');
+  eq(dayLabel('2026-01-01'), 'Jan 1', 'with no leading zero');
+  eq(dayLabel('2025-12-31'), 'Dec 31', 'across the year boundary');
+  eq(shortLabel('2026-08'), 'Aug 26', 'periodShortLabel still means August 2026 on an axis');
+  eq(dayLabel(periodRange('2026-08').end), 'Aug 22',
+    'so the end of the August period reads Aug 22, agreeing with periodTitle above it');
 }
 
 /* ---- month_start_day = 1 (calendar months) ---- */
