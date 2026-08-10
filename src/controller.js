@@ -555,6 +555,17 @@ function mountApp(view) {
   /* Wrapped rather than passed by reference: addAccount now takes a defaults
      object, and a bare listener would hand it the MouseEvent. */
   $('#acctAdd').addEventListener('click', () => ctx.addAccount());
+  /* Accounts' own filter controls. Debounced like the Transactions search, and
+     for the same reason: each keystroke re-runs the whole page, reconciliation
+     included. The state itself lives on S but its SHAPE belongs to accounts.js
+     — hence going through ctx rather than writing S.acctView from here, which
+     is how a half-built state object ends up bypassing the defaults. */
+  $('#acctSearch').addEventListener('input', e => {
+    const q = e.target.value;
+    clearTimeout(S._acctQ);
+    S._acctQ = setTimeout(() => ctx.acctSearch(q), 200);
+  });
+  $('#acctGroupToggle').addEventListener('click', () => ctx.acctToggleGroup());
   $('#savAdd').addEventListener('click', () => ctx.addAccount());
   /* Creating an account is reachable from Transactions and from the import
      review, not only from the two pages that list accounts — every path that

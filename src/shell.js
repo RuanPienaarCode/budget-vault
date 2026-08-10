@@ -388,11 +388,27 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title" data-i18n="nav.accounts">Accounts</h1>
           <div class="sub-note">Click a balance to update it, or a name to see that account's transactions — the account's markdown file is rewritten.</div>
         </div>
-        <div class="mini-grid mini-kpis-4 mb-4" id="acctKpis"></div>
-        <div class="row mb-4" style="justify-content:flex-end">
+        <div class="top-grid mb-4" id="acctSummary"></div>
+        <!-- The queue. Rendered empty and given its class by renderDeck, which
+             also collapses it to a single line when nothing wants a decision —
+             so an all-clear vault gets no shelf standing there saying nothing. -->
+        <div id="acctDeck"></div>
+        <div class="acct-strip mb-4">
+          <div class="acct-segs" id="acctFilters"></div>
+          <div class="acct-search">
+            <input type="search" id="acctSearch" data-i18n-placeholder="acct.search" data-i18n-aria="acct.search" placeholder="Find an account…" aria-label="Find an account">
+          </div>
+          <button class="btn-ghost" id="acctGroupToggle" aria-pressed="true"><span data-i18n="acct.groupBy">Group by kind</span></button>
           <button class="btn-ghost" id="acctAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
         </div>
-        <div id="acctSections"></div>
+        <div class="card">
+          <div class="card-h">
+            <div><h2 data-i18n="acct.table.title">All accounts</h2><div class="sub" id="acctTblSub"></div></div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="table-responsive"><table class="table" id="acctTable"></table></div>
+          </div>
+        </div>
       </section>
 
       <section id="view-assets" class="hidden">
