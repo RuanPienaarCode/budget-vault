@@ -361,4 +361,99 @@ const card = {
   ok(L.committed > 0, 'the committed side still works without it');
 }
 
+/* ---- a merchant that RENAMES its debit order is still taking the money ----
+
+   Taken from the live vault: Vodacom bills under eight distinct descriptions.
+   Read through the dominant description group alone, Airtime's last charge
+   looked like February while it had actually gone off eight days ago — so the
+   derived due date landed months in the past, `due < from` dropped the service,
+   and a live instalment vanished from the committed figure. Silent, and always
+   in the direction that makes the reader look richer.
+
+   Price still comes from the dominant group; only WHEN follows the merchant. */
+{
+  const airtime = { name: 'Airtime and Data', provider: 'Vodacom', cycle: 'monthly', amount: 675, active: true, next: '' };
+  // The dominant group by spend is the old name, and it stopped in February.
+  // The live charges sit under a renamed description at a lower price.
+  // Both descriptions bill the same 583, so the DUE DATE is the only variable
+  // under test — a fixture where they differ would confound it with the price.
+  const renamed = [
+    { date: '2025-11-07', desc: 'VODACOM ONLINE ACCOUN', cat: 'Cellphone', amount: -583 },
+    { date: '2025-12-07', desc: 'VODACOM ONLINE ACCOUN', cat: 'Cellphone', amount: -583 },
+    { date: '2026-01-07', desc: 'VODACOM ONLINE ACCOUN', cat: 'Cellphone', amount: -583 },
+    { date: '2026-02-07', desc: 'VODACOM ONLINE ACCOUN', cat: 'Cellphone', amount: -583 },
+    { date: '2026-06-02', desc: 'VODACOM BUNDLES', cat: 'Cellphone', amount: -583 },
+    { date: '2026-07-02', desc: 'VODACOM BUNDLES', cat: 'Cellphone', amount: -583 },
+  ];
+
+  // Period 26 Jul - 25 Aug, read on 30 Jul: the 2 Aug charge has not landed yet.
+  const due = serviceCommitments({
+    services: [airtime], rows: renamed, from: '2026-07-30', to: P_END, periodStart: P_START,
+  });
+  eq(due.length, 1, 'a renamed debit order is still coming, not cancelled');
+  eq(due[0].due, '2026-08-02', 'dated from the LAST charge under any of its names');
+  eq(due[0].amount, 583, 'while the price still comes from the dominant group');
+
+  // Once it lands — under the renamed description — it must not be claimed again.
+  const landed = [...renamed, { date: '2026-08-02', desc: 'VODACOM BUNDLES', cat: 'Cellphone', amount: -583 }];
+  eq(serviceCommitments({ services: [airtime], rows: landed, from: '2026-08-05', to: P_END, periodStart: P_START }),
+    [], 'and a charge that has landed under the NEW name is not counted a second time');
+
+  // The regression this replaces: anchored on the dominant group the due date
+  // would be 2026-03-07, which is before `from`, and the service disappears.
+  ok(due[0].due > '2026-07-30', 'the anchor is never a charge months in the past');
+}
+
+/* ---- the chain has FOUR terms when a card is being settled, and still adds up ---- */
+{
+  const cardAcct = { name: 'Discovery Card', implied: -17011, dated: true, inBudget: true,
+    type: 'credit_card', settleMonthly: true };
+  const cheque = { name: 'Cheque', implied: 148, dated: true, inBudget: true, type: 'checking' };
+  const SAL = 'CASHFOCUS SALARIS';
+  const income = [
+    { date: '2026-05-23', amount: 40240.20, desc: SAL },
+    { date: '2026-06-23', amount: 40240.20, desc: SAL },
+    { date: '2026-07-23', amount: 40240.20, desc: SAL },
+  ];
+  const L = whatsLeft({
+    accounts: [cheque, cardAcct], services: [fibre], debts: [], rows: fibreRows, incomeRows: income,
+    periodStart: P_START, periodEnd: P_END, today: '2026-07-30',
+  });
+
+  eq(L.cardDue, 17011, 'the card settlement is reported as its own term');
+  ok(L.committedOther > 0, 'and the debit orders keep a term of their own');
+  eq(L.committedOther + L.cardDue, L.committed, 'the two halves are exactly the old committed figure');
+  // The whole reason the term is split out: cash - orders - card = free, and a
+  // reader can add up every number on the card.
+  eq(Math.round((L.cash - L.committedOther - L.cardDue) * 100), Math.round(L.free * 100),
+    'the four-term chain still reconciles to `free`');
+  ok(L.short, 'R148 against a R17 011 settlement is short, not free');
+
+  eq(L.incoming.amount, 40240.20, 'the salary is found and reported at its real amount');
+  eq(L.incoming.next, '2026-08-23', 'on the day it actually lands');
+
+  // A card with no settle_monthly flag is disclosed, never claimed as due.
+  const unflagged = whatsLeft({
+    accounts: [cheque, { ...cardAcct, settleMonthly: false }], services: [], debts: [], rows: [],
+    periodStart: P_START, periodEnd: P_END, today: '2026-07-30',
+  });
+  eq(unflagged.cardDue, 0, 'an unflagged card adds no term to the chain');
+  eq(unflagged.owed, 17011, 'but is still disclosed beside it — the reader who revolves a balance is not told it is due');
+
+  // Income that lands after the window cannot resolve the window.
+  const late = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [], incomeRows: income,
+    periodStart: P_START, periodEnd: '2026-08-10', today: '2026-07-30',
+  });
+  eq(late.incoming, null, 'a salary arriving after the period ends is not a comfort this period');
+
+  // No repeating credit: silence, never a guess.
+  const quiet = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: [{ date: '2026-07-02', amount: 90000, desc: 'ONE OFF WINDFALL' }],
+    periodStart: P_START, periodEnd: P_END, today: '2026-07-30',
+  });
+  eq(quiet.incoming, null, 'one big credit predicts nothing, and the card says nothing');
+}
+
 console.log(`PASS — the forward view counts what is coming, once, and only what it can place (${checks} assertions).`);

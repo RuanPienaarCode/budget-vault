@@ -634,6 +634,10 @@ module.exports = {
     other: '{count} Kartenausgleiche',
   },
   'dash.left.none': 'nichts geplant',
+  'dash.left.cardDue': 'Karte auszugleichen',
+  'dash.left.incoming': '{amount} kommt am {date}',
+  'dash.left.incomingCovers': 'Das deckt alles oben und lässt etwa {amount} übrig.',
+  'dash.left.incomingShort': 'Auch danach fehlen dir {amount}.',
   'dash.left.days': {
     one: '{count} Tag',
     other: '{count} Tage',

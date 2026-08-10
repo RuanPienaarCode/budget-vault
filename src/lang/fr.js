@@ -639,6 +639,10 @@ module.exports = {
     other: '{count} soldes de carte',
   },
   'dash.left.none': 'rien de prévu',
+  'dash.left.cardDue': 'carte à régler',
+  'dash.left.incoming': '{amount} arrive le {date}',
+  'dash.left.incomingCovers': 'Cela couvre tout ce qui précède et laisse environ {amount}.',
+  'dash.left.incomingShort': 'Même après cela, il vous manque {amount}.',
   'dash.left.days': {
     one: '{count} jour',
     other: '{count} jours',

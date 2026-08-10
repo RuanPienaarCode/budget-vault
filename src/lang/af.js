@@ -633,6 +633,10 @@ module.exports = {
     other: '{count} kaartvereffenings',
   },
   'dash.left.none': 'niks geskeduleer nie',
+  'dash.left.cardDue': 'kaart om te vereffen',
+  'dash.left.incoming': '{amount} kom op {date} in',
+  'dash.left.incomingCovers': 'Dit dek alles hierbo en laat sowat {amount} oor.',
+  'dash.left.incomingShort': 'Selfs daarna kom jy {amount} kort.',
   'dash.left.days': {
     one: '{count} dag',
     other: '{count} dae',

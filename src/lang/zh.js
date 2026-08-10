@@ -603,6 +603,10 @@ module.exports = {
     other: '{count} 笔信用卡还款',
   },
   'dash.left.none': '没有预定支出',
+  'dash.left.cardDue': '待还信用卡',
+  'dash.left.incoming': '{date} 将有 {amount} 入账',
+  'dash.left.incomingCovers': '足以支付上述所有款项，并剩余约 {amount}。',
+  'dash.left.incomingShort': '即便如此仍短缺 {amount}。',
   'dash.left.days': {
     other: '还有 {count} 天',
   },

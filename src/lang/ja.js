@@ -603,6 +603,10 @@ module.exports = {
     other: 'カード清算 {count} 件',
   },
   'dash.left.none': '予定なし',
+  'dash.left.cardDue': 'カード決済分',
+  'dash.left.incoming': '{date} に {amount} が入金',
+  'dash.left.incomingCovers': '上記をすべて賄い、約 {amount} が残ります。',
+  'dash.left.incomingShort': 'それでも {amount} 不足します。',
   'dash.left.days': {
     other: '残り {count} 日',
   },

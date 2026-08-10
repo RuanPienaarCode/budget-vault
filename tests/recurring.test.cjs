@@ -231,4 +231,56 @@ const svc = (name, provider, amount, cycle, category) =>
     'amounts keep their cents');
 }
 
+/* ---- finding the salary, and refusing far more often than answering ----
+
+   This is the only matcher in the file with nothing to match AGAINST: no vault
+   names its income, so the pattern is discovered in the rows. That makes the
+   refusals the real contract. Each case below is a shape that broke a
+   hand-written four-month average on a real vault, which came to R61 000
+   against a true salary of R40 240. */
+{
+  const { findRecurringCredit } = require('../src/recurring');
+  const c = (date, amount, desc, excluded) => ({ date, amount, desc, excluded: !!excluded });
+  const T = '2026-08-09';
+  const SAL = 'CASHFOCUS SALARIS / SALARY';
+
+  const found = findRecurringCredit(
+    [c('2026-05-23', 40240.20, SAL), c('2026-06-23', 40240.20, SAL), c('2026-07-23', 40240.20, SAL)], T);
+  ok(found, 'three steady monthly credits are a salary');
+  eq(found.amount, 40240.20, 'reported at the amount actually paid, never an average of everything');
+  eq(found.day, 23, 'on the day it actually lands');
+  eq(found.next, '2026-08-23', 'and the next one is a real date');
+  eq(found.count, 3, 'with the evidence count carried so the card can show its working');
+
+  const no = (rows, why, today) => eq(findRecurringCredit(rows, today || T), null, why);
+  no([c('2026-06-23', 40240, SAL), c('2026-07-23', 40240, SAL)], 'two occurrences is a coincidence with a witness');
+  no([c('2025-11-28', 38025, 'SALARY NOV 2025'), c('2025-12-19', 38025, 'SALARY DEC 2025'), c('2026-01-23', 45901, 'SALARY JAN 2026')],
+    'a description carrying its own month never groups, so a second earner is never predicted');
+  no([c('2026-08-06', 40000, 'UIF payment')], 'a one-off payment is not a rhythm');
+  no([c('2026-05-23', 40240, SAL, 1), c('2026-06-23', 40240, SAL, 1), c('2026-07-23', 40240, SAL, 1)],
+    'an excluded row is the reader vetoing it as income — transfers and pass-throughs leave this way');
+  no([c('2026-05-23', 20000, 'COMMISSION'), c('2026-06-23', 48000, 'COMMISSION'), c('2026-07-23', 31000, 'COMMISSION')],
+    'an amount that swings is not predictable, and "about R33 000, give or take fifteen" helps nobody');
+  no([c('2026-01-23', 5000, 'DIVIDEND'), c('2026-04-23', 5000, 'DIVIDEND'), c('2026-07-23', 5000, 'DIVIDEND')],
+    'quarterly is not monthly');
+  no([c('2026-01-23', 40240, SAL), c('2026-02-23', 40240, SAL), c('2026-03-23', 40240, SAL)],
+    'a salary that stopped five months ago is not money that is coming');
+  no([c('2026-05-23', -40240, 'RENT'), c('2026-06-23', -40240, 'RENT'), c('2026-07-23', -40240, 'RENT')],
+    'an outflow is never income, however regular');
+  eq(findRecurringCredit([], T), null, 'no rows, no claim');
+  eq(findRecurringCredit(null, T), null, 'a missing list is not a crash');
+
+  // A raise last year must not disqualify a salary that has been steady since.
+  const raised = findRecurringCredit([
+    c('2026-03-23', 30000, SAL), c('2026-04-23', 30000, SAL),
+    c('2026-05-23', 40240, SAL), c('2026-06-23', 40240, SAL), c('2026-07-23', 40240, SAL)], T);
+  eq(raised.amount, 40240, 'stability is judged on the RECENT three, so an old raise is history not noise');
+
+  // Two repeating credits: the salary is the one worth naming.
+  const both = findRecurringCredit([
+    c('2026-05-23', 40240, SAL), c('2026-06-23', 40240, SAL), c('2026-07-23', 40240, SAL),
+    c('2026-05-01', 500, 'POCKET MONEY'), c('2026-06-01', 500, 'POCKET MONEY'), c('2026-07-01', 500, 'POCKET MONEY')], T);
+  eq(both.amount, 40240, 'the largest repeating credit wins');
+}
+
 console.log(`recurring.test.cjs — ${checks} checks OK`);

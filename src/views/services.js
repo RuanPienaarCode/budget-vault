@@ -45,7 +45,12 @@ module.exports = function registerServices(ctx) {
         // because a renamed debit order is not a cancellation.
         status: chargeStatus(chargeStats(m.all), s.cycle, today),
         price: comparePrice(s, stats),
-        next: nextExpected(stats, s.cycle),
+        /* Anchored on the merchant, like the liveness pill above and for the
+           same reason: the next charge follows the LAST one under any of its
+           names. Read through the dominant group alone, a renamed debit order
+           projects its due date from a charge months old — which is how
+           committed.js came to drop a live service from "What's left". */
+        next: nextExpected(chargeStats(m.all), s.cycle),
         related: m.related,
       });
     }

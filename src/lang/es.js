@@ -635,6 +635,10 @@ module.exports = {
     other: '{count} liquidaciones de tarjeta',
   },
   'dash.left.none': 'nada programado',
+  'dash.left.cardDue': 'tarjeta por liquidar',
+  'dash.left.incoming': '{amount} entra el {date}',
+  'dash.left.incomingCovers': 'Eso cubre todo lo anterior y deja unos {amount}.',
+  'dash.left.incomingShort': 'Incluso después te faltan {amount}.',
   'dash.left.days': {
     one: '{count} día',
     other: '{count} días',

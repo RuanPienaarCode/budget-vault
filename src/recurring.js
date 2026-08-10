@@ -210,6 +210,98 @@ function comparePrice(service, stats) {
   };
 }
 
+/* ------------------------- repeating INCOME ----------------------------- */
+
+/* The salary, found the same way a subscription is — and refusing on the same
+   terms.
+
+   Everything above matches a charge the reader has ALREADY LISTED. This has
+   nothing to match against: no vault names its income, so the pattern has to be
+   discovered in the rows themselves. That makes the refusal rule matter more,
+   not less.
+
+   IT MUST NEVER RETURN AN AVERAGE. A four-month mean of everything landing in
+   one real account came to R61 000 against a true salary of R40 240 — it had
+   quietly folded in a second earner who stopped in February, a R40 000 payment
+   that arrived on the 6th and left again on the 7th, and two insurance claims.
+   Every one of those inflates a mean and not one of them is coming again. A
+   figure the reader can check against their own payslip earns trust; a mean
+   they cannot reproduce is the Services page all over again.
+
+   So the bar is deliberately high, and `null` is a perfectly good answer:
+
+     - THREE occurrences at least. Two is a coincidence with a witness.
+     - A MONTHLY rhythm. Median gap 26-35 days, which absorbs weekends and the
+       difference between February and July without admitting a quarterly bonus.
+     - A STABLE amount. The last three within 15% of each other, the same test
+       `varies` applies to a price. A salary that swings is not predictable, and
+       a card that says "about R40 000, give or take twelve" helps nobody.
+     - NOT excluded. An excluded row is vetoed from income by the reader's own
+       hand, which is exactly how transfers between their own accounts and that
+       UIF pass-through get out of the way.
+
+   Descriptions are normalised, which is what separates a real salary from a
+   dated one: "CASHFOCUS SALARIS" repeats verbatim and groups, while "SALARY SEP
+   2025" / "SALARY OCT 2025" lose their digits and still differ by month name,
+   so they never reach three and are never claimed.
+
+   Returns { desc, amount, day, last, next, count } or null. */
+const CREDIT_MIN_COUNT = 3;
+const CREDIT_GAP_MIN = 26, CREDIT_GAP_MAX = 35;
+const CREDIT_SPREAD = 0.15;
+
+function findRecurringCredit(rows, today) {
+  const groups = new Map();
+  for (const r of rows || []) {
+    if (!r || typeof r.amount !== 'number' || r.amount <= 0) continue;   // inflows only
+    if (r.excluded) continue;                                            // the reader's own veto
+    if (!ISO_DATE.test(r.date || '')) continue;
+    const n = normDesc(r.desc);
+    if (!n) continue;
+    if (!groups.has(n)) groups.set(n, []);
+    groups.get(n).push(r);
+  }
+
+  let best = null;
+  for (const [desc, list] of groups) {
+    if (list.length < CREDIT_MIN_COUNT) continue;
+    const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+
+    // Monthly rhythm, measured on the median gap so one late payment cannot
+    // disqualify a year of regular ones.
+    const gaps = [];
+    for (let i = 1; i < sorted.length; i++) gaps.push(isoDayNumber(sorted[i].date) - isoDayNumber(sorted[i - 1].date));
+    const gap = median(gaps);
+    if (gap < CREDIT_GAP_MIN || gap > CREDIT_GAP_MAX) continue;
+
+    // A stable amount, judged on the RECENT three — a raise last year must not
+    // disqualify a salary that has been steady since.
+    const recent = sorted.slice(-3).map(r => r.amount);
+    const amount = median(recent);
+    if (!(amount > 0)) continue;
+    if ((Math.max(...recent) - Math.min(...recent)) / amount > CREDIT_SPREAD) continue;
+
+    const last = sorted[sorted.length - 1].date;
+    const cand = {
+      desc, amount, count: sorted.length, last,
+      day: Math.round(median(sorted.map(r => Number(r.date.slice(8, 10))))),
+      next: nextExpected({ last }, 'monthly'),
+    };
+    // The largest repeating credit wins: a household with a salary and a small
+    // regular transfer wants the salary named, not the transfer.
+    if (!best || cand.amount > best.amount) best = cand;
+  }
+  if (!best) return null;
+
+  /* A salary that stopped is not a salary that is coming. Two whole cycles of
+     silence is the same generosity chargeStatus extends to a subscription, and
+     for the same reason: a bank can post late, and this must not go quiet on a
+     payment that is merely a few days behind. */
+  if (ISO_DATE.test(today || '') && isoDayNumber(today) - isoDayNumber(best.last) > 62) return null;
+  return best;
+}
+
 module.exports = {
   normDesc, serviceTokens, matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice,
+  findRecurringCredit,
 };

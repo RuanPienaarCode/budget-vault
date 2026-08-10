@@ -117,10 +117,21 @@ module.exports = function registerDashboard(ctx) {
     });
 
     const rows = [];
-    for (const f of Object.values(S.txFiles)) for (const r of f.rows) rows.push(r);
+    /* A second list, in-budget accounts only, for the repeating-credit search.
+       A fund's monthly debit order is a CREDIT on that fund's own statement, and
+       predicting it as household income would announce money arriving when it is
+       only moving between the reader's own pockets. */
+    const skipLabels = nonBudgetLabels();
+    const incomeRows = [];
+    for (const f of Object.values(S.txFiles)) {
+      for (const r of f.rows) {
+        rows.push(r);
+        if (!skipLabels.has(f.label)) incomeRows.push(r);
+      }
+    }
 
     const L = whatsLeft({
-      accounts, services: S.services, debts: S.debts, rows,
+      accounts, services: S.services, debts: S.debts, rows, incomeRows,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 
@@ -157,24 +168,59 @@ module.exports = function registerDashboard(ctx) {
     const comParts = [];
     if (L.counts.service) comParts.push(i18n.t('dash.left.orders', { count: L.counts.service }));
     if (L.counts.debt) comParts.push(i18n.t('dash.left.instalments', { count: L.counts.debt }));
-    if (L.counts.card) comParts.push(i18n.t('dash.left.cards', { count: L.counts.card }));
 
     const freeParts = [];
     if (L.days !== null) freeParts.push(i18n.t('dash.left.days', { count: L.days }));
     if (L.perDay) freeParts.push(i18n.t('dash.left.perDay', { amount: money(L.perDay, 0) }));
 
-    const grid = el('div', { class: 'left-grid' },
+    /* FOUR terms, not three, whenever a card settlement is in play.
+
+       A card you settle monthly and a Spotify debit order are both subtracted,
+       and they are not the same kind of claim: one is this cycle's own spending
+       coming home, the other is a fixed instalment somebody else takes. Summed
+       into one "still committed" figure, seventeen thousand rand of card hid
+       ninety-five rand of Spotify and the reader could audit neither.
+
+       The term is rendered only when there IS one. A vault with no card, or a
+       card carrying nothing, gets the three-term chain it always had rather
+       than a R0 column that means "not applicable". */
+    const op = () => el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−');
+    const grid = el('div', { class: `left-grid${L.cardDue > 0 ? ' left-grid--card' : ''}` },
       fig('is-cash', L.cashKnown ? money(L.cash, 0) : '—',
         i18n.t('dash.left.cash'), cashParts.join(' · ')),
-      el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−'),
-      fig('is-committed', money(L.committed, 0),
-        i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')),
-      el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
+      op(),
+      fig('is-committed', money(L.committedOther, 0),
+        i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')));
+    if (L.cardDue > 0) {
+      grid.append(op(), fig('is-card', money(L.cardDue, 0),
+        i18n.t('dash.left.cardDue'),
+        L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })));
+    }
+    grid.append(el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
       /* "Short", never a negative amount of free money — a minus sign in front
          of a figure labelled "actually free" is a sentence that means nothing. */
       fig(L.short ? 'is-short' : 'is-free', money(Math.abs(L.free), 0),
         i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
     body.append(grid);
+
+    /* What is coming IN, when the rows can prove it — and nothing at all when
+       they cannot. Without this the card reads as a crisis at the same point in
+       every cycle, and a warning that fires every month is one nobody reads.
+       With it, the card answers the question actually being asked: not "am I
+       short" but "am I short until payday". */
+    if (L.incoming) {
+      const after = L.free + L.incoming.amount;
+      body.append(el('div', { class: 'left-incoming' },
+        icoEl(['arrow-down-circle', 'circle-arrow-down', 'arrow-down']),
+        el('div', {},
+          el('div', { class: 'li-t' }, i18n.t('dash.left.incoming', {
+            amount: money(L.incoming.amount, 0), date: L.incoming.next,
+          })),
+          el('div', { class: 'li-s' }, i18n.t(
+            after >= 0 ? 'dash.left.incomingCovers' : 'dash.left.incomingShort',
+            { amount: money(Math.abs(after), 0), count: L.incoming.count },
+          )))));
+    }
 
     /* The bar only means something when there is cash to divide. */
     if (L.cashKnown && L.cash > 0) {
@@ -195,7 +241,13 @@ module.exports = function registerDashboard(ctx) {
        cheque account holds with no mention of what is already claimed against
        it, which is how "actually free" came to sit beside five figures of card
        balance and say nothing. */
-    if (L.owed > 0) {
+    /* Only for a card NOT already in the chain. A card marked `settle_monthly`
+       is subtracted above as its own term, and repeating the same figure here
+       as "not taken off any figure above" would flatly contradict the column
+       that just took it off. The sentence exists for the other case — a card
+       whose balance cannot be placed in this period, so it is disclosed rather
+       than claimed. */
+    if (L.owed > 0 && L.cardDue === 0) {
       const line = L.owedCards.length === 1
         ? i18n.t('dash.left.owedCard', { amount: money(L.owed, 0), name: L.owedCards[0] })
         : i18n.t('dash.left.owedCards', { amount: money(L.owed, 0), count: L.owedCards.length });

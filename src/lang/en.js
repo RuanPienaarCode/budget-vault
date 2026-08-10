@@ -657,6 +657,10 @@ module.exports = {
     other: '{count} card settlements',
   },
   'dash.left.none': 'nothing scheduled',
+  'dash.left.cardDue': 'card to settle',
+  'dash.left.incoming': '{amount} lands on {date}',
+  'dash.left.incomingCovers': 'That covers everything above and leaves about {amount}.',
+  'dash.left.incomingShort': 'Even after that you are {amount} short.',
   'dash.left.days': {
     one: '{count} day',
     other: '{count} days',

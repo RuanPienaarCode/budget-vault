@@ -3,6 +3,46 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.15 — 2026-08-10
+
+### Added
+
+- **"What's left" now shows the card settlement as its own figure, and says what
+  is coming in.** A card you settle every month was being folded into "still
+  committed" alongside your debit orders — where seventeen thousand rand of card
+  hid a ninety-five rand Spotify order and neither could be checked. It now gets
+  its own column, so the card reads as one line of arithmetic you can add up:
+  what you hold, less the debit orders, less the card, leaves what is actually
+  free. Set `settle_monthly: true` on a credit-card account to turn it on. A card
+  you carry a balance on is deliberately left alone and still just disclosed
+  beside the figures — it is not due this period, and claiming it would be wrong.
+
+- **The card can now tell you that payday is coming.** When your transactions
+  prove a repeating credit — the same payer, a monthly rhythm and a steady
+  amount — it says what lands and when, and whether that covers what you owe. So
+  a figure that reads "short" says *short until the 23rd*, which is the question
+  actually being asked.
+
+  It refuses far more often than it answers, deliberately: three occurrences at
+  minimum, a monthly gap, the last three amounts within 15% of each other, and
+  nothing you have excluded. Irregular income gets silence rather than a guess.
+  This matters more than it sounds — a plain average of everything landing in one
+  real account came to R61 000 against a true salary of R40 240, because it had
+  quietly folded in a second earner who had stopped months earlier, a payment
+  that arrived one day and left the next, and two insurance claims.
+
+### Fixed
+
+- **A service that bills under more than one name is no longer dropped from
+  "What's left".** Providers rename their debit orders — one real vault has eight
+  different descriptions for the same phone contract — and the card was reading
+  only the most common one. So a live service whose last charge under that name
+  was months ago projected a due date in the past and vanished from the committed
+  figure entirely, while a charge that had already gone off under a new name was
+  still being counted as coming. On the vault this was found in, two services
+  worth R1 185 a period were invisible. The price still comes from the merchant's
+  main description; only the timing now follows every name it bills under.
+
 ## 1.11.14 — 2026-08-09
 
 ### Added

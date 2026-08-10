@@ -53,7 +53,7 @@
    bare node, and `today` is injected rather than read off the clock. */
 
 const { ISO_DATE } = require('./dates');
-const { matchCharges, chargeStats, nextExpected } = require('./recurring');
+const { matchCharges, chargeStats, nextExpected, findRecurringCredit } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
 
 /* A debt instalment can only be placed inside a window at least this long when
@@ -134,17 +134,40 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
   for (const s of services || []) {
     if (!s || !s.active) continue;
     const m = matchCharges(s, history);
-    const stats = chargeStats(m.charges);
+    /* TWO stats, from two different groups, because two different questions are
+       being asked and only one of them is about price.
+
+       PRICE comes from the dominant description group: "Spotify" hits both the
+       R94.99 subscription and the R2.50 international-payment fee on it, and
+       averaging those is how the card would quote a price nobody pays.
+
+       WHEN — has it landed, and when is it next due — must come from EVERY
+       description the tokens hit. A merchant that renames its debit order is
+       still taking the money: this vault has eight distinct Vodacom
+       descriptions, and read through the dominant group alone Airtime's last
+       charge looked like 2026-02-07 when it had actually gone off on 2026-08-02.
+       The effect was silent and one-directional: a stale anchor puts the derived
+       due date months in the past, `due < from` drops the service, and a real
+       instalment vanishes from the committed figure — which is the number
+       telling the reader how much is safe to spend. Website Hosting was hidden
+       the same way while its R601 had already gone off.
+
+       views/services.js reached this conclusion first for its liveness pill
+       (see its `chargeStats(m.all)`); this is the same rule applied to the half
+       that moves money. */
+    const stats = chargeStats(m.charges);        // price
+    const seen = chargeStats(m.all);             // liveness + cadence
 
     /* Already charged in this period? Asked of the merchant's own charges, not
        of the category — a phone contract and a cloud subscription share a
-       category on real data, and one would cancel the other out. */
-    const landed = (m.charges || []).some(c => c.date >= periodStart && c.date <= to);
+       category on real data, and one would cancel the other out. Across every
+       description, so a renamed debit order is not claimed a second time. */
+    const landed = (m.all || []).some(c => c.date >= periodStart && c.date <= to);
     if (landed) continue;
 
     /* Derived first, typed second. Every next-billing date in the reference
        vault was months in the past; the charge history knows better. */
-    const due = nextExpected(stats, s.cycle) || (ISO_DATE.test(s.next || '') ? s.next : null);
+    const due = nextExpected(seen, s.cycle) || (ISO_DATE.test(s.next || '') ? s.next : null);
     if (!due || due < from || due > to) continue;
 
     const derived = stats && stats.recent > 0;
@@ -284,6 +307,11 @@ function cardsOwed(accounts) {
    `accounts`  [{ name, implied, dated, inBudget }] — implied balances from reconcile()
    `services`  S.services            `debts`  S.debts
    `rows`      every transaction row in the vault
+   `incomeRows` rows from IN-BUDGET accounts only, for the repeating-credit
+               search. Separate from `rows` on purpose: a monthly debit order
+               into a savings fund is a credit on that fund's statement, and
+               predicting it as household income would announce money arriving
+               that is only moving.
    `periodStart` / `periodEnd`       the window the Dashboard is showing
    `today`     injected
 
@@ -291,7 +319,7 @@ function cardsOwed(accounts) {
    negative amount of free money. `perDay` is null on the last day of a period —
    dividing the balance by zero days remaining, or printing a whole balance as a
    daily rate, are both worse than saying nothing. */
-function whatsLeft({ accounts, services, debts, rows, periodStart, periodEnd, today }) {
+function whatsLeft({ accounts, services, debts, rows, incomeRows, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
   /* The window starts today, not at the period start: a charge dated earlier
@@ -310,14 +338,34 @@ function whatsLeft({ accounts, services, debts, rows, periodStart, periodEnd, to
   ].sort((a, b) => (b.amount - a.amount));
 
   const committed = items.reduce((s, i) => s + i.amount, 0);
+  /* The card settlement, kept SEPARABLE from the debit orders even though both
+     are subtracted. They are different kinds of claim and the reader needs to
+     tell them apart: a debit order is a fixed instalment somebody else takes on
+     a known day, and a card settlement is this cycle's own spending coming home.
+     Folded into one "still committed" figure, seventeen thousand rand of card
+     hides ninety-five rand of Spotify and the reader cannot see either. */
+  const cardDue = items.filter(i => i.kind === 'card').reduce((s, i) => s + i.amount, 0);
   const daysLeft = now ? Math.max(0, daysBetween(now, periodEnd)) : null;
   const free = cash - committed;
+
+  /* What is due to LAND before this period ends, when the vault can prove it.
+     Only ever from repeating credits the rows themselves establish — see
+     findRecurringCredit, which returns null far more often than it answers.
+     Gated on the period too: a salary arriving after the window closes cannot
+     resolve this window's shortfall, and saying so would be a false comfort. */
+  const credit = findRecurringCredit(incomeRows || [], now);
+  const incoming = (credit && now && credit.next >= now && credit.next <= periodEnd) ? credit : null;
 
   return {
     cash,
     cashKnown: counted > 0,
     countedAccounts: counted,
     unknownAccounts: unknown,
+    cardDue,
+    /* The debit-order half on its own, so the chain can show four terms that
+       still add up: cash - committedOther - cardDue = free. */
+    committedOther: committed - cardDue,
+    incoming,
     /* Reported beside the figures, deliberately absent from every one of them:
        cash, committed and free are all unchanged by this. */
     owed,
