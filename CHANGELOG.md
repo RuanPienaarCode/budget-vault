@@ -3,6 +3,52 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.12.0 — 2026-08-10
+
+### Changed
+
+- **The Accounts page now names what needs deciding, and then gets out of the
+  way.** It was a grid of tiles, and every tile said the same eight things about
+  an account whether or not any of them mattered — at roughly 180px of height
+  each, a vault with fifteen accounts was four screens of mostly-quiet cards
+  with the two that actually needed a decision buried somewhere inside. The page
+  already *knew* which those were: it counted them into a tile reading "Needs
+  attention: 3" and then left you to go and find them.
+
+  Three bands now, in the order you need them:
+
+  **One figure.** What these accounts are worth between them, with a ring
+  saying what it is made of — the same opening move the Dashboard makes, so the
+  two pages finally read as siblings.
+
+  **The queue.** The accounts whose stated balance cannot currently be trusted,
+  most urgent first, each with the one action that settles it. An account that
+  has drifted is offered its arithmetic; one that is merely old is offered a
+  confirmation. It is capped at four, and the remainder is *named* rather than
+  quietly dropped — a queue that scrolls is not a queue, and a silent cap reads
+  as "that is all of them". When nothing wants a decision the whole band
+  collapses to a single green line.
+
+  **The ledger.** Every account as one table row — sortable, filterable,
+  searchable — with everything the tile used to carry below its balance folded
+  into a drawer that opens under the row. On a phone it keeps the name, the
+  balance and the state, and the drawer holds the rest.
+
+  Nothing about the arithmetic changed: the same reconciliation, the same
+  utilisation thresholds, the same refusal to silently overwrite either figure.
+
+### Fixed
+
+- **A never-confirmed balance sorted as `Infinity`,** so two of them subtracted
+  to `NaN`. A `NaN` comparator does not merely mis-sort — it is *unstable*, so
+  the order could change between renders and the row you were about to tap moved
+  out from under you.
+
+- **The page's sort, filter and open row no longer reset while you are reading.**
+  They lived in the view's own closure, and the file watcher re-renders the whole
+  app whenever anything in the vault changes — so an import saving a file in
+  another window threw away whatever you had set up.
+
 ## 1.11.17 — 2026-08-10
 
 ### Changed
