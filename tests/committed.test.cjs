@@ -456,4 +456,97 @@ const card = {
   eq(quiet.incoming, null, 'one big credit predicts nothing, and the card says nothing');
 }
 
+/* ---- the settlement cycle: card spend against the income that clears it ----
+
+   The household this was measured on runs the whole month through the card and
+   settles it on payday. The work month runs the 23rd to the 22nd, so the salary
+   that clears it lands on day ONE of the next period — and the cash left in the
+   cheque account mid-period is the tail of LAST month's salary, which was never
+   going to pay the card. Subtracting the card from that cash reported
+   "R16 958 short" at the same point in every cycle.
+
+   The interest is what proves it is timing, not credit: 16.5% on R40 000 would
+   cost about R550 a month and the real card charged R0.02, R1.92 and R23.62.
+
+   So the verdict is card spend vs settling income, and `over` is the only state
+   worth colouring — the cycle that genuinely did not pay for itself. */
+{
+  const cheque = { name: 'Cheque', implied: 148, dated: true, inBudget: true, type: 'checking' };
+  const cardAcct = { name: 'Discovery Card', implied: -17011, dated: true, inBudget: true,
+    type: 'credit_card', settleMonthly: true };
+  const SAL = 'CASHFOCUS SALARIS';
+  const income = [
+    { date: '2026-05-23', amount: 40240.20, desc: SAL },
+    { date: '2026-06-23', amount: 40240.20, desc: SAL },
+    { date: '2026-07-23', amount: 40240.20, desc: SAL },
+  ];
+  // A work month running 23 Jul -> 22 Aug. The salary that settles it lands
+  // 23 Aug, the day AFTER the period ends.
+  const PS = '2026-07-23', PE = '2026-08-22', TODAY = '2026-08-10';
+  const spend = amt => [{ date: '2026-08-01', desc: 'CHECKERS', amount: -amt }];
+
+  const under = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: income, cardRows: spend(17011),
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  });
+  ok(under.cycle, 'a settled card is measured as a cycle, not as a claim on cash');
+  eq(under.cycle.spend, 17011, 'the cycle counts what went ON the card this period');
+  eq(under.cycle.settling, 40240.20, 'against the salary that clears it');
+  eq(under.cycle.date, '2026-08-23', 'which lands the day AFTER the period ends — the gate `incoming` uses would have hidden it');
+  eq(under.cycle.over, false, 'R17 011 of a R40 240 salary is the pattern working');
+  eq(Math.round(under.cycle.headroom), 23229, 'and the headroom is what is left of that salary');
+  eq(under.incoming, null, 'the in-period income line stays silent — nothing lands before the 22nd');
+
+  // The one state that means something: the cycle did not pay for itself.
+  const over = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: income, cardRows: spend(45000),
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  });
+  eq(over.cycle.over, true, 'card spend ABOVE the settling salary is the real overspend signal');
+  ok(over.cycle.headroom < 0, 'and the headroom goes negative rather than clamping');
+
+  // A card that is NOT settled monthly is a genuine claim and keeps the old
+  // treatment — no cycle, and the chain still subtracts it.
+  const revolving = whatsLeft({
+    accounts: [cheque, { ...cardAcct, settleMonthly: false }], services: [], debts: [], rows: [],
+    incomeRows: income, cardRows: spend(17011),
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  });
+  eq(revolving.cycle, null, 'a revolving balance is not a settlement cycle');
+  eq(revolving.cardDue, 0, 'it is not claimed as due this period either');
+  eq(revolving.owed, 17011, 'it is disclosed instead — the reader carrying a balance is told the truth about it');
+
+  // No repeating credit: no cycle. A comparison against a guessed income is
+  // exactly the average this whole feature refuses to compute.
+  const noIncome = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: [{ date: '2026-07-02', amount: 90000, desc: 'ONE OFF' }], cardRows: spend(17011),
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  });
+  eq(noIncome.cycle, null, 'without a proven settling income there is no ratio to state');
+
+  // No card spending this period: nothing to compare.
+  eq(whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: income, cardRows: [],
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  }).cycle, null, 'a cycle with no card spending states nothing');
+
+  // Only spending INSIDE the period counts, and settlements are not spending.
+  const mixed = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: income,
+    cardRows: [
+      { date: '2026-07-01', desc: 'LAST CYCLE', amount: -9999 },   // before periodStart
+      { date: '2026-08-01', desc: 'CHECKERS', amount: -1000 },
+      { date: '2026-08-02', desc: 'Settling July', amount: 5000 }, // a payment IN
+      { date: '2026-09-01', desc: 'NEXT CYCLE', amount: -8888 },   // after periodEnd
+    ],
+    periodStart: PS, periodEnd: PE, today: TODAY,
+  });
+  eq(mixed.cycle.spend, 1000, 'only outflows dated inside the period are this cycle\'s card spending');
+}
+
 console.log(`PASS — the forward view counts what is coming, once, and only what it can place (${checks} assertions).`);

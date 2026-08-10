@@ -122,16 +122,23 @@ module.exports = function registerDashboard(ctx) {
        predicting it as household income would announce money arriving when it is
        only moving between the reader's own pockets. */
     const skipLabels = nonBudgetLabels();
-    const incomeRows = [];
+    /* And a third, for the settle-monthly cards only: their spending this cycle
+       is what gets measured against the income that clears it. Resolved by
+       LABEL because rows carry no account of their own. */
+    const cardLabels = new Set(S.accounts
+      .filter(a => a.settle_monthly && String(a.type || '').trim().toLowerCase() === 'credit_card')
+      .map(a => a.tx_label || a.name));
+    const incomeRows = [], cardRows = [];
     for (const f of Object.values(S.txFiles)) {
       for (const r of f.rows) {
         rows.push(r);
         if (!skipLabels.has(f.label)) incomeRows.push(r);
+        if (cardLabels.has(f.label)) cardRows.push(r);
       }
     }
 
     const L = whatsLeft({
-      accounts, services: S.services, debts: S.debts, rows, incomeRows,
+      accounts, services: S.services, debts: S.debts, rows, incomeRows, cardRows,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 
@@ -173,35 +180,66 @@ module.exports = function registerDashboard(ctx) {
     if (L.days !== null) freeParts.push(i18n.t('dash.left.days', { count: L.days }));
     if (L.perDay) freeParts.push(i18n.t('dash.left.perDay', { amount: money(L.perDay, 0) }));
 
-    /* FOUR terms, not three, whenever a card settlement is in play.
+    /* FOUR terms only where the card really is a claim on this cash.
 
-       A card you settle monthly and a Spotify debit order are both subtracted,
-       and they are not the same kind of claim: one is this cycle's own spending
-       coming home, the other is a fixed instalment somebody else takes. Summed
-       into one "still committed" figure, seventeen thousand rand of card hid
-       ninety-five rand of Spotify and the reader could audit neither.
+       A card SETTLED MONTHLY is not. Its balance is this cycle's spending
+       waiting for the salary that clears it, and that salary lands on day one of
+       the NEXT period — so subtracting it from the cheque account's leftover
+       cash produced "R16 958 short" at the same point in every cycle, a warning
+       that fires monthly and is therefore read by nobody. That card moves out of
+       this chain entirely and into its own band below, measured against the
+       income that actually settles it.
 
-       The term is rendered only when there IS one. A vault with no card, or a
-       card carrying nothing, gets the three-term chain it always had rather
-       than a R0 column that means "not applicable". */
+       A card NOT settled monthly stays here: a revolving balance genuinely is a
+       claim, and `cycle` is null for it. So the fourth term appears exactly when
+       the subtraction is true. */
+    const showCardTerm = L.cardDue > 0 && !L.cycle;
     const op = () => el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−');
-    const grid = el('div', { class: `left-grid${L.cardDue > 0 ? ' left-grid--card' : ''}` },
+    const grid = el('div', { class: `left-grid${showCardTerm ? ' left-grid--card' : ''}` },
       fig('is-cash', L.cashKnown ? money(L.cash, 0) : '—',
         i18n.t('dash.left.cash'), cashParts.join(' · ')),
       op(),
       fig('is-committed', money(L.committedOther, 0),
         i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')));
-    if (L.cardDue > 0) {
+    if (showCardTerm) {
       grid.append(op(), fig('is-card', money(L.cardDue, 0),
         i18n.t('dash.left.cardDue'),
         L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })));
     }
+    /* With the settled card out of the chain, `free` must come out of it too —
+       it still has the card subtracted. Cash less the debit orders is what the
+       three remaining terms actually say. */
+    const chainFree = L.cycle ? L.cash - L.committedOther : L.free;
+    const chainShort = chainFree < 0;
     grid.append(el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
       /* "Short", never a negative amount of free money — a minus sign in front
          of a figure labelled "actually free" is a sentence that means nothing. */
-      fig(L.short ? 'is-short' : 'is-free', money(Math.abs(L.free), 0),
-        i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
+      fig(chainShort ? 'is-short' : 'is-free', money(Math.abs(chainFree), 0),
+        i18n.t(chainShort ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
     body.append(grid);
+
+    /* The settlement cycle: what went on the card this period against the income
+       that clears it. This is the figure that carries a verdict — under 100% the
+       pattern is working, over it the cycle genuinely did not pay for itself,
+       which is the one case worth colouring red. */
+    if (L.cycle) {
+      const c = L.cycle;
+      const pct = Math.round(c.ratio * 100);
+      body.append(el('div', { class: `left-cycle${c.over ? ' is-over' : ''}` },
+        el('div', { class: 'lc-head' },
+          el('span', { class: 'lc-t' }, i18n.t('dash.left.cycle', {
+            spend: money(c.spend, 0), settling: money(c.settling, 0),
+          })),
+          el('span', { class: 'lc-p num' }, `${pct}%`)),
+        el('div', { class: 'lc-bar', role: 'img',
+          'aria-label': i18n.t('dash.left.cycleAria', {
+            spend: money(c.spend), settling: money(c.settling), pct,
+          }) },
+        el('i', { style: `width:${Math.min(100, pct).toFixed(1)}%` })),
+        el('div', { class: 'lc-s' }, i18n.t(
+          c.over ? 'dash.left.cycleOver' : 'dash.left.cycleUnder',
+          { amount: money(Math.abs(c.headroom), 0), date: c.date }))));
+    }
 
     /* What is coming IN, when the rows can prove it — and nothing at all when
        they cannot. Without this the card reads as a crisis at the same point in

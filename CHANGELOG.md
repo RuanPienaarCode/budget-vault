@@ -3,6 +3,36 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.11.17 — 2026-08-10
+
+### Changed
+
+- **A credit card you settle every month is no longer treated as a claim on your
+  cash.** It never was one. If you run the month through the card and clear it on
+  payday, the balance is this cycle's spending waiting for a salary that has been
+  earned but not yet paid — and the cash sitting in your cheque account is the
+  tail of *last* month's salary, which was never going to pay it. Subtracting one
+  from the other produced "R16 958 short" at the same point in every single
+  cycle, and a warning that fires every month is one nobody reads.
+
+  The card now gets its own line, measured against the thing that actually
+  clears it: **what went on the card this cycle, against the income due to
+  settle it.** Under 100% the pattern is working and the line stays quiet. Over
+  100% it turns red — because a cycle whose card spending exceeded the income
+  coming to settle it is the one case that genuinely means something.
+
+  This also fixes a feature that could never fire. The income line was gated to
+  money landing *before* the period ends, but under a payday month anchored on
+  payday the settling salary always lands on day one of the *next* period — so
+  the only income that was ever going to clear the balance was the one income
+  the card refused to look at.
+
+  A card you carry a balance on is deliberately untouched: it stays a real claim
+  and keeps its old treatment, and it is re-checked inside the calculation rather
+  than trusted from the caller — telling someone with revolving debt they have
+  "headroom before the 23rd" is the most dangerous sentence this card could
+  print.
+
 ## 1.11.16 — 2026-08-10
 
 ### Fixed

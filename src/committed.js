@@ -307,6 +307,9 @@ function cardsOwed(accounts) {
    `accounts`  [{ name, implied, dated, inBudget }] — implied balances from reconcile()
    `services`  S.services            `debts`  S.debts
    `rows`      every transaction row in the vault
+   `cardRows`  rows from the cards that are SETTLED MONTHLY, for the cycle
+               comparison — spending on those cards this period against the
+               income that will clear it.
    `incomeRows` rows from IN-BUDGET accounts only, for the repeating-credit
                search. Separate from `rows` on purpose: a monthly debit order
                into a savings fund is a credit on that fund's statement, and
@@ -319,7 +322,7 @@ function cardsOwed(accounts) {
    negative amount of free money. `perDay` is null on the last day of a period —
    dividing the balance by zero days remaining, or printing a whole balance as a
    daily rate, are both worse than saying nothing. */
-function whatsLeft({ accounts, services, debts, rows, incomeRows, periodStart, periodEnd, today }) {
+function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
   /* The window starts today, not at the period start: a charge dated earlier
@@ -356,6 +359,55 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, periodStart, p
   const credit = findRecurringCredit(incomeRows || [], now);
   const incoming = (credit && now && credit.next >= now && credit.next <= periodEnd) ? credit : null;
 
+  /* ------------------------- the settlement cycle -------------------------
+
+     A card settled every month is not a claim on the cash sitting in the cheque
+     account, and subtracting it from that cash answers a question nobody asks.
+
+     The household this was measured on runs its whole month through the card
+     and clears it on payday: the work month runs the 23rd to the 22nd, spending
+     happens on the card throughout, and the salary that lands on the 23rd — day
+     ONE of the next period — settles it. The cash left in the cheque account
+     mid-period is the tail of LAST month's salary after the non-card spending;
+     it was never going to pay the card. Measured against it the card reported
+     "R16 958 short" at the same point in every single cycle, which is a warning
+     that fires monthly and is therefore read by nobody.
+
+     The interest is what proves this is timing and not credit: 16.5% on R40 000
+     would cost about R550 a month, and the real card charged R0.02, R1.92 and
+     R23.62 across three of them. It is a conduit, not a loan.
+
+     So the honest comparison is card spending THIS CYCLE against the income
+     that will settle it — and `over` is the signal that actually matters,
+     because a cycle whose card spend exceeds its settling income is the one
+     case where the pattern really has stopped working.
+
+     `settling` is deliberately NOT gated on periodEnd the way `incoming` is.
+     Under a payday month anchored on payday the settling salary ALWAYS lands on
+     day one of the next period, so a period-end gate excludes the only income
+     that was ever going to clear the balance. That gate is right for "what else
+     arrives before this window shuts" and exactly backwards for this. */
+  const cardSpend = (cardRows || []).reduce((s, r) => (
+    r && typeof r.amount === 'number' && r.amount < 0 && !isSplitPart(r) &&
+    r.date >= periodStart && r.date <= periodEnd ? s - r.amount : s), 0);
+  const settling = (credit && now && credit.next >= now) ? credit : null;
+  /* The settle-monthly card is re-checked HERE rather than trusted from the
+     caller's filtering of `cardRows`. A revolving balance must never be read as
+     a settlement cycle — it is a real claim, and telling its holder they have
+     "headroom before the 23rd" would be the most dangerous sentence this card
+     could print. Leaving that guarantee in the caller is how the two drift:
+     whatsLeft would report a cycle for any rows it was handed. */
+  const settlesMonthly = (accounts || []).some(a => a && a.settleMonthly &&
+    a.inBudget !== false && String(a.type || '').trim().toLowerCase() === 'credit_card');
+  const cycle = (settlesMonthly && cardSpend > 0 && settling) ? {
+    spend: cardSpend,
+    settling: settling.amount,
+    date: settling.next,
+    ratio: cardSpend / settling.amount,
+    over: cardSpend > settling.amount,
+    headroom: settling.amount - cardSpend,
+  } : null;
+
   return {
     cash,
     cashKnown: counted > 0,
@@ -366,6 +418,8 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, periodStart, p
        still add up: cash - committedOther - cardDue = free. */
     committedOther: committed - cardDue,
     incoming,
+    cardSpend,
+    cycle,
     /* Reported beside the figures, deliberately absent from every one of them:
        cash, committed and free are all unchanged by this. */
     owed,
