@@ -1136,20 +1136,27 @@
 @media (max-width: 640px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-5, .budget-app-root .mini-kpis-3 { grid-template-columns: 1fr; } }
 
 /* ------------------------------------------------------------
-   ACCOUNT TILE EXTRAS — reconciliation, staleness, drill-through.
+   ACCOUNTS PAGE — summary ring, the decision queue, the ledger.
    Colours come from this plugin's own palette vars, never from
    Obsidian's, so a theme can't recolour a warning into a nothing.
+
+   No color-mix() anywhere below, deliberately: it is Safari 16.2+
+   and this plugin's floor is iOS 15, so every rule using it needs
+   a hand-written twin in the @supports block at the foot of this
+   file. Neutral rgba(127,127,127,·) reads correctly on both
+   themes and needs no twin at all.
    ------------------------------------------------------------ */
 /* The account name doubles as the link to its transactions. Reset the button
-   chrome so it still reads as the tile's label, not as a control bolted on. */
-.budget-app-root .mini .acct-name-btn {
-  display: block; width: 100%; text-align: left;
+   chrome so it still reads as the row's label, not a control bolted on. */
+.budget-app-root .acct-name-btn {
+  display: inline-block; text-align: left;
   background: none; border: 0; padding: 0; cursor: pointer;
-  font: inherit; font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
-  color: var(--ink-faint); font-weight: 600;
+  font: inherit; font-weight: 650; font-size: 13.5px; letter-spacing: -.01em;
+  color: var(--text-primary);
 }
-.budget-app-root .mini .acct-name-btn:hover { color: var(--text-primary); text-decoration: underline; }
-.budget-app-root .mini .acct-name-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+.budget-app-root .acct-name-btn:hover { text-decoration: underline; }
+.budget-app-root .acct-name-btn.is-plain { cursor: default; }
+.budget-app-root .acct-name-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
 
 .budget-app-root .acct-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .budget-app-root .acct-badge {
@@ -1163,17 +1170,6 @@
 }
 .budget-app-root .acct-badge.muted { opacity: .8; }
 
-.budget-app-root .acct-act { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-
-/* Credit-card utilisation. Reuses .cat-bar / .cat-bar-fill and its warn/danger
-   variants so a filled bar carries the same meaning here as on the Dashboard. */
-.budget-app-root .acct-util { margin-top: 10px; }
-.budget-app-root .acct-util-top {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  font-size: 11.5px; color: var(--text-muted); margin-bottom: 5px;
-}
-.budget-app-root .acct-util .cat-bar { min-width: 0; }
-.budget-app-root .acct-util-sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; }
 
 .budget-app-root .acct-recon {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -1285,17 +1281,199 @@
   cursor: help; margin-top: 1px;
 }
 
-.budget-app-root .acct-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  flex-wrap: wrap; margin-top: 8px;
+/* ============================================================
+   ACCOUNTS — the three bands: summary, queue, ledger.
+   ============================================================ */
+
+/* Band 1 — the figure and the ring, side by side on a wide pane. */
+.budget-app-root .top-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: stretch; }
+.budget-app-root .acct-hero { padding: 34px 34px 30px; display: flex; flex-direction: column; justify-content: center; }
+.budget-app-root .acct-hero .hero-num { font-size: clamp(38px, 5.4vw, 62px); }
+.budget-app-root .acct-hero-facts {
+  display: flex; gap: 26px; flex-wrap: wrap;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color);
 }
-.budget-app-root .acct-foot-acts { display: inline-flex; gap: 12px; }
-.budget-app-root .acct-link {
-  background: none; border: 0; padding: 0; cursor: pointer;
-  font: inherit; font-size: 11.5px; color: var(--text-muted); text-decoration: underline;
+.budget-app-root .acct-fact-l {
+  font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 600;
 }
-.budget-app-root .acct-link:hover { color: var(--text-primary); }
-.budget-app-root .acct-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
+.budget-app-root .acct-fact-v {
+  font-size: 19px; font-weight: 700; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; margin-top: 4px;
+}
+.budget-app-root .acct-ring-body { display: flex; align-items: center; justify-content: center; gap: 26px; flex-wrap: wrap; }
+.budget-app-root svg.acct-donut { width: 190px; height: auto; flex: none; display: block; }
+.budget-app-root .acct-ring-legend { min-width: 160px; }
+.budget-app-root .acct-ring-note { flex-basis: 100%; font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; }
+
+/* Band 2 — the queue. Amber because it is a prompt, not an error: every line
+   in it is answerable, and most weeks the whole band is the green all-clear. */
+.budget-app-root .acct-deck {
+  border-radius: var(--radius-card); border: 1px solid var(--color-warning);
+  background: var(--color-warning-light); padding: 22px 26px;
+}
+.budget-app-root .acct-deck:empty { display: none; }
+.budget-app-root .acct-deck-h { display: flex; align-items: center; gap: 11px; margin-bottom: 4px; }
+.budget-app-root .acct-deck-h h2 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+/* The soft ring is a palette TOKEN, not a literal: the glow tokens follow
+   whichever palette is active, and a hardcoded emerald here would leave the
+   all-clear dot green under a palette that has no green in it. */
+.budget-app-root .acct-deck-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: none;
+  background: var(--color-warning); box-shadow: 0 0 0 4px var(--color-warning-light);
+}
+.budget-app-root .acct-deck-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px; }
+.budget-app-root .acct-deck-list { display: flex; flex-direction: column; gap: 8px; }
+.budget-app-root .acct-deck-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border-color);
+}
+.budget-app-root .acct-deck-name { font-weight: 650; font-size: 13.5px; }
+.budget-app-root .acct-deck-why { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.budget-app-root .acct-deck-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.budget-app-root .acct-deck-btn {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 5px 13px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--color-primary); background: var(--color-primary-light); color: var(--color-primary);
+}
+.budget-app-root .acct-deck-btn .ico svg { width: 0.8rem; height: 0.8rem; }
+.budget-app-root .acct-deck-btn.ghost { border-color: var(--border-color); background: transparent; color: var(--text-muted); }
+.budget-app-root .acct-deck-btn.ghost:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.budget-app-root .acct-deck-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .acct-deck-more { width: 100%; justify-content: center; margin-top: 10px; padding: 9px 13px; background: var(--surface); }
+/* An empty queue is not an empty shelf — the band becomes one quiet green line. */
+.budget-app-root .acct-deck.is-clear {
+  border-color: var(--color-primary); background: var(--color-primary-light); padding: 16px 24px;
+}
+.budget-app-root .acct-deck.is-clear .acct-deck-dot { background: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-light); }
+.budget-app-root .acct-deck.is-clear .acct-deck-sub { margin-bottom: 0; }
+
+/* Band 3 — the control strip. */
+.budget-app-root .acct-strip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.budget-app-root .acct-segs {
+  display: inline-flex; padding: 4px; border-radius: 999px; gap: 2px; flex-wrap: wrap;
+  border: 1px solid var(--border-color); background: rgba(127, 127, 127, .06);
+}
+.budget-app-root .acct-seg {
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 6px 15px; border-radius: 999px; border: 0; background: transparent;
+  color: var(--text-muted); display: inline-flex; align-items: center; gap: 7px;
+}
+.budget-app-root .acct-seg:hover { color: var(--text-primary); }
+.budget-app-root .acct-seg[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.budget-app-root .acct-seg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .acct-seg-n {
+  font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  background: rgba(127, 127, 127, .18); color: var(--text-muted);
+}
+.budget-app-root .acct-seg.is-warn .acct-seg-n { background: var(--color-warning); color: #12151c; }
+/* The group toggle is a switch, not a command — it has to LOOK held down when
+   it is, or the only feedback that it did anything is the table quietly
+   regrouping under the reader's eye. */
+.budget-app-root .acct-strip .btn-ghost[aria-pressed="true"] {
+  background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary);
+}
+.budget-app-root .acct-search { flex: 1; min-width: 170px; }
+.budget-app-root .acct-search input {
+  width: 100%; font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid var(--border-color); background: var(--surface); color: var(--text-primary);
+}
+.budget-app-root .acct-search input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+/* Band 3 — the ledger rows. */
+.budget-app-root .table tbody tr.acct-row { cursor: pointer; }
+.budget-app-root .table tbody tr.acct-row:hover { background: rgba(127, 127, 127, .07); }
+.budget-app-root .table tbody tr.acct-row.is-open { background: var(--color-primary-light); }
+.budget-app-root .table tbody tr.acct-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+/* The state rail. A box-shadow inset rather than a border so it cannot shift
+   the cell's width and knock the column grid out of alignment. */
+.budget-app-root .table tbody tr.acct-row.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
+.budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
+.budget-app-root .acct-cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.budget-app-root .acct-cell-sub { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
+.budget-app-root .acct-bal {
+  background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+  font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; text-align: right; width: 100%;
+}
+.budget-app-root .acct-bal:hover { text-decoration: underline; }
+.budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+.budget-app-root .acct-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  font-variant-numeric: tabular-nums; border: 1px solid var(--border-color); color: var(--text-muted);
+}
+.budget-app-root .acct-chip.up { color: var(--color-success); border-color: var(--color-success); background: var(--color-success-light); }
+.budget-app-root .acct-chip.down { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-light); }
+.budget-app-root svg.acct-spark { display: block; width: 96px; height: 24px; }
+.budget-app-root .acct-goal { display: inline-flex; align-items: center; }
+.budget-app-root .acct-mbar {
+  width: 88px; height: 6px; border-radius: 6px; background: var(--border-color);
+  overflow: hidden; display: inline-block; vertical-align: middle; flex: none;
+}
+.budget-app-root .acct-mbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); }
+.budget-app-root .acct-mbar i.bg-warning { background: linear-gradient(90deg, var(--color-warning), #ffcf87); }
+.budget-app-root .acct-mbar i.bg-danger { background: linear-gradient(90deg, var(--color-danger), #ffb27f); }
+/* nowrap: "63% of R 100 000" broke after the 100, which reads as a different
+   figure for the half-second before the eye re-parses the line. */
+.budget-app-root .acct-mbar-l { font-size: 11px; color: var(--ink-faint); margin-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.budget-app-root .acct-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.budget-app-root .acct-dash { color: var(--ink-faint); }
+.budget-app-root .acct-caret { opacity: .4; font-size: .8em; }
+.budget-app-root .table thead th.is-sorted button { color: var(--text-primary); }
+.budget-app-root .table thead th.is-sorted .acct-caret { opacity: 1; color: var(--color-primary); }
+.budget-app-root .table thead th button {
+  font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.budget-app-root .table thead th button:hover { color: var(--text-primary); }
+.budget-app-root .table thead th button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .acct-group-total {
+  float: right; font-size: .92rem; letter-spacing: 0; text-transform: none;
+  color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.budget-app-root .table tbody tr.acct-empty td { padding: 34px 12px; text-align: center; color: var(--text-muted); font-size: 13px; border-bottom: none; }
+.budget-app-root .acct-pill {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
+  padding: 2px 9px; border-radius: 999px; display: inline-block;
+  border: 1px solid var(--border-color); color: var(--text-muted);
+}
+.budget-app-root .acct-pill.ok { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .acct-pill.warn { color: var(--color-warning-ink); border-color: var(--color-warning); background: var(--color-warning-light); }
+.budget-app-root .acct-pill.danger { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-light); }
+
+/* The drawer — everything the tile used to carry, shown for ONE account. */
+.budget-app-root .table tbody tr.acct-drawer-row td.acct-drawer-cell { padding: 0 .25rem .5rem; border-bottom: none; background: none; }
+.budget-app-root .acct-drawer {
+  border-radius: 20px; border: 1px solid var(--color-primary);
+  background: var(--color-primary-light); padding: 20px 22px;
+}
+.budget-app-root .acct-drawer-h { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.budget-app-root .acct-drawer-h h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.budget-app-root .acct-drawer-v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.budget-app-root .acct-drawer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; margin-bottom: 4px; }
+.budget-app-root .acct-drawer-l { font-size: 10.5px; letter-spacing: .9px; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+.budget-app-root .acct-drawer-val { font-size: 14px; font-weight: 600; margin-top: 3px; }
+.budget-app-root .acct-drawer-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.budget-app-root .acct-drawer-act {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 5px 13px; border-radius: 999px;
+  border: 1px solid var(--border-color); background: var(--surface); color: var(--text-muted);
+}
+.budget-app-root .acct-drawer-act:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.budget-app-root .acct-drawer-act:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+@media (max-width: 900px) { .budget-app-root .top-grid { grid-template-columns: 1fr; } }
+/* A phone gets the name, the balance and the state. Everything the three
+   dropped columns carried is in the drawer, one tap away. */
+@media (max-width: 760px) {
+  .budget-app-root .acct-hero { padding: 26px 22px; }
+  .budget-app-root .table th.acct-col-drop,
+  .budget-app-root .table td.acct-col-drop { display: none; }
+}
 
 /* ============================================================
    STATUS PILLS + GOALS (Owed Money, Savings)
@@ -2196,13 +2374,18 @@
   .budget-app-root .upload-area:focus  { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
-  .budget-app-root .mini .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .acct-bal:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .acct-deck-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .acct-seg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .acct-drawer-act:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .table thead th button:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .table tbody tr.acct-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .trend-svg-wrap svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .svc-next-hint:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .budget-app-root .acct-link:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
   .budget-app-root .donut-legend .dl-link:focus,

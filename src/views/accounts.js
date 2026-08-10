@@ -3,7 +3,11 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
-const { el, kpiTiles, icoEl } = require('../dom');
+const { el, icoEl } = require('../dom');
+/* The ring reuses the Dashboard's own chart primitives rather than a second
+   donut implementation — same arc maths, same tooltip, same theme lookup, so
+   the two rings on this app cannot drift apart visually. */
+const { createChart, arcPath, tip, themeColors } = require('../chart');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
@@ -13,12 +17,17 @@ const { askFields } = require('../modal');
 /* The reconciliation engine was written here first and now lives in its own
    module, because Savings, Services and Debt all need to make the same argument
    about a hand-typed figure. Behaviour on this page is unchanged. */
-const { STALE_DAYS, daysSince, isStale, reconcile } = require('../reconcile');
+/* reconcile is published on ctx for the tests that drive the REAL arithmetic;
+   the page itself now reaches it through acct-status below. */
+const { reconcile } = require('../reconcile');
+/* The state machine behind the decision queue — which accounts land in it, in
+   what order, and why. Pure, and tested without a DOM. */
+const { statusOf, wantsALook, staleRank, queueOrder } = require('../acct-status');
 const { supersededBySplit } = require('../tx-role');
 const { ISO_DATE, todayIso } = require('../dates');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, money, toast, writeFile, ensureFolder, relPath, fileAt,
+  const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt,
     txInPeriod, accountForLabel, accountIndex, periodMonthName } = ctx;
 
   // Every type the loader can produce must appear in exactly one group, or an
@@ -214,8 +223,699 @@ module.exports = function registerAccounts(ctx) {
     toast(i18n.t(a.in_budget ? 'acct.budget.on' : 'acct.budget.off', { name: a.name }));
   }
 
-  /* ------------------------------ rendering ------------------------------ */
+  /* ------------------------------ rendering ------------------------------
+
+     The page is three bands, in the order a reader needs them:
+
+       1. one figure — what these accounts are worth between them, and what
+          that figure is made of;
+       2. the QUEUE — the accounts whose stated balance cannot currently be
+          trusted, each with the single action that settles it;
+       3. the LEDGER — every account as one table row, sortable, with the
+          detail folded into a drawer that opens under the row.
+
+     It replaced a grid of tiles. Tiles cost ~180px of height each and said the
+     same eight things about an account whether or not any of them mattered, so
+     a vault with fifteen accounts was four screens of mostly-quiet cards with
+     the two that needed a decision somewhere inside it. The queue is the fix
+     for that; the table is the fix for the height. */
+
   function badge(text, cls) { return el('span', { class: `acct-badge${cls ? ' ' + cls : ''}` }, text); }
+
+  /* Page state lives on S, NOT in a module-local. The file watcher re-renders
+     the whole app whenever anything under the budget folder changes, and a
+     sort, a filter or an open drawer held in this closure would reset itself
+     every time a transaction file was saved — including by an import running
+     in another window while the reader is halfway down this page.
+
+     Filled in field by field and IN PLACE rather than replaced wholesale: the
+     click handlers below capture the object this returns, so handing out a
+     fresh one per call would let a handler mutate a copy nothing reads. */
+  function view() {
+    if (!S.acctView) S.acctView = {};
+    const v = S.acctView;
+    if (typeof v.filter !== 'string') v.filter = 'all';
+    if (typeof v.q !== 'string') v.q = '';
+    if (typeof v.sort !== 'string') v.sort = 'balance';
+    if (v.dir !== 1 && v.dir !== -1) v.dir = -1;
+    if (typeof v.grouped !== 'boolean') v.grouped = true;
+    if (v.open === undefined) v.open = null;
+    return v;
+  }
+
+  /* type → the group it renders under, derived FROM ACCT_GROUPS so the two can
+     never disagree. A type missing from the map would render nowhere, which is
+     the bug ACCT_GROUPS' own comment warns about. */
+  const GROUP_OF = new Map();
+  for (const [key, types] of ACCT_GROUPS) for (const ty of types) GROUP_OF.set(ty, key);
+  const groupOf = a => GROUP_OF.get(a.type) || 'acct.group.other';
+
+  /* One colour per kind of account, from this plugin's own palette and never
+     from Obsidian's, so a theme cannot recolour a credit card into a savings
+     pot. Cards are the danger red on purpose: on this page a card is the one
+     row whose balance is usually money owed. */
+  const TYPE_COLOUR = {
+    checking:    'var(--color-info)',
+    credit_card: 'var(--color-danger)',
+    cash:        'var(--color-gold)',
+    savings:     'var(--color-primary)',
+    investment:  'var(--color-investment)',
+    other:       'var(--color-accent)',
+  };
+  const GROUP_COLOUR = {
+    'acct.group.bank':        'var(--color-info)',
+    'acct.group.savings':     'var(--color-primary)',
+    'acct.group.investments': 'var(--color-investment)',
+    'acct.group.other':       'var(--color-accent)',
+  };
+  const colourOf = a => TYPE_COLOUR[a.type] || 'var(--color-accent)';
+
+  /* Everything every band on this page needs, computed once per render.
+     reconcile() walks an account's whole row list, so doing it separately in
+     the summary, the queue and the table would be three passes over the same
+     transactions to reach the same answer. */
+  function model() {
+    const idx = accountIndex();
+    return S.accounts.map(a => {
+      const entry = idx.get(a);
+      const rows = entry ? entry.rows : [];
+      const labels = entry ? entry.labels : new Set();
+      const st = statusOf(a, rows);
+      const act = periodActivity(labels);
+      return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a) }, st);
+    });
+  }
+
+  /* ------------------------------- band 1 --------------------------------
+     One figure, and the ring that says what it is made of. */
+
+  function renderSummary(rows) {
+    const wrap = $('#acctSummary');
+    if (!wrap) return;
+    wrap.empty();
+
+    /* By the SIGN of the balance rather than by account type: a credit card in
+       credit is not a liability, and an overdrawn cheque account is one. */
+    let assets = 0, liabilities = 0;
+    for (const a of S.accounts) {
+      if (a.balance >= 0) assets += a.balance; else liabilities += -a.balance;
+    }
+    const net = assets - liabilities;
+    const attention = rows.filter(wantsALook).length;
+    const oldest = rows.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
+
+    /* Only qualify the figure when there IS something elsewhere for it to
+       disagree with. On a vault with no assets and no debts the pages report
+       the same number, and a caveat about a difference that does not exist is
+       just noise. */
+    const elsewhere = (S.assets || []).some(x => x.value > 0)
+      || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
+
+    const hero = el('div', { class: 'card hero acct-hero' },
+      el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
+      el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
+      el('div', { class: 'hero-sub' },
+        i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
+        + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')));
+
+    const facts = el('div', { class: 'acct-hero-facts' });
+    const fact = (label, value, cls) => facts.append(el('div', { class: 'acct-fact' },
+      el('div', { class: 'acct-fact-l' }, label),
+      el('div', { class: `acct-fact-v${cls ? ' ' + cls : ''}` }, value)));
+    fact(i18n.t('acct.hero.count'), String(S.accounts.length));
+    fact(i18n.t('acct.kpi.attention'), String(attention), attention > 0 ? 'text-warning' : '');
+    fact(i18n.t('acct.hero.oldest'),
+      oldest < 0 ? i18n.t('acct.hero.oldestNone') : i18n.t('acct.hero.oldestDays', { count: oldest }));
+    hero.append(facts);
+
+    wrap.append(hero, whereItSits());
+  }
+
+  /* The ring. Positive group totals only — a donut cannot draw a negative
+     wedge, and a group whose card debt exceeds its cash is a bar-chart problem.
+     Rather than drop it silently (which would leave the ring and the hero
+     quietly disagreeing), such a group is NAMED under the legend. */
+  function whereItSits() {
+    const groups = ACCT_GROUPS.map(([key]) => ({
+      key,
+      colour: GROUP_COLOUR[key] || 'var(--color-accent)',
+      total: S.accounts.filter(a => groupOf(a) === key).reduce((s, a) => s + a.balance, 0),
+    })).filter(g => g.total !== 0);
+
+    const drawn = groups.filter(g => g.total > 0).sort((x, y) => y.total - x.total);
+    const negative = groups.filter(g => g.total < 0);
+    const sum = drawn.reduce((s, g) => s + g.total, 0);
+
+    const card = el('div', { class: 'card acct-ring' });
+    card.append(el('div', { class: 'card-h' },
+      el('div', {},
+        el('h2', {}, i18n.t('acct.where.title')),
+        el('div', { class: 'sub' }, i18n.t('acct.where.sub')))));
+
+    const body = el('div', { class: 'body-pad acct-ring-body' });
+    if (!sum) { card.append(body); return card; }
+
+    const pctOf = g => (g.total / sum) * 100;
+    const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 92;
+    const { svg, add } = createChart({
+      w: W, h: H, cls: 'donut acct-donut',
+      label: i18n.t('acct.where.aria', {
+        parts: drawn.map(g => i18n.t('acct.where.part',
+          { group: i18n.t(g.key), pct: Math.round(pctOf(g)) })).join(', '),
+      }),
+    });
+
+    let a0 = -Math.PI / 2;                  // 12 o'clock, so the largest slice starts at the top
+    for (const g of drawn) {
+      const sweep = (g.total / sum) * Math.PI * 2;
+      const seg = add('path', {
+        d: arcPath(cx, cy, rOut, rIn, a0, a0 + sweep),
+        fill: g.colour, stroke: themeColors(root).hole, 'stroke-width': '2',
+      });
+      tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${Math.round(pctOf(g))}%`);
+      a0 += sweep;
+    }
+    add('text', {
+      x: cx, y: cy + 10, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '700',
+      fill: 'currentColor', 'font-family': 'inherit',
+    }).textContent = money(sum, 0);
+
+    const legend = el('ul', { class: 'donut-legend acct-ring-legend' });
+    for (const g of drawn) {
+      legend.append(el('li', {},
+        el('i', { style: `background:${g.colour}` }),
+        el('span', { class: 'dl-name' }, i18n.t(g.key)),
+        el('span', { class: 'dl-val num' }, money(g.total, 0)),
+        el('span', { class: 'dl-pct' }, `${Math.round(pctOf(g))}%`)));
+    }
+    body.append(svg, legend);
+    if (negative.length) {
+      body.append(el('div', { class: 'acct-ring-note' },
+        i18n.t('acct.where.negative', {
+          count: negative.length,
+          names: negative.map(g => i18n.t(g.key)).join(', '),
+        })));
+    }
+    card.append(body);
+    return card;
+  }
+
+  /* ------------------------------- band 2 --------------------------------
+     The queue. This is the band the redesign exists for: the page has always
+     KNOWN which accounts could not be trusted — it reported the number in a
+     tile and then left the reader to find them. */
+
+  /* Four is what fits without pushing the ledger off the screen. A queue that
+     scrolls is not a queue — but the remainder is NAMED rather than dropped,
+     because a silent cap reads as "that is all of them". */
+  const DECK_MAX = 4;
+
+  function deckWhy(r) {
+    if (r.state === 'drift') {
+      return i18n.t('acct.deck.why.drift',
+        { count: r.rec.count, implied: money(r.rec.implied), stated: money(r.a.balance) });
+    }
+    if (r.state === 'stale') {
+      return i18n.t('acct.deck.why.stale', { count: r.days, date: r.a.balance_updated });
+    }
+    return i18n.t(r.state === 'nodate' ? 'acct.deck.why.nodate' : 'acct.deck.why.notx');
+  }
+
+  /* The ONE action a reader would take without looking. Everything else is
+     "Review", which opens this account's drawer in the table below — so there
+     is one place to act in a hurry and one place to act in depth, rather than
+     two competing copies of the same controls. */
+  function deckAction(r) {
+    if (r.state === 'drift') {
+      return { label: i18n.t('acct.deck.do.drift', { amount: money(r.rec.implied) }),
+        run: () => acceptImplied(r.a, r.rec.implied) };
+    }
+    if (r.state === 'stale' || r.state === 'nodate') {
+      return { label: i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'),
+        run: () => editBalance(r.a) };
+    }
+    return { label: i18n.t('acct.deck.do.notx'), run: () => editAccount(r.a) };
+  }
+
+  function renderDeck(rows) {
+    const wrap = $('#acctDeck');
+    if (!wrap) return;
+    wrap.empty();
+
+    const flagged = queueOrder(rows);
+
+    /* An empty queue is not an empty shelf: the whole band collapses to one
+       quiet line, which is the state most weeks will be in. */
+    if (!flagged.length) {
+      /* An empty vault gets the table's own empty state, not an all-clear about
+         nothing. The class is cleared too: leaving a stale `acct-deck` on an
+         empty div would paint a bordered amber box with no content in it. */
+      if (!S.accounts.length) { wrap.className = ''; return; }
+      wrap.className = 'acct-deck is-clear mb-4';
+      wrap.append(
+        el('div', { class: 'acct-deck-h' },
+          el('span', { class: 'acct-deck-dot' }),
+          el('h2', {}, i18n.t('acct.deck.clear'))),
+        el('div', { class: 'acct-deck-sub' }, i18n.t('acct.deck.clearSub')));
+      return;
+    }
+
+    wrap.className = 'acct-deck mb-4';
+    wrap.append(
+      el('div', { class: 'acct-deck-h' },
+        el('span', { class: 'acct-deck-dot' }),
+        el('h2', {}, i18n.t('acct.deck.title', { count: flagged.length }))),
+      el('div', { class: 'acct-deck-sub' }, i18n.t('acct.deck.sub')));
+
+    const list = el('div', { class: 'acct-deck-list' });
+    for (const r of flagged.slice(0, DECK_MAX)) {
+      const act = deckAction(r);
+      const reviewBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost',
+        'aria-label': i18n.t('acct.deck.ariaReview', { name: r.a.name }) }, i18n.t('acct.deck.review'));
+      reviewBtn.addEventListener('click', () => openRow(r.a.name, true));
+      const doBtn = el('button', { type: 'button', class: 'acct-deck-btn' }, icoEl(['check']), act.label);
+      doBtn.addEventListener('click', act.run);
+      list.append(el('div', { class: 'acct-deck-item' },
+        el('div', { class: 'acct-deck-txt' },
+          el('div', { class: 'acct-deck-name' }, r.a.name),
+          el('div', { class: 'acct-deck-why' }, deckWhy(r))),
+        el('div', { class: 'acct-deck-acts' }, reviewBtn, doBtn)));
+    }
+    wrap.append(list);
+
+    const rest = flagged.length - Math.min(flagged.length, DECK_MAX);
+    if (rest > 0) {
+      const more = el('button', { type: 'button', class: 'acct-deck-btn ghost acct-deck-more' },
+        i18n.t('acct.deck.more', { count: rest }));
+      more.addEventListener('click', () => {
+        view().filter = 'flag';
+        view().open = null;
+        renderAccounts();
+      });
+      wrap.append(more);
+    }
+  }
+
+  /* ------------------------------- band 3 --------------------------------
+     The ledger. Reuses the sheet's own .table rules, so a row here and a row
+     on the Dashboard's Budget vs Actual card are the same object. */
+
+  const FILTERS = () => [
+    { key: 'all', label: i18n.t('acct.filter.all'), test: () => true },
+    ...ACCT_GROUPS.map(([key]) => ({ key, label: i18n.t(key), test: r => r.group === key })),
+    { key: 'flag', label: i18n.t('acct.filter.flag'), test: wantsALook, warn: true },
+  ];
+
+  const SORTERS = {
+    name:    (x, y) => x.a.name.localeCompare(y.a.name),
+    balance: (x, y) => x.a.balance - y.a.balance,
+    flow:    (x, y) => x.flow - y.flow,
+    stale:   (x, y) => staleRank(x) - staleRank(y),
+  };
+
+  function visibleRows(rows) {
+    const v = view();
+    const f = FILTERS().find(x => x.key === v.filter) || FILTERS()[0];
+    const q = (v.q || '').trim().toLowerCase();
+    return rows
+      .filter(r => f.test(r))
+      .filter(r => !q || `${r.a.name} ${r.a.institution || ''} ${r.a.type}`.toLowerCase().includes(q))
+      .sort((x, y) => (SORTERS[v.sort] || SORTERS.balance)(x, y) * v.dir);
+  }
+
+  function renderFilters(rows) {
+    const wrap = $('#acctFilters');
+    if (!wrap) return;
+    wrap.empty();
+    const v = view();
+    for (const f of FILTERS()) {
+      const n = rows.filter(f.test).length;
+      /* A chip that filters to nothing is a control that cannot be used. "All"
+         always stands — it is how you get back — but a vault with no
+         investments has no business offering an Investments tab, and "Needs a
+         look" disappearing entirely IS the good news. The one exception is a
+         chip that is currently selected: removing the control the reader is
+         standing on would strand them on an empty table with no way back. */
+      if (!n && f.key !== 'all' && v.filter !== f.key) continue;
+      const b = el('button', { type: 'button',
+        class: `acct-seg${f.warn ? ' is-warn' : ''}`,
+        'aria-pressed': String(v.filter === f.key) },
+        f.label, el('span', { class: 'acct-seg-n' }, String(n)));
+      b.addEventListener('click', () => {
+        v.filter = f.key;
+        v.open = null;                     // a drawer left open under a filtered-out row
+        renderAccounts();
+      });
+      wrap.append(b);
+    }
+  }
+
+  /* A running total through the period, drawn as a line with no axis and no
+     numbers: its job is SHAPE — climbing, flat, or falling off a cliff.
+     Deliberately the cumulative MOVEMENT rather than the balance itself: the
+     opening balance for the period is not a figure this page knows, and
+     inventing one would put a number under the reader's eye that no file says.
+     An account nothing moved through gets no line at all, because a flat
+     stroke would claim a month that was measured and found still. */
+  function sparkline(r) {
+    const rowsInPeriod = txInPeriod(S.period)
+      .filter(t => r.labels.has(t.label) && !supersededBySplit(t))
+      .sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+    if (rowsInPeriod.length < 2) return null;
+
+    let run = 0;
+    const series = [0];
+    for (const t of rowsInPeriod) { run += t.amount; series.push(run); }
+
+    const W = 96, H = 24, pad = 2;
+    const lo = Math.min(...series), hi = Math.max(...series), span = (hi - lo) || 1;
+    /* The one inversion (SVG's y grows downward) happens here and nowhere else,
+       so the series above stays plain ascending-is-up. */
+    const d = series.map((v, i) => {
+      const x = (i / (series.length - 1)) * W;
+      const y = H - pad - ((v - lo) / span) * (H - pad * 2);
+      return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    }).join(' ');
+
+    const { svg, add } = createChart({ w: W, h: H, cls: 'acct-spark' });
+    add('path', {
+      d, fill: 'none', stroke: colourOf(r.a), 'stroke-width': '1.8',
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: '0.85',
+    });
+    svg.removeAttribute('role');            // decorative: the figures are in the cells beside it
+    svg.setAttribute('aria-hidden', 'true');
+    return svg;
+  }
+
+  /* The goal / limit cell: a credit card measured against its limit, a savings
+     pot against its goal, an investment against what was put into it. Same bar
+     and same thresholds as the Dashboard's budget bars, so a filled bar means
+     one thing everywhere in this app. */
+  function goalCell(r) {
+    const a = r.a;
+    const bar = (pct, tone, label) => el('span', { class: 'acct-goal' },
+      el('span', { class: 'acct-mbar' },
+        el('i', { class: tone || '', style: `width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%` })),
+      el('span', { class: 'acct-mbar-l' }, label));
+
+    const u = utilisationOf(a);
+    if (u) {
+      return bar(u.pct, u.over ? 'bg-danger' : u.near ? 'bg-warning' : '',
+        u.over ? i18n.t('acct.overLimit', { amount: money(-u.available, 0) })
+          : i18n.t('acct.limitOf', { pct: Math.round(u.pct), amount: money(a.credit_limit, 0) }));
+    }
+    if (a.goal_amount > 0) {
+      const pct = (a.balance / a.goal_amount) * 100;
+      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(pct), amount: money(a.goal_amount, 0) }));
+    }
+    if (a.total_invested > 0) {
+      const pct = ((a.balance - a.total_invested) / a.total_invested) * 100;
+      return bar(100, pct < 0 ? 'bg-warning' : '',
+        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: money(a.total_invested, 0) }));
+    }
+    return el('span', { class: 'acct-dash' }, '—');
+  }
+
+  function statePill(r) {
+    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', nodate: 'warn', notx: 'warn' }[r.state];
+    const label = r.state === 'stale'
+      ? i18n.t('acct.state.stale', { count: r.days })
+      : i18n.t(`acct.state.${r.state}`);
+    return el('span', { class: `acct-pill ${cls}` }, label);
+  }
+
+  function accountRow(r) {
+    const a = r.a, v = view();
+    const open = v.open === a.name;
+    const tr = el('tr', {
+      class: `acct-row${r.state === 'drift' ? ' is-drift' : wantsALook(r) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
+      tabindex: '0',
+      'aria-expanded': String(open),
+      'aria-label': i18n.t('acct.aria.row', { name: a.name }),
+    });
+
+    /* The name is the drill-through to this account's transactions. A button
+       rather than a link: it moves the view, it does not navigate anywhere a
+       URL could describe. */
+    const primary = [...r.labels][0];
+    const nameEl = primary
+      ? el('button', { type: 'button', class: 'acct-name-btn',
+        'aria-label': i18n.t('acct.aria.showTx', { name: a.name }) }, a.name)
+      : el('span', { class: 'acct-name-btn is-plain' }, a.name);
+    if (primary) {
+      nameEl.addEventListener('click', e => { e.stopPropagation(); openTransactions(primary); });
+    }
+
+    const balBtn = el('button', { type: 'button',
+      class: `acct-bal num${a.balance < 0 ? ' text-danger' : ''}`,
+      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }) },
+      money(a.balance));
+    balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
+
+    const flowCell = r.act.count
+      ? el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}` },
+        `${r.flow >= 0 ? '+' : '−'}${money(Math.abs(r.flow), 0)}`)
+      : el('span', { class: 'acct-dash' }, '—');
+
+    const spark = sparkline(r);
+
+    tr.append(
+      el('td', {}, el('div', { class: 'acct-cell-name' },
+        el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }),
+        el('span', {}, nameEl,
+          el('span', { class: 'acct-cell-sub' },
+            [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · '))))),
+      el('td', { class: 'num' }, balBtn),
+      el('td', { class: 'num acct-col-drop' }, flowCell),
+      el('td', { class: 'acct-col-drop' }, spark || el('span', { class: 'acct-dash' }, '—')),
+      el('td', { class: 'acct-col-drop' }, goalCell(r)),
+      el('td', { class: 'acct-col-drop' },
+        el('span', { class: 'acct-when' }, a.balance_updated || i18n.t('acct.noDate'))),
+      el('td', {}, statePill(r)));
+
+    tr.addEventListener('click', () => openRow(a.name, false));
+    tr.addEventListener('keydown', e => {
+      if (e.target !== tr) return;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      openRow(a.name, false);
+    });
+    return tr;
+  }
+
+  /* Everything the tile used to carry below its balance, moved wholesale into
+     a drawer that opens under the row. Nothing here is new information — it is
+     the same badges, the same activity line and the same reconciliation offer,
+     shown when the reader asks for one account rather than for all of them. */
+  function drawerRow(r) {
+    const a = r.a;
+    const box = el('div', { class: 'acct-drawer' });
+
+    box.append(el('div', { class: 'acct-drawer-h' },
+      el('h3', {}, a.name),
+      el('div', { class: `acct-drawer-v num${a.balance < 0 ? ' text-danger' : ''}` }, money(a.balance))));
+
+    const grid = el('div', { class: 'acct-drawer-grid' });
+    const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },
+      el('div', { class: 'acct-drawer-l' }, label),
+      el('div', { class: 'acct-drawer-val num' }, value)));
+
+    const u = utilisationOf(a);
+    if (u) {
+      f(i18n.t('acct.drawer.limit'), money(a.credit_limit));
+      f(i18n.t('acct.drawer.available'), money(u.available));
+    }
+    if (a.goal_amount > 0) {
+      f(i18n.t('acct.drawer.goal'), money(a.goal_amount));
+      f(i18n.t('acct.drawer.toGo'), money(Math.max(0, a.goal_amount - a.balance)));
+    }
+    if (a.total_invested > 0) {
+      f(i18n.t('acct.drawer.invested'), money(a.total_invested));
+      f(i18n.t('acct.drawer.growth'), money(a.balance - a.total_invested));
+    }
+    if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), money(a.monthly_contribution));
+    if (r.act.count) {
+      f(i18n.t('acct.drawer.flow'),
+        `+${money(r.act.inAmt, 0)} · −${money(r.act.outAmt, 0)}`);
+      f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
+    }
+    f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
+    f(i18n.t('acct.drawer.inBudget'), i18n.t(a.in_budget ? 'acct.drawer.yes' : 'acct.drawer.no'));
+    box.append(grid);
+
+    /* The badges the tile carried. Kept because they say things the state pill
+       cannot: "not in budget" is not a problem with the figure, it is a fact
+       about what the figure counts toward. */
+    const badges = el('div', { class: 'acct-badges' });
+    if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
+    if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
+    if (a.balance_updated && r.days === null) {
+      badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
+    }
+    if (badges.childElementCount) box.append(badges);
+
+    box.append(reconLine(r));
+
+    const acts = el('div', { class: 'acct-drawer-acts' });
+    const act = (label, aria, run) => {
+      const b = el('button', { type: 'button', class: 'acct-drawer-act', 'aria-label': aria }, label);
+      b.addEventListener('click', run);
+      acts.append(b);
+    };
+    act(i18n.t('acct.btn.editBalance'),
+      i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }), () => editBalance(a));
+    const primary = [...r.labels][0];
+    if (primary) {
+      act(i18n.t('acct.btn.seeTx'), i18n.t('acct.aria.showTx', { name: a.name }),
+        () => openTransactions(primary));
+    }
+    act(i18n.t('acct.btn.edit'), i18n.t('acct.aria.edit', { name: a.name }), () => editAccount(a));
+    act(i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'),
+      i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }),
+      () => toggleBudget(a));
+    act(i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }),
+      () => openAccountFile(a));
+    box.append(acts);
+
+    const td = el('td', { colspan: '7', class: 'acct-drawer-cell' }, box);
+    return el('tr', { class: 'acct-drawer-row' }, td);
+  }
+
+  /* The reconciliation, stated the same way it always was — the arithmetic and
+     an offer, never a silent correction. */
+  function reconLine(r) {
+    const a = r.a, rec = r.rec;
+    const line = el('div', { class: 'acct-recon' });
+    if (rec.state === 'drift') {
+      const diff = rec.implied - a.balance;
+      line.append(el('div', { class: 'acct-recon-txt' },
+        i18n.t('acct.drawer.drift', {
+          count: rec.count,
+          date: a.balance_updated,
+          implied: money(rec.implied),
+          diff: money(Math.abs(diff), 0),
+          dir: i18n.t(diff < 0 ? 'acct.drawer.lower' : 'acct.drawer.higher'),
+        }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '')));
+      const btn = el('button', { type: 'button', class: 'acct-recon-btn',
+        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: money(rec.implied) }) },
+        icoEl(['check']), i18n.t('acct.recon.useThis'));
+      btn.addEventListener('click', () => acceptImplied(a, rec.implied));
+      line.append(btn);
+      return line;
+    }
+    const txt = r.state === 'notx' ? i18n.t('acct.drawer.recon.notx')
+      : r.state === 'nodate' ? i18n.t('acct.drawer.recon.nodate')
+        : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
+          : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
+            : i18n.t('acct.drawer.recon.ok');
+    line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` }, txt));
+    if (r.state === 'stale' || r.state === 'nodate') {
+      const btn = el('button', { type: 'button', class: 'acct-recon-btn' },
+        i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'));
+      btn.addEventListener('click', () => editBalance(a));
+      line.append(btn);
+    }
+    return line;
+  }
+
+  function sortHeader(key, label) {
+    const v = view();
+    const on = v.sort === key;
+    const th = el('th', { class: on ? 'is-sorted' : '', scope: 'col' });
+    const b = el('button', { type: 'button', 'aria-label': i18n.t('acct.aria.sortBy', { column: label }) },
+      label, el('span', { class: 'acct-caret' }, on ? (v.dir === -1 ? '↓' : '↑') : '↕'));
+    b.addEventListener('click', () => {
+      if (v.sort === key) v.dir = -v.dir;
+      else { v.sort = key; v.dir = key === 'name' ? 1 : -1; }
+      renderAccounts();
+    });
+    th.append(b);
+    return th;
+  }
+
+  function renderTable(rows) {
+    const table = $('#acctTable');
+    if (!table) return;
+    table.empty();
+    const v = view();
+    const shown = visibleRows(rows);
+
+    const head = el('tr', {},
+      sortHeader('name', i18n.t('acct.col.account')),
+      sortHeader('balance', i18n.t('acct.col.balance')),
+      sortHeader('flow', periodMonthName(S.period)),
+      el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')),
+      el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')),
+      sortHeader('stale', i18n.t('acct.col.confirmed')),
+      el('th', { scope: 'col' }, i18n.t('acct.col.state')));
+    head.children[2].classList.add('acct-col-drop', 'num');
+    head.children[5].classList.add('acct-col-drop');
+    table.append(el('thead', {}, head));
+
+    const body = el('tbody', {});
+    const emit = r => {
+      body.append(accountRow(r));
+      if (v.open === r.a.name) body.append(drawerRow(r));
+    };
+
+    if (!shown.length) {
+      body.append(el('tr', { class: 'acct-empty' },
+        el('td', { colspan: '7' },
+          S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
+    } else if (v.grouped) {
+      for (const [key] of ACCT_GROUPS) {
+        const inGroup = shown.filter(r => r.group === key);
+        if (!inGroup.length) continue;
+        const total = inGroup.reduce((s, r) => s + r.a.balance, 0);
+        body.append(el('tr', { class: 'type-row' },
+          el('td', { colspan: '7' },
+            i18n.t(key),
+            el('span', { class: 'acct-group-total num' }, money(total)))));
+        for (const r of inGroup) emit(r);
+      }
+    } else {
+      for (const r of shown) emit(r);
+    }
+    table.append(body);
+
+    const sub = $('#acctTblSub');
+    if (sub) {
+      sub.textContent =
+        (shown.length === S.accounts.length
+          ? i18n.t('acct.table.subAll', { count: S.accounts.length })
+          : i18n.t('acct.table.subSome', { shown: shown.length, total: S.accounts.length }))
+        + i18n.t(v.grouped ? 'acct.table.grouped' : 'acct.table.flat')
+        + i18n.t('acct.table.sortedBy', { column: i18n.t(`acct.sort.${v.sort}`) });
+    }
+    const toggle = $('#acctGroupToggle');
+    if (toggle) toggle.setAttribute('aria-pressed', String(v.grouped));
+    const search = $('#acctSearch');
+    if (search && search.value !== v.q) search.value = v.q;
+  }
+
+  /* Open (or close) one account's drawer. `scroll` is for the queue's Review
+     button, which may be pointing at a row a filter is currently hiding — so
+     it clears a group filter first rather than scrolling to nothing. */
+  function openRow(name, scroll) {
+    const v = view();
+    if (scroll && v.filter !== 'all' && v.filter !== 'flag') v.filter = 'all';
+    v.open = v.open === name && !scroll ? null : name;
+    renderAccounts();
+    if (!scroll || !v.open) return;
+    const table = $('#acctTable');
+    if (!table) return;
+    for (const tr of table.querySelectorAll('tr.acct-row')) {
+      if (tr.classList.contains('is-open')) { tr.scrollIntoView({ block: 'center' }); tr.focus(); break; }
+    }
+  }
+
+  function renderAccounts() {
+    const rows = model();
+    renderSummary(rows);
+    renderDeck(rows);
+    renderFilters(rows);
+    renderTable(rows);
+  }
 
   /* Credit-card utilisation, or null when it would mean nothing (not a card, or
      no limit recorded). A card's balance is stored negative when money is owed,
@@ -232,189 +932,6 @@ module.exports = function registerAccounts(ctx) {
     const over = used > a.credit_limit;
     return { used, pct, over, near: !over && pct >= 85, available: a.credit_limit - used };
   }
-  function utilisation(a) {
-    const u = utilisationOf(a);
-    if (!u) return null;
-    const { used, pct, over, near, available } = u;
-    return el('div', { class: 'acct-util' },
-      el('div', { class: 'acct-util-top' },
-        el('span', {}, i18n.t('acct.creditUsed')),
-        el('span', { class: 'num' }, i18n.t('acct.creditOf', { used: money(used, 0), limit: money(a.credit_limit, 0) }))),
-      el('div', { class: 'cat-bar' },
-        el('i', { class: `cat-bar-fill${over ? ' bg-danger' : near ? ' bg-warning' : ''}`,
-          style: `width:${Math.min(100, pct).toFixed(1)}%` })),
-      el('div', { class: `acct-util-sub${over ? ' text-danger' : near ? ' text-warning' : ''}` },
-        over
-          ? i18n.t('acct.overLimit', { amount: money(-available, 0) })
-          : i18n.t('acct.utilised', { pct: Math.round(pct), available: money(available, 0) })));
-  }
-
-  function renderKpis() {
-    const wrap = $('#acctKpis');
-    if (!wrap) return;
-    wrap.empty();
-    /* By the SIGN of the balance rather than by account type: a credit card in
-       credit is not a liability, and an overdrawn cheque account is one.
-
-       Scoped to THIS PAGE's accounts, and says so. Savings & Investments
-       reports a whole-household net worth that also carries the Assets page
-       and the Debt page, so the two figures legitimately differ — but a tile
-       labelled "Net worth" with no qualifier reads as the household's, and a
-       reader who spots the two disagreeing has no way to tell which is wrong.
-       The sub-line is what makes them both true at once. */
-    let assets = 0, liabilities = 0;
-    for (const a of S.accounts) {
-      if (a.balance >= 0) assets += a.balance; else liabilities += -a.balance;
-    }
-    const idx = accountIndex();
-    const attention = S.accounts.filter(a => {
-      const e = idx.get(a);
-      if (!e) return true;                                   // nothing importing into it
-      if (isStale(a.balance_updated)) return true;            // never confirmed, or long ago
-      return reconcile(a, e.rows).state === 'drift';
-    }).length;
-
-    // Only qualify the tile when there IS something elsewhere for it to
-    // disagree with — on a vault with no assets and no debts the two pages
-    // report the same number, and a caveat about a difference that does not
-    // exist is just noise.
-    const elsewhere = (S.assets || []).some(a => a.value > 0)
-      || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
-
-    const tile = kpiTiles(wrap);
-    tile(i18n.t('acct.kpi.inCredit'), money(assets), 'text-success');
-    tile(i18n.t('acct.kpi.overdrawn'), money(liabilities), liabilities > 0 ? 'text-danger' : '');
-    tile(i18n.t('acct.kpi.netWorth'), money(assets - liabilities), assets - liabilities >= 0 ? 'grad-txt' : 'text-danger',
-      elsewhere ? i18n.t('acct.kpi.netWorthNote') : null);
-    tile(i18n.t('acct.kpi.attention'), String(attention), attention > 0 ? 'text-warning' : '',
-      i18n.t(attention > 0 ? 'acct.kpi.attentionNote' : 'acct.kpi.allGood'));
-  }
-
-  function accountTile(a, entry) {
-    const labels = entry ? entry.labels : new Set();
-    const rows = entry ? entry.rows : [];
-    const card = el('div', { class: 'mini' });
-
-    // The name is the drill-through. A button rather than a link: this moves
-    // the view, it does not navigate anywhere a URL could describe.
-    const primary = [...labels][0];
-    if (primary) {
-      const nameBtn = el('button', { type: 'button', class: 'l acct-name-btn',
-        'aria-label': i18n.t('acct.aria.showTx', { name: a.name }) }, a.name);
-      nameBtn.addEventListener('click', () => openTransactions(primary));
-      card.append(nameBtn);
-    } else {
-      card.append(el('div', { class: 'l' }, a.name));
-    }
-
-    const v = el('button', { type: 'button', class: `v num${a.balance < 0 ? ' text-danger' : ''}`,
-      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }) }, money(a.balance));
-    v.addEventListener('click', () => editBalance(a));
-    card.append(v);
-
-    // The limit is dropped from this line when the utilisation bar below is
-    // going to state it in full — saying it twice just crowds the tile.
-    const util = utilisation(a);
-    card.append(el('div', { class: 's' },
-      [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · '),
-      !util && a.credit_limit ? i18n.t('acct.limitSuffix', { amount: money(a.credit_limit, 0) }) : '',
-      a.monthly_contribution ? i18n.t('acct.monthlySuffix', { amount: money(a.monthly_contribution, 0) }) : ''));
-    if (util) card.append(util);
-
-    /* Badges — the state of the figure above, not the account's details. */
-    const days = daysSince(a.balance_updated);
-    const badges = el('div', { class: 'acct-badges' });
-    if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
-    if (!rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
-    if (a.balance_updated && days === null) badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
-    else if (days === null) badges.append(badge(i18n.t('acct.badge.neverConfirmed'), 'warn'));
-    else if (days > STALE_DAYS) badges.append(badge(i18n.t('acct.badge.unconfirmed', { count: days }), 'warn'));
-    if (badges.childElementCount) card.append(badges);
-
-    /* Activity in the period the header is showing. */
-    const act = periodActivity(labels);
-    if (act.count) {
-      card.append(el('div', { class: 'acct-act' },
-        el('span', { class: 'text-success' }, `+${money(act.inAmt, 0)}`), i18n.t('acct.act.in'),
-        el('span', { class: 'text-danger' }, `-${money(act.outAmt, 0)}`), i18n.t('acct.act.out'),
-        i18n.t('acct.act.count', { count: act.count, month: periodMonthName(S.period) })));
-    }
-
-    /* Reconciliation — the stated figure measured against what has moved. */
-    const rec = reconcile(a, rows);
-    // Rows dated ahead of today are named wherever they exist, so "matches your
-    // transactions" is never quietly hiding a scheduled debit order.
-    const pending = n => (n ? i18n.t('acct.recon.pending', { count: n }) : '');
-    if (rec.state === 'drift') {
-      const line = el('div', { class: 'acct-recon' },
-        el('div', { class: 'acct-recon-txt' },
-          i18n.t('acct.recon.since', { count: rec.count }),
-          el('b', { class: 'num' }, money(rec.implied)),
-          pending(rec.ahead)));
-      const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: money(rec.implied) }) },
-        icoEl(['check']), i18n.t('acct.recon.useThis'));
-      btn.addEventListener('click', () => acceptImplied(a, rec.implied));
-      line.append(btn);
-      card.append(line);
-    } else if (rec.state === 'clean') {
-      card.append(el('div', { class: 'acct-recon' },
-        el('div', { class: 'acct-recon-txt text-success' }, i18n.t('acct.recon.matches'))));
-    } else if (rec.state === 'pending') {
-      card.append(el('div', { class: 'acct-recon' },
-        el('div', { class: 'acct-recon-txt text-muted' },
-          i18n.t('acct.recon.upToDate', { count: rec.ahead }))));
-    } else if (rec.state === 'no-date' && rows.length) {
-      card.append(el('div', { class: 'acct-recon' },
-        el('div', { class: 'acct-recon-txt text-muted' },
-          i18n.t('acct.recon.setDate'))));
-    }
-
-    /* Footer — the two actions that are about the FILE rather than the figure. */
-    const foot = el('div', { class: 'acct-foot' });
-    const updated = a.balance_updated ? i18n.t('acct.foot.updated', { date: a.balance_updated }) : i18n.t('acct.foot.noDate');
-    foot.append(el('span', { class: 's2' }, updated));
-    const acts = el('span', { class: 'acct-foot-acts' });
-    const budgetBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }) },
-      i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'));
-    budgetBtn.addEventListener('click', () => toggleBudget(a));
-    const editBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': i18n.t('acct.aria.edit', { name: a.name }) }, i18n.t('acct.btn.edit'));
-    editBtn.addEventListener('click', () => editAccount(a));
-    const openBtn = el('button', { type: 'button', class: 'acct-link',
-      'aria-label': i18n.t('acct.aria.openNote', { name: a.name }) }, i18n.t('acct.btn.openNote'));
-    openBtn.addEventListener('click', () => openAccountFile(a));
-    acts.append(editBtn, budgetBtn, openBtn);
-    foot.append(acts);
-    card.append(foot);
-
-    return card;
-  }
-
-  function renderAccounts() {
-    renderKpis();
-    const idx = accountIndex();
-    const wrap = $('#acctSections'); wrap.empty();
-    for (const [titleKey, types] of ACCT_GROUPS) {
-      const accounts = S.accounts.filter(a => types.includes(a.type));
-      if (!accounts.length) continue;
-      const grid = el('div', { class: 'mini-grid' });
-      const total = accounts.reduce((a, b) => a + b.balance, 0);
-      for (const a of accounts) grid.append(accountTile(a, idx.get(a)));
-      wrap.append(el('div', { class: 'card mb-4' },
-        el('div', { class: 'card-h' },
-          el('div', {}, el('h2', {}, i18n.t(titleKey)), el('div', { class: 'sub' }, i18n.t('acct.group.count', { count: accounts.length }))),
-          el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total))))),
-        el('div', { class: 'body-pad' }, grid)));
-    }
-    if (!S.accounts.length) {
-      wrap.append(el('div', { class: 'card' }, el('div', { class: 'body-pad' },
-        el('p', { class: 'text-muted', style: 'margin:0' },
-          i18n.t('acct.empty')))));
-    }
-  }
-
   /* `keys` names the extra frontmatter fields to write from the model — the
      edit form passes EDITABLE_KEYS, everything else passes nothing. The balance,
      its date and the budget flag are always patched, because they are the only
@@ -551,6 +1068,12 @@ module.exports = function registerAccounts(ctx) {
   // accountIndex used to be published here too; it now lives on period.js,
   // which is where Savings reaches it from as well. Publishing it twice would
   // be a duplicate ctx key, which shell-contract.test.cjs rejects.
+  /* The two shell controls the controller wires. They live here rather than in
+     controller.js so the shape of S.acctView has exactly one owner. */
+  function acctSearch(q) { view().q = q; view().open = null; renderAccounts(); }
+  function acctToggleGroup() { const v = view(); v.grouped = !v.grouped; renderAccounts(); }
+
   ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount,
+    acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };
