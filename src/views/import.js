@@ -17,9 +17,10 @@ const { normalizeAmount } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, counterpartyAccount } = require('../statement');
 const { prepareRules, autoCategorise } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
+const { confirmModal } = require('../modal');
 
 module.exports = function registerImport(ctx) {
-  const { S, $, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
+  const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -537,5 +538,31 @@ module.exports = function registerImport(ctx) {
     showColumnMapper(p.rows, p.file, p.map);
   }
 
-  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport });
+  /* Drop a parsed-but-uncommitted statement. The review screen had no exit: a
+     file opened by mistake stayed on screen until a DIFFERENT file replaced it
+     or the vault was reloaded from the menu — so the only way out of an import
+     was through it. Nothing has been written to disk at this point, so this
+     costs only the parse. */
+  async function cancelImport() {
+    const p = S.pendingImport;
+    if (!p) return;
+    // Only ask when there is hand work to lose. A file dropped by mistake must
+    // close in one tap; a review someone has spent ten minutes categorising
+    // must not vanish on a mis-tap.
+    if (p.items.some(it => it.manual)) {
+      const go = await confirmModal(app, {
+        title: 'Discard this import?',
+        message: `${p.filename} hasn't been imported yet. The categories you picked on this screen will be lost.`,
+        confirmText: 'Discard import',
+      });
+      if (!go) return;
+    }
+    S.pendingImport = null;
+    importShown = IMPORT_PAGE;     // the next file starts at the first page
+    $('#importReview').classList.add('hidden');
+    $('#importMap').classList.add('hidden');
+    toast('Import cancelled — nothing was saved');
+  }
+
+  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport, cancelImport });
 };

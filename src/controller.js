@@ -591,6 +591,7 @@ function mountApp(view) {
   wireDropZone('#taxDrop', '#taxFileInput', f => ctx.handleTaxFile(f));
   $('#impCommit').addEventListener('click', ctx.commitImport);
   $('#impRemap').addEventListener('click', ctx.remapImport);
+  $('#impCancel').addEventListener('click', ctx.cancelImport);
   wireDropZone('#drop', '#fileInput', f => ctx.handleStatementFile(f));
 
   return {

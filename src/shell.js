@@ -643,6 +643,7 @@ const SHELL_HTML = `
               <div class="sub imp-nonbudget hidden" id="impNonBudget"></div>
             </div>
             <div class="row">
+              <button class="btn-ghost" id="impCancel" title="Discard this statement without importing anything">Cancel import</button>
               <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
               <select id="impAccount" class="form-select form-select-sm"></select>
               <button class="btn-ghost" id="impNewAccount" title="Create an account for these rows to land in"><span class="ico" data-ico="plus"></span> New account</button>
