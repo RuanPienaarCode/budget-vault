@@ -297,6 +297,7 @@ module.exports = {
   'bud.total.leftNote': 'まだ配分していない収入',
   'bud.total.spent': '支出合計',
   'bud.total.spentNote': '予算の {pct}% を使用',
+  'bud.total.spentNoteAssumed': '予算の {pct}% を使用 · 支出済みの {amount} を含む',
 
   'bud.col.category': 'カテゴリ',
   'bud.col.type': '種類',
@@ -306,11 +307,31 @@ module.exports = {
 
   'bud.remaining.over': '{amount} 超過',
   'bud.remaining.left': '残り {amount}',
+  'bud.remaining.assumed': '支出済み',
+
+  'bud.assumed.tag': '支出済み',
+  'bud.assumed.note': '取引の予定なし',
+  'bud.assumed.on': '{category} の予算を支出済みとして数えます',
+  'bud.assumed.off': '{category} は再び実際の取引を数えます',
+  'bud.assumed.missing': '{category} というカテゴリはありません',
+  'bud.assumed.noFile': '{category} のノートを読めませんでした',
+
+  'bud.pull.label': '超過分を取り込む',
+  'bud.pull.title': '{lag} 期間前の超過支出から入力します',
+  'bud.pull.none': '{period} に超過はありません — {amount} 残して終わりました',
+  'bud.pull.confirmTitle': '前期の超過分を取り込む',
+  'bud.pull.confirmBody': '{period} は収入より {amount} 多く使いました。{category} を {amount} にしますか？現在は {current} です。',
+  'bud.pull.confirmOk': '金額を設定',
+  'bud.pull.confirmCancel': 'そのままにする',
+  'bud.pull.done': '{period} から {amount} に設定しました — 予算を保存すると残ります',
 
   'bud.aria.amount': '{category} の予算額',
   'bud.aria.notes': '{category} のメモ',
   'bud.aria.clear': '{category} の予算を消去',
   'bud.title.clear': 'この期間のファイルからこのカテゴリを外す',
+  'bud.aria.assume': '{category} の予算を支出済みとして数える',
+  'bud.title.assumeOn': 'この予算を支出済みとして数えます — 対応する取引は届きません',
+  'bud.title.assumeOff': 'このカテゴリを実際の取引で測り直します',
   'bud.aria.delete': 'カテゴリ {category} を削除',
   'bud.title.delete': 'このカテゴリをすべての場所から削除',
 

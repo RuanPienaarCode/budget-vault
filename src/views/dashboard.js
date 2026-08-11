@@ -45,7 +45,7 @@ function sharePercents(amounts) {
 }
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, accountIndex } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -702,7 +702,15 @@ module.exports = function registerDashboard(ctx) {
     const body = el('tbody', {});
     const budget = S.budgets[S.period] || [];
     const rows = new Map();
-    for (const b of budget) rows.set(b.category, { budget: b.amount, type: b.type, actual: 0, notes: b.notes });
+    /* An assume-spent row IS its own actual — the money left in an earlier
+       period, so no transaction here will ever match it. Seeded before the
+       transaction pass so the bar, the remaining figure and the red are all
+       computed off the amount rather than off a zero that nothing will fill.
+       See the flag's comment in src/load.js. */
+    for (const b of budget) {
+      const assumed = b.type !== 'income' && b.type !== 'transfer' && catAssumeSpent(b.category);
+      rows.set(b.category, { budget: b.amount, type: b.type, actual: assumed ? (b.amount || 0) : 0, notes: b.notes, assumed });
+    }
     for (const [cat, amt] of Object.entries(sum.byCat)) {
       if (!cat) continue;
       const type = catType(cat);
@@ -726,7 +734,9 @@ module.exports = function registerDashboard(ctx) {
          budget to subtract from. Three such rows on this vault came to R995,
          which is why the column did not add up to the figure in the hero. A
          blank cell reads as "nothing to report" — the opposite of the truth. */
-      const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
+      // An assume-spent row is on budget by construction, and a zero-budget one
+      // has nothing to be over — neither is the unbudgeted-spending case.
+      const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0 && !r.assumed;
       const near = !over && r.budget > 0 && r.actual / r.budget >= 0.85;
       const barCls = r.type === 'income' ? '' : (over || unbudgeted) ? ' bg-danger' : near ? ' bg-warning' : '';
       const remaining = r.budget - r.actual;

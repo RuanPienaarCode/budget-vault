@@ -297,6 +297,7 @@ module.exports = {
   'bud.total.leftNote': '尚未分配的收入',
   'bud.total.spent': '支出合计',
   'bud.total.spentNote': '已用预算的 {pct}%',
+  'bud.total.spentNoteAssumed': '已用预算的 {pct}% · 含已支出的 {amount}',
 
   'bud.col.category': '分类',
   'bud.col.type': '类型',
@@ -306,11 +307,31 @@ module.exports = {
 
   'bud.remaining.over': '超出 {amount}',
   'bud.remaining.left': '剩余 {amount}',
+  'bud.remaining.assumed': '已支出',
+
+  'bud.assumed.tag': '已支出',
+  'bud.assumed.note': '不会有对应交易',
+  'bud.assumed.on': '{category} 现在把预算算作已支出',
+  'bud.assumed.off': '{category} 重新按实际交易计算',
+  'bud.assumed.missing': '没有名为 {category} 的分类',
+  'bud.assumed.noFile': '无法读取 {category} 的笔记',
+
+  'bud.pull.label': '取回超支',
+  'bud.pull.title': '用 {lag} 个周期前的超支金额填入',
+  'bud.pull.none': '{period} 没有超支 — 结余 {amount}',
+  'bud.pull.confirmTitle': '取回上期超支',
+  'bud.pull.confirmBody': '{period} 的支出比收入多 {amount}。把 {category} 设为 {amount}？当前是 {current}。',
+  'bud.pull.confirmOk': '设置金额',
+  'bud.pull.confirmCancel': '保持不变',
+  'bud.pull.done': '已按 {period} 设为 {amount} — 保存预算以保留',
 
   'bud.aria.amount': '{category} 的预算金额',
   'bud.aria.notes': '{category} 的备注',
   'bud.aria.clear': '清除 {category} 的预算',
   'bud.title.clear': '把这个分类从本周期的文件中移除',
+  'bud.aria.assume': '把 {category} 的预算算作已支出',
+  'bud.title.assumeOn': '把这笔预算算作已支出 — 不会有对应交易到来',
+  'bud.title.assumeOff': '重新按实际交易衡量这个分类',
   'bud.aria.delete': '删除分类 {category}',
   'bud.title.delete': '在所有位置删除这个分类',
 

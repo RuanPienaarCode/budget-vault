@@ -75,8 +75,8 @@ function mountApp(view) {
   /* ------------------------------- state -------------------------------- */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '' },
-    categories: [],            // {name, type, color}
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '', overspend_lag: 1 },
+    categories: [],            // {name, type, color, assumeSpent, rel}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
     budgetMeta: {},

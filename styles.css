@@ -1658,6 +1658,21 @@
 }
 .budget-app-root .bud-remaining.over { color: var(--color-danger); }
 
+/* Assume-spent rows — a budget whose amount IS the actual spend, because the
+   money left in an earlier period. Deliberately NOT red: nothing is wrong here,
+   the row is exactly on budget by construction. Muted and italic instead, so it
+   reads as "this line is settled" rather than as a warning. */
+.budget-app-root .bud-remaining-assumed { font-style: italic; }
+.budget-app-root .bud-assumed-tag,
+.budget-app-root .bud-assumed-note {
+  font-size: 11.5px; color: var(--ink-faint); font-style: italic;
+  margin-top: 2px; white-space: nowrap;
+}
+.budget-app-root .bud-actual-assumed { color: var(--ink-dim); }
+/* The toggle reads as pressed rather than as another ghost button in the row. */
+.budget-app-root .bud-assume-on { color: var(--color-accent); }
+.budget-app-root .bud-pull { margin-top: 4px; font-size: 11.5px; white-space: nowrap; }
+
 /* Budget page: period totals strip, repeated above and below the table */
 .budget-app-root .bud-totals {
   display: grid;

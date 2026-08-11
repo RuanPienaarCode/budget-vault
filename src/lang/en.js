@@ -311,6 +311,7 @@ module.exports = {
   'bud.total.leftNote': 'income not yet allocated',
   'bud.total.spent': 'Total spent',
   'bud.total.spentNote': '{pct}% of budget used',
+  'bud.total.spentNoteAssumed': '{pct}% of budget used · includes {amount} already spent',
 
   'bud.col.category': 'Category',
   'bud.col.type': 'Type',
@@ -320,11 +321,33 @@ module.exports = {
 
   'bud.remaining.over': '{amount} over',
   'bud.remaining.left': '{amount} left',
+  'bud.remaining.assumed': 'already spent',
+
+  /* Assume-spent: a category whose budgeted amount IS its actual spend,
+     because the money left in an earlier period. */
+  'bud.assumed.tag': 'already spent',
+  'bud.assumed.note': 'no transaction expected',
+  'bud.assumed.on': '{category} now counts its budget as already spent',
+  'bud.assumed.off': '{category} counts actual transactions again',
+  'bud.assumed.missing': 'No category called {category}',
+  'bud.assumed.noFile': 'Could not read the note for {category}',
+
+  'bud.pull.label': 'Pull overspend',
+  'bud.pull.title': 'Fill this in from the overspend {lag} period(s) back',
+  'bud.pull.none': '{period} did not overspend — it ended {amount} up',
+  'bud.pull.confirmTitle': 'Pull previous overspend',
+  'bud.pull.confirmBody': '{period} spent {amount} more than it received. Set {category} to {amount}? It currently reads {current}.',
+  'bud.pull.confirmOk': 'Set the amount',
+  'bud.pull.confirmCancel': 'Leave it',
+  'bud.pull.done': 'Set to {amount} from {period} — save the budget to keep it',
 
   'bud.aria.amount': 'Budget amount for {category}',
   'bud.aria.notes': 'Notes for {category}',
   'bud.aria.clear': 'Clear budget for {category}',
   'bud.title.clear': 'Clear this category from the period file',
+  'bud.aria.assume': 'Count the budget for {category} as already spent',
+  'bud.title.assumeOn': 'Count this budget as already spent — no transaction will arrive for it',
+  'bud.title.assumeOff': 'Go back to measuring this category against actual transactions',
   'bud.aria.delete': 'Delete category {category}',
   'bud.title.delete': 'Delete this category everywhere',
 

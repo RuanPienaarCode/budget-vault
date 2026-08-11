@@ -301,6 +301,7 @@ module.exports = {
   'bud.total.leftNote': 'ingresos aún sin asignar',
   'bud.total.spent': 'Total gastado',
   'bud.total.spentNote': '{pct}% del presupuesto usado',
+  'bud.total.spentNoteAssumed': '{pct}% del presupuesto usado · incluye {amount} ya gastado',
 
   'bud.col.category': 'Categoría',
   'bud.col.type': 'Tipo',
@@ -310,11 +311,31 @@ module.exports = {
 
   'bud.remaining.over': '{amount} de más',
   'bud.remaining.left': '{amount} restante',
+  'bud.remaining.assumed': 'ya gastado',
+
+  'bud.assumed.tag': 'ya gastado',
+  'bud.assumed.note': 'no se espera ninguna transacción',
+  'bud.assumed.on': '{category} ahora cuenta su presupuesto como ya gastado',
+  'bud.assumed.off': '{category} vuelve a contar transacciones reales',
+  'bud.assumed.missing': 'No hay ninguna categoría llamada {category}',
+  'bud.assumed.noFile': 'No se pudo leer la nota de {category}',
+
+  'bud.pull.label': 'Traer el exceso',
+  'bud.pull.title': 'Rellenar con el exceso de gasto de hace {lag} periodo(s)',
+  'bud.pull.none': '{period} no gastó de más — terminó {amount} a favor',
+  'bud.pull.confirmTitle': 'Traer el exceso anterior',
+  'bud.pull.confirmBody': '{period} gastó {amount} más de lo que recibió. ¿Poner {category} en {amount}? Ahora marca {current}.',
+  'bud.pull.confirmOk': 'Poner el importe',
+  'bud.pull.confirmCancel': 'Dejarlo',
+  'bud.pull.done': 'Puesto en {amount} desde {period} — guarda el presupuesto para conservarlo',
 
   'bud.aria.amount': 'Importe presupuestado para {category}',
   'bud.aria.notes': 'Notas de {category}',
   'bud.aria.clear': 'Vaciar el presupuesto de {category}',
   'bud.title.clear': 'Quitar esta categoría del archivo del periodo',
+  'bud.aria.assume': 'Contar el presupuesto de {category} como ya gastado',
+  'bud.title.assumeOn': 'Contar este presupuesto como ya gastado — no llegará ninguna transacción',
+  'bud.title.assumeOff': 'Volver a medir esta categoría con transacciones reales',
   'bud.aria.delete': 'Eliminar la categoría {category}',
   'bud.title.delete': 'Eliminar esta categoría en todas partes',
 

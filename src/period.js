@@ -274,6 +274,43 @@ module.exports = function registerPeriod(ctx) {
     return out;
   }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
+  /* Is this category one whose budgeted amount IS its actual spend? See the
+     comment on the flag in src/load.js. Its own lookup rather than a field on
+     the budget row, because the answer belongs to the category and has to hold
+     across every period the row appears in — including periods whose file was
+     written before the flag existed. */
+  function catAssumeSpent(name) { return S.categories.find(c => c.name === name)?.assumeSpent === true; }
+
+  /* What the assume-spent rows come to in a period's budget. Kept separate from
+     periodSummary rather than folded into it: `spend` there means "money that
+     moved, according to the statements", and a dozen callers — the trend chart,
+     the donut, the Tax view, the deficit below — depend on it meaning exactly
+     that. This is a budgeting overlay on top, and only the two pages that show
+     a budget add it in. */
+  function assumedSpend(p) {
+    let total = 0;
+    for (const b of S.budgets[p] || []) {
+      if (b.type === 'income' || b.type === 'transfer') continue;
+      if (catAssumeSpent(b.category)) total += b.amount || 0;
+    }
+    return total;
+  }
+
+  /* How far a period ended in the hole: what actually went out, less what
+     actually came in. Positive means overspent by that much; zero or less means
+     the period paid for itself and there is nothing to carry.
+
+     Real transactions only — deliberately NOT including assumedSpend(p). An
+     assume-spent row is this period's provision for an EARLIER period's hole;
+     counting it here would carry the same overspend forward a second time, and
+     then a third, growing by itself every month with no bank line anywhere
+     behind it. The money that dug the hole is already in `spend`, in whichever
+     period and category it actually left. */
+  function periodDeficit(p) {
+    const sum = periodSummary(p);
+    return sum.spend - sum.income;
+  }
+
   function periodSummary(p) {
     const { start, end } = periodRange(p);
     return summaryInRange(start, end);
@@ -425,6 +462,6 @@ module.exports = function registerPeriod(ctx) {
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
     txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, accountsWithFolder, nonBudgetLabels,
-    intervalDays, periodKeyValid,
+    intervalDays, periodKeyValid, catAssumeSpent, assumedSpend, periodDeficit,
   });
 };

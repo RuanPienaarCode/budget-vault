@@ -88,7 +88,25 @@ function periodLengthOptions(current) {
   return o;
 }
 
+/* How many periods back the Budget page reads when it pulls a previous
+   overspend. Shared by the loader and BOTH halves of the settings tab, so the
+   file, the control and the button can never disagree about what an
+   out-of-range value means.
+
+   Clamped to 1–12 rather than rejected: 0 would read the period you are
+   standing in, whose deficit is still growing — the button would hand back a
+   different number every time you pressed it — and a negative value would read
+   the future. Anything unreadable falls to 1, the answer for everyone who has
+   never heard of this setting. */
+const OVERSPEND_LAG_DEFAULT = 1;
+const OVERSPEND_LAG_MAX = 12;
+function overspendLag(v) {
+  const n = parseInt((v ?? '').toString().trim(), 10);
+  if (!Number.isFinite(n)) return OVERSPEND_LAG_DEFAULT;
+  return Math.min(OVERSPEND_LAG_MAX, Math.max(1, n));
+}
+
 const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX };

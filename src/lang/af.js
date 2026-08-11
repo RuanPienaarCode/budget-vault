@@ -299,6 +299,7 @@ module.exports = {
   'bud.total.leftNote': 'inkomste nog nie toegewys nie',
   'bud.total.spent': 'Totaal bestee',
   'bud.total.spentNote': '{pct}% van begroting gebruik',
+  'bud.total.spentNoteAssumed': '{pct}% van begroting gebruik · sluit {amount} in wat reeds bestee is',
 
   'bud.col.category': 'Kategorie',
   'bud.col.type': 'Tipe',
@@ -308,11 +309,31 @@ module.exports = {
 
   'bud.remaining.over': '{amount} te veel',
   'bud.remaining.left': '{amount} oor',
+  'bud.remaining.assumed': 'reeds bestee',
+
+  'bud.assumed.tag': 'reeds bestee',
+  'bud.assumed.note': 'geen transaksie verwag nie',
+  'bud.assumed.on': '{category} tel sy begroting nou as reeds bestee',
+  'bud.assumed.off': '{category} tel weer werklike transaksies',
+  'bud.assumed.missing': 'Geen kategorie genaamd {category} nie',
+  'bud.assumed.noFile': 'Kon nie die notas vir {category} lees nie',
+
+  'bud.pull.label': 'Haal oorbesteding',
+  'bud.pull.title': 'Vul dit in uit die oorbesteding {lag} tydperk(e) terug',
+  'bud.pull.none': '{period} het nie oorbestee nie — dit het {amount} oor geëindig',
+  'bud.pull.confirmTitle': 'Haal vorige oorbesteding',
+  'bud.pull.confirmBody': '{period} het {amount} meer bestee as wat ontvang is. Stel {category} op {amount}? Dit lees tans {current}.',
+  'bud.pull.confirmOk': 'Stel die bedrag',
+  'bud.pull.confirmCancel': 'Los dit',
+  'bud.pull.done': 'Op {amount} gestel uit {period} — stoor die begroting om dit te hou',
 
   'bud.aria.amount': 'Begrotingsbedrag vir {category}',
   'bud.aria.notes': 'Notas vir {category}',
   'bud.aria.clear': 'Maak begroting vir {category} skoon',
   'bud.title.clear': 'Verwyder hierdie kategorie uit die tydperklêer',
+  'bud.aria.assume': 'Tel die begroting vir {category} as reeds bestee',
+  'bud.title.assumeOn': 'Tel hierdie begroting as reeds bestee — geen transaksie sal daarvoor kom nie',
+  'bud.title.assumeOff': 'Meet hierdie kategorie weer teen werklike transaksies',
   'bud.aria.delete': 'Skrap kategorie {category}',
   'bud.title.delete': 'Skrap hierdie kategorie oral',
 

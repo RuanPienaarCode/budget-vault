@@ -305,6 +305,7 @@ module.exports = {
   'bud.total.leftNote': 'revenus pas encore affectés',
   'bud.total.spent': 'Total dépensé',
   'bud.total.spentNote': '{pct}% du budget utilisé',
+  'bud.total.spentNoteAssumed': '{pct}% du budget utilisé · dont {amount} déjà dépensé',
 
   'bud.col.category': 'Catégorie',
   'bud.col.type': 'Type',
@@ -314,11 +315,31 @@ module.exports = {
 
   'bud.remaining.over': '{amount} de dépassement',
   'bud.remaining.left': '{amount} restant',
+  'bud.remaining.assumed': 'déjà dépensé',
+
+  'bud.assumed.tag': 'déjà dépensé',
+  'bud.assumed.note': 'aucune transaction attendue',
+  'bud.assumed.on': '{category} compte désormais son budget comme déjà dépensé',
+  'bud.assumed.off': '{category} compte à nouveau les transactions réelles',
+  'bud.assumed.missing': 'Aucune catégorie nommée {category}',
+  'bud.assumed.noFile': 'Impossible de lire la note de {category}',
+
+  'bud.pull.label': 'Reprendre le dépassement',
+  'bud.pull.title': 'Remplir à partir du dépassement d\'il y a {lag} période(s)',
+  'bud.pull.none': '{period} n\'a pas dépassé — la période s\'est terminée avec {amount} de plus',
+  'bud.pull.confirmTitle': 'Reprendre le dépassement précédent',
+  'bud.pull.confirmBody': '{period} a dépensé {amount} de plus qu\'elle n\'a reçu. Mettre {category} à {amount} ? La ligne indique {current}.',
+  'bud.pull.confirmOk': 'Fixer le montant',
+  'bud.pull.confirmCancel': 'Laisser',
+  'bud.pull.done': 'Fixé à {amount} depuis {period} — enregistrez le budget pour le conserver',
 
   'bud.aria.amount': 'Montant budgété pour {category}',
   'bud.aria.notes': 'Notes de {category}',
   'bud.aria.clear': 'Vider le budget de {category}',
   'bud.title.clear': 'Retirer cette catégorie du fichier de la période',
+  'bud.aria.assume': 'Compter le budget de {category} comme déjà dépensé',
+  'bud.title.assumeOn': 'Compter ce budget comme déjà dépensé — aucune transaction n\'arrivera',
+  'bud.title.assumeOff': 'Mesurer à nouveau cette catégorie sur les transactions réelles',
   'bud.aria.delete': 'Supprimer la catégorie {category}',
   'bud.title.delete': 'Supprimer cette catégorie partout',
 

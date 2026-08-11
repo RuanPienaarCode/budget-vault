@@ -2,7 +2,7 @@
 /* loadVault — reads every budget file into the in-memory state S. */
 
 const { TFile } = require('obsidian');
-const { TYPE_ORDER } = require('./constants');
+const { TYPE_ORDER, overspendLag } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
@@ -76,6 +76,14 @@ module.exports = function registerLoad(ctx) {
          contract localeFor gives country. */
       S.settings.language = setLanguage(fm.language || defaultLanguage());
       S.settings.household = fm.household || '';
+      /* How many periods back "pull last period's overspend" reads from. 1 is
+         the obvious answer and the default; it is a setting because a credit
+         card settles a month in arrears, so the hole you are funding in August
+         is often June's, not July's. Clamped to 1–12: a 0 would read the period
+         you are standing in (whose deficit is still growing, so the figure
+         would change every time you pressed the button) and a negative one
+         would read the future. */
+      S.settings.overspend_lag = overspendLag(fm.overspend_lag);
     }
     /* Reads go out in parallel; parsing stays serial. Every loop below used to
        await one file at a time — ~163 sequential round trips on a real vault,
@@ -93,7 +101,25 @@ module.exports = function registerLoad(ctx) {
       const { fm } = parseFrontmatter(text);
       // Prefer the exact name from frontmatter — filenames drop filesystem-illegal
       // chars, so the frontmatter `name` is the source of truth.
-      S.categories.push({ name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888' });
+      S.categories.push({
+        name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888',
+        /* A category whose budgeted amount IS the actual spend — no transaction
+           will ever arrive for it, because the money left in a previous period.
+           "Previous month overspending" is the case it was written for: the hole
+           is real, it has to be funded out of this period's income, and the
+           bank line that dug it is sitting in last period's statement under some
+           other category. Budgeting it as an ordinary row left it reading
+           "R1 900 left" all month — the exact opposite of the truth.
+           fmBool, so an unreadable value is "unset" rather than a silent false.
+           The path travels with it so the Budget page can toggle the flag
+           without re-deriving a filename from a display name (two names can
+           sanitise to one file — see promptCreateCategory). */
+        assumeSpent: fmBool(fm.assume_spent) === true,
+        /* Budget-folder-relative, because that is the currency readFile and
+           writeFile deal in — file.path is absolute within the vault and would
+           be re-prefixed by relPath into a path that does not exist. */
+        rel: `Categories/${file.name}`,
+      });
     }
     S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
 

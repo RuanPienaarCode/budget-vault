@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions } = require('./constants');
+const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 /* Namespace import, not `const { t }`: this codebase already binds `t` as a
@@ -24,7 +24,7 @@ const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
    API binds a control to this.plugin.settings[key] by default, so these
    route through the getControlValue/setControlValue overrides instead. */
-const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'language', 'currency', 'period_days', 'period_anchor']);
+const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'language', 'currency', 'period_days', 'period_anchor', 'overspend_lag']);
 
 /* Language dropdown options, as {id: nativeName}. Built off LANGUAGE_ORDER —
    itself derived from the tables that actually ship — so the dropdown can never
@@ -62,6 +62,7 @@ function periodNeedsAnchor(md) {
 function periodLengthDesc(md) {
   return periodNeedsAnchor(md) ? PERIOD_LENGTH_DESC + PERIOD_LENGTH_NO_ANCHOR : PERIOD_LENGTH_DESC;
 }
+const OVERSPEND_LAG_DESC = 'How many periods back the Budget page reads when you press "Pull overspend" on an already-spent category. 1 is the previous period. Set it higher when the hole you are funding is older than that — a credit card settles in arrears, so August is often covering June. 1–12.';
 const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
 const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
 const SUPPORT_DESC = 'Budget Vault is free and always will be. If you\'d like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.';
@@ -217,6 +218,28 @@ class BudgetSettingTab extends PluginSettingTab {
             // anchor field below — afterwards there is nothing to compare against.
             this.noticeMonthStartReslices(md, Number(md.month_start_day ?? 23), n);
             await this.plugin.updateBudgetSettingsMd('month_start_day', String(n));
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Overspend lag')
+      .setDesc(OVERSPEND_LAG_DESC)
+      .addText(t => {
+        t.inputEl.type = 'number';
+        t.setValue(String(overspendLag(md.overspend_lag)));
+        t.onChange(v => {
+          clearTimeout(this._lagTimer);
+          this._lagTimer = setTimeout(async () => {
+            const n = parseInt(v, 10);
+            // Say so, same as the month start day above — a bare return leaves
+            // the rejected value sitting in the field looking saved.
+            if (!Number.isFinite(n) || n < 1 || n > OVERSPEND_LAG_MAX) {
+              new Notice(`Budget: "${v}" is not a valid overspend lag — enter a number from 1 to ${OVERSPEND_LAG_MAX}.`, 6000);
+              return;
+            }
+            await this.plugin.updateBudgetSettingsMd('overspend_lag', String(n));
             this.plugin.reloadViews();
           }, 800);
         });
@@ -438,6 +461,9 @@ class BudgetSettingTab extends PluginSettingTab {
     const md = this.mdSettings();
     if (key === 'household') return md.household ?? '';
     if (key === 'month_start_day') return Number(md.month_start_day ?? 23);
+    // Clamped on the way out, like period_days below: the control shows what
+    // the app is actually running, not what a hand-edited file happens to say.
+    if (key === 'overspend_lag') return overspendLag(md.overspend_lag);
     // Dropdown values are strings; the banded number keeps the control honest
     // about what the app is running rather than what the file happens to say.
     if (key === 'period_days') return String(periodDaysOrZero(md.period_days));
@@ -486,6 +512,7 @@ class BudgetSettingTab extends PluginSettingTab {
     }
     const raw = key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'month_start_day' ? String(parseInt(value, 10))
+      : key === 'overspend_lag' ? String(overspendLag(value))
       : key === 'period_days' ? String(periodDaysOrZero(value))
       : key === 'period_anchor' ? String(value).trim()
       : key === 'country' ? String(value)
@@ -585,6 +612,17 @@ class BudgetSettingTab extends PluginSettingTab {
           validate: v => {
             const n = parseInt(v, 10);
             return n >= 1 && n <= 28 ? undefined : 'Pick a day between 1 and 28.';
+          },
+        },
+      },
+      {
+        name: 'Overspend lag',
+        desc: OVERSPEND_LAG_DESC,
+        control: {
+          type: 'number', key: 'overspend_lag', defaultValue: OVERSPEND_LAG_DEFAULT, min: 1, max: OVERSPEND_LAG_MAX,
+          validate: v => {
+            const n = parseInt(v, 10);
+            return n >= 1 && n <= OVERSPEND_LAG_MAX ? undefined : `Pick a number between 1 and ${OVERSPEND_LAG_MAX}.`;
           },
         },
       },

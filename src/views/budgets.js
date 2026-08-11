@@ -3,9 +3,9 @@
    Budgets/<period>.md. */
 
 const { el, icoEl } = require('../dom');
-const { escMd, patchFrontmatter } = require('../markdown');
+const { escMd, patchFrontmatter, parseFrontmatter } = require('../markdown');
 const { TYPE_ORDER } = require('../constants');
-const { askBudgetReslice } = require('../modal');
+const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
@@ -13,7 +13,7 @@ const { ISO_DATE, isoDayNumber } = require('../dates');
 const i18n = require('../i18n');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -188,13 +188,22 @@ module.exports = function registerBudgets(ctx) {
   function budgetTotalsStrip() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    let income = 0, budgeted = 0;
+    let income = 0, budgeted = 0, assumed = 0;
     for (const d of draft) {
       if (d.type === 'income') income += d.amount || 0;
-      else if (d.type !== 'transfer') budgeted += d.amount || 0;
+      else if (d.type !== 'transfer') {
+        budgeted += d.amount || 0;
+        if (catAssumeSpent(d.category)) assumed += d.amount || 0;
+      }
     }
+    /* Assume-spent rows have no transactions to find, so periodSummary knows
+       nothing about them — and "Total spent" read R1 900 low all month while
+       the row itself claimed R1 900 still to go. Added here, off the LIVE draft
+       rather than the saved file, so the tile moves as the amount is typed,
+       like every other figure on this strip. */
+    const spent = sum.spend + assumed;
     const allocPct = income > 0 ? Math.round((budgeted / income) * 100) : null;
-    const usedPct = budgeted > 0 ? Math.round((sum.spend / budgeted) * 100) : null;
+    const usedPct = budgeted > 0 ? Math.round((spent / budgeted) * 100) : null;
     /* Income minus what's been budgeted — the number that answers "have I given
        every rand a job yet?". Negative means the plan spends more than it earns,
        which is the one figure here that deserves red. */
@@ -208,8 +217,9 @@ module.exports = function registerBudgets(ctx) {
         over: unallocated < 0,
         note: unallocated < 0 ? i18n.t('bud.total.overNote')
           : (income > 0 ? i18n.t('bud.total.leftNote') : '') },
-      { label: i18n.t('bud.total.spent'), value: money(sum.spend), over: budgeted > 0 && sum.spend > budgeted,
-        note: usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '' },
+      { label: i18n.t('bud.total.spent'), value: money(spent), over: budgeted > 0 && spent > budgeted,
+        note: assumed > 0 ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
+          : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '') },
     ];
   }
 
@@ -245,14 +255,26 @@ module.exports = function registerBudgets(ctx) {
     let lastType = null;
     for (const d of rows) {
       if (d.type !== lastType) { lastType = d.type; body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, d.type))); }
+      /* An assume-spent row is its own actual: the money left in an earlier
+         period, so no transaction in THIS one will ever match it. Reading the
+         (always empty) transaction total for it is what made the row sit there
+         claiming the whole amount was still available. */
+      const assumed = catAssumeSpent(d.category);
       const raw = sum.byCat[d.category] || 0;
-      const actual = d.type === 'income' ? raw : -raw;
-      const overActual = actual > d.amount && d.amount > 0 && d.type !== 'income';
+      const actual = assumed ? (d.amount || 0) : (d.type === 'income' ? raw : -raw);
+      // Never "over" while assumed — actual is the amount, so it is exactly on
+      // budget by construction and red would be meaningless.
+      const overActual = !assumed && actual > d.amount && d.amount > 0 && d.type !== 'income';
       /* Live "remaining" line under the amount input — budget minus actual,
          red when overspent (never red for income: earning above target is fine). */
       const remainingEl = el('div', { class: 'bud-remaining' });
       const updateRemaining = () => {
         if (!d.amount) { remainingEl.textContent = ''; remainingEl.className = 'bud-remaining'; return; }
+        if (assumed) {
+          remainingEl.textContent = i18n.t('bud.remaining.assumed');
+          remainingEl.className = 'bud-remaining bud-remaining-assumed';
+          return;
+        }
         const rem = d.amount - actual;
         const over = rem < 0 && d.type !== 'income';
         remainingEl.textContent = over
@@ -262,16 +284,36 @@ module.exports = function registerBudgets(ctx) {
       };
       updateRemaining();
       body.append(el('tr', {},
-        el('td', {}, d.category),
+        el('td', {}, d.category,
+          assumed ? el('div', { class: 'bud-assumed-tag' }, i18n.t('bud.assumed.tag')) : ''),
         el('td', {}, typeBadge(d.type)),
         el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
           el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
             'aria-label': i18n.t('bud.aria.amount', { category: d.category }), onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); renderBudgetTotals(); } }),
-          remainingEl)),
-        el('td', { class: `num${overActual ? ' text-danger' : ' text-muted'}`, style: 'white-space:nowrap' }, money(actual)),
+          remainingEl,
+          // Only offered where it means something. On an ordinary row the
+          // figure would be written into a budget that transactions will then
+          // contradict.
+          assumed ? el('button', {
+            class: 'btn-ghost btn-ghost-sm bud-pull', type: 'button',
+            title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag }),
+            onclick: () => pullPreviousOverspend(d),
+          }, i18n.t('bud.pull.label')) : '')),
+        el('td', { class: `num${overActual ? ' text-danger' : assumed ? ' bud-actual-assumed' : ' text-muted'}`, style: 'white-space:nowrap' },
+          money(actual),
+          assumed ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : ''),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
           'aria-label': i18n.t('bud.aria.notes', { category: d.category }), onchange: e => { d.notes = e.target.value; mark(); } })),
         el('td', { style: 'white-space:nowrap' },
+          // Income and transfers are never "already spent" — offering the
+          // toggle there would only invite a state with no meaning.
+          d.type === 'income' || d.type === 'transfer' ? '' : el('button', {
+            class: `btn-ghost btn-ghost-sm${assumed ? ' bud-assume-on' : ''}`, type: 'button',
+            'aria-pressed': assumed ? 'true' : 'false',
+            'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
+            title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
+            onclick: () => toggleAssumeSpent(d.category, !assumed),
+          }, icoEl(['circle-check', 'check-circle', 'check'])),
           d.inFile
             ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
             : '',
@@ -326,6 +368,76 @@ module.exports = function registerBudgets(ctx) {
     budDirty = false;
     $('#budSave').disabled = true;
     toast(i18n.t('bud.saved', { period: S.period }));
+  }
+
+  /* Flip a category's assume-spent flag and persist it to its own note.
+
+     Writes the CATEGORY file, not the period file, because the answer belongs
+     to the category — "previous month overspending" is never funded by a
+     transaction in any period, not just this one. Mirrors promptCreateCategory:
+     the file is written and S.categories is updated in place rather than
+     triggering a full reload, so an unsaved budget draft on this page survives
+     the toggle. */
+  async function toggleAssumeSpent(name, on) {
+    const cat = S.categories.find(c => c.name === name);
+    if (!cat) return toast(i18n.t('bud.assumed.missing', { category: name }), true);
+    if (!cat.rel) return toast(i18n.t('bud.assumed.noFile', { category: name }), true);
+    const text = await readFile(cat.rel);
+    if (text == null) return toast(i18n.t('bud.assumed.noFile', { category: name }), true);
+    const { raw, body } = parseFrontmatter(text);
+    // null removes the key outright rather than writing `assume_spent: false` —
+    // absent is this flag's own default, so turning it off should leave the file
+    // as it would have been had it never been turned on.
+    const next = patchFrontmatter(raw, { assume_spent: on ? 'true' : null });
+    // No newline before `body`: parseFrontmatter's body starts immediately after
+    // the closing fence and keeps its own leading break, so adding one here
+    // would grow the file by a blank line on every toggle.
+    await writeFile(cat.rel, `---\n${next}\n---${body}`);
+    cat.assumeSpent = on;
+    renderBudgets();
+    toast(i18n.t(on ? 'bud.assumed.on' : 'bud.assumed.off', { category: name }));
+  }
+
+  /* Write the overspend of an earlier period into this row's amount.
+
+     The figure is that period's DEFICIT — what actually went out, less what
+     actually came in — so it is the size of the hole the bank account is in,
+     not the sum of the lines that broke their own budget (under-spends
+     elsewhere are real money and do offset it). See periodDeficit in period.js
+     for why it deliberately excludes assume-spent rows.
+
+     How far back to look is `overspend_lag` in Settings.md, because a credit
+     card settles in arrears: the hole being funded in August is often June's.
+     Confirms first — this overwrites a figure that may have been typed by hand,
+     and the number is worth reading before it lands. */
+  async function pullPreviousOverspend(d) {
+    const lag = S.settings.overspend_lag || 1;
+    const src = shiftPeriod(S.period, -lag);
+    const deficit = periodDeficit(src);
+    const label = `${periodMonthName(src)} · ${periodTitle(src)}`;
+    if (!(deficit > 0)) {
+      return toast(i18n.t('bud.pull.none', { period: label, amount: money(-deficit) }), true);
+    }
+    const rounded = Math.round(deficit * 100) / 100;
+    const ok = await confirmModal(app, {
+      title: i18n.t('bud.pull.confirmTitle'),
+      message: i18n.t('bud.pull.confirmBody', {
+        amount: money(rounded), period: label, category: d.category, current: money(d.amount || 0),
+      }),
+      confirmText: i18n.t('bud.pull.confirmOk'),
+      cancelText: i18n.t('bud.pull.confirmCancel'),
+    });
+    if (!ok) return;
+    d.amount = rounded;
+    // Same reason resliceFrom clears it: the "could not parse, write back
+    // verbatim" flag belongs to the figure it was read with, and this is a
+    // number we just computed.
+    d.amountRaw = null;
+    d.inFile = true;
+    budDirty = true;
+    $('#budSave').disabled = false;
+    renderBudgets();
+    toast(i18n.t('bud.pull.done', { amount: money(rounded), period: label }));
   }
 
   function copyPreviousBudget() {

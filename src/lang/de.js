@@ -300,6 +300,7 @@ module.exports = {
   'bud.total.leftNote': 'Einnahmen noch nicht zugeteilt',
   'bud.total.spent': 'Ausgegeben gesamt',
   'bud.total.spentNote': '{pct}% des Budgets verbraucht',
+  'bud.total.spentNoteAssumed': '{pct}% des Budgets verbraucht · enthält {amount} bereits ausgegeben',
 
   'bud.col.category': 'Kategorie',
   'bud.col.type': 'Art',
@@ -309,11 +310,31 @@ module.exports = {
 
   'bud.remaining.over': '{amount} darüber',
   'bud.remaining.left': '{amount} übrig',
+  'bud.remaining.assumed': 'bereits ausgegeben',
+
+  'bud.assumed.tag': 'bereits ausgegeben',
+  'bud.assumed.note': 'keine Buchung erwartet',
+  'bud.assumed.on': '{category} zählt sein Budget jetzt als bereits ausgegeben',
+  'bud.assumed.off': '{category} zählt wieder tatsächliche Buchungen',
+  'bud.assumed.missing': 'Keine Kategorie namens {category}',
+  'bud.assumed.noFile': 'Die Notiz für {category} konnte nicht gelesen werden',
+
+  'bud.pull.label': 'Mehrausgabe holen',
+  'bud.pull.title': 'Aus der Mehrausgabe von vor {lag} Zeitraum/Zeiträumen ausfüllen',
+  'bud.pull.none': '{period} hatte keine Mehrausgabe — es endete {amount} im Plus',
+  'bud.pull.confirmTitle': 'Vorherige Mehrausgabe holen',
+  'bud.pull.confirmBody': '{period} hat {amount} mehr ausgegeben als eingenommen. {category} auf {amount} setzen? Aktuell steht dort {current}.',
+  'bud.pull.confirmOk': 'Betrag setzen',
+  'bud.pull.confirmCancel': 'Lassen',
+  'bud.pull.done': 'Auf {amount} aus {period} gesetzt — Budget speichern, um es zu behalten',
 
   'bud.aria.amount': 'Budgetbetrag für {category}',
   'bud.aria.notes': 'Notizen zu {category}',
   'bud.aria.clear': 'Budget für {category} leeren',
   'bud.title.clear': 'Diese Kategorie aus der Zeitraumdatei entfernen',
+  'bud.aria.assume': 'Das Budget für {category} als bereits ausgegeben zählen',
+  'bud.title.assumeOn': 'Dieses Budget als bereits ausgegeben zählen — dafür kommt keine Buchung',
+  'bud.title.assumeOff': 'Diese Kategorie wieder an tatsächlichen Buchungen messen',
   'bud.aria.delete': 'Kategorie {category} löschen',
   'bud.title.delete': 'Diese Kategorie überall löschen',
 
