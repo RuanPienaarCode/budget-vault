@@ -3,6 +3,78 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.15.0 — 2026-08-11
+
+### Added
+
+- **A budget line can be its own actual, and carry last period's hole.**
+  "Previous month overspending" is not waiting for a transaction to arrive. The
+  money already left, in an earlier period; this period's row is the provision
+  that funds the hole. Budgeted as an ordinary row it read "R1 900 left" all
+  month — the exact opposite of the truth — the Dashboard drew it as a full
+  green bar, and Total spent was short by the same amount, because there was
+  nothing for the period summary to find.
+
+  A category can now carry `assume_spent: true`, and its budgeted amount **is**
+  its actual, on the Budget page and in the Dashboard's category table alike.
+  The flag lives on the category rather than on the period row, because the
+  answer holds in every period the row appears in — including periods whose file
+  was written before the flag existed. It is toggled from the row itself.
+
+  **Pull overspend** fills such a row from an earlier period's deficit — what
+  actually went out, less what actually came in — behind a confirmation that
+  names the period, the figure, and what the row currently says. How far back to
+  look is `overspend_lag` in `Settings.md` (default 1, clamped 1–12), because a
+  credit card settles in arrears: the hole funded in August is often June's.
+
+  The deficit counts real transactions only, and deliberately excludes
+  assume-spent rows — counting those would carry one overspend forward again the
+  next period, and again the one after, compounding off no bank line at all. The
+  flag defaults off, so every existing vault behaves exactly as it always did.
+
+### Fixed
+
+- **The "What's left" bar disagreed with the figure above it.** The bar split
+  the cash on one set of commitments while the "actually free" number directly
+  above it used another; under a settlement cycle those differ by the whole card
+  balance, so the green segment was visibly smaller than the figure it sat
+  beneath. The screen-reader label announced a cash, a committed and a free that
+  did not sum — a sentence there is no way to correct by looking. The bar is now
+  derived from the free figure itself rather than from a second guess at what
+  went into it, and once commitments exceed the cash the label stops offering
+  "{free} is free" for money that is not there.
+
+### Changed
+
+- **Figures about the outside world now carry their provenance.** Every SARS
+  bracket, National Credit Act cap and lending rate has moved into a single
+  ledger where each records what it claims in words, the primary source it was
+  read from, the date it was last read, and a date after which the build fails
+  until someone checks it again. No figure changed; the calculators return
+  exactly what they returned before.
+
+  The reason is the class of failure this app has already had. It shipped a SARS
+  transfer-duty table whose top brackets appear in no published table from any
+  year, National Credit Act caps described to the reader as statutory maximums
+  that nobody had read from the regulation, and a tax threshold that would have
+  told compliant savers they owed a penalty they did not. Each was a bare
+  number, and a bare number cannot say whether it was checked last week or
+  invented.
+
+  Four figures now state plainly that nobody has ever verified them against a
+  primary source — the prime-rate default, the conveyancing cost anchors, the
+  vehicle insurance estimate, and the 36% debt-to-income reference. That is a
+  deliberate value, not a gap: "nobody has checked this" and "checked against
+  SARS last week" used to be the same thing on screen.
+
+- **Every view now has a test that runs it.** The Debt page threw on every
+  render for the whole of 1.13.0, and forty-nine green suites did not notice,
+  because no test ever called the page — the arithmetic beneath a view is easy
+  to cover and reads, at a glance, like coverage of the view. All thirteen views
+  are now mounted and rendered in four states: populated, empty as a new install
+  is, twice over as the app repaints on every period change, and on a period the
+  vault has no data for. Nothing else was found broken.
+
 ## 1.14.0 — 2026-08-11
 
 ### Fixed
