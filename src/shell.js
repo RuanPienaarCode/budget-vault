@@ -441,7 +441,7 @@ const SHELL_HTML = `
              is stale, so a gap hung on it is a gap that exists only while
              something is wrong. -->
         <div class="mb-4">
-          <div class="mini-grid mini-kpis-4" id="savingsKpis"></div>
+          <div class="mini-grid mini-kpis-5" id="savingsKpis"></div>
           <div class="kpi-caveat" id="savingsStale"></div>
         </div>
         <div class="card mb-4" id="savingsWorthCard">
@@ -452,6 +452,21 @@ const SHELL_HTML = `
             </div>
           </div>
           <div class="body-pad"><div class="stack-wrap" id="savingsWorth"></div></div>
+        </div>
+        <!-- What built the balance. Placed AFTER the composition chart because
+             composition answers "what is this made of" and this answers "how did
+             it get here" — and a reader who does not yet know what they hold has
+             no use for its history. The whole card is hidden when no account is
+             measurable, rather than showing an empty frame. -->
+        <div class="card mb-4" id="savingsGrowthCard">
+          <div class="card-h">
+            <div>
+              <h2>What built this balance</h2>
+              <div class="sub" id="savingsGrowthSub"></div>
+            </div>
+            <div class="legend" id="savingsGrowthTotal"></div>
+          </div>
+          <div class="body-pad"><div class="stack-wrap" id="savingsGrowth"></div></div>
         </div>
         <div class="card mb-4" id="savingsGoalsCard">
           <div class="card-h" style="align-items:center">

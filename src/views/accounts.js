@@ -1432,6 +1432,7 @@ module.exports = function registerAccounts(ctx) {
      fields a type offers, the parsing, and the frontmatter keys written all have
      exactly one owner. */
   ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, editBalance,
+    openAccountFile, openAccountTransactions: openTransactions,
     acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };
