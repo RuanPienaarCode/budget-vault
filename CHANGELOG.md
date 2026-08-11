@@ -41,6 +41,55 @@ All notable changes to Budget Vault. Versions match the plugin version in
   like every other page, with any frontmatter the plugin does not model left
   untouched.
 
+- **An account can now state its own currency.** Put `currency: "€"` in an
+  account's frontmatter and that account's own figures print in it — the
+  balance cell, the drawer, the dialog that edits it. A euro account reads
+  `€ 1 200,00` instead of claiming to hold twelve hundred rand. The separators
+  do not move: a South African reading a euro balance still reads `1 234,56`,
+  because that convention belongs to the person reading the figure rather than
+  to the currency it is denominated in. Accounts without the key print in the
+  household currency exactly as before, so a single-currency vault — nearly all
+  of them — needs no frontmatter and changes in no way.
+
+  What it deliberately does **not** do is convert, or exclude. No conversion,
+  because an exchange rate is a fact about a *day*, and this vault does not hold
+  one; storing a rate would mean every figure derived from it silently ages, and
+  a household total that was right last month is the worst kind of wrong,
+  because it looks exactly like one that still is. No exclusion, because
+  `budget: false` is already the single mechanism for keeping an account out of
+  the household totals, and a currency rule layered on top would be a second,
+  invisible one — which is how a reader ends up unable to explain their own
+  total.
+
+  So a total that spans more than one currency is still added up, and now says
+  so. The Accounts hero names the symbols it folded together, and a group total
+  that mixes them carries an asterisk explaining the same thing. A disclosure
+  you can act on — opt the account out with `budget: false`, which you already
+  know how to do — beats a silent rule you cannot see.
+
+- **Warnings you have already answered can be switched off, per account.** Some
+  accounts are permanently odd in a way that is not a problem: a cash float
+  nothing imports into, a pension whose statement arrives once a year. Both sat
+  in the Accounts queue forever, and a queue that always has something in it is
+  a queue nobody reads. `ignore_warnings:` in an account's frontmatter — or the
+  switches in the account dialog — quietens any of the five: the balance
+  drifted from the transactions, it has not been confirmed recently, it was
+  never confirmed, nothing has imported yet, or no folder is linked at all.
+  Write `true` for all of them or list the ones you mean; spellings normalise,
+  so `no_transactions`, `no transactions` and `no-transactions` are one
+  instruction. A word it does not recognise is dropped rather than read as
+  "mute everything" — guessing wide on a typo would hide the very state you
+  were trying to name.
+
+  A muted account **keeps its state**. The row still shows the pill saying what
+  the balance actually is; only the queue, the attention count and the "Needs a
+  look" filter let it go, and the hero counts how many warnings are being
+  ignored so the quiet is never invisible. Reporting it as fine instead would
+  have been fewer lines and a lie: a figure nothing has ever confirmed does not
+  agree with your transactions, it is merely one you have said you do not want
+  asked about. That distinction is the whole reason this is a mute and not a
+  fix.
+
 ### Fixed
 
 - **Six ways a statement import could write wrong figures into your vault, and
