@@ -105,6 +105,15 @@ module.exports = function registerLoad(ctx) {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
+        /* The symbol this account's OWN figures are printed in. Absent means
+           the household's, so no existing vault renders differently on
+           upgrade. It never converts and never excludes — see currency.js. */
+        currency: String(fm.currency || '').trim(),
+        /* Warnings this account has been told to stay quiet about — `true`, or
+           a list like [no-transactions, unconfirmed]. Kept as the raw string;
+           acct-status.js owns what the words mean, so there is one parser
+           rather than one here and another there. */
+        ignore_warnings: String(fm.ignore_warnings || '').trim(),
         // parseNum, not parseFloat: a hand-edited "1,234.56" read as 1 would be
         // written straight back as 1.00 on the next balance edit, destroying the
         // real figure. balanceRaw preserves anything the strict parse rejected,

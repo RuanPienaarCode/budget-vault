@@ -21,7 +21,31 @@ class FieldModal extends Modal {
     for (const f of this.fieldDefs) {
       const s = new Setting(this.contentEl).setName(f.label);
       if (f.desc) s.setDesc(f.desc);
-      if (f.type === 'select') {
+      if (f.type === 'toggles') {
+        /* A set of independent yes/no choices under one heading — for
+           "which of these do you want off", where a dropdown would force the
+           answers into a single mutually-exclusive list they are not.
+           Resolves to an ARRAY of the values switched on.
+
+           Obsidian's own toggle rather than a bare <input type=checkbox>: it
+           is the control the reader already knows, it is keyboard-reachable,
+           and it behaves on iOS, where a hand-rolled checkbox row would need
+           its own hit-target work. */
+        this.values[f.key] = [...(f.value || [])];
+        s.setHeading();
+        for (const o of f.options) {
+          const row = new Setting(this.contentEl).setName(o.label);
+          if (o.desc) row.setDesc(o.desc);
+          row.addToggle(tg => {
+            tg.setValue(this.values[f.key].includes(o.value));
+            tg.onChange(on => {
+              const cur = this.values[f.key].filter(v => v !== o.value);
+              if (on) cur.push(o.value);
+              this.values[f.key] = cur;
+            });
+          });
+        }
+      } else if (f.type === 'select') {
         this.values[f.key] = f.value ?? f.options[0];
         s.addDropdown(d => {
           for (const o of f.options) d.addOption(o.value ?? o, o.label ?? o);

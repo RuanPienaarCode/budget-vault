@@ -98,17 +98,22 @@ function mountApp(view) {
   /* Amount formatting — thousands/decimal separators come from the country
      profile (SA: "R 1 234,56"; US: "$ 1,234.56"). The symbol itself comes
      from Settings.md (`currency`). */
-  function money(v, decimals = 2) {
+  /* The separators stay the COUNTRY's either way: a South African reading a
+     euro balance still reads "1 234,56", because the convention belongs to the
+     person reading the figure, not to the currency it is denominated in.
+     Only the symbol moves. */
+  function moneyIn(symbol, v, decimals = 2) {
     const loc = locale();
     const sign = v < 0 ? '-' : '';
     const parts = Math.abs(v).toFixed(decimals).split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
-    return `${S.settings.currency} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
+    return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
   }
+  function money(v, decimals = 2) { return moneyIn(S.settings.currency, v, decimals); }
   const typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
 
   /* --------------------------- assemble ctx ----------------------------- */
-  const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, typeBadge, locale };
+  const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, moneyIn, typeBadge, locale };
 
   /* Every module publishes onto this one flat namespace — 60+ keys with no
      collision detection, where a silent overwrite would show up much later as

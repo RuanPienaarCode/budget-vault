@@ -9,6 +9,9 @@ const { el, icoEl } = require('../dom');
    the two rings on this app cannot drift apart visually. */
 const { createChart, arcPath, tip, themeColors } = require('../chart');
 const { normalizeAmount } = require('../amount');
+/* A display symbol per account, and the disclosure when a total spans more
+   than one of them. It converts nothing — see the module header. */
+const { symbolOf, currenciesIn } = require('../currency');
 const { patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
@@ -22,13 +25,21 @@ const { askFields } = require('../modal');
 const { reconcile } = require('../reconcile');
 /* The state machine behind the decision queue — which accounts land in it, in
    what order, and why. Pure, and tested without a DOM. */
-const { statusOf, wantsALook, staleRank, queueOrder } = require('../acct-status');
+const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } = require('../acct-status');
 const { supersededBySplit } = require('../tx-role');
 const { ISO_DATE, todayIso } = require('../dates');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt,
-    txInPeriod, accountForLabel, accountIndex, periodMonthName } = ctx;
+    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
+
+  /* One account's own figures, in its own symbol. Used for everything that
+     describes a SINGLE account — its balance, its limit, its goal, its month.
+     Cross-account totals keep plain money(), because they are stated in the
+     household currency; where that spans more than one symbol the summary
+     says so rather than converting. */
+  const acctMoney = (a, v, decimals = 2) =>
+    ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
 
   // Every type the loader can produce must appear in exactly one group, or an
   // account renders nowhere on this page — including `other`, which is what a
@@ -48,6 +59,46 @@ module.exports = function registerAccounts(ctx) {
      they cannot drift. Built per call so a language change is picked up. */
   const acctTypeOptions = () => ACCT_TYPES.map(v => ({ value: v, label: i18n.t('acctType.' + v) }));
 
+  /* Which optional fields belong to which kind of account.
+
+     The form used to offer all eleven to every type, so opening a cash wallet
+     asked for its credit limit, its savings target date and the total invested
+     in it — three questions with no answer, above the two that mattered. A
+     wallet is a bank account with fewer moving parts, not a different species,
+     so it gets the bank set: what it is, where it is, what is in it.
+
+     Everything NOT listed here is still WRITTEN and still READ — this hides
+     the input, it does not drop the key. `other` is deliberately absent from
+     the map and falls through to the full set, because a type this app has no
+     opinion about is not one it should be narrowing questions for. */
+  const TYPE_FIELDS = {
+    checking:    [],
+    cash:        [],
+    credit_card: ['credit_limit'],
+    savings:     ['goal_amount', 'target_date', 'monthly_contribution', 'starting_amount', 'inception_date'],
+    investment:  ['total_invested', 'starting_amount', 'inception_date', 'goal_amount', 'target_date', 'monthly_contribution'],
+  };
+  const ALL_OPTIONAL = ['credit_limit', 'goal_amount', 'target_date',
+    'monthly_contribution', 'total_invested', 'starting_amount', 'inception_date'];
+
+  /* A field is shown when the type calls for it — OR when the account already
+     holds a value for it, whatever the type.
+
+     That second half is not politeness, it is the difference between hiding a
+     field and deleting one. editAccount saves every key in EDITABLE_KEYS from
+     the form's result, so a field the form never rendered comes back
+     `undefined`, parses to null, and FM_WRITERS removes the line. Retype a
+     savings pot as cash and its goal would be silently erased by a dialog that
+     never showed it. Anything already set stays on screen, where the reader
+     can see it and clear it deliberately if that is what they meant. */
+  function fieldsForType(type, a) {
+    const forType = TYPE_FIELDS[type] || ALL_OPTIONAL;
+    const set = new Set(forType);
+    if (a) for (const k of ALL_OPTIONAL) if (hasValue(a[k])) set.add(k);
+    return ALL_OPTIONAL.filter(k => set.has(k));
+  }
+  const hasValue = v => v != null && String(v).trim() !== '' && v !== 0;
+
   /* Frontmatter key → the line to write for this account's current value, or
      null to REMOVE the key. saveAccount only patches the keys it is handed, so
      a field nobody edited is never reformatted — that is what keeps the
@@ -57,6 +108,13 @@ module.exports = function registerAccounts(ctx) {
   const FM_WRITERS = {
     type: a => a.type,
     institution: a => (a.institution ? yamlStr(a.institution) : null),
+    // Absent means "the household's", so an account left on the default keeps
+    // a frontmatter block free of a line that says nothing.
+    currency: a => (a.currency ? yamlStr(a.currency) : null),
+    // Written raw, not through yamlStr: the value is either `true` or a YAML
+    // flow list, and quoting either would turn it into a string that reads
+    // back as one unrecognised word and mutes nothing.
+    ignore_warnings: a => a.ignore_warnings || null,
     account_number: a => (a.account_number ? yamlStr(a.account_number) : null),
     tx_label: a => (a.tx_label ? yamlStr(a.tx_label) : null),
     credit_limit: a => (a.credit_limit ? a.credit_limit.toFixed(2) : null),
@@ -132,7 +190,11 @@ module.exports = function registerAccounts(ctx) {
 
   async function editBalance(a) {
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
-      { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: a.balance.toFixed(2) },
+      { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: a.balance.toFixed(2),
+        // Which currency the figure being typed is IN. Nothing converts it, so
+        // the symbol is the only thing telling the reader what they are
+        // entering — and on a euro account that is the whole question.
+        desc: i18n.t('acct.balance.inCurrency', { symbol: symbolOf(a, S.settings.currency) }) },
     ]);
     if (!r) return;
     const num = parseAmount(r.balance);
@@ -154,7 +216,7 @@ module.exports = function registerAccounts(ctx) {
     a.balance_updated = todayIso();
     await saveAccount(a);
     renderAccounts();
-    toast(i18n.t('acct.reconciled', { name: a.name, amount: money(implied) }));
+    toast(i18n.t('acct.reconciled', { name: a.name, amount: acctMoney(a, implied) }));
   }
 
   /* Everything about the account EXCEPT its balance and its name. The balance
@@ -163,6 +225,26 @@ module.exports = function registerAccounts(ctx) {
      silently orphan the history — that is a move-the-files operation, not a
      form field. */
   async function editAccount(a) {
+    /* The optional half of the form, built per type. Keyed so the shown list
+       below can pick from it by name and keep ALL_OPTIONAL's order. */
+    const optional = {
+      credit_limit: { key: 'credit_limit', label: i18n.t('acct.field.limit'), type: 'number',
+        value: a.credit_limit != null ? String(a.credit_limit) : '',
+        desc: i18n.t('acct.field.limitDesc') },
+      goal_amount: { key: 'goal_amount', label: i18n.t('acct.field.goal'), type: 'number',
+        value: a.goal_amount != null ? String(a.goal_amount) : '' },
+      target_date: { key: 'target_date', label: i18n.t('acct.field.goalDate'), type: 'date', value: a.target_date },
+      monthly_contribution: { key: 'monthly_contribution', label: i18n.t('acct.field.monthly'), type: 'number',
+        value: a.monthly_contribution != null ? String(a.monthly_contribution) : '' },
+      total_invested: { key: 'total_invested', label: i18n.t('acct.field.invested'), type: 'number',
+        value: a.total_invested != null ? String(a.total_invested) : '',
+        desc: i18n.t('acct.field.investedDesc') },
+      starting_amount: { key: 'starting_amount', label: i18n.t('acct.field.starting'), type: 'number',
+        value: a.starting_amount != null ? String(a.starting_amount) : '' },
+      inception_date: { key: 'inception_date', label: i18n.t('acct.field.opened'), type: 'date', value: a.inception_date },
+    };
+    const shown = fieldsForType(a.type, a);
+
     const r = await askFields(app, i18n.t('acct.edit.title', { name: a.name }), [
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: a.type },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', value: a.institution },
@@ -170,30 +252,30 @@ module.exports = function registerAccounts(ctx) {
         desc: i18n.t('acct.field.numberDesc') },
       { key: 'tx_label', label: i18n.t('acct.field.folder'), type: 'text', value: a.tx_label,
         desc: i18n.t('acct.field.folderDesc', { name: a.name }) },
+      { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text', value: a.currency,
+        placeholder: S.settings.currency,
+        desc: i18n.t('acct.field.currencyDesc', { symbol: S.settings.currency }) },
       { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select',
         value: a.in_budget ? 'yes' : 'no',
         options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
           { value: 'no', label: i18n.t('acct.counts.no') }] },
-      { key: 'credit_limit', label: i18n.t('acct.field.limit'), type: 'number',
-        value: a.credit_limit != null ? String(a.credit_limit) : '',
-        desc: i18n.t('acct.field.limitDesc') },
-      { key: 'goal_amount', label: i18n.t('acct.field.goal'), type: 'number',
-        value: a.goal_amount != null ? String(a.goal_amount) : '' },
-      { key: 'target_date', label: i18n.t('acct.field.goalDate'), type: 'date', value: a.target_date },
-      { key: 'monthly_contribution', label: i18n.t('acct.field.monthly'), type: 'number',
-        value: a.monthly_contribution != null ? String(a.monthly_contribution) : '' },
-      { key: 'total_invested', label: i18n.t('acct.field.invested'), type: 'number',
-        value: a.total_invested != null ? String(a.total_invested) : '',
-        desc: i18n.t('acct.field.investedDesc') },
-      { key: 'starting_amount', label: i18n.t('acct.field.starting'), type: 'number',
-        value: a.starting_amount != null ? String(a.starting_amount) : '' },
-      { key: 'inception_date', label: i18n.t('acct.field.opened'), type: 'date', value: a.inception_date },
+      ...shown.map(k => optional[k]),
+      { key: 'ignore_warnings', label: i18n.t('acct.field.mute'), type: 'toggles',
+        desc: i18n.t('acct.field.muteDesc'),
+        value: [...mutedWarnings(a)],
+        options: WARNINGS.map(w => ({ value: w, label: i18n.t('acct.mute.' + w) })) },
     ]);
     if (!r) return;
 
     if (!ACCT_TYPES.includes(r.type)) return toast(i18n.t('acct.err.type'), true);
+    /* Only the fields this dialog actually SHOWED are read back. A field the
+       type hid was never on screen, so treating its absent result as "the user
+       cleared it" would write a decision nobody made — and saveAccount patches
+       every EDITABLE_KEY from the model, so the untouched ones round-trip
+       unchanged on their own. */
     const nums = {};
-    for (const k of ['credit_limit', 'goal_amount', 'monthly_contribution', 'total_invested', 'starting_amount']) {
+    for (const k of shown) {
+      if (k === 'target_date' || k === 'inception_date') continue;
       const n = parseAmount(r[k]);
       if (n !== null && isNaN(n)) return toast(i18n.t('acct.err.notNumber', { field: k.replace(/_/g, ' ') }), true);
       nums[k] = n;
@@ -204,10 +286,20 @@ module.exports = function registerAccounts(ctx) {
     a.institution = (r.institution || '').trim();
     a.account_number = (r.account_number || '').trim();
     a.tx_label = (r.tx_label || '').trim();
+    /* Blank means "the household's" — stored as empty, which FM_WRITERS turns
+       into a removed key rather than a line asserting the default. */
+    a.currency = (r.currency || '').trim();
+    /* Serialised in WARNINGS order rather than the order the toggles happened
+       to be flipped, so switching one off and back on again does not rewrite
+       the line and show up as a diff in a file the reader syncs. `true` when
+       every one is muted — shorter to read, and what a hand-editor writes. */
+    const mute = WARNINGS.filter(w => (r.ignore_warnings || []).includes(w));
+    a.ignore_warnings = mute.length === WARNINGS.length ? 'true'
+      : mute.length ? `[${mute.join(', ')}]` : '';
     a.in_budget = r.budget !== 'no';
     Object.assign(a, nums);
-    a.target_date = (r.target_date || '').trim();
-    a.inception_date = (r.inception_date || '').trim();
+    if (shown.includes('target_date')) a.target_date = (r.target_date || '').trim();
+    if (shown.includes('inception_date')) a.inception_date = (r.inception_date || '').trim();
 
     await saveAccount(a, EDITABLE_KEYS);
     // ctx.render, not renderAccounts: a type change moves the account between
@@ -331,12 +423,26 @@ module.exports = function registerAccounts(ctx) {
     const elsewhere = (S.assets || []).some(x => x.value > 0)
       || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
 
+    /* This figure ADDS every balance and states the result in the household
+       currency. Where an account is denominated in something else that is not
+       a conversion — no rate is stored, and one would be a fact about a day
+       this vault does not hold — it is a plain sum of unlike figures. So it
+       says so, right under the number.
+
+       Deliberately not an exclusion. `budget: false` is the one mechanism this
+       app has for keeping an account out of a total, and committed.js states
+       why there must not be a second: two overlapping ways to exclude the same
+       account is how a reader ends up unable to explain their own total. A
+       reader who wants the euro account out already knows how to do it. */
+    const symbols = currenciesIn(S.accounts, S.settings.currency);
+
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
       el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
-        + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')));
+        + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
+        + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')));
 
     const facts = el('div', { class: 'acct-hero-facts' });
     const fact = (label, value, cls) => facts.append(el('div', { class: 'acct-fact' },
@@ -344,6 +450,11 @@ module.exports = function registerAccounts(ctx) {
       el('div', { class: `acct-fact-v${cls ? ' ' + cls : ''}` }, value)));
     fact(i18n.t('acct.hero.count'), String(S.accounts.length));
     fact(i18n.t('acct.kpi.attention'), String(attention), attention > 0 ? 'text-warning' : '');
+    /* Only when there ARE muted accounts. A page that permanently advertised
+       "0 ignored" would be teaching every reader about a setting most of them
+       will never use — and a zero here is not news, it is the default. */
+    const muted = rows.filter(r => r.muted).length;
+    if (muted) fact(i18n.t('acct.hero.muted'), String(muted));
     fact(i18n.t('acct.hero.oldest'),
       oldest < 0 ? i18n.t('acct.hero.oldestNone') : i18n.t('acct.hero.oldestDays', { count: oldest }));
     hero.append(facts);
@@ -621,26 +732,34 @@ module.exports = function registerAccounts(ctx) {
     const u = utilisationOf(a);
     if (u) {
       return bar(u.pct, u.over ? 'bg-danger' : u.near ? 'bg-warning' : '',
-        u.over ? i18n.t('acct.overLimit', { amount: money(-u.available, 0) })
-          : i18n.t('acct.limitOf', { pct: Math.round(u.pct), amount: money(a.credit_limit, 0) }));
+        u.over ? i18n.t('acct.overLimit', { amount: acctMoney(a, -u.available, 0) })
+          : i18n.t('acct.limitOf', { pct: Math.round(u.pct), amount: acctMoney(a, a.credit_limit, 0) }));
     }
     if (a.goal_amount > 0) {
       const pct = (a.balance / a.goal_amount) * 100;
-      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(pct), amount: money(a.goal_amount, 0) }));
+      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(pct), amount: acctMoney(a, a.goal_amount, 0) }));
     }
     if (a.total_invested > 0) {
       const pct = ((a.balance - a.total_invested) / a.total_invested) * 100;
       return bar(100, pct < 0 ? 'bg-warning' : '',
-        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: money(a.total_invested, 0) }));
+        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: acctMoney(a, a.total_invested, 0) }));
     }
     return el('span', { class: 'acct-dash' }, '—');
   }
 
   function statePill(r) {
-    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', nodate: 'warn', notx: 'warn' }[r.state];
+    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', nodate: 'warn', notx: 'warn', nofolder: 'warn' }[r.state];
     const label = r.state === 'stale'
       ? i18n.t('acct.state.stale', { count: r.days })
       : i18n.t(`acct.state.${r.state}`);
+    /* A muted account still says what it IS — the pill is the fact, and the
+       reader asked for the nagging to stop, not for the page to start
+       claiming the figure agrees with transactions it has never seen. Muting
+       only drops the alarm colour and adds the reason it is quiet. */
+    if (r.muted) {
+      return el('span', { class: 'acct-pill muted', title: i18n.t('acct.mutedTitle') },
+        label, el('span', { class: 'acct-pill-mute' }, i18n.t('acct.state.muted')));
+    }
     return el('span', { class: `acct-pill ${cls}` }, label);
   }
 
@@ -668,13 +787,13 @@ module.exports = function registerAccounts(ctx) {
 
     const balBtn = el('button', { type: 'button',
       class: `acct-bal num${a.balance < 0 ? ' text-danger' : ''}`,
-      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }) },
-      money(a.balance));
+      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: acctMoney(a, a.balance) }) },
+      acctMoney(a, a.balance));
     balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
 
     const flowCell = r.act.count
       ? el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}` },
-        `${r.flow >= 0 ? '+' : '−'}${money(Math.abs(r.flow), 0)}`)
+        `${r.flow >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(r.flow), 0)}`)
       : el('span', { class: 'acct-dash' }, '—');
 
     const spark = sparkline(r);
@@ -713,7 +832,7 @@ module.exports = function registerAccounts(ctx) {
 
     box.append(el('div', { class: 'acct-drawer-h' },
       el('h3', {}, a.name),
-      el('div', { class: `acct-drawer-v num${a.balance < 0 ? ' text-danger' : ''}` }, money(a.balance))));
+      el('div', { class: `acct-drawer-v num${a.balance < 0 ? ' text-danger' : ''}` }, acctMoney(a, a.balance))));
 
     const grid = el('div', { class: 'acct-drawer-grid' });
     const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },
@@ -722,21 +841,21 @@ module.exports = function registerAccounts(ctx) {
 
     const u = utilisationOf(a);
     if (u) {
-      f(i18n.t('acct.drawer.limit'), money(a.credit_limit));
-      f(i18n.t('acct.drawer.available'), money(u.available));
+      f(i18n.t('acct.drawer.limit'), acctMoney(a, a.credit_limit));
+      f(i18n.t('acct.drawer.available'), acctMoney(a, u.available));
     }
     if (a.goal_amount > 0) {
-      f(i18n.t('acct.drawer.goal'), money(a.goal_amount));
-      f(i18n.t('acct.drawer.toGo'), money(Math.max(0, a.goal_amount - a.balance)));
+      f(i18n.t('acct.drawer.goal'), acctMoney(a, a.goal_amount));
+      f(i18n.t('acct.drawer.toGo'), acctMoney(a, Math.max(0, a.goal_amount - a.balance)));
     }
     if (a.total_invested > 0) {
-      f(i18n.t('acct.drawer.invested'), money(a.total_invested));
-      f(i18n.t('acct.drawer.growth'), money(a.balance - a.total_invested));
+      f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
+      f(i18n.t('acct.drawer.growth'), acctMoney(a, a.balance - a.total_invested));
     }
-    if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), money(a.monthly_contribution));
+    if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), acctMoney(a, a.monthly_contribution));
     if (r.act.count) {
       f(i18n.t('acct.drawer.flow'),
-        `+${money(r.act.inAmt, 0)} · −${money(r.act.outAmt, 0)}`);
+        `+${acctMoney(a, r.act.inAmt, 0)} · −${acctMoney(a, r.act.outAmt, 0)}`);
       f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
     }
     f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
@@ -867,10 +986,16 @@ module.exports = function registerAccounts(ctx) {
         const inGroup = shown.filter(r => r.group === key);
         if (!inGroup.length) continue;
         const total = inGroup.reduce((s, r) => s + r.a.balance, 0);
+        /* Same disclosure as the hero, at group scale: a Bank total that has
+           quietly added euros to rands is marked where the total is, not in a
+           legend somewhere else on the page. */
+        const mixed = currenciesIn(inGroup.map(r => r.a), S.settings.currency).length > 1;
         body.append(el('tr', { class: 'type-row' },
           el('td', { colspan: '7' },
             i18n.t(key),
-            el('span', { class: 'acct-group-total num' }, money(total)))));
+            el('span', { class: 'acct-group-total num' }, money(total),
+              ...(mixed ? [el('span', { class: 'acct-mixed',
+                title: i18n.t('acct.mixedTitle') }, '*')] : [])))));
         for (const r of inGroup) emit(r);
       }
     } else {
@@ -967,6 +1092,8 @@ module.exports = function registerAccounts(ctx) {
     const lines = ['---', `type: ${a.type}`];
     if (a.institution) lines.push(`institution: ${yamlStr(a.institution)}`);
     if (a.account_number) lines.push(`account_number: ${yamlStr(a.account_number)}`);
+    if (a.currency) lines.push(`currency: ${yamlStr(a.currency)}`);
+    if (a.ignore_warnings) lines.push(`ignore_warnings: ${a.ignore_warnings}`);
     lines.push(`balance: ${a.balance.toFixed(2)}`);
     if (a.balance_updated) lines.push(`balance_updated: ${a.balance_updated}`);
     if (!a.in_budget) lines.push('budget: false');
@@ -1009,15 +1136,27 @@ module.exports = function registerAccounts(ctx) {
      group on this page renders. */
   async function addAccount(defaults) {
     const preType = defaults && ACCT_TYPES.includes(defaults.type) ? defaults.type : 'savings';
+    /* The create form offers only the two optional figures it always has, and
+       now only when the kind being created has any use for them — a cash
+       wallet is not asked for its savings goal or what was invested in it.
+       Everything else is a job for the edit dialog, which is where the full
+       set lives; a create form that asked eleven questions would be a worse
+       trade than a second click. */
+    const opt = fieldsForType(preType, null);
     const r = await askFields(app, i18n.t('acct.new.title'), [
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: 'e.g. Easy Equities' },
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
-      { key: 'goal_amount', label: i18n.t('acct.field.goalOpt'), type: 'number',
-        desc: i18n.t('acct.field.goalOptDesc') },
-      { key: 'total_invested', label: i18n.t('acct.field.investedOpt'), type: 'number',
-        desc: i18n.t('acct.field.investedDesc') },
+      { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text',
+        placeholder: S.settings.currency,
+        desc: i18n.t('acct.field.currencyDesc', { symbol: S.settings.currency }) },
+      ...(opt.includes('goal_amount')
+        ? [{ key: 'goal_amount', label: i18n.t('acct.field.goalOpt'), type: 'number',
+          desc: i18n.t('acct.field.goalOptDesc') }] : []),
+      ...(opt.includes('total_invested')
+        ? [{ key: 'total_invested', label: i18n.t('acct.field.investedOpt'), type: 'number',
+          desc: i18n.t('acct.field.investedDesc') }] : []),
       { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select', value: 'yes',
         options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
           { value: 'no', label: i18n.t('acct.counts.no') }],
@@ -1042,6 +1181,11 @@ module.exports = function registerAccounts(ctx) {
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),
       account_number: '', tx_label: '',
+      currency: (r.currency || '').trim(),
+      // Nothing muted on a fresh account: the warnings are how a new account
+      // gets set up, so starting them off would hide the very prompts that
+      // tell the reader to link a folder and import something.
+      ignore_warnings: '',
       balance, balance_updated: todayIso(),
       in_budget: r.budget !== 'no',
       credit_limit: null, goal_amount: goal, target_date: '',

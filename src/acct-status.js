@@ -59,10 +59,83 @@ function statusOf(a, rows, today) {
   else if (days === null) state = 'nodate';
   else if (isStale(a.balance_updated, today)) state = 'stale';
   else state = 'ok';
-  return { state, rec, days };
+  /* Resolved against the state that was actually reached, not against every
+     state the account could have been in. An account told to ignore `notx`
+     that later starts drifting is asked about the drift — muting one warning
+     is not a standing licence to stop checking the figure. */
+  const muted = state !== 'ok' && mutedWarnings(a).has(state);
+  return { state, rec, days, muted };
 }
 
-const wantsALook = s => s.state !== 'ok';
+/* ------------------------- muting a warning ---------------------------- */
+
+/* Every state that can be silenced. `ok` is absent because there is nothing
+   there to silence, and its absence is what stops `ignore_warnings: ok` from
+   parsing into something meaningless.
+
+   `nofolder` is listed although this file cannot currently REACH that state —
+   it arrives with the folder-detection work landing separately. Listing it now
+   costs nothing (a state that never occurs never matches) and means the vault
+   frontmatter, the dialog and this list do not have to change again when it
+   does. */
+const WARNINGS = ['drift', 'stale', 'nodate', 'notx', 'nofolder'];
+
+/* The frontmatter is written by hand as often as by the dialog, so the words a
+   reader would actually reach for all resolve. `notx` and `nodate` are what the
+   code calls them; nobody types that unprompted, and a key that silently fails
+   to parse is worse than no key at all — the reader sets it, the warning stays,
+   and there is nothing on screen explaining why. */
+const WARNING_ALIASES = {
+  drift: 'drift', drifted: 'drift', drifting: 'drift',
+  stale: 'stale', unconfirmed: 'stale', old: 'stale', 'not-confirmed': 'stale',
+  nodate: 'nodate', 'no-date': 'nodate', 'never-confirmed': 'nodate', undated: 'nodate',
+  notx: 'notx', 'no-transactions': 'notx', 'no-transaction': 'notx',
+  'nothing-imported': 'notx', 'no-imports': 'notx', 'no-import': 'notx',
+  nofolder: 'nofolder', 'no-folder': 'nofolder', 'not-linked': 'nofolder',
+};
+
+/* Which warnings this account has been told to keep quiet about.
+
+   Accepts `true` (all of them — the shorthand, and what the dialog's
+   everything-off state means), a bracketed or bare comma list, or nothing.
+   Underscores and spaces normalise to hyphens so `no_transactions`,
+   `no transactions` and `no-transactions` are the same instruction.
+
+   An unrecognised word is DROPPED rather than treated as "mute everything":
+   guessing wide on a typo would hide the very state the reader is trying to
+   name, which is the one failure this key must not have. */
+function mutedWarnings(a) {
+  const raw = String((a && a.ignore_warnings) || '').trim();
+  if (!raw) return new Set();
+  if (/^(true|yes|on|all|1)$/i.test(raw)) return new Set(WARNINGS);
+  if (/^(false|no|off|none|0)$/i.test(raw)) return new Set();
+  /* Split on COMMAS only, then fold the whitespace inside each item into a
+     hyphen. Splitting on whitespace too would look more generous and be less
+     useful: `[no transactions, unconfirmed]` is what someone writing the words
+     out actually types, and a whitespace split tears it into "no" and
+     "transactions", neither of which means anything. The cost is that a
+     comma-less `notx nofolder` mutes nothing — which is not valid YAML flow
+     syntax anyway, and failing closed is the right direction to fail. */
+  const out = new Set();
+  for (const part of raw.replace(/^\[|\]$/g, '').split(',')) {
+    const k = part.trim().toLowerCase()
+      .replace(/^["']|["']$/g, '')
+      .replace(/[_\s]+/g, '-');
+    if (WARNING_ALIASES[k]) out.add(WARNING_ALIASES[k]);
+  }
+  return out;
+}
+
+/* A muted account KEEPS its state — it is not reported as `ok`, and the page
+   still shows the pill saying what it actually is. Only `wantsALook` changes,
+   which is what takes it out of the queue, the attention count and the
+   "Needs a look" filter.
+
+   Reporting it as `ok` instead would have been fewer lines and a lie: a figure
+   nothing has ever confirmed does not agree with the transactions, it is
+   merely one the reader has said they do not want asked about. The distinction
+   is the whole reason this is a mute and not a fix. */
+const wantsALook = s => s.state !== 'ok' && !s.muted;
 
 /* The decision queue: everything that wants a look, most urgent first, and
    within one urgency the oldest figure first. Returns a NEW array — the caller
@@ -74,4 +147,5 @@ function queueOrder(statuses) {
     .sort((x, y) => URGENCY[x.state] - URGENCY[y.state] || staleRank(y) - staleRank(x));
 }
 
-module.exports = { URGENCY, STALE_DAYS, statusOf, wantsALook, staleRank, queueOrder };
+module.exports = { URGENCY, STALE_DAYS, WARNINGS, statusOf, wantsALook, staleRank,
+  queueOrder, mutedWarnings };

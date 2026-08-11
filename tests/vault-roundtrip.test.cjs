@@ -35,6 +35,13 @@ const FILES = {
 
   [`${B}/Accounts/FNB Cheque.md`]: '---\ntype: checking\ninstitution: "FNB"\naccount_number: "12345678901"\ntx_label: "FNB Cheque"\nbalance: 1234.56\nbalance_updated: 2026-07-01\ntags: [finance]\n---\n\n# FNB Cheque\n\nNotes body.\n',
   [`${B}/Accounts/Odd Balance.md`]: '---\ntype: savings\nbalance: 1 234,56\n---\n',
+  /* An account denominated in something other than the household currency, and
+     a cash wallet that states the household's own symbol explicitly. The pair
+     is here because the second is the one that goes wrong quietly: read it as
+     "a currency was set" rather than as "the same currency was restated" and
+     every total in a single-currency vault picks up a mixed-currency mark. */
+  [`${B}/Accounts/Euro Wallet.md`]: '---\ntype: cash\ncurrency: "€"\nbalance: 250.00\nbalance_updated: 2026-07-01\n---\n',
+  [`${B}/Accounts/Rand Wallet.md`]: '---\ntype: cash\ncurrency: "R"\nbalance: 80.00\nbalance_updated: 2026-07-01\nignore_warnings: [no-transactions]\n---\n',
   /* Every OPTIONAL numeric key, written the way a person writes them by hand.
      These used to go through parseFloat, which reads "15,000" as 15 and
      "1.234,56" as 1.234 — and because saveAccount writes them back, the next
@@ -124,6 +131,32 @@ const FILES = {
   eq(grp.starting_amount, 0, 'an explicit 0 stays 0');
   const noneSet = S.accounts.find(a => a.name === 'FNB Cheque');
   eq(noneSet.credit_limit, null, 'an absent optional number is null, not NaN');
+
+  /* Per-account currency, through the REAL loader. It is a display symbol —
+     the balance beside it is untouched, because nothing converts. */
+  const { symbolOf, isForeign, currenciesIn } = require('../src/currency');
+  const euro = S.accounts.find(a => a.name === 'Euro Wallet');
+  eq(euro.currency, '€', 'a currency key must load');
+  eq(euro.balance, 250, 'and the balance beside it is NOT converted');
+  eq(symbolOf(euro, S.settings.currency), '€', 'so this account prints in its own symbol');
+  eq(isForeign(euro, S.settings.currency), true, 'and reads as foreign');
+  eq(noneSet.currency, '', 'an account with no currency key loads as empty, not undefined');
+  eq(symbolOf(noneSet, S.settings.currency), 'R', 'and falls back to the household symbol');
+  eq(isForeign(S.accounts.find(a => a.name === 'Rand Wallet'), S.settings.currency), false,
+    'restating the household symbol is not a second currency');
+  eq(currenciesIn(S.accounts, S.settings.currency), ['R', '€'],
+    'this vault spans two symbols, so its totals must disclose it');
+
+  /* The muted-warning key, read by the REAL loader off the shape a hand-edited
+     wallet actually carries — a YAML flow list of readable words. This is the
+     join that a unit test on the parser alone cannot check: frontmatter values
+     arrive here as flat strings, so a list the loader mangled would still
+     parse "successfully" into a mute of nothing. */
+  const { mutedWarnings } = require('../src/acct-status');
+  const rand = S.accounts.find(a => a.name === 'Rand Wallet');
+  eq(rand.ignore_warnings, '[no-transactions]', 'the raw key survives the loader verbatim');
+  eq([...mutedWarnings(rand)], ['notx'], 'and resolves to the state the page checks');
+  eq([...mutedWarnings(euro)], [], 'an account without the key mutes nothing');
 
   eq(Object.keys(S.txFiles).length, 2, 'two transactions files');
   const txKey = 'FNB Cheque/2026-07';

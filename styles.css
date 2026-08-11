@@ -1435,6 +1435,13 @@
   float: right; font-size: .92rem; letter-spacing: 0; text-transform: none;
   color: var(--text-primary); font-variant-numeric: tabular-nums;
 }
+/* The asterisk beside a group total that has added more than one currency
+   together. Deliberately a mark and a title rather than a colour: it is not a
+   warning about a wrong figure, it is a note about what the figure is made of,
+   and the same information is spelled out under the hero above. */
+.budget-app-root .acct-mixed {
+  margin-left: 3px; color: var(--text-muted); font-weight: 700; cursor: help;
+}
 .budget-app-root .table tbody tr.acct-empty td { padding: 34px 12px; text-align: center; color: var(--text-muted); font-size: 13px; border-bottom: none; }
 .budget-app-root .acct-pill {
   font-size: 10.5px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
@@ -1444,6 +1451,15 @@
 .budget-app-root .acct-pill.ok { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-primary-light); }
 .budget-app-root .acct-pill.warn { color: var(--color-warning-ink); border-color: var(--color-warning); background: var(--color-warning-light); }
 .budget-app-root .acct-pill.danger { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-light); }
+/* A warning the reader has told this account to keep quiet about. It keeps the
+   words — the state is still true — and gives up the alarm colour, which is
+   the only part that was asking for a decision. Dashed, so a muted pill is
+   tellable from a plain one without relying on colour alone. */
+.budget-app-root .acct-pill.muted {
+  color: var(--text-muted); border-style: dashed; background: none; opacity: .85;
+}
+.budget-app-root .acct-pill-mute { margin-left: 5px; font-weight: 500; opacity: .8; }
+.budget-app-root .acct-pill-mute::before { content: '· '; }
 
 /* The drawer — everything the tile used to carry, shown for ONE account. */
 .budget-app-root .table tbody tr.acct-drawer-row td.acct-drawer-cell { padding: 0 .25rem .5rem; border-bottom: none; background: none; }
