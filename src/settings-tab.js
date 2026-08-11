@@ -213,6 +213,9 @@ class BudgetSettingTab extends PluginSettingTab {
               new Notice(`Budget: "${v}" is not a valid month start day — enter a number from 1 to 28.`, 6000);
               return;
             }
+            // Read the previous value before the write, same ordering as the
+            // anchor field below — afterwards there is nothing to compare against.
+            this.noticeMonthStartReslices(md, Number(md.month_start_day ?? 23), n);
             await this.plugin.updateBudgetSettingsMd('month_start_day', String(n));
             this.plugin.reloadViews();
           }, 800);
@@ -388,6 +391,29 @@ class BudgetSettingTab extends PluginSettingTab {
       .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
   }
 
+  /* Month start day is the gap the two controls above already cover: neither
+     strandedBudgetCount's monthly-monthly branch nor period_anchor's own
+     warning fires here, because a YYYY-MM file's NAME never changes — only the
+     window period.js reads it against does. On the vault this was built
+     against, moving the day from 23 to 1 pulled 2026-08.md's window from
+     2026-07-23..2026-08-22 (R16,200 actual spend, 3 rows) to
+     2026-08-01..2026-08-31 (R6,800, 2 rows) — a 2.4x change in a figure that
+     looked untouched because the file it came from was. Split from the Notice
+     purely so it can be tested, same as strandedBudgetCount above.
+     Ignored outside monthly mode: periodLengthDesc() already tells the reader
+     the day is unused once a pay-cycle length is active, so warning about it
+     here too would fire on a setting with zero effect on anything shown. */
+  monthStartReslicesCount(md, before, after) {
+    if (before === after) return 0;
+    if (periodDaysOrZero(md.period_days)) return 0;
+    return this.monthBudgetCount();
+  }
+  noticeMonthStartReslices(md, before, after) {
+    const n = this.monthStartReslicesCount(md, before, after);
+    if (!n) return;
+    new Notice(i18n.t('settings.monthStartReslices', { count: n }), 10000);
+  }
+
   /* ADR 0001: an anchor is meaningful only modulo the period length, so moving
      it by a whole number of cycles describes the same periods and must stay
      silent — warning there would train the user to ignore the warning that
@@ -451,6 +477,12 @@ class BudgetSettingTab extends PluginSettingTab {
     }
     if (key === 'period_days') {
       this.noticeBudgetsKept(periodDaysOrZero(this.mdSettings().period_days), periodDaysOrZero(value));
+    }
+    if (key === 'month_start_day') {
+      const n = parseInt(value, 10);
+      if (n >= 1 && n <= 28) {
+        this.noticeMonthStartReslices(this.mdSettings(), Number(this.mdSettings().month_start_day ?? 23), n);
+      }
     }
     const raw = key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'month_start_day' ? String(parseInt(value, 10))

@@ -256,6 +256,73 @@ console.log(`PASS — debt amortisation, strategy simulation and formatting (${c
     'a first-of-the-month agreement is unaffected');
 }
 
+/* ---- expectedBalance: an UNANCHORED (original, start) pair must not project ----
+   addDebt seeds `original = balance` and `start = todayIso()` together, so the
+   pair is self-consistent at the moment a row is created. Neither field has an
+   editor in the Debt table — the only way `original` ever changes afterward is
+   a hand edit to Debts.md, which views/debts.js's own comment invites ("edit it
+   in Debts.md to the real original amount for a true figure"). Doing that
+   moves `original` without moving `start`, and the pair now silently asserts
+   something that never happened: that the balance was this new `original` on
+   the day the ROW was created, not the day the loan actually began.
+
+   That is not a judgement call to detect — it is provable. A balance can only
+   fall by cash actually paid (crediting the most generous case, 0% interest,
+   where every rand paid is principal). So `original - balance` can never
+   exceed `payment(+extra) × months` elapsed since `start`. A long-running,
+   recently-added mortgage whose `original` was hand-corrected to the true loan
+   amount blows straight through that bound — a few months of a normal
+   instalment cannot explain the gap between "true original" and "today's
+   balance" — and that is exactly the phantom-discrepancy bug: the schedule
+   projects almost no amortisation and screams a six-figure gap that isn't
+   real.
+
+   The guard only engages when the caller supplies `.balance` (a real Number),
+   so it never touches the callers above that exercise the pure date/month
+   arithmetic without a balance at all — those are a different concern and stay
+   exactly as they were. */
+{
+  const { expectedBalance } = require('../src/debt-math');
+
+  // The reported shape: a long-running debt just added to the tracker, then
+  // "corrected" per the comment's advice. `start` is effectively today; the
+  // true original is far larger than one month of instalments could explain.
+  const unanchored = {
+    original: 1500000, rate: 11, payment: 15000, extra: 0,
+    start: '2026-07-11', balance: 1190000,
+  };
+  eq(expectedBalance(unanchored, '2026-08-11'), null,
+    'a hand-corrected original with a stale (recent) start cannot project — the ' +
+    '310 000 apparent reduction is impossible from one month at 15 000/mo');
+
+  // The boundary itself: exactly as much reduction as the cash paid allows.
+  // Not flagged — this is the legitimate edge, not the impossible one.
+  const atBound = {
+    original: 100000, rate: 0, payment: 2000, extra: 0,
+    start: '2026-07-11', balance: 98000, // 100000 - 2000*1 = 98000
+  };
+  ok(expectedBalance(atBound, '2026-08-11') !== null,
+    'a reduction exactly equal to one month of cash paid is still plausible');
+
+  // A single rand past the bound tips it over.
+  const pastBound = {
+    original: 100000, rate: 0, payment: 2000, extra: 0,
+    start: '2026-07-11', balance: 97998,
+  };
+  eq(expectedBalance(pastBound, '2026-08-11'), null,
+    'one rand more reduction than cash paid could ever produce is unanchored');
+
+  // A genuinely anchored, long-tracked debt: two years of a real instalment
+  // account comfortably for the drop, and still shows its projection.
+  const anchored = {
+    original: 100000, rate: 8, payment: 1000, extra: 0,
+    start: '2024-08-11', balance: 80000,
+  };
+  const exp = expectedBalance(anchored, '2026-08-11');
+  ok(exp !== null, 'a debt whose drop is well within two years of real payments still projects');
+  eq(exp.months, 24, 'twenty-four months elapsed');
+}
+
 /* ---- a stalled plan's series RISES above its opening balance ----
    The precondition behind the payoff curve's scaling in views/debts.js. That
    chart used to take its y-axis maximum from series[0], on the assumption that

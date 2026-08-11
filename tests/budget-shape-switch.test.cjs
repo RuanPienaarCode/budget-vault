@@ -121,6 +121,41 @@ const MONTHLY_BUDGET = [
     'and with no usable anchor there is no phase to measure, so it stays quiet rather than guessing');
 }
 
+/* ---- month start day: the window moves while the filename does not ---- */
+{
+  /* strandedBudgetCount(0, 0) correctly says nothing about FILES becoming
+     unreachable on a monthly -> monthly change — but month_start_day changes
+     WITHIN that pairing, and every 2026-08.md keeps its name while the window
+     period.js reads it against moves underneath it. Nothing above catches
+     that; monthStartReslicesCount is the control built to. */
+  const { BudgetSettingTab } = require('../src/settings-tab');
+
+  function tabWith(budgetBasenames, mdExtra = {}) {
+    const tab = Object.create(BudgetSettingTab.prototype);
+    tab.plugin = { settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' };
+    tab.app = {
+      vault: {
+        getMarkdownFiles: () => budgetBasenames.map(b => new (require('./helpers/harness.cjs').TFile)(`Budget/Budgets/${b}.md`)),
+        getAbstractFileByPath: () => null,
+      },
+      metadataCache: { getFileCache: () => null },
+    };
+    tab.mdSettings = () => mdExtra;
+    return tab;
+  }
+
+  const monthly = tabWith(['2026-07', '2026-08', '2026-07-24']);
+  eq(monthly.monthStartReslicesCount({}, 23, 1), 2,
+    'monthly mode: changing the day re-slices every month-named budget, counted the same way monthBudgetCount does');
+  eq(monthly.monthStartReslicesCount({}, 23, 23), 0, 'a no-op change says nothing, same as strandedBudgetCount(0, 0)');
+
+  eq(tabWith(['2026-08-07', '2026-07-24']).monthStartReslicesCount({ period_days: 14 }, 23, 1), 0,
+    'on a pay cycle the day is ignored entirely — periodLengthDesc() already tells the reader so, and warning here too would describe a setting with no effect');
+
+  eq(tabWith([]).monthStartReslicesCount({}, 23, 1), 0,
+    'a vault with no month-named budgets yet has nothing for the change to touch');
+}
+
 /* ---- carrying structure never carries an amount ---- */
 {
   const { carryStructure } = budgetsCtx(14, '2026-08-07', {});

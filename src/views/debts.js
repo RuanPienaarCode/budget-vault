@@ -57,7 +57,15 @@ module.exports = function registerDebts(ctx) {
     const total = list.reduce((s, d) => s + d.balance, 0);
     const perMonth = list.reduce((s, d) => s + committed(d), 0);
     const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
-    const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
+    /* Read ONCE and named here. The caption below used to reach for a bare
+       `extra`, which is declared in renderDebtPlan — a different function — so
+       this threw ReferenceError the moment the page drew its tiles, and took
+       the whole Debts view down with it. It shipped in 1.13.0 because this file
+       has no render test: every guard suite was green while the page was dead.
+       Same value the simulation runs on, so the caption cannot describe a
+       different plan from the one above it. */
+    const extra = planExtra();
+    const plan = simulate(list, { extra, strategy: planStrategy() });
 
     const tile = kpiTiles($('#debtKpis'));
     // Neutral: owing money is an ordinary financial position, not a red state.
@@ -265,14 +273,18 @@ module.exports = function registerDebts(ctx) {
        monthly salary lands in one period out of four, and scaling left three
        weeks with no ratio at all and made the fourth read 4.35 paycheques. */
     const iv = ctx.intervalDays();
-    const { income, periods: nPeriods, complete } = ctx.monthlyIncome(S.period);
+    const { income, months: nMonths, complete } = ctx.monthlyIncome(S.period);
     /* Not `window` — that shadows the browser global inside this whole function.
        "complete" distinguishes a settled average from the one case that still
        leans on a period in progress (a vault with no finished history yet), so
        the line doesn't present a part-week figure as a months-long average. */
+    /* Months, not periods: the window is three CALENDAR months now, because no
+       count of periods holds a stable number of monthly paydays — see
+       monthlyIncome in period.js. The phrase has to name what was actually
+       measured, or the page describes a window the figure did not come from. */
     const avgWindow = !complete ? 'this period so far'
-      : nPeriods === 1 ? 'the last complete period'
-      : `the last ${nPeriods} complete periods`;
+      : nMonths === 1 ? 'the last complete month'
+      : `the last ${nMonths} complete months`;
     const scaleNote = iv ? ` monthly income, averaged over ${avgWindow},` : ' income';
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {
@@ -371,11 +383,14 @@ module.exports = function registerDebts(ctx) {
               const gap = d.balance - exp.expected;
               const material = Math.abs(gap) > Math.max(50, d.original * 0.02);
               if (material) {
+                // The date it projects from is in the visible text, not only the
+                // title — a hover tooltip is invisible on a phone, which is half
+                // of where this table is read.
                 payoffCell.append(el('div', { class: 'debt-implied',
                   title: `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
                     + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. `
                     + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.` },
-                `schedule says ${money(exp.expected, 0)}`));
+                `schedule says ${money(exp.expected, 0)} since ${d.start}`));
               }
             }
           }

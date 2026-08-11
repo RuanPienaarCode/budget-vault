@@ -125,6 +125,10 @@ module.exports = {
     other: 'Presupuesto: esto desplaza cada límite de periodo. {count} archivos de presupuesto con nombre de fecha dejarán de coincidir — permanecen en tu bóveda, y volver a poner esta fecha en {prev} los trae enseguida de vuelta.',
   },
   'settings.dateNotReal': 'Presupuesto: «{value}» no es una fecha — usa el selector, o escribe AAAA-MM-DD.',
+  'settings.monthStartReslices': {
+    one: 'Presupuesto: esto desplaza la ventana con la que se mide cada archivo de presupuesto mensual, sin renombrar el archivo — presupuesto frente a real de {count} periodo pasado cambiará. No se elimina nada, y volver a poner el día como estaba lo restaura.',
+    other: 'Presupuesto: esto desplaza la ventana con la que se mide cada archivo de presupuesto mensual, sin renombrar el archivo — presupuesto frente a real de {count} periodos pasados cambiará. No se elimina nada, y volver a poner el día como estaba lo restaura.',
+  },
 
   /* ============================ setup wizard ============================== */
   'wiz.title': 'Configurar Budget Vault',
@@ -714,6 +718,7 @@ module.exports = {
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% del gasto — mostrar transacciones',
   'dash.split.noteAria': 'Abrir la nota de la categoría {cat}',
   'dash.split.noteMissing': 'No se encontró nota de categoría para «{cat}»',
+  'dash.split.centerLabel': 'Gasto categorizado',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Lo que queda',

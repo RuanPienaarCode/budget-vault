@@ -202,4 +202,53 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   }
 }
 
+/* ---- the home costs card must charge the fee it advertises ---- */
+/* recalcHome() in src/views/loans.js never read p.serviceFee, while
+   recalcCar() (same file) does — and the ZA profile's own costsNote, printed
+   on the HOME costs card, literally reads "monthly service fee R69.00". So the
+   page stated the fee and never charged it: R69 x 240 months is R16 560
+   missing from a 20-year bond, invisible in the exact monthly figure a buyer
+   checks affordability against.
+
+   Two things are pinned here. First, the arithmetic recalcHome() now folds in
+   — split into a pure, DOM-free function and published via ctx.provide() the
+   same way src/views/budgets.js publishes otherShapeBudgets()/carryStructure()
+   for the same reason: src/dom.js's el() calls document.createElement, so
+   recalcHome() itself cannot run in bare node. Second, a source-text guard so
+   a future edit that stops CALLING the fold (leaving it defined but unused,
+   the exact shape of the original bug) fails the build rather than passing
+   silently — tests/settings-parity.test.cjs uses the same text-anchored
+   technique for the same reason: a DOM-free check cannot see what never ran. */
+{
+  const fs = require('fs');
+  const path = require('path');
+  const { stubObsidian, makeCtx } = require('./helpers/harness.cjs');
+  stubObsidian();
+
+  const ctx = makeCtx({}, { settings: { country: 'za' } });
+  ctx.registerDirty = () => {};
+  require('../src/views/loans')(ctx);
+  ok(typeof ctx.homeServiceFeeFold === 'function',
+    'src/views/loans.js publishes homeServiceFeeFold via ctx.provide, same pattern as budgets.js');
+
+  const p = L.loanProfileFor('za');
+  eq(p.serviceFee, 69, 'sanity: the ZA NCA-capped monthly service fee is R69.00 (R60 + 15% VAT)');
+
+  const withFee = ctx.homeServiceFeeFold(13935, p.serviceFee, 240);
+  eq(withFee.monthlyTotal, 14004, 'R13 935 repayment + R69 service fee = R14 004 a month, not R13 935');
+  eq(withFee.termTotal, 16560, 'R69 x 240 months = R16 560 over a 20-year bond — the figure the bug dropped');
+
+  const noFee = ctx.homeServiceFeeFold(9000, 0, 120);
+  eq(noFee.monthlyTotal, null, 'a country/profile with no service fee gets no Total-per-month row — matches recalcCar\'s if(service>0) gate');
+  eq(noFee.termTotal, 0, 'and no Service-fees-over-the-term row either');
+
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'loans.js'), 'utf8');
+  const recalcHome = src.slice(src.indexOf('function recalcHome('), src.indexOf('\n  /* --------------------------- vehicle finance'));
+  ok(/p\.serviceFee/.test(recalcHome), 'recalcHome() must read p.serviceFee — this is the exact line the original bug omitted');
+  ok(/homeServiceFeeFold\(/.test(recalcHome), 'recalcHome() must actually CALL the fold, not just define it unused');
+  ok(/'Monthly service fee'/.test(recalcHome), 'recalcHome() must render the Monthly service fee row');
+  ok(/'Total per month'/.test(recalcHome), 'recalcHome() must render the Total per month row, folding the fee in like recalcCar does');
+  ok(/'Service fees over the term'/.test(recalcHome), 'recalcHome() must render the Service fees over the term row');
+}
+
 console.log(`PASS — loan maths, SARS duty brackets and cost profiles intact (${checks} checks).`);

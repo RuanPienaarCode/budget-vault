@@ -29,6 +29,31 @@ const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } =
 const { supersededBySplit } = require('../tx-role');
 const { ISO_DATE, todayIso } = require('../dates');
 
+/* Largest-remainder (Hare quota) allocation for a column of percentages that
+   must sum to exactly 100 — independent `Math.round()` per group does not:
+   three equal thirds print 33 three times (99%), and the same rounded set is
+   what gets concatenated into the ring's aria-label, so for a screen-reader
+   user the gap is the only reading of the chart they get, not a cosmetic one.
+
+   Duplicated from src/views/dashboard.js's own copy rather than shared,
+   because the two views own their own files. Each keeps its floor and the
+   leftover whole points go to the largest fractional remainder, biggest
+   first; ties are broken by ORIGINAL INDEX rather than by trusting
+   `Array.prototype.sort` to stay stable across a future refactor, so two
+   equal groups resolve the same way on every render. */
+function sharePercents(amounts) {
+  const total = amounts.reduce((s, v) => s + v, 0);
+  if (total <= 0) return amounts.map(() => 0);
+  const floors = amounts.map(v => Math.floor((v / total) * 100));
+  const remainders = amounts
+    .map((v, i) => ({ i, frac: (v / total) * 100 - floors[i] }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  let left = 100 - floors.reduce((s, v) => s + v, 0);
+  const pct = floors.slice();
+  for (let k = 0; k < remainders.length && left > 0; k++, left--) pct[remainders[k].i]++;
+  return pct;
+}
+
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
@@ -490,39 +515,43 @@ module.exports = function registerAccounts(ctx) {
     const body = el('div', { class: 'body-pad acct-ring-body' });
     if (!sum) { card.append(body); return card; }
 
-    const pctOf = g => (g.total / sum) * 100;
+    /* Computed ONCE and indexed everywhere below — the aria-label, each
+       wedge's tooltip and the legend's % column all read the same array, so
+       the three can never disagree with each other the way three independent
+       Math.round() calls on the same group occasionally did. */
+    const shares = sharePercents(drawn.map(g => g.total));
     const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 92;
     const { svg, add } = createChart({
       w: W, h: H, cls: 'donut acct-donut',
       label: i18n.t('acct.where.aria', {
-        parts: drawn.map(g => i18n.t('acct.where.part',
-          { group: i18n.t(g.key), pct: Math.round(pctOf(g)) })).join(', '),
+        parts: drawn.map((g, i) => i18n.t('acct.where.part',
+          { group: i18n.t(g.key), pct: shares[i] })).join(', '),
       }),
     });
 
     let a0 = -Math.PI / 2;                  // 12 o'clock, so the largest slice starts at the top
-    for (const g of drawn) {
+    drawn.forEach((g, i) => {
       const sweep = (g.total / sum) * Math.PI * 2;
       const seg = add('path', {
         d: arcPath(cx, cy, rOut, rIn, a0, a0 + sweep),
         fill: g.colour, stroke: themeColors(root).hole, 'stroke-width': '2',
       });
-      tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${Math.round(pctOf(g))}%`);
+      tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${shares[i]}%`);
       a0 += sweep;
-    }
+    });
     add('text', {
       x: cx, y: cy + 10, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '700',
       fill: 'currentColor', 'font-family': 'inherit',
     }).textContent = money(sum, 0);
 
     const legend = el('ul', { class: 'donut-legend acct-ring-legend' });
-    for (const g of drawn) {
+    drawn.forEach((g, i) => {
       legend.append(el('li', {},
         el('i', { style: `background:${g.colour}` }),
         el('span', { class: 'dl-name' }, i18n.t(g.key)),
         el('span', { class: 'dl-val num' }, money(g.total, 0)),
-        el('span', { class: 'dl-pct' }, `${Math.round(pctOf(g))}%`)));
-    }
+        el('span', { class: 'dl-pct' }, `${shares[i]}%`)));
+    });
     body.append(svg, legend);
     if (negative.length) {
       body.append(el('div', { class: 'acct-ring-note' },
@@ -1233,3 +1262,8 @@ module.exports = function registerAccounts(ctx) {
     acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };
+
+/* Exposed for a direct, DOM-free unit test of the rounding algorithm — see
+   tests/donut-percentages.test.cjs, which covers this copy and dashboard.js's
+   independently, plus the full render for each. */
+module.exports.sharePercents = sharePercents;

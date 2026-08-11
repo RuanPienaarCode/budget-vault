@@ -549,4 +549,58 @@ const card = {
   eq(mixed.cycle.spend, 1000, 'only outflows dated inside the period are this cycle\'s card spending');
 }
 
+/* ---- DEFECT 1: the headline, perDay, "after" and the bar aria-label must
+   all read the SAME free figure — the one the card actually shows.
+
+   During an active settlement cycle the card that used to be subtracted from
+   `free` is shown in its own band instead (see dash.left.cycle in
+   views/dashboard.js). Before this fix `free` still had the card taken off,
+   so the per-day rate, the "short/covered" sentence and the bar's
+   aria-label all quoted a smaller figure than the headline — a card that
+   contradicted itself out loud. */
+{
+  const cheque = { name: 'Cheque', implied: 148, dated: true, inBudget: true, type: 'checking' };
+  const cardAcct = { name: 'Discovery Card', implied: -17011, dated: true, inBudget: true,
+    type: 'credit_card', settleMonthly: true };
+  const SAL = 'CASHFOCUS SALARIS';
+  const income = [
+    { date: '2026-05-23', amount: 40240.20, desc: SAL },
+    { date: '2026-06-23', amount: 40240.20, desc: SAL },
+    { date: '2026-07-23', amount: 40240.20, desc: SAL },
+  ];
+  const PS = '2026-07-23', PE = '2026-08-22', TODAY2 = '2026-08-10';
+  const spend = amt => [{ date: '2026-08-01', desc: 'CHECKERS', amount: -amt }];
+
+  const L = whatsLeft({
+    accounts: [cheque, cardAcct], services: [], debts: [], rows: [],
+    incomeRows: income, cardRows: spend(17011),
+    periodStart: PS, periodEnd: PE, today: TODAY2,
+  });
+  ok(L.cycle, 'a settlement cycle is active for this fixture');
+  eq(L.cardDue, 17011, 'the card commitment is still reported — the cycle band shows it, the chain no longer subtracts it');
+  eq(L.committedOther, 0, 'no debit orders in this fixture');
+  eq(L.free, 148, 'free is cash less what is STILL a claim on it — the card is not, once it has its own band');
+  eq(L.short, false, 'R148 with nothing else committed is not short');
+  eq(L.days, 12, '10 Aug to 22 Aug is 12 days');
+  eq(Math.round(L.perDay * 100) / 100, Math.round((148 / 12) * 100) / 100,
+    'perDay must divide the SAME free the headline shows, not the card-inclusive figure');
+}
+
+/* ---- DEFECT 3: short is read off cents, not a raw float difference ----
+   Two accounts and two debit orders that are exactly break-even on paper
+   leave a sub-cent float remainder behind — never a real shortfall, and
+   never one a human could act on. */
+{
+  const L = whatsLeft({
+    accounts: [{ name: 'Cheque', implied: 4001.60, dated: true, inBudget: true, type: 'checking' }],
+    services: [], debts: [
+      { name: 'A', payment: 1000.70, extra: 0, status: 'active', category: '', start: '' },
+      { name: 'B', payment: 3000.90, extra: 0, status: 'active', category: '', start: '' },
+    ],
+    rows: [], periodStart: P_START, periodEnd: P_END, today: TODAY,
+  });
+  ok(Math.abs(L.free) < 1e-6, 'the float remainder is sub-cent, as measured');
+  eq(L.short, false, 'break-even to the cent must not read as short off a -4.5e-13 float artefact');
+}
+
 console.log(`PASS — the forward view counts what is coming, once, and only what it can place (${checks} assertions).`);

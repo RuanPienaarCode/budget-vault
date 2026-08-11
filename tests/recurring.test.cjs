@@ -126,6 +126,12 @@ const svc = (name, provider, amount, cycle, category) =>
   eq(nextExpected({ last: '2026-01-31' }, 'monthly'), '2026-02-28', 'the 31st clamps into February');
   eq(nextExpected({ last: '2024-01-31' }, 'monthly'), '2024-02-29', 'and knows a leap year');
   eq(nextExpected({ last: '2026-03-10' }, 'annual'), '2027-03-10', 'annual adds a year');
+  // A subscription last charged on a leap day: naive "+1 year, same month/day"
+  // lands on 2029-02-29, a date that does not exist. The monthly branch above
+  // already clamps to the real last day of the target month — the annual
+  // branch must do the same.
+  eq(nextExpected({ last: '2028-02-29' }, 'annual'), '2029-02-28', 'a Feb 29 anniversary in a non-leap year clamps to the 28th');
+  eq(nextExpected({ last: '2027-02-28' }, 'annual'), '2028-02-28', 'an ordinary Feb 28 anniversary is untouched even into a leap year');
   eq(nextExpected(null, 'monthly'), null, 'nothing to predict from');
 }
 

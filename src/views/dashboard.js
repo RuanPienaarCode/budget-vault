@@ -17,6 +17,33 @@ const {
   historicalRanges, rangeFor, rangePills,
 } = require('../chart');
 
+/* Largest-remainder (Hare quota) allocation for a column of percentages that
+   must sum to exactly 100 — independent `Math.round()` per slice does not: six
+   equal sixths print 17 six times (102%), three equal thirds print 33 three
+   times (99%), and [50,25,12.5,12.5] prints 50,25,13,13 (101%). The same
+   rounded set is what gets concatenated into the donut's aria-label, so for a
+   screen-reader user the gap is not cosmetic — it is the only reading of the
+   chart they get.
+
+   Each slice keeps its floor and the leftover whole points go to the slices
+   with the largest fractional remainder, biggest first. Ties are broken by
+   ORIGINAL INDEX rather than by trusting `Array.prototype.sort` to stay
+   stable across a future refactor, so two equal slices resolve the same way
+   on every render — a screen reader announcing the same chart twice must
+   hear the same numbers twice. */
+function sharePercents(amounts) {
+  const total = amounts.reduce((s, v) => s + v, 0);
+  if (total <= 0) return amounts.map(() => 0);
+  const floors = amounts.map(v => Math.floor((v / total) * 100));
+  const remainders = amounts
+    .map((v, i) => ({ i, frac: (v / total) * 100 - floors[i] }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  let left = 100 - floors.reduce((s, v) => s + v, 0);
+  const pct = floors.slice();
+  for (let k = 0; k < remainders.length && left > 0; k++, left--) pct[remainders[k].i]++;
+  return pct;
+}
+
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, accountIndex } = ctx;
 
@@ -239,16 +266,17 @@ module.exports = function registerDashboard(ctx) {
         i18n.t('dash.left.cardDue'),
         L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })));
     }
-    /* With the settled card out of the chain, `free` must come out of it too —
-       it still has the card subtracted. Cash less the debit orders is what the
-       three remaining terms actually say. */
-    const chainFree = L.cycle ? L.cash - L.committedOther : L.free;
-    const chainShort = chainFree < 0;
+    /* With the settled card out of the chain, `free` comes out of it too —
+       committed.js already accounts for that (see the settlement-cycle
+       comment there), so this reads straight off L.free/L.short rather than
+       recomputing a second figure the view could drift out of step with. The
+       per-day rate, the "short/covered" sentence below and the bar's
+       aria-label all read the SAME L.free for exactly that reason. */
     grid.append(el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
       /* "Short", never a negative amount of free money — a minus sign in front
          of a figure labelled "actually free" is a sentence that means nothing. */
-      fig(chainShort ? 'is-short' : 'is-free', money(Math.abs(chainFree), 0),
-        i18n.t(chainShort ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
+      fig(L.short ? 'is-short' : 'is-free', money(Math.abs(L.free), 0),
+        i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
     body.append(grid);
 
     /* The settlement cycle: what went on the card this period against the income
@@ -1287,22 +1315,28 @@ module.exports = function registerDashboard(ctx) {
       });
     }
 
+    /* Computed ONCE and indexed everywhere below — the aria-label, each
+       wedge's tooltip and the legend's % column all read the same array, so
+       the three can never disagree with each other the way three independent
+       Math.round() calls on the same slice occasionally did. */
+    const shares = sharePercents(shown.map(x => x.amount));
+
     const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
     const { svg, add } = createChart({
       w: W, h: H, cls: 'donut',
       label: i18n.t('dash.split.aria', { month: periodMonthName(S.period) }) +
-        shown.map(x => `${x.cat} ${Math.round((x.amount / total) * 100)}%`).join(', '),
+        shown.map((x, i) => `${x.cat} ${shares[i]}%`).join(', '),
     });
 
     let a = -Math.PI / 2;                      // 12 o'clock, so the largest slice starts at the top
-    for (const x of shown) {
+    shown.forEach((x, i) => {
       const sweep = (x.amount / total) * Math.PI * 2;
       const seg = add('path', {
         d: arcPath(cx, cy, rOut, rIn, a, a + sweep),
         fill: x.color, stroke: themeColors(root).hole, 'stroke-width': '2',
         class: x.other ? null : 'donut-slice',
       });
-      tip(add, seg, `${x.cat}: ${money(x.amount)} · ${Math.round((x.amount / total) * 100)}%`);
+      tip(add, seg, `${x.cat}: ${money(x.amount)} · ${shares[i]}%`);
       /* Pointer only, deliberately: the <svg> is role="img", which takes its
          whole subtree out of the accessibility tree, so a focusable wedge would
          be a tab stop no screen reader can announce. The legend below carries
@@ -1310,12 +1344,16 @@ module.exports = function registerDashboard(ctx) {
          path, and the wedge is the convenience one for a mouse or thumb. */
       if (!x.other) seg.addEventListener('click', () => openCategory(x.cat));
       a += sweep;
-    }
+    });
 
+    /* NOT "Total spent" — that is the hero tile's gross figure, on the same
+       screen. This number is categorised spend with refunds netted off inside
+       their category (the subtitle above already discloses that gap exactly;
+       see `gapNote`), which is a materially smaller and different figure. */
     add('text', {
       x: cx, y: cy - 6, 'text-anchor': 'middle', 'font-size': '13',
       fill: 'currentColor', 'fill-opacity': '0.5', 'font-family': 'inherit',
-    }).textContent = 'Total spent';
+    }).textContent = i18n.t('dash.split.centerLabel');
     add('text', {
       x: cx, y: cy + 22, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '700',
       fill: 'currentColor', 'font-family': 'inherit',
@@ -1336,8 +1374,8 @@ module.exports = function registerDashboard(ctx) {
       el('span', { class: 'dl-pct' }, '%'),
       el('span', { class: 'dl-base' }, base.label),
       el('span', { class: 'dl-delta' }, i18n.t('dash.split.colChange'))));
-    for (const x of shown) {
-      const pct = Math.round((x.amount / total) * 100);
+    shown.forEach((x, i) => {
+      const pct = shares[i];
       /* Rebuilt per row rather than shared: these are appended into either a
          plain <li> or a <button>, and a node can only live in one of them. */
       /* "Other" gets no comparison: it is a bucket whose membership changes
@@ -1357,7 +1395,7 @@ module.exports = function registerDashboard(ctx) {
       ];
       /* "Other" is a bucket of categories, so neither action has a single
          target to point at — it stays an inert row. */
-      if (x.other) { legend.append(el('li', {}, face())); continue; }
+      if (x.other) { legend.append(el('li', {}, face())); return; }
       legend.append(el('li', {},
         /* aria-label rather than the row's own text: read as-is a screen
            reader gets "Groceries 4 200 32", three unlabelled fragments. */
@@ -1376,7 +1414,7 @@ module.exports = function registerDashboard(ctx) {
              pipe. Passed as a string the whole thing is treated as one icon
              name, setIcon silently draws nothing, and the button ships empty. */
         }, icoEl(['file-text', 'file']))));
-    }
+    });
     wrap.append(svg, legend);
 
     /* Say out loud that the baseline is a part-month, because the column no
@@ -1427,3 +1465,10 @@ module.exports = function registerDashboard(ctx) {
      two cards this module just took care to isolate. */
   ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit });
 };
+
+/* Exposed for a direct, DOM-free unit test of the rounding algorithm itself —
+   the six-equal / three-equal / exact-tie / single-slice / zero-slice cases
+   in tests/donut-percentages.test.cjs. The full render is covered separately
+   (aria-label and legend text) so a wiring bug that stops the view from
+   USING this function is caught even if the function itself is correct. */
+module.exports.sharePercents = sharePercents;

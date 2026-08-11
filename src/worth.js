@@ -59,10 +59,18 @@ function worth(accounts, debts, assets) {
   // total, where it would quietly reduce a real liability.
   const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
   const liabilities = fromAccounts + fromDebts;
+  // Rounded to the cent, then `|| 0` collapses -0 — the same two-step
+  // `fromAccounts` already applies above, extended to the difference itself.
+  // A household exactly break-even (50.30 owned, 10.10 + 40.20 owed) leaves
+  // a float remainder like -7.1e-15 behind; read raw, `net < 0` reports a
+  // solvent household as short and renders "-R0.00". The remainder is a
+  // read-off-the-sign bug, not a summing one — nothing above this line
+  // changes.
+  const net = (Math.round((owned - liabilities) * 100) / 100) || 0;
   return {
     assets: owned, ownedAccounts, ownedAssets,
     liabilities, fromAccounts, fromDebts,
-    net: owned - liabilities, active,
+    net, active,
   };
 }
 

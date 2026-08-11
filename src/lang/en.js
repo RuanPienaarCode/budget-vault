@@ -129,6 +129,10 @@ module.exports = {
     other: 'Budget: this shifts every period boundary. {count} budget files named by date will stop matching — they stay in your vault, and setting this date back to {prev} brings them straight back.',
   },
   'settings.dateNotReal': 'Budget: "{value}" is not a date — use the picker, or type YYYY-MM-DD.',
+  'settings.monthStartReslices': {
+    one: 'Budget: this moves the window each monthly budget file is measured against, without renaming the file — budget vs actual for {count} past period will change. Nothing is deleted, and setting the day back restores it.',
+    other: 'Budget: this moves the window each monthly budget file is measured against, without renaming the file — budget vs actual for {count} past periods will change. Nothing is deleted, and setting the day back restores it.',
+  },
 
   /* ============================ setup wizard ============================== */
   /* Day numbers reach these sentences through i18n.day(), never as a bare
@@ -741,6 +745,10 @@ module.exports = {
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% of spending — show transactions',
   'dash.split.noteAria': 'Open the {cat} category note',
   'dash.split.noteMissing': 'No category note found for "{cat}"',
+  /* The donut's centre figure, NOT "Total spent" — that's the hero tile's
+     gross figure above it. This one is categorised spend with refunds netted
+     off inside their category, which the subtitle already discloses. */
+  'dash.split.centerLabel': 'Categorised spend',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'What\'s left',

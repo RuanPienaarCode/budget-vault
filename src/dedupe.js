@@ -43,6 +43,41 @@ const NEAR_DAYS = 4;
    match; dropping to 6 starts pulling in unrelated chain stores. */
 const MIN_PREFIX = 8;
 
+/* Every bank glues a transaction-type verb onto the front of its descriptor,
+   and that verb is IDENTICAL across every row of that type — "Card Purchase
+   WOOLWORTHS" and "Card Purchase DIS-CHEM" share 12 characters before the
+   merchant even starts. Against a fixed MIN_PREFIX that clears the bar on the
+   verb alone: two different merchants under the same verb collide, and the
+   merchant is never actually compared. No threshold on the RATIO of the
+   shared prefix fixes this either — the false "Internet Payment TO ALICE" /
+   "…TO BOBBY" collision shares 77% of the shorter string, well above the 56%
+   a genuine "MusicCoZA Stockholm SE" / "MusicCoZA 94.99 ZAR" match clears, so
+   a single ratio cannot separate them; the only thing that reliably
+   distinguishes "shared verb, different merchant" from "shared merchant,
+   different rewrite" is knowing which part of the string is the verb.
+   Longest phrases first so "Internet Payment TO" strips whole, not as
+   "Payment To" leaving a stray "Internet ". Stripping is applied to BOTH
+   sides before comparing, so a genuine pending→settled pair that happens to
+   share a verb ("Card Purchase GROCER ONE TERM0099" / "…CITYVILLE") still
+   matches on the merchant stem underneath — only the verb itself stops
+   counting as evidence. */
+const VERB_PREFIXES = [
+  'INTERNET PAYMENT TO', 'IMMEDIATE PAYMENT TO', 'EFT PAYMENT TO',
+  'PAYSHAP PAYMENT TO', 'PAYSHAP TO', 'PAYMENT TO',
+  'CARD PURCHASE', 'POS PURCHASE', 'INTERNET PURCHASE', 'ONLINE PURCHASE',
+  'PREPAID PURCHASE',
+  'AUTOBANK CASH WITHDRAWAL', 'CASH WITHDRAWAL', 'ATM WITHDRAWAL',
+  'EFT CREDIT', 'EFT DEBIT',
+];
+
+function stripVerbPrefix(s) {
+  const upper = String(s).toUpperCase();
+  for (const verb of VERB_PREFIXES) {
+    if (upper.startsWith(verb)) return upper.slice(verb.length);
+  }
+  return upper;
+}
+
 /* The one true exact key. dedupSet, the review probe and commitImport all
    derive from this — they used to build the string inline in three places. */
 function txKey(date, desc, amount, label) {
@@ -62,17 +97,30 @@ function commonPrefixLen(a, b) {
 
 /* Same merchant, allowing for the bank's own rewriting. Equality after
    stripping punctuation covers the whitespace-only variants Discovery emits
-   ("Pay *Plato" vs "Pay   *Plato"); the prefix rule covers the rest. */
+   ("Pay *Plato" vs "Pay   *Plato"); the prefix rule covers the rest — but the
+   prefix rule runs on the verb-stripped strings (see VERB_PREFIXES above), not
+   the raw ones, or the bank's own boilerplate is what gets "matched". Full
+   equality is still checked on the UNSTRIPPED strings first: two identical
+   verb-less descriptions ("Intl payment fee MUSICCO" vs itself) must not
+   depend on the strip list knowing about them. */
 function descsLikelySame(a, b) {
   const x = normDesc(a), y = normDesc(b);
   if (!x || !y) return false;
   if (x === y) return true;
-  return commonPrefixLen(x, y) >= MIN_PREFIX;
+  const sx = normDesc(stripVerbPrefix(a)), sy = normDesc(stripVerbPrefix(b));
+  if (!sx || !sy) return false;
+  return commonPrefixLen(sx, sy) >= MIN_PREFIX;
 }
 
 function daysApart(a, b) {
   const ms = Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`);
   return Number.isNaN(ms) ? Infinity : Math.abs(ms) / 86400000;
+}
+
+function shiftDate(d, days) {
+  const ms = Date.parse(`${d}T00:00:00Z`);
+  if (Number.isNaN(ms)) return d;
+  return new Date(ms + days * 86400000).toISOString().slice(0, 10);
 }
 
 /* Index every existing row once per import: the exact keys, plus a
@@ -126,16 +174,25 @@ function addToIndex(index, date, desc, amount, label) {
 
    `range` is the incoming file's own [min,max] date span. A vault row outside
    it is absent for a boring reason — the export simply doesn't cover it — not
-   because it settled, so it must not be treated as evidence. */
+   because it settled, so it must not be treated as evidence. BUT widen that
+   test by NEAR_DAYS on each side first: a pending row can be re-dated by the
+   bank on settlement, which is exactly what this pass exists to catch, so a
+   vault row sitting one day before range.min is not "outside the file" — it's
+   the untouched half of the pair the settled row two days into the file was
+   meant to replace. Testing the raw [min,max] rejected precisely the rows
+   nearest the file's own edges, which is where a re-dated pending charge
+   actually lands. */
 function findNearDuplicate(item, index, label, incomingKeys, consumed, range) {
   const lab = String(label || '').trim().toLowerCase();
   const bucket = index.byAmount.get(`${lab}|${Number(item.amount).toFixed(2)}`);
   if (!bucket) return null;
+  const lo = range ? shiftDate(range.min, -NEAR_DAYS) : null;
+  const hi = range ? shiftDate(range.max, NEAR_DAYS) : null;
   let best = null, bestGap = Infinity;
   for (const cand of bucket) {
     if (consumed.has(cand.id)) continue;
     if (incomingKeys.has(cand.key)) continue;            // still in the file → accounted for
-    if (range && (cand.date < range.min || cand.date > range.max)) continue;
+    if (range && (cand.date < lo || cand.date > hi)) continue;
     const gap = daysApart(item.date, cand.date);
     if (gap > NEAR_DAYS) continue;
     if (!descsLikelySame(item.desc, cand.desc)) continue;

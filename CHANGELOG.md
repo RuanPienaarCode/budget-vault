@@ -3,6 +3,127 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.14.0 — 2026-08-11
+
+### Fixed
+
+- **The Debt page did not open in 1.13.0.** The Debt-free tile's new caption
+  reached for a value declared inside a different function, which is a
+  ReferenceError the instant the page draws its tiles — and unlike the
+  Dashboard, this view has no per-card guard, so the throw escaped into the
+  view dispatcher and the page never rendered at all. If you are on 1.13.0 and
+  the Debt page appeared blank or frozen, this is why, and updating fixes it.
+  Nothing was written to your vault and nothing needs repairing; only the
+  drawing of that one page was broken.
+
+  It shipped because `views/debts.js` had no test that ever *called* it. The
+  arithmetic underneath it is covered thoroughly, and coverage of the maths
+  reads like coverage of the page — so all forty-nine checks were green while
+  the page was dead. There is now a render test that mounts the real view and
+  fails on a throw; `node --check` cannot catch this class, because an
+  out-of-scope name is perfectly valid syntax.
+
+- **Stated monthly income moved by up to 50% from one period to the next.** The
+  figure the Debt page divides by to work out what share of your income goes to
+  debt was averaged over a window measured in *periods* — thirteen weeks, say —
+  chosen because thirteen weeks is 2.99 months and was believed to catch three
+  paydays every time. It does not. A monthly payday recurs every 28 to 31 days,
+  so whether a fixed span of days contains two of them or three depends on where
+  in the month the span happens to start, and no length fixes that: swept over
+  every start date, every candidate from 63 to 366 days holds a varying count —
+  even a full year holds eleven paydays or twelve.
+
+  A household earning R40 000 a month could see that figure read anywhere from
+  R26 758 to R40 137 depending only on which week they opened the app. The
+  window is now three calendar months, which is exact rather than approximate:
+  step back three months and you have stepped over exactly three monthly
+  paydays, whatever days they fall on. Measured across the same sweep, it holds
+  three every time. The same household now reads R40 000, every week.
+
+- **A long-running debt could be told its balance was hundreds of thousands
+  out.** The "schedule says" chip projects from a debt's original amount and its
+  start date — but neither is editable in the Debt table, and adding a debt
+  seeds them from today. Correct the original amount by hand in `Debts.md`, as
+  the app itself suggests, and the start date silently stays at the day you
+  added the row: a twenty-year bond then projects one month of amortisation and
+  announces a six-figure discrepancy in the alarming direction. The chip now
+  stays silent when the pair cannot describe one continuous debt — a balance can
+  only fall by cash actually paid, and that is a bound, not a guess — and when
+  it does appear it names the date it is projecting from, in the text rather
+  than in a tooltip no phone can show.
+
+- **Two different charges of the same amount could be treated as the same one.**
+  Near-duplicate detection compared the first eight characters of a description,
+  which was calibrated on merchant names — but every bank prefixes its
+  descriptors, and "Card Purchase" alone is twelve. So a R450 charge at one shop
+  quietly un-ticked a R450 charge at another two days later, and the import
+  dropped a real transaction unless you read every row. The comparison now
+  strips the bank's own verb before looking at the merchant. Duplicate detection
+  was also blind at the very edge of a statement's date range, which is exactly
+  where a re-dated pending charge lands.
+
+- **The "What's left" card contradicted itself.** With a settle-monthly card in
+  the picture, the headline showed one figure while the per-day rate, the "this
+  leaves you short / covered" sentence and the bar's screen-reader label were all
+  derived from a different one — so the card could read "R28 800 free" above
+  "R1 486/day" for a fortnight, and say *short* directly beneath *free*. There is
+  now one figure, and everything on the card comes from it.
+
+- **A household exactly break-even was told it was short.** Whether you are
+  short was decided by the sign of a floating-point subtraction, so cash of
+  R4 001.60 against debits of R1 000.70 and R3 000.90 came out at minus
+  0.000000000000455 and rendered as "R -0,00". Net worth had the same edge.
+  Both now compare in cents.
+
+- **Copy-pasted amounts could silently import as zero.** A minus sign copied
+  from a PDF statement or a bank's web page is often the Unicode minus, not the
+  ASCII one, and the amount reader did not recognise it — so a R100 debit
+  contributed nothing to every total while the original text sat correctly in
+  the file. A leading `DR`/`CR` marker had the same problem, though the trailing
+  form worked. Both are read now.
+
+- **A refund reversal in a Credit column imported as income.** Money-in cells
+  were forced positive regardless of what they said, so a `-30.00` posted in the
+  Credit column — money out — became `+30.00`.
+
+- **A category named `constructor` or `__proto__` blanked the spending donut.**
+  The per-category accumulator was a plain object, so those names collided with
+  JavaScript's own, and the chart rendered "nothing to show" while real spending
+  sat in the period.
+
+- **The CSV export double-counted split transactions**, with no way for the
+  reader to correct it: parent and parts both appeared, and the parent's only
+  marker was identical to an ordinary transfer, so filtering it out also deleted
+  every transfer. Both exports now carry a Split column. Amounts also export as
+  the parsed number rather than the raw cell, so a grouped-thousands figure is no
+  longer silently read as text by a spreadsheet and left out of the total.
+
+- **Donut percentages did not add up to 100** — each slice was rounded on its
+  own, three separate times per chart, so the legend, the tooltips and the
+  screen-reader label could disagree with each other as well as with arithmetic.
+  Largest-remainder allocation now shares one set of figures across all three.
+
+- **The home-loan calculator did not charge the monthly service fee its own
+  costs note advertises** — R16 560 over a twenty-year bond, absent from the
+  monthly figure a buyer checks affordability against.
+
+- **Changing the month start day silently moved every historical budget.**
+  Budget files are named by month and keep their names while the window they are
+  measured against moves, so budget-vs-actual for past periods could change by
+  more than double with nothing on screen. It now warns, as the two settings
+  either side of it already did.
+
+- Smaller: an annual recurring charge could be given a date that does not exist
+  (29 February in a non-leap year); a non-finite amount rendered as
+  "R NaN,undefined"; and `contributionRate` — a savings comparison no screen
+  ever called, carrying twelve passing assertions — has been removed rather than
+  left looking like a feature.
+
+### Changed
+
+- The Debt page's income note now says "the last 3 complete months" rather than
+  naming a number of periods, because that is what is now measured.
+
 ## 1.13.0 — 2026-08-10
 
 ### Added

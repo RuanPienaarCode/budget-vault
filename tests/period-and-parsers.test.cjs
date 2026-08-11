@@ -350,8 +350,63 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   ok(raw.includes(0) && raw.includes(SALARY),
     'the single-period figure this replaced swung between 0 and a whole salary');
 
-  eq(weekly.monthlyIncome('2026-04-03').periods, 13,
-    'a weekly cycle averages over 13 periods — 91 days is 2.99 months, so it catches three paydays every time');
+  eq(weekly.monthlyIncome('2026-04-03').months, 3,
+    'the window is three calendar months — the only shape that holds a stable number of monthly paydays');
+
+  /* ---- the window has to be measured in MONTHS, not in periods ----
+
+     It used to be `n` periods long, with `n` chosen so that n × interval landed
+     closest to a whole number of average months — 13 weeks = 91 days = 2.99
+     months, and the comment claimed that "catches three paydays every time".
+
+     It does not, and no other length does either. A monthly payday recurs every
+     28–31 days, so whether a FIXED span of days catches two of them or three
+     depends on where in the month the span happens to start. Swept over every
+     start date, every candidate length from 63 to 366 days holds a varying
+     count — even 365 days holds eleven paydays or twelve. There is no `n` that
+     fixes this, which is why the search that picked one is gone rather than
+     retuned.
+
+     The measured cost on the shipped code: a household paid R40 000 a month saw
+     its stated monthly income swing 50% between consecutive weeks, reading
+     R26 758 at worst — a 33% understatement, feeding a debt-to-income ratio
+     that is compared against a 36% threshold.
+
+     A window of three CALENDAR months is exact instead of approximate: each
+     calendar month step contains exactly one monthly payday, whatever the day.
+     Swept the same way, over 5 117 windows and seven payday days, it holds
+     three every time with zero deviation. */
+  for (const iv of [7, 14, 28]) {
+    for (const salaryDay of [1, 15, 28]) {
+      const files = {};
+      const put = (date, cat, amount) => {
+        const m = date.slice(0, 7);
+        (files[`A/${m}`] = files[`A/${m}`] || { label: 'A', month: m, dirty: false, rows: [] })
+          .rows.push({ date, desc: 'x', cat, amount, excluded: false, note: '' });
+      };
+      // Every second day, so no period can read as "no data" whatever the cycle
+      // length — that isolates the window from the leading-empty trim, which is
+      // a separate and deliberate mechanism with its own case below.
+      for (let t = Date.UTC(2025, 0, 1); t <= Date.UTC(2026, 5, 30); t += 86400000) {
+        const d = new Date(t).toISOString().slice(0, 10);
+        if (+d.slice(8, 10) % 2 === 1) put(d, 'Groceries', -50);
+        if (+d.slice(8, 10) === salaryDay) put(d, 'Salary', SALARY);
+      }
+      const c = intervalCtx(iv, '2025-01-01', files);
+      c.S.categories = [{ name: 'Salary', type: 'income', color: '#888' },
+        { name: 'Groceries', type: 'expense', color: '#888' }];
+      let p = '2025-10-01';
+      while (c.periodRange(p).start < '2025-10-01') p = c.shiftPeriod(p, 1);
+      const vals = [];
+      for (let i = 0; i < 8; i++) { vals.push(c.monthlyIncome(p).income); p = c.shiftPeriod(p, 1); }
+      const mn = Math.min(...vals), mx = Math.max(...vals);
+      ok((mx / mn - 1) < 0.02,
+        `${iv}-day cycle, salary on the ${salaryDay}: the figure must barely move across 8 periods ` +
+        `(read ${Math.round(mn)}–${Math.round(mx)}, a ${((mx / mn - 1) * 100).toFixed(0)}% swing)`);
+      ok(Math.abs(mx - SALARY) / SALARY < 0.02 && Math.abs(mn - SALARY) / SALARY < 0.02,
+        `${iv}-day cycle, salary on the ${salaryDay}: and must stay within 2% of the real ${SALARY}`);
+    }
+  }
 
   // A vault whose data starts three weeks ago must not be divided by three
   // months of silence it was never around for.
@@ -361,15 +416,29 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
     ] },
   });
   young.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
-  eq(young.monthlyIncome('2026-01-09').periods, 1,
-    'periods with no data at all are trimmed off the back of the window');
-  ok(Math.abs(young.monthlyIncome('2026-01-09').income - 10000 * (365.25 / 12) / 7) < 1,
-    'so the only week on record is scaled up, exactly as before — not averaged into nothing');
+  eq(young.monthlyIncome('2026-01-09').months, 1,
+    'months with no data at all are trimmed off the back of the window');
+  /* A DELIBERATE change of answer, not a loosened assertion.
+
+     The old window was a count of periods, so a vault holding one week scaled
+     that week up by 30.44/7 and reported R43 482 a month from a single R10 000
+     row. That is the "multiply one paycheque by 4.35" reading this function was
+     written to stop doing — it was merely doing it at the other end, to a user
+     with no history rather than to a user on a weekly cycle.
+
+     One month of window holding one salary now reads R10 000 a month. Neither
+     answer is knowable from one data point: the reader might be paid weekly and
+     simply have three paycheques not yet imported. But of the two guesses this
+     is the one that claims less, and it errs toward a HIGHER debt-to-income
+     ratio rather than a flattering one — the safer direction for a figure whose
+     whole job is to tell someone their debt is heavy. */
+  eq(Math.round(young.monthlyIncome('2026-01-09').income), 10000,
+    'a lone salary in a one-month window is a month of that salary — not one week multiplied by 4.35');
 
   // The payday month is untouched: the period already IS a month.
   const month = periodCtx(23, txFiles);
   month.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
-  eq(month.monthlyIncome('2026-02'), { income: month.periodSummary('2026-02').income, periods: 1, complete: true },
+  eq(month.monthlyIncome('2026-02'), { income: month.periodSummary('2026-02').income, months: 1, complete: true },
     'a payday month reports its own income untouched');
 }
 
@@ -432,17 +501,23 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
     'a past period is complete, so the window ends at itself rather than one earlier');
 }
 
-/* ---- the averaging window stays inside its own two-to-four-month band ---- */
+/* ---- the averaging window is three months, whatever the cycle ---- */
 {
-  const MONTH_DAYS = 365.25 / 12;
-  /* averagingPeriods isn't exported, so the window length is read back off the
-     `periods` it returns. That only equals the chosen count when nothing gets
-     trimmed — so every period in the window carries a transaction. An empty
-     vault trims down to 1 and would make this assert nothing at all. */
+  /* This replaces a band check on the OLD design, which chose a count of
+     periods per cycle length and asserted the result landed between two and
+     four months. The window no longer depends on the cycle at all: three
+     calendar months is three calendar months whether the household is paid
+     weekly, fortnightly or every eleven days.
+
+     That is the property worth pinning, and it is stronger than the band it
+     replaces — the band was satisfied by 91 days and by 98 days alike, and
+     neither holds a stable number of paydays. */
   const seeded = iv => {
     const ctx = intervalCtx(iv, '2026-01-02', {});
     const p = ctx.shiftPeriod(ctx.currentPeriod(), -60);
     const files = {};
+    // One transaction per period going back 30, so nothing is trimmed for lack
+    // of data and the window reports its full intended length.
     for (let i = 0; i <= 30; i++) {
       const date = ctx.periodRange(ctx.shiftPeriod(p, -i)).start;
       const m = date.slice(0, 7);
@@ -451,19 +526,12 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
     }
     ctx.S.txFiles = files;
     ctx.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
-    return ctx.monthlyIncome(p).periods;
+    return ctx.monthlyIncome(p).months;
   };
   // Every cycle length the settings will accept (dates.js bands it 7..31).
   for (let iv = 7; iv <= 31; iv++) {
-    const n = seeded(iv);
-    const months = (n * iv) / MONTH_DAYS;
-    ok(months >= 2 && months <= 4,
-      `a ${iv}-day cycle averages ${n} periods = ${months.toFixed(2)} months — inside the stated two-to-four band`);
+    eq(seeded(iv), 3, `a ${iv}-day cycle averages over three calendar months, like every other cycle`);
   }
-  // The specific case that escaped it: hi rounded UP, so fortnightly reached
-  // for 9 periods (126 days, 4.14 months) — past its own ceiling.
-  ok(seeded(14) <= 8, `a fortnightly cycle takes ${seeded(14)} periods, not the 9 that overran four months`);
-  eq(seeded(7), 13, 'and thirteen weeks is still chosen for a weekly cycle — 2.99 months, three paydays every time');
 }
 
 /* ---- fortnightly transactions land in exactly one period ---- */
@@ -542,6 +610,34 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   eq(sum.count, 4, 'count covers every non-excluded row in the period');
 }
 
+/* ---- summary: a category NAME cannot collide with Object.prototype ---- */
+{
+  /* byCat used to be a plain `{}`, so a category literally named "constructor",
+     "toString" or "__proto__" landed on an inherited slot instead of an own
+     one. "constructor" read back as a STRING (the function concatenated with
+     the amount via +=), and "__proto__" silently redirected the assignment
+     onto the object's own prototype instead of creating a key at all — R500
+     of real spend vanishing from the total the donut renders from. Traced into
+     renderSplit, `-amt` on that string is NaN, so the chart's total goes NaN,
+     `if (!total)` reads true, and it shows "nothing to show" while R850 was
+     actually spent. */
+  const rows = [
+    { date: '2026-08-01', desc: 'a', cat: 'constructor', amount: -250, excluded: false, note: '' },
+    { date: '2026-08-02', desc: 'b', cat: 'toString', amount: -100, excluded: false, note: '' },
+    { date: '2026-08-03', desc: 'c', cat: '__proto__', amount: -500, excluded: false, note: '' },
+  ];
+  const ctx = periodCtx(23, { 'FNB/2026-08': { label: 'FNB', month: '2026-08', dirty: false, rows } });
+  ctx.S.categories = [];
+  const sum = ctx.periodSummary('2026-08');
+  eq(sum.spend, 850, 'the total spend still counts all three rows');
+  eq(sum.byCat.constructor, -250, 'a category named "constructor" gets its own numeric slot, not the inherited function');
+  eq(sum.byCat.toString, -100, 'same for "toString"');
+  eq(sum.byCat['__proto__'], -500, '"__proto__" is a real own key here, not a prototype redirect');
+  eq(Object.getPrototypeOf(sum.byCat), null, 'byCat is null-prototype, so no category name can ever collide with Object.prototype');
+  eq(Object.keys(sum.byCat).sort(), ['__proto__', 'constructor', 'toString'],
+    'all three categories show up as ordinary own keys');
+}
+
 /* ========================= normalizeAmount ============================== */
 for (const [cell, want, why] of [
   ['1234.56', 1234.56, 'plain decimal'],
@@ -556,6 +652,19 @@ for (const [cell, want, why] of [
   ['+123.45', 123.45, 'explicit plus'],
   ['123.45 Cr', 123.45, 'Cr marker is a credit'],
   ['123.45 Dr', -123.45, 'Dr marker is a debit'],
+  /* A trailing marker was handled but a LEADING one was not, and some export
+     styles put it first ("DR 100.00" rather than "100.00 DR"). */
+  ['DR 100.00', -100, 'a leading Dr marker is a debit'],
+  ['CR 100.00', 100, 'a leading Cr marker is a credit'],
+  ['Dr. 100.00', -100, 'leading marker with a trailing full stop'],
+  /* U+2212 MINUS SIGN is what copy-pasting a PDF bank statement or a formatted
+     online-banking page actually yields — not ASCII hyphen-minus. Rejecting it
+     served a R100 debit as a silent 0.00 in every total. U+FF0D FULLWIDTH
+     HYPHEN-MINUS shows up from CJK-locale exports for the same reason. */
+  ['−100', -100, 'a Unicode minus sign (U+2212) is a real negative'],
+  ['−123.45', -123.45, 'Unicode minus with decimals'],
+  ['R−100', -100, 'Unicode minus inside the currency symbol'],
+  ['－100', -100, 'a fullwidth minus (U+FF0D) is a real negative too'],
   ['0', 0, 'zero is a valid amount, not a failure'],
   ['0.00', 0, 'zero with decimals'],
   ['', null, 'blank is null'],

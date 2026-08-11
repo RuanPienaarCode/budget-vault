@@ -123,6 +123,10 @@ module.exports = {
     other: 'Begroting: dit skuif elke tydperkgrens. {count} begrotingslêers wat volgens datum benoem is, sal ophou pas — hulle bly in jou kluis, en om hierdie datum terug te stel na {prev} bring hulle dadelik terug.',
   },
   'settings.dateNotReal': 'Begroting: "{value}" is nie \'n datum nie — gebruik die kieser, of tik JJJJ-MM-DD.',
+  'settings.monthStartReslices': {
+    one: 'Begroting: dit skuif die venster waarteen elke maandelikse begrotingslêer gemeet word, sonder om die lêer te hernoem — begroot teenoor werklik vir {count} vorige tydperk sal verander. Niks word verwyder nie, en om die dag terug te stel herstel dit.',
+    other: 'Begroting: dit skuif die venster waarteen elke maandelikse begrotingslêer gemeet word, sonder om die lêer te hernoem — begroot teenoor werklik vir {count} vorige tydperke sal verander. Niks word verwyder nie, en om die dag terug te stel herstel dit.',
+  },
 
   /* ============================ setup wizard ============================== */
   'wiz.title': 'Stel Budget Vault op',
@@ -712,6 +716,7 @@ module.exports = {
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% van besteding — wys transaksies',
   'dash.split.noteAria': 'Maak die {cat}-kategorienota oop',
   'dash.split.noteMissing': 'Geen kategorienota vir "{cat}" gevind nie',
+  'dash.split.centerLabel': 'Gekategoriseerde besteding',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Wat oor is',

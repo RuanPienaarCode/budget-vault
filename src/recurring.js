@@ -158,8 +158,14 @@ function matchCharges(service, rows, tokens) {
 function nextExpected(stats, cycle) {
   if (!stats || !stats.last) return null;
   if (cycle === 'annual') {
+    // Same clamp as the monthly branch below: "+1 year, same month/day" lands
+    // on 2029-02-29 for a service last charged 2028-02-29, a date that does
+    // not exist. String comparison keeps the ordering sane either way, so
+    // nothing crashes — it just renders a due date nobody's calendar has.
     const [y, m, d] = stats.last.split('-').map(Number);
-    return `${y + 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const ny = y + 1;
+    const lastDay = new Date(Date.UTC(ny, m, 0)).getUTCDate();
+    return `${ny}-${String(m).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
   }
   // Monthly: same day next month, clamped to a short month's last day so
   // "the 31st" does not roll into the month after.

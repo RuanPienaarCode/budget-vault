@@ -120,7 +120,12 @@ module.exports = function registerImport(ctx) {
       let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
       if (amount == null && iCredit !== -1) {
         const c = normalizeAmount(r[iCredit]);
-        if (c != null && c !== 0) amount = Math.abs(c);
+        // Money in is normally written as a plain positive number, but an
+        // explicit sign in the cell is the statement telling us something —
+        // a reversal-of-a-refund posted as "-30.00" in the Credit column is
+        // money OUT, and abs-ing it away booked a real outflow as income.
+        // Honour whatever sign normalizeAmount actually read.
+        if (c != null && c !== 0) amount = c;
       }
       if (amount == null && iDebit !== -1) {
         const d = normalizeAmount(r[iDebit]);

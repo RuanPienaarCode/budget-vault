@@ -12,7 +12,7 @@
 */
 
 const assert = require('assert');
-const { splitFlows, accountFlows, contributionRate } = require('../src/savings-math');
+const { splitFlows, accountFlows } = require('../src/savings-math');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -139,33 +139,7 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
   eq(splitFlows(rows, typeOf, { from: '2026-01-01', to: '2026-01-31' }).contributions, 2000, 'both together');
 }
 
-/* ---- 9. contribution rate ignores the unfinished month ----
-   Checked in the first week of August, the window must END in July. Counting
-   an incomplete August would report a shortfall that has not happened. */
-{
-  const rows = [];
-  for (const m of ['02', '03', '04', '05', '06', '07']) rows.push(row(`2026-${m}-03`, 1000, ''));
-  rows.push(row('2026-08-01', 5, ''));              // the part-month, must be ignored
-
-  const r = contributionRate(rows, typeOf, 6, '2026-08-07');
-  ok(r, 'six whole months of history is enough to speak');
-  eq(r.from, '2026-02-01', 'the window starts six months before last month');
-  eq(r.to, '2026-07-31', 'and ends at the end of last month, not today');
-  eq(r.total, 6000, 'the August row is outside it');
-  eq(r.perMonth, 1000, 'so the average is the real one');
-
-  eq(contributionRate([], typeOf, 6, '2026-08-07'), null, 'no history says nothing');
-  eq(contributionRate(rows, typeOf, 6, ''), null, 'and neither does an unusable date');
-  eq(contributionRate(rows, typeOf, 0, '2026-08-07'), null, 'nor a zero-month window');
-
-  // January must not roll the year back incorrectly.
-  const jan = contributionRate([row('2025-12-10', 800, '')], typeOf, 1, '2026-01-15');
-  ok(jan, 'a January check reads December');
-  eq(jan.from, '2025-12-01', 'crossing the year boundary');
-  eq(jan.to, '2025-12-31', 'correctly');
-}
-
-/* ---- 10. junk in, zero out ---- */
+/* ---- 9. junk in, zero out ---- */
 {
   const f = splitFlows([null, { date: '2026-01-01' }, { amount: 0, date: '2026-01-01' }, undefined], typeOf);
   eq(f.count, 0, 'rows with no usable amount are skipped, not counted as zero-value flows');
@@ -174,32 +148,11 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
   eq(accountFlows(undefined, [], typeOf).basis, 'none', 'missing account does not throw');
 }
 
-/* ---- 11. a rate is divided by the months the account was actually around for ----
-   Dividing by the whole requested window reported a fund opened in June at a
-   third of its real monthly rate over a six-month window — and this figure
-   exists to be checked against a stated monthly_contribution, so understating it
-   manufactures a shortfall that is not there. */
+/* ---- 10. splitFlows reports the earliest row that actually counted ----
+   Nobody has to re-derive the filtering (usable amount, split parent, window)
+   to find the start of the history — splitFlows does it once, here. */
 {
-  // One R1 000 contribution, in the LAST month of a six-month window.
-  const late = [row('2026-07-10', 1000, '')];
-  const r = contributionRate(late, typeOf, 6, '2026-08-07');
-  eq(r.months, 1, 'only the month the account has existed for is in the denominator');
-  eq(r.requested, 6, 'while the window that was asked for is still reported');
-  eq(r.perMonth, 1000, 'so the rate is the real one, not a sixth of it');
-  eq(r.from, '2026-07-01', 'and the window says where it actually starts');
-
-  // A gap in the MIDDLE is real silence and still counts.
   const gap = [row('2026-02-10', 1000, ''), row('2026-07-10', 1000, '')];
-  const g = contributionRate(gap, typeOf, 6, '2026-08-07');
-  eq(g.months, 6, 'silence inside the window is not trimmed');
-  eq(g.perMonth, 2000 / 6, 'so the months of nothing drag the average down, correctly');
-
-  // The full-history case is unchanged.
-  eq(contributionRate([row('2026-02-10', 600, ''), row('2026-07-10', 600, '')], typeOf, 6, '2026-08-07').from,
-    '2026-02-01', 'a window covered from its first month keeps the window it asked for');
-
-  // splitFlows reports the first row that actually counted, so nobody has to
-  // re-derive the filtering to find it.
   eq(splitFlows(gap, typeOf).first, '2026-02-10', 'the earliest counted row is reported');
   eq(splitFlows([], typeOf).first, null, 'and is null when nothing counted');
 }

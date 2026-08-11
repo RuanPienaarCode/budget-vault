@@ -126,6 +126,9 @@ module.exports = {
     other: '予算: これによりすべての期間の区切りがずれます。日付で名付けられた予算ファイル {count} 件が一致しなくなります — ファイルは保管庫に残り、この日付を {prev} に戻せばすぐに元どおりになります。',
   },
   'settings.dateNotReal': '予算: 「{value}」は日付ではありません — 日付選択を使うか、YYYY-MM-DD 形式で入力してください。',
+  'settings.monthStartReslices': {
+    other: '予算: これにより、月次の予算ファイルの名前を変えずに、その測定基準となる期間の範囲がずれます — 過去 {count} 期間分の予算と実績の数値が変わります。何も削除されず、日を元に戻せば元どおりになります。',
+  },
 
   /* ============================ setup wizard ============================== */
   'wiz.title': 'Budget Vault をセットアップ',
@@ -686,6 +689,7 @@ module.exports = {
   'dash.split.sliceAria': '{cat}: {amount}、支出の {pct}% — 取引を表示',
   'dash.split.noteAria': '{cat} のカテゴリノートを開く',
   'dash.split.noteMissing': '「{cat}」のカテゴリノートが見つかりません',
+  'dash.split.centerLabel': 'カテゴリ分け済み支出',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': '残りはいくら',

@@ -17,6 +17,19 @@
         the two differ.
      5. A pipe in a description must not break the markdown table.
      6. A period name the user controls must not escape into the file path.
+     7. A split PARENT and its PARTS both reach the CSV (the parent stays on
+        disk so a re-import can't re-add it, see src/tx-role.js) — and without a
+        way to tell "parent, superseded" apart from "transfer, still real
+        money", a plain SUM over the Amount column double-counts every split by
+        exactly the amount that was split. The Split column is that way; it is
+        not decorative.
+     8. amountRaw is the loader's "could not strictly parse this cell, keep it
+        verbatim" flag — right for the vault file, wrong for a CSV whose whole
+        job is a number a spreadsheet can add. Writing it into the Amount cell
+        quotes it (the formula guard), Excel's SUM silently skips a quoted
+        cell, and the markdown export — which always uses the parsed number —
+        disagrees with the CSV over the very rows a reader is most likely to
+        have hand-corrected.
 
    Pure — no DOM, no obsidian, no vault. */
 
@@ -70,10 +83,31 @@ const ROWS = [
     'negatives keep their sign and large numbers keep no separators');
 }
 
-/* amountRaw wins when the loader could not strictly parse the cell. */
+/* amountRaw does NOT win in the CSV — the parsed number does, so the column
+   stays arithmetic-ready and agrees with what markdown counts for the same
+   row. amountRaw is untouched everywhere else (the vault file still gets it
+   verbatim via serializeTxFile); this is only about what the CSV Amount cell
+   holds. */
 {
-  const csv = transactionsCsv([{ ...ROWS[0], amount: 0, amountRaw: '1 234,56 CR' }]);
-  ok(csv.includes('1 234,56 CR'), 'an unparseable original amount is written back verbatim, not as 0.00');
+  // The loader's best-guess parse of "1 234,56 CR" IS 1234.56 (normalizeAmount
+  // handles the format) — amount already carries that value even though the
+  // strict on-disk-shape check failed and set amountRaw.
+  const row = { ...ROWS[0], amount: 1234.56, amountRaw: '1 234,56 CR' };
+  const csv = transactionsCsv([row]);
+  const cell = csv.trim().split('\n')[1].split(',')[4];
+  eq(cell, '1234.56', 'the Amount cell is the parsed number, not the raw text');
+  ok(!csv.includes('1 234,56 CR'), 'the unparsed original text does not leak into the CSV at all');
+}
+/* A cell too garbled even for normalizeAmount falls back to amount: 0 at load
+   — and that is exactly what the CSV and the markdown must now agree on,
+   instead of one saying "abc" and the other saying R 0.00. */
+{
+  const row = { ...ROWS[0], amount: 0, amountRaw: 'abc' };
+  const csv = transactionsCsv([row]);
+  const md = transactionsMarkdown([row], { range: 'Aug 2026', filters: [], generated: 'x' }, money);
+  const cell = csv.trim().split('\n')[1].split(',')[4];
+  eq(cell, '0.00', 'a cell the loader could not parse at all exports as the same zero the app itself uses');
+  ok(md.includes(money(0)), 'and markdown agrees — same row, same figure, in both files');
 }
 
 /* ---- 3. excluded rows are exported, and marked ---- */
@@ -83,6 +117,44 @@ const ROWS = [
   const line = csv.split('\n').find(l => l.includes('TRANSFER TO SAVINGS'));
   eq(line.split(',')[5], 'yes', 'and is marked excluded');
   eq(csv.trim().split('\n').length, ROWS.length + 1, 'every row plus a header, nothing dropped');
+}
+
+/* ---- 3b. a split parent and its transfer look-alike are distinguishable ----
+
+   A R1 000 charge split 600/400: the parent stays on disk (excluded: true,
+   split: 'parent'), the parts are new rows (excluded: false, split: 'part').
+   A transfer carries excluded: true too, with no split role at all — the one
+   thing that makes it impossible to tell "phantom, drop it" from "real money,
+   keep it" using the Excluded column alone. */
+const SPLIT_ROWS = [
+  { date: '2026-08-05', desc: 'SUPERMARKET', label: 'Cheque', cat: 'Food', amount: -1000, excluded: true, note: 'split into 2', split: 'parent' },
+  { date: '2026-08-05', desc: 'SUPERMARKET', label: 'Cheque', cat: 'Food', amount: -600, excluded: false, note: '', split: 'part' },
+  { date: '2026-08-05', desc: 'SUPERMARKET', label: 'Cheque', cat: 'Household', amount: -400, excluded: false, note: '', split: 'part' },
+  { date: '2026-08-06', desc: 'TRANSFER TO SAVINGS', label: 'Cheque', cat: 'Transfer', amount: -500, excluded: true, note: '' },
+];
+{
+  const csv = transactionsCsv(SPLIT_ROWS);
+  const head = csv.split('\n')[0];
+  ok(/(^|,)Split(,|$)/.test(head), 'the CSV header carries a Split column');
+
+  const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
+  eq(rows[0][7], 'parent', 'the split parent is marked, not just excluded');
+  eq(rows[1][7], 'part', 'so are its parts');
+  eq(rows[2][7], 'part', '');
+  eq(rows[3][5], 'yes', 'the transfer is excluded, same as the parent...');
+  eq(rows[3][7], '', '...but its Split cell is empty — Excluded alone could never tell these apart');
+
+  /* The correct filter now exists: drop rows where Split is "parent" and sum
+     the rest. That is real money only — the parts (already summing back to
+     what the parent was) plus the transfer, which still moved. */
+  const realTotal = rows.filter(r => r[7] !== 'parent').reduce((t, r) => t + Number(r[4]), 0);
+  eq(realTotal, -1500, 'no double count: -600 + -400 + -500, the parent itself excluded from the sum');
+
+  /* And the filter the app already uses for its own totals (Excluded != yes)
+     still lands on the same figure for the split specifically, because a
+     part is never excluded and a parent always is. */
+  const budgetTotal = rows.filter(r => r[5] !== 'yes').reduce((t, r) => t + Number(r[4]), 0);
+  eq(budgetTotal, -1000, 'Excluded != yes already avoided the double-count on its own — -600 + -400');
 }
 
 /* ---- 4. markdown totals count only the counted rows, and say so ---- */
@@ -106,7 +178,9 @@ const ROWS = [
   const md = transactionsMarkdown(ROWS, { range: 'Aug 2026', filters: [], generated: 'x' }, money);
   const line = md.split('\n').find(l => l.includes('ROLL'));
   ok(line.includes('PAY \\| ROLL'), 'a pipe in a description is escaped');
-  eq(line.split(/(?<!\\)\|/).length - 2, 7, 'so the row still has exactly seven cells');
+  // (?<!\\) is a plain node-side test helper, not shipped src/ — src/ itself
+  // never uses lookbehind (it is a parse-time SyntaxError before iOS 16.4).
+  eq(line.split(/(?<!\\)\|/).length - 2, 8, 'so the row still has exactly eight cells (Split is the 8th)');
 }
 
 /* ---- 6. filters are disclosed in the document ---- */

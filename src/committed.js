@@ -349,7 +349,7 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
      hides ninety-five rand of Spotify and the reader cannot see either. */
   const cardDue = items.filter(i => i.kind === 'card').reduce((s, i) => s + i.amount, 0);
   const daysLeft = now ? Math.max(0, daysBetween(now, periodEnd)) : null;
-  const free = cash - committed;
+  const committedOther = committed - cardDue;
 
   /* What is due to LAND before this period ends, when the vault can prove it.
      Only ever from repeating credits the rows themselves establish — see
@@ -408,6 +408,31 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
     headroom: settling.amount - cardSpend,
   } : null;
 
+  /* THE ONE FREE FIGURE. Everything the card renders about "what's actually
+     free" — the headline, the per-day rate, the "this leaves you short/
+     covered" sentence and the bar's aria-label — must all read this same
+     number, or the card contradicts itself out loud (a screen-reader user
+     hearing one figure in the aria-label and a different one printed beside
+     it is exactly that).
+
+     While a settlement cycle is running the card has its OWN band below
+     (`cycle`) and is no longer a claim on this cash — see the settlement-
+     cycle comment above cardSpend. So `free` excludes cardDue exactly when
+     `cycle` says the card is being handled separately; committedOther alone
+     is what is still coming out of THIS cash. Outside a cycle, cardDue is a
+     real claim like any other and stays in. */
+  const free = cycle ? cash - committedOther : cash - committed;
+
+  /* Compared in CENTS, never as a raw float difference. Summing floats that
+     were themselves fine (measured across 1,000 realistic amounts: no
+     drift) can still leave a difference of a few units in the 13th decimal
+     place — R4,001.60 confirmed against R1,000.70 + R3,000.90 committed
+     nets to -4.55e-13, not zero, in IEEE 754. Read as `free < 0` a household
+     that is exactly break-even is told it is short and shown "R -0,00".
+     Rounding to the cent before comparing is the fix; the sums themselves
+     are untouched. */
+  const freeCents = Math.round(free * 100);
+
   return {
     cash,
     cashKnown: counted > 0,
@@ -415,8 +440,9 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
     unknownAccounts: unknown,
     cardDue,
     /* The debit-order half on its own, so the chain can show four terms that
-       still add up: cash - committedOther - cardDue = free. */
-    committedOther: committed - cardDue,
+       still add up: cash - committedOther - cardDue = free (outside a
+       cycle; inside one, cash - committedOther = free directly). */
+    committedOther,
     incoming,
     cardSpend,
     cycle,
@@ -427,9 +453,9 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
     committed,
     items,
     free,
-    short: free < 0,
+    short: freeCents < 0,
     days: daysLeft,
-    perDay: (daysLeft && daysLeft > 0 && free > 0) ? free / daysLeft : null,
+    perDay: (daysLeft && daysLeft > 0 && freeCents > 0) ? free / daysLeft : null,
     counts: {
       service: items.filter(i => i.kind === 'service').length,
       debt: items.filter(i => i.kind === 'debt').length,

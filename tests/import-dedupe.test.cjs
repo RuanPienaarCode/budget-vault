@@ -67,8 +67,22 @@ const DIFFERENT = [
   ['Pay   *Corner Cafe Cityville', 'Pay   *Harbour Deli Cityville'],
   ['CHARGE POINT NORTHGATE', 'PETROL BAY NORTHGATE CONV Cityville'],
   ['SUBSCRIPTION SVC 59.00 ZAR', 'MusicCoZA 94.99 ZAR'],
+  /* Bank verb-prefix false positives (synthetic merchants, real rewrite
+     SHAPE): every bank prefixes its descriptors, and those prefixes alone
+     clear the old fixed MIN_PREFIX=8 — so two DIFFERENT merchants under the
+     same "Card Purchase" / "POS Purchase" / "Internet Payment TO" verb
+     collided and the merchant itself was never actually compared. */
+  ['Card Purchase GROCER ONE', 'Card Purchase MEGAMART'],
+  ['POS Purchase VILLAGE STORE', 'POS Purchase PARKING CO'],
+  ['Internet Payment TO ALICE', 'Internet Payment TO BOBBY'],
 ];
 for (const [a, b] of DIFFERENT) ok(!descsLikelySame(a, b), `should NOT match: "${a}" vs "${b}"`);
+
+/* The verb-prefix strip must not stop a genuine pending->settled rewrite from
+   matching just because both sides happen to share the same bank verb —
+   stripping is symmetric, so the merchant stem underneath is still compared. */
+ok(descsLikelySame('Card Purchase GROCER ONE TERM0099', 'Card Purchase GROCER ONE CITYVILLE'),
+  'should match: shared verb prefix, shared merchant stem underneath');
 
 /* The prefix rule alone would collide these two -1.20 fees on their shared
    14-char stem. They are only kept apart by the `accounted` guard in layer 2,
@@ -113,6 +127,22 @@ const RANGE = { min: '2026-06-01', max: '2026-06-30' };
   const item = { date: '2026-05-09', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
   const hit = findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE);
   ok(!hit, 'vault rows outside the incoming file date range are not candidates');
+}
+{ // the range guard was blind at the incoming file's OWN date boundary — exactly
+  // where a re-dated pending charge lands. The vault row sits one day before
+  // range.min (2026-06-01), the settled row lands just inside the range, and
+  // the gap between them is well within NEAR_DAYS: this must still be caught,
+  // not silently treated as "outside the file's coverage".
+  const index = idx([{ date: '2026-05-31', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: '2026-06-01', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
+  const hit = findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE);
+  ok(hit && hit.date === '2026-05-31', 'a candidate NEAR_DAYS before range.min is still evidence, not out of scope');
+}
+{ // symmetric on the top edge.
+  const index = idx([{ date: '2026-07-02', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);
+  const item = { date: '2026-06-30', desc: 'GROCER ONE CITYVILLE', amount: -250.00 };
+  const hit = findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE);
+  ok(hit && hit.date === '2026-07-02', 'a candidate NEAR_DAYS past range.max is still evidence');
 }
 { // beyond the window
   const index = idx([{ date: '2026-06-01', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);

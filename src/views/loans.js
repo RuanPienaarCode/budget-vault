@@ -176,6 +176,23 @@ module.exports = function registerLoans(ctx) {
     'not a quote: rates, attorney fees and lender charges all vary. Confirm the numbers with your bank, ' +
     'your attorney and a qualified adviser before committing to anything.';
 
+  /* Folds the flat monthly service fee into the totals a reader checks
+     affordability against — the same fold recalcCar() already does inline
+     (`money(t.payment + service + insurance, 0)` / `service * car.months`).
+     Split into a DOM-free function, unlike recalcCar's inline version, purely
+     so it can be pinned by a bare-node test: src/dom.js's el() calls
+     document.createElement, so recalcHome() itself cannot run outside a
+     browser. tests/loan-math.test.cjs reaches this via ctx.provide(), the same
+     pattern src/views/budgets.js uses for otherShapeBudgets()/carryStructure().
+     Gated on service > 0, same as recalcCar's `if (service > 0)`: a country
+     with no fee profile gets no extra rows rather than a "R0.00" one. */
+  function homeServiceFeeFold(payment, service, months) {
+    return {
+      monthlyTotal: service > 0 ? payment + service : null,
+      termTotal: service > 0 ? service * months : 0,
+    };
+  }
+
   function amortTable(tbl, rows, termLabel) {
     tbl.empty();
     tbl.append(el('thead', {}, el('tr', {},
@@ -249,15 +266,24 @@ module.exports = function registerLoans(ctx) {
     const init = p.mortgageInitiationFee(loan);
     const onceOff = duty + bond + transfer + init;
 
+    // The ZA profile's own costsNote prints "monthly service fee R69.00" on
+    // this exact card — the fee below is what makes that sentence true.
+    const service = p.serviceFee;
+    const fee = homeServiceFeeFold(t.payment, service, home.years * 12);
+
     const out = $('#loanHomeOut'); out.empty();
     const block = el('div', { class: 'loan-out' },
-      row('Monthly repayment', money(t.payment, 0), 'lo-big grad-txt'),
+      row('Monthly repayment', money(t.payment, 0), 'lo-big grad-txt'));
+    if (service > 0) block.append(row('Monthly service fee', money(service, 0)));
+    if (fee.monthlyTotal !== null) block.append(row('Total per month', money(fee.monthlyTotal, 0), 'text-danger'));
+    block.append(
       row('Loan amount', money(loan, 0)),
       row('Total interest', money(t.totalInterest, 0), 'text-warning'),
       row('Total repaid', money(t.totalRepaid, 0)));
     block.append(el('div', { class: 'lo-sep' }));
     block.append(row('Deposit', money(deposit, 0)));
     if (p.hasBuyingCosts) block.append(row('Once-off costs', money(onceOff, 0)));
+    if (fee.termTotal > 0) block.append(row('Service fees over the term', money(fee.termTotal, 0)));
     block.append(row('Cash needed upfront', money(deposit + (p.hasBuyingCosts ? onceOff : 0), 0), 'text-danger'));
     block.append(el('div', { class: 'lo-note' }, DISCLAIMER));
     out.append(block);
@@ -427,5 +453,5 @@ module.exports = function registerLoans(ctx) {
     recalcCar();
   }
 
-  ctx.provide({ renderLoans });
+  ctx.provide({ renderLoans, homeServiceFeeFold });
 };

@@ -26,7 +26,17 @@
    EXCLUDED ROWS ARE EXPORTED, and carry a column saying so. The glossary is
    explicit that an excluded transaction is vetoed from income and spend totals,
    not hidden — dropping them here would make an export disagree with the app it
-   came from, and the reader would have no way to see why. */
+   came from, and the reader would have no way to see why.
+
+   SPLIT PARENTS ARE EXPORTED TOO, for the same reason and one more: the parent
+   stays on disk after a split precisely so a re-import can't re-add the bank's
+   original line on top of its own parts (src/tx-role.js). Dropping it from the
+   export would make the CSV a worse audit trail than the vault file it came
+   from. What it needs is not removal but a label: a Split column, same shape
+   as serializeTxFile already writes into the vault, so a parent (Split:
+   "parent") reads differently from a transfer (Split: "" but Excluded: yes) —
+   the one distinction `Excluded` alone can never make, because both mean
+   "vetoed from totals" and only one of them means "described twice". */
 
 /* csvCell is imported, not injected. It used to be handed in as a `cell`
    argument because it lived in util.js, which pulled in obsidian and would have
@@ -35,6 +45,13 @@
    exists. `money` further down is still injected, for a real reason: it is the
    view's own locale-aware formatter, not a fixed escaping rule. */
 const { csvCell } = require('./csv');
+/* splitRole only — this module reads it exactly the way serializeTxFile does
+   (src/views/transactions.js's `roleOf`), never as a third hand-copy of
+   `r.split === 'parent'`. See src/tx-role.js for why that string got its own
+   module: `excluded` already carries a different, unrelated meaning
+   (transfer, still real money) and cannot be reused to mean "phantom row,
+   described elsewhere" too. */
+const { splitRole } = require('./tx-role');
 
 /* Where exports land. A folder of its own so an export is never mistaken for
    one of the vault's own data files, and so deleting the lot is one action. */
@@ -65,18 +82,29 @@ function safeName(s) {
    returns zero. A column of correct-looking figures that will not add up is
    about the worst thing an export can produce, because nothing announces it.
 
-   So: a value that IS a plain number is written bare — it needs no escaping,
-   since a number contains no comma, quote or newline. Anything else is
-   untrusted (amountRaw is the verbatim cell from a file the loader could not
-   parse, and could hold anything at all) and gets the full csvCell treatment,
-   formula guard included. */
+   ALWAYS row.amount, NEVER row.amountRaw — deliberately, and this used to be
+   the other way round. amountRaw is the loader's "I could not strictly parse
+   this on-disk cell, keep the human's exact text for the SERIALIZER to write
+   back unchanged" flag (src/load.js, src/amount.js) — right for the vault
+   file, which must round-trip a hand-typed "1 234,56" byte for byte. A CSV
+   export has no such duty and exactly one job for this column: a number a
+   spreadsheet can add. Writing amountRaw here fails BOTH ends of that job —
+   the value fails the bare-number test below, so csvCell quotes it, so Excel
+   reads it as text and SUM silently treats the row as zero, while
+   transactionsMarkdown (which always uses `amount`, the parser's numeric best
+   guess, and is right to) counts the real figure. Two files written by one
+   click that disagree, and nothing on either announces it. `amount` is that
+   same numeric best guess — normalizeAmount already turned "1 234,56 CR" into
+   1234.56 before amountRaw was ever set — so using it here is not a loss of
+   precision, only a stop to re-deriving amountRaw's OWN reason for existing
+   (round-tripping the vault file) as if it were also a reason to break the
+   export's arithmetic. */
 function amountCell(row) {
-  const v = row.amountRaw != null ? row.amountRaw : Number(row.amount || 0).toFixed(2);
-  return /^-?\d+(\.\d+)?$/.test(String(v)) ? String(v) : csvCell(v);
+  return Number(row.amount || 0).toFixed(2);
 }
 
 function transactionsCsv(rows) {
-  const head = ['Date', 'Description', 'Account', 'Category', 'Amount', 'Excluded', 'Note'];
+  const head = ['Date', 'Description', 'Account', 'Category', 'Amount', 'Excluded', 'Note', 'Split'];
   const body = rows.map(r => [
     csvCell(r.date),
     csvCell(r.desc),
@@ -85,6 +113,7 @@ function transactionsCsv(rows) {
     amountCell(r),
     csvCell(r.excluded ? 'yes' : ''),
     csvCell(r.note || ''),
+    csvCell(splitRole(r.split)),
   ].join(','));
   return [head.map(csvCell).join(','), ...body].join('\n') + '\n';
 }
@@ -132,11 +161,14 @@ function transactionsMarkdown(rows, meta, money) {
     ...(rows.length !== included.length
       ? [`Totals cover ${included.length} of ${rows.length} rows — excluded rows are listed but not counted.`, '']
       : []),
-    '| Date | Description | Account | Category | Amount | Excluded | Note |',
-    '|------|-------------|---------|----------|-------:|----------|------|',
+    '| Date | Description | Account | Category | Amount | Excluded | Note | Split |',
+    '|------|-------------|---------|----------|-------:|----------|------|-------|',
   );
   for (const r of rows) {
-    out.push(`| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} |`);
+    // splitRole, not r.split raw: same reason serializeTxFile reads it this
+    // way — only two strings are ever legal here, so the cell never needs
+    // escMd, and a stray hand-typed word in the source column reads as ''.
+    out.push(`| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`);
   }
   return out.join('\n') + '\n';
 }

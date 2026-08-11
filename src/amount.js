@@ -24,6 +24,12 @@ function normalizeAmount(raw) {
   if (!s) return null;
   let neg = false;
   if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1).trim(); }
+  // A Dr/Cr marker can lead ("DR 100.00") or trail ("100.00 Dr") — both are
+  // routine across statement exports, and only the trailing form used to be
+  // read. Checked before the trailing form so a marker on ONE side of a bare
+  // cell is consumed exactly once, from whichever side it's actually on.
+  const leadMarker = s.match(/^(cr|dr)\.?\s*/i);
+  if (leadMarker) { if (leadMarker[1].toLowerCase() === 'dr') neg = true; s = s.slice(leadMarker[0].length).trim(); }
   const marker = s.match(/(cr|dr)\.?\s*$/i);
   if (marker) { if (marker[1].toLowerCase() === 'dr') neg = true; s = s.slice(0, marker.index).trim(); }
   if (s.endsWith('-')) { neg = true; s = s.slice(0, -1).trim(); }
@@ -41,8 +47,13 @@ function normalizeAmount(raw) {
      junk into a confident number, which is the one thing this file exists to
      refuse. A doubled sign is not a format any bank writes; it is a damaged
      cell, and null is the honest answer. */
+  // ASCII hyphen-minus is not the only minus a real cell carries: U+2212 MINUS
+  // SIGN is what copy-pasting a PDF bank statement or a formatted online-
+  // banking page actually yields, and U+FF0D FULLWIDTH HYPHEN-MINUS shows up
+  // from CJK-locale exports. Both were silently falling through to null here,
+  // which parseNum then serves to every total as a plausible zero.
   const sign = () => {
-    if (s.startsWith('-')) { neg = true; s = s.slice(1).trim(); return true; }
+    if (/^[-−－]/.test(s)) { neg = true; s = s.slice(1).trim(); return true; }
     if (s.startsWith('+')) { s = s.slice(1).trim(); return true; }
     return false;
   };

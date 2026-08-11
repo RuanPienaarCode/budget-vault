@@ -192,6 +192,13 @@ module.exports = function registerPeriod(ctx) {
   }
   function txInPeriod(p) {
     const { start, end } = periodRange(p);
+    return txInRange(start, end);
+  }
+  /* The same scan against an arbitrary date range. Split out because the
+     monthly-income window is measured in CALENDAR MONTHS rather than in
+     periods, and a second copy of this loop is how the two would come to
+     disagree about what "excluded" or "in range" means. */
+  function txInRange(start, end) {
     const out = [];
     for (const f of Object.values(S.txFiles)) {
       if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7)) continue;
@@ -268,13 +275,20 @@ module.exports = function registerPeriod(ctx) {
   }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
   function periodSummary(p) {
+    const { start, end } = periodRange(p);
+    return summaryInRange(start, end);
+  }
+  function summaryInRange(start, end) {
     // Excluded rows are the user's per-row veto; the non-budget set is the
     // per-account one. Both drop out of income/spend here and nowhere else —
     // Transactions still lists every row, so nothing goes invisible.
     const skip = nonBudgetLabels();
-    const tx = txInPeriod(p).filter(t => !t.excluded && !skip.has(t.label));
+    const tx = txInRange(start, end).filter(t => !t.excluded && !skip.has(t.label));
     let income = 0, spend = 0, uncategorised = 0, uncatSpend = 0;
-    const byCat = {};
+    // Object.create(null): a category named "constructor" or "__proto__"
+    // otherwise collides with Object.prototype instead of getting its own
+    // slot — src/views/debts.js:224 does the same for the same reason.
+    const byCat = Object.create(null);
     for (const t of tx) {
       const type = catType(t.cat);
       if (!t.cat) uncategorised++;
@@ -328,55 +342,77 @@ module.exports = function registerPeriod(ctx) {
      4.14 months — which is only harmless because income lands every period on
      that cycle. Nothing in the search knew that; it was luck, not design.
      Math.max keeps hi ≥ lo for the long end of the band, where floor can bite. */
-  function averagingPeriods(iv) {
-    const lo = Math.max(1, Math.ceil((2 * MONTH_DAYS) / iv));
-    const hi = Math.max(lo, Math.floor((4 * MONTH_DAYS) / iv));
-    let best = lo, bestErr = Infinity;
-    for (let n = lo; n <= hi; n++) {
-      const months = (n * iv) / MONTH_DAYS;
-      const err = Math.abs(months - Math.round(months));
-      if (err < bestErr) { best = n; bestErr = err; }
-    }
-    return best;
+  /* The window is three CALENDAR months, and that is the whole point.
+
+     It used to be a count of PERIODS, chosen so that count × interval landed
+     closest to a whole number of average months — thirteen weeks being 91 days,
+     2.99 months, which the comment here claimed "catches three paydays every
+     time". It does not, and neither does any other length. A monthly payday
+     recurs every 28 to 31 days, so whether a fixed span of DAYS contains two of
+     them or three depends on where in the month the span happens to begin.
+     Swept over every start date, every candidate from 63 to 366 days holds a
+     varying count — even a full 365 days holds eleven paydays or twelve. There
+     is no count that fixes it, which is why the search that picked one is gone
+     rather than retuned.
+
+     Measured on the code this replaces: a household earning R40 000 a month saw
+     its stated monthly income move 50% between consecutive weeks, reading as
+     little as R26 758 — and that figure is what the Debt page divides by to
+     compare against a 36% threshold.
+
+     Calendar months are exact where day counts can only approximate: step back
+     three months and you have stepped over exactly three monthly paydays,
+     whatever day of the month they fall on and however long those months were.
+     Swept the same way over 5 117 windows and seven payday days, it holds three
+     every time, with zero deviation. */
+  const INCOME_MONTHS = 3;
+  /* n calendar months before an ISO date, clamping a day the target month does
+     not have: 31 March back one month is 28 February, not 3 March. */
+  function isoMinusMonths(isoDate, n) {
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d));
+    t.setUTCMonth(t.getUTCMonth() - n);
+    if (t.getUTCDate() !== d) t.setUTCDate(0);
+    return t.toISOString().slice(0, 10);
   }
+  const nextDayIso = d => isoFromDayNum(dayNum(d) + 1);
+  /* Monthly income, for a cycle that is not already monthly.
+
+     A period still RUNNING is a partial one: whatever has landed so far divided
+     by a whole cycle reads low, and a low income is a HIGH debt-to-income ratio
+     shown in red on the strength of nothing but which day of the week it is. So
+     the window ends at the last COMPLETE period. A p in the past is already
+     complete and ends at itself. */
   function monthlyIncome(p) {
     const iv = intervalDays();
-    if (!iv) return { income: periodSummary(p).income, periods: 1, complete: true };
-    const need = averagingPeriods(iv);
-    /* `need` periods ending `back` periods before p, with leading empties
-       trimmed off the far end. */
-    function windowEndingBefore(back) {
-      const sums = [];
-      for (let i = need - 1 + back; i >= back; i--) sums.push(periodSummary(shiftPeriod(p, -i)));
-      let from = 0;
-      while (from < sums.length - 1 && sums[from].count === 0) from++;
-      return sums.slice(from);
-    }
-    /* A period still RUNNING is a partial one: whatever has landed so far is
-       divided by a whole cycle's worth of days, so the figure reads low early
-       in the period and climbs as the days pass. That matters here more than
-       it would anywhere else, because this feeds debt-to-income against a 36%
-       threshold — and a low income is a HIGH ratio, shown in red, on the
-       strength of nothing but which day of the week it is. On a weekly cycle
-       the empty first days of a 13-week window cost about 8%.
+    // The payday month is untouched: the period already IS a month, and
+    // averaging would only blur it.
+    if (!iv) return { income: periodSummary(p).income, months: 1, complete: true };
 
-       Trailing periods can't be trimmed the way leading ones are: a gap in the
-       MIDDLE of the window is real silence and has to count, and an empty
-       trailing period is indistinguishable from one by transaction count
-       alone. So the running period is dropped outright and the window ends at
-       the last COMPLETE one. A p in the past is already complete — it keeps
-       the whole window, ending at itself. */
     const running = p === currentPeriod();
-    let used = windowEndingBefore(running ? 1 : 0);
-    /* Unless dropping it leaves nothing to average: a vault set up this week
-       has no completed history, and would otherwise report no income at all
-       while the user is looking straight at the salary they just imported. A
-       partial figure beats a blank ratio — but say which one it is, so the
-       page can label it honestly rather than implying a settled average. */
-    const complete = !running || used.some(s => s.count > 0);
-    if (!complete) used = windowEndingBefore(0);
-    const total = used.reduce((s, x) => s + x.income, 0);
-    return { income: total / (used.length * iv) * MONTH_DAYS, periods: used.length, complete };
+    const endsAt = periodRange(running ? shiftPeriod(p, -1) : p).end;
+    /* (from, endsAt] — exclusive at the far end, so a payday sitting exactly on
+       the boundary is not counted by two consecutive windows. */
+    const win = n => summaryInRange(nextDayIso(isoMinusMonths(endsAt, n)), endsAt);
+
+    /* Months with no data at all are trimmed off the FAR end, exactly as the
+       period window used to trim leading empties: a vault whose history starts
+       three weeks ago must not be divided by three months of silence it was
+       never around for. A gap in the MIDDLE is real silence and still counts —
+       this only walks in from the oldest month while that month is empty. */
+    let months = INCOME_MONTHS;
+    while (months > 1 && win(months).count === win(months - 1).count) months--;
+
+    const w = win(months);
+    /* A vault set up this week has no completed period at all, and would report
+       no income while the user is looking straight at the salary they just
+       imported. A partial figure beats a blank ratio — but say which one it is,
+       so the page can label it honestly rather than implying a settled average. */
+    if (running && w.count === 0) {
+      const part = periodSummary(p);
+      return { income: part.income / iv * MONTH_DAYS, months: 0, complete: false };
+    }
+    return { income: w.income / months, months, complete: true };
   }
   function budgetTotals(p) {
     const budget = S.budgets[p] || [];

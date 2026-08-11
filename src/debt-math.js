@@ -200,6 +200,28 @@ function expectedBalance(debt, today) {
   const months = (ty - sy) * 12 + (tm - sm) - (td < billDay ? 1 : 0);
   if (months <= 0) return null;
 
+  /* UNANCHORED: `original` and `start` are only ever set together, by
+     addDebt, as `original = balance` on the day the row is created — nothing
+     in the Debt table edits either field afterward. The only way `original`
+     later disagrees with a fresh row's balance is a hand edit to Debts.md
+     (which the view's own comment invites, to record the loan's true original
+     amount), and that edit moves `original` alone: `start` is left reading as
+     the ROW's creation date, not the day that original amount was actually
+     owed.
+
+     That is provable, not a guess: a balance can only fall by cash actually
+     paid, and crediting every rand of it straight to principal (0% interest,
+     the most generous case) still bounds the drop by payment(+extra) × months
+     elapsed. `original - balance` exceeding that bound means the balance
+     could not possibly have gone from `original` to today's figure on this
+     schedule — proof the pair does not describe one continuous debt, not a
+     material discrepancy to flag. Gated on a real `.balance` so the bare
+     date/month arithmetic exercised without one (above) is untouched. */
+  if (Number.isFinite(d.balance)) {
+    const maxCashPaid = pay * months;
+    if (original - d.balance > maxCashPaid + 0.01) return null;
+  }
+
   const r = monthlyRate(d.rate);
   let b = original;
   let paid = 0, interest = 0;

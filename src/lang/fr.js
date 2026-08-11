@@ -129,6 +129,10 @@ module.exports = {
     other: 'Budget : ceci décale chaque limite de période. {count} fichiers de budget nommés par date ne correspondront plus — ils restent dans votre coffre, et remettre cette date à {prev} les ramène aussitôt.',
   },
   'settings.dateNotReal': 'Budget : « {value} » n\'est pas une date — utilisez le sélecteur, ou saisissez AAAA-MM-JJ.',
+  'settings.monthStartReslices': {
+    one: 'Budget : ceci déplace la fenêtre par rapport à laquelle chaque fichier de budget mensuel est mesuré, sans renommer le fichier — le budget vs réel de {count} période passée va changer. Rien n\'est supprimé, et remettre le jour comme avant l\'annule.',
+    other: 'Budget : ceci déplace la fenêtre par rapport à laquelle chaque fichier de budget mensuel est mesuré, sans renommer le fichier — le budget vs réel de {count} périodes passées va changer. Rien n\'est supprimé, et remettre le jour comme avant l\'annule.',
+  },
 
   /* ============================ setup wizard ============================== */
   'wiz.title': 'Configurer Budget Vault',
@@ -718,6 +722,7 @@ module.exports = {
   'dash.split.sliceAria': '{cat} : {amount}, {pct}% des dépenses — afficher les transactions',
   'dash.split.noteAria': 'Ouvrir la note de la catégorie {cat}',
   'dash.split.noteMissing': 'Aucune note de catégorie trouvée pour « {cat} »',
+  'dash.split.centerLabel': 'Dépenses catégorisées',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Ce qu’il reste',

@@ -177,4 +177,18 @@ const asset = (type, value) => ({ type, value });
   eq(assetsByType(undefined), [], 'no asset page groups to nothing');
 }
 
+/* ---- 12. DEFECT 3: net worth reads cents, not a raw float difference ----
+   Assets and debts that are exactly break-even on paper leave a sub-cent
+   float remainder behind (50.30 - 10.10 - 40.20 = -7.1e-15 in IEEE 754).
+   `fromAccounts` above already collapses this class of artefact with
+   `|| 0` for a literal -0; `net` never got the same treatment, so a
+   household at exactly zero net worth was told it is in the red and shown
+   "-R0.00". */
+{
+  const w = worth([], [debt('other', 10.10), debt('other', 40.20)], [asset('cash', 50.30)]);
+  ok(Math.abs(w.liabilities - 50.30) < 1e-6, 'the float remainder is sub-cent, as measured');
+  eq(w.net, 0, 'break-even to the cent must not read as negative off a -7.1e-15 float artefact');
+  ok(!Object.is(w.net, -0), 'and must never be the literal -0 that renders as "-R0.00" either');
+}
+
 console.log(`worth.test.cjs — ${checks} checks OK`);

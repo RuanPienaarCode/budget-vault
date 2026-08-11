@@ -29,6 +29,22 @@ const registerTax = require('./views/tax');
 const registerLoans = require('./views/loans');
 const registerImport = require('./views/import');
 
+/* The pure core of money formatting, pulled out of moneyIn() so it is
+   testable without a live mount — see tests/controller-money.test.cjs.
+   Guards non-finite input: `(NaN).toFixed(2)` is the string "NaN", which has
+   no '.' to split on, so parts[1] comes back undefined and the caller renders
+   "R NaN,undefined" — a garbage figure sitting next to every real one on the
+   screen. No loader coercion or render-path division has been found to reach
+   this un-guarded (every one is already checked), so this is a latent-hazard
+   guard, not a fix for a proven path: render 0 rather than propagate garbage. */
+function formatMoney(symbol, v, decimals, loc) {
+  if (!Number.isFinite(v)) v = 0;
+  const sign = v < 0 ? '-' : '';
+  const parts = Math.abs(v).toFixed(decimals).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
+  return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
+}
+
 function mountApp(view) {
   const plugin = view.plugin;
   const app = view.app;
@@ -107,13 +123,7 @@ function mountApp(view) {
      euro balance still reads "1 234,56", because the convention belongs to the
      person reading the figure, not to the currency it is denominated in.
      Only the symbol moves. */
-  function moneyIn(symbol, v, decimals = 2) {
-    const loc = locale();
-    const sign = v < 0 ? '-' : '';
-    const parts = Math.abs(v).toFixed(decimals).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
-    return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
-  }
+  function moneyIn(symbol, v, decimals = 2) { return formatMoney(symbol, v, decimals, locale()); }
   function money(v, decimals = 2) { return moneyIn(S.settings.currency, v, decimals); }
   const typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
 
@@ -690,4 +700,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp };
+module.exports = { mountApp, formatMoney };
