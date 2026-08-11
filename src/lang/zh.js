@@ -669,6 +669,8 @@ module.exports = {
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': '还剩多少',
   'dash.left.sub': '在本期于 {date} 结束之前',
+  'dash.left.nowSub': '你现在拥有的钱',
+  'dash.left.notNow': '这张卡衡量的是你现在拥有的钱，因此只有在当前周期才准确。切换到 {period} 即可查看。',
   'dash.left.cash': '账户余额',
   'dash.left.committed': '尚未扣除',
   'dash.left.free': '实际可用',

@@ -669,6 +669,8 @@ module.exports = {
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': '残りはいくら',
   'dash.left.sub': 'この期間が {date} に終わるまで',
+  'dash.left.nowSub': '今ある現金',
+  'dash.left.notNow': 'このカードは今ある現金を測るため、現在の期間でしか正しくありません。{period} に切り替えると表示されます。',
   'dash.left.cash': '口座にある額',
   'dash.left.committed': '支払い予定',
   'dash.left.free': '実際に使える額',

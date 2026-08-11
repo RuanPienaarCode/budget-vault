@@ -89,11 +89,44 @@ module.exports = function registerDashboard(ctx) {
      The card hides itself when there is nothing honest to show. A vault with no
      confirmed balance and no recurring charges would otherwise get three zeroes
      and a per-day rate of nothing, which reads as a broken card rather than an
-     empty one. */
+     empty one.
+
+     THE RUNNING PERIOD ONLY. Every input here except the window is present
+     tense: cash is what the accounts hold NOW, staleness is measured against
+     today, and committed.js starts its window at today rather than at the
+     period start. Point that at another period and both directions lie, each
+     in its own way.
+
+     BACKWARDS the card goes inert. `from` (today) sits after `to` (that period's
+     end), so `due < from` drops every service and debt and the middle figure
+     falls to zero — while cash, which never consulted the period at all, keeps
+     reporting today's balance. Every past month therefore showed the same cash,
+     nothing committed, and all of it free. That is not a picture of how that
+     month went; it is today's picture wearing that month's date.
+
+     FORWARDS is worse, because it looks right. `from` becomes the period start,
+     so next month's debit orders ARE found and subtracted — from TODAY's cash,
+     with the rest of THIS period's claims never counted. The number comes out
+     bigger than the truth on a card whose whole job is to say what is safe to
+     spend. `days` compounds it, spanning from today to the far period's end, so
+     the per-day rate is diluted across two periods at once.
+
+     So: one period, the one we are standing in. The card stays on screen and
+     says why rather than vanishing — a card that disappears as you page through
+     months reads as the bug, and takes the layout with it on the way out. */
   function renderLeft() {
     const card = $('#leftCard');
     const body = $('#leftBody'); body.empty();
     const { start, end } = periodRange(S.period);
+
+    if (card) card.classList.remove('hidden');
+    if (S.period !== currentPeriod()) {
+      const sub = $('#leftSub');
+      if (sub) sub.textContent = i18n.t('dash.left.nowSub');
+      body.append(el('p', { class: 'text-muted', style: 'margin:0' },
+        i18n.t('dash.left.notNow', { period: periodMonthName(currentPeriod()) })));
+      return;
+    }
 
     /* Implied balances, not stated ones — reconcile() is what turns a claim
        with an age into what the account should read right now. `dated` is what

@@ -695,6 +695,8 @@ module.exports = {
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Wat oor is',
   'dash.left.sub': 'Voor hierdie tydperk op {date} eindig',
+  'dash.left.nowSub': 'Geld wat jy nou het',
+  'dash.left.notNow': 'Hierdie kaart meet die geld wat jy nou het, dus lees dit net waar vir die tydperk waarin jy is. Skakel oor na {period} om dit te sien.',
   'dash.left.cash': 'in jou rekeninge',
   'dash.left.committed': 'nog verbind',
   'dash.left.free': 'werklik beskikbaar',

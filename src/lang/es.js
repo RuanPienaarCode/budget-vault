@@ -697,6 +697,8 @@ module.exports = {
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Lo que queda',
   'dash.left.sub': 'Antes de que este período termine el {date}',
+  'dash.left.nowSub': 'El dinero que tienes ahora',
+  'dash.left.notNow': 'Esta tarjeta mide el dinero que tienes ahora, así que solo es cierta para el período en el que estás. Cambia a {period} para verla.',
   'dash.left.cash': 'en tus cuentas',
   'dash.left.committed': 'aún comprometido',
   'dash.left.free': 'realmente libre',
