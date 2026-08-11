@@ -11,6 +11,7 @@ const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
 const { splitRole } = require('./tx-role');
+const { parseOwners } = require('./owners');
 
 /* An optional numeric frontmatter key: absent or blank → null ("not set"),
    anything normalizeAmount can read → that number, anything it cannot → null.
@@ -76,6 +77,11 @@ module.exports = function registerLoad(ctx) {
          contract localeFor gives country. */
       S.settings.language = setLanguage(fm.language || defaultLanguage());
       S.settings.household = fm.household || '';
+      /* The people the household's accounts can belong to. Absent means "one
+         person", which is what every vault written before this key existed
+         says — and the Accounts page then hides the owner controls entirely
+         rather than offering a question with one possible answer. */
+      S.settings.owners = parseOwners(fm.owners);
       /* How many periods back "pull last period's overspend" reads from. 1 is
          the obvious answer and the default; it is a setting because a credit
          card settles a month in arrears, so the hole you are funding in August
@@ -131,6 +137,12 @@ module.exports = function registerLoad(ctx) {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
+        /* Which member of the household this account belongs to — a name from
+           Settings.md's `owners:` line, the reserved word `joint`, or absent.
+           Kept verbatim rather than matched against the declared list here:
+           owners.js owns what the value means, so an owner since removed from
+           the settings line keeps its account instead of quietly losing it. */
+        owner: String(fm.owner || '').trim(),
         /* The symbol this account's OWN figures are printed in. Absent means
            the household's, so no existing vault renders differently on
            upgrade. It never converts and never excludes — see currency.js. */

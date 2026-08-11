@@ -72,11 +72,30 @@ class FakeEl {
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   removeAttribute(k) { delete this.attrs[k]; }
   hasAttribute(k) { return k in this.attrs; }
-  addEventListener() {}
-  removeEventListener() {}
+  /* Handlers are KEPT, not swallowed. A stub that drops them lets a suite prove
+     a control was rendered and never that pressing it does anything — which is
+     most of what a control is. _fire() is the way in; click() routes through it
+     so a view calling .click() on its own element behaves. */
+  addEventListener(type, fn) {
+    if (typeof fn !== 'function') return;
+    (this._on || (this._on = {}))[type] = [...((this._on || {})[type] || []), fn];
+  }
+  removeEventListener(type, fn) {
+    if (!this._on || !this._on[type]) return;
+    this._on[type] = this._on[type].filter(f => f !== fn);
+  }
+  /* Deliberately NOT a DOM event: no bubbling, no default action, no synthetic
+     Event object beyond what the handlers here actually read. Anything more
+     would be a second event system to keep true to the first. */
+  _fire(type, evt = {}) {
+    for (const fn of (this._on && this._on[type]) || []) {
+      fn({ target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...evt });
+    }
+    return this;
+  }
   focus() {}
   blur() {}
-  click() {}
+  click() { return this._fire('click'); }
   closest() { return null; }
   contains() { return false; }
   scrollIntoView() {}

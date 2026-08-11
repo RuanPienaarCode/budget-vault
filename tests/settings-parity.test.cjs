@@ -69,7 +69,7 @@ const mdKeys = new Set(
   [...src.matchAll(/const MD_KEYS = new Set\(\[([^\]]*)\]\)/g)]
     .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])));
 eq([...mdKeys].sort(),
-  ['country', 'currency', 'household', 'language', 'month_start_day', 'overspend_lag', 'period_anchor', 'period_days'],
+  ['country', 'currency', 'household', 'language', 'month_start_day', 'overspend_lag', 'owners', 'period_anchor', 'period_days'],
   'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');

@@ -15,6 +15,7 @@ const i18n = require('./i18n');
 const { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
 const { periodDaysOrZero } = require('./dates');
 const { yamlStr } = require('./markdown');
+const { parseOwners } = require('./owners');
 const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
@@ -24,7 +25,13 @@ const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
    API binds a control to this.plugin.settings[key] by default, so these
    route through the getControlValue/setControlValue overrides instead. */
-const MD_KEYS = new Set(['household', 'month_start_day', 'country', 'language', 'currency', 'period_days', 'period_anchor', 'overspend_lag']);
+const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'period_days', 'period_anchor', 'overspend_lag']);
+
+/* Shared by display() and getSettingDefinitions(), same as PALETTE_DESC above.
+   It has to explain what the setting TURNS ON as well as what it stores: an
+   empty owners line is why the Accounts page shows no owner control at all, and
+   a reader hunting for that field would otherwise have no way to find this. */
+const OWNERS_DESC = 'The people this household\'s accounts can belong to, separated by commas — e.g. "Ruan, Christine". Each account then gets an Owner dropdown offering these plus Joint, and the Accounts page gains a per-person breakdown and filter. Leave blank if the budget is one person\'s.';
 
 /* Language dropdown options, as {id: nativeName}. Built off LANGUAGE_ORDER —
    itself derived from the tables that actually ship — so the dropdown can never
@@ -169,6 +176,7 @@ class BudgetSettingTab extends PluginSettingTab {
      the same teardown discipline the view controller applies in destroy(). */
   hide() {
     clearTimeout(this._hhTimer);
+    clearTimeout(this._ownersTimer);
     clearTimeout(this._msdTimer);
     clearTimeout(this._curTimer);
   }
@@ -193,6 +201,24 @@ class BudgetSettingTab extends PluginSettingTab {
             // quotes rather than escaping them, so 'Ruan "The General"' saved
             // as 'Ruan The General'.
             await this.plugin.updateBudgetSettingsMd('household', yamlStr(v.trim()));
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Household members')
+      .setDesc(OWNERS_DESC)
+      .addText(t => {
+        t.setPlaceholder('Ruan, Christine');
+        // Re-serialised from the parse rather than echoed back raw, so the field
+        // shows the list the app is actually running — a stray comma or a
+        // duplicate reads back tidied instead of sitting there looking accepted.
+        t.setValue(parseOwners(md.owners).join(', '));
+        t.onChange(v => {
+          clearTimeout(this._ownersTimer);
+          this._ownersTimer = setTimeout(async () => {
+            await this.plugin.updateBudgetSettingsMd('owners', yamlStr(parseOwners(v).join(', ')));
             this.plugin.reloadViews();
           }, 800);
         });
@@ -460,6 +486,10 @@ class BudgetSettingTab extends PluginSettingTab {
     if (!MD_KEYS.has(key)) return super.getControlValue(key);
     const md = this.mdSettings();
     if (key === 'household') return md.household ?? '';
+    // Through the parse, so the control shows the list the app runs rather than
+    // whatever the file happens to say — and so a YAML flow list, which
+    // metadataCache hands over as a real array, reaches a text control as text.
+    if (key === 'owners') return parseOwners(md.owners).join(', ');
     if (key === 'month_start_day') return Number(md.month_start_day ?? 23);
     // Clamped on the way out, like period_days below: the control shows what
     // the app is actually running, not what a hand-edited file happens to say.
@@ -510,7 +540,8 @@ class BudgetSettingTab extends PluginSettingTab {
         this.noticeMonthStartReslices(this.mdSettings(), Number(this.mdSettings().month_start_day ?? 23), n);
       }
     }
-    const raw = key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
+    const raw = key === 'owners' ? yamlStr(parseOwners(value).join(', '))
+      : key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'month_start_day' ? String(parseInt(value, 10))
       : key === 'overspend_lag' ? String(overspendLag(value))
       : key === 'period_days' ? String(periodDaysOrZero(value))
@@ -603,6 +634,11 @@ class BudgetSettingTab extends PluginSettingTab {
         name: 'Name / household',
         desc: 'Shown in the dashboard greeting and top bar. Leave blank for none.',
         control: { type: 'text', key: 'household', placeholder: 'Leave blank for none' },
+      },
+      {
+        name: 'Household members',
+        desc: OWNERS_DESC,
+        control: { type: 'text', key: 'owners', placeholder: 'Ruan, Christine' },
       },
       {
         name: 'Month start day',

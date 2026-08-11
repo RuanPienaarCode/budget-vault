@@ -553,6 +553,15 @@ module.exports = {
   'acct.deck.do.notx': '导入交易',
   'acct.deck.do.nofolder': '关联文件夹',
 
+  'acct.field.owner': '所有者',
+  'acct.field.ownerDesc': '此账户属于谁。名称来自插件设置中的“家庭成员”。',
+  'acct.owner.none': '未设置',
+  'acct.owner.joint': '共有',
+  'acct.owner.all': '所有人',
+  'acct.owner.title': '归属情况',
+  'acct.owner.sub': '同一净额，按每个账户的所有者拆分',
+  'acct.owner.aria': '{owner}：{amount}。仅显示这些账户',
+
   'acct.filter.all': '全部',
   'acct.filter.flag': '需要留意',
   'acct.search': '查找账户…',

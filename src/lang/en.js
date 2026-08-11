@@ -584,6 +584,16 @@ module.exports = {
   'acct.deck.do.notx': 'Import transactions',
   'acct.deck.do.nofolder': 'Link a folder',
 
+  /* ---- who an account belongs to ---- */
+  'acct.field.owner': 'Owner',
+  'acct.field.ownerDesc': 'Who this account belongs to. The names come from "Household members" in the plugin settings.',
+  'acct.owner.none': 'Not set',
+  'acct.owner.joint': 'Joint',
+  'acct.owner.all': 'Everyone',
+  'acct.owner.title': 'Whose it is',
+  'acct.owner.sub': 'The same net figure, split by who each account belongs to',
+  'acct.owner.aria': '{owner}: {amount}. Show only these accounts',
+
   /* ---- the ledger ---- */
   'acct.filter.all': 'All',
   'acct.filter.flag': 'Needs a look',

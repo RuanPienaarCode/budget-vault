@@ -567,6 +567,15 @@ module.exports = {
   'acct.deck.do.notx': 'Voer transaksies in',
   'acct.deck.do.nofolder': 'Koppel \'n vouer',
 
+  'acct.field.owner': 'Eienaar',
+  'acct.field.ownerDesc': 'Aan wie hierdie rekening behoort. Die name kom uit “Huishouding se lede” in die inprop se instellings.',
+  'acct.owner.none': 'Nie gestel nie',
+  'acct.owner.joint': 'Gesamentlik',
+  'acct.owner.all': 'Almal',
+  'acct.owner.title': 'Wie s’n dit is',
+  'acct.owner.sub': 'Dieselfde netto syfer, verdeel volgens aan wie elke rekening behoort',
+  'acct.owner.aria': '{owner}: {amount}. Wys net hierdie rekeninge',
+
   'acct.filter.all': 'Alles',
   'acct.filter.flag': 'Verg aandag',
   'acct.search': 'Vind \'n rekening…',

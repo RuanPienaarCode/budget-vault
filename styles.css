@@ -1306,6 +1306,26 @@
 .budget-app-root .acct-ring-legend { min-width: 160px; }
 .budget-app-root .acct-ring-note { flex-basis: 100%; font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; }
 
+/* Whose it is — the per-owner split of the same net figure. Each row is a
+   BUTTON that filters the ledger below, so it gets a real hit target and a
+   pressed state rather than looking like a static read-out that happens to
+   move the page when you touch it. */
+.budget-app-root .acct-owner-row {
+  display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: transparent; color: inherit; padding: 9px 10px; margin-bottom: 2px;
+}
+.budget-app-root .acct-owner-row:hover { background: rgba(127, 127, 127, .07); }
+.budget-app-root .acct-owner-row.is-on { border-color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .acct-owner-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .acct-owner-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.budget-app-root .acct-owner-name { font-size: 13.5px; font-weight: 600; }
+.budget-app-root .acct-owner-net { font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The bar wants the full width here, unlike the goal cell in the table where it
+   shares a row with its label. */
+.budget-app-root .acct-owner-row .acct-mbar { display: block; width: 100%; margin: 6px 0 4px; }
+.budget-app-root .acct-owner-sub { font-size: 11px; color: var(--ink-faint); }
+
 /* Band 2 — the queue. Amber because it is a prompt, not an error: every line
    in it is answerable, and most weeks the whole band is the green all-clear. */
 .budget-app-root .acct-deck {
@@ -1369,6 +1389,11 @@
   background: rgba(127, 127, 127, .18); color: var(--text-muted);
 }
 .budget-app-root .acct-seg.is-warn .acct-seg-n { background: var(--color-warning); color: #12151c; }
+/* The owner chips sit on their own line ABOVE the kind chips, so the two axes
+   read as two questions rather than one long segmented control. Margin only
+   when the row exists — renderOwnerFilters leaves the div classless in a
+   single-person vault, and a bare div must not reserve space. */
+.budget-app-root .acct-segs--owner { margin-bottom: 10px; }
 /* The group toggle is a switch, not a command — it has to LOOK held down when
    it is, or the only feedback that it did anything is the table quietly
    regrouping under the reader's eye. */
@@ -1420,6 +1445,23 @@
 /* nowrap: "63% of R 100 000" broke after the 100, which reads as a different
    figure for the half-second before the eye re-parses the line. */
 .budget-app-root .acct-mbar-l { font-size: 11px; color: var(--ink-faint); margin-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The split variant: capital against growth on one account's card, two
+   segments instead of one fill. A modifier on .acct-mbar rather than a bar of
+   its own, so the height, the radius and the track colour stay in one place —
+   a second bar component is how two bars on one page end up 1px apart.
+
+   Square corners on the children because two adjacent rounded segments cut a
+   notch where they meet; the parent already clips, so the outer radius holds.
+   Flat colours, not the gradients above: these two segments are a QUANTITY
+   comparison read against each other, and a gradient makes the same width look
+   like a different amount at each end. Info blue and success green are the same
+   two the chart above uses for the same two things. */
+.budget-app-root .acct-mbar--split { width: 100%; display: flex; margin: 7px 0 5px; }
+.budget-app-root .acct-mbar--split i { border-radius: 0; }
+.budget-app-root .acct-mbar--split i.seg-in { background: var(--color-info); }
+.budget-app-root .acct-mbar--split i.seg-growth { background: var(--color-success); }
+.budget-app-root .acct-mbar--split i.seg-growth.neg { background: var(--color-danger); }
 .budget-app-root .acct-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .budget-app-root .acct-dash { color: var(--ink-faint); }
 .budget-app-root .acct-caret { opacity: .4; font-size: .8em; }
@@ -2409,6 +2451,7 @@
   .budget-app-root .acct-bal:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-deck-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-seg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .acct-owner-row:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-drawer-act:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table thead th button:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table tbody tr.acct-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }

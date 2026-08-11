@@ -573,6 +573,15 @@ module.exports = {
   'acct.deck.do.notx': 'Importer des transactions',
   'acct.deck.do.nofolder': 'Lier un dossier',
 
+  'acct.field.owner': 'Titulaire',
+  'acct.field.ownerDesc': 'À qui appartient ce compte. Les noms proviennent de « Membres du foyer » dans les réglages du plugin.',
+  'acct.owner.none': 'Non défini',
+  'acct.owner.joint': 'Commun',
+  'acct.owner.all': 'Tout le monde',
+  'acct.owner.title': 'À qui c’est',
+  'acct.owner.sub': 'Le même montant net, réparti selon le titulaire de chaque compte',
+  'acct.owner.aria': '{owner} : {amount}. Afficher uniquement ces comptes',
+
   'acct.filter.all': 'Tous',
   'acct.filter.flag': 'À vérifier',
   'acct.search': 'Trouver un compte…',

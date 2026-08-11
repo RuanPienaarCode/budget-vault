@@ -475,6 +475,10 @@ const SHELL_HTML = `
              also collapses it to a single line when nothing wants a decision —
              so an all-clear vault gets no shelf standing there saying nothing. -->
         <div id="acctDeck"></div>
+        <!-- Owner chips, on their own row above the kind chips because they are
+             a different question: renderOwnerFilters gives this its class and
+             leaves it bare in a household that has not named anybody. -->
+        <div id="acctOwners"></div>
         <div class="acct-strip mb-4">
           <div class="acct-segs" id="acctFilters"></div>
           <div class="acct-search">

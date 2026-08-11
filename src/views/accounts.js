@@ -27,6 +27,11 @@ const { reconcile } = require('../reconcile');
    what order, and why. Pure, and tested without a DOM. */
 const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } = require('../acct-status');
 const { supersededBySplit } = require('../tx-role');
+/* Who an account belongs to. The vocabulary lives in its own module because
+   three bands on this page ask the same question of it — the hero's split, the
+   filter chips and both dialogs — and a household with one person must get the
+   same page it had before the key existed. */
+const { ownerKey, ownerLabel, ownerOptions, netByOwner } = require('../owners');
 const { ISO_DATE, todayIso } = require('../dates');
 
 /* Largest-remainder (Hare quota) allocation for a column of percentages that
@@ -83,6 +88,35 @@ module.exports = function registerAccounts(ctx) {
   /* Shared with the setup wizard under acctType.* — one label, two screens, so
      they cannot drift. Built per call so a language change is picked up. */
   const acctTypeOptions = () => ACCT_TYPES.map(v => ({ value: v, label: i18n.t('acctType.' + v) }));
+
+  /* The household's declared people. Read off S per call rather than captured
+     at register time: Settings.md is editable in the next tab across, and the
+     reload that follows refreshes S without re-running this module. */
+  const declaredOwners = () => S.settings.owners || [];
+
+  /* Does this vault have an owner question at all? A Settings.md that names
+     nobody is a one-person household, and it gets the page it had before this
+     key existed — no field on the form, no chips, no split in the hero. The
+     second half is the escape hatch: an account file that already names an
+     owner brings the controls back whatever the settings say, because the
+     alternative is a value the reader can see in their own file and cannot
+     edit anywhere in this app. */
+  const ownerInPlay = () => declaredOwners().length > 0 || S.accounts.some(a => a.owner);
+
+  /* The owner control, or nothing at all — spread into a field list, so the
+     empty case adds no row. Blank is offered first and deliberately: "not
+     said" is a real answer, and a form that forced a name onto a joint bond
+     would be inventing one. */
+  const ownerField = value => (ownerInPlay()
+    ? [{ key: 'owner', label: i18n.t('acct.field.owner'), type: 'select',
+      value: value || '',
+      desc: i18n.t('acct.field.ownerDesc'),
+      options: [
+        { value: '', label: i18n.t('acct.owner.none') },
+        ...ownerOptions(declaredOwners(), S.accounts)
+          .map(v => ({ value: v, label: ownerLabel(v, declaredOwners()) })),
+      ] }]
+    : []);
 
   /* Which optional fields belong to which kind of account.
 
@@ -141,6 +175,10 @@ module.exports = function registerAccounts(ctx) {
     // back as one unrecognised word and mutes nothing.
     ignore_warnings: a => a.ignore_warnings || null,
     account_number: a => (a.account_number ? yamlStr(a.account_number) : null),
+    // Absent means "nobody has said", which is what every account in a
+    // single-person vault means — so an unowned account keeps a frontmatter
+    // block free of a line asserting it.
+    owner: a => (a.owner ? yamlStr(a.owner) : null),
     tx_label: a => (a.tx_label ? yamlStr(a.tx_label) : null),
     credit_limit: a => (a.credit_limit ? a.credit_limit.toFixed(2) : null),
     goal_amount: a => (a.goal_amount ? a.goal_amount.toFixed(2) : null),
@@ -228,7 +266,11 @@ module.exports = function registerAccounts(ctx) {
     a.balanceRaw = null;   // the user just gave us a clean figure
     a.balance_updated = todayIso();
     await saveAccount(a);
-    renderAccounts();
+    /* ctx.render, not renderAccounts: this dialog is opened from the Savings &
+       Investments page too, and renderAccounts() would rebuild the page the
+       reader is NOT looking at — leaving the figure they just typed absent from
+       the one they are. render() draws whichever view is current. */
+    ctx.render();
     toast(i18n.t('acct.balance.updated', { name: a.name }));
   }
 
@@ -273,6 +315,7 @@ module.exports = function registerAccounts(ctx) {
     const r = await askFields(app, i18n.t('acct.edit.title', { name: a.name }), [
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: a.type },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', value: a.institution },
+      ...ownerField(a.owner),
       { key: 'account_number', label: i18n.t('acct.field.number'), type: 'text', value: a.account_number,
         desc: i18n.t('acct.field.numberDesc') },
       { key: 'tx_label', label: i18n.t('acct.field.folder'), type: 'text', value: a.tx_label,
@@ -309,6 +352,11 @@ module.exports = function registerAccounts(ctx) {
     // be written to disk by the save below with no way to tell what changed.
     a.type = r.type;
     a.institution = (r.institution || '').trim();
+    /* Only when the control was actually on screen. Same rule the optional
+       figures follow above: a one-person vault never renders this field, so
+       reading its absent result as "the user cleared it" would strip the owner
+       off every account the moment someone emptied the settings line. */
+    if (ownerInPlay()) a.owner = (r.owner || '').trim();
     a.account_number = (r.account_number || '').trim();
     a.tx_label = (r.tx_label || '').trim();
     /* Blank means "the household's" — stored as empty, which FM_WRITERS turns
@@ -377,6 +425,10 @@ module.exports = function registerAccounts(ctx) {
     if (v.dir !== 1 && v.dir !== -1) v.dir = -1;
     if (typeof v.grouped !== 'boolean') v.grouped = true;
     if (v.open === undefined) v.open = null;
+    /* null is "every owner", '' is "the ones nobody has claimed" — two states
+       that a single falsy value cannot tell apart, and conflating them would
+       make the Unassigned chip the same control as the All chip. */
+    if (v.owner === undefined) v.owner = null;
     return v;
   }
 
@@ -488,7 +540,52 @@ module.exports = function registerAccounts(ctx) {
       oldest < 0 ? i18n.t('acct.hero.oldestNone') : i18n.t('acct.hero.oldestDays', { count: oldest }));
     hero.append(facts);
 
-    wrap.append(hero, whereItSits());
+    const split = whoseItIs();
+    wrap.append(hero, ...(split ? [split] : []), whereItSits());
+  }
+
+  /* Whose it is — the same net figure as the hero, cut by owner.
+
+     A READING of the total, never a replacement for it: every row here is
+     already inside the number above, and the bars are drawn against the largest
+     POSITIVE side rather than against the net, so an owner carrying more card
+     debt than cash still gets a row that says so instead of an empty track.
+
+     Absent entirely in a one-person vault — see ownerInPlay(). A card headed
+     "Whose it is" with one row under it answers a question nobody asked. */
+  function whoseItIs() {
+    if (!ownerInPlay()) return null;
+    const rows = netByOwner(S.accounts, declaredOwners());
+    if (rows.length < 2) return null;
+
+    const card = el('div', { class: 'card acct-owners' });
+    card.append(el('div', { class: 'card-h' },
+      el('div', {},
+        el('h2', {}, i18n.t('acct.owner.title')),
+        el('div', { class: 'sub' }, i18n.t('acct.owner.sub')))));
+
+    const body = el('div', { class: 'body-pad' });
+    const widest = rows.reduce((m, r) => Math.max(m, Math.abs(r.net)), 0) || 1;
+    for (const r of rows) {
+      const pct = (Math.abs(r.net) / widest) * 100;
+      const line = el('button', { type: 'button',
+        class: `acct-owner-row${view().owner === r.key ? ' is-on' : ''}`,
+        'aria-pressed': String(view().owner === r.key),
+        'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) }) },
+      el('div', { class: 'acct-owner-top' },
+        el('span', { class: 'acct-owner-name' }, r.label),
+        el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}` }, money(r.net))),
+      el('span', { class: 'acct-mbar' },
+        el('i', { class: r.net < 0 ? 'bg-danger' : '', style: `width:${pct.toFixed(1)}%` })),
+      el('div', { class: 'acct-owner-sub' }, i18n.t('acct.group.count', { count: r.count })));
+      /* Clicking a row filters the ledger to that owner — the figure and the
+         accounts behind it are one click apart, rather than the figure being
+         here and the way to check it being a chip further down the page. */
+      line.addEventListener('click', () => setOwnerFilter(view().owner === r.key ? null : r.key));
+      body.append(line);
+    }
+    card.append(body);
+    return card;
   }
 
   /* The ring. Positive group totals only — a donut cannot draw a negative
@@ -684,14 +781,62 @@ module.exports = function registerAccounts(ctx) {
     stale:   (x, y) => staleRank(x) - staleRank(y),
   };
 
+  /* The owner filter, applied on its own axis. Kept separate from FILTERS()
+     rather than folded in as more chips: kind and owner are two different
+     questions, and one `v.filter` can only hold one answer — merging them would
+     mean picking "Christine" silently dropped the reader out of "Savings". */
+  const ownerMatch = r => view().owner === null || ownerKey(r.a.owner) === view().owner;
+
   function visibleRows(rows) {
     const v = view();
     const f = FILTERS().find(x => x.key === v.filter) || FILTERS()[0];
     const q = (v.q || '').trim().toLowerCase();
     return rows
       .filter(r => f.test(r))
-      .filter(r => !q || `${r.a.name} ${r.a.institution || ''} ${r.a.type}`.toLowerCase().includes(q))
+      .filter(ownerMatch)
+      /* Owner joins the searchable text: typing a name into the box is the
+         first thing a reader tries, and it landing on "0 rows" while a chip
+         with that exact name sits above it reads as a broken search. */
+      .filter(r => !q || `${r.a.name} ${r.a.institution || ''} ${r.a.type} ${ownerLabel(r.a.owner, declaredOwners())}`.toLowerCase().includes(q))
       .sort((x, y) => (SORTERS[v.sort] || SORTERS.balance)(x, y) * v.dir);
+  }
+
+  function setOwnerFilter(key) {
+    const v = view();
+    v.owner = key;
+    v.open = null;                        // a drawer left open under a filtered-out row
+    renderAccounts();
+  }
+
+  /* The owner chips, on their own row under the kind chips. Rendered only when
+     the vault has an owner question — and only when more than one answer is in
+     use, because a single chip beside "Everyone" cannot change what is on
+     screen. The band is emptied rather than left standing in that case, so a
+     vault that had two owners and now has one loses the control cleanly. */
+  function renderOwnerFilters(rows) {
+    const wrap = $('#acctOwners');
+    if (!wrap) return;
+    wrap.empty();
+    const v = view();
+    const buckets = netByOwner(S.accounts, declaredOwners());
+    if (!ownerInPlay() || buckets.length < 2) {
+      wrap.className = '';
+      // A filter left set on an owner this vault no longer distinguishes would
+      // hide accounts with no visible control explaining why.
+      if (v.owner !== null) { v.owner = null; }
+      return;
+    }
+    wrap.className = 'acct-segs acct-segs--owner';
+
+    const chip = (key, label, n) => {
+      const b = el('button', { type: 'button', class: 'acct-seg',
+        'aria-pressed': String(v.owner === key) },
+      label, el('span', { class: 'acct-seg-n' }, String(n)));
+      b.addEventListener('click', () => setOwnerFilter(key));
+      wrap.append(b);
+    };
+    chip(null, i18n.t('acct.owner.all'), rows.length);
+    for (const b of buckets) chip(b.key, b.label, b.count);
   }
 
   function renderFilters(rows) {
@@ -699,8 +844,12 @@ module.exports = function registerAccounts(ctx) {
     if (!wrap) return;
     wrap.empty();
     const v = view();
+    /* Counted WITHIN the current owner, so the two chip rows agree with each
+       other and with the table. A "Savings 5" sitting above three rows is not a
+       count, it is a contradiction the reader has to resolve themselves. */
+    const inScope = rows.filter(ownerMatch);
     for (const f of FILTERS()) {
-      const n = rows.filter(f.test).length;
+      const n = inScope.filter(f.test).length;
       /* A chip that filters to nothing is a control that cannot be used. "All"
          always stands — it is how you get back — but a vault with no
          investments has no business offering an Investments tab, and "Needs a
@@ -843,7 +992,11 @@ module.exports = function registerAccounts(ctx) {
         el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }),
         el('span', {}, nameEl,
           el('span', { class: 'acct-cell-sub' },
-            [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · '))))),
+            /* Owner joins the kind and the bank on the one line the row
+               already has. Only when there IS one — an empty owner would leave
+               a trailing separator on every row in a single-person vault. */
+            [a.type.replace('_', ' '), a.institution,
+              a.owner ? ownerLabel(a.owner, declaredOwners()) : ''].filter(Boolean).join(' · '))))),
       el('td', { class: 'num' }, balBtn),
       el('td', { class: 'num acct-col-drop' }, flowCell),
       el('td', { class: 'acct-col-drop' }, spark || el('span', { class: 'acct-dash' }, '—')),
@@ -898,6 +1051,11 @@ module.exports = function registerAccounts(ctx) {
         `+${acctMoney(a, r.act.inAmt, 0)} · −${acctMoney(a, r.act.outAmt, 0)}`);
       f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
     }
+    /* Stated even when unset, unlike the row subtitle above: the drawer is
+       where a reader goes to find out what this app knows about an account, and
+       a question with a blank answer is itself the answer. Suppressed only in a
+       vault that has no owner question at all. */
+    if (ownerInPlay()) f(i18n.t('acct.field.owner'), ownerLabel(a.owner, declaredOwners()));
     f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
     f(i18n.t('acct.drawer.inBudget'), i18n.t(a.in_budget ? 'acct.drawer.yes' : 'acct.drawer.no'));
     box.append(grid);
@@ -1077,6 +1235,9 @@ module.exports = function registerAccounts(ctx) {
 
   function renderAccounts() {
     const rows = model();
+    /* Owner chips FIRST: that pass is what clears a filter pointing at an owner
+       this vault no longer distinguishes, and everything below reads v.owner. */
+    renderOwnerFilters(rows);
     renderSummary(rows);
     renderDeck(rows);
     renderFilters(rows);
@@ -1133,6 +1294,10 @@ module.exports = function registerAccounts(ctx) {
     const lines = ['---', `type: ${a.type}`];
     if (a.institution) lines.push(`institution: ${yamlStr(a.institution)}`);
     if (a.account_number) lines.push(`account_number: ${yamlStr(a.account_number)}`);
+    // addAccount reaches saveAccount through THIS branch (a fresh account has no
+    // fmRaw to patch), so an owner missing here is an owner the create form
+    // collects and then throws away.
+    if (a.owner) lines.push(`owner: ${yamlStr(a.owner)}`);
     if (a.currency) lines.push(`currency: ${yamlStr(a.currency)}`);
     if (a.ignore_warnings) lines.push(`ignore_warnings: ${a.ignore_warnings}`);
     lines.push(`balance: ${a.balance.toFixed(2)}`);
@@ -1188,6 +1353,7 @@ module.exports = function registerAccounts(ctx) {
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: 'e.g. Easy Equities' },
+      ...ownerField(defaults && defaults.owner),
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
       { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text',
         placeholder: S.settings.currency,
@@ -1221,6 +1387,9 @@ module.exports = function registerAccounts(ctx) {
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),
+      // '' when the form never asked — saveAccount's FM_WRITERS then writes no
+      // owner line at all, which is what a one-person vault should produce.
+      owner: (r.owner || '').trim(),
       account_number: '', tx_label: '',
       currency: (r.currency || '').trim(),
       // Nothing muted on a fresh account: the warnings are how a new account
@@ -1258,7 +1427,11 @@ module.exports = function registerAccounts(ctx) {
   function acctSearch(q) { view().q = q; view().open = null; renderAccounts(); }
   function acctToggleGroup() { const v = view(); v.grouped = !v.grouped; renderAccounts(); }
 
-  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount,
+  /* editBalance and editAccount are shared with views/savings.js rather than
+     copied into it. One account form in this plugin, not two that drift — the
+     fields a type offers, the parsing, and the frontmatter keys written all have
+     exactly one owner. */
+  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, editBalance,
     acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };

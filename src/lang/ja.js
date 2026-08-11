@@ -553,6 +553,15 @@ module.exports = {
   'acct.deck.do.notx': '取引を取り込む',
   'acct.deck.do.nofolder': 'フォルダーを紐付け',
 
+  'acct.field.owner': '所有者',
+  'acct.field.ownerDesc': 'この口座が誰のものか。名前はプラグイン設定の「世帯メンバー」から取得されます。',
+  'acct.owner.none': '未設定',
+  'acct.owner.joint': '共同',
+  'acct.owner.all': '全員',
+  'acct.owner.title': '誰のものか',
+  'acct.owner.sub': '同じ純資産額を、口座の所有者ごとに分けたもの',
+  'acct.owner.aria': '{owner}：{amount}。この口座のみ表示',
+
   'acct.filter.all': 'すべて',
   'acct.filter.flag': '要確認',
   'acct.search': '口座を検索…',
