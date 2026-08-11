@@ -1,0 +1,174 @@
+'use strict';
+/* A DOM small enough to run a view against, and no smaller.
+
+   Views are where this app breaks in the way tests miss: the arithmetic under
+   them is covered thoroughly, and coverage of the maths reads like coverage of
+   the page. A caption in views/debts.js once reached for a binding declared in
+   a different function — valid syntax, so `node --check` passed, and there is
+   no linter — and the Debt page threw on every render for a whole release while
+   every guard suite stayed green. Nothing but executing the view catches that.
+
+   Deliberately NOT a DOM implementation. It answers the calls src/dom.js and
+   the views actually make, and it auto-creates any element asked for by id, so
+   a test does not have to enumerate a view's containers and go stale when one
+   is added. If a view starts needing something that isn't here, the honest fix
+   is to add it here rather than to give that view its own private stub.
+
+   Used by tests/views-render.test.cjs and tests/debts-render.test.cjs. */
+
+class FakeEl {
+  constructor(tag = 'div') {
+    this.nodeType = 1;
+    this.tagName = String(tag).toUpperCase();
+    this.children = [];
+    this.attrs = {};
+    this.style = {};
+    this.dataset = {};
+    this._cls = new Set();
+    this._text = '';
+    this.value = '';
+    this.checked = false;
+    this.disabled = false;
+    this.files = [];
+    const self = this;
+    this.classList = {
+      add: (...c) => c.forEach(x => x && self._cls.add(x)),
+      remove: (...c) => c.forEach(x => self._cls.delete(x)),
+      toggle: (c, on) => (on === undefined
+        ? (self._cls.has(c) ? self._cls.delete(c) : self._cls.add(c))
+        : (on ? self._cls.add(c) : self._cls.delete(c))),
+      contains: c => self._cls.has(c),
+    };
+  }
+  get className() { return [...this._cls].join(' '); }
+  set className(v) { this._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }
+  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
+  set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
+  // A real <select> exposes its <option>s, and more than one view counts them
+  // to decide whether the list still needs building.
+  get options() { return this.children.filter(c => c.tagName === 'OPTION'); }
+  get firstChild() { return this.children[0] || null; }
+  get lastChild() { return this.children[this.children.length - 1] || null; }
+  get parentElement() { return this._parent || null; }
+  get offsetWidth() { return 800; }
+  get scrollTop() { return 0; }
+  set scrollTop(_v) { /* keepScroll writes this back */ }
+
+  empty() { this.children = []; this._text = ''; }
+  append(...kids) {
+    for (const k of kids) {
+      if (k == null || k === '') continue;
+      const node = typeof k === 'string' ? Object.assign(new FakeEl('#text'), { _text: k }) : k;
+      node._parent = this;
+      this.children.push(node);
+    }
+  }
+  appendChild(k) { this.append(k); return k; }
+  insertBefore(k, _ref) { this.append(k); return k; }
+  removeChild(k) { this.children = this.children.filter(c => c !== k); return k; }
+  remove() { if (this._parent) this._parent.removeChild(this); }
+  replaceChildren(...kids) { this.children = []; this._text = ''; this.append(...kids); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  removeAttribute(k) { delete this.attrs[k]; }
+  hasAttribute(k) { return k in this.attrs; }
+  addEventListener() {}
+  removeEventListener() {}
+  focus() {}
+  blur() {}
+  click() {}
+  closest() { return null; }
+  contains() { return false; }
+  scrollIntoView() {}
+  getBoundingClientRect() { return { top: 0, left: 0, width: 800, height: 400, right: 800, bottom: 400 }; }
+  // Depth-first, matching only the shapes the views actually query for.
+  querySelectorAll(sel) { return descend(this).filter(e => matches(e, sel)); }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
+}
+
+function descend(el, out = []) {
+  for (const c of el.children) { if (c.nodeType === 1) { out.push(c); descend(c, out); } }
+  return out;
+}
+function matches(el, sel) {
+  const s = String(sel).trim();
+  if (s.startsWith('.')) return el._cls.has(s.slice(1));
+  if (s.startsWith('#')) return el.attrs.id === s.slice(1);
+  return el.tagName === s.toUpperCase();
+}
+
+/* Install the globals src/dom.js and src/chart.js reach for. Idempotent, so a
+   suite that calls it twice does not end up with two different document
+   objects handing out incompatible elements. */
+function installDom() {
+  if (!global.document) {
+    global.document = {
+      createElement: t => new FakeEl(t),
+      createElementNS: (_ns, t) => new FakeEl(t),
+      createTextNode: t => Object.assign(new FakeEl('#text'), { _text: String(t) }),
+      createDocumentFragment: () => new FakeEl('#fragment'),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      body: new FakeEl('body'),
+      documentElement: new FakeEl('html'),
+    };
+  }
+  if (!global.getComputedStyle) {
+    // Empty throughout, so themeColors() takes its documented hex fallbacks
+    // rather than depending on a stylesheet no test loads.
+    global.getComputedStyle = () => ({ getPropertyValue: () => '' });
+  }
+  if (!global.requestAnimationFrame) global.requestAnimationFrame = fn => setTimeout(fn, 0);
+  if (!global.matchMedia) global.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  /* `window` itself, because several views legitimately reach for browser APIs
+     that exist in Obsidian on both desktop and mobile — matchMedia for a
+     hover-capable pointer, PointerEvent for chart interaction, setTimeout for
+     deferred focus. Note the guards in the views test the METHOD
+     (`typeof window.matchMedia === 'function'`), which throws before it can
+     help if `window` is absent entirely — so a bare node run needs this even
+     though the app never does.
+
+     matchMedia reports NO hover and NO fine pointer: of the two branches that
+     is the touch one, which is the harder path and the one a phone takes. */
+  if (!global.window) {
+    global.window = {
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: id => clearTimeout(id),
+      requestAnimationFrame: fn => setTimeout(fn, 0),
+      getComputedStyle: () => ({ getPropertyValue: () => '' }),
+      addEventListener() {}, removeEventListener() {},
+      // Deliberately absent: PointerEvent. chart.js checks for it before wiring
+      // pointer handlers, so leaving it undefined exercises the fallback.
+      document: global.document,
+      innerWidth: 800, innerHeight: 1000, devicePixelRatio: 1,
+    };
+  }
+  return global.document;
+}
+
+/* An auto-vivifying `$`. A view asking for a container it owns gets one, so a
+   test never has to list a view's ids — that list is exactly the thing that
+   goes stale, and a missing id fails as "the card guarded itself correctly"
+   rather than as a gap in the test. The tag is guessed from the id because a
+   couple of views read `.value` or count `.options`. */
+function makeDom() {
+  installDom();
+  const nodes = new Map();
+  const tagFor = id => (/table$/i.test(id) ? 'table'
+    : /(select|range|strategy|filter|sort|period|year|cycle|mode)$/i.test(id) ? 'select'
+    : /(input|search|extra|amount|name|note|date|file)$/i.test(id) ? 'input'
+    : 'div');
+  const $ = sel => {
+    const key = String(sel);
+    if (!nodes.has(key)) {
+      const el = new FakeEl(key.startsWith('#') ? tagFor(key.slice(1)) : 'div');
+      if (key.startsWith('#')) el.attrs.id = key.slice(1);
+      nodes.set(key, el);
+    }
+    return nodes.get(key);
+  };
+  return { $, nodes, FakeEl };
+}
+
+module.exports = { FakeEl, makeDom, installDom, descend };

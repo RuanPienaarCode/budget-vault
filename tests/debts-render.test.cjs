@@ -25,51 +25,16 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+const { makeDom } = require('./helpers/dom-stub.cjs');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const noThrow = (fn, m) => { assert.doesNotThrow(fn, m); checks++; };
 
-/* A minimal DOM, deliberately its own copy rather than an import: the richer
-   stub in dashboard-cards.test.cjs carries fault-injection hooks this file has
-   no use for, and a shared one would have to grow to serve both. */
-class FakeEl {
-  constructor(tag) {
-    this.tagName = String(tag).toUpperCase();
-    this.children = []; this.attrs = {}; this.style = {};
-    this._cls = new Set(); this._text = ''; this.value = '';
-    const self = this;
-    this.classList = {
-      add: (...c) => c.forEach(x => self._cls.add(x)),
-      remove: (...c) => c.forEach(x => self._cls.delete(x)),
-      toggle: (c, on) => (on ? self._cls.add(c) : self._cls.delete(c)),
-      contains: c => self._cls.has(c),
-    };
-  }
-  get className() { return [...this._cls].join(' '); }
-  set className(v) { this._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }
-  // A real <select> exposes its <option>s; syncRangeSelect() counts them to
-  // decide whether the list still needs building.
-  get options() { return this.children.filter(c => c.tagName === 'OPTION'); }
-  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
-  set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
-  empty() { this.children = []; this._text = ''; }
-  append(...kids) { for (const k of kids) this.children.push(k); }
-  setAttribute(k, v) { this.attrs[k] = String(v); }
-  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
-  addEventListener() {}
-  closest() { return null; }
-  querySelectorAll() { return []; }
-}
-global.document = {
-  createElement: t => new FakeEl(t),
-  createElementNS: (_ns, t) => new FakeEl(t),
-  createTextNode: t => Object.assign(new FakeEl('#text'), { _text: String(t) }),
-};
-global.getComputedStyle = () => ({ getPropertyValue: () => '' });
-
-const IDS = ['debtKpis', 'debtPlan', 'debtOrder', 'debtCurve', 'debtTable',
-  'debtPayments', 'debtExtra', 'debtStrategy', 'debtRange', 'debtSave'];
+/* The DOM comes from tests/helpers/dom-stub.cjs — the same one
+   views-render.test.cjs uses. A private copy here was the obvious thing to
+   write and the wrong thing to keep: two stubs drift, and the one that drifts
+   is always the one the failing test is using. */
 
 const B = 'Budget';
 /* Two debts so the payoff simulation has an ordering to make, one of them a
@@ -87,11 +52,11 @@ async function mount(files = FILES, extra = '') {
   const ctx = makeCtx(files);
   const S = await loadInto(ctx);
   S.period = '2026-07';
-  const nodes = new Map(IDS.map(id => [id, new FakeEl(id === 'debtTable' ? 'table' : 'div')]));
-  nodes.get('debtExtra').value = extra;
-  nodes.get('debtStrategy').value = 'avalanche';
-  ctx.$ = sel => nodes.get(sel.slice(1)) || null;
-  ctx.root = new FakeEl('div');
+  const { $, nodes } = makeDom();
+  $('#debtExtra').value = extra;
+  $('#debtStrategy').value = 'avalanche';
+  ctx.$ = $;
+  ctx.root = $('#root');
   ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
   require('../src/views/debts')(ctx);
   return { ctx, S, nodes };
@@ -102,9 +67,9 @@ async function mount(files = FILES, extra = '') {
   {
     const { ctx, nodes } = await mount();
     noThrow(() => ctx.renderDebts(), 'renderDebts must not throw on an ordinary vault');
-    ok(nodes.get('debtKpis').children.length > 0, 'the KPI tiles are drawn, not merely attempted');
-    ok(nodes.get('debtPlan').children.length > 0, 'the payoff plan is drawn');
-    ok(nodes.get('debtTable').children.length > 0, 'the debt table is drawn');
+    ok(nodes.get('#debtKpis').children.length > 0, 'the KPI tiles are drawn, not merely attempted');
+    ok(nodes.get('#debtPlan').children.length > 0, 'the payoff plan is drawn');
+    ok(nodes.get('#debtTable').children.length > 0, 'the debt table is drawn');
   }
 
   /* ---- 2. the exact escape: a what-if extra reaches the caption ----
@@ -114,7 +79,7 @@ async function mount(files = FILES, extra = '') {
   {
     const { ctx, nodes } = await mount(FILES, '3000');
     noThrow(() => ctx.renderDebts(), 'a what-if extra must not throw on the way into the Debt-free caption');
-    const txt = nodes.get('debtKpis').textContent;
+    const txt = nodes.get('#debtKpis').textContent;
     ok(/3\s?000/.test(txt.replace(/ /g, ' ')),
       'and the caption states the extra it folded in, rather than promising a date that assumes it silently');
   }
