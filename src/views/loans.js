@@ -13,6 +13,8 @@
    same lifetime as S, so a value typed here survives switching to another view
    and back, and is gone on reload, which is what a scratchpad should do. */
 
+const { fact } = require('../facts');
+
 const { el } = require('../dom');
 const { totalsFor, amortise, byYear, loanProfileFor } = require('../loan-math');
 
@@ -47,7 +49,10 @@ module.exports = function registerLoans(ctx) {
      such on the page. It exists so the instalment is not mistaken for the cost
      of running the car — financing without insuring is not an option a lender
      offers — not to compete with a real quote. */
-  const INSURANCE_RATE = 0.0035;   // of the vehicle price, per month
+  /* Never checked against real South African premiums — src/facts.js records
+     that as verified: null, and the UI copy has to keep saying so for as long
+     as it does. */
+  const INSURANCE_RATE = fact('za.vehicle.insurance.rate');
   const insuranceEstimate = price => Math.max(450, Math.round(price * INSURANCE_RATE));
 
   /* ------------------------------ fields --------------------------------- */

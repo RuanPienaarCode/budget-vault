@@ -106,14 +106,13 @@ function totalsFor(principal, annualRatePct, months, balloon = 0) {
    table compounds EXACTLY, which tests/loan-math.test.cjs now asserts as an
    invariant rather than pinning the numbers. On a R5m house the old table
    understated duty by R4 626, under a UI note calling it exact arithmetic. */
-const ZA_TRANSFER_DUTY = [
-  [0, 1210000, 0, 0],
-  [1210000, 1663800, 0, 0.03],
-  [1663800, 2329300, 13614, 0.06],
-  [2329300, 2994800, 53544, 0.08],
-  [2994800, 13310000, 106784, 0.11],
-  [13310000, Infinity, 1241456, 0.13],
-];
+const { fact } = require('./facts');
+
+/* The table itself lives in src/facts.js, with the SARS URL it was read from
+   and the date it was last checked. It is data about the world, not logic —
+   and the previous version of it was fabricated, so where it came from is
+   now recorded beside it rather than in a comment nobody can verify. */
+const ZA_TRANSFER_DUTY = fact('za.transfer.duty');
 
 function zaTransferDuty(price) {
   const v = Number(price) || 0;
@@ -149,21 +148,22 @@ function zaTransferDuty(price) {
    a rand lost to the same artefact the split modal and the owed totals each
    had to learn about separately. Multiplying by 115 before dividing keeps the
    half-cent exact, so the rounding is the decimal one a person would do. */
-const vatIncl = ex => (ex * 115) / 100;
-const ZA_INIT_CAP_EX_VAT = 5250;                   // mortgage agreements
+const VAT_PCT = Math.round(fact('za.vat.rate') * 100);   // 115
+const vatIncl = ex => (ex * VAT_PCT) / 100;
+const ZA_INIT_CAP_EX_VAT = fact('za.nca.init.mortgage.cap');
 const ZA_INIT_CAP = vatIncl(ZA_INIT_CAP_EX_VAT);   // R6 037.50
 
 /* Everything that is not a mortgage — "other credit agreements", and the same
    figures the gazette gives for credit facilities, unsecured and short-term
    credit: "R165 per credit agreement, plus 10% of the amount in excess of
    R1 000 … But never to exceed R1 050". Vehicle finance lives here. */
-const ZA_OTHER_INIT_BASE = 165;
-const ZA_OTHER_INIT_CAP_EX_VAT = 1050;
+const ZA_OTHER_INIT_BASE = fact('za.nca.init.other.base');
+const ZA_OTHER_INIT_CAP_EX_VAT = fact('za.nca.init.other.cap');
 
 function zaMortgageInitiationFee(loanAmount) {
   const a = Number(loanAmount) || 0;
   if (a <= 0) return 0;
-  const exVat = Math.min(1100 + Math.max(0, a - 10000) * 0.10, ZA_INIT_CAP_EX_VAT);
+  const exVat = Math.min(fact('za.nca.init.mortgage.base') + Math.max(0, a - 10000) * 0.10, ZA_INIT_CAP_EX_VAT);
   return Math.round(vatIncl(exVat));
 }
 
@@ -194,7 +194,7 @@ function zaVehicleInitiationFee(financeAmount) {
    the Act, is R60" — exclusive of VAT, so R69.00 at 15%. The figure here was
    R74.50, which matches no version of the regulation: it was R50 before 6 May
    2016 and R60 after. Stored VAT-inclusive because that is what is rendered. */
-const ZA_SERVICE_FEE = vatIncl(60);   // R69.00 exactly
+const ZA_SERVICE_FEE = vatIncl(fact('za.nca.servicefee'));   // R69.00 exactly
 
 /* Conveyancing and bond-registration cost anchors, INCLUDING VAT, the deeds
    office fee and typical disbursements. Interpolated between anchors and
@@ -238,7 +238,7 @@ const round50 = v => Math.round(v / 50) * 50;
 const LOAN_PROFILES = {
   za: {
     hasBuyingCosts: true,
-    defaultRate: 11,
+    defaultRate: fact('za.prime.rate'),
     /* Every figure in these three notes now names WHEN it was checked. A hedge
        with no date cannot be acted on: the reader has no way to tell whether it
        is six weeks or three years old, which is the state the old wording left

@@ -16,6 +16,8 @@
 
 /* Format an amount with a profile's own separators. figureChecks methods use
    method shorthand so `this` is the profile they were read off. */
+const { fact, limitsFor: zaLimitsForFact } = require('./facts');
+
 const fmtAmt = (p, v) => {
   const parts = Math.abs(v).toFixed(2).split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, p.thousands);
@@ -51,15 +53,11 @@ const sumCodes = (figures, ...codes) => (figures || [])
        it is deliberately NOT coded here. Year-keying it now makes that a
        one-line data edit once someone reads the figure rather than a code
        change. Verifying it is an open item. */
-const ZA_YEAR_LIMITS = [
-  { from: 2027, tfsa: 46000, cgt: 40000 },
-  { from: 2017, tfsa: 36000, cgt: 40000 },
-];
-const zaLimitsFor = (year) => {
-  const y = Number(year) || 0;
-  const row = ZA_YEAR_LIMITS.find(r => y >= r.from) || ZA_YEAR_LIMITS[ZA_YEAR_LIMITS.length - 1];
-  return { ...row, year: y || row.from };
-};
+/* Year-keyed limits live in src/facts.js — the reason they are keyed at all
+   is that figureChecks used to receive the tax year and never read it, so a
+   2027 page asserted a 2026 threshold and told a compliant saver they owed a
+   40% penalty on R10 000. */
+const zaLimitsFor = zaLimitsForFact;
 
 const ZA_INCOME_CODES = [
   '3601', '3605', '3606', '3610', '3615', '3616', '3617', '3699',
@@ -199,7 +197,7 @@ const PROFILES = {
 
       const localInterest = sumCodes(figures, '4201');
       if (localInterest > 0) {
-        const exempt = 23800;   // under 65; R34 500 from 65
+        const exempt = fact('za.interest.exemption.under65');   // over-65s get more; the message says so
         msgs.push(localInterest <= exempt
           ? { ok: true, text: `Local interest ${fmt(localInterest)} is under the ${fmt(exempt)} under-65 exemption — ${fmt(exempt - localInterest)} of headroom.` }
           : { ok: false, text: `Local interest ${fmt(localInterest)} exceeds the ${fmt(exempt)} under-65 exemption — ${fmt(localInterest - exempt)} is taxable.` });
@@ -229,7 +227,7 @@ const PROFILES = {
            "defaults to verify" disclaimer covers: the numbers going stale is one
            thing, a stated relationship being wrong is another. */
         const excess = gains - lim.cgt;
-        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(lim.cgt)} annual exclusion by ${fmt(excess)} — at the 40% inclusion rate for individuals, about ${fmt(excess * 0.4)} feeds into taxable income.` });
+        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(lim.cgt)} annual exclusion by ${fmt(excess)} — at the 40% inclusion rate for individuals, about ${fmt(excess * fact('za.cgt.inclusion.individual'))} feeds into taxable income.` });
       } else if (gains > 0) {
         msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(lim.cgt)} annual exclusion.` });
       }
