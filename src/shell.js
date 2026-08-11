@@ -51,6 +51,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
+    <button class="drawer-link" data-view="plan">
+      <span class="di"><span class="ico" data-ico="target|goal|crosshair"></span></span><span data-i18n="nav.plan">Plan</span>
+    </button>
 
     <div class="drawer-divider"></div>
 
@@ -270,6 +273,85 @@ const SHELL_HTML = `
             <div class="table-responsive"><table class="table" id="budTable"></table></div>
             <div class="bud-totals bud-totals-bottom" id="budTotalsBottom"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="view-plan" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title" data-i18n="nav.plan">Plan</h1>
+          <div class="sub-note">Money that arrives once, divided on purpose · saved to <code>Plans/&lt;name&gt;.md</code></div>
+        </div>
+
+        <div class="card hidden" id="planEmptyCard">
+          <div class="card-h" style="justify-content:center"><h2>No plan yet</h2></div>
+          <div class="body-pad">
+            <p>A plan is for money that arrives once — a payout, a refund, a bonus, next month's
+              salary surplus, something you sold — and answers one question: where does every rand
+              of it land.</p>
+            <p class="text-muted">Different from the Budget page, which sets a rate per period.
+              A plan is a fixed sum, divided into envelopes, spent down until there is none left.</p>
+            <p style="margin-top:1.4rem"><button class="btn-gradient" id="planStart" style="padding:0.55rem 1.5rem">Start a plan…</button></p>
+          </div>
+        </div>
+
+        <div id="planContent">
+          <div class="plan-strip mb-4">
+            <div class="plan-segs hidden" id="planPickerWrap" role="group" aria-label="Choose a plan">
+              <span id="planPicker"></span>
+            </div>
+            <div class="row ml-auto">
+              <button class="btn-ghost" id="planNew"><span class="ico" data-ico="plus"></span> New plan</button>
+              <button class="btn-gradient" id="planSave" disabled>Save plan</button>
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="pot" id="planPot"></div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-h" style="align-items:center">
+              <div>
+                <h2>Money in</h2>
+                <div class="sub">Anything that funds this plan — name it yourself, or pick a kind</div>
+              </div>
+              <div class="row">
+                <button class="btn-ghost" id="planAddSource"><span class="ico" data-ico="plus"></span> Add a source</button>
+              </div>
+            </div>
+            <div class="body-pad" id="planSources"></div>
+          </div>
+
+          <!-- Envelopes sit bare on the page background, not inside a .card:
+               each .env carries a border of its own, and every other mini-grid
+               in the app (Savings, Accounts, Debt, Owed, Assets, Services) does
+               the same rather than wrapping bordered tiles in a bordered card. -->
+          <div class="mb-4">
+            <!-- The button is a SIBLING of .section-h, not a child of the div
+                 that holds the heading. #planEnvSub is a .sub, and the rule
+                 ".section-h .sub:empty { display:none }" removes it whenever
+                 renderEnvelopes has nothing to say — so the gap below this
+                 header has to hang on .section-h, which is always rendered and
+                 already carries margin-bottom. Wrapping h2 and .sub in a plain
+                 div to make room for the button would have moved .sub's parent
+                 to a box that owns no margin, and the gap would vanish in
+                 exactly the state where the subtitle does.
+                 (No backticks anywhere in this file: SHELL_HTML is a template
+                 literal, so one in a comment ends the string.) -->
+            <div class="plan-env-head">
+              <div class="section-h">
+                <h2>Envelopes</h2>
+                <div class="sub" id="planEnvSub"></div>
+              </div>
+              <button class="btn-ghost" id="planAddEnvelope"><span class="ico" data-ico="plus"></span> New envelope</button>
+            </div>
+            <div class="mini-grid" id="planEnvelopes"></div>
+          </div>
+
+          <!-- The loud card. Rendered empty and hidden by renderFree when the
+               split balances, so a finished plan gets no shelf standing there
+               saying "R 0.00 left" — the same rule the Accounts deck follows. -->
+          <div class="plan-free hidden" id="planFree"></div>
         </div>
       </section>
 

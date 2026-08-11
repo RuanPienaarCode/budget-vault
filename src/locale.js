@@ -30,6 +30,37 @@ const sumCodes = (figures, ...codes) => (figures || [])
 /* SARS remuneration + fringe-benefit codes — what an IRP5 contributes to
    taxable income. Deliberately excludes investment codes (4201/4218/4250/…),
    which are exempt or separately assessed. */
+/* SARS thresholds that CHANGE BY TAX YEAR, newest first.
+
+   figureChecks has always received `year` and never read it, so every threshold
+   was frozen at whatever was true when it was typed and the page went on
+   asserting it for every year after. The tax-free investment annual limit rose
+   from R36 000 to R46 000 with effect from 1 March 2026 — the 2027 tax year —
+   which meant a 2027 page told a saver who had contributed R40 000, entirely
+   within the limit, that they owed a 40% penalty on R4 000.
+
+   `year` here is the SARS tax year (the one ending in February of that calendar
+   year), matching what views/tax.js passes in. An unrecognised or missing year
+   falls back to the oldest row rather than the newest, so a figure is never
+   asserted for a year this table has not been told about.
+
+   Verified against sars.gov.za on 10 August 2026:
+     - TFSA annual limit R36 000 through 2026, R46 000 from 2027.
+     - CGT annual exclusion R40 000. A rise to R50 000 from 2027 was reported
+       during the audit but could NOT be confirmed against a primary source, so
+       it is deliberately NOT coded here. Year-keying it now makes that a
+       one-line data edit once someone reads the figure rather than a code
+       change. Verifying it is an open item. */
+const ZA_YEAR_LIMITS = [
+  { from: 2027, tfsa: 46000, cgt: 40000 },
+  { from: 2017, tfsa: 36000, cgt: 40000 },
+];
+const zaLimitsFor = (year) => {
+  const y = Number(year) || 0;
+  const row = ZA_YEAR_LIMITS.find(r => y >= r.from) || ZA_YEAR_LIMITS[ZA_YEAR_LIMITS.length - 1];
+  return { ...row, year: y || row.from };
+};
+
 const ZA_INCOME_CODES = [
   '3601', '3605', '3606', '3610', '3615', '3616', '3617', '3699',
   '3701', '3702', '3707', '3713', '3718',
@@ -180,15 +211,16 @@ const PROFILES = {
         msgs.push({ ok: true, text: `Foreign interest ${fmt(foreignInterest)} gets no exemption — declare it separately from local interest.` });
       }
 
+      const lim = zaLimitsFor(year);
       const tfsa = sumCodes(figures, '4219');
-      if (tfsa > 36000) {
-        msgs.push({ ok: false, text: `TFSA contributions ${fmt(tfsa)} exceed the ${fmt(36000)} annual limit — 40% penalty on the ${fmt(tfsa - 36000)} excess.` });
+      if (tfsa > lim.tfsa) {
+        msgs.push({ ok: false, text: `TFSA contributions ${fmt(tfsa)} exceed the ${fmt(lim.tfsa)} annual limit for the ${lim.year} tax year — 40% penalty on the ${fmt(tfsa - lim.tfsa)} excess. Confirm the current limit on sars.gov.za.` });
       } else if (tfsa > 0) {
-        msgs.push({ ok: true, text: `TFSA ${fmt(tfsa)} of ${fmt(36000)} used — ${fmt(36000 - tfsa)} of headroom before the year closes.` });
+        msgs.push({ ok: true, text: `TFSA ${fmt(tfsa)} of the ${fmt(lim.tfsa)} limit for the ${lim.year} tax year used — ${fmt(lim.tfsa - tfsa)} of headroom before the year closes.` });
       }
 
       const gains = sumCodes(figures, '4250');
-      if (gains > 40000) {
+      if (gains > lim.cgt) {
         /* The EXCESS is not what reaches taxable income — an individual's
            inclusion rate is 40%, so R100 000 of gains puts R24 000 into taxable
            income, not R60 000. Stating the excess as though it were the taxable
@@ -196,10 +228,10 @@ const PROFILES = {
            thresholds either side of it that is not a figure the page's
            "defaults to verify" disclaimer covers: the numbers going stale is one
            thing, a stated relationship being wrong is another. */
-        const excess = gains - 40000;
-        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(40000)} annual exclusion by ${fmt(excess)} — at the 40% inclusion rate for individuals, about ${fmt(excess * 0.4)} feeds into taxable income.` });
+        const excess = gains - lim.cgt;
+        msgs.push({ ok: false, text: `Capital gains ${fmt(gains)} exceed the ${fmt(lim.cgt)} annual exclusion by ${fmt(excess)} — at the 40% inclusion rate for individuals, about ${fmt(excess * 0.4)} feeds into taxable income.` });
       } else if (gains > 0) {
-        msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(40000)} annual exclusion.` });
+        msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(lim.cgt)} annual exclusion.` });
       }
 
       return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES));

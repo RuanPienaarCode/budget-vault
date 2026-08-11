@@ -120,6 +120,45 @@ const THREE_WAY = [
   eq(p2.note, 'card ending 4471 · Split into 3', 'an existing note is kept, not overwritten');
 }
 
+/* ---- 2b. a row that already has a role cannot be split again ----
+
+   applySplit assigns the parent role unconditionally, so handing it a PART
+   turned that part into a parent — and the intermediate row stopped being a
+   part. Every reader that filters on isSplitPart (cardSpend, the service and
+   debt histories, and the importer's duplicate index) then counted it as a
+   line the bank had printed, so one R1 000 charge split 600/400 and then split
+   again at 350/250 was totalled as R1 600.
+
+   The split-brain is what makes it invisible: the supersededBySplit readers —
+   reconcile, savings flows, account totals — stay correct throughout, because
+   they key off `excluded` as well as the role. Half the app is right.
+
+   The reported case is splitting a part. The rule is wider and no harder:
+   a row that already carries EITHER role is already described by other rows in
+   the file, and splitting it again describes the same money a third time. */
+{
+  const part = { date: '2026-08-07', desc: 'CHECKERS HYPER', cat: 'Groceries',
+    amount: -600, excluded: false, note: '', split: SPLIT_PART };
+  const before = { ...part };
+  eq(applySplit(part, [{ amount: -350, cat: 'Groceries', note: '' },
+    { amount: -250, cat: 'Household', note: '' }], 'Split into 2'), null,
+  'splitting a part is refused');
+  eq(part, before, 'and the part is left exactly as it was — no role change, no exclusion, no note');
+  ok(isSplitPart(part), 'so every reader that skips parts still skips it');
+  ok(!supersededBySplit(part), 'and no reader mistakes it for a parent');
+
+  const parent = { date: '2026-08-07', desc: 'CHECKERS HYPER', cat: 'Groceries',
+    amount: -1000, excluded: true, note: 'Split into 3', split: SPLIT_PARENT };
+  const parentBefore = { ...parent };
+  eq(applySplit(parent, THREE_WAY, 'Split into 3'), null,
+    'and so is re-splitting a parent, which would describe the same money twice over');
+  eq(parent, parentBefore, 'the parent is untouched too');
+
+  // Negative control: the refusal must be about the ROLE and nothing else.
+  const plain = freshParent();
+  ok(applySplit(plain, THREE_WAY, 'Split into 3'), 'an ordinary row still splits');
+}
+
 /* ---- 3. reconcile: the split charge moves the balance ONCE ---- */
 // A cheque account confirmed at R5,000 on the 1st. One R1,000 grocery charge on
 // the 7th, split three ways. Whatever the split, the account reads R4,000.

@@ -388,11 +388,15 @@ module.exports = function registerAccounts(ctx) {
      transactions to reach the same answer. */
   function model() {
     const idx = accountIndex();
+    /* Separate from idx on purpose: idx only knows accounts that have a month
+       file, so an account with an empty folder is absent from it and would be
+       told to link the folder it already has. */
+    const folders = accountsWithFolder();
     return S.accounts.map(a => {
       const entry = idx.get(a);
       const rows = entry ? entry.rows : [];
       const labels = entry ? entry.labels : new Set();
-      const st = statusOf(a, rows);
+      const st = statusOf(a, rows, null, folders.has(a));
       const act = periodActivity(labels);
       return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a) }, st);
     });
@@ -549,7 +553,7 @@ module.exports = function registerAccounts(ctx) {
     if (r.state === 'stale') {
       return i18n.t('acct.deck.why.stale', { count: r.days, date: r.a.balance_updated });
     }
-    return i18n.t(r.state === 'nodate' ? 'acct.deck.why.nodate' : 'acct.deck.why.notx');
+    return i18n.t(`acct.deck.why.${r.state}`);
   }
 
   /* The ONE action a reader would take without looking. Everything else is
@@ -565,7 +569,14 @@ module.exports = function registerAccounts(ctx) {
       return { label: i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'),
         run: () => editBalance(r.a) };
     }
-    return { label: i18n.t('acct.deck.do.notx'), run: () => editAccount(r.a) };
+    /* A linked-but-empty folder needs a statement, not a second folder — so it
+       goes to Import, where the reader picks a file. The account cannot be
+       preselected on the way in: Import's account <select> is only built once a
+       statement has been parsed, so there is nothing to select yet. */
+    if (r.state === 'notx') {
+      return { label: i18n.t('acct.deck.do.notx'), run: () => ctx.switchView('import') };
+    }
+    return { label: i18n.t('acct.deck.do.nofolder'), run: () => editAccount(r.a) };
   }
 
   function renderDeck(rows) {
@@ -923,10 +934,11 @@ module.exports = function registerAccounts(ctx) {
       return line;
     }
     const txt = r.state === 'notx' ? i18n.t('acct.drawer.recon.notx')
-      : r.state === 'nodate' ? i18n.t('acct.drawer.recon.nodate')
-        : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
-          : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
-            : i18n.t('acct.drawer.recon.ok');
+      : r.state === 'nofolder' ? i18n.t('acct.drawer.recon.nofolder')
+        : r.state === 'nodate' ? i18n.t('acct.drawer.recon.nodate')
+          : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
+            : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
+              : i18n.t('acct.drawer.recon.ok');
     line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` }, txt));
     if (r.state === 'stale' || r.state === 'nodate') {
       const btn = el('button', { type: 'button', class: 'acct-recon-btn' },

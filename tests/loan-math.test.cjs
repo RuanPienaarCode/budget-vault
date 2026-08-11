@@ -38,11 +38,22 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   const p = L.loanProfileFor('za');
   eq(p.bondCost(loan), 23550, 'bond registration estimate on a R1 350 000 bond');
   eq(p.transferCost(price), 23000, 'transfer cost estimate on a R1 500 000 purchase');
-  eq(p.mortgageInitiationFee(loan), 6563, 'NCA initiation fee, capped at R5 707 + VAT');
+  /* Regulation 42(2) Table B, mortgage agreements: "R1 100 per credit agreement,
+     plus 10 % of the amount in excess of R10 000 … But never to exceed R5 250".
+     R5 250 × 1.15 = R6 037.50. This pinned 6563 against a cap of R5 707, a
+     figure that appears in no version of the regulation. */
+  eq(p.mortgageInitiationFee(loan), 6038, 'NCA initiation fee, capped at R5 250 + VAT');
+  // R30 000 is small enough to stay under the cap: 1 100 + 10% of the 20 000
+  // above R10 000 = R3 100, + VAT = R3 565. From R51 500 up the cap governs.
+  eq(p.mortgageInitiationFee(30000), 3565,
+    'and below the cap it is the published formula from R1 100, not R1 207');
 
   const onceOff = duty + p.bondCost(loan) + p.transferCost(price) + p.mortgageInitiationFee(loan);
-  eq(onceOff, 61813, 'total once-off buying costs');
-  eq(deposit + onceOff, 211813, 'cash needed upfront');
+  // 61813 before the initiation-fee correction; the R525 delta is that fee alone
+  // (R6 563 → R6 038), duty and the two conveyancing anchors are unchanged here
+  // because a R1.5m purchase sits well below the brackets that were wrong.
+  eq(onceOff, 61288, 'total once-off buying costs');
+  eq(deposit + onceOff, 211288, 'cash needed upfront');
 
   // The schedule has to reconcile with the headline instalment, not drift off it.
   const rows = L.amortise(loan, 11, 240, t.payment);
@@ -69,18 +80,31 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(t.totalInterest, 95940, 'total interest');
 
   const p = L.loanProfileFor('za');
-  /* INCLUDING VAT (1% of R315 000 = R3 150, grossed up at 15%), like the
-     mortgage initiation fee and like what the lender actually debits. This was
-     3150 while the function capped an ex-VAT 1% against a VAT-inclusive cap and
-     returned it raw — two bases in one expression, and the same amount read
-     R2 000 here against R6 563 on the mortgage path. */
-  eq(p.vehicleInitiationFee(finance), 3622, 'vehicle initiation fee, VAT included');
-  eq(p.vehicleInitiationFee(10000000), Math.round(5707 * 1.15),
-    'and it caps at the same NCA maximum the mortgage fee does');
-  eq(p.serviceFee * 60, 4470, 'service fees over the term');
+  /* Vehicle finance is an "OTHER CREDIT AGREEMENT" under Regulation 42(2)
+     Table B, not a mortgage: R165 plus 10% above R1 000, capped at R1 050 ex
+     VAT. Any car worth financing is past the cap, so the answer is the cap —
+     R1 050 × 1.15 = R1 207.50.
+
+     This asserted 3622 while the function charged 1% of the financed amount
+     against the R5 707 MORTGAGE cap: more than five times the statutory
+     maximum, under a note telling the reader the fees follow the NCA caps.
+     Both the 1% convention and the borrowed cap are gone; the regulation
+     publishes a formula, so the app uses the formula. */
+  eq(p.vehicleInitiationFee(finance), 1208, 'vehicle initiation fee — the "other credit agreement" cap, VAT included');
+  /* The "other credit agreement" cap binds from R9 850 up (165 + 10% of the
+     8 850 above R1 000 = 1 050), so every vehicle loan a person would actually
+     take pays exactly the cap. Below it the published formula governs: R5 000
+     gives 165 + 400 = R565, + VAT = R649.75. */
+  eq(p.vehicleInitiationFee(5000), 650,
+    'below the cap it is the published formula, not a percentage of the loan');
+  eq(p.vehicleInitiationFee(10000000), Math.round(1050 * 1.15),
+    'and it caps at R1 050 + VAT, NOT at the mortgage cap');
+  // Regulation 44: R60 ex VAT = R69.00. Was R74.50, which matches no version of
+  // the regulation — it was R50 before 6 May 2016 and R60 after.
+  eq(Math.round(p.serviceFee * 60), 4140, 'service fees over the term');
 
   // Total cost of ownership INCLUDES the deposit — it is money spent on the car.
-  eq(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60, 454032,
+  eq(Math.round(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60), 451288,
     'total cost of ownership');
 }
 
@@ -112,9 +136,41 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(L.zaTransferDuty(1210000), 0, 'nothing is due at the top of the nil band');
   near(L.zaTransferDuty(1663800), 13614, 0.01, 'bracket 2 ends on its published base');
   near(L.zaTransferDuty(2329300), 53544, 0.01, 'bracket 3 ends on its published base');
-  near(L.zaTransferDuty(3149000), 119120, 0.01, 'bracket 4 ends on its published base');
-  near(L.zaTransferDuty(12100500), 1103783, 3, 'bracket 5 ends on its published base');
-  ok(L.zaTransferDuty(20000000) > L.zaTransferDuty(12100500), 'the top bracket keeps rising');
+  near(L.zaTransferDuty(2994800), 106784, 0.01, 'bracket 4 ends on its published base');
+  near(L.zaTransferDuty(13310000), 1241456, 0.01, 'bracket 5 ends on its published base');
+  ok(L.zaTransferDuty(20000000) > L.zaTransferDuty(13310000), 'the top bracket keeps rising');
+
+  /* Worked cases from the published table, so a future edit has to move a figure
+     a reader can check against SARS rather than only an internal boundary. */
+  near(L.zaTransferDuty(5000000), 327356, 0.01, 'R5m: 106 784 + 11% of the 2 005 200 above 2 994 800');
+  near(L.zaTransferDuty(3149000), 123746, 0.01, 'R3 149 000 sits inside the 11% band, not at the top of the 8% one');
+  near(L.zaTransferDuty(20000000), 2111156, 0.01, 'R20m: 1 241 456 + 13% of the 6 690 000 above 13 310 000');
+
+  /* THE GUARD THAT WOULD HAVE CAUGHT THE FABRICATION.
+
+     A real SARS table is exactly self-consistent: each bracket's published base
+     IS the duty at its own lower bound, so compounding the band below reproduces
+     it to the cent. The table this file shipped until now was not — chaining the
+     11% band to its stated top gave R1 103 785 against a stated base of
+     R1 103 783, and that two-rand gap was explained away in a comment as a SARS
+     rounding quirk, then papered over with a Math.min clamp and defended by a
+     per-rand seam sweep. It was not a quirk. It was the arithmetic of a table
+     nobody published, and the brackets either side matched no SARS year.
+
+     Asserting the invariant rather than the numbers is what makes this
+     structural: a base that does not equal the compounded value below it is a
+     base nobody published, whatever provenance is claimed for it. */
+  // [lower bound, published base at that bound, marginal rate above it]
+  const BANDS = [
+    [1210000, 0, 0.03], [1663800, 13614, 0.06], [2329300, 53544, 0.08],
+    [2994800, 106784, 0.11], [13310000, 1241456, 0.13],
+  ];
+  for (let i = 1; i < BANDS.length; i++) {
+    const [from, base, rate] = BANDS[i - 1];
+    const [nextFrom, nextBase] = BANDS[i];
+    near(base + (nextFrom - from) * rate, nextBase, 0.005,
+      `the base at R${nextFrom} must equal the duty compounded from R${from} — exactly, not to within a few rand`);
+  }
 
   // Monotonic across the whole table — a mis-keyed base would show up as a
   // purchase price where paying MORE for the house costs LESS in duty.
@@ -126,24 +182,14 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   }
   checks++;
 
-  /* Again at every SEAM, one rand at a time. The R25 000 stride above steps
-     from R12 100 000 straight to R12 125 000 and jumps clean over the only
-     place the table actually dipped: compounding the 11% band to the top of
-     bracket 5 gives R1 103 785, while SARS publishes R1 103 783 as bracket 6's
-     base — so duty fell by two rand as the price rose by one. Real, invisible
-     to a coarse sweep, and indefensible in a figure the file calls exact
-     arithmetic on the published table. */
-  for (const seam of [1210000, 1663800, 2329300, 3149000, 12100500]) {
-    let p2 = -1;
-    for (let v = seam - 3; v <= seam + 3; v++) {
-      const d = L.zaTransferDuty(v);
-      assert.ok(d >= p2, `transfer duty dipped crossing the seam at R${seam} (at R${v})`);
-      p2 = d;
-    }
-    checks++;
-  }
-  near(L.zaTransferDuty(12100500), 1103783, 0.01,
-    'and the top seam lands exactly on the published base, not two rand above it');
+  /* A per-rand sweep across every seam used to sit here, hunting a two-rand dip
+     that the coarse stride above steps over. It is deliberately GONE, along with
+     the Math.min clamp in loan-math.js that it was written to prove correct.
+     Both existed only because the table was fabricated: the real one compounds
+     exactly (asserted above), so there is no discontinuity left to clamp and
+     nothing for a seam sweep to find. Left in place they would read as evidence
+     that the dip is a real property of SARS's table and invite the next reader
+     to reconstruct the wrong figures from them. */
 }
 
 /* ---- countries without a cost profile still get the calculator ---- */

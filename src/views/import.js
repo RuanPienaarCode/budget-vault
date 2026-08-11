@@ -14,7 +14,7 @@
 
 const { el } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, counterpartyAccount } = require('../statement');
+const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties } = require('../statement');
 const { prepareRules, autoCategorise } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
@@ -129,18 +129,11 @@ module.exports = function registerImport(ctx) {
       if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
       const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
       if (date && desc && amount != null && amount !== 0) {
-        /* Moving your own money between your own accounts is not income and
-           not spend, so a recognised counterparty arrives pre-excluded rather
-           than counted. Pre-EXCLUDED, not pre-categorised: there is no transfer
-           category in this app's vocabulary, and "vetoed from income and spend
-           totals" is exactly what an excluded transaction means.
-
-           A suggestion, never a decision — the review screen's exclude tick is
-           live on this row like any other, and `transferTo` is carried only so
-           the reader can see WHY it arrived ticked. */
-        const other = counterpartyAccount(desc, S.accounts, label0);
+        /* excluded/transferTo are filled in by applyCounterparties below, once
+           for the whole file, because the account this statement is believed to
+           belong to is not settled yet — see the note on that function. */
         items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules),
-          include: true, excluded: !!other, transferTo: other ? (other.tx_label || other.name) : '' });
+          include: true, excluded: false, transferTo: '' });
       } else if (date || amount != null) {
         // Looked like a transaction and wasn't usable — worth reporting.
         skipped++;
@@ -154,6 +147,15 @@ module.exports = function registerImport(ctx) {
       }
     }
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
+    /* Moving your own money between your own accounts is not income and not
+       spend, so a recognised counterparty arrives pre-excluded rather than
+       counted. Pre-EXCLUDED, not pre-categorised: there is no transfer category
+       in this app's vocabulary, and "vetoed from income and spend totals" is
+       exactly what an excluded transaction means. A suggestion, never a
+       decision — the review's exclude tick is live on this row like any other,
+       and `transferTo` is carried only so the reader can see WHY it arrived
+       ticked. renderImportReview runs this again whenever the account changes. */
+    applyCounterparties(items, S.accounts, label0);
     /* Prove the sign convention against the statement's own balance column.
        This is what lets a bank nobody has tested import safely: if its single
        Amount column lists debits as positive, the balances say so and every
@@ -162,7 +164,16 @@ module.exports = function registerImport(ctx) {
        there means something else is off and is reported, not "fixed".
        A file that doesn't prove itself is imported UNCHANGED and flagged in the
        review; silent correction on a guess is the one outcome to avoid. */
-    const rec = iBalance !== -1 ? reconcileAmounts(ledger) : null;
+    /* A credit card's balance column is the amount OWING and rises when you
+       spend, so the relation the ledger has to satisfy is the opposite of an
+       asset account's. The numbers reconcile either way — only the account can
+       say which reading is right. An account the importer could not identify
+       keeps the asset reading rather than guessing at a sign, which is the one
+       thing this whole block exists to avoid. */
+    const acct0 = label0 ? accountForLabel(label0) : null;
+    const rec = iBalance !== -1
+      ? reconcileAmounts(ledger, { liability: !!acct0 && acct0.type === 'credit_card' })
+      : null;
     const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
     if (flipped) for (const it of items) it.amount = -it.amount;
     /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
@@ -335,6 +346,12 @@ module.exports = function registerImport(ctx) {
     for (const l of labels) accSel.append(el('option', { value: l, ...(l === p.label ? { selected: '' } : {}) }, l));
     if (!p.label && labels.length) p.label = accSel.value;
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
+    /* The account is only settled HERE — by the user's pick, by an account made
+       on the spot, or by the default above when detection came back empty. The
+       self-transfer suggestion is a function of that account, so it is
+       recomputed every render rather than left as parse-time guesswork; rows
+       the reader has decided on carry manualExclude and are skipped. */
+    applyCounterparties(p.items, S.accounts, p.label);
 
     /* The statement is already parsed and on screen by the time anyone notices
        it belongs to an account this vault has never had — and on a fresh vault
@@ -443,7 +460,11 @@ module.exports = function registerImport(ctx) {
         // `checked` reflects the model: after a partial-failure re-render the
         // ticks used to vanish while the rows stayed excluded.
         el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
-          ...(it.excluded ? { checked: '' } : {}), onchange: e => it.excluded = e.target.checked }))));
+          // manualExclude is the same sticky bit as nearAuto above: once the
+          // reader has ticked either way, switching account must not silently
+          // undo it on the next render.
+          ...(it.excluded ? { checked: '' } : {}),
+          onchange: e => { it.excluded = e.target.checked; it.manualExclude = true; } }))));
     }
     if (p.items.length > visible.length) {
       const rest = p.items.length - visible.length;

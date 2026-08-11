@@ -91,18 +91,28 @@ function totalsFor(principal, annualRatePct, months, balloon = 0) {
 
 /* ------------------------- South African costs -------------------------- */
 
-/* SARS transfer duty, 2025/26 table (effective 1 April 2025). Each row is
-   [from, to, base duty at `from`, marginal rate above `from`]. The base column
-   is SARS's own published figure, not a recomputation — the top bracket's
-   1 103 783 differs by R2 from what compounding the lower brackets gives, and
-   the published number is the one that matters. */
+/* SARS transfer duty, effective 1 April 2025 (unchanged for 1 April 2026).
+   Each row is [from, to, base duty at `from`, marginal rate above `from`].
+
+   Verified against sars.gov.za/tax-rates/transfer-duty/ on 10 August 2026.
+
+   The four figures above R2 329 300 used to be different, and wrong: bracket
+   boundaries of R3 149 000 and R12 100 500 with bases of R119 120 and
+   R1 103 783, which appear in no SARS table from any year. They were assembled
+   rather than copied, and the tell was arithmetic — chaining the 11% band gave
+   R1 103 785 against a stated base of R1 103 783. That two-rand gap was written
+   off as a SARS rounding quirk, hidden behind a Math.min clamp, and defended by
+   a per-rand seam sweep in the test file. All three are gone: the published
+   table compounds EXACTLY, which tests/loan-math.test.cjs now asserts as an
+   invariant rather than pinning the numbers. On a R5m house the old table
+   understated duty by R4 626, under a UI note calling it exact arithmetic. */
 const ZA_TRANSFER_DUTY = [
   [0, 1210000, 0, 0],
   [1210000, 1663800, 0, 0.03],
   [1663800, 2329300, 13614, 0.06],
-  [2329300, 3149000, 53544, 0.08],
-  [3149000, 12100500, 119120, 0.11],
-  [12100500, Infinity, 1103783, 0.13],
+  [2329300, 2994800, 53544, 0.08],
+  [2994800, 13310000, 106784, 0.11],
+  [13310000, Infinity, 1241456, 0.13],
 ];
 
 function zaTransferDuty(price) {
@@ -111,56 +121,80 @@ function zaTransferDuty(price) {
   for (let i = 0; i < ZA_TRANSFER_DUTY.length; i++) {
     const [from, to, base, rate] = ZA_TRANSFER_DUTY[i];
     if (v > to) continue;
-    const duty = base + (v - from) * rate;
-    /* Never more than the next bracket's own published starting figure.
-
-       The R2 the comment above describes is not only a rounding curiosity: it
-       makes the raw table non-monotonic at the seam. Compounding the 11% band up
-       to R12 100 500 gives R1 103 785, while SARS publishes R1 103 783 as the
-       13% band's base — so duty FELL by two rand as the price rose by one, which
-       reads as a bug to anyone who finds it and is indefensible in a figure
-       labelled "exact arithmetic on the published table". Clamping to the next
-       base keeps the published numbers authoritative and the curve rising. */
-    const next = ZA_TRANSFER_DUTY[i + 1];
-    return next ? Math.min(duty, next[2]) : duty;
+    /* No clamp. There used to be a Math.min against the next bracket's base,
+       holding down a two-rand dip that only the fabricated table produced. The
+       published table compounds exactly, so the curve rises on its own and a
+       clamp could now only ever mask the next data-entry error. */
+    return base + (v - from) * rate;
   }
   return 0;
 }
 
-/* National Credit Act initiation-fee cap for a mortgage agreement:
-   R1 207 + 10% of the amount above R10 000, capped at R5 707 excluding VAT.
-   VAT is added because that is what the lender actually debits. */
-const ZA_VAT = 1.15;
-const ZA_INIT_CAP_EX_VAT = 5707;
-const ZA_INIT_CAP = ZA_INIT_CAP_EX_VAT * ZA_VAT;   // R6 563.05
+/* National Credit Act initiation fees, Regulation 42(2) Table B.
+
+   Source: Government Gazette No. 39379, Government Notice 1080 of 6 November
+   2015, in force 6 May 2016. Read from the gazette on 10 August 2026; no later
+   amendment found. Verbatim, for mortgages:
+
+     "(a) R1 100 per credit agreement, plus 10 % of the amount in excess of
+      R10 000   (b) But never to exceed R5 250"
+
+   The figures here were R1 207 and R5 707 until that read. Neither appears in
+   the gazette, in the original 2006 regulations (R1 000 / R5 000), or anywhere
+   else — the same assembled-not-copied shape as the transfer-duty table above,
+   and asserted to the reader as a statutory maximum. VAT is added because that
+   is what the lender actually debits; the caps themselves are ex VAT. */
+/* Integer cents first. `5250 * 1.15` is 6037.4999999999995 in binary floating
+   point, so rounding it gives R6 037 for a fee that is exactly R6 037.50 —
+   a rand lost to the same artefact the split modal and the owed totals each
+   had to learn about separately. Multiplying by 115 before dividing keeps the
+   half-cent exact, so the rounding is the decimal one a person would do. */
+const vatIncl = ex => (ex * 115) / 100;
+const ZA_INIT_CAP_EX_VAT = 5250;                   // mortgage agreements
+const ZA_INIT_CAP = vatIncl(ZA_INIT_CAP_EX_VAT);   // R6 037.50
+
+/* Everything that is not a mortgage — "other credit agreements", and the same
+   figures the gazette gives for credit facilities, unsecured and short-term
+   credit: "R165 per credit agreement, plus 10% of the amount in excess of
+   R1 000 … But never to exceed R1 050". Vehicle finance lives here. */
+const ZA_OTHER_INIT_BASE = 165;
+const ZA_OTHER_INIT_CAP_EX_VAT = 1050;
 
 function zaMortgageInitiationFee(loanAmount) {
   const a = Number(loanAmount) || 0;
   if (a <= 0) return 0;
-  const exVat = Math.min(1207 + Math.max(0, a - 10000) * 0.10, ZA_INIT_CAP_EX_VAT);
-  return Math.round(exVat * ZA_VAT);
+  const exVat = Math.min(1100 + Math.max(0, a - 10000) * 0.10, ZA_INIT_CAP_EX_VAT);
+  return Math.round(vatIncl(exVat));
 }
 
-/* Vehicle finance is quoted differently: lenders price the initiation fee off
-   the financed amount and stop at the same statutory cap. This is the ONE
-   number in this file that is a market convention rather than a published
-   formula — a real lender's quote is the thing to trust. */
+/* Vehicle finance is an "other credit agreement", NOT a mortgage.
+
+   This charged 1% of the financed amount against the MORTGAGE cap, so it
+   returned up to R6 563 where the gazette allows R1 207.50 including VAT — on a
+   R315 000 car, R3 622 against a statutory maximum of R1 207.50, more than five
+   times over, under a note asserting the figures follow the NCA maximums. The
+   1%-of-finance convention went with it: the regulation gives a formula, and a
+   market convention has no business standing in for one that is published. */
 function zaVehicleInitiationFee(financeAmount) {
   const a = Number(financeAmount) || 0;
   if (a <= 0) return 0;
-  /* Capped EX VAT and grossed up afterwards, exactly like the mortgage fee
-     above. Comparing the ex-VAT 1% against the VAT-INCLUSIVE cap and returning
-     it raw mixed two bases in one expression: every sub-cap amount came back
-     without VAT while the cap itself carried it, so the same R200 000 read as
-     R2 000 here and R6 563 on the mortgage path. The 1% rate is still market
-     convention rather than a published formula (see above) — the VAT treatment
-     is not, and the two fees must at least agree about what they include. */
-  const exVat = Math.min(a * 0.01, ZA_INIT_CAP_EX_VAT);
-  return Math.round(exVat * ZA_VAT);
+  /* Capped EX VAT and grossed up afterwards, like the mortgage fee above.
+     Comparing an ex-VAT amount against a VAT-INCLUSIVE cap mixed two bases in
+     one expression once before; the two fees must agree about what they
+     include. */
+  const exVat = Math.min(
+    ZA_OTHER_INIT_BASE + Math.max(0, a - 1000) * 0.10,
+    ZA_OTHER_INIT_CAP_EX_VAT,
+  );
+  return Math.round(vatIncl(exVat));
 }
 
-/* NCA monthly service-fee cap. */
-const ZA_SERVICE_FEE = 74.5;
+/* NCA monthly service-fee cap, Regulation 44, same gazette as above:
+   "The maximum monthly service fee, prescribed in terms of section 105 (1) of
+   the Act, is R60" — exclusive of VAT, so R69.00 at 15%. The figure here was
+   R74.50, which matches no version of the regulation: it was R50 before 6 May
+   2016 and R60 after. Stored VAT-inclusive because that is what is rendered. */
+const ZA_SERVICE_FEE = vatIncl(60);   // R69.00 exactly
 
 /* Conveyancing and bond-registration cost anchors, INCLUDING VAT, the deeds
    office fee and typical disbursements. Interpolated between anchors and
@@ -205,9 +239,14 @@ const LOAN_PROFILES = {
   za: {
     hasBuyingCosts: true,
     defaultRate: 11,
-    rateNote: 'South Africa\'s prime rate was 11.00% (repo + 3.50%) when this default was set — confirm the current rate and what your bank actually offered you.',
-    costsNote: 'Estimates only. Transfer duty is exact arithmetic on the SARS 2025/26 table (effective 1 April 2025); bond registration and transfer costs are interpolated from the guideline conveyancing tariff and will differ from your attorney\'s quote. Fees follow the National Credit Act caps (initiation R5 707 + VAT, monthly service fee R74.50).',
-    feesNote: 'Fees follow the National Credit Act maximums — initiation capped at R5 707 + VAT (R6 563), monthly service fee R74.50. Lenders set their own within those caps, so use your quote when you have one.',
+    /* Every figure in these three notes now names WHEN it was checked. A hedge
+       with no date cannot be acted on: the reader has no way to tell whether it
+       is six weeks or three years old, which is the state the old wording left
+       them in while quoting a prime rate that had moved and two fee caps that
+       had never been read from the regulation at all. */
+    rateNote: 'This calculator defaults to 11.00%. South Africa\'s prime rate has moved since — confirm today\'s rate and what your bank actually offered you before relying on any figure here.',
+    costsNote: 'Estimates only. Transfer duty is arithmetic on the SARS table effective 1 April 2025, checked against sars.gov.za in August 2026; bond registration and transfer costs are interpolated from the guideline conveyancing tariff, which this app has never verified, and will differ from your attorney\'s quote. Lender fees are modelled on the National Credit Act caps as read from Government Gazette 39379 (initiation R5 250 + VAT, monthly service fee R60 + VAT).',
+    feesNote: 'Lender fees are modelled on the National Credit Act caps in Government Gazette 39379 of 6 November 2015 — a mortgage initiation fee of R1 100 plus 10% above R10 000, capped at R5 250 + VAT (R6 038); other credit agreements, including vehicle finance, R165 plus 10% above R1 000, capped at R1 050 + VAT (R1 208); monthly service fee R60 + VAT (R69). Lenders set their own within those caps, so ask for the actual fees on your quote.',
     serviceFee: ZA_SERVICE_FEE,
     transferDuty: zaTransferDuty,
     transferCost: price => round50(interpolate(ZA_TRANSFER_COST, price)),

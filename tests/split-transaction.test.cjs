@@ -118,6 +118,75 @@ for (const [a, b, why] of [
   eq(m.result.length, 3, 'three parts must survive');
   eq(m.result.reduce((s, p) => s + p.amount, 0), -1240.85, 'three parts must sum to the original');
 }
+
+/* ---- 4b. the gate must weigh the values it is about to WRITE ----
+
+   Section 4 above claims both halves of the cent rule: a legitimate split is
+   never rejected by a 1e-15 remainder, and an illegitimate one is never
+   accepted by the same slack. Only the first half held.
+
+   remainder() rounded the SUM of the raw magnitudes while submit() rounded
+   each part on its way out, so anything typed below a cent was measured one way
+   and written another. The amount field is free text with inputmode decimal and
+   no step, so three thirds of a hundred rand is a thing a person types: 33.333
+   each sums to 99.999, rounds to 100.00, and the modal reports balanced — then
+   writes 33.33 three times and the parent loses a cent.
+
+   That cent does not go anywhere visible. tx-role.js takes the modal at its
+   word — "already summing to it exactly; this does no arithmetic and
+   deliberately re-checks none, because the modal is the gate" — and the parent
+   comes out excluded, so the difference simply leaves the budget. The fix
+   belongs here, in the gate, and not as a second rule downstream. */
+{
+  const m = modal(-100);
+  m.parts[0].mag = 33.333; m.parts[1].mag = 33.333;
+  m.parts.push({ mag: 33.334, cat: '', note: '' });
+  ok(m.remainder() !== 0,
+    'three sub-cent thirds do not balance a hundred rand, whatever their raw sum rounds to');
+  m.submit();
+  eq(m.result, null, 'and the split is refused rather than writing 99.99');
+}
+{
+  // The same shape where the loss is a third of the charge rather than a cent.
+  const m = modal(-0.03);
+  m.parts[0].mag = 0.015; m.parts[1].mag = 0.015;
+  ok(m.remainder() !== 0, 'two half-cents do not balance three cents');
+  m.submit();
+  eq(m.result, null, 'and are refused rather than writing 0.02');
+}
+{
+  // A part that rounds away entirely is not a part. The balance is fine here —
+  // it is the positivity check that has to see the written value, not the typed
+  // one, or the file gains a 0.00 row under its own category.
+  const m = modal(-100);
+  m.parts[0].mag = 99.996; m.parts[1].mag = 0.004;
+  m.submit();
+  eq(m.result, null, 'a part that rounds to zero is not an amount');
+}
+/* The invariant the three cases above are instances of, stated once: whatever
+   the modal accepts, the rows it hands back sum to the parent EXACTLY. */
+for (const [label, mags] of [
+  ['cent-exact halves', [50, 50]],
+  ['uneven thirds', [33.34, 33.33, 33.33]],
+  ['a rounding-prone tenth', [0.1, 0.2]],
+  ['sub-cent thirds', [33.333, 33.333, 33.334]],
+  ['half-cents', [0.015, 0.015]],
+]) {
+  const total = label === 'a rounding-prone tenth' ? -0.30
+    : label === 'half-cents' ? -0.03 : -100;
+  const m = modal(total);
+  m.parts = mags.map((mag, i) => ({ mag, cat: i ? '' : 'Groceries', note: '' }));
+  m.submit();
+  if (m.result) {
+    // In cents, not raw floats: -0.1 + -0.2 is -0.30000000000000004, which is
+    // the same binary artefact this module rounds to avoid. Summing the written
+    // parts as floats would fail a split that is exactly right.
+    eq(Math.round(m.result.reduce((s, p) => s + p.amount, 0) * 100), Math.round(total * 100),
+      `accepted (${label}) — the parts written must sum to the parent`);
+  } else {
+    ok(true, `refused (${label}) — nothing is written, so nothing can drift`);
+  }
+}
 {
   const m = modal(-100);
   m.parts[0].mag = 33.33; m.parts[1].mag = 33.33;

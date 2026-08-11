@@ -122,6 +122,42 @@ ok(overInterest.some(m => !m.ok && /taxable/.test(m.text)), 'interest over the e
 const overCgt = za.figureChecks([{ code: '4250', description: '', source: '', amount: 50000 }], 2026, filed);
 ok(overCgt.some(m => !m.ok), 'gains over the annual exclusion warn');
 
+/* ---- 4a. the thresholds follow the TAX YEAR ----------------------------
+
+   figureChecks has always taken `year` and never read it, so every threshold
+   was frozen at whatever was true when it was typed. SARS raised the tax-free
+   investment annual contribution limit from R36 000 to R46 000 with effect from
+   1 March 2026 — the 2027 tax year — so from that date the page told a saver who
+   had contributed R40 000, entirely within the limit, that they faced a 40%
+   penalty on R4 000, while the header two cards above read "Tax year 2027".
+
+   The assertion is deliberately that the two years DISAGREE rather than that
+   either equals a particular number: pinning a value is what let the stale one
+   sit here being defended as correct. A test cannot know the current limit; it
+   can know the argument is wired. */
+{
+  const forty = [{ code: '4219', description: '', source: '', amount: 40000 }];
+  const in2026 = textOf(za.figureChecks(forty, 2026, filed));
+  const in2027 = textOf(za.figureChecks(forty, 2027, filed));
+  ok(in2026 !== in2027, 'the same contribution must not read identically in two different tax years');
+  ok(/40%/.test(in2026), 'R40 000 is over the 2026 limit and still warns');
+  ok(!/40%/.test(in2027), 'and is under the 2027 limit, so it must NOT assert a penalty');
+  ok(/2027/.test(in2027), 'the message names the tax year whose limit it used');
+
+  // The limit still bites when genuinely exceeded, in whichever year.
+  const fifty = [{ code: '4219', description: '', source: '', amount: 50000 }];
+  ok(/40%/.test(textOf(za.figureChecks(fifty, 2027, filed))),
+    'R50 000 is over even the 2027 limit and warns');
+
+  // Same shape for the capital-gains annual exclusion. Its 2027 value is NOT
+  // changed here — red team 1 could not reach a primary source for the reported
+  // rise to R50 000, and this audit does not code a figure it has not read.
+  // Year-keying it now means that correction is a one-line data edit later.
+  ok(/40 000,00 annual exclusion/.test(
+    textOf(za.figureChecks([{ code: '4250', description: '', source: '', amount: 60000 }], 2026, filed))),
+  'the CGT exclusion is stated for the year it was checked against');
+}
+
 /* ---- 4b. assessed-vs-declared reconciliation --------------------------- */
 // Not assessed yet → the reconciliation stays quiet.
 ok(!/[Aa]ssessed taxable income/.test(textOf(za.figureChecks(original, 2026, filed))),

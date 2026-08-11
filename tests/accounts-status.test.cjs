@@ -58,14 +58,35 @@ const row = (date, amount) => ({ date, amount, label: 'A' });
   /* Stale by 94 days AND no rows. The staleness is true and useless: there is
      nothing that could have confirmed it. */
   const s = statusOf(acct({ balance_updated: '2026-05-08' }), [], TODAY);
-  eq(s.state, 'notx', 'no rows wins over staleness');
+  eq(s.state, 'nofolder', 'no rows wins over staleness');
 
   /* No rows AND no date. Same answer — still nothing to check against. */
-  eq(statusOf(acct({ balance_updated: '' }), [], TODAY).state, 'notx',
+  eq(statusOf(acct({ balance_updated: '' }), [], TODAY).state, 'nofolder',
     'no rows wins over a missing date too');
 
   /* And it is genuinely in the queue, not quietly dropped for lack of data. */
   ok(wantsALook(s), 'an account nothing imports into still asks for a look');
+}
+
+/* ---- 1b. a linked folder that is still empty is NOT an unlinked one ---- */
+{
+  /* Identical zero rows, opposite answers. The difference is knowledge the row
+     list cannot carry — a folder exists — and it decides what the reader is
+     told to do. Collapsed, every one of these got "Link a folder", which sends
+     someone who already has one to link it twice. */
+  const linked = statusOf(acct({ balance_updated: '2026-05-08' }), [], TODAY, true);
+  eq(linked.state, 'notx', 'an empty but linked folder wants an import, not a link');
+
+  const unlinked = statusOf(acct({ balance_updated: '2026-05-08' }), [], TODAY, false);
+  eq(unlinked.state, 'nofolder', 'no folder at all still asks to be linked');
+
+  ok(wantsALook(linked), 'a linked-but-empty account is still in the queue');
+  ok(URGENCY.notx < URGENCY.nofolder, 'the nearer of the two to being answered sorts first');
+
+  /* Omitting the argument reads as "no folder" — which is the action every
+     caller got before the split, so an uninformed caller cannot silently start
+     telling people to import into a folder that isn't there. */
+  eq(statusOf(acct(), [], TODAY).state, 'nofolder', 'omitting hasFolder reads as no folder');
 }
 
 /* ---- 2. drift outranks staleness ---- */
@@ -98,6 +119,7 @@ const row = (date, amount) => ({ date, amount, label: 'A' });
      Infinity, and a NaN comparator silently un-sorts the whole list. */
   const q = queueOrder([
     mk('okOne', 'ok', 2),
+    mk('nofolderOne', 'nofolder', 40),
     mk('notxOne', 'notx', 40),
     mk('nodateA', 'nodate', null),
     mk('staleOld', 'stale', 94),
@@ -106,7 +128,8 @@ const row = (date, amount) => ({ date, amount, label: 'A' });
     mk('staleNew', 'stale', 38),
   ]);
 
-  eq(q.map(x => x.name), ['driftOne', 'staleOld', 'staleNew', 'nodateA', 'nodateB', 'notxOne'],
+  eq(q.map(x => x.name),
+    ['driftOne', 'staleOld', 'staleNew', 'nodateA', 'nodateB', 'notxOne', 'nofolderOne'],
     'urgency first, then the oldest figure within an urgency');
   ok(!q.some(x => x.state === 'ok'), 'an account that agrees is never in the queue');
 

@@ -202,6 +202,12 @@ module.exports = function registerTransactions(ctx) {
     const r = item._row;
     if (!r.amount) return toast(i18n.t('tx.split.zero'), true);
     if (r.excluded) return toast(i18n.t('tx.split.excluded'), true);
+    /* Before the modal, not after: a part passes both guards above — it has a
+       real amount and is not excluded — so without this the reader allocates a
+       charge across categories and only then finds out it could not be done.
+       applySplit refuses the same case as the authority on roles; this is the
+       half that says so. */
+    if (splitRole(r.split)) return toast(i18n.t('tx.split.part'), true);
     const parts = await askSplit(app, {
       tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
       categories: S.categories.map(c => c.name),
@@ -215,6 +221,10 @@ module.exports = function registerTransactions(ctx) {
        excluded rows on purpose. Setting only the first counted every split
        charge twice in every implied balance — see src/tx-role.js. */
     const rows = applySplit(r, parts, i18n.t('tx.split.marker', { n: parts.length }));
+    // applySplit is the authority and can refuse. Unreachable while the guard
+    // above matches it, and handled anyway so the two can never drift into a
+    // dead button that spreads null into the file's rows.
+    if (!rows) return toast(i18n.t('tx.split.part'), true);
     // Same file: every part shares the parent's date, so it shares its month.
     item._file.rows.push(...rows);
     item._file.dirty = true;

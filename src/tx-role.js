@@ -103,6 +103,18 @@ function isSplitPart(row) {
    arithmetic and deliberately re-checks none, because the modal is the gate
    and a second, subtly different rule here is how the two drift apart. */
 function applySplit(parent, parts, marker) {
+  /* A row that already carries a role is already described by other rows in
+     this file, so splitting it again would describe the same money a third
+     time. Refused HERE and not only in the view, because the role is assigned
+     here — and because the parent role used to be written unconditionally,
+     which turned a PART into a parent and stopped it being a part. Every reader
+     that skips parts (cardSpend, the service and debt histories, the importer's
+     duplicate index) then counted it as a line the bank had printed.
+
+     Null rather than a throw: the caller is a click handler, and "nothing
+     happened" with a toast beside it is the honest outcome for a button that
+     should not have been offered. */
+  if (splitRole(parent && parent.split)) return null;
   /* No amountRaw on a part, deliberately. It is the loader's "I could not
      strictly parse this cell, write it back verbatim" flag, and the serializer
      prefers it over the number — so a part inheriting the parent's would write

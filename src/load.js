@@ -170,10 +170,20 @@ module.exports = function registerLoad(ctx) {
     }
 
     S.txFiles = {};
+    /* Every folder under Transactions/, whether or not it holds a month file.
+
+       S.txFiles cannot answer "does this account have a folder?" — it is keyed
+       per month file, so a folder someone created and has not imported into yet
+       contributes no entry and reads exactly like a folder that was never
+       linked. Those are different situations with different next steps (import
+       a statement vs. link a folder), and telling the second story to someone
+       in the first sends them to re-link a folder they already have. */
+    S.txFolders = [];
     // Flattened first so every month file across every account goes out in one
     // batch — this is the bulk of the read count on a real vault.
     const txFiles = [];
     for (const acct of subfoldersIn('Transactions')) {
+      S.txFolders.push(acct.name);
       for (const f of acct.children) {
         if (!(f instanceof TFile) || f.extension !== 'md' || !/^\d{4}-\d{2}$/.test(f.basename)) continue;
         txFiles.push({ acct, f });
@@ -218,9 +228,12 @@ module.exports = function registerLoad(ctx) {
          existed has neither, and must mean exactly what it always meant —
          nothing repaid, no lending date. Never reorder the first five. */
       S.owed.push({
-        person: unescMd(c[0]), amount: parseFloat(c[1]) || 0, description: unescMd(c[2] || ''),
+        // parseNum, not parseFloat, for the reason spelled out on the debt
+        // balances below — and with the same consequence, because serializeOwed
+        // writes the parsed number straight back with toFixed(2).
+        person: unescMd(c[0]), amount: parseNum(c[1] || '0').value || 0, description: unescMd(c[2] || ''),
         due: (c[3] || '').trim(), status: (c[4] || 'outstanding').trim().toLowerCase() === 'paid' ? 'paid' : 'outstanding',
-        repaid: parseFloat(c[5]) || 0,
+        repaid: parseNum(c[5] || '0').value || 0,
         lent: (c[6] || '').trim(),
       });
     }
@@ -279,12 +292,77 @@ module.exports = function registerLoad(ctx) {
     if (svcTxt) for (const c of parseMdTable(svcTxt).slice(1)) {
       if (!c[0]) continue;
       S.services.push({
-        name: unescMd(c[0]), provider: unescMd(c[1] || ''), amount: parseFloat(c[2]) || 0,
+        // parseNum, not parseFloat — same reason as the owed and debt columns,
+        // and this one feeds the committed total the Dashboard subtracts from
+        // "actually free to spend", so a truncated cell overstates it.
+        name: unescMd(c[0]), provider: unescMd(c[1] || ''), amount: parseNum(c[2] || '0').value || 0,
         cycle: (c[3] || 'monthly').trim().toLowerCase() === 'annual' ? 'annual' : 'monthly',
         next: (c[4] || '').trim(), category: unescMd(c[5] || ''),
         active: (c[6] || 'yes').trim().toLowerCase() !== 'no', notes: unescMd(c[7] || ''),
       });
     }
+    /* Plans — one file per plan in Plans/, keyed by the file's basename. Same
+       multi-file shape as Tax above, and read with the same heading-slice
+       trick: the three tables ("Money in", "Envelopes", "Items") live in one
+       file because a plan is read as one thing, and parseMdTable would happily
+       run them together into a single malformed list if they were handed to it
+       whole. The section names are load-bearing — plan.js's serializer writes
+       exactly these headings. */
+    S.plans = {}; S.planDirty = false;
+    for (const { file: f, text } of await read(mdFilesIn('Plans'))) {
+      const { fm, raw, body } = parseFrontmatter(text);
+      const section = (name) => {
+        for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
+          if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
+        }
+        return '';
+      };
+      /* Every status falls back rather than throwing, the same way stepStatus
+         does below: these files are hand-editable, and a typo in one cell must
+         not cost the reader the other forty rows. */
+      const srcStatus = s => (s || '').trim().toLowerCase() === 'expected' ? 'expected' : 'received';
+      const itemStatus = s => {
+        const t = (s || '').trim().toLowerCase();
+        return t === 'done' ? 'done' : (t === 'part' || t === 'partial') ? 'part' : 'planned';
+      };
+      // Money columns go through normalizeAmount for the reason the debt
+      // balances do: a hand-typed "40 000,00" read as 40 would be written
+      // straight back over a figure nobody was editing.
+      const amt = v => normalizeAmount(v) ?? 0;
+      S.plans[f.basename] = {
+        /* KEYED BY BASENAME, not by display name, and `file` carries it back
+           out. The two differ on purpose: a plan can be called "Baby &
+           catch-up" while living in a filesystem-safe file, and frontmatter is
+           hand-editable — so two files could name themselves the same thing.
+           The file is the identity; the name is a label. Writers must derive
+           the path from `file` and never re-sanitise the name, or a rename in
+           frontmatter would fork the plan into a second file. */
+        file: f.basename,
+        name: (fm.plan || '').toString().trim() || f.basename,
+        fmRaw: raw,   // verbatim frontmatter, for lossless write-back
+        started: (fm.started || '').toString().trim(),
+        status: (fm.status || 'active').toString().trim(),
+        sources: parseMdTable(section('money in')).slice(1).filter(c => c[0]).map(c => ({
+          name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), amount: amt(c[2]),
+          date: (c[3] || '').trim(), status: srcStatus(c[4]), notes: unescMd(c[5] || ''),
+        })),
+        // Tint is written back verbatim so a hand-picked colour survives, and
+        // an absent one renders as no wash rather than as the string "".
+        envelopes: parseMdTable(section('envelopes')).slice(1).filter(c => c[0]).map(c => ({
+          name: unescMd(c[0]), amount: amt(c[1]), note: unescMd(c[2] || ''),
+          tint: (c[3] || '').trim(),
+        })),
+        items: parseMdTable(section('items')).slice(1).filter(c => c[0]).map(c => ({
+          name: unescMd(c[0]), envelope: unescMd(c[1] || ''), amount: amt(c[2]),
+          spent: amt(c[3]), status: itemStatus(c[4]),
+          category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
+        })),
+      };
+    }
+    // Keep the open plan if it still exists; otherwise fall to the first by
+    // name, or null — which is what renders the empty state.
+    if (!S.planName || !S.plans[S.planName]) S.planName = Object.keys(S.plans).sort()[0] || null;
+
     S.tax = {}; S.taxDirty = false;
     for (const { file: f, text } of await read(mdFilesIn('Tax').filter(f => /^\d{4}$/.test(f.basename)))) {
       const { fm, raw, body } = parseFrontmatter(text);
@@ -369,10 +447,17 @@ module.exports = function registerLoad(ctx) {
      second, near-identical folder and split the account in half; and the name
      is self-evidently legal, because the filesystem is already holding it. Only
      a label that has never been written gets sanitised into a new segment. */
+  /* Case-folded, because the filesystems this plugin ships on are. macOS, iOS
+     and Windows all resolve `Transactions/cheque/` and `Transactions/Cheque/`
+     to one directory, so a `tx_label` differing only in case — hand-editable
+     frontmatter that syncs between devices — missed the in-memory lookup while
+     the write still landed on the existing file. Folding here keeps the two
+     sides agreeing, which is the whole contract vault-path.js exists to hold. */
   function txSegment(label) {
     const want = safeSeg(label);
+    const key = want.toLowerCase();
     for (const f of Object.values(S.txFiles)) {
-      if (f.label === label || safeSeg(f.label) === want) return f.label;
+      if (f.label === label || safeSeg(f.label).toLowerCase() === key) return f.label;
     }
     return want;
   }

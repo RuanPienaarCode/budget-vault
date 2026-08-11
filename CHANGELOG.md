@@ -3,6 +3,178 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.13.0 — 2026-08-10
+
+### Added
+
+- **Plan — a new page for money that arrives once.** A budget is a rate: R4 000
+  a month on groceries, every period, forever. A windfall is not. When a UIF
+  payout, a tax refund, a bonus or the proceeds of something you sold lands in
+  the account, the question is not *what is our monthly allowance* but *where
+  does every rand of this particular sum go* — and the Budget page has no way to
+  ask it. Plan does, and lives under Budget in the menu because it is a thing
+  you keep rather than a calculator you visit.
+
+  A plan is funded by **sources you name yourself**. Anything at all: a payout,
+  a refund, next month's salary surplus, a gift, a sale. Each carries an amount,
+  a date and a free-text kind — *UIF*, *Tax*, *Salary*, *Bonus*, *Gift*,
+  *Once-off*, or your own word — where the kind is only a label and the date is
+  what does the real work. A source dated in the future counts toward what you
+  can plan with but not toward what you can spend this afternoon, so the page
+  states both figures and never lets the second be mistaken for the first.
+
+  The money is divided into **envelopes**, each with a slider that visibly takes
+  from what is not yet spoken for. An envelope's amount is deliberately *not*
+  the sum of the items listed inside it: you decide that R12 300 goes to the
+  baby before you know the four things you will buy, and the card reports the
+  difference as *unassigned* rather than quietly forcing the two to agree. Items
+  cycle planned → part-bought → done, and a part-bought item shows both what has
+  gone and what was planned, because neither figure alone is the answer.
+
+  One bar across the top says what has happened to the whole sum — already
+  spent, spoken for, not spoken for — and the card underneath it goes loud while
+  anything is unplaced and disappears entirely once the split balances. Leaving
+  money unallocated is a decision too; it should just be one you made rather
+  than one you forgot.
+
+  Saved as `Plans/<name>.md` — three markdown tables in one file, hand-editable
+  like every other page, with any frontmatter the plugin does not model left
+  untouched.
+
+### Fixed
+
+- **Six ways a statement import could write wrong figures into your vault, and
+  one that could quietly delete real income.** A six-agent audit went through
+  the money paths and ranked what it found by a single question — *does it
+  write?* — because a wrong number on a calculator screen is one page refresh
+  from correct, while a wrong number in a markdown file is there until someone
+  notices. These are the ones that wrote.
+
+  **A filtered bank export could import the running-balance column as every
+  transaction amount.** Column detection knew three states — reconciled,
+  provably-not-a-balance, and not-enough-file-to-tell — and guarded only two of
+  them. A "debits only" export whose balance column has gaps cannot reconcile,
+  and that was read as proof the column was not a balance at all. On a realistic
+  file that turned R4 756 of spending into R148 108 of income, and because the
+  fall-through also cleared the balance-column index, the review screen's
+  reconciliation banner was hidden entirely — including the warning written for
+  precisely this case. Anything that cannot prove itself now opens the manual
+  column mapper. More files will land there, which is the right trade: a file
+  you map by hand is a file you looked at.
+
+  **A credit-card statement imported every purchase as income.** A card's
+  balance column is the amount owing, so it rises when you spend, while every
+  asset ledger falls — and both reconcile perfectly under some sign. Read as an
+  asset, a card statement verified cleanly and reported that its signs were
+  already right, under the most reassuring sentence the review screen has. The
+  account settles what the arithmetic cannot, so a card account now inverts the
+  expected relation.
+
+  **European dates filed into the wrong month.** `DD.MM.YYYY` is the ordinary
+  format across the whole EU profile, and the date rules accepted only `/` and
+  `-`, so every such cell fell through to JavaScript's `Date` constructor — the
+  one path this app's own date parser exists to avoid. Measured against both
+  engines: `03.04.2026` became 4 March on the desktop and was dropped on the
+  phone; `JUN 12` produced a different *year* on each. Since the same test also
+  decides which column is which, a file's whole layout could resolve differently
+  on an iPhone than on a laptop. Dotted separators are handled properly and the
+  fallback is gone, so an unrecognised cell is now reported as skipped rather
+  than guessed at.
+
+  **A hand-typed amount in Owed Money or Services was destroyed on save.**
+  Three columns still used a lenient number reader that stops at the first
+  character it cannot use, so `1 500,00` loaded as R1 and `R4000` as nothing —
+  and because saving writes the parsed number straight back, one click made the
+  truncation permanent. A R4 000 loan with a part-payment recorded read as
+  *Paid* and left the totals entirely.
+
+  **An import whose account could not be identified arrived pre-excluded.**
+  Statements routinely quote their own account number, and the guard that stops
+  those rows being tagged as transfers needs to know which account the file
+  belongs to. When the filename gave nothing away the guard was inert, so every
+  such row was ticked *Exclude* — written to disk, and vetoed from income and
+  spending for good. The suggestion now follows whichever account the review
+  screen has actually settled on, while leaving alone any row you have ticked
+  yourself.
+
+  **Splitting a row that was already part of a split counted the money twice.**
+  The intermediate row stopped being a part and became a parent, so every reader
+  that skips parts counted it as a line the bank had printed: one R1 000 charge
+  totalled R1 600. Splitting a row that already carries a split role is refused.
+
+  **A split could be approved for one set of amounts and write another.** The
+  balance check rounded the total while the save rounded each part, so three
+  thirds of R100 typed as `33.333` reported *balanced* and then wrote R99.99 —
+  and since the original row is excluded on the way out, the missing cent left
+  the budget. The gate now weighs the values it is about to write.
+
+  Also: two different sanitisers could turn one account name into two different
+  folder paths, so a `tx_label` differing only in case could stop a month's
+  transactions importing; and impossible dates like 30 February were accepted,
+  filed, and used as duplicate-detection keys.
+
+- **Figures the app stated as fact about South African tax and credit law,
+  which were wrong.**
+
+  **The SARS transfer-duty table above R2 329 300 was not SARS's.** The bracket
+  boundaries and base amounts appear in no published table from any year, under
+  a note calling the result *exact arithmetic on the published table*. The tell
+  was arithmetic: a real table's published base equals the duty compounded from
+  the band below it, exactly, and this one was two rand out — a gap that had
+  been explained away as a rounding quirk, hidden behind a clamp, and defended
+  by a test. On a R5 000 000 house the duty was understated by R4 626. The
+  published figures are in, the clamp and its test are out, and the invariant is
+  asserted directly, so a base that was never published now fails the build.
+
+  **From 1 March 2026 the tax page told compliant savers they owed a penalty.**
+  SARS raised the tax-free-investment annual limit from R36 000 to R46 000 for
+  the 2027 tax year. The threshold was fixed in place, and the function checking
+  it had always received the tax year and never read it — so a 2027 page told
+  someone who had contributed R40 000, entirely within the limit, that they
+  faced a 40% penalty on R4 000, while the header two cards above read *Tax
+  year 2027*. Thresholds are now keyed by tax year and each message names the
+  year whose figure it used.
+
+  **The National Credit Act fee caps were quoted as statutory maximums without
+  ever having been read from the regulation.** Against Government Gazette 39379
+  of 6 November 2015: the mortgage initiation fee is R1 100 plus 10% above
+  R10 000 capped at R5 250, not R1 207 capped at R5 707; the monthly service fee
+  is R60 excluding VAT, not R74.50. Vehicle finance was charged against the
+  *mortgage* cap when it is an "other credit agreement" capped at R1 050 — on a
+  R315 000 car, R3 622 against a statutory maximum of R1 207.50. All four
+  figures are corrected and the wording now says the fees are *modelled on* the
+  caps, and names the gazette.
+
+### Changed
+
+- **The Debt page stops grading your finances.** It projected payoff dates fifty
+  years out, quoted total interest in the hundreds of thousands, ranked your
+  debts and rendered the answer in the page's celebratory style — with no
+  disclaimer anywhere and its assumptions stated nowhere you could see them.
+  The debt-to-income ratio was coloured red, amber or green against a 36%
+  threshold introduced as *"lenders treat above 36% as stretched"* — a United
+  States mortgage-underwriting convention, unattributed, shown identically in
+  all eight country profiles, and one that does not describe South African
+  affordability testing at all. The percentage stays because it is arithmetic on
+  your own numbers; the grade and the claim are gone, and so is the red on
+  simply having any debt. *"Put every spare rand at these in order"* now reads
+  *"The plan below aims spare money in this order."* The page states what it
+  assumes, and says plainly that it is not financial advice.
+
+- **"Debt-free: never" now says what is actually known.** Projections stop at
+  fifty years, and anything that had not closed by then was reported as a
+  payment too small to cover its own interest. That is a different statement,
+  and often false: R500 000 at 11% paying R4 600 covers its R4 583 of monthly
+  interest and closes in 616 months. Those dates now read *not at this payment*
+  and *does not clear within 50 years*. The debt-free headline also names the
+  assumptions it had been folding in silently — the what-if extra typed into the
+  planner below it, and each cleared payment rolling into the next.
+
+- **An account with no transactions folder is told apart from one with an empty
+  folder.** Both used to read the same, so an account nothing imports into
+  looked merely quiet rather than unconnected. The Accounts queue now names it,
+  and offers the action that fixes it.
+
 ## 1.12.0 — 2026-08-10
 
 ### Changed

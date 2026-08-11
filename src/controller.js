@@ -18,6 +18,7 @@ const registerCategories = require('./categories');
 const registerDashboard = require('./views/dashboard');
 const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
+const registerPlan = require('./views/plan');
 const registerAccounts = require('./views/accounts');
 const registerSavings = require('./views/savings');
 const registerAssets = require('./views/assets');
@@ -73,6 +74,10 @@ function mountApp(view) {
     owedDirty: false,
     services: [],              // {name, provider, amount, cycle, next, category, active, notes}
     servicesDirty: false,
+    // basename -> {file, name, fmRaw, started, status, sources, envelopes, items}
+    plans: {},
+    planName: null,            // the open plan's FILE key, not its display name
+    planDirty: false,
     tax: {},                   // 'YYYY' -> {fmRaw, taxpayer_type, assessment, deadlines, steps, docs}
     taxYear: null,
     taxDirty: false,
@@ -182,6 +187,7 @@ function mountApp(view) {
   registerDashboard(ctx);
   registerTransactions(ctx);
   registerBudgets(ctx);
+  registerPlan(ctx);
   registerAccounts(ctx);
   registerSavings(ctx);
   registerAssets(ctx);
@@ -213,6 +219,7 @@ function mountApp(view) {
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
+       plan: ctx.renderPlan,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
        debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
@@ -593,6 +600,13 @@ function mountApp(view) {
     await plugin.saveSettings();
     ctx.replan();
   });
+  $('#planSave').addEventListener('click', ctx.savePlan);
+  $('#planNew').addEventListener('click', ctx.newPlan);
+  $('#planStart').addEventListener('click', ctx.newPlan);
+  $('#planAddSource').addEventListener('click', () => ctx.addSource());
+  // Wrapped rather than passed bare: addEventListener hands the listener a
+  // MouseEvent, and addEnvelope's second parameter is a suggested amount.
+  $('#planAddEnvelope').addEventListener('click', () => ctx.addEnvelope());
   $('#owedSave').addEventListener('click', ctx.saveOwed);
   $('#owedAdd').addEventListener('click', ctx.addOwed);
   $('#svcSave').addEventListener('click', ctx.saveServices);

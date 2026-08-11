@@ -15,6 +15,7 @@
    read is testable without one. */
 
 const { normalizeAmount } = require('./amount');
+const { isRealIsoDate } = require('./dates');
 const { parseDelimited, sniffDelimiter } = require('./csv');
 
 /* Parse a foreign statement: sniff the delimiter, then read it. */
@@ -58,9 +59,16 @@ function decodeStatement(bytes) {
    whose non-ISO parsing differs between V8 (desktop) and JavaScriptCore (iOS)
    and silently mis-files DD/MM vs MM/DD dates. SA bank exports are DD/MM/YYYY;
    an unambiguous MM/DD (day field > 12) is tolerated by swapping. */
+/* The bounds alone let every month have 31 days, so "2026-02-30" came out as a
+   real-looking ISO string — written to disk, filed into a month, and keyed into
+   the dedup index, where daysApart returns Infinity for it and switches off
+   near-duplicate matching for that row. isRealIsoDate settles it against the
+   actual calendar; it works in Date.UTC on NUMBERS, which is fully specified,
+   rather than parsing a string, which is the part engines disagree about. */
 function isoParts(y, mo, d) {
   if (!y || y < 1000 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const iso = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  return isRealIsoDate(iso) ? iso : null;
 }
 /* Month ABBREVIATION → number, for reading a statement's "12 Mar 2026". Named
    apart from constants.js's MONTHS, which is the reverse — an array of short
@@ -78,9 +86,12 @@ function parseStatementDate(raw, dayFirst = true) {
      cell fell through to the Date constructor below, which is exactly the
      engine-dependent path this function exists to avoid. */
   s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z|[+-]\d{2}:?\d{2})?$/i, '').trim();
-  let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);      // ISO: YYYY-MM-DD
+  /* Separators: / - and DOT. The dot is not decoration — DD.MM.YYYY is the
+     ordinary format across the whole `eu` profile, and without it every such
+     cell fell through to the Date constructor below. */
+  let m = s.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/);      // ISO: YYYY-MM-DD
   if (m) return isoParts(+m[1], +m[2], +m[3]);
-  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);          // DD/MM/YYYY or MM/DD/YYYY
+  m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);          // DD/MM/YYYY or MM/DD/YYYY
   if (m) {
     let d = dayFirst ? +m[1] : +m[2], mo = dayFirst ? +m[2] : +m[1];
     if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }     // tolerate the other order
@@ -95,8 +106,24 @@ function parseStatementDate(raw, dayFirst = true) {
     const mo = MONTH_NUM[m[2].slice(0, 3).toLowerCase()];
     if (mo) return isoParts(+m[3], mo, +m[1]);
   }
-  const dt = new Date(s);                                        // last-resort fallback
-  if (!isNaN(dt.getTime())) return isoParts(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+  /* No last-resort `new Date(s)`. It used to sit here and it was the one path
+     in this function that broke its own contract — measured 10 Aug 2026 against
+     node v22 (V8) and macOS jsc, the JavaScriptCore line Obsidian mobile runs:
+
+       '03.04.2026'      V8 2026-03-04   JSC Invalid Date
+       'PICK N PAY 1234' V8 1234-01-01   JSC Invalid Date
+       'JUN 12'          V8 2001-06-12   JSC 2000-06-12   <- different YEAR
+
+     So the same statement produced different rows on the desktop and on the
+     phone, and since isDate() decides dataStart, the data filter and the
+     right-to-left description scan in detectHeaderlessColumns, it could resolve
+     the whole column layout differently on each. An unrecognised cell is now
+     null: the row is reported as skipped on the review screen, and a file whose
+     dates none of the rules match opens the manual column mapper.
+
+     A format that only ever worked through this branch is not supported. When a
+     real export needs one, give it an explicit rule above — the same standard
+     loc.banks applies to naming a bank. */
   return null;
 }
 
@@ -136,6 +163,39 @@ function counterpartyAccount(desc, accounts, selfLabel) {
   return null;
 }
 
+/* Apply the counterparty suggestion to a whole statement's rows, for the
+   account the file is currently BELIEVED to belong to.
+
+   One function rather than one call at parse time, because the belief changes
+   after the rows are built. The importer guesses the account from the filename
+   and preamble; the review screen then settles it — from the user's pick, from
+   an account created on the spot, or from the plain default of the first label
+   in the list when the guess came back empty. That last path needs no user
+   action at all, so "the guess was wrong" is the ordinary case for any
+   hand-saved or renamed export, not an edge one.
+
+   It matters because counterpartyAccount can only skip the statement's own
+   account if it is told which one that is: with an empty selfLabel the skip is
+   falsy and every row quoting the file's own number matches ITSELF. Those rows
+   arrive pre-excluded, `excluded` is written to disk, and periodSummary vetoes
+   them from income and spend — so a guess that failed silently deletes real
+   money from the totals.
+
+   `manualExclude` is the same sticky bit as nearAuto on the import tick and
+   `manual` on the category: once the reader has decided, a re-render leaves
+   their decision alone, in either direction. Without it this would trade a
+   silent wrong exclusion for a silently reverted correction, since the review
+   re-renders on every account switch and every "show more". */
+function applyCounterparties(items, accounts, selfLabel) {
+  for (const it of items || []) {
+    if (it.manualExclude) continue;
+    const other = counterpartyAccount(it.desc, accounts, selfLabel);
+    it.excluded = !!other;
+    it.transferTo = other ? (other.tx_label || other.name) : '';
+  }
+  return items;
+}
+
 /* Check a statement's amounts against its own running-balance column, and say
    whether the amounts carry the sign this app expects (negative = money out).
 
@@ -159,8 +219,15 @@ function counterpartyAccount(desc, accounts, selfLabel) {
    Returns { verified, flip, order, pairs, agreement }. `verified: false` means
    "this file did not prove itself" — never "the amounts are wrong". Callers
    must degrade to showing the user rather than to guessing. */
-function reconcileAmounts(rows) {
+function reconcileAmounts(rows, { liability = false } = {}) {
   const c = v => Math.round(v * 100);
+  /* An asset ledger falls when money leaves; a credit card's balance is the
+     amount OWING, so it rises. Both reconcile perfectly under some sign, and
+     the arithmetic alone cannot tell them apart — read as an asset, a card
+     reported flip:false and every purchase imported POSITIVE, as income, under
+     the review screen's most reassuring sentence. The account settles what the
+     numbers cannot, so the expected step inverts for a liability. */
+  const dir = liability ? -1 : 1;
   const pts = (rows || []).filter(r => r && r.amount != null && r.balance != null);
   // Under three pairs, agreement is as likely to be coincidence as proof.
   if (pts.length < 4) return { verified: false, flip: false, order: null, pairs: Math.max(0, pts.length - 1), agreement: 0 };
@@ -173,7 +240,7 @@ function reconcileAmounts(rows) {
         const prev = c(pts[i - 1].balance), bal = c(pts[i].balance);
         // Oldest-first: this row's amount moved the balance to here.
         // Newest-first: the PREVIOUS row's amount moved the balance away from here.
-        const step = order === 'fwd' ? sign * c(pts[i].amount) : -sign * c(pts[i - 1].amount);
+        const step = dir * (order === 'fwd' ? sign * c(pts[i].amount) : -sign * c(pts[i - 1].amount));
         if (bal - prev === step) agree++;
       }
       if (agree > best.agreement) best = { verified: false, flip: sign === -1, order, pairs: pts.length - 1, agreement: agree };
@@ -230,20 +297,24 @@ function detectHeaderlessColumns(rows, dayFirst = true) {
     // Only the first reconciles, so the file decides rather than the importer.
     const bal = reconcileAmounts(data.map(r => ({ amount: num(r[width - 2]), balance: num(r[width - 1]) })));
     if (bal.verified) { iAmount = width - 2; iBalance = width - 1; }
-    // Three states, not two: reconciled (above), provably-not-a-balance (a
-    // Debit/Credit pair — fall through and read the last column as the amount),
-    // and NOT ENOUGH FILE TO TELL. reconcileAmounts reports the third as fewer
-    // than three pairs, and it must not collapse into the second: on an
-    // amount+balance export that silently imports the running balance as every
-    // transaction — an expense booked as income, with plausible-looking totals
-    // and nothing to announce it.
+    // Reconciled is the ONLY state that licenses reading the penultimate column
+    // as the amount, and `verified` is the only thing that reports it.
+    // Everything else is the absence of proof, and it arrives in two flavours
+    // that must not be told apart here: too few pairs to judge, and enough
+    // pairs that judged and disagreed. A filtered "debits only" export is the
+    // second — every row shown is real, but the rows filtered OUT moved the
+    // balance too, so nothing lines up. Treating either as "provably a
+    // Debit/Credit pair" reads the running balance as every transaction, which
+    // books spending as income with plausible-looking totals; and because that
+    // path also leaves iBalance at -1, views/import.js computes no reconcile
+    // verdict, so the review screen shows no warning either. Silent twice over.
     //
     // The ambiguity is only real when BOTH columns could be the amount. A
     // penultimate column that never carries a value (the all-zero Money Out of
     // a Debit/Credit pair) is not a candidate, so the last column still wins
     // without proof. Otherwise there is nothing to choose on but a guess, and
     // null is the honest answer — the caller opens the manual column mapper.
-    else if (bal.pairs < 3 && data.some(r => num(r[width - 2]) !== 0)) return null;
+    else if (!bal.verified && data.some(r => num(r[width - 2]) !== 0)) return null;
   }
 
   // Description: the rightmost column left of the amount whose values are
@@ -317,6 +388,6 @@ function detectStatementColumns(rows, dayFirst = true) {
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
-  counterpartyAccount, reconcileAmounts,
+  counterpartyAccount, applyCounterparties, reconcileAmounts,
   detectHeaderlessColumns, detectStatementColumns,
 };

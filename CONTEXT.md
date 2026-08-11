@@ -123,3 +123,35 @@ Measuring the stated balance against the implied one and showing the reader the
 disagreement. It never silently overwrites either figure — the reader is the one
 who decides which is wrong.
 _Avoid_: sync, refresh, auto-update, verification
+
+### Accounts and their folders
+
+See `docs/accounts-and-transaction-folders.html` for the mechanism and the two
+ways it fails silently.
+
+**Transaction folder**:
+The folder under `Transactions/` holding an account's monthly files. A separate
+thing from the account file, joined to it only by a string.
+_Avoid_: account folder, ledger
+
+**Transaction label** (`tx_label`):
+An OVERRIDE, naming the transaction folder when it differs from the account's
+own name. Reading accepts three names — `tx_label`, the account name, or the
+filesystem-cleaned account name — but importing writes to exactly one,
+`tx_label || name`. So a `tx_label` naming a folder that does not exist reads
+perfectly and, on the next import, creates a second folder and re-imports every
+row as new. It must name a folder that exists, or be absent.
+_Avoid_: display name, folder name
+
+**Orphan folder**:
+A transaction folder no account claims by any of the three names. Its rows still
+appear in Transactions and still count toward period totals, but they contribute
+to no account balance, never appear in a reconciliation, and are absent from the
+cash figure. Deliberate — the loader will not invent an account — but silent.
+_Avoid_: unlinked folder, stray folder
+
+**Account number**:
+The bank's own number for an account. It routes a statement file to the right
+folder, and it is what lets a transfer between the reader's own accounts be
+recognised as a transfer rather than imported as income.
+_Avoid_: account ID, reference

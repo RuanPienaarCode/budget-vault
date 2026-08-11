@@ -16,6 +16,7 @@ const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS } = require('./c
 const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
 const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
+const { safeSeg } = require('./vault-path');
 
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
@@ -87,7 +88,16 @@ function currentPeriodForCycle(days, anchor) {
   const a = isoDayNumber(anchor);
   return isoFromDayNumber(a + Math.floor((today - a) / days) * days);
 }
-const safeFileName = s => s.replace(/[\\/:*?"<>|]/g, '-').trim();
+/* safeSeg, not a local sanitiser. vault-path.js is the ONE canonicaliser for
+   path segments and says so at length: a name turned into a path by two
+   different functions is a lookup that misses while the write still lands on
+   the existing file. The local copy that used to live here dropped NFC
+   normalisation, NBSP folding, control and bidi stripping, dot-run collapsing,
+   leading-dot stripping, trailing dot/space stripping and Windows reserved
+   names — so the wizard could create `Savings.` or `CON` as a folder that every
+   later lookup would name differently. This is the first folder a new install
+   ever gets, which makes it the worst place to have a second rule. */
+const safeFileName = safeSeg;
 
 class OnboardingWizard extends Modal {
   constructor(app, plugin) {

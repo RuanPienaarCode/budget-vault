@@ -2406,6 +2406,18 @@
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
   .budget-app-root .donut-legend .dl-link:focus,
   .budget-app-root .donut-legend .dl-note:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
+
+  /* Plan. Seven controls, and the slider matters most of the three kinds here:
+     it is the page's primary gesture, and on 15.0-15.3 an invisible focus ring
+     on a range input leaves a keyboard user dragging money with no idea which
+     envelope they are in. */
+  .budget-app-root .plan-seg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .env-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .env-amt-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
+  .budget-app-root .env-slider:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+  .budget-app-root .ei-tick:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .ei-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .env-add:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
@@ -2543,4 +2555,282 @@
   margin-top: 1.6rem;
   padding: 0.7rem 2rem;
   font-size: 0.95rem;
+}
+
+/* ============================================================
+   PLAN — money that arrives once, divided on purpose.
+
+   The page is a DIVISION, not a spend-against-budget, and the
+   CSS says so: one pot bar at the top whose three segments sum
+   to the whole, envelope cards whose slider visibly takes from
+   what is unplaced, and a loud gold card that disappears the
+   moment the split balances.
+
+   colour-mix is used for tints and washes, so every rule that
+   depends on it is written as a plain fallback FIRST and the
+   mix inside @supports — the engine floor here is iOS 15 /
+   WebKit, which shipped no color-mix() at all and would drop
+   the whole declaration.
+   ============================================================ */
+
+/* ---- the strip: plan switcher, new, save ---- */
+.budget-app-root .plan-strip { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.budget-app-root .plan-segs {
+  display: inline-flex; padding: 4px; border-radius: 999px; gap: 2px; flex-wrap: wrap;
+  border: 1px solid var(--border-color); background: rgba(127, 127, 127, .06);
+}
+.budget-app-root .plan-segs > span { display: inline-flex; gap: 2px; flex-wrap: wrap; }
+.budget-app-root .plan-seg {
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 6px 15px; border-radius: 999px; border: 0; background: transparent;
+  color: var(--text-muted);
+}
+.budget-app-root .plan-seg:hover { color: var(--text-primary); }
+.budget-app-root .plan-seg[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+.budget-app-root .plan-seg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* .section-h is a plain block everywhere else, and it stays one here: the row
+   is this WRAPPER, with .section-h as its first item. That keeps #planEnvSub a
+   direct child of .section-h, which is the box that owns the gap below this
+   header — see the note in shell.js. align-items:flex-start rather than
+   flex-end so the button sits level with the heading and .section-h's own
+   margin-bottom is left to do its job untouched. */
+.budget-app-root .plan-env-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+
+/* ---- the pot: one number, and the bar that says what happened to it ---- */
+.budget-app-root .pot { padding: 30px 34px 28px; }
+.budget-app-root .pot-eyebrow {
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-faint); font-weight: 700;
+}
+.budget-app-root .pot-fig {
+  font-size: 46px; font-weight: 700; letter-spacing: -.03em; line-height: 1.02;
+  margin-top: 8px; color: var(--text-primary);
+}
+.budget-app-root .pot-sub { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+.budget-app-root .pot-sub b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* Three states of the same rand: gone, spoken for, free. The segments are
+   width-driven and sum to 100% by construction (planSummary is the only place
+   that arithmetic happens), so no gap or border may sit between them. */
+.budget-app-root .plan-split {
+  margin-top: 22px; height: 16px; border-radius: 999px; overflow: hidden; display: flex;
+  border: 1px solid var(--border-color); background: rgba(127, 127, 127, .08);
+}
+.budget-app-root .plan-split i { display: block; height: 100%; }
+.budget-app-root .plan-split .s-spent { background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary)); }
+.budget-app-root .plan-split .s-alloc { background: var(--color-accent); }
+.budget-app-root .plan-split .s-free {
+  background: repeating-linear-gradient(135deg, var(--color-warning) 0 6px, transparent 6px 12px);
+  opacity: .5;
+}
+.budget-app-root .split-key { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 14px; }
+.budget-app-root .split-key > div { min-width: 118px; }
+.budget-app-root .sk-top {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--text-muted); font-weight: 600;
+}
+.budget-app-root .sk-top i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.budget-app-root .sk-fig {
+  font-size: 19px; font-weight: 700; margin-top: 3px; letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.budget-app-root .plan-free-fig { color: var(--color-gold); }
+
+/* ---- money in: any source at all, and when it actually lands ---- */
+.budget-app-root .src-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 0; border-top: 1px solid var(--line-soft);
+}
+.budget-app-root .src-row:first-child { border-top: 0; }
+.budget-app-root .src-main { flex: 1; min-width: 200px; }
+.budget-app-root .src-name { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.budget-app-root .src-name-input {
+  font: inherit; font-size: 13.5px; font-weight: 650; color: var(--text-primary);
+  background: none; border: 0; padding: 2px 0; min-width: 140px; flex: 1;
+  border-bottom: 1px solid transparent;
+}
+.budget-app-root .src-name-input:hover { border-bottom-color: var(--border-color); }
+.budget-app-root .src-name-input:focus { outline: none; border-bottom-color: var(--color-primary); }
+/* The kind is a grouping aid; the source's NAME is what is worth reading, so
+   this stays deliberately quiet. Free text — the dropdown only seeds it. */
+.budget-app-root .kind {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 6px; white-space: nowrap;
+  background: rgba(127, 127, 127, .16); color: var(--color-accent);
+}
+.budget-app-root .src-when {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-muted); margin-top: 5px;
+}
+.budget-app-root .src-date { width: 140px; }
+.budget-app-root .src-amt { width: 130px; }
+.budget-app-root .src-amt input { width: 100%; text-align: right; }
+.budget-app-root .plan-empty-row { padding: 14px 0; font-size: 13px; }
+
+/* ---- the envelopes: the act of dividing, made draggable ---- */
+.budget-app-root .env {
+  position: relative; padding: 22px 24px 18px; border-radius: 24px;
+  border: 1px solid var(--border-color); background: var(--surface);
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; overflow: hidden;
+  transition: border-color .14s, transform .14s;
+}
+.budget-app-root .env:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+.budget-app-root .env:focus-within { border-color: var(--color-primary); }
+/* A tint wash keyed to the envelope — the fastest way to tell "Settle up" from
+   "For the baby" in peripheral vision, and it costs no vertical space. */
+.budget-app-root .env::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 104px;
+  pointer-events: none; opacity: .16;
+  background: radial-gradient(140% 100% at 0% 0%, var(--tint, transparent), transparent 62%);
+}
+.budget-app-root .env > * { position: relative; }
+.budget-app-root .env-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.budget-app-root .env-name {
+  font: inherit; font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
+  font-weight: 600; color: var(--ink-faint); background: none; border: 0; padding: 0;
+  cursor: pointer; text-align: left;
+}
+.budget-app-root .env-name:hover { color: var(--text-primary); text-decoration: underline; }
+.budget-app-root .env-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .env-share {
+  font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; flex: none;
+  background: rgba(127, 127, 127, .16); color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Tap the figure to type it. The slider is the good part of this design and
+   also the fiddly part on a phone; without this, a precise amount is
+   unreachable by touch and unreachable by keyboard at any sensible step. */
+.budget-app-root .env-amt-btn {
+  background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+  display: block; width: 100%; text-align: left;
+}
+.budget-app-root .env-amt-btn:hover .env-amt { text-decoration: underline; }
+.budget-app-root .env-amt-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
+.budget-app-root .env-amt {
+  font-size: 29px; font-weight: 700; letter-spacing: -.025em; margin-top: 10px;
+  line-height: 1.05; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.budget-app-root .env-rail { margin-top: 16px; }
+.budget-app-root .env-slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 8px;
+  border-radius: 999px; background: rgba(127, 127, 127, .2); outline: none; cursor: pointer;
+}
+/* A 22px thumb because this is dragged with a thumb on a phone, not a mouse —
+   below about 20px the control is reliably missable at arm's length. */
+.budget-app-root .env-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--surface); border: 2px solid var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+.budget-app-root .env-slider::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--surface);
+  border: 2px solid var(--color-primary);
+}
+.budget-app-root .env-slider:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.budget-app-root .env-rail-note {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 11.5px; color: var(--ink-faint); margin-top: 7px;
+}
+.budget-app-root .env-items {
+  list-style: none; margin: 16px 0 0; padding: 14px 0 0;
+  border-top: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 9px;
+}
+/* align-items:flex-start, not center: a name that wraps to two lines would
+   otherwise drag its tick and its amount to the vertical middle of the row,
+   leaving a column of ticks that no longer line up with each other.
+   flex-wrap so a long part-bought label ("R 640,00 / R 900,00") drops to its
+   own line rather than squeezing the name into a four-line column — these
+   cards are 280px at their narrowest and both cannot always fit side by side. */
+.budget-app-root .env-item {
+  display: flex; align-items: flex-start; flex-wrap: wrap; gap: 2px 10px; font-size: 12.5px;
+}
+.budget-app-root .ei-tick {
+  width: 17px; height: 17px; border-radius: 5px; flex: none; cursor: pointer;
+  border: 1px solid var(--border-color); background: transparent;
+  display: grid; place-items: center; font-size: 10px; line-height: 1;
+  color: var(--text-muted); padding: 0;
+}
+.budget-app-root .ei-tick.done { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.budget-app-root .ei-tick.part { border-color: var(--color-warning); color: var(--color-warning-ink); }
+.budget-app-root .ei-tick:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* flex:1 rather than the default flex:0 1 auto. As a shrink-only item the name
+   was squeezed to its narrowest fitting width by the amount beside it, so
+   "Books and sensory toys" wrapped onto four lines in a card with room to
+   spare. It takes the slack; the amount keeps its nowrap and stays right. */
+.budget-app-root .ei-name {
+  font: inherit; font-size: 12.5px; background: none; border: 0; padding: 0;
+  cursor: pointer; text-align: left; color: var(--text-primary);
+  flex: 1 1 55%; min-width: 0;
+}
+.budget-app-root .ei-name:hover { text-decoration: underline; }
+.budget-app-root .ei-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .ei-name.done { color: var(--text-muted); text-decoration: line-through; }
+.budget-app-root .ei-amt, .budget-app-root .ei-actual {
+  margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600;
+  white-space: nowrap; flex: none; align-self: flex-start;
+}
+.budget-app-root .ei-amt { color: var(--text-muted); }
+.budget-app-root .ei-actual { color: var(--color-primary); font-size: 11.5px; }
+.budget-app-root .env-item-add { margin-top: 2px; }
+.budget-app-root .env-add {
+  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  padding: 4px 11px; border-radius: 999px; border: 1px dashed var(--border-color);
+  background: transparent; color: var(--text-muted);
+}
+.budget-app-root .env-add:hover { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); }
+.budget-app-root .env-add:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .env-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: auto; padding-top: 16px;
+}
+.budget-app-root .env-count { font-size: 11.5px; color: var(--ink-faint); }
+
+/* ---- what is not spoken for ---- */
+/* The only deliberately loud card on the page. Hidden by renderFree the moment
+   the split balances: an all-clear plan gets no shelf standing there saying
+   "R 0.00 left", the same rule the Accounts deck follows. */
+.budget-app-root .plan-free {
+  border-radius: var(--radius-card); border: 1px dashed var(--color-gold);
+  padding: 24px 28px; background: var(--color-warning-light);
+}
+.budget-app-root .plan-free.is-over { border-color: var(--color-danger); background: var(--color-danger-light); }
+.budget-app-root .plan-free h2 { margin: 0; font-size: 16px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .plan-free .free-fig {
+  font-size: 34px; font-weight: 700; letter-spacing: -.025em; margin-top: 6px;
+  color: var(--color-gold); font-variant-numeric: tabular-nums;
+}
+.budget-app-root .plan-free.is-over .free-fig { color: var(--color-danger); }
+.budget-app-root .plan-free p { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; max-width: 56ch; }
+.budget-app-root .plan-free .free-acts { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 16px; }
+
+/* Tints, washes and chips get their mixed colours only where color-mix exists.
+   Everything above already reads correctly without this block — these are
+   refinements, not the design. */
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  .budget-app-root .plan-split .s-free {
+    background: repeating-linear-gradient(135deg,
+      color-mix(in srgb, var(--color-gold) 38%, transparent) 0 6px, transparent 6px 12px);
+    opacity: 1;
+  }
+  .budget-app-root .plan-split .s-alloc {
+    background: linear-gradient(90deg, var(--color-accent),
+      color-mix(in srgb, var(--color-accent) 55%, transparent));
+  }
+  .budget-app-root .env::before { opacity: .5; }
+  .budget-app-root .env:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color)); }
+  .budget-app-root .env-share { background: color-mix(in srgb, var(--text-primary) 9%, transparent); }
+  .budget-app-root .kind { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+  .budget-app-root .env-slider { background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+  .budget-app-root .plan-free { background: color-mix(in srgb, var(--color-gold) 7%, transparent); }
+  .budget-app-root .plan-free.is-over { background: color-mix(in srgb, var(--color-danger) 7%, transparent); }
+}
+
+@media (max-width: 640px) {
+  .budget-app-root .pot { padding: 24px 20px; }
+  .budget-app-root .pot-fig { font-size: 34px; }
+  .budget-app-root .src-amt { width: 110px; }
+  .budget-app-root .env { padding: 20px; }
 }

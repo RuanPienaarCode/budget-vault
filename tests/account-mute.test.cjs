@@ -35,15 +35,15 @@ const wallet = extra => ({ name: 'Cash', balance: 500, balance_updated: TODAY, .
 /* ---- 1. unmuted, an account with no folder asks to be looked at ---- */
 {
   const s = statusOf(wallet(), [], TODAY, false);
-  eq(s.state, 'notx', 'nothing has imported into it');
+  eq(s.state, 'nofolder', 'no folder linked');
   eq(s.muted, false, 'and nothing has told it to be quiet');
   eq(wantsALook(s), true, 'so it is in the queue');
 }
 
 /* ---- 2. muted, it keeps its state and leaves the queue ---- */
 {
-  const s = statusOf(wallet({ ignore_warnings: '[no-transactions]' }), [], TODAY, false);
-  eq(s.state, 'notx', 'the state is UNCHANGED — this is a mute, not a fix');
+  const s = statusOf(wallet({ ignore_warnings: '[no-folder]' }), [], TODAY, false);
+  eq(s.state, 'nofolder', 'the state is UNCHANGED — this is a mute, not a fix');
   eq(s.muted, true, 'but it is marked muted');
   eq(wantsALook(s), false, 'so it drops out of the queue, the count and the filter');
   eq(queueOrder([s]), [], 'and out of the ordered queue itself');
@@ -58,7 +58,7 @@ const wallet = extra => ({ name: 'Cash', balance: 500, balance_updated: TODAY, .
 {
   /* Confirmed on the 1st, then R100 moved on the 5th and the stated figure was
      never updated — so the transactions imply 400 where the file says 500. */
-  const a = wallet({ balance_updated: '2026-08-01', ignore_warnings: '[unconfirmed]' });
+  const a = wallet({ balance_updated: '2026-08-01', ignore_warnings: '[no-transactions]' });
   const rows = [{ date: '2026-08-05', amount: -100, label: 'Cash' }];
   const s = statusOf(a, rows, TODAY, true);
   eq(s.state, 'drift', 'with rows present it is drifting, not the muted state');

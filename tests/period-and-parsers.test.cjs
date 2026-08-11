@@ -623,6 +623,40 @@ for (const [cell, dayFirst, want, why] of [
   ['2026-13-01', true, null, 'month 13 is rejected, not wrapped'],
   ['2026-00-10', true, null, 'month 0 is rejected'],
   ['2026-07-32', true, null, 'day 32 is rejected'],
+
+  /* Dotted separators. DD.MM.YYYY is the ordinary format across the whole `eu`
+     profile, which ships with de/fr/es UI languages — and the regexes accepted
+     only / and -, so every one of these fell through to the Date constructor
+     below and was read MM.DD by V8 while iOS dropped it. */
+  ['03.04.2026', true, '2026-04-03', 'DD.MM.YYYY under a day-first profile'],
+  ['13.04.2026', true, '2026-04-13', 'a dotted day past the 12th is unambiguous'],
+  ['31.12.2026', true, '2026-12-31', 'and a dotted month-end parses rather than vanishing'],
+  ['04.03.2026', false, '2026-04-03', 'MM.DD.YYYY under a month-first profile'],
+  ['2026.07.23', true, '2026-07-23', 'ISO with dots'],
+  ['23.07.2026 00:20', true, '2026-07-23', 'dotted with a trailing clock time'],
+
+  /* The Date constructor is GONE, so nothing here is engine-dependent any more.
+     Measured 10 Aug 2026 against node v22 (V8) and macOS jsc (JavaScriptCore),
+     the engine Obsidian mobile runs: V8 turned the first four into dates and
+     JSC returned Invalid Date for all of them — and `JUN 12` produced a
+     different YEAR on each (2001 vs 2000). isDate() drives three decisions in
+     detectHeaderlessColumns, so this was column detection resolving differently
+     on the phone than on the desktop for the same file. */
+  ['PICK N PAY 1234', true, null, 'a merchant name is not a date, whatever V8 made of it'],
+  ['PURCHASE 0', true, null, 'nor is a description ending in a digit'],
+  ['1 May', true, null, 'a day and a month with no year is not a date'],
+  ['JUN 12', true, null, 'and this one disagreed about the year between engines'],
+  ['Mar 3 2026', true, null, 'Mon DD YYYY is unsupported — add an explicit rule, never guess'],
+
+  /* Impossible calendar dates. The bounds check allowed any day up to 31 in any
+     month, so these became real-looking ISO strings that were written to disk,
+     filed into a month, and keyed into the dedup index — and daysApart returns
+     Infinity for them, which switches off near-duplicate matching for that row. */
+  ['2026-02-30', true, null, '30 February is not a day'],
+  ['31/02/2026', true, null, 'and it is still not a day by the DD/MM route'],
+  ['2026-04-31', true, null, 'April has thirty days'],
+  ['2026-02-29', true, null, '2026 is not a leap year'],
+  ['2024-02-29', true, '2024-02-29', 'but 2024 is, and a real leap day must still parse'],
 ]) {
   eq(parseStatementDate(cell, dayFirst), want,
     `parseStatementDate(${JSON.stringify(cell)}, dayFirst=${dayFirst}) — ${why}`);
@@ -695,6 +729,66 @@ for (const [cell, dayFirst, want, why] of [
   ok(!reconcileAmounts(half).verified, 'a half-matching ledger is not proof');
 }
 
+/* ---- the balance column runs BACKWARDS on a credit card ----
+
+   Every case above is an asset ledger: money out makes the balance fall. A card
+   statement's balance column is the amount OWING, so it RISES when you spend —
+   and the arithmetic cannot tell the two apart, because both reconcile perfectly
+   under some sign. Left to itself the function verified a card the same way it
+   verifies a cheque account and reported flip:false, so every purchase imported
+   POSITIVE — as income — under the review screen's most reassuring sentence,
+   "Amounts check out against this statement's own balance column."
+
+   Nothing in the numbers can settle it. The account can: a credit_card account
+   is the app's one liability type, and for it the expected relation inverts. */
+const CARD = [
+  { amount: 150, balance: 1150 },   // purchases, printed positive, balance owing rises
+  { amount: 250, balance: 1400 },
+  { amount: -500, balance: 900 },   // a payment lands as a credit and pays it down
+  { amount: 75, balance: 975 },
+  { amount: 25, balance: 1000 },
+];
+{
+  const asAsset = reconcileAmounts(CARD);
+  ok(asAsset.verified, 'a card ledger reconciles perfectly — that was never the problem');
+  eq(asAsset.flip, false, 'and read as an asset it says the signs are already right');
+
+  const asCard = reconcileAmounts(CARD, { liability: true });
+  ok(asCard.verified, 'told it is a card, it still reconciles');
+  eq(asCard.flip, true, 'but now says every amount must be negated — a purchase is money OUT');
+}
+{
+  /* What the flag is, stated honestly: it RELABELS, it does not add evidence.
+     The four hypotheses already span both signs, so any ledger that reconciles
+     at all reconciles under either reading — only `flip` differs. A cheque
+     ledger called a card verifies just as happily and then claims its signs are
+     backwards, which they are not.
+
+     So the balance column can prove the MAGNITUDES line up and never what they
+     mean; the account is the only thing that settles that. Which is exactly why
+     an account the importer could not identify keeps the asset reading instead
+     of guessing — see the caller. */
+  const cheque = [
+    { amount: -100, balance: 900 }, { amount: -200, balance: 700 },
+    { amount: 500, balance: 1200 }, { amount: -50, balance: 1150 },
+    { amount: -150, balance: 1000 },
+  ];
+  ok(reconcileAmounts(cheque).verified, 'a cheque ledger verifies as an asset');
+  eq(reconcileAmounts(cheque).flip, false, 'with its signs already correct');
+  ok(reconcileAmounts(cheque, { liability: true }).verified,
+    'the same ledger called a card still reconciles — the flag is not extra proof');
+  eq(reconcileAmounts(cheque, { liability: true }).flip, true,
+    'it just reads the signs the other way, so the caller has to be right about the account');
+}
+{
+  // Default and explicit-false must stay the asset reading, so no existing
+  // caller changes behaviour.
+  eq(reconcileAmounts(CARD).flip, reconcileAmounts(CARD, {}).flip,
+    'an absent option reads exactly as before');
+  eq(reconcileAmounts(CARD, { liability: false }).flip, false,
+    'and so does an explicit non-liability account');
+}
+
 /* ====================== detectHeaderlessColumns ========================= */
 /* Nedbank's cheque export carries no header row at all — a short preamble, then
    date,description,amount,balance. The layout has to be read off the shape of
@@ -753,6 +847,50 @@ const SHORT_HEADERLESS = [
   ok(shape, 'four data rows resolve');
   eq(shape.iAmount, 2, 'the amount column wins once the balances can prove it');
   eq(shape.iBalance, 3, 'and the trailing column is recorded as the balance');
+}
+/* ENOUGH FILE TO TELL, AND IT SAID NO.
+
+   The guard above closed the "too few rows to prove it" door and left the
+   other one open. reconcileAmounts reports BOTH "not enough evidence" (fewer
+   than three pairs) and "the balances do not line up" as verified:false — and
+   only the first was being caught. A file with plenty of rows whose balance
+   column simply fails to reconcile fell through to the SAME branch as a
+   Debit/Credit pair and had its running balance read as every amount.
+
+   The shape below is a "debits only" filtered export, which every bank offers.
+   Each row shown is real, but the rows filtered OUT moved the balance too, so
+   the balance steps by more than the amount beside it and nothing reconciles
+   (agreement 0 over 5 pairs). Read as amounts, the balance column turns
+   R4 100.00 of spending into R39 190.00 of income — and because the
+   fall-through also sets iBalance = -1, views/import.js computes no reconcile
+   verdict at all, so the review screen shows neither the warning nor any other
+   banner. Silent in both directions at once.
+
+   Verified:false is not proof of a Debit/Credit pair. It is the absence of
+   proof, and the honest answer is the manual column mapper. */
+const FILTERED_HEADERLESS = [
+  'Account 1234',
+  'Statement Enquiry',
+  '01Jul2026,ALPHA STORE,-100.00,9000.00',
+  '02Jul2026,BETA FUEL,-500.00,8210.00',
+  '03Jul2026,GAMMA SHOP,-600.00,7455.00',
+  '04Jul2026,DELTA CAFE,-900.00,6120.00',
+  '05Jul2026,EPSILON MART,-800.00,5015.00',
+  '06Jul2026,ZETA CO,-1200.00,3390.00',
+].join('\n');
+{
+  const rows = parseCsv(FILTERED_HEADERLESS);
+  const ledger = rows.slice(2).map(r => ({ amount: +r[2], balance: +r[3] }));
+  const bal = reconcileAmounts(ledger);
+  // Pin the premise: this file has plenty of pairs and still proves nothing.
+  // Without this the test could pass for the old reason (too few rows).
+  ok(bal.pairs >= 3, 'the fixture has enough pairs to be past the "not enough file" guard');
+  eq(bal.verified, false, 'and the balances still do not reconcile');
+
+  eq(detectHeaderlessColumns(rows, true), null,
+    'a balance column that cannot prove itself is not a licence to read it as the amount');
+  eq(detectStatementColumns(rows, true), null,
+    'and the decision function passes that through, so the import view opens the mapper');
 }
 /* Nedbank's credit card is the same headerless preamble, but a different shape:
    TWO leading date columns (posted, transacted) and a single amount at the

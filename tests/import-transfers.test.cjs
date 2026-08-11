@@ -21,7 +21,7 @@
 
 const assert = require('assert');
 require('./helpers/harness.cjs').stubObsidian();
-const { counterpartyAccount } = require('../src/statement');
+const { counterpartyAccount, applyCounterparties } = require('../src/statement');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -88,6 +88,64 @@ const hit = (desc, self) => counterpartyAccount(desc, ACCOUNTS, self);
   const shortAcct = [{ name: 'Tiny', account_number: '123' }];
   eq(counterpartyAccount('PAYMENT 123', shortAcct, 'x'), null,
     'a 3-digit account number is below the floor and never matches');
+}
+
+/* ---- 7. the suggestion has to follow the account the statement is believed
+   to belong to ----
+
+   counterpartyAccount can only skip the statement's OWN account if it is told
+   which one that is, and the import view learns that in two steps: it guesses
+   from the filename and preamble first, and only later does the review screen
+   settle on a label — from the user's pick, from a newly created account, or
+   from the plain default of the first one in the list when the guess came back
+   empty.
+
+   So the guess being empty is not an edge case, it is every hand-saved or
+   renamed export. With selfLabel '' the self-skip is falsy and never fires,
+   and every row quoting the statement's own account number matches ITSELF and
+   arrives pre-excluded — which is the one outcome statement.js's own comment
+   says the skip exists to prevent, because `excluded` is written to disk and
+   periodSummary vetoes those rows from income and spend for good.
+
+   The suggestion therefore cannot be computed once. It has to be recomputed
+   whenever the believed account changes — while never overwriting a row the
+   reader has already decided on, the way nearAuto and `manual` already protect
+   the import tick and the category. */
+{
+  const rows = () => ([
+    { desc: 'IB TRANSFER FROM 1122334455', excluded: false, transferTo: '' },
+    { desc: 'IB TRANSFER TO 9876543210', excluded: false, transferTo: '' },
+    { desc: 'SALARY ACME PAYROLL', excluded: false, transferTo: '' },
+  ]);
+
+  // Detection failed: selfLabel is ''. This is the state runImport builds in.
+  const guessed = applyCounterparties(rows(), ACCOUNTS, '');
+  eq(guessed[0].excluded, true,
+    'with no known self, a row naming the statement’s own account matches itself');
+
+  // The review screen settles on the real account — by pick, by new account, or
+  // by the default at import.js:337. The suggestion must follow it.
+  const settled = applyCounterparties(guessed, ACCOUNTS, 'Transaction Account');
+  eq(settled[0].excluded, false,
+    'once the account is known, a row naming it is the statement’s own and not a transfer');
+  eq(settled[0].transferTo, '', 'and its "transfer" badge goes with it');
+  eq(settled[1].excluded, true, 'a row naming a DIFFERENT account is still a transfer');
+  eq(settled[1].transferTo, 'Emergency Fund', 'and still says which one');
+  eq(settled[2].excluded, false, 'ordinary income is untouched throughout');
+
+  // Idempotent: renderImportReview runs on every account switch and every
+  // "show more", so a second pass at the same label must change nothing.
+  const again = applyCounterparties(settled, ACCOUNTS, 'Transaction Account');
+  eq(again.map(r => r.excluded), [false, true, false],
+    're-rendering at the same account changes nothing');
+
+  // A decision the reader has made outranks the suggestion, in both directions.
+  const held = applyCounterparties(
+    [{ desc: 'IB TRANSFER TO 9876543210', excluded: false, transferTo: '', manualExclude: true },
+     { desc: 'SALARY ACME PAYROLL', excluded: true, transferTo: '', manualExclude: true }],
+    ACCOUNTS, 'Transaction Account');
+  eq(held[0].excluded, false, 'a transfer the reader un-excluded stays un-excluded');
+  eq(held[1].excluded, true, 'and a row the reader excluded by hand stays excluded');
 }
 
 console.log(`import-transfers.test.cjs — ${checks} checks OK`);

@@ -60,16 +60,26 @@ module.exports = function registerDebts(ctx) {
     const plan = simulate(list, { extra: planExtra(), strategy: planStrategy() });
 
     const tile = kpiTiles($('#debtKpis'));
-    tile('Total debt', money(total), total > 0 ? 'text-danger' : 'text-success',
+    // Neutral: owing money is an ordinary financial position, not a red state.
+    tile('Total debt', money(total), '',
       `${list.length} active · ${S.debts.length} tracked`);
     tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
     // The single most actionable number here: what this month costs before a
     // cent of principal moves.
     tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
       perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
-    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months)) : (total > 0 ? 'never' : '—'),
+    /* The tile silently folded in BOTH the what-if extra typed into the planner
+       below it and the rollover of each cleared payment into the next — so
+       typing 3000 into a box moved the page's headline promise 34 months
+       earlier with nothing saying so. The projection is fine; the caption is
+       what was missing. 'never' likewise became a verdict on the reader rather
+       than a statement about the inputs. */
+    const planAssumes = extra > 0
+      ? `assumes ${money(extra, 0)}/mo extra and each cleared payment rolling into the next`
+      : 'assumes each cleared payment rolls into the next';
+    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months)) : (total > 0 ? 'not at this payment' : '—'),
       plan.settled && plan.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
-      plan.settled && plan.months ? humanMonths(plan.months) : (total > 0 ? 'payments too low' : 'no debt tracked'));
+      plan.settled && plan.months ? `${humanMonths(plan.months)} — ${planAssumes}` : (total > 0 ? 'not within 50 years at the payments entered' : 'no debt tracked'));
   }
 
   /* ------------------------------ the plan -------------------------------
@@ -106,8 +116,8 @@ module.exports = function registerDebts(ctx) {
         el('div', { class: 'dp-h' }, el('b', {}, r.label),
           r.key === chosen ? el('span', { class: 'dp-tag' }, 'selected') : ''),
         el('div', { class: 'dp-note' }, r.note),
-        el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : 'never'),
-        el('div', { class: 'dp-sub' }, r.res.settled && r.res.months ? humanMonths(r.res.months) : 'payments never clear the interest'),
+        el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : 'not at this payment'),
+        el('div', { class: 'dp-sub' }, r.res.settled && r.res.months ? humanMonths(r.res.months) : 'does not clear within 50 years'),
         el('div', { class: 'dp-row' }, el('span', {}, 'Interest'),
           el('b', { class: 'num' }, r.res.settled ? money(r.res.interest, 0) : '—')));
       if (r.key !== 'minimum' && saved > 1) {
@@ -122,12 +132,36 @@ module.exports = function registerDebts(ctx) {
       grid.append(card);
     }
     wrap.append(grid);
+
+    /* The page had NO disclaimer at all while projecting payoff dates fifty
+       years out, quoting total interest in the hundreds of thousands, ranking
+       the reader's debts and rendering the result in the celebratory gradient
+       style. The Loan Calculators view has carried one since 1.0.14; this is
+       the same sentence, plus the assumption set — which appeared nowhere the
+       reader could see it, though every date on the page depends on it.
+
+       Deliberately a local const and English-only, matching views/loans.js and
+       views/tax.js as they stand today. Promoting all three to a shared
+       i18n-backed module, and adding the test that fails when one is deleted,
+       is its own change. */
+    wrap.append(el('p', { class: 'text-muted', style: 'margin:16px 0 0;font-size:12px;line-height:1.5' },
+      'Projections assume the rate, the payment and any extra all stay exactly as entered, with nothing '
+      + 'new borrowed and no fees. A rate change or one missed payment moves every date here. '
+      + 'Estimates only — this is not financial advice. Confirm anything important with your lender '
+      + 'or a qualified adviser.'));
     renderDebtCurve(runs);
 
     if (!base.settled) {
       wrap.append(el('p', { class: 'text-danger', style: 'margin:14px 0 0;font-size:12.5px' },
-        `On the contracted payments alone, ${base.stalled.join(', ')} never clears — the interest is at or above the payment. ` +
-        'Raise the payment or add extra above.'));
+        /* "never clears — the interest is at or above the payment" was stated as
+           fact for anything that had not closed within the 600-month cap, which
+           includes debts that DO clear, just slowly: R500 000 at 11% paying
+           R4 600 covers its R4 583 of monthly interest and closes in 616 months.
+           Three separate strings asserted the interest was winning when it was
+           not. This one says what is actually known — it did not clear inside
+           the horizon the projection runs to. */
+        `On the contracted payments alone, ${base.stalled.join(', ')} does not clear within 50 years. ` +
+        'Raising the payment, or adding extra above, shortens it.'));
     }
 
     /* Attack order for the selected method. Snowball and avalanche only differ
@@ -138,8 +172,11 @@ module.exports = function registerDebts(ctx) {
        was computing a result already sitting in the array. */
     const plan = runs.find(r => r.key === chosen).res;
     const seq = priorityOrder(list.map(d => ({ ...d })), chosen);
+    /* "Put every spare rand at these in order" until now — an instruction, and
+       the most advice-shaped sentence in the app. The order is arithmetic and
+       stays; telling the reader what to do with their money is not. */
     order.append(el('div', { class: 'sub', style: 'margin-bottom:10px' },
-      `Put every spare rand at these in order${extra ? ` — ${money(extra, 0)} extra a month` : ''}. ` +
+      `The plan below aims spare money in this order${extra ? ` — ${money(extra, 0)} extra a month` : ''}. ` +
       'As each one closes, its payment rolls into the next.'));
     const ol = el('ol', { class: 'debt-order' });
     for (const d of seq) {
@@ -240,10 +277,21 @@ module.exports = function registerDebts(ctx) {
     const note = el('div', { class: 'debt-dti' });
     if (income > 0) {
       const ratio = (committedAll / income) * 100;
-      note.append(el('b', { class: `num ${ratio > 36 ? 'text-danger' : ratio > 20 ? 'text-warning' : 'text-success'}` }, `${ratio.toFixed(1)}%`),
+      /* Neutral, deliberately. This used to render red above 36%, amber above
+         20% and green below, under the sentence "Lenders treat above 36% as
+         stretched" — a US mortgage-underwriting rule of thumb, unattributed,
+         shown identically in all eight country profiles. South African
+         affordability under the NCA is a disposable-income calculation against
+         a prescribed expense table, not a ratio at all.
+
+         A calculator says what share of your income goes to debt. Grading that
+         share, and citing "lenders" to back the grade, is an assessment of the
+         reader's finances rather than arithmetic on their numbers — and it is
+         the clearest verdict-shaped output in the app. The number is the useful
+         part and it stays; the colour and the claim do not. */
+      note.append(el('b', { class: 'num' }, `${ratio.toFixed(1)}%`),
         ` of your${scaleNote} goes to debt payments — ${money(committedAll)} across ` +
-        `${list.length} debt${list.length === 1 ? '' : 's'}`,
-        el('span', { class: 'text-muted' }, ratio > 36 ? '. Lenders treat above 36% as stretched.' : '.'));
+        `${list.length} debt${list.length === 1 ? '' : 's'}.`);
     } else {
       note.append(el('span', { class: 'text-muted' },
         `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? '' : 's'}. ` +
@@ -338,9 +386,11 @@ module.exports = function registerDebts(ctx) {
             clearCell.append(el('span', { class: 'text-success' }, 'settled'));
             interestCell.append(el('span', { class: 'text-muted' }, '—'));
           } else if (!a.settled) {
-            // The payment never clears the interest — the one case a payoff
-            // date would be a lie rather than an estimate.
-            clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'never' : 'no payment'));
+            /* Did not close inside the 600-month horizon amortise runs to. That
+               covers a payment genuinely below the interest AND one just above
+               it that simply takes decades, so this says what is known rather
+               than asserting the interest is winning. */
+            clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'not in 50 yrs' : 'no payment'));
             interestCell.append(el('span', { class: 'text-danger num' }, `+${money(monthlyInterest(d.balance, d.rate), 0)}/mo`));
           } else {
             clearCell.append(el('span', {}, monthLabel(addMonths(a.months))),

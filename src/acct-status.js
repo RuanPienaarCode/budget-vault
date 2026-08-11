@@ -10,11 +10,21 @@
 
    The states, and why the order between them is what it is:
 
-     notx    nothing imports into this account, so NOTHING can check the
-             figure. Said first because it makes every other state below
-             unanswerable rather than false: an account with no transactions
-             cannot drift, and calling it "unconfirmed for 94 days" implies a
-             check that could have happened and didn't.
+     notx    a transactions folder is linked, but nothing has imported into it
+             yet. Nothing can check the figure.
+     nofolder no folder is linked at all, so nothing can import, so nothing can
+             check the figure either.
+
+             These two are separated because the ANSWER differs and only the
+             answer is actionable: the first reader imports a statement, the
+             second links a folder. Collapsed into one state — which is what
+             "zero rows" gives you, since an empty folder contributes no rows —
+             the page hands every one of them "Link a folder", telling the first
+             reader to re-link a folder they already have. Both are said before
+             the states below for the same reason as before: they make every one
+             of them unanswerable rather than false, because an account with no
+             transactions cannot drift, and calling it "unconfirmed for 94 days"
+             implies a check that could have happened and didn't.
      drift   money has moved since the figure was confirmed, and there is an
              exact replacement waiting. The only state with a one-tap answer,
              so it outranks the two below even when they are also true.
@@ -39,8 +49,12 @@ const { daysSince, isStale, reconcile, STALE_DAYS } = require('./reconcile');
 /* Lower sorts first. The queue is ordered by what it costs the reader to
    settle, not by where the account happens to sit in the vault: a drift has an
    exact replacement waiting, a stale figure is probably still right, and the
-   last two are set-up gaps that have already waited this long. */
-const URGENCY = { drift: 0, stale: 1, nodate: 2, notx: 3, ok: 9 };
+   last three are set-up gaps that have already waited this long.
+
+   `notx` sorts above `nofolder` because it is the nearer of the two to being
+   answered — the folder is already there, so the reader is one import from a
+   checkable figure, where the other still has to decide what to link. */
+const URGENCY = { drift: 0, stale: 1, nodate: 2, notx: 3, nofolder: 4, ok: 9 };
 
 /* Never-confirmed sorts as the oldest thing on the page. MAX_SAFE_INTEGER
    rather than Infinity so two of them subtract to 0 rather than to NaN — a NaN
@@ -49,12 +63,16 @@ const URGENCY = { drift: 0, stale: 1, nodate: 2, notx: 3, ok: 9 };
 const OLDEST = Number.MAX_SAFE_INTEGER;
 const staleRank = s => (s.days === null ? OLDEST : s.days);
 
-function statusOf(a, rows, today) {
+/* `hasFolder` is the caller's answer to "is a Transactions/ folder linked to
+   this account?" — knowledge that lives in the vault tree, not in the rows, and
+   cannot be recovered from an empty row list. Omitting it resolves to
+   `nofolder`, which is what every caller got before this argument existed. */
+function statusOf(a, rows, today, hasFolder) {
   const list = rows || [];
   const rec = reconcile(a, list, today);
   const days = daysSince(a.balance_updated, today);
   let state;
-  if (!list.length) state = 'notx';
+  if (!list.length) state = hasFolder ? 'notx' : 'nofolder';
   else if (rec.state === 'drift') state = 'drift';
   else if (days === null) state = 'nodate';
   else if (isStale(a.balance_updated, today)) state = 'stale';
@@ -71,13 +89,7 @@ function statusOf(a, rows, today) {
 
 /* Every state that can be silenced. `ok` is absent because there is nothing
    there to silence, and its absence is what stops `ignore_warnings: ok` from
-   parsing into something meaningless.
-
-   `nofolder` is listed although this file cannot currently REACH that state —
-   it arrives with the folder-detection work landing separately. Listing it now
-   costs nothing (a state that never occurs never matches) and means the vault
-   frontmatter, the dialog and this list do not have to change again when it
-   does. */
+   parsing into something meaningless. */
 const WARNINGS = ['drift', 'stale', 'nodate', 'notx', 'nofolder'];
 
 /* The frontmatter is written by hand as often as by the dialog, so the words a
@@ -97,8 +109,8 @@ const WARNING_ALIASES = {
 /* Which warnings this account has been told to keep quiet about.
 
    Accepts `true` (all of them — the shorthand, and what the dialog's
-   everything-off state means), a bracketed or bare comma list, or nothing.
-   Underscores and spaces normalise to hyphens so `no_transactions`,
+   everything-off state means), a bracketed or bare comma/space list, or
+   nothing. Underscores and spaces normalise to hyphens so `no_transactions`,
    `no transactions` and `no-transactions` are the same instruction.
 
    An unrecognised word is DROPPED rather than treated as "mute everything":

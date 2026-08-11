@@ -175,10 +175,23 @@ class SplitModal extends Modal {
     this.refresh();
   }
 
+  /* The cents a part will actually be WRITTEN as.
+
+     Everything that judges a part goes through here — the balance, the
+     positivity check, and the rows submit() hands back — because the gate has
+     to weigh the values it is about to write, not the ones that were typed. It
+     used to round the SUM of the raw magnitudes while submit() rounded each
+     part on its way out, so anything below a cent was measured one way and
+     written another: 33.333 three times sums to 99.999, rounds to 100.00, and
+     reported balanced while writing 99.99. tx-role.js re-checks none of this by
+     design ("the modal is the gate"), and the parent is excluded on the way
+     out, so the difference simply left the budget. */
+  partMag(p) { return Math.round(((p && p.mag) || 0) * 100) / 100; }
+
   /* Rounded to cents at every step: comparing raw float sums against the
      original is how a 0.004 remainder ends up permanently un-zeroable. */
   allocated() {
-    return Math.round(this.parts.reduce((a, p) => a + (p.mag || 0), 0) * 100) / 100;
+    return Math.round(this.parts.reduce((a, p) => a + this.partMag(p), 0) * 100) / 100;
   }
   remainder() { return Math.round((this.total - this.allocated()) * 100) / 100; }
 
@@ -229,7 +242,10 @@ class SplitModal extends Modal {
     const { money } = this.opts;
     const rem = this.remainder();
     const balanced = rem === 0;
-    const allPositive = this.parts.every(p => p.mag > 0);
+    // The written value, not the typed one: 0.004 is a number the reader typed
+    // and not an amount the file can hold, so it must read as missing here
+    // rather than balance the split and then land as a 0.00 row.
+    const allPositive = this.parts.every(p => this.partMag(p) > 0);
     /* The message names the actual blocker. "Balanced" while the Split button
        sits disabled (the seeded second part is still 0) reads as a bug. */
     this.footEl.textContent = !balanced
@@ -243,9 +259,12 @@ class SplitModal extends Modal {
   }
 
   submit() {
-    if (this.remainder() !== 0 || !this.parts.every(p => p.mag > 0)) return;
-    this.result = this.parts.map(p => ({
-      amount: parseFloat((this.sign * p.mag).toFixed(2)),
+    // Same rounded magnitudes the gate weighed, reused rather than recomputed —
+    // one rule, so what was approved is exactly what is written.
+    const mags = this.parts.map(p => this.partMag(p));
+    if (this.remainder() !== 0 || !mags.every(m => m > 0)) return;
+    this.result = this.parts.map((p, i) => ({
+      amount: parseFloat((this.sign * mags[i]).toFixed(2)),
       cat: p.cat,
       note: p.note.trim(),
     }));

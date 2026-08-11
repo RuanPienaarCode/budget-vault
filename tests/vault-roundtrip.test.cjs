@@ -63,7 +63,13 @@ const FILES = {
      stops a future reader deciding it does. */
   [`${B}/Transactions/FNB Cheque/2026-08.md`]: `---\naccount: "FNB Cheque"\nmonth: 2026-08\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n| 2026-08-04 | Virgin Active | Gym | -600.00 |  |  |  |\n| 2026-08-07 | Checkers Hyper | Groceries | -1000.00 | yes | Split into 3 | parent |\n| 2026-08-07 | Checkers Hyper | Groceries | -600.00 |  |  | part |\n| 2026-08-07 | Checkers Hyper | Household | -280.00 |  |  | part |\n| 2026-08-07 | Checkers Hyper | Pharmacy | -120.00 |  |  | part |\n`,
 
-  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status |\n|---|---:|---|---|---|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding |\n| Léa | 40.00 | multi<br>line | | paid |\n',
+  /* Rows 3 and 4 are hand-typed the way Assets.md and Debts.md already are: a
+     space-grouped amount, a comma-grouped one, and a currency prefix. The
+     Amount and Repaid columns are arithmetic input like a debt balance, so
+     they must be READ, not truncated — and this file is the one place that can
+     prove it, because owed-math's own suite builds its rows from numeric
+     literals and never goes through the loader. */
+  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | |\n| Léa | 40.00 | multi<br>line | | paid | |\n| Thabo | 1 500,00 | space-grouped \\| comma decimal | 2026-09-01 | outstanding | |\n| Nadia | R4000 | currency prefix, part repaid | | outstanding | 1 000,00 |\n| Yusuf | 12,500.00 | comma-grouped thousands | | outstanding | |\n',
 
   [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n',
 
@@ -72,7 +78,9 @@ const FILES = {
      is not one of the presets, and a row with nothing but a name. */
   [`${B}/Assets.md`]: '---\nkind: assets\naliases: [possessions]\n---\n\n# Assets\n\n| Item | Kind | Value | Valued | Notes |\n|------|------|------:|--------|-------|\n| The house \\| Gardens | property | 15 000 000 | 2026-03-01 | bonded \\| see Debts |\n| Corolla | vehicle | 70000.00 | when we bought it | non-ISO date |\n| Rings | jewellery | 60000.00 | 2019-11-02 | multi<br>line |\n| Krugerrands | precious metals | 1.234,56 | | hand-edited cell |\n| Nameplate only | | | | |\n',
 
-  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n',
+  /* Same hazard in the Services amount column, which feeds the committed total
+     the Dashboard subtracts from "actually free to spend". */
+  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: assessed\ndeadline_standard: "2026-10-20"\nassessment_ref: "ITA34: 2026/0031"\nassessment_result: -1250.00\nassessment_income: 480000\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | banks \\| investments |\n| File ITR12 | todo |  |  |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | uploaded | irp5.pdf | |\n| IT3(b) | Bank \\| A | needed | | multi<br>line |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n| 4201 | Local interest | Bank B | 12000.00 |\n',
 };
@@ -172,9 +180,40 @@ const FILES = {
   const splitRows = S.txFiles[splitKey].rows;
   eq(splitRows.filter(r => r.split === 'part').reduce((s, r) => s + r.amount, 0), -1000,
     'the parts loaded off disk sum to the parent loaded off disk');
-  eq(S.owed.length, 2, 'both owed rows load');
-  eq(S.services.length, 2, 'both services load');
+  eq(S.owed.length, 5, 'every owed row loads');
+  eq(S.services.length, 4, 'every service loads');
   eq(S.debts.length, 2, 'both debts load');
+
+  /* The Owed and Services money columns were the last three in this file still
+     read with parseFloat, which stops at the first character it cannot use:
+     "1 500,00" became 1, "12,500.00" became 12, "R4000" became NaN → 0. Every
+     other money column here was moved to parseNum with a comment saying why,
+     so this is an unfinished sweep rather than a decision.
+
+     It has to be caught HERE, on the absolute value, and not by the round-trip
+     equality further down: serializeOwed writes o.amount.toFixed(2), so a
+     truncated 1 is written back as "1.00" and reloads as 1. Both passes agree
+     perfectly on the wrong number — the round-trip is self-consistent while
+     being silently destructive, which is exactly how one Save turns a R1 500
+     loan into a R1 loan on disk. */
+  const owedOf = p => S.owed.find(o => o.person === p);
+  eq(owedOf('Thabo').amount, 1500, 'a space-grouped owed amount must be READ, not truncated to 1');
+  eq(owedOf('Yusuf').amount, 12500, 'a comma-grouped owed amount must not be truncated to 12');
+  eq(owedOf('Nadia').amount, 4000, 'a currency-prefixed owed amount must not fall through to 0');
+  eq(owedOf('Nadia').repaid, 1000, 'and the Repaid column is read the same way');
+  eq(owedOf('Sam | Pete').amount, 250, 'a plain amount is unaffected');
+
+  /* The consequence the loader alone cannot show: with amount 0 and repaid 1,
+     outstandingOf floors at 0 and isSettled calls a live loan Paid — it leaves
+     the Outstanding total and renders a green pill. */
+  const { outstandingOf, isSettled } = require('../src/owed-math');
+  eq(outstandingOf(owedOf('Nadia')), 3000, 'outstanding is the amount net of what came back');
+  eq(isSettled(owedOf('Nadia')), false, 'a live loan must not read as settled because its cell failed to parse');
+
+  const svcOf = n => S.services.find(s => s.name === n);
+  eq(svcOf('School fees').amount, 5430, 'a comma-grouped service amount must not be truncated to 5');
+  eq(svcOf('Insurance').amount, 1299, 'a space-grouped service amount must not be truncated to 1');
+  eq(svcOf('Netflix | HD').amount, 199, 'a plain service amount is unaffected');
 
   eq(S.assets.length, 5, 'every asset row loads, including the one with only a name');
   const house = S.assets.find(a => a.name === 'The house | Gardens');
@@ -287,6 +326,29 @@ const FILES = {
     'the resolved segment must reproduce the key loadVault used');
   eq(ctx3.txSegment('Brand New Account'), 'Brand New Account',
     'a label never written before is sanitised into a new segment');
+
+  /* The same bug through the door the ':' case does not cover: CASE.
+
+     `tx_label` is hand-editable frontmatter and syncs between devices, so
+     `tx_label: cheque` against a folder named `Cheque` is an ordinary typo, not
+     a contrivance. Neither comparison here folded case, so the lookup missed —
+     while macOS, iOS and Windows all resolve the two paths to the SAME file.
+     The write then rebuilt that month holding only the newly imported rows.
+
+     (Measured 10 Aug 2026: Obsidian stops the destruction by accident rather
+     than design — vault.getFileByPath is case-SENSITIVE so the plugin takes the
+     create branch, and vault.create guards with adapter.exists, which is
+     case-INSENSITIVE on APFS, so it throws "File already exists." History
+     survives; that account's month simply can never import, with an error the
+     reader cannot act on. Resolving the label correctly is still the fix.) */
+  const ctxCase = makeCtx({ ...FILES });
+  await loadInto(ctxCase);
+  eq(ctxCase.txSegment('fnb cheque'), 'FNB Cheque',
+    'a label differing only in case must resolve to the folder already on disk');
+  eq(ctxCase.txSegment('FNB CHEQUE'), 'FNB Cheque',
+    'in either direction');
+  eq(ctxCase.txSegment('FNB Cheque'), 'FNB Cheque',
+    'and an exact match is unaffected');
 
   console.log(`PASS — full vault round-trip through the REAL loader + serializers (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

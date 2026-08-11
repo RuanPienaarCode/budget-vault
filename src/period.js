@@ -235,6 +235,26 @@ module.exports = function registerPeriod(ctx) {
     return idx;
   }
 
+  /* The accounts a Transactions/ folder resolves to, EMPTY FOLDERS INCLUDED.
+
+     accountIndex() cannot answer this and never could: it is built from
+     S.txFiles, so an account whose folder exists but holds no month file yet
+     produces no entry there and is indistinguishable from one with no folder at
+     all. Both come back as zero rows; only this set separates them.
+
+     Resolved through accountForLabel, the same door accountIndex uses, so a
+     `tx_label` pointing at a differently-named folder counts here exactly as it
+     counts there — otherwise an account would be told to link the folder it is
+     already successfully importing from. */
+  function accountsWithFolder() {
+    const set = new Set();
+    for (const name of S.txFolders || []) {
+      const a = accountForLabel(name);
+      if (a) set.add(a);
+    }
+    return set;
+  }
+
   /* Labels belonging to `budget: false` accounts. Resolved per call rather than
      cached because periodSummary runs six times over for the dashboard trend
      and an account can be toggled between any two of them. */
@@ -368,7 +388,7 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
-    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, nonBudgetLabels,
+    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, accountsWithFolder, nonBudgetLabels,
     intervalDays, periodKeyValid,
   });
 };
