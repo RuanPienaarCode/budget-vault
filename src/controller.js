@@ -28,6 +28,7 @@ const registerServices = require('./views/services');
 const registerTax = require('./views/tax');
 const registerLoans = require('./views/loans');
 const registerImport = require('./views/import');
+const registerNotes = require('./views/notes');
 
 /* The pure core of money formatting, pulled out of moneyIn() so it is
    testable without a live mount — see tests/controller-money.test.cjs.
@@ -97,6 +98,11 @@ function mountApp(view) {
     tax: {},                   // 'YYYY' -> {fmRaw, taxpayer_type, assessment, deadlines, steps, docs}
     taxYear: null,
     taxDirty: false,
+    // {rel, name, kind, subject, created, title, excerpt} — one entry per file
+    // in Notes/, filled by loadVault. Prose, not figures: nothing here feeds a
+    // total. The Notes page's own filter state is seeded by views/notes.js,
+    // which owns its shape.
+    notes: [],
     period: null,
     view: 'dashboard',
     pendingImport: null,
@@ -194,6 +200,11 @@ function mountApp(view) {
   registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
   registerLoad(ctx);        // loadVault, txSegment
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
+  /* Before the views, because five of them render its noteButton() chip — they
+     reach it through ctx at render time rather than by destructuring, so the
+     order is belt-and-braces rather than load-bearing. loadVault calls
+     ctx.loadNotes(), which is late-bound for the same reason. */
+  registerNotes(ctx);
   registerDashboard(ctx);
   registerTransactions(ctx);
   registerBudgets(ctx);
@@ -229,7 +240,7 @@ function mountApp(view) {
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
-       plan: ctx.renderPlan,
+       plan: ctx.renderPlan, notes: ctx.renderNotes,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
        debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
@@ -485,6 +496,44 @@ function mountApp(view) {
   view.registerEvent(vault.on('create', onFsChange));
   view.registerEvent(vault.on('delete', onFsChange));
   view.registerEvent(vault.on('rename', onFsChange));
+
+  /* An account or category note renamed in Obsidian's OWN file explorer.
+     Obsidian repairs every `[[wikilink]]` pointing at it, which covers the
+     note_for key a budget note carries — but not note_subject, which is the
+     key this plugin actually reads. Left alone, renaming "Cheque" to "Current
+     account" would leave its notes looking correctly linked in the graph and
+     attached to nothing at all in here.
+
+     Only these two kinds: they are the ones whose identity IS a file, so a
+     rename is an event there is something to observe. Debts, assets, services
+     and owed entries are table rows, renamed by editing a cell in a markdown
+     file the watcher cannot read intent from — those are caught after the fact
+     by the "unmatched" badge on the Notes page instead. */
+  view.registerEvent(vault.on('rename', async (file, oldPath) => {
+    if (!S.loaded) return;
+    const bp = ctx.basePath();
+    const kindOf = p => {
+      if (typeof p !== 'string' || (p !== bp && !p.startsWith(bp + '/'))) return null;
+      const rel = p.slice(bp.length + 1);
+      if (/^Accounts\/[^/]+\.md$/.test(rel)) return 'account';
+      if (/^Categories\/[^/]+\.md$/.test(rel)) return 'category';
+      return null;
+    };
+    const kind = kindOf(oldPath);
+    // Moved OUT of Accounts/ (or into it) is not a rename of an account — it
+    // is a file leaving the model, and re-pointing notes at wherever it landed
+    // would be a guess.
+    if (!kind || kindOf(file?.path) !== kind) return;
+    const base = p => p.split('/').pop().replace(/\.md$/, '');
+    const from = base(oldPath);
+    const to = base(file.path);
+    let moved = 0;
+    try { moved = await ctx.repointNotes(kind, from, to); } catch (e) { return; }
+    if (!moved) return;
+    toast(`Re-pointed ${moved} note${moved === 1 ? '' : 's'} from "${from}" to "${to}"`);
+    if (S.view === 'notes') ctx.renderNotes();
+  }));
+
   view.registerEvent(app.workspace.on('css-change', applyTheme));
 
   /* ------------------------------- wiring -------------------------------- */
@@ -610,6 +659,15 @@ function mountApp(view) {
     await plugin.saveSettings();
     ctx.replan();
   });
+  $('#noteAdd').addEventListener('click', () => ctx.addNote());
+  $('#noteAbout').addEventListener('change', e => { S.noteFilter.about = e.target.value; ctx.renderNotes(); });
+  // Debounced like the Transactions and Accounts searches, and for the same
+  // reason: each keystroke rebuilds the whole list.
+  $('#noteSearch').addEventListener('input', e => {
+    const q = e.target.value;
+    clearTimeout(S._noteQ);
+    S._noteQ = setTimeout(() => { S.noteFilter.q = q; ctx.renderNotes(); }, 200);
+  });
   $('#planSave').addEventListener('click', ctx.savePlan);
   $('#planNew').addEventListener('click', ctx.newPlan);
   $('#planStart').addEventListener('click', ctx.newPlan);
@@ -648,6 +706,7 @@ function mountApp(view) {
     destroy: () => {
       clearTimeout(reloadTimer);
       clearTimeout(S._q);
+      clearTimeout(S._noteQ);
       const t = $('#toast');
       if (t) clearTimeout(t._h);
     },

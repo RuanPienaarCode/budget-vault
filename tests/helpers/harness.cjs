@@ -191,11 +191,21 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
   return ctx;
 }
 
-/* Registers io + period + load onto a ctx and runs the real loadVault. */
+/* Registers io + period + load + notes onto a ctx and runs the real loadVault.
+
+   views/notes.js is in the list because it is not only a page: it publishes
+   noteButton(), the chip five OTHER views render beside an account, debt,
+   asset, service or owed name. Leaving it out made every test that renders one
+   of those pages throw "ctx.noteButton is not a function" — the right failure
+   for a real wiring break, and the wrong one for a test that never meant to
+   opt out of it. Registering it here lets those call sites stay direct
+   (`ctx.noteButton(...)`) rather than defensive, so a genuine break in the app
+   still fails loudly. */
 async function loadInto(ctx) {
   require('../../src/io')(ctx);
   require('../../src/period')(ctx);
   require('../../src/load')(ctx);
+  require('../../src/views/notes')(ctx);
   await ctx.loadVault();
   return ctx.S;
 }

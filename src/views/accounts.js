@@ -990,7 +990,12 @@ module.exports = function registerAccounts(ctx) {
     tr.append(
       el('td', {}, el('div', { class: 'acct-cell-name' },
         el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }),
-        el('span', {}, nameEl,
+        /* The notes chip rides with the NAME rather than taking a column of
+           its own: every other column here is a figure, and a count of notes
+           is not one — it belongs to the thing it qualifies. It stops its own
+           click reaching the row, which is itself a button that opens the
+           account drawer. */
+        el('span', {}, nameEl, ctx.noteButton('account', a.name),
           el('span', { class: 'acct-cell-sub' },
             /* Owner joins the kind and the bank on the one line the row
                already has. Only when there IS one — an empty owner would leave

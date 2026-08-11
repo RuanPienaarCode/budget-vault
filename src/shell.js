@@ -54,6 +54,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="plan">
       <span class="di"><span class="ico" data-ico="target|goal|crosshair"></span></span><span data-i18n="nav.plan">Plan</span>
     </button>
+    <button class="drawer-link" data-view="notes">
+      <span class="di"><span class="ico" data-ico="notebook-pen|sticky-note|file-text"></span></span><span data-i18n="nav.notes">Notes</span>
+    </button>
 
     <div class="drawer-divider"></div>
 
@@ -352,6 +355,32 @@ const SHELL_HTML = `
                split balances, so a finished plan gets no shelf standing there
                saying "R 0.00 left" — the same rule the Accounts deck follows. -->
           <div class="plan-free hidden" id="planFree"></div>
+        </div>
+      </section>
+
+      <section id="view-notes" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title" data-i18n="nav.notes">Notes</h1>
+          <div class="sub-note">Things the figures can't tell you &middot; one markdown note each, in <code>Notes/</code></div>
+        </div>
+        <div class="mini-grid mini-kpis-3 mb-4" id="notesKpis"></div>
+        <div class="card">
+          <div class="card-h" style="align-items:center">
+            <div><h2>Your notes</h2><div class="sub">Open one to carry on writing in Obsidian</div></div>
+            <div class="row">
+              <button class="btn-gradient" id="noteAdd"><span class="ico" data-ico="plus"></span> New note</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight">
+            <div class="row note-filters">
+              <label class="sr-only" for="noteAbout">Show notes about</label>
+              <select class="form-select form-select-sm" id="noteAbout"></select>
+              <label class="sr-only" for="noteSearch">Search notes</label>
+              <input class="form-control form-control-sm" id="noteSearch" type="search" placeholder="Search notes…"
+                     autocomplete="off" autocorrect="off" spellcheck="false">
+            </div>
+            <div class="notes-list" id="notesList"></div>
+          </div>
         </div>
       </section>
 
