@@ -58,7 +58,7 @@ module.exports = function registerOwed(ctx) {
            derivable, and is the figure that actually applies pressure. */
         const age = daysSince(o.lent);
         body.append(el('tr', {},
-          el('td', { style: 'font-weight:600' }, o.person,
+          el('td', { style: 'font-weight:600' }, o.person, ctx.noteButton('owed', o.person),
             ...(age !== null && !settled
               ? [el('div', { class: 'owed-age' }, `out ${age} day${age === 1 ? '' : 's'}`)] : [])),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description, style: 'width:220px',

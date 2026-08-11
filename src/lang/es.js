@@ -30,6 +30,7 @@ module.exports = {
   'nav.transactions': 'Transacciones',
   'nav.budgets': 'Presupuesto',
   'nav.plan': 'Plan',
+  'nav.notes': 'Notas',
   'nav.savings': 'Ahorros e inversiones',
   'nav.accounts': 'Cuentas',
   'nav.assets': 'Activos',

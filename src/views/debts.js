@@ -434,7 +434,7 @@ module.exports = function registerDebts(ctx) {
         const refreshAll = () => { mark(); refreshRow(); renderDebtKpis(); renderDebtPlan(); renderDebtPayments(); };
 
         body.append(el('tr', { class: paidPill ? 'debt-settled' : '' },
-          el('td', {}, el('div', { style: 'font-weight:600' }, d.name),
+          el('td', {}, el('div', { style: 'font-weight:600' }, d.name, ctx.noteButton('debt', d.name)),
             el('div', { class: 'text-muted', style: 'font-size:11.5px' },
               [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.balance || '',

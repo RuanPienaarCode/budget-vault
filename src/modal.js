@@ -45,6 +45,23 @@ class FieldModal extends Modal {
             });
           });
         }
+      } else if (f.type === 'textarea') {
+        /* Prose, not a value. The single-line addText below is right for a
+           name or an amount and wrong for the first paragraph of a note: on a
+           phone it scrolls a whole sentence sideways through a 200px slot,
+           with no way to see what you already typed.
+
+           Deliberately NOT pushed onto firstInputs — autofocusing a textarea
+           raises the iOS keyboard over the fields above it before the reader
+           has even seen them, and this is never the first field in a form. */
+        this.values[f.key] = String(f.value ?? '');
+        s.setClass('bud-field-tall');
+        s.addTextArea(t => {
+          t.setValue(this.values[f.key]);
+          if (f.placeholder) t.setPlaceholder(f.placeholder);
+          t.inputEl.rows = f.rows || 5;
+          t.onChange(v => { this.values[f.key] = v; });
+        });
       } else if (f.type === 'select') {
         this.values[f.key] = f.value ?? f.options[0];
         s.addDropdown(d => {
@@ -67,7 +84,16 @@ class FieldModal extends Modal {
     new Setting(this.contentEl)
       .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
       .addButton(b => b.setButtonText('OK').setCta().onClick(() => this.submit()));
-    this.scope.register([], 'Enter', evt => { evt.preventDefault(); this.submit(); });
+    /* Enter submits — except inside a textarea, where it is the only way to
+       start a new paragraph. Without this guard adding the `textarea` field
+       type above would have silently made every multi-line field single-line:
+       the key never reaches the control, the modal closes, and the note is
+       saved holding the one sentence typed so far. */
+    this.scope.register([], 'Enter', evt => {
+      if (evt.target && evt.target.tagName === 'TEXTAREA') return;
+      evt.preventDefault();
+      this.submit();
+    });
     if (firstInputs[0]) window.setTimeout(() => firstInputs[0].focus(), 10);
   }
   submit() { this.submitted = true; this.close(); }

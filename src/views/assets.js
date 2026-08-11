@@ -119,7 +119,7 @@ module.exports = function registerAssets(ctx) {
       for (const a of S.assets) {
         const age = valuedAge(a);
         body.append(el('tr', {},
-          el('td', { style: 'font-weight:600' }, a.name,
+          el('td', { style: 'font-weight:600' }, a.name, ctx.noteButton('asset', a.name),
             ...(age ? [el('div', { class: `asset-age${isUnvalued(a) ? ' asset-age-old' : ''}` }, age)] : [])),
           // A kind that no longer appears in the preset list (a hand-edited
           // Assets.md, or a list trimmed between versions) keeps an option of

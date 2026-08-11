@@ -149,7 +149,7 @@ module.exports = function registerServices(ctx) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
           body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
-            el('td', { style: 'font-weight:600' }, s.name, ...svcFlags(s, c)),
+            el('td', { style: 'font-weight:600' }, s.name, ctx.noteButton('service', s.name), ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
               'aria-label': `Amount for ${s.name}`,

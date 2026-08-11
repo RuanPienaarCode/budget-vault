@@ -2476,6 +2476,14 @@
   .budget-app-root .ei-tick:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .ei-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .env-add:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+  /* Notes. The title is the card's primary action and the chip is how you
+     reach a note from the account it is about — both are bare buttons styled
+     down to look like text, so without a ring there is nothing at all to show
+     a keyboard user where they are. */
+  .budget-app-root .note-title:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .note-orphan:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .note-chip:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
@@ -2863,6 +2871,79 @@
 .budget-app-root .plan-free.is-over .free-fig { color: var(--color-danger); }
 .budget-app-root .plan-free p { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; max-width: 56ch; }
 .budget-app-root .plan-free .free-acts { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ---- Notes -------------------------------------------------------------
+   A list of prose, so it is a stack of cards rather than a table: a note has
+   one long variable-length field (the excerpt) and no columns worth aligning,
+   and every table on the sibling pages is already wider than a phone. */
+.budget-app-root .note-filters { gap: 9px; flex-wrap: wrap; margin-bottom: 14px; }
+.budget-app-root .note-filters #noteAbout { flex: 1 1 190px; min-width: 0; }
+.budget-app-root .note-filters #noteSearch { flex: 2 1 200px; min-width: 0; }
+
+.budget-app-root .notes-list { display: flex; flex-direction: column; gap: 10px; }
+
+.budget-app-root .note-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.budget-app-root .note-card-h { display: flex; align-items: baseline; gap: 10px; }
+/* A button, not a heading carrying a click handler: opening the note is the
+   card's primary action, so it has to be keyboard-reachable and announced as
+   something that does a thing. Styled back down to look like the title it is. */
+.budget-app-root .note-title {
+  flex: 1 1 auto; min-width: 0;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-size: 15px; font-weight: 650; text-align: start; line-height: 1.35;
+  color: var(--text-primary);
+}
+.budget-app-root .note-title:hover { color: var(--color-primary); }
+.budget-app-root .note-title:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+.budget-app-root .note-date { flex: 0 0 auto; font-size: 11.5px; color: var(--ink-faint); }
+
+.budget-app-root .note-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.budget-app-root .note-orphan { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.budget-app-root .note-orphan .ico svg { width: 0.7rem; height: 0.7rem; }
+.budget-app-root .note-orphan:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Two lines of the note's own words. Clamped rather than cut at a character
+   count alone (src/notes.js already caps the string): the clamp is what keeps
+   every card the same height whatever the reader's font size. The -webkit-
+   prefixed form is the only one that works on this plugin's iOS 15 floor, and
+   it degrades to an unclamped paragraph rather than to nothing. */
+.budget-app-root .note-excerpt {
+  margin-top: 8px; font-size: 13px; line-height: 1.5; color: var(--text-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.budget-app-root .note-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.budget-app-root .note-empty { padding: 22px 4px; font-size: 13.5px; line-height: 1.55; }
+
+/* The chip beside an account/debt/service name. Deliberately quiet with no
+   notes against it — there it is an invitation, not a figure — and it takes
+   the primary colour once there is something to go and read. */
+.budget-app-root .note-chip {
+  display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
+  margin-inline-start: 6px; padding: 1px 6px; border-radius: 999px; cursor: pointer;
+  font-size: 11px; font-weight: 600; line-height: 1.6;
+  border: 1px solid var(--border-color); background: none; color: var(--ink-faint);
+}
+.budget-app-root .note-chip .ico svg { width: 0.72rem; height: 0.72rem; }
+.budget-app-root .note-chip.has-notes { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
+.budget-app-root .note-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.budget-app-root .note-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* The multi-line field type added to askFields. Unscoped, like every other
+   rule in the modal block near the bottom of this file: an Obsidian Modal
+   renders OUTSIDE .budget-app-root, so a scoped selector would never match it.
+   Obsidian lays a .setting-item out as a row (info | control), which gives a
+   textarea a narrow slot on the right; a note needs the full width. */
+.bud-field-tall { display: block; }
+.bud-field-tall .setting-item-control { width: 100%; padding-top: 8px; }
+.bud-field-tall textarea {
+  width: 100%; min-height: 108px; resize: vertical;
+  font-family: inherit; font-size: 14px; line-height: 1.5;
+}
 
 /* Tints, washes and chips get their mixed colours only where color-mix exists.
    Everything above already reads correctly without this block — these are

@@ -12,6 +12,7 @@ const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
 const { splitRole } = require('./tx-role');
 const { parseOwners } = require('./owners');
+const { NOTES_DIR, parseNote, sortNotes } = require('./note-file');
 
 /* An optional numeric frontmatter key: absent or blank → null ("not set"),
    anything normalizeAmount can read → that number, anything it cannot → null.
@@ -473,6 +474,32 @@ module.exports = function registerLoad(ctx) {
     // Changing the period length reaches this line via main.js's reload, and the
     // old name would otherwise survive it in a shape nothing can read.
     if (!S.period || !periodKeyValid(S.period)) S.period = currentPeriod();
+
+    await loadNotes();
+  }
+
+  /* Notes/ — one markdown file per note. Unlike every other file read above,
+     the BODY is content rather than a serialized table, so the excerpt comes
+     out of it; parseNote in src/notes.js owns that and is the same module the
+     writer serializes through.
+
+     Exposed on ctx as well as called from loadVault, because views/notes.js
+     re-reads after every write it makes — so what the page lists always comes
+     from the same parse as everything else, and a serializer/parser
+     disagreement shows up on the first note rather than after the next reload.
+
+     A note that cannot be read is SKIPPED rather than failing the load: these
+     are files the user creates and edits by hand, and one unreadable note must
+     not take the whole budget down with it. */
+  async function loadNotes() {
+    const notes = [];
+    for (const f of mdFilesIn(NOTES_DIR)) {
+      let text;
+      try { text = await vault.cachedRead(f); } catch (e) { continue; }
+      const rel = `${NOTES_DIR}/${f.name}`;
+      notes.push({ rel, name: f.name, ...parseNote(text, rel) });
+    }
+    S.notes = sortNotes(notes);
   }
 
   /* Resolve an account label to the exact folder segment to key by AND write
@@ -500,5 +527,5 @@ module.exports = function registerLoad(ctx) {
     return want;
   }
 
-  ctx.provide({ loadVault, txSegment });
+  ctx.provide({ loadVault, loadNotes, txSegment });
 };

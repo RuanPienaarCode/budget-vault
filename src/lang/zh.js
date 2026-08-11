@@ -32,6 +32,7 @@ module.exports = {
   'nav.transactions': '交易',
   'nav.budgets': '预算',
   'nav.plan': '资金计划',
+  'nav.notes': '笔记',
   'nav.savings': '储蓄与投资',
   'nav.accounts': '账户',
   'nav.assets': '资产',
