@@ -766,6 +766,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/jour',
   'dash.left.barAria': 'Sur {cash}, {committed} est engagé et {free} est libre',
+  'dash.left.barAriaShort': 'Sur {cash}, {committed} est engagé — {short} de plus que ce que vous avez',
   'dash.left.owedCard': '{amount} sont dus sur {name} — déjà dépensés, et déduits d\'aucun chiffre ci-dessus.',
   'dash.left.owedCards': '{amount} sont dus sur {count} cartes de crédit — déjà dépensés, et déduits d\'aucun chiffre ci-dessus.',
   'dash.left.whatsCounted': 'Ce qui compte comme engagé',

@@ -761,6 +761,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/Tag',
   'dash.left.barAria': 'Von {cash} sind {committed} fest eingeplant und {free} frei',
+  'dash.left.barAriaShort': 'Von {cash} sind {committed} fest eingeplant — {short} mehr als vorhanden',
   'dash.left.owedCard': '{amount} sind auf {name} offen — bereits ausgegeben und von keiner Zahl oben abgezogen.',
   'dash.left.owedCards': '{amount} sind auf {count} Kreditkarten offen — bereits ausgegeben und von keiner Zahl oben abgezogen.',
   'dash.left.whatsCounted': 'Was als fest eingeplant zählt',

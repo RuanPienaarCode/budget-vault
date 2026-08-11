@@ -760,6 +760,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/dag',
   'dash.left.barAria': 'Van {cash} is {committed} verbind en {free} beskikbaar',
+  'dash.left.barAriaShort': 'Van {cash} is {committed} verbind — {short} meer as wat jy het',
   'dash.left.owedCard': '{amount} is verskuldig op {name} — reeds bestee, en van geen syfer hierbo afgetrek nie.',
   'dash.left.owedCards': '{amount} is verskuldig oor {count} kredietkaarte — reeds bestee, en van geen syfer hierbo afgetrek nie.',
   'dash.left.whatsCounted': 'Wat as verbind getel word',

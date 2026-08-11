@@ -321,14 +321,54 @@ module.exports = function registerDashboard(ctx) {
           )))));
     }
 
-    /* The bar only means something when there is cash to divide. */
+    /* The bar only means something when there is cash to divide.
+
+       It must divide the cash the SAME WAY the chain above it did, or it
+       contradicts the figures it sits under. Under a settlement cycle the card
+       moves out of the chain and `free` is cash − committedOther (see the
+       settlement-cycle comment in committed.js), so a bar built on `committed`
+       — which still carries cardDue — drew a committed segment larger than the
+       one the reader had just been shown and a free segment visibly smaller
+       than the "actually free" figure directly above it. The aria-label was
+       worse than the bar: it announced a cash, a committed and a free that no
+       longer summed, so a screen-reader user got three numbers and no way to
+       reconcile them.
+
+       So the bar is derived FROM `free` rather than from a second guess at
+       which terms went into it: whatever the chain subtracted is exactly
+       cash − free, under a cycle and outside one alike. Written as the
+       subtraction rather than as `L.cycle ? L.committedOther : L.committed`
+       so that a future change to what `free` excludes cannot pull the bar out
+       of step with it a second time — the condition lives in ONE place, in
+       committed.js, which is the same reason `free` itself is computed there
+       and only read here. Short reads correctly too: cash − free then exceeds
+       cash, the clamp fills the bar, and fully-committed is the truth.
+
+       THE LABEL SPLITS WHERE THE BAR DOES. Once commitments exceed the cash the
+       neutral sentence has no true reading left: it would announce "{free} is
+       free" for money that is not there. A sighted reader is covered — the bar
+       is fully amber and the figure above it is labelled "short" — and a screen
+       reader is not, which is exactly the asymmetry an aria-label exists to
+       close. `L.short` is committed.js's own cent-rounded verdict, the same one
+       that chose the word "short" above, so the two can never disagree about
+       which side of zero this vault is on.
+
+       Math.abs survives on the covered branch on purpose: `short` is false at
+       exactly zero cents, and the float that rounds there can still be a hair
+       under it (see the freeCents comment in committed.js), which would
+       otherwise announce "R -0,00 is free". */
     if (L.cashKnown && L.cash > 0) {
-      const comPct = Math.min(100, (L.committed / L.cash) * 100);
+      const barCommitted = L.cash - L.free;
+      const comPct = Math.min(100, (barCommitted / L.cash) * 100);
       body.append(el('div', {
         class: 'left-bar', role: 'img',
-        'aria-label': i18n.t('dash.left.barAria', {
-          cash: money(L.cash), committed: money(L.committed), free: money(Math.abs(L.free)),
-        }),
+        'aria-label': L.short
+          ? i18n.t('dash.left.barAriaShort', {
+            cash: money(L.cash), committed: money(barCommitted), short: money(Math.abs(L.free)),
+          })
+          : i18n.t('dash.left.barAria', {
+            cash: money(L.cash), committed: money(barCommitted), free: money(Math.abs(L.free)),
+          }),
       },
       el('i', { class: 'b-com', style: `width:${comPct.toFixed(2)}%` }),
       el('i', { class: 'b-free', style: `width:${(100 - comPct).toFixed(2)}%` })));

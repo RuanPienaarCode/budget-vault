@@ -728,6 +728,7 @@ module.exports = {
   },
   'dash.left.perDay': '1日あたり {amount}',
   'dash.left.barAria': '{cash} のうち {committed} が支払い予定、{free} が使えます',
+  'dash.left.barAriaShort': '{cash} のうち {committed} が支払い予定 — 手持ちより {short} 多くなっています',
   'dash.left.owedCard': '{name} に {amount} の未払いがあります — 支出済みで、上のどの金額からも差し引かれていません。',
   'dash.left.owedCards': 'クレジットカード {count} 枚に {amount} の未払いがあります — 支出済みで、上のどの金額からも差し引かれていません。',
   'dash.left.whatsCounted': '支払い予定に数えたもの',

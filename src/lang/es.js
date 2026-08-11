@@ -762,6 +762,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/día',
   'dash.left.barAria': 'De {cash}, {committed} está comprometido y {free} está libre',
+  'dash.left.barAriaShort': 'De {cash}, {committed} está comprometido — {short} más de lo que tienes',
   'dash.left.owedCard': 'Debes {amount} en {name} — ya gastado, y no se resta de ninguna cifra de arriba.',
   'dash.left.owedCards': 'Debes {amount} en {count} tarjetas de crédito — ya gastado, y no se resta de ninguna cifra de arriba.',
   'dash.left.whatsCounted': 'Qué cuenta como comprometido',

@@ -792,6 +792,11 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/day',
   'dash.left.barAria': 'Of {cash}, {committed} is committed and {free} is free',
+  /* The same bar when the commitments exceed the cash. The sighted reader sees
+     a fully-amber bar and the figure above it labelled "short"; the neutral
+     wording announced "{free} is free" for money that is not there, which is
+     the one sentence a screen-reader user has no second cue to correct. */
+  'dash.left.barAriaShort': 'Of {cash}, {committed} is committed — {short} more than you have',
   'dash.left.owedCard': '{amount} is owed on {name} — already spent, and not taken off any figure above.',
   'dash.left.owedCards': '{amount} is owed across {count} credit cards — already spent, and not taken off any figure above.',
   'dash.left.whatsCounted': 'What\'s counted as committed',

@@ -728,6 +728,7 @@ module.exports = {
   },
   'dash.left.perDay': '每天 {amount}',
   'dash.left.barAria': '{cash} 中，{committed} 已被占用，{free} 可用',
+  'dash.left.barAriaShort': '{cash} 中，{committed} 已被占用 — 比现有资金多 {short}',
   'dash.left.owedCard': '{name} 尚欠 {amount} — 已经花掉，且未从上方任何数字中扣除。',
   'dash.left.owedCards': '{count} 张信用卡共欠 {amount} — 已经花掉，且未从上方任何数字中扣除。',
   'dash.left.whatsCounted': '哪些算作尚未扣除',
