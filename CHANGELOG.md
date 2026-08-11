@@ -3,6 +3,82 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.16.0 — 2026-08-11
+
+### Added
+
+- **Notes — the things the figures can't tell you.** Every page in this plugin
+  holds numbers the vault can derive. None of them held what the bank actually
+  said on the phone, why last month looked wrong, or which quote you are still
+  waiting on. There is now a Notes page, and a Notes entry in the menu.
+
+  A note is a **real markdown file** under `Notes/`, not a row in a table like
+  `Services.md`. That difference is the whole point: a note is prose you write,
+  so it has to be editable in Obsidian, searchable by Obsidian, and joined to
+  the graph — a table cell is none of those. The page creates, lists, filters
+  and opens; it deliberately does not edit. **Open** hands the file to a real
+  Obsidian tab, which already has a markdown editor, wikilink completion,
+  attachments and sync.
+
+  That split is load-bearing rather than a shortcut. Every other serializer
+  here rebuilds its file from state on save; doing that to a note would eat the
+  paragraph you typed in the other tab ten seconds earlier. So the only write
+  this makes to an existing note is a frontmatter patch, and the body coming
+  back byte-identical is pinned by a test carrying a negative control.
+
+  A note can be about an account, a category, a period, a debt, an asset, a
+  service, an owed entry — or nothing in particular. It points at its subject
+  through `note_kind` + `note_subject`, plus a `note_for` wikilink for the two
+  kinds that have a note of their own (accounts and categories). Debts, assets,
+  services and owed entries are table rows with no file, so a wikilink for them
+  would be a permanent unresolved node in your graph, once per note — hence it
+  is written only where it actually resolves.
+
+  Renaming an account note in Obsidian's own file explorer repairs the
+  wikilink, but not `note_subject`, which is the key the plugin reads — so a
+  rename would have left its notes looking correctly linked and attached to
+  nothing. Both keys now move together. A rename the plugin cannot see — a debt
+  renamed by editing a cell in `Debts.md` — is reported on the note as
+  **unmatched**, with the fix one tap away, rather than hidden.
+
+  A notes chip sits beside every account, debt, asset, service and owed name:
+  it shows how many notes there are, and opens them filtered to that subject —
+  or starts the first one.
+
+- **Growth the fund never posted, and an account you can edit where you read
+  it.** Growth was only ever counted where an account POSTED it as a
+  transaction — interest, a dividend. A market-linked fund posts none: the
+  value moves, the balance is retyped, and no row is ever written. So the
+  holding with the most growth on the page reported the least, under the words
+  "no growth recorded".
+
+  Total return now works backwards from the balance instead — anything in the
+  balance the household did not put there is, by definition, what the account
+  earned. That buys a dependency the derived figure does not have: where the
+  transaction history starts after the account did, contributions are
+  undercounted and growth is overstated, silently and in the flattering
+  direction. So the gap is measured and the card says so rather than letting
+  the figure pass as measured; an account with no baseline gets no figure and
+  the action that fixes it.
+
+  The chart deliberately does not draw a growth curve — undated growth has no
+  date by definition, and spreading it across the months would draw a line
+  through measurements nobody took. It is a labelled block at the right edge,
+  and capital plus posted growth plus undated growth equals the balances on the
+  cards below, so the chart cannot disagree with the tiles above it. The
+  annualised rate is marked approximate wherever it appears, and withheld
+  entirely under a year rather than annualising a few months of noise.
+
+  Accounts can now be edited from the Savings page, reusing the Accounts page's
+  own editors rather than a second copy — so the fields a type offers and the
+  frontmatter keys written keep exactly one owner.
+
+### Changed
+
+- The input modal grows a multi-line field type, used for a note's first
+  paragraph. Enter no longer submits from inside one, which would have made
+  every multi-line field silently single-line.
+
 ## 1.15.0 — 2026-08-11
 
 ### Added
