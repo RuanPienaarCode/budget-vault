@@ -579,6 +579,7 @@ module.exports = {
   'acct.col.goal': '目标 / 额度',
   'acct.col.confirmed': '确认日期',
   'acct.col.state': '状态',
+  'acct.col.notes': '笔记',
   'acct.sort.name': '名称',
   'acct.sort.balance': '余额',
   'acct.sort.flow': '本期',

@@ -593,6 +593,7 @@ module.exports = {
   'acct.col.goal': 'Doel / limiet',
   'acct.col.confirmed': 'Bevestig',
   'acct.col.state': 'Stand',
+  'acct.col.notes': 'Notas',
   'acct.sort.name': 'naam',
   'acct.sort.balance': 'saldo',
   'acct.sort.flow': 'hierdie tydperk',

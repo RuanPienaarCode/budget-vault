@@ -599,6 +599,7 @@ module.exports = {
   'acct.col.goal': 'Objectif / plafond',
   'acct.col.confirmed': 'Confirmé',
   'acct.col.state': 'État',
+  'acct.col.notes': 'Notes',
   'acct.sort.name': 'nom',
   'acct.sort.balance': 'solde',
   'acct.sort.flow': 'cette période',

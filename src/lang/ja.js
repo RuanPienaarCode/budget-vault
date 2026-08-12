@@ -579,6 +579,7 @@ module.exports = {
   'acct.col.goal': '目標 / 限度額',
   'acct.col.confirmed': '確認日',
   'acct.col.state': '状態',
+  'acct.col.notes': 'メモ',
   'acct.sort.name': '名前',
   'acct.sort.balance': '残高',
   'acct.sort.flow': '今期',

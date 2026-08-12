@@ -990,12 +990,7 @@ module.exports = function registerAccounts(ctx) {
     tr.append(
       el('td', {}, el('div', { class: 'acct-cell-name' },
         el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }),
-        /* The notes chip rides with the NAME rather than taking a column of
-           its own: every other column here is a figure, and a count of notes
-           is not one — it belongs to the thing it qualifies. It stops its own
-           click reaching the row, which is itself a button that opens the
-           account drawer. */
-        el('span', {}, nameEl, ctx.noteButton('account', a.name),
+        el('span', {}, nameEl,
           el('span', { class: 'acct-cell-sub' },
             /* Owner joins the kind and the bank on the one line the row
                already has. Only when there IS one — an empty owner would leave
@@ -1008,7 +1003,18 @@ module.exports = function registerAccounts(ctx) {
       el('td', { class: 'acct-col-drop' }, goalCell(r)),
       el('td', { class: 'acct-col-drop' },
         el('span', { class: 'acct-when' }, a.balance_updated || i18n.t('acct.noDate'))),
-      el('td', {}, statePill(r)));
+      el('td', {}, statePill(r)),
+      /* Notes get a column of their own, at the end.
+         It rode with the account NAME first, which read fine on one-line names
+         and badly on the real ones: "Discovery Bank Transaction Account
+         (Ruan)" wraps to three lines, and an inline chip after the last word
+         lands alone under the name looking like a stray control belonging to
+         nothing. A column keeps it on the row's own baseline whatever the name
+         does, and puts every account's chip in one scannable strip.
+         NOT acct-col-drop: the columns that drop on a phone are the figures a
+         narrow screen can do without, and notes are the opposite — the phone
+         is where you write "the bank said X" while still on the call. */
+      el('td', { class: 'acct-col-notes' }, ctx.noteButton('account', a.name)));
 
     tr.addEventListener('click', () => openRow(a.name, false));
     tr.addEventListener('keydown', e => {
@@ -1099,7 +1105,7 @@ module.exports = function registerAccounts(ctx) {
       () => openAccountFile(a));
     box.append(acts);
 
-    const td = el('td', { colspan: '7', class: 'acct-drawer-cell' }, box);
+    const td = el('td', { colspan: '8', class: 'acct-drawer-cell' }, box);
     return el('tr', { class: 'acct-drawer-row' }, td);
   }
 
@@ -1170,7 +1176,15 @@ module.exports = function registerAccounts(ctx) {
       el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')),
       el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')),
       sortHeader('stale', i18n.t('acct.col.confirmed')),
-      el('th', { scope: 'col' }, i18n.t('acct.col.state')));
+      el('th', { scope: 'col' }, i18n.t('acct.col.state')),
+      /* The label is for a screen reader, not for the eye. Spelling "Notes"
+         out visibly made the column 76px wide to hold a 26px chip, which
+         pushed the whole table 24px past its card at 1280 — and the column it
+         clipped was this one. A column of icons needs no word over it; a `th`
+         with no accessible name at all would leave every chip in it announced
+         without the one word that says what the column is. */
+      el('th', { class: 'acct-col-notes', scope: 'col' },
+        el('span', { class: 'sr-only' }, i18n.t('acct.col.notes'))));
     head.children[2].classList.add('acct-col-drop', 'num');
     head.children[5].classList.add('acct-col-drop');
     table.append(el('thead', {}, head));
@@ -1183,7 +1197,7 @@ module.exports = function registerAccounts(ctx) {
 
     if (!shown.length) {
       body.append(el('tr', { class: 'acct-empty' },
-        el('td', { colspan: '7' },
+        el('td', { colspan: '8' },
           S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
     } else if (v.grouped) {
       for (const [key] of ACCT_GROUPS) {
@@ -1195,7 +1209,7 @@ module.exports = function registerAccounts(ctx) {
            legend somewhere else on the page. */
         const mixed = currenciesIn(inGroup.map(r => r.a), S.settings.currency).length > 1;
         body.append(el('tr', { class: 'type-row' },
-          el('td', { colspan: '7' },
+          el('td', { colspan: '8' },
             i18n.t(key),
             el('span', { class: 'acct-group-total num' }, money(total),
               ...(mixed ? [el('span', { class: 'acct-mixed',

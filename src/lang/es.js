@@ -595,6 +595,7 @@ module.exports = {
   'acct.col.goal': 'Meta / límite',
   'acct.col.confirmed': 'Confirmado',
   'acct.col.state': 'Estado',
+  'acct.col.notes': 'Notas',
   'acct.sort.name': 'nombre',
   'acct.sort.balance': 'saldo',
   'acct.sort.flow': 'este periodo',

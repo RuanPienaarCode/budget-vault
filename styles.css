@@ -2933,6 +2933,33 @@
 .budget-app-root .note-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .budget-app-root .note-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* The Accounts table's own notes column. `width: 1%` is the standard way to
+   ask a table cell for its content width and no more — the remaining columns
+   absorb the slack, so a 28px chip cannot claim an eighth of the row.
+   The chip's inline offset comes off here: it exists to separate the chip from
+   a name it trails, and in its own cell there is nothing to its left. */
+/* The Accounts table's notes column. `width: 1%` is the standard way to ask a
+   table cell for its content width and no more, so the other columns absorb
+   the slack rather than a 26px chip claiming an eighth of the row.
+
+   Written against `.table thead th` / `.table tbody td` rather than the class
+   alone, because those two carry `padding: 0.75rem 1rem` at (0,2,1) — a bare
+   `.acct-col-notes` is (0,2,0) and silently loses the shorthand, which is
+   exactly what happened first time round: the column stayed 58px wide and
+   went on pushing the table past its card at 1280.
+
+   Padding is the only slack left once the header word is visually hidden, and
+   this column needs it: at house padding the table measured 1084px inside a
+   1078px box, and the column that got clipped was this one. */
+.budget-app-root .table thead th.acct-col-notes,
+.budget-app-root .table tbody td.acct-col-notes {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+  padding-inline: 6px;
+}
+.budget-app-root .acct-col-notes .note-chip { margin-inline-start: 0; }
+
 /* The multi-line field type added to askFields. Unscoped, like every other
    rule in the modal block near the bottom of this file: an Obsidian Modal
    renders OUTSIDE .budget-app-root, so a scoped selector would never match it.
