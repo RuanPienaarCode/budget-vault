@@ -2922,9 +2922,20 @@
 /* The chip beside an account/debt/service name. Deliberately quiet with no
    notes against it — there it is an invitation, not a figure — and it takes
    the primary colour once there is something to go and read. */
+/* 24px floor on both axes, because this is a TAP target on a phone and it sits
+   directly beside other controls: in the Accounts table its neighbour is the
+   account-name button, and a mis-tap opens the wrong thing rather than doing
+   nothing. At its natural size (11px text, 1px padding) it rendered 15.5px
+   tall — well under the 24px minimum, and under the 28px `min-height` that
+   .btn-ghost-sm was given for exactly this reason a build earlier. This chip
+   missed that pass; it is not doing so again.
+   justify-content, because a min-width wider than the content would otherwise
+   leave the count and icon hugging the leading edge of the pill. */
 .budget-app-root .note-chip {
-  display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
-  margin-inline-start: 6px; padding: 1px 6px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 3px; vertical-align: middle;
+  min-height: 24px; min-width: 24px;
+  margin-inline-start: 6px; padding: 2px 7px; border-radius: 999px; cursor: pointer;
   font-size: 11px; font-weight: 600; line-height: 1.6;
   border: 1px solid var(--border-color); background: none; color: var(--ink-faint);
 }
