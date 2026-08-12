@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.17.0 — 2026-08-12
+
+### Added
+
+- **Notes filed into subfolders are found.** `Notes/` was read one level deep,
+  so tidying a year of notes into `Notes/2025/` emptied the page while every
+  one of them sat safely on disk. The whole folder is read now, however deeply
+  you nest it, and renaming an account still reaches the notes you filed away.
+  New notes are still created at the top of `Notes/` — nothing moves your files
+  around.
+
 ## 1.16.1 — 2026-08-12
 
 Everything a six-lane audit of 1.16.0 turned up. Nothing here changes what the
