@@ -109,26 +109,27 @@ function norm(v) {
 {
   const AA = 4.5;
 
-  /* One grandfathered pair, recorded rather than hidden.
+  /* No grandfathered pairs. There was one, and this is the note it left.
 
-     vault-green's DARK --text-light (#6f7799) measures 4.07:1 on the dark card
-     (--surface #12162a). That is the palette as it has shipped since the theme
-     was written, and it predates this generator — the "AA (5.0:1)" note in
-     src/styles.css is the LIGHT-mode figure, measured against --body-bg; the
-     dark value was never annotated with a ratio, and on the darker page behind
-     the card it does clear AA (5.05:1). It is only the card that falls short.
+     vault-green's DARK --text-light was #6f7799, which measured 4.07:1 on the
+     dark card (--surface #12162a) — it cleared AA against the PAGE and failed
+     against the card, which is where nearly every consumer of the token it
+     feeds actually sits. It was waived here rather than hidden, on the
+     reasoning that nudging it changes the look of the palette every existing
+     user is on, and that is a product decision rather than one a test should
+     make silently.
 
-     Left as-is rather than nudged, because changing it would change the look of
-     the palette every existing user is on, which is exactly what the
-     reproduction test above exists to prevent — that is a product decision, not
-     a thing a test should make silently. The three newer palettes are held to
-     the full gate: their dark --text-light values were chosen to clear 4.5:1 on
-     both the card and the page.
+     Taken in 1.16.1, after an audit found the same 4.07:1 independently. The
+     product decision was made deliberately: #7d85a7, which measures 4.93:1 on
+     the card and 5.61:1 on the page, and sits in family with the three newer
+     palettes (4.56-4.59 against their own surfaces). The seed in
+     scripts/presets.cjs and the hand-written pair in src/styles.css moved
+     together, as the note that used to live here required.
 
-     Fixing vault-green means editing the seed AND src/styles.css together, then
-     deleting this entry — the assertion below fails if the pair is ever brought
-     up to AA and the exemption is left behind, so it cannot rot. */
-  const GRANDFATHERED = [{ id: 'vault-green', mode: 'dark', fg: 'textLight', bg: 'surface', ratio: 4.07 }];
+     The list stays, empty, because the mechanism is the valuable part: a
+     waiver that cannot rot. An entry here fails the moment its pair is brought
+     up to AA, so an exemption cannot outlive the problem it excused. */
+  const GRANDFATHERED = [];
 
   for (const p of PRESETS) {
     for (const mode of ['light', 'dark']) {

@@ -43,7 +43,7 @@ const {
 const SEP = '\u001F';
 
 module.exports = function registerNotes(ctx) {
-  const { S, $, app, vault, toast, writeFile, readFile, fileAt } = ctx;
+  const { S, $, app, vault, toast, writeFile, readFile, fileAt, mdFilesIn } = ctx;
 
   /* The filter's SHAPE belongs to this module, so this module seeds it — the
      same split accounts.js makes for S.acctView. It lived in controller.js's
@@ -101,12 +101,21 @@ module.exports = function registerNotes(ctx) {
     /* A note whose subject no longer exists still has to be selectable in the
        filter, or the only notes you cannot reach are the ones that most need
        looking at. Added after the live entities so it reads as the tail. */
-    const live = new Set(out.map(o => o.value));
+    /* Keyed FOLDED, because notesFor, isOrphan, noteButton and the Subjects
+       tile all fold — and a set that compares verbatim while everything else
+       compares folded disagrees with all of them. A note whose subject is
+       "cash" against an account named "Cash" got a second dropdown row reading
+       "Account · cash (missing)", sitting under the real one, for a note the
+       card correctly showed as attached. */
+    const live = new Set(out.map(o => {
+      const i = o.value.indexOf(SEP);
+      return i === -1 ? o.value : o.value.slice(0, i) + SEP + fold(o.value.slice(i + 1));
+    }));
     for (const n of S.notes) {
-      const v = n.kind + SEP + n.subject;
-      if (n.subject && !live.has(v)) {
-        live.add(v);
-        out.push({ value: v, label: `${KIND_LABELS[n.kind]} · ${n.subject} (missing)` });
+      const key = n.kind + SEP + fold(n.subject);
+      if (n.subject && !live.has(key)) {
+        live.add(key);
+        out.push({ value: n.kind + SEP + n.subject, label: `${KIND_LABELS[n.kind]} · ${n.subject} (missing)` });
       }
     }
     return out;
@@ -222,17 +231,49 @@ module.exports = function registerNotes(ctx) {
     const rows = visibleNotes();
     if (!rows.length) {
       const filtered = S.notes.length > 0;
-      list.append(el('div', { class: 'note-empty text-muted' },
+      list.append(el('li', { class: 'note-empty text-muted' },
         filtered
           ? 'No notes match this filter.'
           : `No notes yet. Write one and it lands in ${NOTES_DIR}/ as an ordinary markdown note — editable in Obsidian, and linked to whatever it is about.`));
       return;
     }
+    /* Each card in its own <li>. The card's title is a button rather than a
+       heading — deliberately, since a heading that does something is its own
+       anti-pattern — which left a screen reader no structure at all to move
+       between notes by, only linear tabbing through every control of every
+       card. A list restores "item 3 of 15" and the list rotor, and costs one
+       element per card. */
     const known = knownNames();
-    for (const n of rows) list.append(noteCard(n, known));
+    for (const n of rows) list.append(el('li', {}, noteCard(n, known)));
   }
 
   /* ------------------------------ creating ------------------------------- */
+
+  /* "Is this path already used?", asked the way the FILESYSTEM would answer it.
+
+     `fileAt` is vault.getFileByPath — an exact-key lookup in Obsidian's index.
+     macOS, iOS and iCloud Drive all resolve paths case-insensitively, so
+     "Notes/2026-08-12 Bank call.md" and "…bank call.md" are one file on disk
+     and two different keys in that index. Probing with the exact key alone
+     reports the second as free, and vault.create then either writes THROUGH to
+     the first note — destroying prose the user typed, the one thing this
+     feature promises never to do — or throws, which before the guard above
+     lost the new note just as silently.
+
+     This repo has already paid for this once: see the comment above txSegment
+     in load.js, where a `tx_label` differing only in case missed the in-memory
+     lookup while the write still landed on the existing file. Same asymmetry,
+     same fix — fold both sides.
+
+     Built once per call rather than folding inside the probe, because
+     uniqueNotePath may ask up to 999 times and each ask would otherwise walk
+     the folder again. */
+  function taken() {
+    const used = new Set(
+      S.notes.map(n => n.rel.toLowerCase()).concat(
+        mdFilesIn(NOTES_DIR).map(f => `${NOTES_DIR}/${f.name}`.toLowerCase())));
+    return p => used.has(p.toLowerCase()) || !!fileAt(p);
+  }
 
   /* `about` pre-selects a subject — passed by the note buttons on the Accounts,
      Debt, Services and Owed pages, so writing a note about the thing you are
@@ -255,11 +296,20 @@ module.exports = function registerNotes(ctx) {
     const created = todayIso();
     let rel;
     try {
-      rel = uniqueNotePath(created, title, p => !!fileAt(p));
+      rel = uniqueNotePath(created, title, taken());
     } catch (e) {
       return toast(e.message || String(e), true);
     }
-    await writeFile(rel, serializeNote({ title, kind, subject, created, body: r.body || '' }));
+    /* Guarded, because this is where the user's typed body actually lands. The
+       call above was already wrapped and this one was not, so a rejected write
+       — a path the case-folded probe below did not anticipate, a full disk, a
+       sync lock — closed the dialog, discarded what they wrote and said
+       nothing at all. */
+    try {
+      await writeFile(rel, serializeNote({ title, kind, subject, created, body: r.body || '' }));
+    } catch (e) {
+      return toast(`Could not write that note: ${e.message || e}`, true);
+    }
 
     /* Re-read rather than pushing a hand-built object onto S.notes: what the
        page lists then comes from the same parse as everything else, so a
@@ -340,18 +390,29 @@ module.exports = function registerNotes(ctx) {
   }
 
   async function deleteNote(n) {
+    /* Resolved BEFORE the confirm, and the TFile is what gets trashed.
+       Resolving afterwards meant re-reading a path across an await the user
+       spends seconds inside: if the note was renamed meanwhile, that path is
+       either gone — and the old code cheerfully announced "Note deleted"
+       having deleted nothing — or now points at a DIFFERENT file, which it
+       would then trash. A TFile survives a rename; a path does not. */
+    const f = fileAt(n.rel);
+    if (!f) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
     const go = await confirmModal(app, {
       title: 'Delete note',
       message: `Move "${n.title}" to your vault trash? The note file goes with it — this does not touch the account or debt it is about.`,
       confirmText: 'Delete note',
     });
     if (!go) return;
-    const f = fileAt(n.rel);
     // vault.trash(file, false) — the SYSTEM-trash flag is false, so the file
     // lands in the vault's own .trash and is recoverable from inside Obsidian.
     // Same call categories.js makes when a category file is deleted; a note is
     // prose the user typed, so it earns at least the same care.
-    if (f) await vault.trash(f, false);
+    try {
+      await vault.trash(f, false);
+    } catch (e) {
+      return toast(`Could not delete that note: ${e.message || e}`, true);
+    }
     await ctx.loadNotes();
     renderNotes();
     toast('Note deleted');

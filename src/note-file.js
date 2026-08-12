@@ -70,6 +70,15 @@ const KIND_LABELS = {
 const LINKED_KINDS = new Set(['account', 'category']);
 const hasOwnNote = kind => LINKED_KINDS.has(kind);
 
+/* Would `[[name]]` actually reach a file? Two ways it would not:
+   the name is not its own filename (safeSeg rewrites `/`, `:`, `?` and the
+   rest, so a category called "Kids/School" lives at "Kids-School.md"), or it
+   carries a character Obsidian's own link syntax consumes. `#` and `^` open a
+   heading and a block reference; `|` opens an alias; brackets close the link
+   early. Each turns the target into something other than the name. */
+const LINK_HOSTILE = /[[\]|#^]/;
+const linkResolves = name => !!name && safeSeg(name) === name && !LINK_HOSTILE.test(name);
+
 /* A kind whose subject has to NAME SOMETHING THAT EXISTS, so a note pointing
    at a name that has since gone is a broken link worth showing.
 
@@ -114,7 +123,14 @@ function unwrapLink(v) {
    here has — and iOS fails that write rather than truncating it. */
 const TITLE_MAX = 80;
 function noteFileName(created, title) {
-  const seg = safeSeg((title ?? '').toString().trim()).slice(0, TITLE_MAX).trim().replace(/[. ]+$/, '');
+  /* Spread, not .slice — a plain slice counts UTF-16 code units, so a title
+     with an emoji or any astral character straddling the cut leaves a LONE
+     SURROGATE at the end of the filename. That encodes to U+FFFD on the way to
+     UTF-8, which means two different titles can land on one on-disk name while
+     the collision probe still sees them as different, and on iOS the write is
+     rejected outright. Slicing by code point cannot split a character. */
+  const seg = [...safeSeg((title ?? '').toString().trim())]
+    .slice(0, TITLE_MAX).join('').trim().replace(/[. ]+$/, '');
   return `${created} ${seg || 'Note'}.md`;
 }
 
@@ -156,8 +172,22 @@ function noteFmLines({ kind, subject, created }) {
   ];
   /* Only where it resolves — see the header. An unresolvable wikilink is not
      a harmless extra, it is a permanent phantom node in the graph, once per
-     note. */
-  if (subj && hasOwnNote(k)) lines.push(`note_for: ${yamlStr(`[[${subj}]]`)}`);
+     note.
+
+     `hasOwnNote` answers whether the KIND has a file, which is necessary and
+     not sufficient: the NAME has to reach it too. A category stores its
+     display name in frontmatter and its sanitised name on disk, so
+     "Kids/School" — the example categories.js uses itself — lives at
+     `Categories/Kids-School.md` and `[[Kids/School]]` resolves to nothing.
+     Bracket characters fail differently and just as badly: Obsidian's link
+     target excludes them, so `[[Bond [2024]]]` either fails to parse as a link
+     at all or resolves to a truncated phantom.
+
+     So the key is written only when the subject is its own filename and
+     carries nothing Obsidian's link syntax would eat. Suppressing it costs a
+     backlink; emitting it costs a permanent phantom node, and the backlink was
+     the entire reason for the key. */
+  if (subj && hasOwnNote(k) && linkResolves(subj)) lines.push(`note_for: ${yamlStr(`[[${subj}]]`)}`);
   lines.push(`created: ${created}`);
   return lines;
 }
@@ -231,8 +261,29 @@ function parseNote(text, path = '') {
    backslash; YAML gives that sequence no meaning unquoted anyway, and the
    alternative is showing escape characters to everyone who ever types an
    apostrophe-free quotation mark. */
+/* Now also undoes \n, \r and \t, because yamlStr escapes them — a subject
+   carrying a newline (a table-cell name wrapped with `<br>`) would otherwise
+   read back with a literal backslash-n on the card where Obsidian shows a
+   break, and, worse, would no longer EQUAL the debt it names, so every note
+   about it would show as unmatched.
+
+   One pass, left to right, rather than a chain of .replace() calls. A chain
+   un-escapes in stages, so a value holding a literal backslash-then-n — the
+   two characters, escaped by yamlStr as `\\n` — comes out of the `\n` stage as
+   a real newline that the `\\` stage has already walked past. Reading each
+   escape once, where it occurs, is the only shape that is a true inverse. */
 function unyaml(v) {
-  return (v ?? '').toString().trim().replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  const s = (v ?? '').toString().trim();
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] !== '\\' || i === s.length - 1) { out += s[i]; continue; }
+    const next = s[++i];
+    out += next === 'n' ? '\n'
+      : next === 'r' ? '\r'
+        : next === 't' ? '\t'
+          : next;                    // \" and \\ — and anything else, verbatim
+  }
+  return out;
 }
 
 const ISO_PREFIX = /^(\d{4}-\d{2}-\d{2})/;
@@ -273,7 +324,7 @@ function isOrphan(note, known) {
 
 module.exports = {
   NOTES_DIR, NOTE_KINDS, KIND_LABELS, TITLE_MAX, EXCERPT_MAX,
-  hasOwnNote, isTracked, normalizeKind, unwrapLink,
+  hasOwnNote, isTracked, linkResolves, normalizeKind, unwrapLink,
   noteFileName, uniqueNotePath, noteFmLines, serializeNote,
   noteExcerpt, parseNote, notesFor, sortNotes, isOrphan, fold,
 };

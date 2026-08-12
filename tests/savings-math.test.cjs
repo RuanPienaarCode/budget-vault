@@ -177,7 +177,16 @@ const TODAY = '2026-08-11';
     const mo = String((i % 12) + 1).padStart(2, '0');
     rows.push(row(`${2022 + Math.floor(i / 12)}-${mo}-01`, 2000, ''));
   }
-  const a = { balance: 214300, starting_amount: 40000, inception_date: '2022-03-01' };
+  /* Opens on 2022-01-01 — the month the first debit order lands.
+
+     It said 2022-03-01 until 1.16.1, which contradicted this block's own
+     prose. `starting_amount` is the balance AT `inception_date`, so under that
+     date the January and February orders were already inside the R40 000 and
+     were then counted a second time; the figure only came to R110 000 because
+     totalReturn summed the rows unwindowed. The fixture was wrong, not the
+     arithmetic — and 11b below now covers the pre-inception case deliberately
+     rather than leaving it hidden inside this one. */
+  const a = { balance: 214300, starting_amount: 40000, inception_date: '2022-01-01' };
   const r = totalReturn(a, rows, typeOf, { today: TODAY });
 
   eq(r.basis, 'measured', 'a stated starting amount is a measurable baseline');
@@ -188,6 +197,32 @@ const TODAY = '2026-08-11';
   near(r.undatedGrowth, 64300, 0.001, 'so all of it is undated');
   near(r.returnPct, 42.8667, 0.001, 'return is measured on capital, not on the balance');
   ok(r.annualisedPct > 8 && r.annualisedPct < 9, `≈8.4%/yr (got ${r.annualisedPct})`);
+  eq(r.trust, 'ok', 'nothing predates the opening date, so there is nothing to disclose');
+}
+
+/* ---- 11b. money that moved BEFORE the opening date is not counted twice ----
+   `starting_amount` is the balance AT `inception_date`. Rows older than that
+   date are already inside it, so adding them again inflates capital and
+   deflates growth — and unlike the history-gap case the error runs in the
+   UNFLATTERING direction, which is why nothing disclosed it: an account that
+   really earned R200 reported R0 and looked merely dull.
+
+   Adopting an existing account is the ordinary way in: you import the full
+   statement history, and set inception_date to when YOU started tracking. */
+{
+  const a = { balance: 1500, starting_amount: 1200, inception_date: '2026-01-01' };
+  const rows = [row('2025-02-05', 200, ''), row('2026-03-05', 100, '')];
+  const r = totalReturn(a, rows, typeOf, { today: '2026-08-12' });
+
+  near(r.capitalIn, 1300, 0.001, 'only the row AFTER the opening date joins the baseline');
+  near(r.growth, 200, 0.001, 'so the R200 the account actually earned is visible');
+  eq(r.trust, 'pre-inception', 'and the reader is told the record predates the opening date');
+  eq(r.gapDays, -330, 'by how far, signed, so the direction is unambiguous');
+
+  /* The negative control for the whole fix: unwindowed, this is what it used
+     to say — capital swallowing the growth, and 'ok' printed over it. */
+  const naive = 1200 + 200 + 100;
+  ok(naive !== r.capitalIn, `negative control: the unwindowed sum (${naive}) is not what is reported`);
 }
 
 /* ---- 12. the identity: what is put in plus what it earned IS the balance ----

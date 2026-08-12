@@ -231,7 +231,24 @@ function totalReturn(account, rows, typeOf, opts) {
   const a = account || {};
   const today = (opts && opts.today) || todayIso();
   const balance = typeof a.balance === 'number' ? a.balance : 0;
-  const f = splitFlows(rows, typeOf);
+
+  /* `starting_amount` is the balance AT `inception_date` — so it ALREADY
+     contains everything that happened before that date. Summing the rows
+     unwindowed added those contributions a second time, and the error runs in
+     the UNFLATTERING direction: capital too high, growth too low, a fund that
+     earned R200 reporting R0. Nothing disclosed it, because the trust check
+     below only fires when history starts LATE.
+
+     Reached by importing an account's full statement history into an account
+     whose `inception_date` marks when tracking started rather than when the
+     account opened — which is the ordinary way to adopt an existing account.
+
+     `all` stays unwindowed: `f.first` and the gap test have to see the whole
+     record to answer "when does the history actually begin". Only the capital
+     sums are windowed. */
+  const all = splitFlows(rows, typeOf);
+  const from = ISO_DATE.test(a.inception_date || '') ? a.inception_date : '';
+  const f = from ? splitFlows(rows, typeOf, { from }) : all;
 
   /* fmNum writes null for an absent key and a number for a written one, so a
      deliberate `starting_amount: 0` — an account opened empty and funded by
@@ -296,8 +313,18 @@ function totalReturn(account, rows, typeOf, opts) {
      same failure as one whose history starts late, and gets the same flag. */
   let trust = 'ok', gapDays = null;
   if (ISO_DATE.test(a.inception_date || '')) {
-    const g = daysBetween(a.inception_date, f.first || today);
+    /* Against the UNWINDOWED first row: the question is when the record
+       begins, and the window above deliberately hides everything before
+       inception, so asking `f` would always answer "on or after inception"
+       and the gap could never be seen. */
+    const g = daysBetween(a.inception_date, all.first || today);
     if (g !== null && g > HISTORY_GAP_DAYS) { trust = 'history-gap'; gapDays = g; }
+    /* The mirror case, which used to pass silently as 'ok'. Rows exist BEFORE
+       the stated opening date, so either the date is wrong or the baseline is
+       not the balance at it — and both mean the split between capital and
+       growth is a guess. Named rather than swallowed; the figure is still
+       shown, because it is the best one available. */
+    else if (g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
   }
 
   return {
@@ -312,13 +339,32 @@ function totalReturn(account, rows, typeOf, opts) {
    uses. `capital` is money the household moved (contributions less
    withdrawals, so a withdrawal month is negative); `posted` is growth the
    account actually wrote down. */
-function monthlyFlows(rows, typeOf) {
+/* A row whose date this cannot place lands under this key rather than being
+   dropped. splitFlows counts such a row (it filters on `from`/`to`, not on
+   shape), so discarding it here put money in the total that appears nowhere in
+   the bands — the identity the chart's whole trustworthiness rests on, broken
+   silently and in a direction nobody would think to check. `date` is stored
+   verbatim by the loader, so an unparseable one is a hand-edit away. */
+const UNDATABLE = '';
+
+function monthlyFlows(rows, typeOf, opts) {
+  const from = (opts && opts.from) || '';
+  const to = (opts && opts.to) || '';
   const out = new Map();
   for (const r of rows || []) {
     const kind = classifyRow(r, typeOf);
     if (!kind) continue;
-    const m = monthOf(r.date);
-    if (!m) continue;
+    /* The SAME window splitFlows applies, character for character — including
+       the raw string comparison, which is the point. totalReturn windows its
+       capital sum from `inception_date`; if the month buckets did not window
+       identically, a row one side of that line would be counted by one and not
+       the other, and the chart would disagree with the tiles above it by
+       exactly that row. Which it did: windowing the sum without windowing the
+       buckets was how a non-ISO date cell put R200 in the bands that the total
+       had already accounted for as undated growth. */
+    if (from && r.date < from) continue;
+    if (to && r.date > to) continue;
+    const m = monthOf(r.date);          // '' when the date is not a real ISO date
     if (!out.has(m)) out.set(m, { capital: 0, posted: 0 });
     const b = out.get(m);
     if (kind === 'growth') b.posted += r.amount;
@@ -353,8 +399,16 @@ function growthSeries(entries, typeOf, opts) {
   const deltas = new Map();
   let firstMonth = '', undated = 0, included = 0, excluded = 0, closing = 0;
 
+  /* Money that counts toward the total but carries no placeable date. Held
+     here and folded into the first point once that point is known — the same
+     treatment truncation already gives the months it drops, and for the same
+     reason: the curve starting partway up is honest, money missing from it is
+     not. Dropping these was one of the two ways the identity could fail. */
+  const pending = { capital: 0, posted: 0 };
+
   const bump = (m, key, amt) => {
-    if (!m || !amt) return;
+    if (!amt) return;
+    if (!m) { pending[key] += amt; return; }
     if (!deltas.has(m)) deltas.set(m, { capital: 0, posted: 0 });
     deltas.get(m)[key] += amt;
     if (!firstMonth || m < firstMonth) firstMonth = m;
@@ -367,14 +421,29 @@ function growthSeries(entries, typeOf, opts) {
     /* 'stated' accounts are excluded too: they have no transactions at all, so
        every figure they carry is undated and they would contribute a flat step
        from a date nobody wrote down. */
-    if (r.basis !== 'measured') { excluded++; continue; }
-    included++;
-    closing += r.balance;
     /* The opening capital sits AT the opening date. Where there is no
        inception_date it sits at the first month the account did anything,
        which is the earliest point the vault can honestly place it. */
-    bump(monthOf(a.inception_date) || monthOf(r.since), 'capital', r.baseline);
-    for (const [m, b] of monthlyFlows(rows, typeOf)) {
+    const at = monthOf(a.inception_date) || monthOf(r.since);
+    /* …and where it can be placed NOWHERE — no opening date, and no
+       transaction to borrow a date from — the account is not chartable, so it
+       is excluded rather than half-included. It used to be counted into
+       `closing` while its baseline went nowhere, which is how a fund with
+       R60 000 of opening capital printed a R95 000 total over bands that
+       topped out at R35 000 and called the difference "growth carrying no
+       date". Exactly the market-linked holding this whole feature exists for:
+       `inception_date` is optional and nothing cross-validates it against
+       `starting_amount`, so filling one and not the other is one keystroke. */
+    if (r.basis !== 'measured' || (r.baseline && !at)) { excluded++; continue; }
+    included++;
+    closing += r.balance;
+    bump(at, 'capital', r.baseline);
+    /* Windowed exactly as totalReturn windows its capital sum — see the note
+       in monthlyFlows. The baseline already contains everything before the
+       opening date, so counting those rows again in the bands would draw money
+       the total does not have. */
+    const from = ISO_DATE.test(a.inception_date || '') ? a.inception_date : '';
+    for (const [m, b] of monthlyFlows(rows, typeOf, from ? { from } : undefined)) {
       bump(m, 'capital', b.capital);
       bump(m, 'posted', b.posted);
     }
@@ -385,7 +454,21 @@ function growthSeries(entries, typeOf, opts) {
     return { points: [], undated: 0, closing: 0, included, excluded, truncatedFrom: '' };
   }
 
-  const lastMonth = monthOf(today) || firstMonth;
+  /* Everything that could not be dated joins the first point. */
+  if (pending.capital || pending.posted) {
+    const d = deltas.get(firstMonth);
+    d.capital += pending.capital;
+    d.posted += pending.posted;
+  }
+
+  /* The walk has to reach the LAST month anything happens in, not merely
+     today. A row dated next month is counted by splitFlows and bucketed by
+     monthlyFlows, but a walk that stopped at today never accumulated it into
+     any point — the second way the identity could fail. Future dates are not
+     hypothetical: a scheduled transfer captured in advance, or a typo in the
+     year, and the loader stores `date` verbatim. */
+  let lastMonth = monthOf(today) || firstMonth;
+  for (const m of deltas.keys()) if (m > lastMonth) lastMonth = m;
   const months = [];
   for (let m = firstMonth; m <= lastMonth; m = nextMonth(m)) months.push(m);
   if (!months.length) months.push(firstMonth);

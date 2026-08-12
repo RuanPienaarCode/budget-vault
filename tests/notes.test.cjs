@@ -34,9 +34,12 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
 const notes = require('../src/note-file');
+/* classifyRename lives in controller.js beside formatMoney — both are pure
+   decisions pulled out of a live mount so they can be asked questions. */
+const { classifyRename } = require('../src/controller');
 const {
   NOTES_DIR, KIND_LABELS, NOTE_KINDS, hasOwnNote, isTracked, normalizeKind,
-  noteFileName, uniqueNotePath, serializeNote, parseNote, noteExcerpt,
+  noteFileName, uniqueNotePath, serializeNote, parseNote, noteExcerpt, noteFmLines, TITLE_MAX,
   notesFor, sortNotes, isOrphan, unwrapLink,
 } = notes;
 
@@ -324,6 +327,136 @@ async function mount(files = vaultFiles()) {
     // Sorting must be total, or the list reshuffles under the reader.
     const same = [{ created: '2026-01-01', title: 'b' }, { created: '2026-01-01', title: 'a' }];
     eq(sortNotes(same).map(n => n.title), ['a', 'b'], 'notes sharing a date sort by title, stably');
+  }
+
+  /* ---- 10. a newline in a subject must not break the block ---------------
+     Names typed into a markdown TABLE cell — debts, assets, services, owed —
+     round trip through unescMd, which turns `<br>` back into a real newline.
+     Written raw into a quoted scalar that newline ENDS THE VALUE, and the rest
+     of the name becomes a line of its own: invalid YAML, so Obsidian drops
+     every property on the file, while this module's own line parser reads the
+     wreckage back as real and reports a FORGED note_kind. Invisible from
+     inside the app, which is what makes it worth its own check. */
+  {
+    const NL = String.fromCharCode(10);
+    const nasty = [
+      ['a name wrapped with <br> that forges a key', `Absa Bond${NL}note_kind: account`],
+      ['a name merely wrapped for width', `Standard Bank${NL}Access Bond`],
+      ['a carriage return', `Old${String.fromCharCode(13)}Mutual`],
+      ['a tab', `Tab${String.fromCharCode(9)}separated`],
+      ['a quote', 'Fee "query"'],
+      ['a backslash', 'Back\\slash'],
+      /* The one a chain of .replace() calls gets wrong: yamlStr escapes the
+         backslash first, so a NAIVE reader that un-escapes \\n before \\\\
+         turns these two literal characters into a real newline. */
+      ['a LITERAL backslash-n, meant as two characters', 'path a\\nb'],
+    ];
+    for (const [what, subject] of nasty) {
+      const text = serializeNote({ title: 'T', kind: 'debt', subject, created: '2026-08-12', body: 'prose' });
+      const fm = text.split('---')[1].trim().split(NL);
+      ok(fm.every(l => /^[a-z_]+:/.test(l)), `the block stays parseable — ${what}`);
+      eq(parseNote(text, `${NOTES_DIR}/x.md`).subject, subject, `and the subject round-trips — ${what}`);
+      eq(parseNote(text, `${NOTES_DIR}/x.md`).kind, 'debt', `and the kind cannot be forged — ${what}`);
+    }
+  }
+
+  /* ---- 11. the collision probe answers the way the FILESYSTEM would ------
+     macOS, iOS and iCloud Drive resolve paths case-insensitively, so a probe
+     that compares exact keys reports a case-variant as free and the write
+     lands on the existing note — destroying prose the user typed. This repo
+     has been here before; see the comment above txSegment in load.js. */
+  {
+    const existing = new Set([`${NOTES_DIR}/2026-08-12 Bank call.md`.toLowerCase()]);
+    const folded = p => existing.has(p.toLowerCase());
+    eq(uniqueNotePath('2026-08-12', 'bank call', folded), `${NOTES_DIR}/2026-08-12 bank call 2.md`,
+      'a title differing only in case is a COLLISION, not a free path');
+    eq(uniqueNotePath('2026-08-12', 'BANK CALL', folded), `${NOTES_DIR}/2026-08-12 BANK CALL 2.md`,
+      'in any casing');
+    eq(uniqueNotePath('2026-08-12', 'Other call', folded), `${NOTES_DIR}/2026-08-12 Other call.md`,
+      'while a genuinely different title still takes the bare name');
+
+    /* Negative control: the exact-key probe this replaced. If this ever agrees
+       with the folded one above, the fix is gone. */
+    const exact = p => existing.has(p);
+    ok(uniqueNotePath('2026-08-12', 'bank call', exact) !== uniqueNotePath('2026-08-12', 'bank call', folded),
+      'negative control: an exact-key probe DOES hand back the colliding path');
+  }
+
+  /* ---- 12. a filename is never cut through the middle of a character -----
+     .slice() counts UTF-16 code units, so a title with an astral character
+     straddling the cap leaves a LONE SURROGATE — U+FFFD on the way to UTF-8,
+     which collides two distinct titles onto one on-disk name, and a rejected
+     write on iOS. */
+  {
+    const name = noteFileName('2026-08-12', 'A'.repeat(TITLE_MAX - 1) + '🏦tail');
+    ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(name), 'no lone high surrogate survives the cap');
+    ok(!/(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(name), 'and no orphaned low surrogate either');
+    ok(name.endsWith('.md'), 'and it is still a markdown filename');
+    eq([...noteFileName('2026-08-12', '🏦'.repeat(200))].length <= TITLE_MAX + 15, true,
+      'an all-emoji title is still capped by code point');
+  }
+
+  /* ---- 13. the wikilink is written only where it RESOLVES -----------------
+     hasOwnNote answers whether the KIND has a file; it does not answer whether
+     the NAME reaches one. A category stores its display name in frontmatter
+     and its sanitised name on disk, so "Kids/School" — categories.js's own
+     example — lives at Categories/Kids-School.md and [[Kids/School]] resolves
+     to nothing. An unresolvable wikilink is a permanent phantom node in the
+     graph, once per note. */
+  {
+    const linkFor = (kind, subject) =>
+      noteFmLines({ kind, subject, created: '2026-08-12' }).find(l => l.startsWith('note_for')) || '';
+    ok(linkFor('account', 'Cheque'), 'a plain name that IS its own filename gets a link');
+    ok(linkFor('category', 'Groceries'), 'for categories too');
+    for (const bad of ['Kids/School', 'Home: rates', 'Bond [2024]', 'Fees|net', 'Note#1', 'Block^ref']) {
+      eq(linkFor('category', bad), '', `no phantom link for a name Obsidian cannot resolve — ${bad}`);
+    }
+    // …and the subject itself is still recorded, so matching keeps working.
+    ok(noteFmLines({ kind: 'category', subject: 'Kids/School', created: '2026-08-12' })
+      .some(l => l.startsWith('note_subject')), 'the subject is recorded either way');
+  }
+
+  /* ---- 14. which vault renames should move a note's subject --------------
+     Extracted from the vault.on('rename') closure precisely so it can be
+     asked these questions — inside the closure nothing could call it. */
+  {
+    const B2 = 'Budget';
+    const cats = [{ name: 'Groceries', rel: 'Categories/Groceries.md' },
+      { name: 'Kids/School', rel: 'Categories/Kids-School.md' }];
+
+    eq(classifyRename(B2, `${B2}/Accounts/Cheque.md`, `${B2}/Accounts/Current account.md`, cats),
+      { kind: 'account', from: 'Cheque', to: 'Current account' }, 'an account renamed in place moves its notes');
+
+    /* "Kids/School" cannot BE its filename — safeSeg rewrites the slash — so
+       load.js takes the name from `fm.name` and the file is merely where it
+       lives. Renaming that file does not rename the category, and repointing
+       would move every note off a subject that never moved. */
+    eq(classifyRename(B2, `${B2}/Categories/Kids-School.md`, `${B2}/Categories/After-school.md`, cats), null,
+      'a category whose name comes from FRONTMATTER does not move when its file is renamed');
+    /* "Groceries" IS its filename, so the name tracks it and the notes follow. */
+    eq(classifyRename(B2, `${B2}/Categories/Groceries.md`, `${B2}/Categories/Food.md`, cats),
+      { kind: 'category', from: 'Groceries', to: 'Food' },
+      'but one whose name tracks its filename does');
+    /* And one the loader has no record of: nothing pins its name, so the
+       filename is all there is to go on. */
+    eq(classifyRename(B2, `${B2}/Categories/Petrol.md`, `${B2}/Categories/Fuel.md`, cats),
+      { kind: 'category', from: 'Petrol', to: 'Fuel' },
+      'and so does one the loader has no record of');
+
+    eq(classifyRename(B2, `${B2}/Accounts/Cheque.md`, `${B2}/Archive/Cheque.md`, cats), null,
+      'moved OUT of Accounts/ is not a rename');
+    eq(classifyRename(B2, `${B2}/Archive/Cheque.md`, `${B2}/Accounts/Cheque.md`, cats), null,
+      'and moved IN is not either');
+    eq(classifyRename(B2, `${B2}/Categories/Food.md`, `${B2}/Accounts/Food.md`, cats), null,
+      'moving between the two tracked folders is a kind change, not a rename');
+    eq(classifyRename(B2, `${B2}/Accounts/Sub/Cheque.md`, `${B2}/Accounts/Sub/Other.md`, cats), null,
+      'a nested folder is not the Accounts/ the loader reads');
+    eq(classifyRename(B2, `${B2}/Debts.md`, `${B2}/Liabilities.md`, cats), null,
+      'debts, assets, services and owed have no file identity to rename');
+    eq(classifyRename(B2, 'Elsewhere/Accounts/Cheque.md', 'Elsewhere/Accounts/X.md', cats), null,
+      'and nothing outside the budget folder counts at all');
+    eq(classifyRename(B2, `${B2}/Accounts/Cheque.md`, undefined, cats), null,
+      'a missing new path is not a crash');
   }
 
   console.log(`PASS — notes: the body is never rebuilt, and the file contract round-trips (${checks} assertions).`);

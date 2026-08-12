@@ -89,7 +89,14 @@ function patchFrontmatter(raw, updates) {
   if (!raw || !raw.trim()) {
     return Object.keys(updates).filter(k => updates[k] != null).map(k => `${k}: ${updates[k]}`).join('\n');
   }
-  const isTopKey = l => /^[^\s#][^:]*:(\s.*)?$/.test(l);
+  /* A top-level key is an unindented line with a colon in it. The `\s` after
+     the colon used to be required, which meant `cssclasses:wide` — legal
+     enough for a human to type, and something Obsidian itself tolerates — read
+     as a CONTINUATION of the entry above it. If that entry was one of the keys
+     being replaced, the hand-typed line was deleted along with it, silently,
+     by a function whose entire contract is to preserve what it does not
+     model. */
+  const isTopKey = l => /^[^\s#][^:]*:(\s.*)?$/.test(l) || /^[^\s#][^:]*:\S/.test(l);
   const entries = [];
   let cur = null;
   for (const line of raw.split(/\r?\n/)) {
@@ -119,7 +126,29 @@ function patchFrontmatter(raw, updates) {
    "Ref: ABC-1" makes the whole block unparseable to Obsidian, which drops the
    note's properties from the metadata cache — while this plugin's own
    first-colon parser reads it back happily, so the breakage is invisible from
-   inside the app. */
-const yamlStr = v => `"${String(v ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+   inside the app.
+
+   NEWLINES ESCAPE TOO, and that is not theoretical. A name typed into a
+   markdown TABLE cell — a debt, an asset, a service, an owed entry — round
+   trips through unescMd, which turns `<br>` back into a real newline. Written
+   raw, that newline ends the scalar mid-value and the REST OF THE NAME becomes
+   a line of its own inside the block:
+
+       note_subject: "Absa Bond
+       note_kind: account"
+
+   which is invalid YAML (so Obsidian drops every property on the file) AND
+   forges a key that this module's own line parser then reads back as real. A
+   name wrapped for width — "Standard Bank<br>Access Bond", no colon, nothing
+   clever — breaks the block just as thoroughly.
+
+   The reader half is unyaml() in note-file.js, which has to undo exactly these
+   four or the app shows a literal backslash-n where Obsidian shows a break. */
+const yamlStr = v => `"${String(v ?? '')
+  .replace(/\\/g, '\\\\')
+  .replace(/"/g, '\\"')
+  .replace(/\r/g, '\\r')
+  .replace(/\n/g, '\\n')
+  .replace(/\t/g, '\\t')}"`;
 
 module.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr };

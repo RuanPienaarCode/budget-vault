@@ -42,6 +42,24 @@ function fmBool(v) {
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
 
+  /* Reads go out in parallel; parsing stays serial. Every loop below used to
+     await one file at a time — ~163 sequential round trips on a real vault,
+     and on mobile each one crosses the Capacitor bridge (an iCloud-backed
+     file may have to be materialised first). Parsing all 5,700 transactions
+     measures ~7ms, so the wait was almost entirely I/O latency. Ordering and
+     results are unchanged: `read` keeps each file paired with its own text.
+
+     Declared HERE rather than inside loadVault, where it lived until 1.16.1.
+     Being a local of loadVault made it unreachable from loadNotes — a sibling
+     function added later in the same file — so that loader re-invented the
+     sequential loop this comment exists to warn about, and the notes read grew
+     to three quarters of the whole vault load. A helper that documents a trap
+     has to be in scope for the next person who would fall into it. */
+  const read = async files => {
+    const texts = await Promise.all(files.map(f => vault.cachedRead(f)));
+    return files.map((file, i) => ({ file, text: texts[i] }));
+  };
+
   async function loadVault() {
     const settingsTxt = await readFile('Settings.md');
     if (settingsTxt) {
@@ -92,17 +110,6 @@ module.exports = function registerLoad(ctx) {
          would read the future. */
       S.settings.overspend_lag = overspendLag(fm.overspend_lag);
     }
-    /* Reads go out in parallel; parsing stays serial. Every loop below used to
-       await one file at a time — ~163 sequential round trips on a real vault,
-       and on mobile each one crosses the Capacitor bridge (an iCloud-backed
-       file may have to be materialised first). Parsing all 5,700 transactions
-       measures ~7ms, so the wait was almost entirely I/O latency. Ordering and
-       results are unchanged: `read` keeps each file paired with its own text. */
-    const read = async files => {
-      const texts = await Promise.all(files.map(f => vault.cachedRead(f)));
-      return files.map((file, i) => ({ file, text: texts[i] }));
-    };
-
     S.categories = [];
     for (const { file, text } of await read(mdFilesIn('Categories'))) {
       const { fm } = parseFrontmatter(text);
@@ -490,15 +497,25 @@ module.exports = function registerLoad(ctx) {
 
      A note that cannot be read is SKIPPED rather than failing the load: these
      are files the user creates and edits by hand, and one unreadable note must
-     not take the whole budget down with it. */
+     not take the whole budget down with it. That is why this cannot simply
+     call `read` above — a single rejection there takes the whole Promise.all
+     down, and with it the entire budget. The catch is per file.
+
+     Reads in parallel for the reason `read`'s own comment gives, and this
+     loader is the case that proves it: measured against a Ruan-shaped vault it
+     was 172ms of a 233ms load at THIRTY notes — three quarters of the wait, at
+     a fraction of the files — because the cost is round trips, not work
+     (parsing measures ~5.5µs a note). Sequential, it grew without bound in the
+     one folder the user is invited to keep adding to. */
   async function loadNotes() {
+    const files = mdFilesIn(NOTES_DIR);
+    const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
     const notes = [];
-    for (const f of mdFilesIn(NOTES_DIR)) {
-      let text;
-      try { text = await vault.cachedRead(f); } catch (e) { continue; }
+    files.forEach((f, i) => {
+      if (texts[i] == null) return;
       const rel = `${NOTES_DIR}/${f.name}`;
-      notes.push({ rel, name: f.name, ...parseNote(text, rel) });
-    }
+      notes.push({ rel, name: f.name, ...parseNote(texts[i], rel) });
+    });
     S.notes = sortNotes(notes);
   }
 

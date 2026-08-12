@@ -46,6 +46,67 @@ function formatMoney(symbol, v, decimals, loc) {
   return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
 }
 
+/* Should a vault rename move the notes attached to what was renamed, and from
+   what name to what name? Pure, and pulled out of the watcher below for the
+   same reason formatMoney was pulled out of moneyIn(): the whole decision lived
+   inside a closure passed to vault.on(), which nothing can call without a live
+   mount — so a regex that stopped matching, or a guard that started matching
+   too much, would have shipped with every suite green.
+
+   Returns null for "not a rename this plugin should act on", or
+   {kind, from, to}. `categories` is S.categories.
+
+   Only accounts and categories: they are the two kinds whose identity IS a
+   file, so a rename is an event there is something to observe. Debts, assets,
+   services and owed entries are rows in a markdown table — renamed by editing a
+   cell, which the vault reports as a modify of the whole file with no way to
+   know what changed inside it. Those are caught after the fact by the
+   "unmatched" badge on the Notes page instead. */
+function classifyRename(basePath, oldPath, newPath, categories) {
+  const bp = basePath;
+  const kindOf = p => {
+    if (typeof p !== 'string' || (p !== bp && !p.startsWith(bp + '/'))) return null;
+    const rel = p.slice(bp.length + 1);
+    if (/^Accounts\/[^/]+\.md$/.test(rel)) return 'account';
+    if (/^Categories\/[^/]+\.md$/.test(rel)) return 'category';
+    return null;
+  };
+  const kind = kindOf(oldPath);
+  /* Moved OUT of Accounts/ (or into it, or between the two) is not a rename of
+     an account — it is a file leaving or joining the model, and re-pointing
+     notes at wherever it landed would be a guess. */
+  if (!kind || kindOf(newPath) !== kind) return null;
+
+  const base = p => p.split('/').pop().replace(/\.md$/, '');
+
+  /* An account IS its filename — the loader takes the name from there, so
+     renaming the file renames the account and its notes must follow.
+
+     A CATEGORY is not. load.js prefers `fm.name` and only falls back to the
+     basename, because two display names can sanitise to one file. So a category
+     carrying an explicit `name:` does not change its name when its FILE is
+     renamed — and repointing then moves every note off a subject that never
+     moved, orphaning them while toasting that it had helped. The only honest
+     move there is to do nothing.
+
+     Told apart by asking whether the name currently tracks the filename: if it
+     does, the rename renames the category; if it does not, `fm.name` is in
+     charge and the file is merely where it happens to live. Deriving this the
+     same way the loader does is the whole fix — deriving it differently is the
+     bug, and it is the second time in this repo (import.js, July: a safeSeg'd
+     label probed against a raw one). */
+  if (kind === 'category') {
+    const rel = oldPath.slice(bp.length + 1);
+    const cat = (categories || []).find(c => c.rel === rel);
+    if (cat && cat.name !== base(oldPath)) return null;
+  }
+
+  const from = base(oldPath);
+  const to = base(newPath);
+  if (!from || from === to) return null;
+  return { kind, from, to };
+}
+
 function mountApp(view) {
   const plugin = view.plugin;
   const app = view.app;
@@ -511,26 +572,12 @@ function mountApp(view) {
      by the "unmatched" badge on the Notes page instead. */
   view.registerEvent(vault.on('rename', async (file, oldPath) => {
     if (!S.loaded) return;
-    const bp = ctx.basePath();
-    const kindOf = p => {
-      if (typeof p !== 'string' || (p !== bp && !p.startsWith(bp + '/'))) return null;
-      const rel = p.slice(bp.length + 1);
-      if (/^Accounts\/[^/]+\.md$/.test(rel)) return 'account';
-      if (/^Categories\/[^/]+\.md$/.test(rel)) return 'category';
-      return null;
-    };
-    const kind = kindOf(oldPath);
-    // Moved OUT of Accounts/ (or into it) is not a rename of an account — it
-    // is a file leaving the model, and re-pointing notes at wherever it landed
-    // would be a guess.
-    if (!kind || kindOf(file?.path) !== kind) return;
-    const base = p => p.split('/').pop().replace(/\.md$/, '');
-    const from = base(oldPath);
-    const to = base(file.path);
+    const move = classifyRename(ctx.basePath(), oldPath, file?.path, S.categories);
+    if (!move) return;
     let moved = 0;
-    try { moved = await ctx.repointNotes(kind, from, to); } catch (e) { return; }
+    try { moved = await ctx.repointNotes(move.kind, move.from, move.to); } catch (e) { return; }
     if (!moved) return;
-    toast(`Re-pointed ${moved} note${moved === 1 ? '' : 's'} from "${from}" to "${to}"`);
+    toast(`Re-pointed ${moved} note${moved === 1 ? '' : 's'} from "${move.from}" to "${move.to}"`);
     if (S.view === 'notes') ctx.renderNotes();
   }));
 
@@ -759,4 +806,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney };
+module.exports = { mountApp, formatMoney, classifyRename };

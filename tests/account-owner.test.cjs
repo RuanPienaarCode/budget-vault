@@ -262,5 +262,52 @@ const textOf = root => descend(root).map(n => n.textContent || '').join(' | ');
     ok(!textOf(drawer).match(/\bOwner\b/), 'and says nothing about an owner');
   }
 
+  /* ---------- 9. a starting amount of ZERO is a real baseline ------------
+     Not an owner question, but it lives in the same FM_WRITERS table and is
+     the same shape of bug: a truthy test where `!= null` was meant.
+
+     savings-math.js states the case outright — an account opened empty and
+     funded entirely by transfer has `starting_amount: 0`, and that must not
+     fall through to basis 'none'. Under the truthy test 0 wrote null, and null
+     REMOVES the key: type 0, save, reload, and the growth block vanished while
+     the card offered "Add starting amount" again. The behaviour the maths
+     module documents was unreachable through the app.
+
+     Both writers are checked, because there are two — the patch branch an edit
+     takes and the build-from-model branch a fresh account takes — and fixing
+     one leaves the bug reachable from the other half of the UI. */
+  {
+    const acct = byName('His Cheque');
+    acct.starting_amount = 0;
+    await ctx.saveAccount(acct, ctx.ACCOUNT_FM_KEYS);
+    const patched = await ctx.readFile('Accounts/His Cheque.md');
+    ok(/^starting_amount: 0\.00$/m.test(patched), `zero is written, not dropped — got:\n${patched}`);
+
+    // The contract it must NOT break: absent still means absent.
+    acct.starting_amount = null;
+    await ctx.saveAccount(acct, ctx.ACCOUNT_FM_KEYS);
+    ok(!/^starting_amount:/m.test(await ctx.readFile('Accounts/His Cheque.md')),
+      'while a genuinely absent starting amount still writes no key at all');
+
+    const pot = {
+      name: 'Empty Pot', type: 'savings', institution: '', owner: '',
+      account_number: '', tx_label: '', currency: '', ignore_warnings: '',
+      balance: 0, balance_updated: '2026-07-01', in_budget: true,
+      credit_limit: null, goal_amount: null, target_date: '',
+      monthly_contribution: null, total_invested: null,
+      starting_amount: 0, inception_date: '2026-01-01', tags: '', body: '\n\n# Empty Pot\n',
+    };
+    await ctx.saveAccount(pot);
+    ok(/^starting_amount: 0\.00$/m.test(await ctx.readFile('Accounts/Empty Pot.md')),
+      'and a NEW account created with zero keeps it too');
+
+    /* The whole point of writing it: the loader reads it back as a NUMBER, so
+       totalReturn sees a baseline rather than nothing. */
+    await ctx.loadVault();
+    const loaded = ctx.S.accounts.find(x => x.name === 'Empty Pot');
+    eq(typeof loaded.starting_amount, 'number', 'and it survives the round trip as a number');
+    eq(loaded.starting_amount, 0, 'holding the value the user actually typed');
+  }
+
   console.log(`account-owner.test.cjs — ${checks} checks passed`);
 })().catch(e => { console.error(e); process.exit(1); });

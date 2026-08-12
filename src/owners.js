@@ -62,6 +62,15 @@ function parseOwners(raw) {
     const name = p.trim().replace(/^["']|["']$/g, '').trim();
     if (!name) continue;
     if (out.some(x => x.toLowerCase() === name.toLowerCase())) continue;
+    /* "Joint" is the reserved value for a shared account, not a person, and
+       ownerOptions splices it in unconditionally after the declared people. A
+       household that literally declares someone called Joint therefore got the
+       word twice in every owner dropdown, both rows rendering through
+       ownerLabel — which short-circuits on the reserved key, so the PERSON was
+       labelled with the shared-account translation too. Dropped at the door,
+       where there is one place to do it, rather than filtered at each of the
+       three places the list is consumed. */
+    if (name.toLowerCase() === JOINT) continue;
     out.push(name);
   }
   return out;

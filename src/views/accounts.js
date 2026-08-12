@@ -185,7 +185,15 @@ module.exports = function registerAccounts(ctx) {
     target_date: a => a.target_date || null,
     monthly_contribution: a => (a.monthly_contribution ? a.monthly_contribution.toFixed(2) : null),
     total_invested: a => (a.total_invested ? a.total_invested.toFixed(2) : null),
-    starting_amount: a => (a.starting_amount ? a.starting_amount.toFixed(2) : null),
+    /* `!= null`, not truthy, because ZERO IS A REAL BASELINE here and the rest
+       of these keys is not the same case. savings-math.js says so outright: an
+       account opened empty and funded entirely by transfer has
+       `starting_amount: 0`, and that must not fall through to basis 'none'.
+       Under the truthy test, null REMOVED the key — so typing 0 into "Starting
+       amount", saving and reloading dropped it, the growth block vanished, and
+       the card offered "Add starting amount" again. The behaviour the maths
+       module documents was unreachable through the app. */
+    starting_amount: a => (a.starting_amount != null ? a.starting_amount.toFixed(2) : null),
     inception_date: a => a.inception_date || null,
   };
   const EDITABLE_KEYS = Object.keys(FM_WRITERS);
@@ -1333,7 +1341,9 @@ module.exports = function registerAccounts(ctx) {
     if (a.target_date) lines.push(`target_date: ${a.target_date}`);
     if (a.monthly_contribution) lines.push(`monthly_contribution: ${a.monthly_contribution.toFixed(2)}`);
     if (a.total_invested) lines.push(`total_invested: ${a.total_invested.toFixed(2)}`);
-    if (a.starting_amount) lines.push(`starting_amount: ${a.starting_amount.toFixed(2)}`);
+    // != null, for the reason spelled out at FM_WRITERS.starting_amount above:
+    // 0 is a baseline the maths module honours, not an absent key.
+    if (a.starting_amount != null) lines.push(`starting_amount: ${a.starting_amount.toFixed(2)}`);
     if (a.inception_date) lines.push(`inception_date: ${a.inception_date}`);
     if (a.tx_label) lines.push(`tx_label: ${yamlStr(a.tx_label)}`);
     if (a.tags) lines.push(`tags: ${a.tags}`);

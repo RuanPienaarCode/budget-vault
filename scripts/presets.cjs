@@ -54,7 +54,15 @@ const PRESETS = [
       primary: '#10b981', primaryDark: '#059669', accent: '#6ee7b7', gold: '#fbbf24',
       surface: '#12162a', bodyBg: '#04050b', bg1: '#080b16',
       glass: 'rgba(18,24,44,.42)', glassHi: 'rgba(34,44,78,.42)',
-      textPrimary: '#f2f4fe', textMuted: '#b3bad6', textLight: '#6f7799',
+      /* textLight feeds --ink-faint, and it has to clear AA against `surface`,
+         not merely against `bodyBg`. It was #6f7799 — 4.63:1 on the page, but
+         4.07:1 on the lighter card surface, which is where nearly every
+         consumer of that token actually sits: card subtitles, KPI labels,
+         account sub-lines, the ages under Owed and Assets. ~48 uses.
+         #7d85a7 measures 4.93:1 on surface and 5.61:1 on bodyBg, and stays in
+         family with the other three dark presets (4.56-4.59 against their own
+         surfaces). This was the only one of the eight palettes that failed. */
+      textPrimary: '#f2f4fe', textMuted: '#b3bad6', textLight: '#7d85a7',
       inkBase: '255,255,255',
     },
   },

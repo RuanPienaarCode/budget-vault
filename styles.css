@@ -93,7 +93,7 @@
   --border-color: rgba(255,255,255,.08);
   --text-primary: #f2f4fe;
   --text-muted:   #b3bad6;
-  --text-light:   #6f7799;
+  --text-light:   #7d85a7;
   --focus-ring:   rgba(16, 185, 129, 0.28);   /* tracks the dark theme's --color-primary */
   --shadow-sm:    0 1px 3px 0 rgb(0 0 0 / 0.4);
   --shadow-md:    0 40px 90px -40px rgb(0 0 0 / 0.8);
@@ -116,7 +116,15 @@
   --surface-glass:     rgba(18,24,44,.42);
   --surface-glass-hi:  rgba(34,44,78,.42);
   --ink-dim:           #b3bad6;
-  --ink-faint:         #6f7799;
+  /* AA on --surface, not merely on --body-bg. It was #6f7799, calibrated
+     against the page background (4.63:1) — but almost every consumer of this
+     token sits inside a .card, whose background is the LIGHTER --surface,
+     where the same colour measures 4.07:1 and fails. That covered ~48 uses:
+     every card subtitle, the KPI labels, the account sub-lines, the ages under
+     Owed and Assets. Predates the Notes page, which merely joined them.
+     #8790b3 is 5.68:1 on --surface and 6.47:1 on --body-bg, so it clears both
+     with room, and stays clearly quieter than --ink-dim above it. */
+  --ink-faint:         #7d85a7;
   --line-soft:         rgba(255,255,255,.04);
 }
 
@@ -2880,7 +2888,14 @@
 .budget-app-root .note-filters #noteAbout { flex: 1 1 190px; min-width: 0; }
 .budget-app-root .note-filters #noteSearch { flex: 2 1 200px; min-width: 0; }
 
-.budget-app-root .notes-list { display: flex; flex-direction: column; gap: 10px; }
+/* A real <ul>, so a screen reader can move note-to-note and announce "3 of
+   15" — the card's title is a button rather than a heading, so without this
+   there is no structure to navigate by at all. list-style and padding off:
+   the semantics are the point, the bullets are not. */
+.budget-app-root .notes-list {
+  display: flex; flex-direction: column; gap: 10px;
+  list-style: none; margin: 0; padding: 0;
+}
 
 .budget-app-root .note-card {
   padding: 14px 16px;
@@ -3062,9 +3077,9 @@
   --surface-glass-hi:    rgba(34,44,78,.42);
   --text-primary:        #f2f4fe;
   --text-muted:          #b3bad6;
-  --text-light:          #6f7799;
+  --text-light:          #7d85a7;
   --ink-dim:             #b3bad6;
-  --ink-faint:           #6f7799;
+  --ink-faint:           #7d85a7;
   --border-color:        rgba(255,255,255,.08);
   --line-soft:           rgba(255,255,255,.04);
   --focus-ring:          rgba(16,185,129,0.28);

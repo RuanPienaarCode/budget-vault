@@ -402,6 +402,21 @@ module.exports = function registerSavings(ctx) {
       `records begin ${r.gapDays} days after it opened — growth may be overstated`));
     }
 
+    /* The mirror case. Transactions exist BEFORE the stated opening date, so
+       either that date is wrong or the starting amount is not the balance at
+       it. Those rows are deliberately left out of the capital sum — the
+       starting amount already contains them — but if the date is the thing
+       that is wrong, real contributions are being ignored and growth is
+       understated. Disclosed for the same reason the flattering direction is:
+       the reader is the only one who knows which of the two is true. */
+    if (r.trust === 'pre-inception') {
+      card.append(el('div', { class: 's2 s2-caveat',
+        title: 'This account has transactions dated before the opening date you gave it. The starting '
+          + 'amount is treated as the balance on that date, so those earlier rows are not counted again. '
+          + 'If the opening date is wrong, correct it and the split corrects itself.' },
+      `records begin ${Math.abs(r.gapDays)} days before its opening date`));
+    }
+
     if (r.basis === 'stated') {
       card.append(el('div', { class: 's2 s2-caveat',
         title: 'No transactions in the vault for this account, so this is the balance less what the '

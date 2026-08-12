@@ -379,7 +379,7 @@ const SHELL_HTML = `
               <input class="form-control form-control-sm" id="noteSearch" type="search" placeholder="Search notes…"
                      autocomplete="off" autocorrect="off" spellcheck="false">
             </div>
-            <div class="notes-list" id="notesList"></div>
+            <ul class="notes-list" id="notesList"></ul>
           </div>
         </div>
       </section>
