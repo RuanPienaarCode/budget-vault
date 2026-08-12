@@ -101,6 +101,31 @@ module.exports = function registerIo(ctx) {
     if (!f) return [];
     return f.children.filter(c => c instanceof TFile && c.extension === 'md');
   }
+  /* Every .md at or below `rel`, depth-first.
+
+     mdFilesIn reads one level, which is right for Categories/ and Accounts/ —
+     those are flat by construction, because the plugin names the files itself
+     and a nested one would not be found by the writer either. Notes/ is the
+     opposite: the files are the USER'S, and filing a year of them into
+     Notes/2026/ is an ordinary thing to do with a folder full of markdown. Read
+     one level deep, that tidy-up silently emptied the page while every note was
+     still on disk.
+
+     Walks the Notes tree rather than filtering vault.getMarkdownFiles(), so the
+     cost stays proportional to the folder rather than to the vault. */
+  function mdFilesUnder(rel) {
+    const root = vault.getFolderByPath(relPath(rel));
+    if (!root) return [];
+    const out = [];
+    const walk = folder => {
+      for (const c of folder.children) {
+        if (c instanceof TFile) { if (c.extension === 'md') out.push(c); }
+        else if (c instanceof TFolder) walk(c);
+      }
+    };
+    walk(root);
+    return out;
+  }
   function subfoldersIn(rel) {
     const f = vault.getFolderByPath(relPath(rel));
     if (!f) return [];
@@ -108,7 +133,7 @@ module.exports = function registerIo(ctx) {
   }
 
   ctx.provide({
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, fileAt, mdFilesIn, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, fileAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   });
 };

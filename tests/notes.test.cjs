@@ -93,6 +93,15 @@ function vaultFiles() {
     // No subject at all. Never an orphan, whatever else is missing.
     [`${B}/${NOTES_DIR}/2026-08-10 Ideas.md`]:
       '---\nnote_kind: general\nnote_subject: ""\ncreated: 2026-08-10\n---\n\n# Ideas\n\nMove the emergency fund.\n',
+
+    /* Filed away into a year folder, and two deep, because tidying a folder
+       full of markdown is an ordinary thing to do and the plugin does not own
+       these files. Read one level deep, this was a note that vanished from the
+       page while sitting perfectly safe on disk. */
+    [`${B}/${NOTES_DIR}/2025/2025-11-02 Old fee query.md`]:
+      '---\nnote_kind: account\nnote_subject: "Cheque"\ncreated: 2025-11-02\n---\n\n# Old fee query\n\nLast year, same fee.\n',
+    [`${B}/${NOTES_DIR}/2025/Q4/2025-12-24 Year end.md`]:
+      '---\nnote_kind: general\nnote_subject: ""\ncreated: 2025-12-24\n---\n\n# Year end\n\nCheck the tax certificate.\n',
   };
 }
 
@@ -107,7 +116,7 @@ async function mount(files = vaultFiles()) {
   {
     const ctx = await mount();
     const S = ctx.S;
-    eq(S.notes.length, 3, 'every file in Notes/ is loaded');
+    eq(S.notes.length, 5, 'every file at or BELOW Notes/ is loaded');
 
     const fee = S.notes.find(n => n.title === 'Discovery fee query');
     ok(fee, 'the title comes from the body H1');
@@ -124,7 +133,9 @@ async function mount(files = vaultFiles()) {
     ok(!fee.excerpt.includes('|'), 'the excerpt skips table rows');
 
     // Newest first — the list must not reshuffle between renders.
-    eq(S.notes.map(n => n.created), ['2026-08-11', '2026-08-10', '2026-08-09'], 'notes load newest-first');
+    eq(S.notes.map(n => n.created),
+      ['2026-08-11', '2026-08-10', '2026-08-09', '2025-12-24', '2025-11-02'],
+      'notes load newest-first, wherever in the tree they live');
   }
 
   /* ---- 2. serialize -> parse round trip, including the nasty scalars ------
@@ -176,7 +187,13 @@ async function mount(files = vaultFiles()) {
     const before = await ctx.readFile(rel);
 
     const moved = await ctx.repointNotes('account', 'Cheque', 'Current account');
-    eq(moved, 1, 'the one note on that subject moved');
+    /* Two: the one at the top of Notes/ and the one filed under Notes/2025/.
+       A note does not stop belonging to an account because it was tidied into
+       a folder, so a rename has to reach it there. */
+    eq(moved, 2, 'every note on that subject moved, wherever it is filed');
+    const nested = await ctx.readFile(`${NOTES_DIR}/2025/2025-11-02 Old fee query.md`);
+    ok(nested.includes('note_subject: "Current account"'), 'including the one in a subfolder');
+    ok(nested.includes('Last year, same fee.'), 'whose body is just as untouchable as any other');
 
     const after = await ctx.readFile(rel);
     const bodyOf = t => t.slice(t.indexOf('\n---', 4) + 4);

@@ -43,7 +43,7 @@ const {
 const SEP = '\u001F';
 
 module.exports = function registerNotes(ctx) {
-  const { S, $, app, vault, toast, writeFile, readFile, fileAt, mdFilesIn } = ctx;
+  const { S, $, app, vault, toast, writeFile, readFile, fileAt, mdFilesUnder } = ctx;
 
   /* The filter's SHAPE belongs to this module, so this module seeds it — the
      same split accounts.js makes for S.acctView. It lived in controller.js's
@@ -269,9 +269,14 @@ module.exports = function registerNotes(ctx) {
      uniqueNotePath may ask up to 999 times and each ask would otherwise walk
      the folder again. */
   function taken() {
+    /* S.notes covers everything the loader found, including notes filed into
+       subfolders; the vault listing catches anything written since. A new note
+       is always created at the top of Notes/, so a nested path can never
+       actually collide with one — they are in the set for completeness rather
+       than because they can clash. */
     const used = new Set(
       S.notes.map(n => n.rel.toLowerCase()).concat(
-        mdFilesIn(NOTES_DIR).map(f => `${NOTES_DIR}/${f.name}`.toLowerCase())));
+        mdFilesUnder(NOTES_DIR).map(f => f.path.slice(ctx.basePath().length + 1).toLowerCase())));
     return p => used.has(p.toLowerCase()) || !!fileAt(p);
   }
 

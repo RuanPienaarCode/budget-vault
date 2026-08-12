@@ -40,7 +40,7 @@ function fmBool(v) {
 }
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, mdFilesIn, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
+  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
 
   /* Reads go out in parallel; parsing stays serial. Every loop below used to
      await one file at a time — ~163 sequential round trips on a real vault,
@@ -508,12 +508,19 @@ module.exports = function registerLoad(ctx) {
      (parsing measures ~5.5µs a note). Sequential, it grew without bound in the
      one folder the user is invited to keep adding to. */
   async function loadNotes() {
-    const files = mdFilesIn(NOTES_DIR);
+    /* Under, not in: a user who files a year of notes into Notes/2026/ has
+       tidied a folder of markdown, not deleted it, and the page must not go
+       blank because of it. See mdFilesUnder in io.js. */
+    const files = mdFilesUnder(NOTES_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
+    const base = ctx.basePath();
     const notes = [];
     files.forEach((f, i) => {
       if (texts[i] == null) return;
-      const rel = `${NOTES_DIR}/${f.name}`;
+      /* Derived from the file's OWN path rather than assembled from the folder
+         and the name — the note may be several levels down, and every writer
+         (readFile, writeFile, fileAt) takes a budget-folder-relative path. */
+      const rel = f.path.slice(base.length + 1);
       notes.push({ rel, name: f.name, ...parseNote(texts[i], rel) });
     });
     S.notes = sortNotes(notes);
