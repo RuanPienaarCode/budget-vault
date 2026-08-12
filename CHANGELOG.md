@@ -3,6 +3,83 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.16.1 — 2026-08-12
+
+Everything a six-lane audit of 1.16.0 turned up. Nothing here changes what the
+app is for; several things change what it *told you*, and those are worth
+reading if you use the Savings page.
+
+### Fixed — figures that were wrong on screen
+
+- **The growth chart could disagree with the total above it.** An account with
+  a starting amount but no opening date and no transactions had its balance
+  counted into the total while its opening capital went nowhere — a fund
+  printed R95 000 over bands that came to R35 000, and described the missing
+  R60 000 as "growth carrying no date". Exactly the market-linked holding the
+  feature exists for. Such an account is now left out of the chart and counted
+  as unmeasurable, like every other one that cannot be placed.
+
+- **Transactions the chart could not date were dropped from it.** A date typed
+  in a format the plugin does not read, or a row dated in a future month, was
+  counted in the total and then left out of every band. Both now land in the
+  chart — the undatable at the first point, the future-dated at the last.
+
+- **Contributions made before an account's opening date were counted twice.**
+  The starting amount IS the balance on that date, so those rows were already
+  inside it. The error made capital too high and growth too low, and nothing
+  disclosed it — the existing warning only fires when records start *after* the
+  opening date. It now says so in the other direction too.
+
+- **A starting amount of zero could not be saved.** An account opened empty and
+  funded entirely by transfer is a real case the growth maths handles, but
+  typing 0 dropped the value on save, so the growth block vanished and the card
+  asked for a starting amount again.
+
+### Fixed — notes
+
+- **A note about something whose name contains a line break corrupted its own
+  properties.** Wrapping a long debt or service name in its table left the note
+  with frontmatter Obsidian could not read, so it silently fell out of its tag,
+  out of Dataview and out of Bases — while the plugin went on displaying it
+  fine. Names with quotes, tabs and backslashes are handled properly now too.
+
+- **Two notes titled the same thing on one day could overwrite each other** if
+  the titles differed only in capitalisation, because macOS and iOS treat those
+  as one filename. And if a note could not be written at all, the dialog closed
+  and said nothing; it now tells you and keeps what you typed on screen.
+
+- **Renaming a category file no longer detaches notes from a category that did
+  not actually change name.** A category whose name is set in its properties
+  keeps that name wherever the file lives.
+
+- **A note about something Obsidian cannot link to no longer adds a dead node
+  to your graph** — a category called `Kids/School`, or a name with brackets.
+  The note still knows what it is about; it just does not draw a link that
+  goes nowhere.
+
+- Deleting a note that had been renamed elsewhere in the meantime could report
+  a deletion that did not happen. It now checks first.
+
+### Fixed — reading and accessibility
+
+- **Small print in dark mode was below the accessible contrast minimum** on
+  every card — subtitles, the labels above each figure, account sub-lines, the
+  ages under Owed and Assets. About fifty places, and it predates the Notes
+  page. The faint text colour in the default palette is slightly lighter as a
+  result; the other three palettes already cleared it.
+- The notes chip on the Accounts, Debt, Assets, Services and Owed pages was
+  too small to tap reliably on a phone, and sat next to controls that do
+  something else.
+- Notes are a real list, so a screen reader can move between them.
+- A household with someone named "Joint" no longer sees the word twice in
+  every owner dropdown.
+
+### Changed
+
+- The Notes folder is read in parallel rather than one file at a time. At
+  thirty notes that was three quarters of the time the plugin took to open,
+  and it grew with every note you wrote.
+
 ## 1.16.0 — 2026-08-11
 
 ### Added
