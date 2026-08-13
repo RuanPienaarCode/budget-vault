@@ -103,6 +103,14 @@ const FILES = {
   eq(ctx.accountForLabel('FNB Cheque'), cheque, 'a folder matching the account filename resolves');
   eq(ctx.accountForLabel('Discovery 32-day'), notice, 'a folder named by tx_label resolves to its account');
   eq(ctx.accountForLabel('No Such Folder'), null, 'an orphan folder resolves to null, not to a wrong account');
+  /* Case-folded, like txSegment: the filesystems this ships on resolve
+     `cheque/` and `Cheque/` to one directory, and the write side already
+     matched case-blind — folding only one side of the contract meant a
+     folder that imported happily while every read through this door saw an
+     orphan: rows in the budget, the account told to link a folder it was
+     already importing from. */
+  eq(ctx.accountForLabel('fnb cheque'), cheque, 'a folder differing only in case still resolves by name');
+  eq(ctx.accountForLabel('DISCOVERY 32-DAY'), notice, 'and by tx_label');
   eq([...ctx.nonBudgetLabels()].sort(), ['Discovery 32-day', 'Ninety One TFSA'],
     'both excluded accounts contribute their FOLDER names, not their file names');
 
@@ -247,6 +255,8 @@ const FILES = {
   eq(ctx.accountUtilisation(card(-5000, null)), null, 'no limit recorded means no bar to draw');
   eq(ctx.accountUtilisation(card(-5000, 0)), null, 'and a zero limit cannot be divided by');
   eq(ctx.accountUtilisation(card(-5000, 30000, 'checking')), null, 'an overdrawn cheque account is not a credit card');
+  eq(ctx.accountUtilisation(card(-15000, 30000, 'Credit_Card')).pct, 50,
+    'a hand-typed Credit_Card still gets its bar — the type test is isCreditCard, the same rule the committed chain and net worth read');
 
   console.log(`PASS — non-budget accounts, reconciliation, edit-form writes and card utilisation intact (${checks} assertions).`);
 })().catch(e => { console.error('FAIL —', e.message); process.exit(1); });

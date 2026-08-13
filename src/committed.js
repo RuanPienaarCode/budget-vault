@@ -80,8 +80,18 @@ const WHOLE_MONTH_DAYS = 28;
    folders against the RAW vault account (`settle_monthly`). One function
    answering both shapes is the point — a second spelling of the rule is how
    the three definitions happened the first time. */
-const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) &&
-  String(a.type || '').trim().toLowerCase() === 'credit_card';
+
+/* THE ONE DEFINITION of "this account is a credit card", split out of
+   isSettleCard because the type test had grown spellings of its own:
+   cardOverlap (worth.js) and the importer's liability reading both compared
+   `a.type === 'credit_card'` strictly, while this file trimmed and
+   case-folded. `type:` is hand-typed frontmatter — load.js keeps it verbatim —
+   so an account typed `Credit_Card` was a card to the committed chain and not
+   a card to net worth or the import sign check: the same account, two
+   different answers, depending on which page asked. */
+const isCreditCard = a => !!a && String(a.type || '').trim().toLowerCase() === 'credit_card';
+
+const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) && isCreditCard(a);
 
 const day = iso => Number(String(iso).slice(8, 10));
 const median = arr => {
@@ -517,6 +527,6 @@ function daysBetween(a, b) {
 }
 
 module.exports = {
-  WHOLE_MONTH_DAYS, nextOnDay, isSettleCard,
+  WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
   cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
 };

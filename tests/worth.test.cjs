@@ -93,6 +93,8 @@ const asset = (type, value) => ({ type, value });
     'the type match is case-insensitive');
   ok(cardOverlap([acct('credit_card', -1)], [debt('creditcard', 1)]),
     'and tolerates the missing space');
+  ok(cardOverlap([acct('Credit_Card', -1)], [debt('credit card', 1)]),
+    'the ACCOUNT side folds case too — isCreditCard is the same rule the committed chain reads, so a hand-typed Credit_Card cannot be a card to one page and not the other');
 
   // Crucially: flagged, but NOT deduped. Both are still in the total.
   const w = worth([acct('credit_card', -3000)], [debt('credit card', 3000)]);

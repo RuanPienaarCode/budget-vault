@@ -3,6 +3,31 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+A plumbing pass in the audit's wake: two more instances of this codebase's
+recurring bug shape — one rule spelled differently in two places — found by
+hunting for the shape itself rather than waiting for the figures to disagree.
+
+### Fixed
+
+- **A hand-typed `Credit_Card` is a card everywhere, or nowhere.** The type
+  test lived in four places and only committed.js trimmed and case-folded it —
+  so an account whose frontmatter said `Credit_Card` joined the committed
+  chain's card arithmetic while net worth's double-count warning, the
+  importer's liability reading and the utilisation bar all looked straight
+  past it. `isCreditCard` is now one exported rule in committed.js, read by
+  all four.
+
+- **A folder differing from its account only in case resolves again.** The
+  write side (`txSegment`) learned to match folders case-blind because the
+  filesystems this plugin ships on are; the read side (`accountForLabel`)
+  never did. A `tx_label: cheque` against an on-disk `Cheque` folder imported
+  happily while every page reading the other way saw an orphan — rows counted
+  in the budget, the account told to link a folder it was already importing
+  from. Both sides of the contract now fold the same way, and `tx_label`
+  passes through safeSeg like the account name always has.
+
 ## 1.17.3 — 2026-08-13
 
 Phase three closes the four-lane audit of 1.17.0: polish, latent traps, and

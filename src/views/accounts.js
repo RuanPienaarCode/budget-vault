@@ -23,6 +23,10 @@ const { askFields } = require('../modal');
 /* reconcile is published on ctx for the tests that drive the REAL arithmetic;
    the page itself now reaches it through acct-status below. */
 const { reconcile } = require('../reconcile');
+/* committed.js owns what counts as a credit card — one tolerant spelling of
+   the type test, shared with net worth and the importer, so a hand-typed
+   `Credit_Card` is a card to every page or to none. */
+const { isCreditCard } = require('../committed');
 /* The state machine behind the decision queue — which accounts land in it, in
    what order, and why. Pure, and tested without a DOM. */
 const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } = require('../acct-status');
@@ -1268,7 +1272,7 @@ module.exports = function registerAccounts(ctx) {
      so a bar means the same thing wherever it appears in this app. Kept apart
      from the markup below so the arithmetic can be tested without a DOM. */
   function utilisationOf(a) {
-    if (a.type !== 'credit_card' || !a.credit_limit || a.credit_limit <= 0) return null;
+    if (!isCreditCard(a) || !a.credit_limit || a.credit_limit <= 0) return null;
     const used = Math.max(0, -a.balance);
     const pct = (used / a.credit_limit) * 100;
     const over = used > a.credit_limit;

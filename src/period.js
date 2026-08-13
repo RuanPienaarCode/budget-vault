@@ -214,11 +214,24 @@ module.exports = function registerPeriod(ctx) {
      another name, and safeSeg() strips filesystem-illegal characters on the way
      to disk. Same three-way match as txSegment() in load.js, run the other way
      round. Returns null for a folder with no account file — an orphan whose
-     rows stay in the budget, since nothing says otherwise. */
+     rows stay in the budget, since nothing says otherwise.
+
+     Case-folded, because txSegment() is and for the same reason: the
+     filesystems this plugin ships on resolve `cheque/` and `Cheque/` to one
+     directory. txSegment gained the fold and this side did not, so a
+     `tx_label: cheque` against an on-disk `Cheque` folder imported happily —
+     the write side matched — while every read through this door saw an
+     orphan: rows counted in the budget, the account told to link a folder it
+     was already importing from. The two halves of one contract must fold the
+     same way. tx_label goes through safeSeg here too — it is the same
+     hand-typed frontmatter a.name is, and a "Visa: Gold" tx_label names a
+     folder the filesystem holds as "Visa- Gold". */
   function accountForLabel(label) {
-    const want = safeSeg(label);
+    const key = safeSeg(label).toLowerCase();
     return S.accounts.find(a =>
-      a.tx_label === label || a.name === label || safeSeg(a.name) === want) || null;
+      a.tx_label === label || a.name === label ||
+      (!!a.tx_label && safeSeg(a.tx_label).toLowerCase() === key) ||
+      safeSeg(a.name).toLowerCase() === key) || null;
   }
   /* account -> { rows, labels } in ONE pass over S.txFiles.
 

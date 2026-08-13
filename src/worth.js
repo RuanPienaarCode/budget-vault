@@ -13,6 +13,11 @@
    again. Pure — no DOM, no obsidian import — so tests/worth.test.cjs runs it in
    bare node. */
 
+/* committed.js owns what counts as a credit card. A strict `===` here read a
+   hand-typed `Credit_Card` as not-a-card while the committed chain trimmed and
+   case-folded — the same account, a card to one page and not the other. */
+const { isCreditCard } = require('./committed');
+
 /* Only `active` debts count. A debt marked paid is history; leaving it in
    reports a bond as still owed years after it was settled. */
 function activeDebts(debts) {
@@ -85,7 +90,7 @@ function worth(accounts, debts, assets) {
    picking one ledger would be the worse failure: it hides money either way, and
    without saying so. */
 function cardOverlap(accounts, debts) {
-  const cardAccounts = (accounts || []).filter(a => a.type === 'credit_card' && (a.balance || 0) < 0);
+  const cardAccounts = (accounts || []).filter(a => isCreditCard(a) && (a.balance || 0) < 0);
   const cardDebts = activeDebts(debts).filter(d => /credit\s*card/i.test(d.type || ''));
   return cardAccounts.length && cardDebts.length
     ? { cardAccounts: cardAccounts.length, cardDebts: cardDebts.length }

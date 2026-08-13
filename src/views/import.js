@@ -18,6 +18,7 @@ const { parseStatement, decodeStatement, parseStatementDate, detectStatementColu
 const { prepareRules, autoCategorise } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
+const { isCreditCard } = require('../committed');
 
 module.exports = function registerImport(ctx) {
   const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
@@ -177,7 +178,7 @@ module.exports = function registerImport(ctx) {
        thing this whole block exists to avoid. */
     const acct0 = label0 ? accountForLabel(label0) : null;
     const rec = iBalance !== -1
-      ? reconcileAmounts(ledger, { liability: !!acct0 && acct0.type === 'credit_card' })
+      ? reconcileAmounts(ledger, { liability: isCreditCard(acct0) })
       : null;
     const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
     if (flipped) for (const it of items) it.amount = -it.amount;

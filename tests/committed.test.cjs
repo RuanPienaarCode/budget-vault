@@ -14,7 +14,7 @@
 
 const assert = require('assert');
 const {
-  WHOLE_MONTH_DAYS, nextOnDay, isSettleCard,
+  WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
   cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
 } = require('../src/committed');
 
@@ -287,6 +287,17 @@ const paidHistory = [
   ok(isSettleCard({ type: 'credit_card', settle_monthly: true }),
     'and the raw vault spelling — the dashboard resolves folders against raw accounts');
   ok(!isSettleCard({ type: 'credit_card' }), 'an unflagged card is not settle-monthly');
+
+  /* The type test underneath is its own exported rule now: worth.js and the
+     importer used to compare `=== 'credit_card'` strictly while this file
+     trimmed and folded — a hand-typed `Credit_Card` was a card to the
+     committed chain and invisible to net worth. One spelling, everywhere. */
+  ok(isCreditCard({ type: 'credit_card' }), 'the canonical spelling is a card');
+  ok(isCreditCard({ type: 'Credit_Card' }), 'hand-typed case survives — frontmatter is kept verbatim by the loader');
+  ok(isCreditCard({ type: ' credit_card ' }), 'and stray whitespace');
+  ok(!isCreditCard({ type: 'checking' }), 'a non-card type is refused');
+  ok(!isCreditCard({}), 'and so is an account with no type at all');
+  ok(!isCreditCard(null), 'null is not a card, so callers need no guard of their own');
 }
 
 /* ---- 5b. RULE 8: a card settled in full is a commitment ---- */
