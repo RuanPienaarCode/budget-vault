@@ -674,6 +674,68 @@ module.exports = function registerTax(ctx) {
     renderTax();
   }
 
+  /* Delete the tax year on screen — the page, not the paperwork.
+
+     `Tax/<year>.md` goes to the vault trash. `Tax/<year>/` and everything
+     uploaded into it deliberately STAYS, which is the answer this page already
+     gives when a single document ROW is removed: the plugin wrote the page, but
+     the reader's bank wrote the certificates, and a checklist is not entitled
+     to bin a tax certificate because someone tidied up.
+
+     That leaves the folder in a state this page already models and already has
+     an affordance for — an orphan year, which renderOrphanYears offers to
+     re-adopt with a fresh page. So the part that matters is reversible: the
+     documents are untouched and one tap rebuilds a year around them. The dialog
+     says so rather than leaving it to be discovered.
+
+     Resolved to a TFile before the dialog and trashed by that handle rather
+     than by re-reading the path afterwards — notes.js spells out why. */
+  async function deleteTaxYear() {
+    const year = S.taxYear;
+    const t = T();
+    if (!year || !t) return;
+    const file = fileAt(`Tax/${year}.md`);
+    const folder = ctx.folderAt(`Tax/${year}`);
+    const docs = (t.docs || []).length;
+    const steps = (t.steps || []).length;
+    const go = await confirmModal(app, {
+      title: `Delete tax year ${year}`,
+      message: (file
+        ? `Move Tax/${year}.md to your vault trash? `
+        : `There is no Tax/${year}.md on disk yet, so the year is simply dropped from the app. `)
+        + `Its ${steps} checklist step${steps === 1 ? '' : 's'} and ${docs} document `
+        + `${docs === 1 ? 'row' : 'rows'} go with the page. `
+        + (folder
+          ? `Everything uploaded into Tax/${year}/ stays exactly where it is — the folder is left alone, `
+            + 'and this page will offer to build a fresh year around those files.'
+          : 'Nothing else in the vault changes.'),
+      confirmText: 'Delete year',
+    });
+    if (!go) return;
+    if (file) {
+      try {
+        await ctx.trashFile(file);
+      } catch (e) {
+        return toast(`Could not delete that tax year: ${(e && e.message) || e}`, true);
+      }
+    }
+    delete S.tax[year];
+    /* Surface the stranded folder immediately rather than at the next vault
+       read. loadVault is what fills S.taxOrphanYears, so without this the
+       documents just orphaned are invisible until something else reloads —
+       which reads as "my tax certificates are gone" at exactly the wrong
+       moment. */
+    if (folder && !(S.taxOrphanYears || []).includes(year)) {
+      S.taxOrphanYears = [...(S.taxOrphanYears || []), year].sort();
+    }
+    /* One dirty flag for the page, and every year switch is gated on it — so
+       whatever it was tracking belonged to the year just deleted. */
+    clearDirty();
+    S.taxYear = Object.keys(S.tax).sort().pop() || null;
+    renderTax();
+    toast(`Deleted the ${year} tax year`);
+  }
+
   /* Every path that changes S.taxYear goes through this first. Discarding
      re-reads the whole vault, so it uses the shared reloadFromDisk rather than
      loadVault directly — otherwise a stale budget draft survives the reset and
@@ -698,5 +760,5 @@ module.exports = function registerTax(ctx) {
     renderTax();
   }
 
-  ctx.provide({ renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, startTax, changeTaxYear, handleTaxFile, serializeTax });
+  ctx.provide({ renderTax, saveTax, addTaxStep, addTaxDoc, addTaxFigure, newTaxYear, deleteTaxYear, startTax, changeTaxYear, handleTaxFile, serializeTax });
 };

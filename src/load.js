@@ -250,6 +250,12 @@ module.exports = function registerLoad(ctx) {
     }
 
     S.txFiles = {};
+    /* The undo receipt goes with them. It holds references to the row objects
+       about to be replaced, so after this line it could only ever remove
+       nothing — and an undo button that quietly does nothing is worse than no
+       button. Cleared HERE, beside the state it depends on, rather than in the
+       callers: reloadFromDisk is not the only door into loadVault. */
+    S.lastImport = null;
     /* Every folder under Transactions/, whether or not it holds a month file.
 
        S.txFiles cannot answer "does this account have a folder?" — it is keyed

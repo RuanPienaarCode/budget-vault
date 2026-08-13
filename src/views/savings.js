@@ -496,6 +496,14 @@ module.exports = function registerSavings(ctx) {
     if (primary) act('Transactions', `Show transactions for ${a.name}`,
       () => ctx.openAccountTransactions(primary));
     act('Open note', `Open the note for ${a.name}`, () => ctx.openAccountFile(a));
+    /* Same dialog the Accounts drawer opens — one delete for an account in this
+       plugin, not two that drift apart on what they say about the transactions
+       folder. Last, and on the same muted class the drawer gives it, so it is
+       never the button a thumb reaches for by accident. */
+    const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del',
+      'aria-label': `Delete the account ${a.name}` }, 'Delete');
+    del.addEventListener('click', () => ctx.deleteAccount(a));
+    acts.append(del);
     card.append(acts);
   }
 

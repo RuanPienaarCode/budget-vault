@@ -142,8 +142,41 @@ function makeIo({ vault, plugin }) {
     await writeFile(rel, `---\n${fm}\n---${body}`);
     return fm;
   }
+  /* Delete, as the only deletion this plugin performs.
+
+     `vault.trash(f, false)` — the SYSTEM-trash flag is deliberately false, so
+     whatever goes lands in the vault's own `.trash` and is recoverable from
+     inside Obsidian. Every file this app deletes is one the user could have
+     written by hand, so a one-way door is never the right shape; categories.js
+     and notes.js each reasoned their way to that call separately, and a third
+     and fourth copy is how one of them eventually gets the flag backwards.
+
+     Takes a TAbstractFile, not a path, and takes it from the caller: a path
+     re-resolved after a confirmation dialog either no longer exists — and the
+     old note code cheerfully announced a delete having deleted nothing — or now
+     points at a DIFFERENT file, which it would then trash. A TFile survives a
+     rename; a path does not. Folders go through here too (an account's
+     Transactions/ folder), which is why this reaches for the abstract type.
+
+     Stamped both sides like every write, so the vault watcher recognises the
+     change as ours and does not schedule a reload on top of the caller's own
+     in-memory cleanup. Returns false for nothing-to-delete so a caller can say
+     so rather than claim a success. */
+  async function trashFile(file) {
+    if (!file) return false;
+    stampWrite();
+    await vault.trash(file, false);
+    stampWrite();
+    return true;
+  }
   function fileAt(rel) {
     return vault.getFileByPath(relPath(rel));
+  }
+  /* The folder at `rel`, or null. The sibling of fileAt, and it exists for the
+     same reason: a caller that needs to hand a folder to trashFile should not
+     have to know that Obsidian keeps files and folders behind two lookups. */
+  function folderAt(rel) {
+    return vault.getFolderByPath(relPath(rel));
   }
   function mdFilesIn(rel) {
     const f = vault.getFolderByPath(relPath(rel));
@@ -182,7 +215,7 @@ function makeIo({ vault, plugin }) {
   }
 
   return {
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, fileAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   };

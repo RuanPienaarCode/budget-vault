@@ -360,12 +360,55 @@ module.exports = {
   'tx.col.excl': '除外',
   'tx.col.note': 'メモ',
   'tx.col.split': '分割',
+  'tx.col.actions': '行の操作',
 
   'tx.aria.category': '{date} {desc} のカテゴリ',
   'tx.aria.exclude': '{desc} を予算の合計から除外',
   'tx.aria.note': '{date} {desc} のメモ',
   'tx.aria.split': '{date} {desc} をカテゴリに分割',
   'tx.title.split': 'カテゴリに分割',
+  'tx.aria.delete': '{date} の {desc} の取引を削除',
+  'tx.title.delete': 'この行を削除',
+  'tx.delete.title': '取引を削除',
+  'tx.delete.msg': '{date} · {desc} · {amount} — 保存時に {file} から削除されます。',
+  'tx.delete.reimport': 'この行は同じ明細を再取り込みしたときの重複を防ぐ鍵を持っています。削除すると、あとで同じ明細を取り込んだ際に再び追加されます。',
+  'tx.delete.parent': {
+    other: '分割された {count} 件の明細も一緒に削除されます。',
+  },
+  'tx.delete.part': 'これは分割の一部です。残りの明細は元の行の金額に一致しなくなり、その差額は口座残高の集計から外れます。元の行の「除外」のチェックを外すと戻せます。',
+  'tx.delete.confirm': '行を削除',
+  'tx.deleted': {
+    other: '{count} 行を削除しました — 「変更を保存」でファイルに書き込まれます',
+  },
+
+  'tx.undo.what': {
+    other: '{at} に {count} 行を {label} へ取り込みました。',
+  },
+  'tx.undo.session': '取り消しは保管庫が再読み込みされるまで有効です。',
+  'tx.undo.do': '取り込みを取り消す',
+  'tx.undo.dismiss': '取り消しの案内を閉じる',
+
+  'tx.bulk.dirty': '先に変更を保存してください — 行の削除は同じファイルを書き換えます',
+  'tx.bulk.needFilter': '先に口座・カテゴリ・検索のいずれかを指定してください — これは絞り込んだ行を削除するもので、無指定ではすべてが対象になります',
+  'tx.bulk.none': '現在の絞り込みに一致する行はありません',
+  'tx.bulk.title': '表示中の行を削除',
+  'tx.bulk.msg': {
+    other: '{range} の {filters} に一致する {count} 行をすべて削除しますか？',
+  },
+  'tx.bulk.backup': '削除前に {path} へ書き出すので元に戻せます — 月別ファイルは削除ではなく編集されるため、保管庫のゴミ箱だけでは戻せません。',
+  'tx.bulk.splits': {
+    other: 'そのうち {count} 件は分割に属し、対になる行は絞り込みに含まれていない可能性があります。',
+  },
+  'tx.bulk.confirm': {
+    other: '{count} 行を削除',
+  },
+  'tx.bulk.backupFailed': 'バックアップを書き出せなかったため、何も削除していません（{error}）',
+  'tx.bulk.failed': {
+    other: '{count} 個のファイルで中断しました（{error}）— 残りは変更されていません',
+  },
+  'tx.bulk.done': {
+    other: '{files} 個のファイルから {count} 行を削除しました · 控えは {path} にあります',
+  },
 
   'tx.none': '該当する取引はありません。',
   'tx.showMore': { other: '残り {remaining} 件のうち {n} 件を表示' },
@@ -518,6 +561,31 @@ module.exports = {
   'acct.btn.edit': '編集',
   'acct.aria.openNote': '{name} のノートを開く',
   'acct.btn.openNote': 'ノートを開く',
+  'acct.btn.delete': '削除',
+  'acct.aria.delete': '口座 {name} を削除',
+  'acct.delete.title': '{name} を削除',
+  'acct.delete.gone': 'Accounts/{name}.md は保管庫にありません',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    other: 'このフォルダには {months} 個の月別ファイルに {count} 件の取引があります。',
+  },
+  'acct.delete.keep': 'フォルダを残す — 取引は集計に残ります',
+  'acct.delete.drop': 'フォルダも削除する — 取引も一緒に消えます',
+  'acct.delete.msg': 'Accounts/{name}.md を保管庫のゴミ箱へ移動しますか？',
+  'acct.delete.noFolder': '取引フォルダがないため、ほかに変わるものはありません。',
+  'acct.delete.willKeep': {
+    other: 'Transactions/{label}/ は残るので、その {count} 件はどの口座にも属さないフォルダのまま各期間の合計に数え続けられます。',
+  },
+  'acct.delete.willDrop': {
+    other: 'Transactions/{label}/ も一緒にゴミ箱へ移り、その {count} 件は集計から外れます。',
+  },
+  'acct.delete.notes': 'この口座について書いたノートは Notes/ に残り、対応先なしと表示されます。すべて保管庫のゴミ箱に入るので Obsidian から復元できます。',
+  'acct.delete.confirm': '口座を削除',
+  'acct.delete.failed': 'その口座を削除できませんでした（{error}）— 保管庫を再読み込みしました',
+  'acct.deleted': '{name} を削除しました',
+  'acct.deleted.withRows': {
+    other: '{name} と {count} 件の取引を削除しました',
+  },
   'acct.empty': 'まだ口座がありません。上の「新しい口座」から、銀行口座・貯蓄・投資を追加してください。',
 
   'acct.hero.label': '口座全体の純額',
@@ -641,6 +709,7 @@ module.exports = {
   'shell.tx.search': '摘要を検索…',
   'shell.tx.wholeHistory': '全期間',
   'shell.tx.export': '書き出し',
+  'shell.tx.deleteFiltered': 'これらの行を削除',
   'shell.tx.add': '取引を追加',
   'shell.bud.title': 'カテゴリ別の予算',
   'shell.bud.copyPrev': '前の期間をコピー',

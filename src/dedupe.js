@@ -70,8 +70,28 @@ const VERB_PREFIXES = [
   'EFT CREDIT', 'EFT DEBIT',
 ];
 
+/* Not a verb — a STATE, and the bank removes it rather than rewriting it.
+   Capitec marks a card transaction that has not settled yet with a literal
+   "(Pending)" in front of the description and leaves its Balance empty; when it
+   settles, the next export carries the same purchase without the marker, on a
+   later posting date. Two of the four exact-key fields change, so the settled
+   row reads as brand new and lands beside the pending one — the same duplicate
+   shape this module was written for, arriving through a marker rather than a
+   rewrite. Stripped on BOTH sides before the merchant is compared, so a pending
+   row and its settled twin match on the stem underneath. */
+const PENDING_PREFIX = '(PENDING)';
+
+function isPendingDesc(s) {
+  return String(s == null ? '' : s).trim().toUpperCase().startsWith(PENDING_PREFIX);
+}
+
 function stripVerbPrefix(s) {
-  const upper = String(s).toUpperCase();
+  let upper = String(s).toUpperCase();
+  // Before the verbs, not instead of them: "(Pending) Card Purchase X" carries
+  // both, and stopping at the marker would leave the verb standing as evidence.
+  if (upper.trimStart().startsWith(PENDING_PREFIX)) {
+    upper = upper.trimStart().slice(PENDING_PREFIX.length).trimStart();
+  }
   for (const verb of VERB_PREFIXES) {
     if (upper.startsWith(verb)) return upper.slice(verb.length);
   }
@@ -243,10 +263,34 @@ function flagItems(items, index, label, range) {
       if (it.nearAuto) { it.include = true; it.nearAuto = false; }
     }
   }
-  return { dupes, nears };
+
+  /* Rows the bank has not settled yet, unticked with the reason shown.
+     Stripping the marker (above) makes a settled row RECOGNISE its pending
+     twin, but only while the two agree on the amount — and they do not always:
+     a card authorisation and its settlement differ by a tip, a currency
+     conversion, a fuel pre-auth. The near pass buckets by exact amount, so
+     those pairs cannot match by any rewriting rule, and the duplicate they
+     leave behind is a phantom nobody can spot afterwards.
+
+     So the honest answer is not to import a row the bank itself calls
+     provisional. Nothing is lost: the same purchase arrives, settled and final,
+     on the next export. It is an UNTICK and not a skip, on the same sticky bit
+     the near pass uses — the reader can tick it, and their decision survives
+     every re-render. */
+  let pendings = 0;
+  for (const it of items) {
+    it.pending = !it.dup && isPendingDesc(it.desc);
+    if (!it.pending) {
+      if (it.pendingAuto) { it.include = true; it.pendingAuto = false; }
+      continue;
+    }
+    pendings++;
+    if (!it.pendingAuto) { it.include = false; it.pendingAuto = true; }
+  }
+  return { dupes, nears, pendings };
 }
 
 module.exports = {
   txKey, buildIndex, addToIndex, findNearDuplicate, flagItems,
-  descsLikelySame, normDesc, NEAR_DAYS,
+  descsLikelySame, normDesc, isPendingDesc, NEAR_DAYS,
 };

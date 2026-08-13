@@ -186,6 +186,14 @@ function mountApp(view) {
     period: null,
     view: 'dashboard',
     pendingImport: null,
+    /* The receipt for the import that just landed, or null — {label, filename,
+       at, count, files:[{key, month, rows}]}, where `rows` holds the very row
+       OBJECTS that were pushed into S.txFiles. Canonical vault state on
+       purpose, above the fence: those references only mean anything against the
+       rows currently in memory, so a reload — which rebuilds every one of them
+       — has to take the offer away with it rather than leave an undo pointing
+       at objects nothing holds. See undoImport in views/import.js. */
+    lastImport: null,
     /* ---- survives loadVault(): UI state and debounce handles ---- */
     acctView: null,            // Accounts page card/list mode, owned by views/accounts.js
     noteFilter: null,          // Notes page {about, q}, seeded by views/notes.js
@@ -691,6 +699,7 @@ function mountApp(view) {
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
   $('#txExport').addEventListener('click', ctx.exportTransactions);
+  $('#txDeleteFiltered').addEventListener('click', ctx.deleteFilteredTransactions);
   for (const id of ['txAccount', 'txCategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
   $('#txSearch').addEventListener('input', () => { clearTimeout(S._q); S._q = setTimeout(ctx.renderTransactions, 200); });
   $('#budSave').addEventListener('click', ctx.saveBudget);
@@ -743,6 +752,7 @@ function mountApp(view) {
   });
   $('#planSave').addEventListener('click', ctx.savePlan);
   $('#planNew').addEventListener('click', ctx.newPlan);
+  $('#planDelete').addEventListener('click', ctx.deletePlan);
   $('#planStart').addEventListener('click', ctx.newPlan);
   $('#planAddSource').addEventListener('click', () => ctx.addSource());
   // Wrapped rather than passed bare: addEventListener hands the listener a
@@ -757,6 +767,7 @@ function mountApp(view) {
   $('#taxAddDoc').addEventListener('click', ctx.addTaxDoc);
   $('#taxAddFigure').addEventListener('click', ctx.addTaxFigure);
   $('#taxNewYear').addEventListener('click', ctx.newTaxYear);
+  $('#taxDeleteYear').addEventListener('click', ctx.deleteTaxYear);
   $('#taxStart').addEventListener('click', ctx.startTax);
   $('#taxYearSel').addEventListener('change', e => ctx.changeTaxYear(e.target.value));
   wireDropZone('#taxDrop', '#taxFileInput', f => ctx.handleTaxFile(f));

@@ -14,7 +14,8 @@
 
 const { el } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties } = require('../statement');
+const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
+  statementAccountNumber, sameAccountNumber } = require('../statement');
 const { prepareRules, autoCategorise } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
@@ -81,6 +82,10 @@ module.exports = function registerImport(ctx) {
   async function runImport(rows, map, file) {
     const loc = locale();
     const { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra } = map;
+    // Defaulted rather than destructured: a map built before the fee column
+    // existed (the manual mapper's, on a re-read of an open file) carries no
+    // iFee, and `undefined !== -1` would index every row at r[undefined].
+    const iFee = map.iFee == null ? -1 : map.iFee;
     const dataRows = rows.slice(map.dataStart);
 
     const index = dedupIndex();
@@ -131,6 +136,24 @@ module.exports = function registerImport(ctx) {
       if (amount == null && iDebit !== -1) {
         const d = normalizeAmount(r[iDebit]);
         if (d != null && d !== 0) amount = -Math.abs(d);
+      }
+      /* The third column — a bank charge, which Capitec writes in `Fee` with
+         Money In and Money Out both empty. Read LAST, so a file that somehow
+         carries both keeps the pair the header named.
+
+         The cell's own sign is honoured, exactly as the credit branch honours
+         it and unlike the debit branch's -Math.abs(). That is not a stylistic
+         choice: the fee column is already signed (-0.35 for a charge), and 8 of
+         the 553 fee rows on the statement this was written against are
+         REVERSALS — "Correction: Cash Withdrawal Fee" at +30.00. Negating by
+         magnitude would turn every refunded charge into a second charge, which
+         is a worse error than the one being fixed here because it invents money
+         leaving rather than merely failing to see it leave. A bank that writes
+         fees unsigned instead is caught by the balance column: fee rows are in
+         the ledger below, so the reconciliation now judges them too. */
+      if (amount == null && iFee !== -1) {
+        const f = normalizeAmount(r[iFee]);
+        if (f != null && f !== 0) amount = f;
       }
       if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
       const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
@@ -203,6 +226,9 @@ module.exports = function registerImport(ctx) {
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
     S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name,
+      // What the FILE says it is, kept beside what the user picked — the two
+      // are compared on every render and again at commit. See acctIdentity().
+      acctNumber: statementAccountNumber(rows, map),
       reconcile: rec ? { ...rec, flipped, inverted } : null,
       // Kept so "Columns wrong?" can reopen the mapper on the SAME file without
       // asking the user to find and drop it again.
@@ -211,6 +237,37 @@ module.exports = function registerImport(ctx) {
     importShown = IMPORT_PAGE;   // a fresh file starts at the first page
     renderImportReview();
     if (showBar) importProgress('done');
+  }
+
+  /* ------------------------- is this the right account? --------------------
+     What the statement says about itself, against what the reader has picked.
+
+     This exists because the failure it prevents is both easy and catastrophic:
+     one wrong pick in the account dropdown wrote 933 rows of one account's
+     history into another, with no warning, and it survived a year of daily use
+     because the result LOOKS right — two accounts, both populated, both full of
+     plausible transactions. Every total in the vault was double-counted, and it
+     was found only by hashing the monthly files and noticing 25 byte-identical
+     pairs across two folders.
+
+     Three answers, and the middle one is the point:
+
+       'mismatch' — both numbers known and different. The import is BLOCKED,
+                    not warned about. This is the one case in the app where a
+                    guess is not offered, because "the file disagrees with the
+                    destination" has no reading under which importing is right.
+       'adopt'    — the file names a number and the account has none. Offered
+                    at commit, never written silently: it is the reader's own
+                    frontmatter, and recording it is what makes every future
+                    import checkable.
+       'ok'       — they agree, or there is not enough to say. Silent. */
+  function acctIdentity(p) {
+    const acct = accountForLabel(p.label || '');
+    if (!acct || !p.acctNumber) return { state: 'ok', acct };
+    const same = sameAccountNumber(p.acctNumber, acct.account_number);
+    if (same === false) return { state: 'mismatch', acct, theirs: acct.account_number, ours: p.acctNumber };
+    if (same === null) return { state: 'adopt', acct, ours: p.acctNumber };
+    return { state: 'ok', acct };
   }
 
   /* ---------------------------------------------------------------- mapper
@@ -225,6 +282,7 @@ module.exports = function registerImport(ctx) {
     { key: 'iAmount', label: 'Amount', required: false, hint: 'One signed column: negative is money out' },
     { key: 'iDebit', label: 'Money out', required: false, hint: 'Use instead of Amount when out and in are separate columns' },
     { key: 'iCredit', label: 'Money in', required: false, hint: 'The partner column to Money out' },
+    { key: 'iFee', label: 'Fee', required: false, hint: 'A third amount column for bank charges (Capitec) — read when the other two are empty' },
     { key: 'iBalance', label: 'Balance', required: false, hint: 'Optional — lets the amounts be checked against the running balance' },
   ];
 
@@ -384,7 +442,7 @@ module.exports = function registerImport(ctx) {
     /* Exact duplicates, then the charges the bank re-dated or re-worded between
        exports — see src/dedupe.js for both. Near-dups are unticked and labelled,
        never skipped: the user sees what each collided with and can override. */
-    const { dupes, nears } = flagItems(p.items, p.index, lab, p.range);
+    const { dupes, nears, pendings } = flagItems(p.items, p.index, lab, p.range);
     const newOnes = p.items.filter(i => !i.dup);
     const auto = newOnes.filter(i => i.cat).length;
     const cur = currentPeriod();
@@ -394,6 +452,7 @@ module.exports = function registerImport(ctx) {
     $('#impStats').textContent =
       `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped` +
       (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
+      (pendings ? ` · ${pendings} still pending (unticked)` : '') +
       ` · ${auto} auto-categorised` +
       (p.skipped ? ` · ${p.skipped} unparseable` : '');
     $('#impLegend').empty();
@@ -428,6 +487,20 @@ module.exports = function registerImport(ctx) {
     if (nonBudget) nbEl.textContent =
       `${target.name} is excluded from the budget — these rows will import and show in Transactions, but won’t count toward income or spending totals.`;
 
+    /* The account-identity verdict, said on the review screen and enforced
+       again at commit. Both, deliberately: the banner is what lets the reader
+       fix the pick before they press anything, and the block is what catches
+       the case where they press it anyway. */
+    const ident = acctIdentity(p);
+    const idEl = $('#impAcctCheck');
+    idEl.classList.toggle('hidden', ident.state !== 'mismatch');
+    idEl.textContent = ident.state === 'mismatch'
+      ? `This statement says it belongs to account ${ident.ours}, but ${ident.acct.name} is recorded as ${ident.theirs}. `
+        + 'Nothing will import until they agree — pick the right account above, or correct the number on the account itself. '
+        + 'A statement written into the wrong account looks entirely normal afterwards and is very hard to unpick.'
+      : '';
+    $('#impCommit').disabled = ident.state === 'mismatch';
+
     const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, 'Import')),
@@ -436,16 +509,24 @@ module.exports = function registerImport(ctx) {
     const body = el('tbody', {});
     const visible = p.items.slice(0, importShown);
     for (const it of visible) {
-      const cls = (it.dup ? 'imp-dup' : it.near ? 'imp-near' : '') + (inCurrent(it) ? ' imp-current' : '');
+      const cls = (it.dup ? 'imp-dup' : it.near || it.pending ? 'imp-near' : '') + (inCurrent(it) ? ' imp-current' : '');
       // Spelled out rather than left to the badge: the row is unticked, and the
       // user needs to know WHICH existing row it collided with to judge whether
       // this is the bank rewriting a pending charge or a real second purchase.
       const nearWhy = it.near
         ? `Looks like the already-imported "${it.near.desc}" on ${it.near.date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.`
         : '';
+      /* Same shape as nearWhy, and said for the same reason: the row arrives
+         unticked, so it has to say what made it so or the reader finds a
+         missing purchase later with no trail back to this screen. */
+      const pendingWhy = it.pending
+        ? 'The bank still lists this as pending, so its date and amount can both change when it settles — '
+          + 'and a settled row at a different amount would import as a second transaction. It will arrive on the next '
+          + 'statement as a final figure. Tick to import it now anyway.'
+        : '';
       body.append(el('tr', { class: cls.trim() },
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}${it.near ? '. ' + nearWhy : ''}`,
+          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
             // nearAuto stays TRUE once we have auto-unticked: it records that the
             // untick already happened, so a re-render (account switch, "show
             // more") leaves the user's decision — either way — alone.
@@ -454,6 +535,9 @@ module.exports = function registerImport(ctx) {
         el('td', {}, it.desc, ...(it.near ? [
           el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
           el('div', { class: 'imp-near-why' }, nearWhy),
+        ] : []), ...(it.pending && !it.near ? [
+          el('span', { class: 'category-badge badge-near', title: pendingWhy }, 'pending'),
+          el('div', { class: 'imp-near-why' }, pendingWhy),
         ] : []), ...(it.transferTo ? [
           // Named, not silent: a row that arrives excluded must say what made
           // it so, or the reader finds a missing figure later with no trail.
@@ -497,6 +581,40 @@ module.exports = function registerImport(ctx) {
     const toAdd = p.items.filter(i => i.include && !i.dup);
     if (!toAdd.length) return toast('Nothing selected to import', true);
 
+    /* The identity gate, re-asked here rather than trusted from the render:
+       the account select is live, so the pick can change after the banner was
+       drawn — and this is the last point at which anything can be stopped. */
+    const ident = acctIdentity(p);
+    if (ident.state === 'mismatch') {
+      return toast(`That statement belongs to account ${ident.ours}, not ${ident.acct.name} (${ident.theirs}) — nothing was imported`, true);
+    }
+    if (ident.state === 'adopt') {
+      /* Asked once, on the first import into an account that has no number.
+         Declining is a real answer and is not asked again this session: the
+         reader may be importing a hand-built CSV whose stray digits are not an
+         account number at all, and nagging would train them to dismiss the one
+         dialog that later blocks a genuine mis-import. */
+      const go = await confirmModal(app, {
+        title: 'Record this account number?',
+        message: `${p.filename} says it belongs to account ${ident.ours}. Recording that on ${ident.acct.name} is what lets a future import stop `
+          + 'itself before writing a statement into the wrong account — which is silent, and expensive to unpick afterwards.',
+        confirmText: 'Record it',
+        cancelText: 'Not now',
+      });
+      if (go) {
+        ident.acct.account_number = ident.ours;
+        try {
+          await ctx.saveAccount(ident.acct, ['account_number']);
+        } catch (e) {
+          // Not fatal to the import: the rows are still going to the account
+          // the reader picked. Say what did not happen and carry on.
+          toast(`Could not record the account number (${e.message || e}) — importing anyway`, true);
+        }
+      }
+      // Either way, not again for this file.
+      p.acctNumber = '';
+    }
+
     // Group the new rows per month, keeping a back-reference to each source item
     // so a committed row can be neutralised after it lands.
     const additions = new Map();   // key -> { month, entries: [{ row, src }] }
@@ -520,6 +638,13 @@ module.exports = function registerImport(ctx) {
     // never re-append a row that already reached disk. serializeTxFile is fed a
     // cloned row array (concat), so it never mutates live S.txFiles rows.
     let done = 0;
+    /* The receipt the undo is built from, filled as each file lands rather than
+       at the end — a run that stops half way through has still written rows,
+       and those are exactly the ones somebody wants to take back. Holds the
+       ROW OBJECTS that were pushed into S.txFiles, not copies of their values:
+       undo then removes precisely what this import added, even where an
+       identical line already existed in the same month. */
+    const landed = [];
     try {
       for (const [key, { month, entries }] of additions) {
         const rows = entries.map(e => e.row);
@@ -538,12 +663,18 @@ module.exports = function registerImport(ctx) {
           // and the near pass must be able to match a later rewrite of it.
           addToIndex(p.index, e.src.date, e.src.desc, e.src.amount, lab);
         }
+        landed.push({ key, month, rows });
         done += rows.length;
       }
     } catch (err) {
+      // The rows that DID land are still undoable — the receipt is written on
+      // this path too, or a partial import would be the one nobody can take
+      // back. Left of the toast so it exists before the early return.
+      if (landed.length) S.lastImport = receipt(p, label, landed, done);
       renderImportReview();   // reflect what already landed; the rest stays selectable
-      return toast(`Import stopped after ${done} row${done === 1 ? '' : 's'} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest.`, true);
+      return toast(`Import stopped after ${done} row${done === 1 ? '' : 's'} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`, true);
     }
+    S.lastImport = receipt(p, label, landed, done);
     const touched = additions;
     let newRules = 0;
     if ($('#impRemember').checked) {
@@ -554,6 +685,110 @@ module.exports = function registerImport(ctx) {
     toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? '' : 's'}` +
           (newRules ? `, saved ${newRules} new rules` : ''));
     ctx.switchView('transactions');
+  }
+
+  /* ------------------------- taking an import back -------------------------
+     A statement dropped into the wrong account is the mistake this app makes
+     easiest to make and, until now, hardest to fix: the rows land in files
+     named after an account they have nothing to do with, they count toward
+     every period total from the moment they land, and the only way back was to
+     open each month file in Obsidian and delete the lines by hand.
+
+     Undo is precise rather than clever. The receipt holds the ROW OBJECTS
+     commitImport pushed into S.txFiles, so removing them takes back exactly
+     what that import added and nothing that looks like it — which matters most
+     in the case that motivates the feature, a statement imported twice into
+     two different accounts, where every row has a twin.
+
+     It lasts for the session and not beyond, and the banner says so. A vault
+     re-read rebuilds every row object from the files, and the receipt's
+     references then point at objects nothing holds — so rather than fall back
+     to matching on date/description/amount, which would happily delete a
+     genuine duplicate the reader had entered by hand, reloadFromDisk drops the
+     receipt and the offer goes with it. After that the per-row delete on this
+     page is the honest tool.
+
+     `at` is a display string only. Stamped here rather than derived later so
+     the banner can say WHICH import it is offering to take back — with two
+     statements imported in a row, "the last one" is not enough to act on. */
+  function receipt(p, label, landed, count) {
+    return {
+      label,
+      filename: (p && p.filename) || '',
+      at: new Date().toISOString().slice(11, 16),
+      count,
+      files: landed,
+    };
+  }
+
+  async function undoImport() {
+    const r = S.lastImport;
+    if (!r || !r.files.length) return;
+
+    /* Resolved against the CURRENT model, not the receipt's own count: a row
+       may already have been deleted by hand from the Transactions table since
+       the import, and offering to remove 42 rows while removing 41 is the kind
+       of small lie that costs the reader's trust in every other figure here. */
+    const targets = [];
+    for (const f of r.files) {
+      const file = S.txFiles[f.key];
+      if (!file) continue;
+      const doomed = new Set(f.rows.filter(row => file.rows.includes(row)));
+      if (doomed.size) targets.push({ file, doomed, dirty: file.dirty });
+    }
+    const total = targets.reduce((n, t) => n + t.doomed.size, 0);
+    if (!total) {
+      S.lastImport = null;
+      ctx.renderTransactions();
+      return toast('Those rows are no longer in the app — nothing to undo', true);
+    }
+    /* Unsaved edits in the same months go to disk with the undo, because the
+       write below serialises the whole file from memory. Said out loud rather
+       than discovered afterwards: it is a save the reader did not press Save
+       for, and on this page there is always the possibility of one. */
+    const alsoSaves = targets.some(t => t.dirty);
+    const go = await confirmModal(app, {
+      title: 'Undo this import',
+      message: `Remove the ${total} row${total === 1 ? '' : 's'} imported into ${r.label}`
+        + (r.filename ? ` from ${r.filename}` : '') + ', and rewrite '
+        + `${targets.length} monthly file${targets.length === 1 ? '' : 's'}? `
+        + 'Categorisation rules learned during the import are kept — they cost nothing and '
+        + 'are useful whichever account the statement really belongs to.'
+        + (alsoSaves ? ' Unsaved edits you have made in those same months will be written out too.' : ''),
+      confirmText: `Remove ${total} row${total === 1 ? '' : 's'}`,
+    });
+    if (!go) return;
+
+    let undone = 0, files = 0;
+    try {
+      for (const t of targets) {
+        const keep = t.file.rows.filter(row => !t.doomed.has(row));
+        /* Written from a MODEL rather than by mutating first: a write that
+           fails must leave the row in memory as well as on disk, or the app
+           starts reporting a total the file does not hold. Same lockstep rule
+           commitImport follows in the other direction. */
+        await writeFile(`Transactions/${t.file.label}/${t.file.month}.md`,
+          serializeTxFile({ ...t.file, rows: keep }));
+        t.file.rows = keep;
+        // Disk now matches memory for this file, including whatever unsaved
+        // edits it carried — so it is genuinely clean, not merely written.
+        t.file.dirty = false;
+        undone += t.doomed.size;
+        files++;
+      }
+    } catch (err) {
+      S.lastImport = null;
+      ctx.renderTransactions();
+      return toast(`Undo stopped after ${files} file${files === 1 ? '' : 's'} (${err.message || err}) — the rest are unchanged`, true);
+    }
+    S.lastImport = null;
+    /* The Save button may have been lit by edits that have just been written
+       out above. Asking the page to recompute is not possible from here — the
+       predicate lives in controller.js — so re-render and let it settle: any
+       file still dirty re-lights it on its own next edit. */
+    if (!Object.values(S.txFiles).some(f => f.dirty)) $('#txSave').disabled = true;
+    ctx.render();
+    toast(`Undone — ${undone} row${undone === 1 ? '' : 's'} removed from ${files} file${files === 1 ? '' : 's'}`);
   }
 
   /* "Columns wrong?" on the review screen — reopen the mapper against the file
@@ -591,5 +826,5 @@ module.exports = function registerImport(ctx) {
     toast('Import cancelled — nothing was saved');
   }
 
-  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport, cancelImport });
+  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport, cancelImport, undoImport });
 };

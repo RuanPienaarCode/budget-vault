@@ -368,12 +368,63 @@ module.exports = {
   'tx.col.excl': 'Excl.',
   'tx.col.note': 'Nota',
   'tx.col.split': 'Dividir',
+  'tx.col.actions': 'Acciones de fila',
 
   'tx.aria.category': 'Categoría de {date} {desc}',
   'tx.aria.exclude': 'Excluir {desc} de los totales del presupuesto',
   'tx.aria.note': 'Nota de {date} {desc}',
   'tx.aria.split': 'Dividir {date} {desc} en categorías',
   'tx.title.split': 'Dividir en categorías',
+  'tx.aria.delete': 'Eliminar la transacción {desc} del {date}',
+  'tx.title.delete': 'Eliminar esta fila',
+  'tx.delete.title': 'Eliminar transacción',
+  'tx.delete.msg': '{date} · {desc} · {amount} — se quita de {file} al guardar.',
+  'tx.delete.reimport': 'Esta fila lleva la clave que evita que una reimportación del mismo extracto la añada otra vez, así que importar ese extracto más adelante volverá a añadirla.',
+  'tx.delete.parent': {
+    one: 'Su parte de la división se va con ella.',
+    other: 'Sus {count} partes de la división se van con ella.',
+  },
+  'tx.delete.part': 'Esta es una parte de una división: las partes ya no sumarán la línea original y la diferencia sale de los totales de la cuenta. Desmarca Excluida en la original para devolverla.',
+  'tx.delete.confirm': 'Eliminar fila',
+  'tx.deleted': {
+    one: 'Fila quitada — guarda los cambios para escribirla en el archivo',
+    other: '{count} filas quitadas — guarda los cambios para escribirlas en el archivo',
+  },
+
+  'tx.undo.what': {
+    one: 'Se importó 1 fila en {label} a las {at}.',
+    other: 'Se importaron {count} filas en {label} a las {at}.',
+  },
+  'tx.undo.session': 'Deshacer sigue disponible hasta que se relea la bóveda.',
+  'tx.undo.do': 'Deshacer importación',
+  'tx.undo.dismiss': 'Descartar la opción de deshacer',
+
+  'tx.bulk.dirty': 'Guarda tus cambios primero — eliminar filas reescribe esos mismos archivos',
+  'tx.bulk.needFilter': 'Elige primero una cuenta, una categoría o una búsqueda — esto elimina lo que seleccionan los filtros, y sin filtro se selecciona todo',
+  'tx.bulk.none': 'Ninguna fila coincide con los filtros actuales',
+  'tx.bulk.title': 'Eliminar las filas en pantalla',
+  'tx.bulk.msg': {
+    one: '¿Eliminar la fila que coincide con {filters} en {range}?',
+    other: '¿Eliminar las {count} filas que coinciden con {filters} en {range}?',
+  },
+  'tx.bulk.backup': 'Primero se escriben en {path}, así que se pueden recuperar — la papelera de la bóveda no puede deshacer esto por sí sola, porque los archivos mensuales se editan en vez de borrarse.',
+  'tx.bulk.splits': {
+    one: '1 de ellas pertenece a una división cuyas otras filas quizá no estén seleccionadas.',
+    other: '{count} de ellas pertenecen a divisiones cuyas otras filas quizá no estén seleccionadas.',
+  },
+  'tx.bulk.confirm': {
+    one: 'Eliminar 1 fila',
+    other: 'Eliminar {count} filas',
+  },
+  'tx.bulk.backupFailed': 'No se pudo escribir la copia, así que no se eliminó nada ({error})',
+  'tx.bulk.failed': {
+    one: 'Se detuvo tras 1 archivo ({error}) — el resto queda igual',
+    other: 'Se detuvo tras {count} archivos ({error}) — el resto queda igual',
+  },
+  'tx.bulk.done': {
+    one: '1 fila eliminada · hay una copia en {path}',
+    other: '{count} filas eliminadas de {files} archivos · hay una copia en {path}',
+  },
 
   'tx.none': 'Ninguna transacción coincide.',
   'tx.showMore': {
@@ -534,6 +585,35 @@ module.exports = {
   'acct.btn.edit': 'Editar',
   'acct.aria.openNote': 'Abrir la nota de {name}',
   'acct.btn.openNote': 'Abrir nota',
+  'acct.btn.delete': 'Eliminar',
+  'acct.aria.delete': 'Eliminar la cuenta {name}',
+  'acct.delete.title': 'Eliminar {name}',
+  'acct.delete.gone': 'Accounts/{name}.md ya no está en la bóveda',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    one: 'Esa carpeta tiene {count} transacción en {months} archivo mensual.',
+    other: 'Esa carpeta tiene {count} transacciones en {months} archivos mensuales.',
+  },
+  'acct.delete.keep': 'Conservar la carpeta — las filas siguen en tus totales',
+  'acct.delete.drop': 'Eliminar también la carpeta — las filas se van con ella',
+  'acct.delete.msg': '¿Mover Accounts/{name}.md a la papelera de la bóveda?',
+  'acct.delete.noFolder': 'No tiene carpeta de transacciones, así que no cambia nada más.',
+  'acct.delete.willKeep': {
+    one: 'Transactions/{label}/ se conserva, así que su {count} fila sigue contando en cada total de periodo — bajo una carpeta que ninguna cuenta reclama.',
+    other: 'Transactions/{label}/ se conserva, así que sus {count} filas siguen contando en cada total de periodo — bajo una carpeta que ninguna cuenta reclama.',
+  },
+  'acct.delete.willDrop': {
+    one: 'Transactions/{label}/ va a la papelera con ella, y su {count} fila sale de tus totales.',
+    other: 'Transactions/{label}/ va a la papelera con ella, y sus {count} filas salen de tus totales.',
+  },
+  'acct.delete.notes': 'Las notas que escribiste sobre ella se quedan en Notes/ y pasarán a leerse como sin emparejar. Todo va a la papelera de la bóveda y se puede recuperar desde Obsidian.',
+  'acct.delete.confirm': 'Eliminar cuenta',
+  'acct.delete.failed': 'No se pudo eliminar esa cuenta ({error}) — se releyó la bóveda',
+  'acct.deleted': '{name} eliminada',
+  'acct.deleted.withRows': {
+    one: '{name} y {count} transacción eliminadas',
+    other: '{name} y {count} transacciones eliminadas',
+  },
   'acct.empty': 'Aún no hay cuentas. Usa «Nueva cuenta» arriba para añadir una cuenta bancaria, un fondo de ahorro o una inversión.',
 
   'acct.hero.label': 'Neto entre tus cuentas',
@@ -657,6 +737,7 @@ module.exports = {
   'shell.tx.search': 'Buscar descripción…',
   'shell.tx.wholeHistory': 'todo el historial',
   'shell.tx.export': 'Exportar',
+  'shell.tx.deleteFiltered': 'Eliminar estas filas',
   'shell.tx.add': 'Añadir transacción',
   'shell.bud.title': 'Presupuestos por categoría',
   'shell.bud.copyPrev': 'Copiar el periodo anterior',

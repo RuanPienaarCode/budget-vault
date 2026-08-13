@@ -367,12 +367,63 @@ module.exports = {
   'tx.col.excl': 'Ausg.',
   'tx.col.note': 'Notiz',
   'tx.col.split': 'Aufteilen',
+  'tx.col.actions': 'Zeilenaktionen',
 
   'tx.aria.category': 'Kategorie für {date} {desc}',
   'tx.aria.exclude': '{desc} aus den Budgetsummen ausschließen',
   'tx.aria.note': 'Notiz zu {date} {desc}',
   'tx.aria.split': '{date} {desc} auf Kategorien aufteilen',
   'tx.title.split': 'Auf Kategorien aufteilen',
+  'tx.aria.delete': 'Transaktion {desc} vom {date} löschen',
+  'tx.title.delete': 'Diese Zeile löschen',
+  'tx.delete.title': 'Transaktion löschen',
+  'tx.delete.msg': '{date} · {desc} · {amount} — wird beim Speichern aus {file} entfernt.',
+  'tx.delete.reimport': 'Diese Zeile trägt den Schlüssel, der verhindert, dass ein erneuter Import desselben Auszugs sie ein zweites Mal anlegt — ein späterer Import dieses Auszugs fügt sie also wieder hinzu.',
+  'tx.delete.parent': {
+    one: 'Ihr Aufteilungsteil geht mit.',
+    other: 'Ihre {count} Aufteilungsteile gehen mit.',
+  },
+  'tx.delete.part': 'Dies ist ein Teil einer Aufteilung: die Teile ergeben dann nicht mehr die ursprüngliche Zeile, und die Differenz verlässt Ihre Kontosummen. Haken Sie „Ausgeschlossen“ bei der Originalzeile ab, um sie zurückzuholen.',
+  'tx.delete.confirm': 'Zeile löschen',
+  'tx.deleted': {
+    one: 'Zeile entfernt — mit „Änderungen speichern“ in die Datei schreiben',
+    other: '{count} Zeilen entfernt — mit „Änderungen speichern“ in die Datei schreiben',
+  },
+
+  'tx.undo.what': {
+    one: 'Um {at} 1 Zeile in {label} importiert.',
+    other: 'Um {at} {count} Zeilen in {label} importiert.',
+  },
+  'tx.undo.session': 'Das Rückgängigmachen bleibt möglich, bis der Tresor neu gelesen wird.',
+  'tx.undo.do': 'Import rückgängig',
+  'tx.undo.dismiss': 'Das Rückgängig-Angebot schließen',
+
+  'tx.bulk.dirty': 'Speichern Sie zuerst — beim Löschen von Zeilen werden dieselben Dateien neu geschrieben',
+  'tx.bulk.needFilter': 'Wählen Sie zuerst ein Konto, eine Kategorie oder eine Suche — gelöscht wird, was die Filter auswählen, und ohne Filter ist das alles',
+  'tx.bulk.none': 'Keine Zeilen passen zu den aktuellen Filtern',
+  'tx.bulk.title': 'Die angezeigten Zeilen löschen',
+  'tx.bulk.msg': {
+    one: 'Die 1 Zeile löschen, die in {range} zu {filters} passt?',
+    other: 'Alle {count} Zeilen löschen, die in {range} zu {filters} passen?',
+  },
+  'tx.bulk.backup': 'Sie werden zuerst nach {path} geschrieben und lassen sich so zurückholen — der Papierkorb des Tresors kann das nicht allein rückgängig machen, weil die Monatsdateien bearbeitet und nicht gelöscht werden.',
+  'tx.bulk.splits': {
+    one: '1 davon gehört zu einer Aufteilung, deren übrige Zeilen die Filter womöglich nicht erfassen.',
+    other: '{count} davon gehören zu Aufteilungen, deren übrige Zeilen die Filter womöglich nicht erfassen.',
+  },
+  'tx.bulk.confirm': {
+    one: '1 Zeile löschen',
+    other: '{count} Zeilen löschen',
+  },
+  'tx.bulk.backupFailed': 'Die Sicherung konnte nicht geschrieben werden, daher wurde nichts gelöscht ({error})',
+  'tx.bulk.failed': {
+    one: 'Nach 1 Datei abgebrochen ({error}) — der Rest ist unverändert',
+    other: 'Nach {count} Dateien abgebrochen ({error}) — der Rest ist unverändert',
+  },
+  'tx.bulk.done': {
+    one: '1 Zeile gelöscht · eine Kopie liegt in {path}',
+    other: '{count} Zeilen aus {files} Dateien gelöscht · eine Kopie liegt in {path}',
+  },
 
   'tx.none': 'Keine Transaktionen passen.',
   'tx.showMore': {
@@ -533,6 +584,35 @@ module.exports = {
   'acct.btn.edit': 'Bearbeiten',
   'acct.aria.openNote': 'Notiz zu {name} öffnen',
   'acct.btn.openNote': 'Notiz öffnen',
+  'acct.btn.delete': 'Löschen',
+  'acct.aria.delete': 'Das Konto {name} löschen',
+  'acct.delete.title': '{name} löschen',
+  'acct.delete.gone': 'Accounts/{name}.md ist nicht mehr im Tresor',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    one: 'Dieser Ordner enthält {count} Transaktion in {months} Monatsdatei.',
+    other: 'Dieser Ordner enthält {count} Transaktionen in {months} Monatsdateien.',
+  },
+  'acct.delete.keep': 'Ordner behalten — die Zeilen bleiben in Ihren Summen',
+  'acct.delete.drop': 'Ordner ebenfalls löschen — die Zeilen gehen mit',
+  'acct.delete.msg': 'Accounts/{name}.md in den Papierkorb des Tresors verschieben?',
+  'acct.delete.noFolder': 'Es hat keinen Transaktionsordner, sonst ändert sich nichts.',
+  'acct.delete.willKeep': {
+    one: 'Transactions/{label}/ bleibt, seine {count} Zeile zählt also weiter in jede Periodensumme — unter einem Ordner, den kein Konto beansprucht.',
+    other: 'Transactions/{label}/ bleibt, seine {count} Zeilen zählen also weiter in jede Periodensumme — unter einem Ordner, den kein Konto beansprucht.',
+  },
+  'acct.delete.willDrop': {
+    one: 'Transactions/{label}/ wandert mit in den Papierkorb, und seine {count} Zeile verlässt Ihre Summen.',
+    other: 'Transactions/{label}/ wandert mit in den Papierkorb, und seine {count} Zeilen verlassen Ihre Summen.',
+  },
+  'acct.delete.notes': 'Notizen dazu bleiben in Notes/ und gelten künftig als nicht zugeordnet. Alles landet im Papierkorb des Tresors und ist aus Obsidian heraus wiederherstellbar.',
+  'acct.delete.confirm': 'Konto löschen',
+  'acct.delete.failed': 'Das Konto konnte nicht gelöscht werden ({error}) — der Tresor wurde neu gelesen',
+  'acct.deleted': '{name} gelöscht',
+  'acct.deleted.withRows': {
+    one: '{name} und {count} Transaktion gelöscht',
+    other: '{name} und {count} Transaktionen gelöscht',
+  },
   'acct.empty': 'Noch keine Konten. Nutze oben „Neues Konto“, um ein Bankkonto, einen Spartopf oder eine Anlage hinzuzufügen.',
 
   'acct.hero.label': 'Netto über deine Konten',
@@ -656,6 +736,7 @@ module.exports = {
   'shell.tx.search': 'Beschreibung suchen…',
   'shell.tx.wholeHistory': 'gesamte Historie',
   'shell.tx.export': 'Exportieren',
+  'shell.tx.deleteFiltered': 'Diese Zeilen löschen',
   'shell.tx.add': 'Transaktion hinzufügen',
   'shell.bud.title': 'Kategoriebudgets',
   'shell.bud.copyPrev': 'Vorherigen Zeitraum kopieren',

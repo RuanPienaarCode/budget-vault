@@ -16,7 +16,7 @@ const { yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
 const i18n = require('../i18n');
-const { askFields } = require('../modal');
+const { askFields, confirmModal } = require('../modal');
 /* The reconciliation engine was written here first and now lives in its own
    module, because Savings, Services and Debt all need to make the same argument
    about a hand-typed figure. Behaviour on this page is unchanged. */
@@ -1110,6 +1110,12 @@ module.exports = function registerAccounts(ctx) {
       () => toggleBudget(a));
     act(i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }),
       () => openAccountFile(a));
+    // Last, and on its own class: it is the only action here that removes
+    // something, and it should not sit a thumb's width from "Edit".
+    const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del',
+      'aria-label': i18n.t('acct.aria.delete', { name: a.name }) }, i18n.t('acct.btn.delete'));
+    del.addEventListener('click', () => deleteAccount(a));
+    acts.append(del);
     box.append(acts);
 
     const td = el('td', { colspan: '8', class: 'acct-drawer-cell' }, box);
@@ -1446,6 +1452,108 @@ module.exports = function registerAccounts(ctx) {
     return acct;
   }
 
+  /* ------------------------------- deleting --------------------------------
+     An account is a FILE and a FOLDER joined by a string, and those two are
+     what makes deleting one different from deleting a row in a table.
+
+     Trash `Accounts/<name>.md` on its own and every transaction it held stays
+     exactly where it was — still parsed, still counted in every period total,
+     still in the cash figure — under a folder no account claims. CONTEXT.md
+     has a name for that state (an orphan folder) because the loader will not
+     invent an account to go with one, and it is deliberately silent: the rows
+     are not wrong, they simply belong to nobody. Someone deleting an account
+     they opened by mistake wants the rows gone; someone retiring a closed
+     account wants the history kept. Neither is guessable, so the folder is a
+     question rather than a default, and the counts are stated in the asking.
+
+     Two other consequences named in the dialog because nothing on screen shows
+     them: notes written about the account stay in Notes/ and start reading as
+     unmatched (their subject no longer resolves — the same after-the-fact badge
+     a table-row rename lands in, see classifyRename in controller.js), and the
+     files go to the VAULT trash rather than the system one, so all of this is
+     recoverable from inside Obsidian.
+
+     Resolved to TFile/TFolder BEFORE the dialogs and trashed by that handle,
+     never by re-reading the path afterwards: a path re-resolved across the
+     seconds a reader spends in a confirmation either no longer exists — and the
+     delete then reports a success it did not have — or now points at something
+     else, which it would trash instead. notes.js paid for that lesson once. */
+  async function deleteAccount(a) {
+    const file = fileAt(`Accounts/${a.name}.md`);
+    if (!file) return toast(i18n.t('acct.delete.gone', { name: a.name }), true);
+
+    /* Every folder that resolves to THIS account, not just `a.name`: tx_label
+       points an account at a folder of another name, and safeSeg renames one on
+       the way to disk. accountForLabel is the same door accountIndex and the
+       reconciliation read through, so a folder counted as this account's
+       everywhere else is counted as this account's here. */
+    const labels = (S.txFolders || []).filter(n => accountForLabel(n) === a);
+    const folders = labels.map(n => ctx.folderAt(`Transactions/${n}`)).filter(Boolean);
+    const files = Object.values(S.txFiles).filter(f => labels.includes(f.label));
+    const rows = files.reduce((n, f) => n + f.rows.length, 0);
+
+    let dropFolder = false;
+    if (folders.length) {
+      const ask = await askFields(app, i18n.t('acct.delete.title', { name: a.name }), [{
+        key: 'folder',
+        label: i18n.t('acct.delete.folderField', { label: labels.join(', ') }),
+        type: 'select',
+        value: 'keep',
+        desc: i18n.t('acct.delete.folderDesc', { count: rows, months: files.length }),
+        options: [
+          { value: 'keep', label: i18n.t('acct.delete.keep') },
+          { value: 'drop', label: i18n.t('acct.delete.drop') },
+        ],
+      }]);
+      if (!ask) return;
+      dropFolder = ask.folder === 'drop';
+    }
+
+    /* The second dialog is not a formality — it is the only one that states the
+       outcome of the choice just made, and it is the one with the warning
+       button on it. An account with no folder never sees the first. */
+    const go = await confirmModal(app, {
+      title: i18n.t('acct.delete.title', { name: a.name }),
+      message: i18n.t('acct.delete.msg', { name: a.name }) + ' '
+        + (!folders.length ? i18n.t('acct.delete.noFolder')
+          : dropFolder ? i18n.t('acct.delete.willDrop', { count: rows, label: labels.join(', ') })
+            : i18n.t('acct.delete.willKeep', { count: rows, label: labels.join(', ') }))
+        + ' ' + i18n.t('acct.delete.notes'),
+      confirmText: i18n.t('acct.delete.confirm'),
+    });
+    if (!go) return;
+
+    try {
+      await ctx.trashFile(file);
+      if (dropFolder) for (const f of folders) await ctx.trashFile(f);
+    } catch (e) {
+      /* Re-read rather than guess which half landed. A delete that threw
+         part-way is exactly the case where the in-memory model and the disk
+         have stopped agreeing, and this app's whole contract is that the
+         markdown is the source of truth. */
+      await ctx.reloadFromDisk();
+      ctx.render();
+      return toast(i18n.t('acct.delete.failed', { error: (e && e.message) || e }), true);
+    }
+
+    S.accounts = S.accounts.filter(x => x !== a);
+    if (dropFolder) {
+      for (const key of Object.keys(S.txFiles)) {
+        if (labels.includes(S.txFiles[key].label)) delete S.txFiles[key];
+      }
+      S.txFolders = (S.txFolders || []).filter(n => !labels.includes(n));
+    }
+    /* Close the drawer if it was this account's — v.open holds a NAME, and a
+       name pointing at nothing renders no drawer but leaves the row that would
+       have opened it looking selected. */
+    const v = view();
+    if (v.open === a.name) v.open = null;
+    ctx.render();   // not renderAccounts — Savings has this button too
+    toast(dropFolder && rows
+      ? i18n.t('acct.deleted.withRows', { name: a.name, count: rows })
+      : i18n.t('acct.deleted', { name: a.name }));
+  }
+
   // accountReconcile is published so a test can drive the REAL arithmetic — the
   // same reason owed.js publishes its serializer. Nothing else on ctx calls it.
   // accountIndex used to be published here too; it now lives on period.js,
@@ -1460,7 +1568,7 @@ module.exports = function registerAccounts(ctx) {
      copied into it. One account form in this plugin, not two that drift — the
      fields a type offers, the parsing, and the frontmatter keys written all have
      exactly one owner. */
-  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, editBalance,
+  ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, editBalance, deleteAccount,
     openAccountFile, openAccountTransactions: openTransactions,
     acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });

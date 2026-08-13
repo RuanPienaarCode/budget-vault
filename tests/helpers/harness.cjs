@@ -88,7 +88,17 @@ function makeVault(files) {
     async createFolder(p) { store.set(p + '/.folder', ''); rebuild(); },
     async modifyBinary(f, data) { store.set(f.path, data); },
     async createBinary(p, data) { store.set(p, data); rebuild(); },
-    async trash(f) { store.delete(f.path); rebuild(); },
+    /* Obsidian's trash takes a TAbstractFile, and trashing a FOLDER takes
+       everything under it with it. Deleting only the exact path left the month
+       files sitting in the store while the code under test believed them
+       gone — so a test could assert that deleting an account's Transactions/
+       folder "worked" against a vault that still held every row. */
+    async trash(f) {
+      for (const p of [...store.keys()]) {
+        if (p === f.path || p.startsWith(f.path + '/')) store.delete(p);
+      }
+      rebuild();
+    },
     getAbstractFileByPath(p) { return nodes.get(p) || null; },
     // Typed getters (Obsidian 1.5+) — src/ prefers these over the
     // getAbstractFileByPath + instanceof dance. Same null-on-miss contract,

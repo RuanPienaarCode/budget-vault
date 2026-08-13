@@ -346,6 +346,25 @@ const DESC_COLS = ['description', 'title', 'narrative', 'narration', 'details', 
 const AMOUNT_COLS = ['amount', 'transaction amount', 'amount (zar)', 'signed amount', 'value'];
 const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out', 'withdrawal', 'withdrawals', 'paid out'];
 const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
+/* A THIRD amount column, and the one this importer was blind to.
+
+   Capitec's export is Money In / Money Out / Fee, and a bank charge goes in the
+   third one with the other two left empty — so a reader that stops after two
+   columns silently drops every fee. On one real 25-month statement that was 553
+   rows and R1,542.50, all of it spending, none of it visible: the rows never
+   appeared anywhere to be missed, and the import reported success. It also cost
+   the reconciliation, because a balance column that steps across a row nobody
+   read cannot line up.
+
+   The three columns are mutually exclusive in practice — across 1,523 rows of
+   three Capitec exports, no row carried a Fee AND a Money In/Out — so reading
+   fee as a fallback after the other two cannot double-count. It is a fallback
+   rather than a sum for exactly that reason: if a bank ever does write both, the
+   pair the header names wins and the balance column is what catches the
+   disagreement, rather than this quietly inventing a combined figure.
+   'charges' is deliberately absent: a column headed "Charges" on a summary
+   export is as often a total as a per-row amount. */
+const FEE_COLS = ['fee', 'fees', 'fee amount', 'bank charge', 'bank charges', 'service fee', 'transaction fee'];
 /* Not a column the importer needs — a column it CHECKS ITSELF against. See
    reconcileAmounts: the balance is what lets a never-before-seen bank's export
    prove its own sign convention instead of the importer assuming one. */
@@ -378,16 +397,96 @@ function detectStatementColumns(rows, dayFirst = true) {
     let iBalance = col(BALANCE_COLS);
     if (iBalance === -1) iBalance = low.findIndex(c => c.includes('balance'));
     const iAmount = col(AMOUNT_COLS), iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+    /* Only ever an EXTRA column beside a pair or a signed amount, never the
+       thing that makes a file importable on its own: a file whose only numeric
+       column is headed "Fee" is a fee schedule, not a statement. So iFee is
+       resolved here but the required-columns test below is unchanged. */
+    let iFee = col(FEE_COLS);
+    if (iFee === iAmount || iFee === iDebit || iFee === iCredit) iFee = -1;
     if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1))) return null;
-    return { iDate, iDesc, iAmount, iDebit, iCredit, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
+    return { iDate, iDesc, iAmount, iDebit, iCredit, iFee, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
   }
   const shape = detectHeaderlessColumns(rows, dayFirst);
   if (!shape) return null;
-  return { ...shape, iDebit: -1, iCredit: -1, iExtra: -1, headerIdx: -1 };
+  /* A headerless file has no column NAMES, so nothing can identify a fee column
+     in one — and inferring it from shape would mean guessing which of several
+     numeric columns is which. Left at -1; the manual mapper is the door. */
+  return { ...shape, iDebit: -1, iCredit: -1, iFee: -1, iExtra: -1, headerIdx: -1 };
+}
+
+/* ------------------------- whose statement is this? -----------------------
+   The account number the FILE says it belongs to, or '' for "cannot say".
+
+   Every Capitec row carries it in an `Account` column; Nedbank prints it once
+   in the preamble ("Account Number :,1041005172"). Either is enough to notice
+   that a statement is about to be written into the wrong account — which is not
+   hypothetical: on one vault a mis-picked dropdown put 933 rows of one
+   account's history into another, silently, and it was only found a year later
+   by hashing the monthly files and finding 25 byte-identical pairs.
+
+   Returns '' rather than a guess in every ambiguous case, including a file
+   whose rows name MORE than one account: a statement that disagrees with itself
+   cannot be the evidence for blocking an import. '' disables the check; it
+   never blocks. */
+const ACCOUNT_COLS = ['account', 'account number', 'account no', 'account no.', 'acc no', 'account_number'];
+
+function statementAccountNumber(rows, map) {
+  /* A run of digits, tolerating the spaces and dashes a bank prints inside an
+     account number. Length is judged AFTER stripping — a four-digit masked tail
+     is a legitimate number and a regex counting raw characters would reject it
+     while accepting "12 34". */
+  const digitsOf = v => {
+    const m = String(v == null ? '' : v).match(/\d[\d\s-]*\d/);
+    return m ? m[0].replace(/\D/g, '') : '';
+  };
+  if (map && map.headerIdx >= 0 && rows[map.headerIdx]) {
+    const low = rows[map.headerIdx].map(c => String(c || '').trim().toLowerCase());
+    let i = -1;
+    for (const n of ACCOUNT_COLS) { const k = low.indexOf(n); if (k !== -1) { i = k; break; } }
+    if (i !== -1) {
+      const seen = new Set();
+      for (const r of rows.slice(map.dataStart)) {
+        const d = digitsOf(r[i]);
+        if (d.length >= 4) seen.add(d);
+      }
+      // Exactly one, or nothing: see the header note on files that disagree.
+      if (seen.size === 1) return [...seen][0];
+      if (seen.size > 1) return '';
+    }
+  }
+  /* The preamble form. Same shape detectAccountLabel already reads for a
+     different purpose — it maps the number to an account, this reports the
+     number itself, and the two must not drift into different ideas of where a
+     statement keeps its identity. */
+  for (const r of (rows || []).slice(0, 10)) {
+    const i = r.findIndex(c => /account\s*(number|no)/i.test(c || ''));
+    if (i === -1) continue;
+    const d = digitsOf(r[i + 1]) || digitsOf(r[i]);
+    if (d.length >= 4) return d;
+  }
+  return '';
+}
+
+/* Do two account numbers describe the same account? true / false / null for
+   "not enough to say".
+
+   Lenient by design, in one direction only. The number in a vault's account
+   file is hand-typed and is very often the masked tail a bank prints on a
+   statement header ("…098"), so a shorter number matching the END of a longer
+   one counts as agreement. Under four digits nothing is compared at all —
+   "a match" on two digits would be worth less than the silence. */
+function sameAccountNumber(a, b) {
+  const x = String(a == null ? '' : a).replace(/\D/g, '');
+  const y = String(b == null ? '' : b).replace(/\D/g, '');
+  if (x.length < 4 || y.length < 4) return null;
+  if (x === y) return true;
+  const [long, short] = x.length >= y.length ? [x, y] : [y, x];
+  return long.endsWith(short);
 }
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
   counterpartyAccount, applyCounterparties, reconcileAmounts,
   detectHeaderlessColumns, detectStatementColumns,
+  statementAccountNumber, sameAccountNumber,
 };

@@ -229,6 +229,13 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title" data-i18n="nav.transactions">Transactions</h1>
           <div class="sub-note" id="txSubNote"></div>
         </div>
+        <!-- The undo offer for the import that just landed. It lives HERE and
+             not on the Import page because commitImport sends the reader here:
+             this is the screen where a statement dropped into the wrong account
+             is actually noticed, and an undo you have to navigate back to find
+             is one you will not find in time. Built by renderTransactions from
+             S.lastImport; hidden when there is nothing to undo. -->
+        <div class="tx-undo hidden" id="txUndoBar" role="status"></div>
         <div class="card">
           <div class="card-h" style="align-items:center">
             <div class="row" style="flex:1">
@@ -242,6 +249,7 @@ const SHELL_HTML = `
             <div class="row">
               <span id="txCount" class="count-note"></span>
               <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
+              <button class="btn-ghost" id="txDeleteFiltered"><span class="ico" data-ico="trash-2|trash"></span> <span data-i18n="shell.tx.deleteFiltered">Delete these rows</span></button>
               <button class="btn-ghost" id="txNewAccount"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
               <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="shell.tx.add">Add transaction</span></button>
               <button class="btn-gradient" id="txSave" disabled data-i18n="shell.saveChanges">Save changes</button>
@@ -304,6 +312,7 @@ const SHELL_HTML = `
             </div>
             <div class="row ml-auto">
               <button class="btn-ghost" id="planNew"><span class="ico" data-ico="plus"></span> New plan</button>
+              <button class="btn-ghost" id="planDelete"><span class="ico" data-ico="trash-2|trash"></span> Delete plan</button>
               <button class="btn-gradient" id="planSave" disabled>Save plan</button>
             </div>
           </div>
@@ -409,6 +418,7 @@ const SHELL_HTML = `
               <div class="row">
                 <select id="taxYearSel" class="form-select form-select-sm" aria-label="Tax year"></select>
                 <button class="btn-ghost" id="taxNewYear"><span class="ico" data-ico="plus"></span> New tax year</button>
+                <button class="btn-ghost" id="taxDeleteYear"><span class="ico" data-ico="trash-2|trash"></span> Delete year</button>
               </div>
             </div>
             <div class="body-pad" id="taxSeasonBody"></div>
@@ -787,6 +797,10 @@ const SHELL_HTML = `
               <div class="sub imp-legend" id="impLegend"></div>
               <div class="sub imp-reconcile hidden" id="impReconcile"></div>
               <div class="sub imp-nonbudget hidden" id="impNonBudget"></div>
+              <!-- The account-identity block: shown only when the statement's
+                   own account number disagrees with the account picked, and the
+                   one banner on this screen that also disables Import rows. -->
+              <div class="sub imp-acct-check hidden" id="impAcctCheck" role="alert"></div>
             </div>
             <div class="row">
               <button class="btn-ghost" id="impCancel" title="Discard this statement without importing anything">Cancel import</button>

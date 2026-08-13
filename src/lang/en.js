@@ -379,12 +379,63 @@ module.exports = {
   'tx.col.excl': 'Excl.',
   'tx.col.note': 'Note',
   'tx.col.split': 'Split',
+  'tx.col.actions': 'Row actions',
 
   'tx.aria.category': 'Category for {date} {desc}',
   'tx.aria.exclude': 'Exclude {desc} from budget totals',
   'tx.aria.note': 'Note for {date} {desc}',
   'tx.aria.split': 'Split {date} {desc} into categories',
   'tx.title.split': 'Split into categories',
+  'tx.aria.delete': 'Delete the {desc} transaction on {date}',
+  'tx.title.delete': 'Delete this row',
+  'tx.delete.title': 'Delete transaction',
+  'tx.delete.msg': '{date} · {desc} · {amount} — removed from {file} when you save.',
+  'tx.delete.reimport': 'This row carries the key that stops a re-import of the same statement adding it twice, so importing that statement again later will re-add the line.',
+  'tx.delete.parent': {
+    one: 'Its split part goes with it.',
+    other: 'Its {count} split parts go with it.',
+  },
+  'tx.delete.part': 'This is one part of a split: the parts will no longer add up to the original line, and the difference leaves your account totals. Untick Excluded on the original to put it back.',
+  'tx.delete.confirm': 'Delete row',
+  'tx.deleted': {
+    one: 'Row removed — Save changes to write it to the file',
+    other: '{count} rows removed — Save changes to write them to the file',
+  },
+
+  'tx.undo.what': {
+    one: 'Imported 1 row into {label} at {at}.',
+    other: 'Imported {count} rows into {label} at {at}.',
+  },
+  'tx.undo.session': 'Undo stays available until the vault is re-read.',
+  'tx.undo.do': 'Undo import',
+  'tx.undo.dismiss': 'Dismiss the undo offer',
+
+  'tx.bulk.dirty': 'Save your changes first — deleting rows rewrites the same files',
+  'tx.bulk.needFilter': 'Pick an account, a category or a search first — this deletes what the filters select, and no filter selects everything',
+  'tx.bulk.none': 'No rows match the current filters',
+  'tx.bulk.title': 'Delete the rows on screen',
+  'tx.bulk.msg': {
+    one: 'Delete the 1 row matching {filters} in {range}?',
+    other: 'Delete all {count} rows matching {filters} in {range}?',
+  },
+  'tx.bulk.backup': 'They are written to {path} first, so they can be brought back — the vault trash cannot undo this on its own, because the monthly files are edited rather than deleted.',
+  'tx.bulk.splits': {
+    one: '1 of them belongs to a split, whose other rows the filters may not have selected.',
+    other: '{count} of them belong to splits, whose other rows the filters may not have selected.',
+  },
+  'tx.bulk.confirm': {
+    one: 'Delete 1 row',
+    other: 'Delete {count} rows',
+  },
+  'tx.bulk.backupFailed': 'Could not write the backup, so nothing was deleted ({error})',
+  'tx.bulk.failed': {
+    one: 'Stopped after 1 file ({error}) — the rest are unchanged',
+    other: 'Stopped after {count} files ({error}) — the rest are unchanged',
+  },
+  'tx.bulk.done': {
+    one: 'Deleted 1 row · a copy is in {path}',
+    other: 'Deleted {count} rows from {files} files · a copy is in {path}',
+  },
 
   'tx.none': 'No transactions match.',
   'tx.showMore': {
@@ -545,6 +596,35 @@ module.exports = {
   'acct.btn.edit': 'Edit',
   'acct.aria.openNote': 'Open the {name} note',
   'acct.btn.openNote': 'Open note',
+  'acct.btn.delete': 'Delete',
+  'acct.aria.delete': 'Delete the account {name}',
+  'acct.delete.title': 'Delete {name}',
+  'acct.delete.gone': 'Accounts/{name}.md is no longer in the vault',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    one: 'That folder holds {count} transaction in {months} monthly file.',
+    other: 'That folder holds {count} transactions in {months} monthly files.',
+  },
+  'acct.delete.keep': 'Keep the folder — the rows stay in your totals',
+  'acct.delete.drop': 'Delete the folder too — the rows go with it',
+  'acct.delete.msg': 'Move Accounts/{name}.md to your vault trash?',
+  'acct.delete.noFolder': 'It has no transactions folder, so nothing else changes.',
+  'acct.delete.willKeep': {
+    one: 'Transactions/{label}/ is kept, so its {count} row still counts toward every period total — under a folder no account claims.',
+    other: 'Transactions/{label}/ is kept, so its {count} rows still count toward every period total — under a folder no account claims.',
+  },
+  'acct.delete.willDrop': {
+    one: 'Transactions/{label}/ goes to the trash with it, and its {count} row leaves your totals.',
+    other: 'Transactions/{label}/ goes to the trash with it, and its {count} rows leave your totals.',
+  },
+  'acct.delete.notes': 'Notes you wrote about it stay in Notes/ and will read as unmatched. Everything goes to the vault trash, recoverable from inside Obsidian.',
+  'acct.delete.confirm': 'Delete account',
+  'acct.delete.failed': 'Could not delete that account ({error}) — the vault was re-read',
+  'acct.deleted': 'Deleted {name}',
+  'acct.deleted.withRows': {
+    one: 'Deleted {name} and {count} transaction',
+    other: 'Deleted {name} and {count} transactions',
+  },
   'acct.empty': 'No accounts yet. Use "New account" above to add a bank account, savings pot or investment.',
 
   /* ---- the page header: one figure, and what it is made of ---- */
@@ -674,6 +754,7 @@ module.exports = {
   'shell.tx.search': 'Search description…',
   'shell.tx.wholeHistory': 'whole history',
   'shell.tx.export': 'Export',
+  'shell.tx.deleteFiltered': 'Delete these rows',
   'shell.tx.add': 'Add transaction',
   'shell.bud.title': 'Category budgets',
   'shell.bud.copyPrev': 'Copy previous period',

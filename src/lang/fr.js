@@ -372,12 +372,63 @@ module.exports = {
   'tx.col.excl': 'Excl.',
   'tx.col.note': 'Note',
   'tx.col.split': 'Répartir',
+  'tx.col.actions': 'Actions de ligne',
 
   'tx.aria.category': 'Catégorie pour {date} {desc}',
   'tx.aria.exclude': 'Exclure {desc} des totaux du budget',
   'tx.aria.note': 'Note pour {date} {desc}',
   'tx.aria.split': 'Répartir {date} {desc} en catégories',
   'tx.title.split': 'Répartir en catégories',
+  'tx.aria.delete': 'Supprimer la transaction {desc} du {date}',
+  'tx.title.delete': 'Supprimer cette ligne',
+  'tx.delete.title': 'Supprimer la transaction',
+  'tx.delete.msg': '{date} · {desc} · {amount} — retirée de {file} à l\'enregistrement.',
+  'tx.delete.reimport': 'Cette ligne porte la clé qui empêche un réimport du même relevé de l\'ajouter une seconde fois : réimporter ce relevé plus tard la rajoutera donc.',
+  'tx.delete.parent': {
+    one: 'Sa part de ventilation part avec elle.',
+    other: 'Ses {count} parts de ventilation partent avec elle.',
+  },
+  'tx.delete.part': 'Ceci est une part d\'une ventilation : les parts ne feront plus la ligne d\'origine, et la différence quitte les totaux du compte. Décochez « Exclue » sur la ligne d\'origine pour la rétablir.',
+  'tx.delete.confirm': 'Supprimer la ligne',
+  'tx.deleted': {
+    one: 'Ligne retirée — enregistrez les modifications pour l\'écrire dans le fichier',
+    other: '{count} lignes retirées — enregistrez les modifications pour les écrire dans le fichier',
+  },
+
+  'tx.undo.what': {
+    one: '1 ligne importée dans {label} à {at}.',
+    other: '{count} lignes importées dans {label} à {at}.',
+  },
+  'tx.undo.session': 'L\'annulation reste possible jusqu\'à la prochaine relecture du coffre.',
+  'tx.undo.do': 'Annuler l\'import',
+  'tx.undo.dismiss': 'Masquer la proposition d\'annulation',
+
+  'tx.bulk.dirty': 'Enregistrez d\'abord vos modifications — supprimer des lignes réécrit les mêmes fichiers',
+  'tx.bulk.needFilter': 'Choisissez d\'abord un compte, une catégorie ou une recherche — ceci supprime ce que les filtres sélectionnent, et sans filtre c\'est tout',
+  'tx.bulk.none': 'Aucune ligne ne correspond aux filtres actuels',
+  'tx.bulk.title': 'Supprimer les lignes affichées',
+  'tx.bulk.msg': {
+    one: 'Supprimer la ligne correspondant à {filters} dans {range} ?',
+    other: 'Supprimer les {count} lignes correspondant à {filters} dans {range} ?',
+  },
+  'tx.bulk.backup': 'Elles sont d\'abord écrites dans {path}, donc récupérables — la corbeille du coffre ne peut pas annuler cela seule, car les fichiers mensuels sont modifiés et non supprimés.',
+  'tx.bulk.splits': {
+    one: '1 d\'entre elles appartient à une ventilation dont les autres lignes ne sont peut-être pas sélectionnées.',
+    other: '{count} d\'entre elles appartiennent à des ventilations dont les autres lignes ne sont peut-être pas sélectionnées.',
+  },
+  'tx.bulk.confirm': {
+    one: 'Supprimer 1 ligne',
+    other: 'Supprimer {count} lignes',
+  },
+  'tx.bulk.backupFailed': 'La sauvegarde n\'a pas pu être écrite, rien n\'a donc été supprimé ({error})',
+  'tx.bulk.failed': {
+    one: 'Arrêté après 1 fichier ({error}) — le reste est inchangé',
+    other: 'Arrêté après {count} fichiers ({error}) — le reste est inchangé',
+  },
+  'tx.bulk.done': {
+    one: '1 ligne supprimée · une copie est dans {path}',
+    other: '{count} lignes supprimées de {files} fichiers · une copie est dans {path}',
+  },
 
   'tx.none': 'Aucune transaction ne correspond.',
   'tx.showMore': {
@@ -538,6 +589,35 @@ module.exports = {
   'acct.btn.edit': 'Modifier',
   'acct.aria.openNote': 'Ouvrir la note de {name}',
   'acct.btn.openNote': 'Ouvrir la note',
+  'acct.btn.delete': 'Supprimer',
+  'acct.aria.delete': 'Supprimer le compte {name}',
+  'acct.delete.title': 'Supprimer {name}',
+  'acct.delete.gone': 'Accounts/{name}.md n\'est plus dans le coffre',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    one: 'Ce dossier contient {count} transaction dans {months} fichier mensuel.',
+    other: 'Ce dossier contient {count} transactions dans {months} fichiers mensuels.',
+  },
+  'acct.delete.keep': 'Garder le dossier — les lignes restent dans vos totaux',
+  'acct.delete.drop': 'Supprimer aussi le dossier — les lignes partent avec lui',
+  'acct.delete.msg': 'Déplacer Accounts/{name}.md vers la corbeille du coffre ?',
+  'acct.delete.noFolder': 'Il n\'a pas de dossier de transactions, rien d\'autre ne change.',
+  'acct.delete.willKeep': {
+    one: 'Transactions/{label}/ est conservé, donc sa {count} ligne compte toujours dans chaque total de période — sous un dossier qu\'aucun compte ne revendique.',
+    other: 'Transactions/{label}/ est conservé, donc ses {count} lignes comptent toujours dans chaque total de période — sous un dossier qu\'aucun compte ne revendique.',
+  },
+  'acct.delete.willDrop': {
+    one: 'Transactions/{label}/ part à la corbeille avec lui, et sa {count} ligne quitte vos totaux.',
+    other: 'Transactions/{label}/ part à la corbeille avec lui, et ses {count} lignes quittent vos totaux.',
+  },
+  'acct.delete.notes': 'Les notes que vous avez écrites à son sujet restent dans Notes/ et apparaîtront comme non rattachées. Tout va à la corbeille du coffre et reste récupérable depuis Obsidian.',
+  'acct.delete.confirm': 'Supprimer le compte',
+  'acct.delete.failed': 'Impossible de supprimer ce compte ({error}) — le coffre a été relu',
+  'acct.deleted': '{name} supprimé',
+  'acct.deleted.withRows': {
+    one: '{name} et {count} transaction supprimés',
+    other: '{name} et {count} transactions supprimés',
+  },
   'acct.empty': 'Aucun compte pour l\'instant. Utilisez « Nouveau compte » ci-dessus pour ajouter un compte bancaire, une épargne ou un placement.',
 
   'acct.hero.label': 'Net sur vos comptes',
@@ -661,6 +741,7 @@ module.exports = {
   'shell.tx.search': 'Rechercher une description…',
   'shell.tx.wholeHistory': 'tout l\'historique',
   'shell.tx.export': 'Exporter',
+  'shell.tx.deleteFiltered': 'Supprimer ces lignes',
   'shell.tx.add': 'Ajouter une transaction',
   'shell.bud.title': 'Budgets par catégorie',
   'shell.bud.copyPrev': 'Copier la période précédente',

@@ -474,6 +474,55 @@ module.exports = function registerPlan(ctx) {
     mark(); renderPlan();
   }
 
+  /* Delete the plan on screen.
+
+     A plan holds no money — it is a division of money that lives in accounts,
+     and every source, envelope and item in it is a statement of intent rather
+     than a transaction. So this touches nothing else in the vault, and the
+     dialog says so plainly: it is the one delete in this app with no
+     arithmetic consequence anywhere, and a reader who has just been warned
+     about orphan folders and dedup keys on the other pages is owed that.
+
+     A plan created but never saved has no file at all — newPlan() puts it in
+     S.plans and the disk has never heard of it. Deleting it is then a purely
+     in-memory drop, and announcing a trip to the trash would be a claim the
+     reader could go and check. */
+  async function deletePlan() {
+    const key = S.planName;
+    const p = P();
+    if (!p) return;
+    const file = fileAt(`Plans/${key}.md`);
+    const n = (arr, word) => `${arr.length} ${word}${arr.length === 1 ? '' : 's'}`;
+    const go = await confirmModal(app, {
+      title: 'Delete plan',
+      message: (file
+        ? `Move Plans/${key}.md to your vault trash? `
+        : 'This plan has never been saved, so there is no file to trash — it is dropped from the app. ')
+        + `“${p.name}” holds ${n(p.sources, 'source')}, ${n(p.envelopes, 'envelope')} and ${n(p.items, 'item')}. `
+        + 'No transaction, account or budget changes: a plan only ever described how money already '
+        + 'in your accounts was meant to be divided.',
+      confirmText: 'Delete plan',
+    });
+    if (!go) return;
+    if (file) {
+      try {
+        await ctx.trashFile(file);
+      } catch (e) {
+        return toast(`Could not delete that plan: ${(e && e.message) || e}`, true);
+      }
+    }
+    delete S.plans[key];
+    /* One dirty flag for the page, and changePlan refuses to switch while it is
+       set — so whatever it was tracking belonged to the plan just deleted.
+       Clearing it is what puts Save back to disabled; left lit, it would offer
+       to save a plan that no longer exists. */
+    clearDirty();
+    S.planName = Object.keys(S.plans)
+      .sort((a, b) => S.plans[a].name.localeCompare(S.plans[b].name))[0] || null;
+    renderPlan();
+    toast(`Deleted plan “${p.name}”`);
+  }
+
   function changePlan(key) {
     if (S.planDirty) return toast('Save this plan first', true);
     S.planName = key;
@@ -545,5 +594,5 @@ module.exports = function registerPlan(ctx) {
     'var(--color-info)', 'var(--color-luxuries)', 'var(--color-giving)', 'var(--color-investment)'];
   const nextTint = p => TINTS[p.envelopes.length % TINTS.length];
 
-  ctx.provide({ renderPlan, savePlan, newPlan, addSource, addEnvelope, serializePlan });
+  ctx.provide({ renderPlan, savePlan, newPlan, deletePlan, addSource, addEnvelope, serializePlan });
 };

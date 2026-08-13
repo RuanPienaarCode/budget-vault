@@ -7,7 +7,7 @@ const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr } = require('../markdown');
 const { SCHEMAS, headerLines, rowLine } = require('../table-schema');
 const { csvCell } = require('../csv');
-const { askFields, askSplit } = require('../modal');
+const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 const { ISO_DATE, todayIso } = require('../dates');
 const { applySplit, splitRole } = require('../tx-role');
@@ -18,7 +18,7 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, plugin, money, toast, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
+  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -113,7 +113,37 @@ module.exports = function registerTransactions(ctx) {
     sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
   }
 
+  /* The undo offer for the import that just landed on this page.
+     Rebuilt on every render from S.lastImport, which import.js writes on commit
+     and clears once it has been used or has become unusable — so there is
+     exactly one place that decides whether an undo is still possible, and this
+     only draws it. See undoImport in views/import.js for why the offer does not
+     survive a vault re-read. */
+  function renderUndoBar() {
+    const bar = $('#txUndoBar');
+    if (!bar) return;
+    const r = S.lastImport;
+    bar.empty();
+    bar.classList.toggle('hidden', !r);
+    if (!r) return;
+    bar.append(el('div', { class: 'tx-undo-txt' },
+      i18n.t('tx.undo.what', { count: r.count, label: r.label, at: r.at }),
+      r.filename ? el('span', { class: 'tx-undo-file' }, r.filename) : '',
+      el('div', { class: 'tx-undo-note' }, i18n.t('tx.undo.session'))));
+    const undo = el('button', { type: 'button', class: 'tx-undo-btn' }, i18n.t('tx.undo.do'));
+    undo.addEventListener('click', () => ctx.undoImport());
+    const hide = el('button', { type: 'button', class: 'tx-undo-x',
+      'aria-label': i18n.t('tx.undo.dismiss') }, '✕');
+    /* Dismiss drops the receipt rather than only hiding the bar. Keeping it
+       alive behind a closed banner would leave an undo that is still armed and
+       no longer visible — and the next thing the reader does on this page is
+       edit the rows it would silently take back. */
+    hide.addEventListener('click', () => { S.lastImport = null; renderUndoBar(); });
+    bar.append(el('div', { class: 'tx-undo-acts' }, undo, hide));
+  }
+
   function renderTransactions() {
+    renderUndoBar();
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
       [['', i18n.t('tx.allAccounts')]]);
@@ -137,7 +167,11 @@ module.exports = function registerTransactions(ctx) {
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, i18n.t('tx.col.date')), el('th', { scope: 'col' }, i18n.t('tx.col.desc')), el('th', { scope: 'col' }, i18n.t('tx.col.account')),
       el('th', { scope: 'col' }, i18n.t('tx.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('tx.col.amount')), el('th', { scope: 'col' }, i18n.t('tx.col.excl')), el('th', { scope: 'col' }, i18n.t('tx.col.note')),
-      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.split'))))));
+      /* One header for the whole action cell rather than one per button. Split
+         and Delete share that cell deliberately: a ninth column costs width the
+         phone does not have, and both colspans on this page — the empty state
+         and the show-more row — would have to be kept in step with it. */
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.actions'))))));
     const body = el('tbody', {});
     for (const item of list) {
       const r = item._row;
@@ -160,7 +194,7 @@ module.exports = function registerTransactions(ctx) {
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
-        el('td', {}, splitButton(item))));
+        el('td', { style: 'white-space:nowrap' }, splitButton(item), deleteButton(item))));
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
@@ -235,6 +269,177 @@ module.exports = function registerTransactions(ctx) {
        auto-categoriser a rule that contradicts itself on every import. */
     renderTransactions();
     toast(i18n.t('tx.split.done', { n: rows.length }));
+  }
+
+  /* ------------------------------- deleting --------------------------------
+     The one control on this page that removes a line rather than describing it,
+     so it says what that costs before doing it.
+
+     Excluding a row was always the gentler answer and stays the default advice
+     — the money still moved, and everything measuring the ACCOUNT deliberately
+     reads excluded rows. But "there is a gentler answer" is not the same as
+     "there is no honest reason", and there are three: a manual entry typed with
+     the wrong amount, a row imported twice under two descriptions the dedup key
+     could not match, and a statement imported into the wrong account. Excluding
+     any of those leaves a line the reconciliation still counts and the reader
+     cannot explain, which is how a page that argues about balances loses the
+     argument.
+
+     What the dialog has to say, because none of it is visible from the button:
+
+       • The importer dedupes on `date|desc|amount|label`, and that key lives in
+         the row and nowhere else. Delete it and re-importing the same statement
+         re-adds the line as new — the exact trap tx-role.js documents as the
+         reason a split parent is kept rather than deleted.
+       • A split parent is not one row. Its parts carry the same money under
+         finer categories, so they go with it — leaving them would leave rows
+         marked `part` describing a line that no longer exists, and an unsplit
+         has nothing left to reverse.
+       • Deleting a single PART is the one case that moves a figure. The parent
+         stays excluded and superseded, so the money that part carried leaves
+         the account totals entirely rather than falling back to the parent —
+         see supersededBySplit in tx-role.js, which requires BOTH columns. The
+         way back is the one that module documents: untick Excluded on the
+         original. */
+  function deleteButton(item) {
+    const r = item._row;
+    const b = el('button', {
+      type: 'button', class: 'btn-ghost btn-ghost-sm',
+      'aria-label': i18n.t('tx.aria.delete', { date: r.date, desc: r.desc }), title: i18n.t('tx.title.delete'),
+    }, icoEl(['trash-2', 'trash']));
+    b.addEventListener('click', () => deleteTransaction(item));
+    return b;
+  }
+
+  /* The parts belonging to one parent, matched on date + description within the
+     parent's own file — the same three facts applySplit copies onto a part, and
+     the only join there is: a part carries no id back to its parent. Narrow
+     rather than clever: a file holding two identical charges on one day, both
+     split, has no way to tell whose parts are whose, so this deliberately takes
+     BOTH sets and the dialog states the count it found. Undercounting would
+     strand rows; overcounting is visible in the number the reader agrees to. */
+  function splitPartsOf(f, parent) {
+    return f.rows.filter(x => x !== parent && splitRole(x.split) === 'part'
+      && x.date === parent.date && x.desc === parent.desc);
+  }
+
+  async function deleteTransaction(item) {
+    const r = item._row, f = item._file;
+    const role = splitRole(r.split);
+    const parts = role === 'parent' ? splitPartsOf(f, r) : [];
+    const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length })
+      : role === 'part' ? i18n.t('tx.delete.part')
+        : i18n.t('tx.delete.reimport');
+    const go = await confirmModal(app, {
+      title: i18n.t('tx.delete.title'),
+      message: i18n.t('tx.delete.msg', {
+        date: r.date, desc: r.desc, amount: money(r.amount), file: `Transactions/${f.label}/${f.month}.md`,
+      }) + ' ' + detail,
+      confirmText: i18n.t('tx.delete.confirm'),
+    });
+    if (!go) return;
+    /* Removed from the in-memory rows and marked dirty rather than written
+       straight to disk, unlike Add transaction. serializeTxFile writes the
+       WHOLE file, so a delete that wrote immediately would also flush every
+       unsaved category, note and Excluded edit sitting in the same month — a
+       save the reader did not ask for, hidden inside a delete they did. The
+       page's own Save button is the one door to disk, and until it is pressed
+       "Reload from disk" is a working undo. */
+    const doomed = new Set([r, ...parts]);
+    f.rows = f.rows.filter(x => !doomed.has(x));
+    f.dirty = true;
+    $('#txSave').disabled = false;
+    renderTransactions();
+    toast(i18n.t('tx.deleted', { count: doomed.size }));
+  }
+
+  /* ---------------------- deleting what the filters select ------------------
+     The tool for the mistake found LATER — a statement imported into the wrong
+     account and noticed next week, when the session's undo is long gone. The
+     filters on this page already describe that set exactly ("account: Cheque,
+     search: Woolworths"), so the honest bulk delete is "remove what I am
+     looking at" rather than a second selection mechanism to get wrong.
+
+     Three gates, each there for its own reason:
+
+       • At least one FILTER must be set. The period alone is not a
+         description of anything — a button that removes every row in the
+         current window because the reader happened to be looking at it is not
+         a delete anyone asked for.
+       • Nothing may be unsaved. serializeTxFile writes the whole file, so a
+         delete over unsaved edits would flush them to disk as a side effect,
+         and the reader would have no way to tell afterwards which of the two
+         they had agreed to. Same rule the export follows, for the same reason.
+       • The removed rows are written to a CSV beside the vault's own data
+         FIRST, and the delete is abandoned if that write fails. Deleting rows
+         is the one destructive act in this app the vault trash cannot undo —
+         the file is modified, not removed — so this is the way back, and
+         cleanupRules already established that a bulk delete which cannot leave
+         one does not happen. Appended rather than overwritten: two deletes on
+         one day must not cost the first one's record. */
+  const DELETED_LOG = 'Data/Deleted transactions.csv';
+
+  async function deleteFilteredTransactions() {
+    if (Object.values(S.txFiles).some(f => f.dirty)) return toast(i18n.t('tx.bulk.dirty'), true);
+    const { rows, range, filters } = filteredRows();
+    if (!filters.length) return toast(i18n.t('tx.bulk.needFilter'), true);
+    if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
+
+    // Split rows in the selection are called out by number: the filters that
+    // select a parent need not select its parts (they carry finer categories),
+    // and parts left behind describe a line that no longer exists.
+    const splits = rows.filter(t => splitRole(t._row.split)).length;
+    const go = await confirmModal(app, {
+      title: i18n.t('tx.bulk.title'),
+      message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: filters.join(', ') })
+        + ' ' + i18n.t('tx.bulk.backup', { path: DELETED_LOG })
+        + (splits ? ' ' + i18n.t('tx.bulk.splits', { count: splits }) : ''),
+      confirmText: i18n.t('tx.bulk.confirm', { count: rows.length }),
+    });
+    if (!go) return;
+
+    /* The backup, before anything is touched. Appended by hand rather than
+       through a writer that could overwrite: read what is there, keep it, and
+       add today's rows under it. transactionsCsv owns the column shape, so the
+       log reads the same as an export and can be imported straight back in. */
+    try {
+      const csv = transactionsCsv(rows);
+      const existing = await readFile(DELETED_LOG);
+      await writeFile(DELETED_LOG, existing
+        ? existing.replace(/\n*$/, '\n') + csv.split('\n').slice(1).join('\n')
+        : csv);
+    } catch (e) {
+      return toast(i18n.t('tx.bulk.backupFailed', { error: (e && e.message) || e }), true);
+    }
+
+    // Grouped per file so each one is written once. The row OBJECTS are what
+    // identifies a row here — two identical lines in one month are two rows,
+    // and only the one the filter selected may go.
+    const perFile = new Map();
+    for (const t of rows) {
+      if (!perFile.has(t._file)) perFile.set(t._file, new Set());
+      perFile.get(t._file).add(t._row);
+    }
+    let removed = 0, files = 0;
+    try {
+      for (const [f, doomed] of perFile) {
+        const keep = f.rows.filter(x => !doomed.has(x));
+        await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile({ ...f, rows: keep }));
+        f.rows = keep;
+        removed += doomed.size;
+        files++;
+      }
+    } catch (e) {
+      renderTransactions();
+      return toast(i18n.t('tx.bulk.failed', { count: files, error: (e && e.message) || e }), true);
+    }
+    /* The receipt describes rows this may just have removed, and it holds them
+       by object identity — an undo run afterwards would find fewer than it
+       promised. Dropped rather than reconciled: the reader has been given the
+       CSV, which is the better way back. */
+    S.lastImport = null;
+    ctx.render();
+    toast(i18n.t('tx.bulk.done', { count: removed, files, path: DELETED_LOG }));
   }
 
   function serializeTxFile(f) {
@@ -399,5 +604,6 @@ module.exports = function registerTransactions(ctx) {
     toast(i18n.t('tx.export.done', { count: rows.length, cats: S.categories.length, path: written.split('/').slice(0, -1).join('/') }));
   }
 
-  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction, exportTransactions, syncOptions });
+  ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
+    deleteTransaction, deleteFilteredTransactions, exportTransactions, syncOptions });
 };

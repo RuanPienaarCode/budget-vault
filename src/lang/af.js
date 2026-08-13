@@ -366,12 +366,63 @@ module.exports = {
   'tx.col.excl': 'Uitgesl.',
   'tx.col.note': 'Nota',
   'tx.col.split': 'Verdeel',
+  'tx.col.actions': 'Ryaksies',
 
   'tx.aria.category': 'Kategorie vir {date} {desc}',
   'tx.aria.exclude': 'Sluit {desc} uit begrotingstotale uit',
   'tx.aria.note': 'Nota vir {date} {desc}',
   'tx.aria.split': 'Verdeel {date} {desc} in kategorieë',
   'tx.title.split': 'Verdeel in kategorieë',
+  'tx.aria.delete': 'Skrap die transaksie {desc} op {date}',
+  'tx.title.delete': 'Skrap hierdie ry',
+  'tx.delete.title': 'Skrap transaksie',
+  'tx.delete.msg': '{date} · {desc} · {amount} — word uit {file} verwyder wanneer jy stoor.',
+  'tx.delete.reimport': 'Hierdie ry dra die sleutel wat keer dat \'n herinvoer van dieselfde staat die lyn \'n tweede keer byvoeg, so \'n latere invoer van daardie staat sal dit weer byvoeg.',
+  'tx.delete.parent': {
+    one: 'Die verdeelde deel gaan saam.',
+    other: 'Die {count} verdeelde dele gaan saam.',
+  },
+  'tx.delete.part': 'Dit is een deel van \'n verdeling: die dele tel nie meer op tot die oorspronklike lyn nie, en die verskil verlaat jou rekeningtotale. Ontmerk Uitgesluit op die oorspronklike om dit terug te sit.',
+  'tx.delete.confirm': 'Skrap ry',
+  'tx.deleted': {
+    one: 'Ry verwyder — stoor veranderinge om dit in die lêer te skryf',
+    other: '{count} rye verwyder — stoor veranderinge om hulle in die lêer te skryf',
+  },
+
+  'tx.undo.what': {
+    one: '1 ry om {at} in {label} ingevoer.',
+    other: '{count} rye om {at} in {label} ingevoer.',
+  },
+  'tx.undo.session': 'Ontdoen bly beskikbaar totdat die kluis weer gelees word.',
+  'tx.undo.do': 'Ontdoen invoer',
+  'tx.undo.dismiss': 'Sluit die ontdoen-aanbod',
+
+  'tx.bulk.dirty': 'Stoor eers jou veranderinge — die skrap van rye herskryf dieselfde lêers',
+  'tx.bulk.needFilter': 'Kies eers \'n rekening, \'n kategorie of \'n soektog — dit skrap wat die filters kies, en geen filter kies alles nie',
+  'tx.bulk.none': 'Geen rye pas by die huidige filters nie',
+  'tx.bulk.title': 'Skrap die rye op die skerm',
+  'tx.bulk.msg': {
+    one: 'Skrap die 1 ry wat by {filters} in {range} pas?',
+    other: 'Skrap al {count} rye wat by {filters} in {range} pas?',
+  },
+  'tx.bulk.backup': 'Hulle word eers na {path} geskryf sodat hulle teruggebring kan word — die kluis se asblik kan dit nie alleen ontdoen nie, want die maandlêers word geredigeer eerder as geskrap.',
+  'tx.bulk.splits': {
+    one: '1 daarvan hoort by \'n verdeling waarvan die ander rye dalk nie gekies is nie.',
+    other: '{count} daarvan hoort by verdelings waarvan die ander rye dalk nie gekies is nie.',
+  },
+  'tx.bulk.confirm': {
+    one: 'Skrap 1 ry',
+    other: 'Skrap {count} rye',
+  },
+  'tx.bulk.backupFailed': 'Kon nie die rugsteun skryf nie, so niks is geskrap nie ({error})',
+  'tx.bulk.failed': {
+    one: 'Gestop na 1 lêer ({error}) — die res is onveranderd',
+    other: 'Gestop na {count} lêers ({error}) — die res is onveranderd',
+  },
+  'tx.bulk.done': {
+    one: '1 ry geskrap · \'n kopie is in {path}',
+    other: '{count} rye uit {files} lêers geskrap · \'n kopie is in {path}',
+  },
 
   'tx.none': 'Geen transaksies pas nie.',
   'tx.showMore': {
@@ -532,6 +583,35 @@ module.exports = {
   'acct.btn.edit': 'Wysig',
   'acct.aria.openNote': 'Maak {name} se nota oop',
   'acct.btn.openNote': 'Maak nota oop',
+  'acct.btn.delete': 'Skrap',
+  'acct.aria.delete': 'Skrap die rekening {name}',
+  'acct.delete.title': 'Skrap {name}',
+  'acct.delete.gone': 'Accounts/{name}.md is nie meer in die kluis nie',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    one: 'Daardie vouer hou {count} transaksie in {months} maandlêer.',
+    other: 'Daardie vouer hou {count} transaksies in {months} maandlêers.',
+  },
+  'acct.delete.keep': 'Hou die vouer — die rye bly in jou totale',
+  'acct.delete.drop': 'Skrap die vouer ook — die rye gaan saam',
+  'acct.delete.msg': 'Skuif Accounts/{name}.md na jou kluis se asblik?',
+  'acct.delete.noFolder': 'Dit het geen transaksievouer nie, so niks anders verander nie.',
+  'acct.delete.willKeep': {
+    one: 'Transactions/{label}/ bly, so sy {count} ry tel steeds by elke periodetotaal — onder \'n vouer wat geen rekening opeis nie.',
+    other: 'Transactions/{label}/ bly, so sy {count} rye tel steeds by elke periodetotaal — onder \'n vouer wat geen rekening opeis nie.',
+  },
+  'acct.delete.willDrop': {
+    one: 'Transactions/{label}/ gaan saam asblik toe, en sy {count} ry verlaat jou totale.',
+    other: 'Transactions/{label}/ gaan saam asblik toe, en sy {count} rye verlaat jou totale.',
+  },
+  'acct.delete.notes': 'Notas wat jy daaroor geskryf het bly in Notes/ en sal as onafgepaar lees. Alles gaan na die kluis se asblik en is van binne Obsidian herwinbaar.',
+  'acct.delete.confirm': 'Skrap rekening',
+  'acct.delete.failed': 'Kon nie daardie rekening skrap nie ({error}) — die kluis is weer gelees',
+  'acct.deleted': '{name} geskrap',
+  'acct.deleted.withRows': {
+    one: '{name} en {count} transaksie geskrap',
+    other: '{name} en {count} transaksies geskrap',
+  },
   'acct.empty': 'Nog geen rekeninge nie. Gebruik "Nuwe rekening" hierbo om \'n bankrekening, spaarpot of belegging by te voeg.',
 
   'acct.hero.label': 'Netto oor jou rekeninge',
@@ -655,6 +735,7 @@ module.exports = {
   'shell.tx.search': 'Soek beskrywing…',
   'shell.tx.wholeHistory': 'hele geskiedenis',
   'shell.tx.export': 'Voer uit',
+  'shell.tx.deleteFiltered': 'Skrap hierdie rye',
   'shell.tx.add': 'Voeg transaksie by',
   'shell.bud.title': 'Kategoriebegrotings',
   'shell.bud.copyPrev': 'Kopieer vorige tydperk',

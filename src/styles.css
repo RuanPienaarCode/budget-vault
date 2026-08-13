@@ -30,6 +30,14 @@
      the app to fix a text problem. The dark block below points it straight back
      at the fill, where the amber already measures 8.3:1. */
   --color-warning-ink:   #9a5c09;   /* AA on --surface (5.4:1) and on the card (4.9:1); the fill amber was 2.2:1 */
+  /* The same move for the rose, for the same reason — see the note above.
+     --color-danger is a fill: right behind a badge and behind a bar, and 3.7:1
+     against white, which is under AA. Its own token rather than a darkened
+     --color-danger, which would dull every negative balance in the app to fix
+     a text problem. Added when Delete arrived on the account drawer: a
+     destructive control has to LOOK destructive, and painting it with the fill
+     would have shipped the one label on the page that was hardest to read. */
+  --color-danger-ink:    #be123c;   /* AA on --surface (6.3:1); the fill rose was 3.7:1 */
   --color-info:          #0ea5e9;
   --color-info-light:    #f0f9ff;
 
@@ -109,6 +117,10 @@
   /* On a dark surface the fill amber is already 8.3:1 as text, and the darkened
      light-mode ink would be the unreadable one. Point it back at the fill. */
   --color-warning-ink:   var(--color-warning);
+  /* Same story as the amber directly above: on #12162a the fill rose measures
+     5.0:1 as text, while the darkened light-mode ink drops to 1.5:1 — the
+     unreadable one here. Point it back at the fill. */
+  --color-danger-ink:    var(--color-danger);
   --color-info-light:    rgba(14,165,233,0.12);
 
   --bg-0:              #04050b;
@@ -1531,6 +1543,48 @@
 }
 .budget-app-root .acct-drawer-act:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .budget-app-root .acct-drawer-act:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* The one action in this row that removes something. Pushed to the right edge
+   rather than sitting a thumb's width from Edit — on the phone these wrap into
+   a block of identical pills, and "the last one is the destructive one" is a
+   weaker signal than a gap. margin-left:auto on a flex-wrap row moves it to the
+   end of whatever line it lands on, which is the behaviour wanted at both
+   widths. The ink token, not the fill: see --color-danger-ink. */
+.budget-app-root .acct-drawer-del { margin-left: auto; color: var(--color-danger-ink); }
+.budget-app-root .acct-drawer-del:hover { color: var(--color-danger-ink); border-color: var(--color-danger); }
+.budget-app-root .acct-drawer-del:focus-visible { outline-color: var(--color-danger); }
+
+/* The import-undo banner on the Transactions page. Deliberately NOT styled as
+   a warning: an import that landed correctly is the common case, and painting
+   the offer red would make every successful import look like a problem. It is
+   an information strip with one obvious action — the primary tint, on the
+   glass surface the cards use, so it reads as part of the page rather than as
+   an alert bolted onto it. */
+.budget-app-root .tx-undo {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 12px 18px;
+  border: 1px solid var(--border-color); border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius); background: var(--surface);
+}
+.budget-app-root .tx-undo-txt { flex: 1 1 260px; font-size: 13px; color: var(--text-primary); }
+.budget-app-root .tx-undo-file { margin-left: 6px; color: var(--ink-faint); }
+.budget-app-root .tx-undo-note { margin-top: 3px; font-size: 11.5px; color: var(--ink-faint); }
+.budget-app-root .tx-undo-acts { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.budget-app-root .tx-undo-btn {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 7px 15px; border-radius: 999px; min-height: 34px;
+  border: 1px solid var(--color-primary); background: transparent; color: var(--color-primary);
+}
+.budget-app-root .tx-undo-btn:hover { background: var(--color-primary-light); }
+.budget-app-root .tx-undo-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .tx-undo-x {
+  font: inherit; font-size: 13px; line-height: 1; cursor: pointer;
+  /* 34px square: the dismiss is the one control here a mis-tap costs something
+     (it drops the receipt), so it gets a real target rather than a bare glyph. */
+  width: 34px; height: 34px; border-radius: 999px;
+  border: 1px solid transparent; background: transparent; color: var(--ink-faint);
+}
+.budget-app-root .tx-undo-x:hover { color: var(--text-primary); border-color: var(--border-color); }
+.budget-app-root .tx-undo-x:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 @media (max-width: 900px) { .budget-app-root .top-grid { grid-template-columns: 1fr; } }
 /* A phone gets the name, the balance and the state. Everything the three
@@ -1817,6 +1871,15 @@
    account is a deliberate setting — but it has to be said before the commit,
    or the missing Dashboard movement afterwards reads as a failed import. */
 .budget-app-root .imp-nonbudget { margin-top: 4px; max-width: 62ch; color: var(--color-primary); }
+/* The one banner on this screen that is a REFUSAL rather than a caveat: the
+   statement's own account number disagrees with the account picked, and Import
+   rows is disabled behind it. Weighted accordingly — the ink token, not the
+   fill, for the reason spelled out at --color-danger-ink. */
+.budget-app-root .imp-acct-check {
+  margin-top: 6px; max-width: 62ch; padding: 8px 12px;
+  border-left: 3px solid var(--color-danger); border-radius: 0 8px 8px 0;
+  background: var(--color-danger-light); color: var(--color-danger-ink); font-weight: 500;
+}
 /* Manual column mapper. Auto-fits on a phone (one field per row) and spreads
    into columns on a wider pane. */
 .budget-app-root .imp-map-fields {
@@ -2541,6 +2604,12 @@
   .budget-app-root .acct-seg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-owner-row:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .acct-drawer-act:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  /* The delete pill's own ring, in the rose rather than the primary — it
+     overrides only the colour above, so it has to be mirrored here separately
+     or the fallback paints it green on 15.0-15.3. */
+  .budget-app-root .acct-drawer-del:focus { outline-color: var(--color-danger); }
+  .budget-app-root .tx-undo-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .tx-undo-x:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table thead th button:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table tbody tr.acct-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }

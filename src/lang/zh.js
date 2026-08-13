@@ -360,12 +360,55 @@ module.exports = {
   'tx.col.excl': '排除',
   'tx.col.note': '备注',
   'tx.col.split': '拆分',
+  'tx.col.actions': '行操作',
 
   'tx.aria.category': '{date} {desc} 的分类',
   'tx.aria.exclude': '把 {desc} 从预算合计中排除',
   'tx.aria.note': '{date} {desc} 的备注',
   'tx.aria.split': '把 {date} {desc} 拆分到多个分类',
   'tx.title.split': '拆分到多个分类',
+  'tx.aria.delete': '删除 {date} 的 {desc} 交易',
+  'tx.title.delete': '删除此行',
+  'tx.delete.title': '删除交易',
+  'tx.delete.msg': '{date} · {desc} · {amount} — 保存时将从 {file} 中移除。',
+  'tx.delete.reimport': '这一行带着防止同一份对账单重复导入的标识；删除后，日后再导入那份对账单会把它重新加回来。',
+  'tx.delete.parent': {
+    other: '它拆分出的 {count} 行也会一并删除。',
+  },
+  'tx.delete.part': '这是一次拆分中的一行：其余各行将不再等于原始金额，差额会离开账户合计。取消原始行的“排除”勾选即可恢复。',
+  'tx.delete.confirm': '删除该行',
+  'tx.deleted': {
+    other: '已移除 {count} 行 — 点“保存更改”写入文件',
+  },
+
+  'tx.undo.what': {
+    other: '{at} 导入了 {count} 行到 {label}。',
+  },
+  'tx.undo.session': '撤销在库重新读取之前一直可用。',
+  'tx.undo.do': '撤销导入',
+  'tx.undo.dismiss': '关闭撤销提示',
+
+  'tx.bulk.dirty': '请先保存更改 — 删除行会重写同样的文件',
+  'tx.bulk.needFilter': '请先选择账户、类别或搜索 — 此操作删除筛选出的行，不设筛选就等于全选',
+  'tx.bulk.none': '没有符合当前筛选的行',
+  'tx.bulk.title': '删除屏幕上的行',
+  'tx.bulk.msg': {
+    other: '删除 {range} 中符合 {filters} 的全部 {count} 行？',
+  },
+  'tx.bulk.backup': '它们会先写入 {path}，因此可以找回 — 月度文件是被修改而非删除，库的回收站无法单独撤销这一步。',
+  'tx.bulk.splits': {
+    other: '其中 {count} 行属于拆分，其配套行未必在筛选范围内。',
+  },
+  'tx.bulk.confirm': {
+    other: '删除 {count} 行',
+  },
+  'tx.bulk.backupFailed': '无法写入备份，因此未删除任何内容（{error}）',
+  'tx.bulk.failed': {
+    other: '在 {count} 个文件后停止（{error}）— 其余未改动',
+  },
+  'tx.bulk.done': {
+    other: '已从 {files} 个文件中删除 {count} 行 · 副本在 {path}',
+  },
 
   'tx.none': '没有符合条件的交易。',
   'tx.showMore': { other: '在剩余的 {remaining} 行中再显示 {n} 行' },
@@ -518,6 +561,31 @@ module.exports = {
   'acct.btn.edit': '编辑',
   'acct.aria.openNote': '打开 {name} 的笔记',
   'acct.btn.openNote': '打开笔记',
+  'acct.btn.delete': '删除',
+  'acct.aria.delete': '删除账户 {name}',
+  'acct.delete.title': '删除 {name}',
+  'acct.delete.gone': '库中已没有 Accounts/{name}.md',
+  'acct.delete.folderField': 'Transactions/{label}/',
+  'acct.delete.folderDesc': {
+    other: '该文件夹在 {months} 个月度文件中共有 {count} 笔交易。',
+  },
+  'acct.delete.keep': '保留文件夹 — 这些交易仍计入合计',
+  'acct.delete.drop': '一并删除文件夹 — 这些交易随之消失',
+  'acct.delete.msg': '把 Accounts/{name}.md 移到库的回收站？',
+  'acct.delete.noFolder': '它没有交易文件夹，其他内容不受影响。',
+  'acct.delete.willKeep': {
+    other: 'Transactions/{label}/ 会保留，其中 {count} 笔仍会计入每个周期的合计 — 归在一个没有账户认领的文件夹下。',
+  },
+  'acct.delete.willDrop': {
+    other: 'Transactions/{label}/ 会一起进入回收站，其中 {count} 笔将离开你的合计。',
+  },
+  'acct.delete.notes': '你为它写的笔记会留在 Notes/ 中，并显示为未匹配。所有内容都进入库的回收站，可在 Obsidian 内恢复。',
+  'acct.delete.confirm': '删除账户',
+  'acct.delete.failed': '无法删除该账户（{error}）— 已重新读取库',
+  'acct.deleted': '已删除 {name}',
+  'acct.deleted.withRows': {
+    other: '已删除 {name} 及 {count} 笔交易',
+  },
   'acct.empty': '还没有账户。使用上方的「新建账户」来添加银行账户、储蓄或投资。',
 
   'acct.hero.label': '所有账户净额',
@@ -641,6 +709,7 @@ module.exports = {
   'shell.tx.search': '搜索摘要…',
   'shell.tx.wholeHistory': '全部历史',
   'shell.tx.export': '导出',
+  'shell.tx.deleteFiltered': '删除这些行',
   'shell.tx.add': '添加交易',
   'shell.bud.title': '分类预算',
   'shell.bud.copyPrev': '复制上一周期',
