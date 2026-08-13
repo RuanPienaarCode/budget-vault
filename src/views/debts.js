@@ -7,7 +7,7 @@
 
 const { el, kpiTiles, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd } = require('../markdown');
+const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
@@ -484,20 +484,19 @@ module.exports = function registerDebts(ctx) {
   }
 
   /* ------------------------------ persistence ---------------------------- */
+  /* Columns, escaping and number formatting come from the same declaration
+     the loader reads with (table-schema.js, ADR-0003); only the prose is
+     this view's own. */
   function serializeDebts() {
-    const lines = ['---', ...(S.debtsFm || 'kind: debts').split('\n'), '---', '', '# Debts', '',
-      'Money the household owes. `rate` is the annual interest rate as a percentage,',
-      '`payment` the contracted monthly amount and `extra` anything paid on top of it.',
-      '`status` is `active` or `paid`.', '',
-      '| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |',
-      '|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|'];
-    for (const d of S.debts) {
-      lines.push(`| ${escMd(d.name)} | ${escMd(d.lender)} | ${escMd(d.type)} | ${d.balance.toFixed(2)} | ` +
-        `${d.original.toFixed(2)} | ${d.rate.toFixed(2)} | ${d.payment.toFixed(2)} | ${d.extra.toFixed(2)} | ` +
-        `${escMd(d.start)} | ${escMd(d.category)} | ${d.status} | ${escMd(d.notes)} |`);
-    }
-    lines.push('');
-    return lines.join('\n');
+    return mdTableFile({
+      fm: S.debtsFm, fallback: 'kind: debts', title: 'Debts',
+      prose: [
+        'Money the household owes. `rate` is the annual interest rate as a percentage,',
+        '`payment` the contracted monthly amount and `extra` anything paid on top of it.',
+        '`status` is `active` or `paid`.',
+      ],
+      schema: SCHEMAS.debts, rows: S.debts,
+    });
   }
 
   async function saveDebts() {
