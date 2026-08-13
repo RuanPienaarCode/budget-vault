@@ -83,21 +83,90 @@ eq([...dispatched].filter(v => !sections.has(v)), [],
 // actually runs; catch it statically across every module instead.
 const provided = new Map();
 const dupes = [];
+const recordKeys = (body, rel) => {
+  for (const k of body.matchAll(/(?:^|[,{\s])([A-Za-z_]\w*)\s*(?:[,:}]|$)/g)) {
+    const key = k[1];
+    if (provided.has(key) && provided.get(key) !== rel) {
+      dupes.push(`${key}: ${provided.get(key)} and ${rel}`);
+    }
+    provided.set(key, rel);
+  }
+};
 for (const file of walk(SRC)) {
   const text = fs.readFileSync(file, 'utf8');
-  for (const m of text.matchAll(/ctx\.provide\(\{([\s\S]*?)\}\)/g)) {
-    for (const k of m[1].matchAll(/(?:^|[,{\s])([A-Za-z_]\w*)\s*(?:[,:}]|$)/g)) {
-      const key = k[1];
-      const rel = path.relative(SRC, file);
-      if (provided.has(key) && provided.get(key) !== rel) {
-        dupes.push(`${key}: ${provided.get(key)} and ${rel}`);
-      }
-      provided.set(key, rel);
-    }
+  const rel = path.relative(SRC, file);
+  for (const m of text.matchAll(/ctx\.provide\(\{([\s\S]*?)\}\)/g)) recordKeys(m[1], rel);
+  /* io.js publishes through a factory — `ctx.provide(makeIo(ctx))` — so its
+     keys live in makeIo's return literal, not in the provide() call. Without
+     this, the whole io surface (writeFile, readFile, …) went invisible to
+     the collision check and a second module could shadow it unseen. */
+  if (/ctx\.provide\(makeIo\(/.test(text)) {
+    const ret = text.match(/function makeIo\([\s\S]*?\n  return \{([\s\S]*?)\n  \};/);
+    ok(ret, `${rel} provides via makeIo, so makeIo's return literal must be parseable here`);
+    if (ret) recordKeys(ret[1], rel);
   }
 }
 eq(dupes, [], 'two modules must not publish the same name onto ctx');
 ok(provided.size > 30, `ctx should carry the full published surface (found ${provided.size})`);
+ok(provided.get('writeFile') === 'io.js',
+  'the io surface is visible to this check — the factory indirection must not hide it');
+
+/* ---- 5b. no module eagerly destructures a key registered after it ---- */
+/* savings.js once destructured saveAccount — provided by views/accounts.js —
+   at register time. That made it the ONE module whose correctness depended on
+   the order of the register calls in controller.js, against the late-bound
+   `ctx.x()` idiom every other cross-view call uses: reorder the calls and the
+   key is silently undefined at mount, throwing a screen and a session away
+   from the cause. The rule, enforced: an identifier pulled out of ctx at the
+   TOP of a register function must already exist at that point — a controller
+   base key, or a key provided by a module registered earlier. */
+{
+  const reqFile = new Map([...controller.matchAll(/const (register\w+) = require\('\.\/(.+?)'\)/g)]
+    .map(m => [m[1], m[2] + '.js']));
+  const order = [...controller.matchAll(/^\s{2}(register\w+)\(ctx\);/gm)].map(m => m[1]);
+  ok(order.length >= 15, `controller registers the modules in one block (found ${order.length})`);
+
+  /* Base keys are only what exists BEFORE the register block runs — the ctx
+     literal plus ctx.<k> assignments above it. reloadFromDisk, assigned
+     below the block, is deliberately NOT base: destructuring it at register
+     time would be exactly the bug this check exists to catch. */
+  const preamble = controller.slice(0, controller.indexOf(`${order[0]}(ctx);`));
+  const avail = new Set();
+  const lit = preamble.match(/const ctx = \{([^}]*)\}/);
+  ok(lit, 'controller still builds ctx as one literal');
+  for (const k of lit[1].matchAll(/([A-Za-z_$]\w*)/g)) avail.add(k[1]);
+  for (const k of preamble.matchAll(/ctx\.([A-Za-z_$]\w*)\s*=/g)) avail.add(k[1]);
+
+  const providesByFile = new Map();
+  for (const [key, rel] of provided) {
+    if (!providesByFile.has(rel)) providesByFile.set(rel, new Set());
+    providesByFile.get(rel).add(key);
+  }
+
+  const violations = [];
+  for (const reg of order) {
+    const rel = reqFile.get(reg);
+    ok(rel, `the registrar ${reg} resolves to a required file`);
+    const text = fs.readFileSync(path.join(SRC, rel), 'utf8');
+    /* Only the destructure at the TOP of the register function runs at
+       register time; ones inside handlers are late-bound and order-immune.
+       Anchored to the function opening (comments allowed between) so a
+       nested destructure deeper in the file is not misread as eager. */
+    const dm = text.match(
+      /module\.exports = function \w*\(ctx\) \{\s*(?:\/\*[\s\S]*?\*\/\s*|\/\/[^\n]*\n\s*)*const \{([^}]*)\} = ctx;/);
+    if (dm) {
+      for (const item of dm[1].split(',')) {
+        const key = (item.split(':')[0] || '').trim();
+        if (key && !avail.has(key)) {
+          violations.push(`${rel} destructures ${key} at register time, but nothing has provided it yet`);
+        }
+      }
+    }
+    for (const k of providesByFile.get(rel) || []) avail.add(k);
+  }
+  eq(violations, [],
+    'a register-time destructure must only reach keys that already exist — late-bind through ctx.x() instead');
+}
 
 /* ---- 6. the shell is DOMParser-safe ---- */
 // controller.js mounts via DOMParser (see the header note). A full-document

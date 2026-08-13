@@ -24,6 +24,7 @@ const { safeSeg } = require('./vault-path');
    wizard is the FIRST writer a new user meets; it follows the same rule
    markdown.js enforces for every other frontmatter scalar. */
 const { yamlStr } = require('./markdown');
+const { makeIo } = require('./io');
 
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
@@ -650,22 +651,20 @@ class OnboardingWizard extends Modal {
     return normalizeAmount(this.data.acctBalance) ?? 0;
   }
 
-  /* Write-guard stamped create: skip files that already exist so re-running
-     the wizard (or racing device sync) never overwrites real data. */
+  /* The wizard's writes go through the SAME machinery as everyone else's.
+     These used to be hand-rolled copies of io.js's ensureFolder and
+     `_lastWrite` stamping — the only writes in the app with no containment
+     check, on a folder that comes from a text field. makeIo needs only
+     { vault, plugin }, both of which exist before any view does; the method
+     names stay so call sites don't change. */
+  io() {
+    return makeIo({ vault: this.app.vault, plugin: this.plugin });
+  }
   async writeIfAbsent(path, content) {
-    const vault = this.app.vault;
-    if (vault.getAbstractFileByPath(path)) return;
-    const parent = path.split('/').slice(0, -1).join('/');
-    await this.ensureFolder(parent);
-    this.plugin._lastWrite = Date.now();
-    try { await vault.create(path, content); } catch (e) { /* raced into existence */ }
-    this.plugin._lastWrite = Date.now();
+    await this.io().createVaultFileIfAbsent(path, content);
   }
   async ensureFolder(path) {
-    if (!path || path === '/') return;
-    if (this.app.vault.getAbstractFileByPath(path)) return;
-    await this.ensureFolder(path.split('/').slice(0, -1).join('/'));
-    try { await this.app.vault.createFolder(path); } catch (e) { /* raced into existence */ }
+    await this.io().ensureVaultFolder(path);
   }
 
   async apply() {

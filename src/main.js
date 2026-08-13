@@ -12,6 +12,7 @@
 const { Plugin, TFile, TFolder, Notice, normalizePath } = require('obsidian');
 const { VIEW_TYPE, DEFAULT_SETTINGS } = require('./constants');
 const { parseFrontmatter, patchFrontmatter } = require('./markdown');
+const { makeIo } = require('./io');
 const { defaultLanguage } = require('./i18n');
 const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
@@ -95,10 +96,17 @@ class BudgetPlugin extends Plugin {
     return fm;
   }
   async updateBudgetSettingsMd(key, value) {
-    const path = this.settingsMdPath();
-    const f = this.app.vault.getFileByPath(path);
+    const f = this.app.vault.getFileByPath(this.settingsMdPath());
+    /* One guarded writer for both branches. makeIo's writeFile is rooted at
+       the budget folder ('Settings.md' resolves to settingsMdPath), does the
+       create-or-modify split itself, carries the containment check this
+       method used to lack, and stamps the shared write-guard — which was
+       previously spelled out by hand four times here, where missing one
+       means the watcher reloads over our own write. */
+    const io = makeIo({ vault: this.app.vault, plugin: this });
+    let text;
     if (f) {
-      let text = await this.app.vault.read(f);
+      text = await this.app.vault.read(f);
       /* patchFrontmatter, not a line regex. The line regex this replaced could
          not collapse a BLOCK value: patching `owners:` written as a YAML list
          (`owners:` newline `  - Ruan` — the way a YAML-literate user writes a
@@ -114,20 +122,15 @@ class BudgetPlugin extends Plugin {
       text = m
         ? `---\n${block}\n---` + text.slice(m[0].length)
         : `---\n${block}\n---\n\n` + text;
-      this._lastWrite = Date.now();          // stamp the shared write-guard so
-      await this.app.vault.modify(f, text);  // the watcher treats this as ours
-      this._lastWrite = Date.now();          // (single intentional reloadViews)
     } else {
       // No Settings.md yet — create it with defaults plus the requested key,
       // whatever that key is (country/household included, not just the two
       // defaults).
       const defaults = { month_start_day: '23', currency: 'R', country: 'za', language: defaultLanguage() };
       defaults[key] = value;
-      this._lastWrite = Date.now();
-      await this.app.vault.create(path,
-        '---\n' + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n# Budget Settings\n');
-      this._lastWrite = Date.now();
+      text = '---\n' + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n# Budget Settings\n';
     }
+    await io.writeFile('Settings.md', text);
   }
 
   async loadSettings() {

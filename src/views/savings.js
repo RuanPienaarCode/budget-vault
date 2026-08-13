@@ -15,7 +15,14 @@ const { daysSince } = require('../reconcile');
 let worthSeq = 0;
 
 module.exports = function registerSavings(ctx) {
-  const { S, $, root, money, toast, accountIndex, catType, saveAccount } = ctx;
+  /* saveAccount is deliberately NOT destructured here. It is provided by
+     views/accounts.js, so pulling it out at register time made this the one
+     module whose correctness depended on registration ORDER in controller.js
+     — reorder the register calls and it silently became undefined, throwing
+     only when a user edited a savings balance a screen away from the cause.
+     Every other cross-view call (ctx.editBalance, ctx.editAccount,
+     ctx.noteButton) is late-bound through ctx at call time; this now is too. */
+  const { S, $, root, money, toast, accountIndex, catType } = ctx;
 
   function renderSavings() {
     const savings = S.accounts.filter(a => a.type === 'savings');
@@ -103,7 +110,7 @@ module.exports = function registerSavings(ctx) {
     a.balance = implied;
     a.balanceRaw = null;
     a.balance_updated = todayIso();
-    await saveAccount(a);
+    await ctx.saveAccount(a);
     renderSavings();
     toast(`${a.name} reconciled to ${money(implied)}`);
   }

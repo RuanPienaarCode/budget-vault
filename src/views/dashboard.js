@@ -7,7 +7,7 @@ const { TYPE_ORDER } = require('../constants');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
-const { whatsLeft } = require('../committed');
+const { whatsLeft, isSettleCard } = require('../committed');
 const { todayIso, isoDayNumber, isoFromDayNumber } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
@@ -45,7 +45,7 @@ function sharePercents(amounts) {
 }
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -183,17 +183,25 @@ module.exports = function registerDashboard(ctx) {
        only moving between the reader's own pockets. */
     const skipLabels = nonBudgetLabels();
     /* And a third, for the settle-monthly cards only: their spending this cycle
-       is what gets measured against the income that clears it. Resolved by
-       LABEL because rows carry no account of their own. */
-    const cardLabels = new Set(S.accounts
-      .filter(a => a.settle_monthly && String(a.type || '').trim().toLowerCase() === 'credit_card')
-      .map(a => a.tx_label || a.name));
+       is what gets measured against the income that clears it. Each folder is
+       resolved to its account through accountForLabel — the SAME three-way
+       rule (tx_label, name, safeSeg(name)) accountIndex and reconcile use.
+       A raw `tx_label || name` comparison here missed any card whose name
+       carries a filesystem-illegal character ("Visa/Gold" → folder
+       "Visa-Gold"): its rows were counted by every other consumer but never
+       joined cardRows, so cardSpend read 0, no cycle formed, and `free`
+       subtracted the full card balance — the same card, two different free
+       figures, depending on whether its name survives safeSeg. The card test
+       itself is isSettleCard, the one definition committed.js exports. */
+    const cardAccounts = new Set(S.accounts.filter(isSettleCard));
     const incomeRows = [], cardRows = [];
     for (const f of Object.values(S.txFiles)) {
+      const owner = accountForLabel(f.label);
+      const isCardFolder = owner ? cardAccounts.has(owner) : false;
       for (const r of f.rows) {
         rows.push(r);
         if (!skipLabels.has(f.label)) incomeRows.push(r);
-        if (cardLabels.has(f.label)) cardRows.push(r);
+        if (isCardFolder) cardRows.push(r);
       }
     }
 
@@ -380,16 +388,19 @@ module.exports = function registerDashboard(ctx) {
        cheque account holds with no mention of what is already claimed against
        it, which is how "actually free" came to sit beside five figures of card
        balance and say nothing. */
-    /* Only for a card NOT already in the chain. A card marked `settle_monthly`
-       is subtracted above as its own term, and repeating the same figure here
-       as "not taken off any figure above" would flatly contradict the column
-       that just took it off. The sentence exists for the other case — a card
-       whose balance cannot be placed in this period, so it is disclosed rather
-       than claimed. */
-    if (L.owed > 0 && L.cardDue === 0) {
-      const line = L.owedCards.length === 1
-        ? i18n.t('dash.left.owedCard', { amount: money(L.owed, 0), name: L.owedCards[0] })
-        : i18n.t('dash.left.owedCards', { amount: money(L.owed, 0), count: L.owedCards.length });
+    /* Only for cards NOT already in the chain — per card, not all-or-nothing.
+       A card marked `settle_monthly` is subtracted above as its own term, and
+       repeating that figure here as "not taken off any figure above" would
+       flatly contradict the column that just took it off. But the old gate
+       (`owed > 0 && cardDue === 0`) suppressed the WHOLE sentence the moment
+       any one card was claimed, so in a mixed household the second, revolving
+       card's balance appeared in no figure and no sentence. whatsLeft now
+       derives `owedElse` — the unclaimed remainder — from the very items the
+       chain claimed, and the sentence fires for exactly that remainder. */
+    if (L.owedElse > 0) {
+      const line = L.owedElseCards.length === 1
+        ? i18n.t('dash.left.owedCard', { amount: money(L.owedElse, 0), name: L.owedElseCards[0] })
+        : i18n.t('dash.left.owedCards', { amount: money(L.owedElse, 0), count: L.owedElseCards.length });
       body.append(el('div', { class: 'kpi-caveat-txt left-owed' },
         icoEl(['info', 'alert-circle']), line));
     }

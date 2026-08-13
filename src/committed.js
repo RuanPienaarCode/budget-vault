@@ -64,6 +64,25 @@ const { isSplitPart } = require('./tx-role');
    point. */
 const WHOLE_MONTH_DAYS = 28;
 
+/* THE ONE DEFINITION of a settle-monthly card. Three sites used to spell it
+   three ways — cardCommitments keyed on the flag alone, cardsOwed on the type
+   alone, the cycle guard on both — and money dropped out through the gaps: a
+   `settle_monthly: true` cheque account landed in cardDue (excluded from
+   `free`) while nothing measured its spending against settling income,
+   because its rows could never join cardRows and no cycle could form. One
+   predicate, used everywhere: the flag only means something ON A CREDIT CARD.
+   On anything else it is a no-op and the account keeps its ordinary
+   treatment (an overdrawn cheque account is already visible as the cash it
+   failed to contribute).
+
+   Reads BOTH spellings of the flag deliberately: whatsLeft's callers hand in
+   a mapped shape (`settleMonthly`), while the dashboard resolves transaction
+   folders against the RAW vault account (`settle_monthly`). One function
+   answering both shapes is the point — a second spelling of the rule is how
+   the three definitions happened the first time. */
+const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) &&
+  String(a.type || '').trim().toLowerCase() === 'credit_card';
+
 const day = iso => Number(String(iso).slice(8, 10));
 const median = arr => {
   if (!arr.length) return 0;
@@ -249,7 +268,7 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays }) {
 function cardCommitments({ accounts, from, to }) {
   const out = [];
   for (const a of accounts || []) {
-    if (!a || a.inBudget === false || !a.settleMonthly || !a.dated) continue;
+    if (!isSettleCard(a) || a.inBudget === false || !a.dated) continue;
     const owed = a.implied < 0 ? -a.implied : 0;
     if (!owed) continue;
 
@@ -292,12 +311,19 @@ function cardCommitments({ accounts, from, to }) {
 function cardsOwed(accounts) {
   let owed = 0;
   const cards = [];
+  /* Per-card entries alongside the totals, so whatsLeft can subtract the
+     cards the commitment chain has CLAIMED and disclose the remainder —
+     without re-deriving which accounts are cards under a second rule. */
+  const entries = [];
   for (const a of accounts || []) {
     if (!a || a.inBudget === false || !a.dated) continue;
     if (String(a.type || '').trim().toLowerCase() !== 'credit_card') continue;
-    if (a.implied < 0) { owed += -a.implied; cards.push(a.name); }
+    if (a.implied < 0) {
+      owed += -a.implied; cards.push(a.name);
+      entries.push({ name: a.name, amount: -a.implied });
+    }
   }
-  return { owed, cards };
+  return { owed, cards, entries };
 }
 
 /* ------------------------------ the card -------------------------------- */
@@ -331,7 +357,7 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   const from = now && now > periodStart ? now : periodStart;
 
   const { cash, counted, unknown } = cashOnHand(accounts);
-  const { owed, cards } = cardsOwed(accounts);
+  const { owed, cards, entries: owedEntries } = cardsOwed(accounts);
 
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
   const items = [
@@ -350,6 +376,19 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   const cardDue = items.filter(i => i.kind === 'card').reduce((s, i) => s + i.amount, 0);
   const daysLeft = now ? Math.max(0, daysBetween(now, periodEnd)) : null;
   const committedOther = committed - cardDue;
+
+  /* The owed remainder: card balances the commitment chain did NOT claim.
+     `owed` states every card in full — that stays, per the both-places test.
+     But the VIEW's sentence used to gate on `owed > 0 && cardDue === 0`,
+     which is all-or-nothing where the data is per-card: one settle-monthly
+     card claimed in the chain (cardDue > 0) suppressed the sentence for a
+     SECOND, revolving card, and that card's balance appeared in no figure
+     and no sentence — the exact silent state this disclosure exists to end.
+     Derived from the actual claimed items, not from a second reading of the
+     account list, so the two cannot disagree about which cards were taken. */
+  const claimedCards = new Set(items.filter(i => i.kind === 'card').map(i => i.name));
+  const owedElseEntries = owedEntries.filter(e => !claimedCards.has(e.name));
+  const owedElse = owedElseEntries.reduce((s, e) => s + e.amount, 0);
 
   /* What is due to LAND before this period ends, when the vault can prove it.
      Only ever from repeating credits the rows themselves establish — see
@@ -397,8 +436,7 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
      "headroom before the 23rd" would be the most dangerous sentence this card
      could print. Leaving that guarantee in the caller is how the two drift:
      whatsLeft would report a cycle for any rows it was handed. */
-  const settlesMonthly = (accounts || []).some(a => a && a.settleMonthly &&
-    a.inBudget !== false && String(a.type || '').trim().toLowerCase() === 'credit_card');
+  const settlesMonthly = (accounts || []).some(a => isSettleCard(a) && a.inBudget !== false);
   const cycle = (settlesMonthly && cardSpend > 0 && settling) ? {
     spend: cardSpend,
     settling: settling.amount,
@@ -450,6 +488,11 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
        cash, committed and free are all unchanged by this. */
     owed,
     owedCards: cards,
+    /* The unclaimed remainder — what the view's sentence should disclose.
+       A card the chain claimed already has its own line in `items`; this is
+       every card balance that would otherwise be nowhere on screen. */
+    owedElse,
+    owedElseCards: owedElseEntries.map(e => e.name),
     committed,
     items,
     free,
@@ -474,6 +517,6 @@ function daysBetween(a, b) {
 }
 
 module.exports = {
-  WHOLE_MONTH_DAYS, nextOnDay,
+  WHOLE_MONTH_DAYS, nextOnDay, isSettleCard,
   cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
 };

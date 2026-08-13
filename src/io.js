@@ -1,13 +1,23 @@
 'use strict';
 /* Vault file access, rooted at the configured budget folder. All paths given
    to these helpers are relative to that folder. Tracks the time of our own
-   writes so the change-watcher can tell them apart from external edits. */
+   writes so the change-watcher can tell them apart from external edits.
+
+   A FACTORY plus a thin registrar, not a closure over a view ctx. The guards
+   here only protect writers who can reach them, and two writers cannot go
+   through a mounted view: the onboarding wizard and main.js's Settings.md
+   updater both run before any view exists. As a ctx closure they each
+   reimplemented ensureFolder and the `_lastWrite` stamping by hand (three
+   copies of one, five hand-spelled stamps of the other — miss one and the
+   watcher reloads over the wizard mid-run), and the wizard's writes were the
+   only ones in the app with no containment check at all, on a folder that
+   comes from a text field. makeIo needs only { vault, plugin }, which both
+   boot-time writers already hold. */
 
 const { normalizePath, TFile, TFolder } = require('obsidian');
 const { collapsePath } = require('./vault-path');
 
-module.exports = function registerIo(ctx) {
-  const { vault, plugin } = ctx;
+function makeIo({ vault, plugin }) {
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
   // outside the view — the Settings.md updater in main.js — can stamp it too and
   // be recognised as our own, suppressing a redundant watcher reload.
@@ -68,6 +78,26 @@ module.exports = function registerIo(ctx) {
     }
     stampWrite();
     return path;
+  }
+  /* The wizard's sibling of writeVaultFile: same vault-ring containment, same
+     write-guard stamping, but SKIPS a file that already exists — re-running
+     the wizard (or racing device sync) must never overwrite real data. Same
+     ring as writeVaultFile because the wizard's folder is typed by the person
+     sitting there, not built from synced data. Returns whether it wrote. */
+  async function createVaultFileIfAbsent(rel, content) {
+    const path = guardedVaultPath(rel);
+    if (vault.getAbstractFileByPath(path)) return false;
+    stampWrite();
+    await ensureFolder(path.split('/').slice(0, -1).join('/'));
+    try { await vault.create(path, content); } catch (e) { /* raced into existence */ }
+    stampWrite();
+    return true;
+  }
+  /* Guarded folder creation for user-named destinations (the wizard's
+     scaffold). ensureFolder itself stays unguarded because every existing
+     caller hands it a path that already passed a guard. */
+  async function ensureVaultFolder(rel) {
+    await ensureFolder(guardedVaultPath(rel));
   }
   async function writeFile(rel, content) {
     const path = guardedPath(rel);
@@ -132,8 +162,16 @@ module.exports = function registerIo(ctx) {
     return f.children.filter(c => c instanceof TFolder);
   }
 
-  ctx.provide({
+  return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, fileAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
+    createVaultFileIfAbsent, ensureVaultFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
-  });
-};
+  };
+}
+
+function registerIo(ctx) {
+  ctx.provide(makeIo(ctx));
+}
+
+module.exports = registerIo;
+module.exports.makeIo = makeIo;

@@ -921,5 +921,43 @@ async function mount(files, period = '2026-07') {
       'no drift, no drift sentence');
   }
 
+  /* --------- a card whose NAME does not survive safeSeg still cycles -------
+     The settlement-cycle rows used to be collected by comparing each folder
+     label against raw `tx_label || name`. But the plugin itself stores an
+     account's transactions under safeSeg(name) — "Visa: Gold" writes to
+     Transactions/Visa- Gold/ — so a settle-monthly card with a filesystem-
+     illegal character in its name had its rows counted by accountIndex and
+     reconcile while NEVER joining cardRows: cardSpend read 0, no cycle
+     formed, and `free` subtracted the full card balance instead of the cycle
+     treatment. Same card, two different free figures, decided by a character
+     in its name. The folder is now resolved through accountForLabel — the
+     same three-way door every other consumer uses. */
+  await atDate('2026-07-15', async () => {
+    const CYCLE_VAULT = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS,
+      [`${B}/Accounts/Cheque.md`]:
+        '---\ntype: checking\ntx_label: "Cheque"\nbalance: 9000\nbalance_updated: 2026-07-14\n---\n',
+      [`${B}/Accounts/Visa: Gold.md`]:
+        '---\ntype: credit_card\nsettle_monthly: true\nbalance: -2500\nbalance_updated: 2026-07-14\n---\n',
+      /* Three paydays, so findRecurringCredit can prove the settling income. */
+      [`${B}/Transactions/Cheque/2026-04.md`]: txFile([['2026-04-25', 'Payday', 'Salary', 20000]]),
+      [`${B}/Transactions/Cheque/2026-05.md`]: txFile([['2026-05-25', 'Payday', 'Salary', 20000]]),
+      [`${B}/Transactions/Cheque/2026-06.md`]: txFile([['2026-06-25', 'Payday', 'Salary', 20000]]),
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([['2026-07-03', 'Woolworths', 'Groceries', -700]]),
+      /* The card's own folder, exactly where the plugin writes it. */
+      [`${B}/Transactions/Visa- Gold/2026-07.md`]: txFile([
+        ['2026-07-05', 'Woolworths', 'Groceries', -1500],
+        ['2026-07-09', 'Uber', 'Transport', -1000],
+      ]),
+    };
+    const { ctx, nodes } = await mount(CYCLE_VAULT);
+    ctx.renderDashboard();
+    ok(has(nodes.get('leftBody'), 'left-cycle'),
+      'the cycle band forms — the renamed-on-disk folder still reaches cardRows');
+    const band = all(nodes.get('leftBody'), e => e._cls.has('left-cycle'))[0];
+    ok(/2500/.test(band.textContent.replace(/[\s,.  ]/g, '')),
+      `the band measures the card's OWN spending (R2 500), not zero — got "${band.textContent}"`);
+  });
+
   console.log(`PASS — dashboard cards fail independently, the donut declares what it hides, the position band ignores the period, the comparison column measures spending rather than the date, and six figures that read wrong now agree with each other (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

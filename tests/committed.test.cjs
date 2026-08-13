@@ -14,7 +14,7 @@
 
 const assert = require('assert');
 const {
-  WHOLE_MONTH_DAYS, nextOnDay,
+  WHOLE_MONTH_DAYS, nextOnDay, isSettleCard,
   cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
 } = require('../src/committed');
 
@@ -219,6 +219,74 @@ const paidHistory = [
   eq(L.committed, 8874, 'settled monthly: it is a commitment');
   eq(L.owed, 8874, 'and the owed line still states it');
   eq(L.free, 1874, 'free counts it ONCE, through committed');
+  eq(L.owedElse, 0, 'a card the chain claimed leaves NO unclaimed remainder — the sentence stays silent');
+}
+{
+  /* THE MIXED HOUSEHOLD — the case the old view gate got wrong. One card is
+     settled monthly and claimed by the chain (cardDue > 0); the second is
+     revolved. The view used to gate its sentence on `owed > 0 && cardDue
+     === 0`, all-or-nothing where the data is per-card, so the revolving
+     card's R8 000 appeared in no figure and no sentence — the exact silent
+     state the disclosure exists to end. `owedElse` is the per-card remainder:
+     derived from the items the chain actually claimed, so the two cannot
+     disagree about which cards were taken. */
+  const L = whatsLeft({
+    accounts: [
+      { name: 'Cheque', implied: 30000, dated: true, inBudget: true, type: 'checking' },
+      { name: 'Settle Card', implied: -17000, dated: true, inBudget: true, type: 'credit_card', settleMonthly: true },
+      { name: 'Revolver', implied: -8000, dated: true, inBudget: true, type: 'credit_card' },
+    ],
+    services: [], debts: [], rows: [], periodStart: P_START, periodEnd: P_END, today: TODAY,
+  });
+  eq(L.cardDue, 17000, 'the settled card is claimed by the chain');
+  eq(L.owed, 25000, 'owed still states every card in full');
+  eq(L.owedElse, 8000, 'the unclaimed remainder is the revolving card alone');
+  eq(L.owedElseCards, ['Revolver'], 'and it is named, so the sentence can say WHOSE balance this is');
+}
+{
+  /* A settle-monthly card whose settle day falls AFTER the period ends is not
+     claimed by the chain ("not this period's problem") — so it must surface
+     in the remainder instead. Claimed nowhere and disclosed nowhere was the
+     bug; unclaimed but disclosed is the contract. */
+  const L = whatsLeft({
+    accounts: [
+      { name: 'Cheque', implied: 5000, dated: true, inBudget: true, type: 'checking' },
+      { name: 'Late Card', implied: -3000, dated: true, inBudget: true,
+        type: 'credit_card', settleMonthly: true, settleDay: 28 },
+    ],
+    services: [], debts: [], rows: [], periodStart: P_START, periodEnd: '2026-08-25', today: TODAY,
+  });
+  eq(L.cardDue, 0, 'a settlement after period end is not claimed');
+  eq(L.owedElse, 3000, 'so the balance is disclosed as the remainder instead');
+}
+
+/* ---- 5c. ONE definition of a settle-monthly card ---- */
+{
+  /* Three sites used to spell the rule three ways — cardCommitments keyed on
+     the flag alone, cardsOwed on the type alone, the cycle guard on both —
+     and a `settle_monthly: true` CHEQUE account fell through the gap: it
+     landed in cardDue (excluded from free) while its rows could never join
+     cardRows and no cycle could form, so money dropped out of the arithmetic.
+     The flag now only means something on a credit card; on anything else it
+     is a no-op and the account keeps the ordinary overdrawn treatment
+     ("already visible as the cash it did not contribute"). */
+  const flaggedCheque = { name: 'Flagged Cheque', implied: -5000, dated: true,
+    inBudget: true, type: 'cheque', settleMonthly: true };
+  eq(cardCommitments({ accounts: [flaggedCheque], from: TODAY, to: P_END }), [],
+    'settle_monthly on a non-card claims no commitment');
+  const L = whatsLeft({
+    accounts: [{ name: 'Cheque', implied: 10000, dated: true, inBudget: true, type: 'checking' }, flaggedCheque],
+    services: [], debts: [], rows: [], periodStart: P_START, periodEnd: P_END, today: TODAY,
+  });
+  eq(L.cardDue, 0, 'nothing lands in cardDue for it');
+  eq(L.owed, 0, 'and it is not a card, so the owed sentence stays out of it too');
+  eq(L.free, 10000, 'free is untouched — the ordinary overdrawn-account treatment applies');
+
+  ok(!isSettleCard(flaggedCheque), 'the one predicate refuses a flagged non-card');
+  ok(isSettleCard({ type: 'credit_card', settleMonthly: true }), 'and accepts the mapped spelling');
+  ok(isSettleCard({ type: 'credit_card', settle_monthly: true }),
+    'and the raw vault spelling — the dashboard resolves folders against raw accounts');
+  ok(!isSettleCard({ type: 'credit_card' }), 'an unflagged card is not settle-monthly');
 }
 
 /* ---- 5b. RULE 8: a card settled in full is a commitment ---- */
