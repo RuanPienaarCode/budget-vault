@@ -16,9 +16,12 @@
    Runs in bare node via a tiny `obsidian` stub. Wired into ./build.sh.
      node tests/serializer-roundtrip.test.cjs        # non-zero exit on failure
 
-   NOTE: `loadTxRows` below mirrors src/load.js's transaction column mapping
-   (indices 0..5). If you change a serializer column OR the loader mapping,
-   update BOTH the source and this helper — that's the parity this test guards. */
+   NOTE: `loadTxRows` below parses with SCHEMAS.transactions — the same
+   declaration src/load.js reads with and serializeTxFile writes with
+   (table-schema.js, ADR-0003). It used to be a hand-written MIRROR of the
+   loader's column mapping, which is the exact anti-pattern CLAUDE.md warns
+   about: a test that stays green while load.js changes and every subsequent
+   save corrupts data. There is nothing left to keep in sync. */
 
 const assert = require('assert');
 const Module = require('module');
@@ -63,39 +66,33 @@ for (const n of [-123.45, 0, 1000, -0.01, 999999.99, 42]) {
   eq(p.value, n, `parseNum value must equal ${n}`);
 }
 
-/* ---- 3. REAL serializeTxFile → loader parse → field-for-field equality ---- */
-// NOTE: this file guards the serializer against a MIRROR of the loader (below).
-// tests/vault-roundtrip.test.cjs drives the real loadVault instead and is the
-// stronger guarantee; this one stays for the focused escaping/amount cases.
+/* ---- 3. REAL serializeTxFile → schema parse → field-for-field equality ---- */
+// tests/vault-roundtrip.test.cjs drives the real loadVault end-to-end and is
+// the stronger guarantee; this one stays for the focused escaping/amount cases.
 const ctx = { S: {}, registerDirty() {}, registerSaveButton: () => () => {}, provide(o) { Object.assign(ctx, o); } };
 registerTransactions(ctx);                 // no calls at register time; only defines fns
 const { serializeTxFile } = ctx;
 ok(typeof serializeTxFile === 'function', 'serializeTxFile must be exposed on ctx');
 
-// Mirror of src/load.js transaction row mapping (columns 0..5). Keep in sync.
+const { SCHEMAS, rowToObject } = require('../src/table-schema');
+
+// The shipped mapping itself, not a copy of it: exactly what load.js does
+// with a transaction row.
 function loadTxRows(text) {
-  const rows = parseMdTable(text);
-  return rows.slice(1).map((c) => {
-    const amt = parseNum(c[3]);
-    return {
-      date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]),
-      amount: amt.value, amountRaw: amt.ok ? null : amt.raw,
-      excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || ''),
-    };
-  });
+  return parseMdTable(text).slice(1).map((c) => rowToObject(SCHEMAS.transactions, c));
 }
 
 const rows = [
-  { date: '2026-07-01', desc: 'Woolworths Gardens', cat: 'Groceries', amount: -249.99, amountRaw: null, excluded: false, note: '' },
-  { date: '2026-07-02', desc: 'PnP | Sandton City', cat: 'Groceries', amount: -1000, amountRaw: null, excluded: false, note: 'split | over two cards' },
-  { date: '2026-07-03', desc: 'Salary', cat: 'Income', amount: 42000.5, amountRaw: null, excluded: false, note: 'multi\nline note' },
-  { date: '2026-07-04', desc: 'Transfer to savings', cat: 'Transfer between accounts', amount: -500, amountRaw: null, excluded: true, note: 'excluded' },
-  { date: '2026-07-05', desc: 'café ¥ 个人所得税', cat: '', amount: 0, amountRaw: null, excluded: false, note: '' },
+  { date: '2026-07-01', desc: 'Woolworths Gardens', cat: 'Groceries', amount: -249.99, amountRaw: null, excluded: false, note: '', split: '' },
+  { date: '2026-07-02', desc: 'PnP | Sandton City', cat: 'Groceries', amount: -1000, amountRaw: null, excluded: false, note: 'split | over two cards', split: '' },
+  { date: '2026-07-03', desc: 'Salary', cat: 'Income', amount: 42000.5, amountRaw: null, excluded: false, note: 'multi\nline note', split: '' },
+  { date: '2026-07-04', desc: 'Transfer to savings', cat: 'Transfer between accounts', amount: -500, amountRaw: null, excluded: true, note: 'excluded', split: '' },
+  { date: '2026-07-05', desc: 'café ¥ 个人所得税', cat: '', amount: 0, amountRaw: null, excluded: false, note: '', split: '' },
   // Non-strict amount cell (hand-edited "1 234,56") must survive byte-for-byte
   // via amountRaw. `amount` is the reader's interpretation of that cell and is
   // NOT written back — it was parseFloat's 1 until parseNum learned to defer to
   // normalizeAmount, which reads the decimal comma correctly.
-  { date: '2026-07-06', desc: 'Legacy row', cat: 'Bank fees', amount: 1234.56, amountRaw: '1 234,56', excluded: false, note: '' },
+  { date: '2026-07-06', desc: 'Legacy row', cat: 'Bank fees', amount: 1234.56, amountRaw: '1 234,56', excluded: false, note: '', split: '' },
 ];
 
 // serializeTxFile sorts f.rows in place; feed a clone and compare order-independently.

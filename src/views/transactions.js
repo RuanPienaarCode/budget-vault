@@ -4,7 +4,8 @@
 
 const { el, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
+const { patchFrontmatter, yamlStr } = require('../markdown');
+const { SCHEMAS, headerLines, rowLine } = require('../table-schema');
 const { csvCell } = require('../csv');
 const { askFields, askSplit } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
@@ -247,25 +248,20 @@ module.exports = function registerTransactions(ctx) {
        month of every account, in a folder the user reads and syncs, to record
        nothing. A file with no split keeps the exact six-column shape it has
        always had. */
-    // splitRole, not the raw value: the loader accepts only the two known roles,
-    // so writing anything else would put a cell on disk that vanishes on the
-    // next load — a write that does not round-trip. It also means the cell can
-    // never need escaping, because there are only ever two strings it can hold.
-    const roleOf = r => splitRole(r.split);
-    const hasSplit = f.rows.some(r => roleOf(r));
-    const lines = ['---', fm, '---', '',
-      hasSplit
-        ? '| Date | Description | Category | Amount | Excluded | Note | Split |'
-        : '| Date | Description | Category | Amount | Excluded | Note |',
-      hasSplit
-        ? '|------|-------------|----------|-------:|----------|------|-------|'
-        : '|------|-------------|----------|-------:|----------|------|'];
+    /* Escaping, number formatting and the splitRole write (only two strings
+       can ever occupy that cell, so writes always round-trip) live in the
+       schema's column declarations — the same ones the loader reads with
+       (table-schema.js, ADR-0003). This file keeps its own document shape:
+       patched frontmatter, no title, no prose, so it consumes only the line
+       builders rather than mdTableFile. A never-split file keeps the exact
+       six-column shape it has always had by slicing the schema, not by
+       hand-writing a second header. */
+    const hasSplit = f.rows.some(r => splitRole(r.split));
+    const schema = hasSplit ? SCHEMAS.transactions
+      : { ...SCHEMAS.transactions, columns: SCHEMAS.transactions.columns.slice(0, 6) };
+    const lines = ['---', fm, '---', '', ...headerLines(schema)];
     f.rows.sort((a, b) => a.date.localeCompare(b.date));
-    for (const r of f.rows) {
-      const amt = r.amountRaw != null ? r.amountRaw : r.amount.toFixed(2);
-      const cells = `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.cat)} | ${amt} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} |`;
-      lines.push(hasSplit ? `${cells} ${roleOf(r)} |` : cells);
-    }
+    for (const r of f.rows) lines.push(rowLine(schema, r));
     lines.push('');
     return lines.join('\n');
   }

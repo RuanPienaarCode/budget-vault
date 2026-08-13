@@ -14,7 +14,6 @@ const { SCHEMAS, rowToObject } = require('./table-schema');
 const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
-const { splitRole } = require('./tx-role');
 const { parseOwners } = require('./owners');
 const { NOTES_DIR, parseNote, sortNotes } = require('./note-file');
 
@@ -278,18 +277,12 @@ module.exports = function registerLoad(ctx) {
       const rows = parseMdTable(text);
       S.txFiles[`${acct.name}/${month}`] = {
         label: acct.name, month, dirty: false, fmRaw: raw,
-        rows: rows.slice(1).map(c => {
-          const amt = parseNum(c[3]);
-          /* c[6] is the Split column, added after these files started being
-             written — absent on every row of every file that predates it,
-             which splitRole reads as '' exactly as it reads a blank cell. That
-             is what makes this column safe to append to a positional parser:
-             a short row yields undefined rather than shifting anything. */
-          return { date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]),
-            amount: amt.value, amountRaw: amt.ok ? null : amt.raw,
-            excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || ''),
-            split: splitRole(c[6]) };
-        }),
+        /* The Split column was added after these files started being written —
+           absent on every row of every file that predates it, which the
+           schema's read yields as '' exactly as it reads a blank cell. The
+           truncation sweep in tests/table-schema-guards.test.cjs holds that
+           property for every column, current and future. */
+        rows: rows.slice(1).map(c => rowToObject(SCHEMAS.transactions, c)),
       };
     });
 
