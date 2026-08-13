@@ -3,6 +3,54 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.17.1 — 2026-08-13
+
+Phase one of a four-lane audit (logic, design, security, iOS) of 1.17.0.
+Nothing here changes what the app is for; everything here closes a way it
+could have been silently wrong or silently stuck.
+
+### Fixed
+
+- **Reloading twice no longer doubles your figures.** Tapping the drawer's
+  reload link again while a slow load was still running (an iCloud vault
+  materialising files takes a moment) ran two loads at once, and every
+  category, account, debt, asset and owed entry landed twice — the totals
+  doubled until the next clean reload. A load already in progress is now
+  joined instead of restarted.
+
+- **Writing a setting can no longer blank the settings tab.** If `owners:` in
+  Settings.md was hand-written as a YAML list, the plugin's own settings
+  writer broke the file's frontmatter in a way Obsidian responds to by
+  dropping *every* property on the file — the plugin kept working, the
+  settings tab went blank, and the broken file synced to every device.
+  Settings.md is now patched by the same frontmatter writer every other file
+  uses, which folds a list value into a scalar instead of orphaning it.
+
+- **The setup wizard quotes what you type.** A quote, backslash or colon in a
+  household name, currency symbol, or bank name was written into frontmatter
+  either half-escaped or not quoted at all — the same silent property-drop as
+  above, on the very first files a new user creates. The wizard now uses the
+  one escaping rule the rest of the app already follows.
+
+- **A category colour must be a colour.** The dashboard legend renders each
+  category's `color:` value straight into its swatch, and anything trailing a
+  valid-looking `rgb(…)` prefix rode along with it — a crafted value in a
+  synced vault could restyle the whole pane. Anything that is not entirely a
+  colour now falls back to the palette.
+
+- **A malformed bank statement can no longer freeze the import.** Rule
+  learning re-scanned the whole description once per trimmed token, so one
+  absurdly long description cell (hundreds of kilobytes) cost seconds of
+  frozen screen — and a file can contain fifty of them. Descriptions are
+  capped at 512 characters before learning; no real bank prints one longer,
+  and learned rules match exactly as before.
+
+### Internal
+
+- The savings-growth guard test read the real clock and went red on
+  2026-08-13 by itself, blocking every build. It now pins its date the way
+  the dashboard tests always have. New guard tests pin all five fixes above.
+
 ## 1.17.0 — 2026-08-12
 
 ### Added
