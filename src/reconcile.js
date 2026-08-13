@@ -22,7 +22,7 @@
    local-vs-UTC "today" does its damage: the value is compared against statement
    dates to decide which rows land after the balance was last confirmed, so an
    hour's drift silently misfiles a day's transactions. */
-const { ISO_DATE, todayIso } = require('./dates');
+const { ISO_DATE, todayIso, isRealIsoDate, daysBetween: isoDaysBetween } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
 
 /* A balance nobody has confirmed in this long is treated as unverified. Long
@@ -31,14 +31,18 @@ const { supersededBySplit } = require('./tx-role');
 const STALE_DAYS = 30;
 
 /* Whole days between an ISO date and today, or null if the value isn't a date
-   this can reason about (blank, or a hand-typed "end of June"). */
+   this can reason about (blank, or a hand-typed "end of June"). dates.js owns
+   the counting; isRealIsoDate is the realness check kept at this boundary — a
+   shape-valid but impossible balance_updated (2026-13-45) must still be
+   refused, not silently rolled forward a day-number library would accept.
+   The wall-clock fallback stays here too, deliberately: `today` is normally
+   injected so a test that reads the clock doesn't pass in June and fail in
+   July, but a live reconciliation still needs an answer when nobody passed
+   one in. */
 function daysSince(iso, today) {
-  if (!ISO_DATE.test(iso || '')) return null;
-  const then = new Date(`${iso}T00:00:00`);
-  if (isNaN(then.getTime())) return null;
-  const now = ISO_DATE.test(today || '') ? new Date(`${today}T00:00:00`) : new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.round((now.getTime() - then.getTime()) / 86400000);
+  if (!isRealIsoDate(iso)) return null;
+  const now = isRealIsoDate(today) ? today : todayIso();
+  return isoDaysBetween(iso, now);
 }
 
 /* Is a stated figure old enough to stop trusting? `null` (never confirmed, or

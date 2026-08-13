@@ -45,6 +45,22 @@ function isoDayNumber(iso) {
   return Math.round(Date.UTC(y, m - 1, d) / 86400000);
 }
 
+/* Whole days from a to b, counted the same way isoDayNumber counts — UTC, so
+   a local-time DST shift cannot round a day away. Both must be date-SHAPED
+   ISO strings (isRealIsoDate is the caller's job, not this one's); returns
+   null when either isn't, so a caller in a loop doesn't have to test twice.
+
+   What null BECOMES — 0, a thrown state, a fall back to the wall clock — is
+   not this function's decision. committed.js, savings-math.js and
+   reconcile.js each had their own copy of this arithmetic with a different
+   answer to that question baked in (0, null, and "assume now" respectively);
+   this is the one copy of the counting, with the policy left at each call
+   site where it was already deliberate. */
+function daysBetween(aIso, bIso) {
+  if (!ISO_DATE.test(aIso || '') || !ISO_DATE.test(bIso || '')) return null;
+  return isoDayNumber(bIso) - isoDayNumber(aIso);
+}
+
 /* The inverse: a UTC day number back to YYYY-MM-DD. UTC getters, to undo
    exactly what isoDayNumber did — reading a day number with local getters
    would shift the result by a day for anyone west of Greenwich. */
@@ -83,5 +99,5 @@ function periodDaysOrZero(v) {
   if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS) return 0;
   return n;
 }
-module.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero };
+module.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero, daysBetween };
 

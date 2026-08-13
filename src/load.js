@@ -25,6 +25,20 @@ function fmNum(v) {
   return s ? normalizeAmount(s) : null;
 }
 
+/* Slice a body by `## Heading` into the chunk under one heading, lower-cased
+   and matched by prefix. Plans and Tax each hold several tables in one file (a
+   plan, or a tax year, is read as one thing) and parseMdTable reads every
+   table row it's handed, so it would run them together into one malformed
+   list without this cut first. One definition for both — it was written out
+   twice, character for character, and a heading typo fixed in one copy would
+   silently not be fixed in the other. */
+function section(body, name) {
+  for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
+    if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
+  }
+  return '';
+}
+
 /* An optional BOOLEAN frontmatter key, tri-state for the same reason fmNum is:
    absent → undefined ("not set, decide by the default"), written → true/false.
    Collapsing absent to false would turn every account in every existing vault
@@ -374,12 +388,6 @@ module.exports = function registerLoad(ctx) {
     S.plans = {}; S.planDirty = false;
     for (const { file: f, text } of await read(mdFilesIn('Plans'))) {
       const { fm, raw, body } = parseFrontmatter(text);
-      const section = (name) => {
-        for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
-          if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
-        }
-        return '';
-      };
       /* Every status falls back rather than throwing, the same way stepStatus
          does below: these files are hand-editable, and a typo in one cell must
          not cost the reader the other forty rows. */
@@ -405,17 +413,17 @@ module.exports = function registerLoad(ctx) {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         started: (fm.started || '').toString().trim(),
         status: (fm.status || 'active').toString().trim(),
-        sources: parseMdTable(section('money in')).slice(1).filter(c => c[0]).map(c => ({
+        sources: parseMdTable(section(body, 'money in')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), amount: amt(c[2]),
           date: (c[3] || '').trim(), status: srcStatus(c[4]), notes: unescMd(c[5] || ''),
         })),
         // Tint is written back verbatim so a hand-picked colour survives, and
         // an absent one renders as no wash rather than as the string "".
-        envelopes: parseMdTable(section('envelopes')).slice(1).filter(c => c[0]).map(c => ({
+        envelopes: parseMdTable(section(body, 'envelopes')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), amount: amt(c[1]), note: unescMd(c[2] || ''),
           tint: (c[3] || '').trim(),
         })),
-        items: parseMdTable(section('items')).slice(1).filter(c => c[0]).map(c => ({
+        items: parseMdTable(section(body, 'items')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), envelope: unescMd(c[1] || ''), amount: amt(c[2]),
           spent: amt(c[3]), status: itemStatus(c[4]),
           category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
@@ -432,12 +440,6 @@ module.exports = function registerLoad(ctx) {
       // The body holds three tables under "## Progress", "## Documents" and
       // "## Figures". parseMdTable reads every table row in the text it's
       // given, so slice the body by heading first and parse each on its own.
-      const section = (name) => {
-        for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
-          if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
-        }
-        return '';
-      };
       const stepStatus = s => {
         const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
         return ['todo', 'busy', 'done', 'n/a', 'na'].includes(t) ? (t === 'na' ? 'n/a' : t) : 'todo';
@@ -471,16 +473,16 @@ module.exports = function registerLoad(ctx) {
         assessment_ref: fm.assessment_ref || '',
         assessment_result: signedNum(fm.assessment_result),
         assessment_income: signedNum(fm.assessment_income),
-        steps: parseMdTable(section('progress')).slice(1).filter(c => c[0]).map(c => ({
+        steps: parseMdTable(section(body, 'progress')).slice(1).filter(c => c[0]).map(c => ({
           step: unescMd(c[0]), status: stepStatus(c[1]), due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
         })),
-        docs: parseMdTable(section('documents')).slice(1).filter(c => c[0]).map(c => ({
+        docs: parseMdTable(section(body, 'documents')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), source: unescMd(c[1] || ''), status: docStatus(c[2]),
           file: unescMd(c[3] || ''), notes: unescMd(c[4] || ''),
         })),
         // Absent on every page written before the Figures table existed — an
         // empty list keeps those loading unchanged.
-        figures: parseMdTable(section('figures')).slice(1).filter(c => c[0]).map(c => ({
+        figures: parseMdTable(section(body, 'figures')).slice(1).filter(c => c[0]).map(c => ({
           code: unescMd(c[0]), description: unescMd(c[1] || ''),
           source: unescMd(c[2] || ''), amount: figAmount(c[3]),
         })),

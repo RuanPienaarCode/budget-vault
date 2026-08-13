@@ -52,7 +52,7 @@
    Pure — no DOM, no obsidian import — so tests/committed.test.cjs drives it in
    bare node, and `today` is injected rather than read off the clock. */
 
-const { ISO_DATE } = require('./dates');
+const { ISO_DATE, daysBetween: isoDaysBetween } = require('./dates');
 const { matchCharges, chargeStats, nextExpected, findRecurringCredit } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
 
@@ -517,13 +517,12 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   };
 }
 
-/* Whole days from a to b. Both are ISO dates the caller has already validated;
-   built on UTC so a local-time DST shift cannot round a day away. */
+/* Whole days from a to b. dates.js owns the UTC counting; this module's own
+   policy is the 0 on an unusable date — a window this can't measure reads as
+   no days rather than as an error the caller has to guard against. */
 function daysBetween(a, b) {
-  if (!ISO_DATE.test(a || '') || !ISO_DATE.test(b || '')) return 0;
-  const [ay, am, ad] = a.split('-').map(Number);
-  const [by, bm, bd] = b.split('-').map(Number);
-  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+  const n = isoDaysBetween(a, b);
+  return n === null ? 0 : n;
 }
 
 module.exports = {

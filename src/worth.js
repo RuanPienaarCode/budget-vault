@@ -97,18 +97,26 @@ function cardOverlap(accounts, debts) {
     : null;
 }
 
-/* Debt-page rows grouped by their own type, largest first, so a bond and a car
-   loan are tellable apart in the chart rather than merged into one anonymous
-   block. Zero and negative balances are dropped — a segment of no width is
-   noise in the legend. */
-function debtsByType(debts) {
+/* Grouped by TYPE, largest first, so a bond and a car loan (or a house and a
+   car) are tellable apart in the chart rather than merged into one anonymous
+   block. Zero and negative amounts are dropped — a segment of no width is
+   noise in the legend. `debtsByType` and `assetsByType` below are this same
+   grouping over a different value key on a different list; kept as one
+   function so the drop rule and the sort cannot drift between the two. */
+function groupedByType(rows, valueOf) {
   const byType = new Map();
-  for (const d of activeDebts(debts)) {
-    if (!(d.balance > 0)) continue;
-    const k = (d.type || '').trim() || 'other';
-    byType.set(k, (byType.get(k) || 0) + d.balance);
+  for (const r of rows || []) {
+    const v = valueOf(r);
+    if (!(v > 0)) continue;
+    const k = (r.type || '').trim() || 'other';
+    byType.set(k, (byType.get(k) || 0) + v);
   }
   return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+}
+
+/* Debt-page rows grouped by their own type. */
+function debtsByType(debts) {
+  return groupedByType(activeDebts(debts), d => d.balance);
 }
 
 /* Every account, grouped for the composition chart, split by SIGN — the known
@@ -158,15 +166,9 @@ function accountGroups(accounts, knownTypes) {
 
 /* The same grouping for the owned side, so the house, the car and the ring are
    three named blocks in the chart rather than one anonymous "possessions"
-   slab. Zero and negative values drop for the same reason they do above. */
+   slab. */
 function assetsByType(assets) {
-  const byType = new Map();
-  for (const a of assets || []) {
-    if (!(a.value > 0)) continue;
-    const k = (a.type || '').trim() || 'other';
-    byType.set(k, (byType.get(k) || 0) + a.value);
-  }
-  return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
+  return groupedByType(assets, a => a.value);
 }
 
 module.exports = {

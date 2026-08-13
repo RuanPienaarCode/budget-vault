@@ -37,6 +37,13 @@ const { supersededBySplit } = require('../tx-role');
    same page it had before the key existed. */
 const { ownerKey, ownerLabel, ownerOptions, netByOwner } = require('../owners');
 const { ISO_DATE, todayIso } = require('../dates');
+/* worth.js owns the by-sign asset/liability split and the -0 collapse a
+   break-even household's float remainder needs — see worth.js for why a raw
+   `net < 0` there once rendered a solvent household as "-R0.00". Called here
+   with no debts/assets so it reduces to the accounts-only split this hero
+   wants, the same call dashboard.js and savings.js make for the vault-wide
+   figure. */
+const { worth } = require('../worth');
 
 /* Shared with views/dashboard.js — see share-percents.js for why a ring's
    percentage column is allocated by largest remainder, never rounded per
@@ -488,12 +495,12 @@ module.exports = function registerAccounts(ctx) {
     wrap.empty();
 
     /* By the SIGN of the balance rather than by account type: a credit card in
-       credit is not a liability, and an overdrawn cheque account is one. */
-    let assets = 0, liabilities = 0;
-    for (const a of S.accounts) {
-      if (a.balance >= 0) assets += a.balance; else liabilities += -a.balance;
-    }
-    const net = assets - liabilities;
+       credit is not a liability, and an overdrawn cheque account is one. No
+       debts/assets pages passed in — this hero is the accounts-only figure,
+       and the `elsewhere` caveat below is what tells the reader when those
+       pages hold more. */
+    const w = worth(S.accounts, null, null);
+    const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     const attention = rows.filter(wantsALook).length;
     const oldest = rows.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
 
