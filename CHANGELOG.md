@@ -3,6 +3,48 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.17.2 — 2026-08-13
+
+Phase two of the four-lane audit: the credit-card rules on the "What's left"
+card now agree with each other, and every write goes through one guarded door.
+
+### Fixed
+
+- **A second card is no longer silently ignored.** If one card was settled
+  monthly and counted in the committed chain, the "owed on cards" sentence
+  went quiet entirely — so a second, revolving card's balance appeared in no
+  figure and no sentence anywhere on the dashboard. The sentence now
+  discloses exactly the cards the chain did NOT claim, per card, including a
+  settle-monthly card whose settlement day falls after the period ends.
+
+- **"Settle monthly" only means something on a credit card.** Three parts of
+  the committed maths each read the setting slightly differently, and a
+  `settle_monthly` flag on a non-card account dropped money out of the
+  arithmetic through the gap: it was subtracted as a card settlement while
+  nothing measured its spending against settling income. One shared
+  definition now; on anything that is not a credit card the flag does
+  nothing, and the account keeps its ordinary treatment.
+
+- **A card whose name carries a filesystem-illegal character cycles
+  correctly.** Transactions are stored under a cleaned-up folder name
+  ("Visa: Gold" lives in "Visa- Gold"), and the settlement-cycle band
+  matched folders against the raw name — so such a card's spending read as
+  zero, no cycle formed, and "actually free" subtracted the full card
+  balance instead. Folders now resolve through the same rule every other
+  page uses.
+
+- **The setup wizard's files are written through the same guarded machinery
+  as everything else.** Its writes were the only ones in the app without the
+  path-containment check, on a folder typed into a text field, with its own
+  hand-rolled copies of the folder-creation and write-stamping logic. One
+  write path now — the wizard gains the guard, and the copies are gone.
+
+### Internal
+
+- The savings view no longer depends on the order modules register in; a new
+  build check enforces that rule for every view, mutation-proven. The ctx
+  collision check regained sight of the io surface through the new factory.
+
 ## 1.17.1 — 2026-08-13
 
 Phase one of a four-lane audit (logic, design, security, iOS) of 1.17.0.
