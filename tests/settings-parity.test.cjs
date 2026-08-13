@@ -126,4 +126,43 @@ for (const [label, half, call] of [
 }
 ok(/function periodLengthDesc\(/.test(src), 'periodLengthDesc() is defined once and shared by both halves');
 
+/* ---- 6. one YAML-quoting rule, one Settings.md patcher ----
+   The Settings.md write path had grown two private dialects of the shared
+   rules: onboarding.js quoted currency/household as `"${v.replace(/"/g,''))}"`
+   (deletes quotes, escapes nothing — a backslash in a household name made the
+   whole block unparseable to Obsidian), and main.js patched keys with a line
+   regex that orphaned block values instead of collapsing them the way
+   patchFrontmatter does. Both are text-analysis-checkable, so the drift is
+   pinned here where the other settings-write invariants already live. */
+{
+  const srcDir = path.join(__dirname, '..', 'src');
+  const onboarding = fs.readFileSync(path.join(srcDir, 'onboarding.js'), 'utf8');
+  const mainSrc = fs.readFileSync(path.join(srcDir, 'main.js'), 'utf8');
+
+  // The quote-deleting idiom must not exist as CODE anywhere in either writer.
+  // (csv.js's `replace(/"/g, '""')` is CSV doubling — a different, correct rule
+  // — and stays out of scope by only scanning the two frontmatter writers.
+  // Comments may cite the idiom as history; code lines may not.)
+  const codeLines = s => s.replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l));
+  for (const [name, text] of [['onboarding.js', onboarding], ['settings-tab.js', src]]) {
+    ok(!codeLines(text).some(l => l.includes(`replace(/"/g, '')`)),
+      `${name} must not hand-quote a frontmatter value by deleting quotes — use yamlStr`);
+  }
+
+  // The wizard routes every free-text scalar through yamlStr.
+  ok(/updateBudgetSettingsMd\('currency', yamlStr\(/.test(onboarding),
+    'onboarding writes currency through yamlStr');
+  ok(/updateBudgetSettingsMd\('household', yamlStr\(/.test(onboarding),
+    'onboarding writes household through yamlStr');
+  ok(/institution: \$\{yamlStr\(/.test(onboarding),
+    'onboarding quotes the free-text institution scalar');
+
+  // Settings.md is patched by the shared patcher, never by a fresh regex.
+  ok(/patchFrontmatter\(/.test(mainSrc),
+    'updateBudgetSettingsMd goes through patchFrontmatter');
+  ok(!/new RegExp\('\^\(/.test(mainSrc),
+    'the line-regex patcher must not come back — it orphans YAML block values');
+}
+
 console.log(`PASS — settings tab parity: ${impNames.size} settings declared both ways (${checks} checks).`);

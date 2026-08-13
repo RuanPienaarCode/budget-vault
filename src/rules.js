@@ -17,7 +17,15 @@
    break it. Falls back to the untrimmed description if trimming would leave
    fewer than 4 characters. */
 function learnPattern(desc) {
-  let s = (desc ?? '').toString().trim();
+  /* Capped BEFORE the loop, because the loop is quadratic: each pass re-runs
+     the full-string match and removes one token, so cost grows with the square
+     of the length — measured 1.7s for a single 200KB description, and import
+     calls this once per row with no field-length limit upstream. A statement
+     CSV is untrusted input; fifty such cells was a frozen app. No real bank
+     prints a 512-char description, and matchRule is substring-based, so a
+     pattern learned from a capped description still matches the full one. */
+  const capped = (desc ?? '').toString().trim().slice(0, 512);
+  let s = capped;
   for (;;) {
     const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
     if (!m) break;
@@ -30,7 +38,7 @@ function learnPattern(desc) {
     if (!noise) break;
     s = m[1];
   }
-  return s.length >= 4 ? s : (desc ?? '').toString().trim();
+  return s.length >= 4 ? s : capped;
 }
 
 /* Normalise the rule list ONCE per pass, not once per row. Rules grow with the

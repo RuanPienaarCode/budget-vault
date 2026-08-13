@@ -60,7 +60,24 @@ module.exports = function registerLoad(ctx) {
     return files.map((file, i) => ({ file, text: texts[i] }));
   };
 
-  async function loadVault() {
+  /* Single-flight. Six sections below use the `S.x = [] … await … push()`
+     shape, so two OVERLAPPING loads don't merely repeat work — they duplicate:
+     run B clears the array run A is still filling, then both push, and the
+     vault ends up with 2× categories/accounts/debts/assets/owed/services while
+     the keyed-object sections (budgets, txFiles, plans, tax) survive. Partial
+     corruption reads as "the maths is wrong", not "it loaded twice". Two live
+     paths overlap today: the drawer's reload link stays tappable for the whole
+     load, and unlockGate can race a pending scheduleReload timer. One latch
+     covers every caller, so a load already in flight is joined, not restarted. */
+  let loadInFlight = null;
+  function loadVault() {
+    if (!loadInFlight) {
+      loadInFlight = doLoadVault().finally(() => { loadInFlight = null; });
+    }
+    return loadInFlight;
+  }
+
+  async function doLoadVault() {
     const settingsTxt = await readFile('Settings.md');
     if (settingsTxt) {
       const { fm } = parseFrontmatter(settingsTxt);

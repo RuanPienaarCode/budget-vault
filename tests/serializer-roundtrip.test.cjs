@@ -210,4 +210,59 @@ ok(/month:\s*2026-07/.test(raw), 'serializer must (re)write the month key');
   eq(rows[1][1], 'ACME GROCER', 'and the row itself is untouched');
 }
 
-console.log(`PASS — serializer round-trip intact (${checks} assertions: escaping, amounts, real serializeTxFile, frontmatter preservation, single-table parse).`);
+/* ---- 6. A settings write collapses a block value instead of orphaning it ----
+   updateBudgetSettingsMd used to patch Settings.md with a line regex — a
+   FOURTH frontmatter writer beside the patchFrontmatter family. It could not
+   collapse a block value: patching `owners:` written as a YAML list (the way a
+   YAML-literate user writes a list of people) replaced the key line and left
+   the `  - name` lines orphaned. Invalid YAML; this plugin's first-colon
+   parser read it back happily, but Obsidian dropped every property on the
+   file, blanking the settings tab. Drives the REAL method against a fake
+   vault; async, so completion itself is asserted at exit. */
+let settingsWriteDone = false;
+{
+  const BudgetPlugin = require('../src/main');
+  const before = [
+    '---',
+    'month_start_day: 23',
+    'owners:',
+    '  - Ruan',
+    '  - Christine',
+    'currency: "R"',
+    '---', '', '# Budget Settings', '',
+  ].join('\n');
+  const file = {};
+  let written = null;
+  const p = new BudgetPlugin();
+  p.settings = { budgetFolder: 'Budget' };
+  p._lastWrite = 0;
+  p.app = { vault: {
+    getFileByPath: () => file,
+    read: async () => before,
+    modify: async (_f, text) => { written = text; },
+  } };
+  (async () => {
+    await p.updateBudgetSettingsMd('owners', yamlStr('Ruan, Christine'));
+    ok(written, 'the settings write reached the vault');
+    ok(!/^\s+- /m.test(written), `no orphaned block lines survive the patch — got:\n${written}`);
+    const { fm, body } = parseFrontmatter(written);
+    eq(fm.owners, 'Ruan, Christine', 'the patched key reads back as one scalar');
+    eq(fm.month_start_day, '23', 'keys before the block value are preserved');
+    eq(fm.currency, 'R', 'and keys after it — the regex patcher stranded these');
+    ok(body.includes('# Budget Settings'), 'the body below the fences is untouched');
+    // The whole failure mode: the rewritten block must still be YAML Obsidian
+    // can parse — every line inside the fences is `key: value`, nothing else.
+    const block = written.match(/^---\n([\s\S]*?)\n---/)[1];
+    ok(block.split('\n').every(l => /^[^\s#][^:]*:(\s|$)/.test(l) || /^[^\s#][^:]*:\S/.test(l)),
+      `every frontmatter line is a top-level key after the patch — got:\n${block}`);
+    settingsWriteDone = true;
+  })().catch(e => { console.error(e); process.exitCode = 1; });
+}
+process.on('exit', () => {
+  if (!settingsWriteDone && !process.exitCode) {
+    console.error('FAILED: the settings-write check never completed');
+    process.exitCode = 1;
+  }
+});
+
+console.log(`PASS — serializer round-trip intact (${checks} assertions: escaping, amounts, real serializeTxFile, frontmatter preservation, single-table parse, settings block-value write).`);

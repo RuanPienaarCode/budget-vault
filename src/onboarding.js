@@ -17,6 +17,13 @@ const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
 const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
 const { safeSeg } = require('./vault-path');
+/* yamlStr, not hand-rolled quoting. This file used to write currency and
+   household as `"${v.replace(/"/g, '')}"` — which deletes quotes and escapes
+   nothing else, so a backslash in a household name produced an invalid YAML
+   escape and Obsidian silently dropped every property on Settings.md. The
+   wizard is the FIRST writer a new user meets; it follows the same rule
+   markdown.js enforces for every other frontmatter scalar. */
+const { yamlStr } = require('./markdown');
 
 
 /* Generic starter pack — types come from TYPE_ORDER in constants.js. The
@@ -677,10 +684,10 @@ class OnboardingWizard extends Modal {
         // leaving the old keys behind to win over the answer just given.
         await p.updateBudgetSettingsMd('period_days', String(this.cycleDays()));
         await p.updateBudgetSettingsMd('period_anchor', this.cycleAnchor());
-        await p.updateBudgetSettingsMd('currency', `"${cur.replace(/"/g, '')}"`);
+        await p.updateBudgetSettingsMd('currency', yamlStr(cur));
         await p.updateBudgetSettingsMd('country', this.data.country);
         await p.updateBudgetSettingsMd('language', i18n.resolveLanguage(this.data.language));
-        if (name) await p.updateBudgetSettingsMd('household', `"${name.replace(/"/g, '')}"`);
+        if (name) await p.updateBudgetSettingsMd('household', yamlStr(name));
       } else {
         for (const sub of ['Categories', 'Accounts', 'Budgets', 'Transactions', 'Tax', 'Data']) {
           await this.ensureFolder(normalizePath(`${folder}/${sub}`));
@@ -688,9 +695,9 @@ class OnboardingWizard extends Modal {
         await this.writeIfAbsent(normalizePath(`${folder}/Settings.md`),
           `---\nmonth_start_day: ${day}\n` +
           (this.cycleDays() ? `period_days: ${this.cycleDays()}\nperiod_anchor: ${this.cycleAnchor()}\n` : '') +
-          `currency: "${cur.replace(/"/g, '')}"\ncountry: ${this.data.country}\n` +
+          `currency: ${yamlStr(cur)}\ncountry: ${this.data.country}\n` +
           `language: ${i18n.resolveLanguage(this.data.language)}\n` +
-          (name ? `household: "${name.replace(/"/g, '')}"\n` : '') +
+          (name ? `household: ${yamlStr(name)}\n` : '') +
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
           (this.cycleDays()
@@ -706,9 +713,9 @@ class OnboardingWizard extends Modal {
         for (const cat of STARTER_CATEGORIES) {
           if (!this.data.cats.has(cat.name)) continue;
           const safe = safeFileName(cat.name);
-          const nameLine = safe !== cat.name ? `name: "${cat.name}"\n` : '';
+          const nameLine = safe !== cat.name ? `name: ${yamlStr(cat.name)}\n` : '';
           await this.writeIfAbsent(normalizePath(`${folder}/Categories/${safe}.md`),
-            `---\n${nameLine}type: ${cat.type}\ncolor: "${cat.color}"\ntags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${cat.name}\n\nBudget category of type **${cat.type}**.\n`);
+            `---\n${nameLine}type: ${cat.type}\ncolor: ${yamlStr(cat.color)}\ntags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${cat.name}\n\nBudget category of type **${cat.type}**.\n`);
         }
         const acct = this.data.acctName.trim();
         if (acct) {
@@ -717,7 +724,9 @@ class OnboardingWizard extends Modal {
           const bal = this.openingBalance();
           await this.writeIfAbsent(normalizePath(`${folder}/Accounts/${safe}.md`),
             `---\ntype: ${this.data.acctType}\n` +
-            (this.data.acctInstitution.trim() ? `institution: ${this.data.acctInstitution.trim()}\n` : '') +
+            // Free text from a wizard field — quoted like every other scalar:
+            // a bare colon-space in a bank's name would fork the key mid-value.
+            (this.data.acctInstitution.trim() ? `institution: ${yamlStr(this.data.acctInstitution.trim())}\n` : '') +
             `balance: ${bal.toFixed(2)}\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
           await this.ensureFolder(normalizePath(`${folder}/Transactions/${safe}`));
         }

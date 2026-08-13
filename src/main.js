@@ -11,7 +11,7 @@
 
 const { Plugin, TFile, TFolder, Notice, normalizePath } = require('obsidian');
 const { VIEW_TYPE, DEFAULT_SETTINGS } = require('./constants');
-const { parseFrontmatter } = require('./markdown');
+const { parseFrontmatter, patchFrontmatter } = require('./markdown');
 const { defaultLanguage } = require('./i18n');
 const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
@@ -99,18 +99,21 @@ class BudgetPlugin extends Plugin {
     const f = this.app.vault.getFileByPath(path);
     if (f) {
       let text = await this.app.vault.read(f);
+      /* patchFrontmatter, not a line regex. The line regex this replaced could
+         not collapse a BLOCK value: patching `owners:` written as a YAML list
+         (`owners:` newline `  - Ruan` — the way a YAML-literate user writes a
+         list of people) replaced the key line and orphaned the `- item` lines.
+         That is invalid YAML; this plugin's first-colon parser reads it back
+         happily, but Obsidian drops every property on the file, blanking the
+         whole settings tab — on the one file every device syncs.
+         patchFrontmatter collapses block→scalar by design and preserves
+         unmodeled keys verbatim. It also treats the key as data, where the
+         regex interpolated it into a pattern unescaped. */
       const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      if (m) {
-        let block = m[1];
-        const re = new RegExp('^(' + key + '\\s*:).*$', 'm');
-        // Replacer function, not a string — so `$`-sequences in the value
-        // (e.g. a "$" currency) are written literally, not as $-patterns.
-        if (re.test(block)) block = block.replace(re, (whole, g1) => `${g1} ${value}`);
-        else block += `\n${key}: ${value}`;
-        text = `---\n${block}\n---` + text.slice(m[0].length);
-      } else {
-        text = `---\n${key}: ${value}\n---\n\n` + text;
-      }
+      const block = patchFrontmatter(m ? m[1] : '', { [key]: value });
+      text = m
+        ? `---\n${block}\n---` + text.slice(m[0].length)
+        : `---\n${block}\n---\n\n` + text;
       this._lastWrite = Date.now();          // stamp the shared write-guard so
       await this.app.vault.modify(f, text);  // the watcher treats this as ours
       this._lastWrite = Date.now();          // (single intentional reloadViews)

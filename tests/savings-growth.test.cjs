@@ -31,6 +31,20 @@ const path = require('path');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 
+/* The clock, pinned. The card annualises via totalReturn(..., { today:
+   todayIso() }) read off the real clock, so an unpinned suite asserts a
+   different percentage every morning — +14.9% became +14.8% on 2026-08-13 and
+   failed the build. Subclassed rather than replaced (the dashboard-cards
+   pattern) so every other use of Date still works: only the no-argument
+   constructor and now() answer from the fixed instant. 2026-08-12 keeps the
+   fixture arithmetic documented below (+14.9% a year) intact. */
+const RealDate = Date;
+class PinnedDate extends RealDate {
+  constructor(...a) { if (a.length) super(...a); else super(2026, 7, 12, 12, 0, 0); }
+  static now() { return new PinnedDate().getTime(); }
+}
+global.Date = PinnedDate;
+
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };

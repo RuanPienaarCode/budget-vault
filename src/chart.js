@@ -108,7 +108,15 @@ function parseColor(value) {
     const h = hex[1].length === 3 ? hex[1].replace(/./g, c => c + c) : hex[1];
     return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
   }
-  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(raw);
+  /* Anchored to the END of the string, not just the start. distinctColors
+     returns the ORIGINAL string for a colour it keeps, and the donut legend
+     interpolates that string into a style attribute — so an unanchored match
+     accepted `rgb(1,2,3);position:fixed;inset:0;…` from a category file's
+     frontmatter and the whole declaration list rode along into the DOM.
+     Anything a caller renders as CSS must therefore BE a colour, entire: an
+     optional alpha channel is allowed (getComputedStyle emits rgba()), and
+     trailing junk means "not a colour" — the palette takes over. */
+  const rgb = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*(?:[,/]\s*[\d.]+%?\s*)?\)$/i.exec(raw);
   return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : null;
 }
 

@@ -1134,4 +1134,22 @@ for (const [desc, want, why] of [
 ok(learnPattern('AB 12345678').length >= 4,
   'trimming must never leave a pattern too short to be meaningful');
 
+/* The trimming loop is quadratic — each pass re-matches the whole string and
+   removes one token — and import feeds it every description in an untrusted
+   statement CSV with no field-length limit upstream. Uncapped, one crafted
+   200KB cell measured 1.7s of main-thread freeze; fifty rows froze the app.
+   The cap is the fix: input is sliced to 512 chars before the loop, so the
+   worst case is bounded no matter what the file says. Wall-clock is asserted
+   loosely (CI machines vary); the real pin is the output length bound. */
+{
+  const hostile = 'EVIL SHOP ' +
+    Array.from({ length: 40000 }, (_, i) => 'REF' + String(i).padStart(7, '0')).join(' ');
+  const t0 = Date.now();
+  const out = learnPattern(hostile);
+  const ms = Date.now() - t0;
+  ok(out.length <= 512, `a learned pattern is never longer than the cap — got ${out.length}`);
+  eq(out, 'EVIL SHOP', 'the merchant stem still comes out of a noise-padded description');
+  ok(ms < 250, `a 400KB description must not freeze the import — took ${ms}ms`);
+}
+
 console.log(`PASS — period maths + statement parsers intact (${checks} assertions).`);
