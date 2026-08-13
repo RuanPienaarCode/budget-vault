@@ -4,7 +4,7 @@
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd } = require('../markdown');
+const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
@@ -180,16 +180,15 @@ module.exports = function registerServices(ctx) {
     });
   }
 
+  /* Columns, escaping and number formatting come from the same declaration
+     the loader reads with (table-schema.js, ADR-0003); only the prose is
+     this view's own. */
   function serializeServices() {
-    const lines = ['---', ...(S.servicesFm || 'kind: services').split('\n'), '---', '', '# Services & Subscriptions', '',
-      'Recurring services and subscriptions. `cycle` is `monthly` or `annual`.', '',
-      '| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |',
-      '|------|----------|-------:|-------|--------------|----------|--------|-------|'];
-    for (const s of S.services) {
-      lines.push(`| ${escMd(s.name)} | ${escMd(s.provider)} | ${s.amount.toFixed(2)} | ${s.cycle} | ${escMd(s.next)} | ${escMd(s.category)} | ${s.active ? 'yes' : 'no'} | ${escMd(s.notes)} |`);
-    }
-    lines.push('');
-    return lines.join('\n');
+    return mdTableFile({
+      fm: S.servicesFm, fallback: 'kind: services', title: 'Services & Subscriptions',
+      prose: ['Recurring services and subscriptions. `cycle` is `monthly` or `annual`.'],
+      schema: SCHEMAS.services, rows: S.services,
+    });
   }
 
   async function saveServices() {

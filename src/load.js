@@ -362,15 +362,7 @@ module.exports = function registerLoad(ctx) {
     S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
     if (svcTxt) for (const c of parseMdTable(svcTxt).slice(1)) {
       if (!c[0]) continue;
-      S.services.push({
-        // parseNum, not parseFloat — same reason as the owed and debt columns,
-        // and this one feeds the committed total the Dashboard subtracts from
-        // "actually free to spend", so a truncated cell overstates it.
-        name: unescMd(c[0]), provider: unescMd(c[1] || ''), amount: parseNum(c[2] || '0').value || 0,
-        cycle: (c[3] || 'monthly').trim().toLowerCase() === 'annual' ? 'annual' : 'monthly',
-        next: (c[4] || '').trim(), category: unescMd(c[5] || ''),
-        active: (c[6] || 'yes').trim().toLowerCase() !== 'no', notes: unescMd(c[7] || ''),
-      });
+      S.services.push(rowToObject(SCHEMAS.services, c));
     }
     /* Plans — one file per plan in Plans/, keyed by the file's basename. Same
        multi-file shape as Tax above, and read with the same heading-slice
