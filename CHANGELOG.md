@@ -3,6 +3,42 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.17.5 — 2026-08-13
+
+An architect's pass over the whole plugin answered "should we simplify?"
+with "mostly no" — but surfaced four more instances of the recurring bug
+shape, one figure derived by two different rules. Each derivation now has
+exactly one owner.
+
+### Fixed
+
+- **The Accounts hero reads net worth from the module that owns it.** The
+  hero re-derived the by-sign asset/liability split with its own raw loop
+  and read the difference unrounded — so the float-remainder failure
+  worth.js was written to end (a break-even household rendering "-R0.00")
+  was still reachable on that one page while Dashboard and Savings agreed.
+  The hero now calls `worth()` with no debts or assets passed, which
+  collapses to the accounts-only figure it always meant.
+
+- **Days are counted between dates by one rule.** dates.js wrote the rule
+  down — format local, count in UTC — and then three other files kept
+  their own counters, two of them counting local. committed.js and
+  reconcile.js now call the one shared `daysBetween`, each keeping its own
+  bad-input policy at its own boundary; reconcile still refuses an
+  impossible date and still falls back to the wall clock deliberately.
+  savings-math.js deliberately keeps its local counter for now: it rejects
+  a hand-typed impossible `inception_date` the shared one would roll
+  forward, and that difference deserves its own decision, not a drive-by.
+
+### Changed
+
+- **Two verbatim duplicates folded into their single owners.** load.js
+  carried the same `section()` heading-slicer twice, character for
+  character; it is one function now. worth.js's `debtsByType` and
+  `assetsByType` were the same grouping over a different value key; both
+  now call one `groupedByType`, so the drop rule and the sort cannot
+  drift between the chart's two sides.
+
 ## 1.17.4 — 2026-08-13
 
 A plumbing pass in the audit's wake: two more instances of this codebase's
