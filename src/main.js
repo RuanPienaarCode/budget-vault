@@ -109,7 +109,7 @@ class BudgetPlugin extends Plugin {
       text = await this.app.vault.read(f);
       /* patchFrontmatter, not a line regex. The line regex this replaced could
          not collapse a BLOCK value: patching `owners:` written as a YAML list
-         (`owners:` newline `  - Ruan` — the way a YAML-literate user writes a
+         (`owners:` newline `  - Alex` — the way a YAML-literate user writes a
          list of people) replaced the key line and orphaned the `- item` lines.
          That is invalid YAML; this plugin's first-colon parser reads it back
          happily, but Obsidian drops every property on the file, blanking the

@@ -204,6 +204,10 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
 async function loadInto(ctx) {
   require('../../src/io')(ctx);
   require('../../src/period')(ctx);
+  // After period (whose helpers it destructures at register time), before the
+  // views — the same slot controller.js gives it. The dashboard's trend chart
+  // and comparison column read these off ctx.
+  require('../../src/trend-math')(ctx);
   require('../../src/load')(ctx);
   require('../../src/views/notes')(ctx);
   await ctx.loadVault();

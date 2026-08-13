@@ -31,7 +31,7 @@ const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'l
    It has to explain what the setting TURNS ON as well as what it stores: an
    empty owners line is why the Accounts page shows no owner control at all, and
    a reader hunting for that field would otherwise have no way to find this. */
-const OWNERS_DESC = 'The people this household\'s accounts can belong to, separated by commas — e.g. "Ruan, Christine". Each account then gets an Owner dropdown offering these plus Joint, and the Accounts page gains a per-person breakdown and filter. Leave blank if the budget is one person\'s.';
+const OWNERS_DESC = 'The people this household\'s accounts can belong to, separated by commas — e.g. "Alex, Sam". Each account then gets an Owner dropdown offering these plus Joint, and the Accounts page gains a per-person breakdown and filter. Leave blank if the budget is one person\'s.';
 
 /* Language dropdown options, as {id: nativeName}. Built off LANGUAGE_ORDER —
    itself derived from the tables that actually ship — so the dropdown can never
@@ -198,8 +198,8 @@ class BudgetSettingTab extends PluginSettingTab {
           this._hhTimer = setTimeout(async () => {
             // yamlStr, same as the currency field below and the declarative tab
             // above: the hand-rolled quoting this replaced DELETED embedded
-            // quotes rather than escaping them, so 'Ruan "The General"' saved
-            // as 'Ruan The General'.
+            // quotes rather than escaping them, so 'Alex "The General"' saved
+            // as 'Alex The General'.
             await this.plugin.updateBudgetSettingsMd('household', yamlStr(v.trim()));
             this.plugin.reloadViews();
           }, 800);
@@ -210,7 +210,7 @@ class BudgetSettingTab extends PluginSettingTab {
       .setName('Household members')
       .setDesc(OWNERS_DESC)
       .addText(t => {
-        t.setPlaceholder('Ruan, Christine');
+        t.setPlaceholder('Alex, Sam');
         // Re-serialised from the parse rather than echoed back raw, so the field
         // shows the list the app is actually running — a stray comma or a
         // duplicate reads back tidied instead of sitting there looking accepted.
@@ -638,7 +638,7 @@ class BudgetSettingTab extends PluginSettingTab {
       {
         name: 'Household members',
         desc: OWNERS_DESC,
-        control: { type: 'text', key: 'owners', placeholder: 'Ruan, Christine' },
+        control: { type: 'text', key: 'owners', placeholder: 'Alex, Sam' },
       },
       {
         name: 'Month start day',

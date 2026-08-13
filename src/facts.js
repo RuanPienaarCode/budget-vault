@@ -246,7 +246,14 @@ function fact(key) {
    is in reconcile.js — a test asserting expiry behaviour must be able to stand
    somewhere other than now. */
 function staleFacts(today) {
-  const t = today || new Date().toISOString().slice(0, 10);
+  /* Local calendar date, not toISOString() — that is UTC, and in Johannesburg
+     it names yesterday until 02:00, so the review banner fired up to two
+     hours off. Same rule as dates.js todayIso(); inlined rather than imported
+     so this file keeps zero project dependencies (facts.test.cjs pins the
+     dependency direction — readers come through THIS module). */
+  const d = new Date();
+  const t = today ||
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   return Object.entries(FACTS)
     .filter(([, f]) => f.reviewBy < t)
     .map(([key]) => ({ key, reviewBy: FACTS[key].reviewBy }));

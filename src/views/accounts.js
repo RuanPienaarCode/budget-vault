@@ -12,7 +12,7 @@ const { normalizeAmount } = require('../amount');
 /* A display symbol per account, and the disclosure when a total spans more
    than one of them. It converts nothing — see the module header. */
 const { symbolOf, currenciesIn } = require('../currency');
-const { patchFrontmatter, yamlStr } = require('../markdown');
+const { yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
 const i18n = require('../i18n');
@@ -34,34 +34,22 @@ const { supersededBySplit } = require('../tx-role');
 const { ownerKey, ownerLabel, ownerOptions, netByOwner } = require('../owners');
 const { ISO_DATE, todayIso } = require('../dates');
 
-/* Largest-remainder (Hare quota) allocation for a column of percentages that
-   must sum to exactly 100 — independent `Math.round()` per group does not:
-   three equal thirds print 33 three times (99%), and the same rounded set is
-   what gets concatenated into the ring's aria-label, so for a screen-reader
-   user the gap is the only reading of the chart they get, not a cosmetic one.
-
-   Duplicated from src/views/dashboard.js's own copy rather than shared,
-   because the two views own their own files. Each keeps its floor and the
-   leftover whole points go to the largest fractional remainder, biggest
-   first; ties are broken by ORIGINAL INDEX rather than by trusting
-   `Array.prototype.sort` to stay stable across a future refactor, so two
-   equal groups resolve the same way on every render. */
-function sharePercents(amounts) {
-  const total = amounts.reduce((s, v) => s + v, 0);
-  if (total <= 0) return amounts.map(() => 0);
-  const floors = amounts.map(v => Math.floor((v / total) * 100));
-  const remainders = amounts
-    .map((v, i) => ({ i, frac: (v / total) * 100 - floors[i] }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
-  let left = 100 - floors.reduce((s, v) => s + v, 0);
-  const pct = floors.slice();
-  for (let k = 0; k < remainders.length && left > 0; k++, left--) pct[remainders[k].i]++;
-  return pct;
-}
+/* Shared with views/dashboard.js — see share-percents.js for why a ring's
+   percentage column is allocated by largest remainder, never rounded per
+   group. Re-exported at the bottom of this file so the donut test keeps
+   reading each view's own door. */
+const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
+
+  /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: this page writes
+     on every edit (each dialog saves on submit), so there is never an unsaved
+     draft for the file watcher to protect. From controller.js an absent
+     registration is indistinguishable from a view that forgot — the failure
+     mode registerDirty exists for — so the absence is recorded here, in the
+     same register budgets.js and transactions.js use for their deviations. */
 
   /* One account's own figures, in its own symbol. Used for everything that
      describes a SINGLE account — its balance, its limit, its goal, its month.
@@ -792,7 +780,7 @@ module.exports = function registerAccounts(ctx) {
   /* The owner filter, applied on its own axis. Kept separate from FILTERS()
      rather than folded in as more chips: kind and owner are two different
      questions, and one `v.filter` can only hold one answer — merging them would
-     mean picking "Christine" silently dropped the reader out of "Savings". */
+     mean picking "Sam" silently dropped the reader out of "Savings". */
   const ownerMatch = r => view().owner === null || ownerKey(r.a.owner) === view().owner;
 
   function visibleRows(rows) {
@@ -1015,7 +1003,7 @@ module.exports = function registerAccounts(ctx) {
       /* Notes get a column of their own, at the end.
          It rode with the account NAME first, which read fine on one-line names
          and badly on the real ones: "Discovery Bank Transaction Account
-         (Ruan)" wraps to three lines, and an inline chip after the last word
+         (Alex)" wraps to three lines, and an inline chip after the last word
          lands alone under the name looking like a stray control belonging to
          nothing. A column keeps it on the row's own baseline whatever the name
          does, and puts every account's chip in one scannable strip.
@@ -1305,15 +1293,13 @@ module.exports = function registerAccounts(ctx) {
         budget: a.in_budget ? null : 'false',
       };
       for (const k of keys) updates[k] = FM_WRITERS[k](a);
-      const fm = patchFrontmatter(a.fmRaw, updates);
-      await writeFile(`Accounts/${a.name}.md`, `---\n${fm}\n---` + (a.body || `\n\n# ${a.name}\n`));
-      /* Re-capture. Every patch is computed against fmRaw, so leaving it at the
-         block read from disk at LOAD time makes each save undo the one before
-         it: edit the credit limit, then click the balance, and the limit goes
-         back to whatever the file said when the vault was opened. Our own
-         writes are deliberately not re-read by the file watcher, so nothing
-         else would put this back in step. */
-      a.fmRaw = fm;
+      /* Re-capture the returned block. Every patch is computed against fmRaw,
+         so leaving it at the block read from disk at LOAD time makes each save
+         undo the one before it: edit the credit limit, then click the balance,
+         and the limit goes back to whatever the file said when the vault was
+         opened. Our own writes are deliberately not re-read by the file
+         watcher, so nothing else would put this back in step. */
+      a.fmRaw = await ctx.patchFile(`Accounts/${a.name}.md`, a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
       return;
     }
     // Legacy fallback: no captured frontmatter (a file the loader never saw) —
@@ -1348,6 +1334,9 @@ module.exports = function registerAccounts(ctx) {
     if (a.tx_label) lines.push(`tx_label: ${yamlStr(a.tx_label)}`);
     if (a.tags) lines.push(`tags: ${a.tags}`);
     lines.push('---');
+    // Not ctx.patchFile — this branch REBUILDS the frontmatter from the model
+    // (there is no raw block to patch), but the trailing `a.body ||` still
+    // preserves the body, same invariant as the patch branch above.
     await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
     // Adopt what was just written, so the NEXT save takes the patch branch
     // above and preserves anything the user has added to the file since.

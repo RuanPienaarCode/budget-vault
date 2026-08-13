@@ -226,8 +226,8 @@ let settingsWriteDone = false;
     '---',
     'month_start_day: 23',
     'owners:',
-    '  - Ruan',
-    '  - Christine',
+    '  - Alex',
+    '  - Sam',
     'currency: "R"',
     '---', '', '# Budget Settings', '',
   ].join('\n');
@@ -242,11 +242,11 @@ let settingsWriteDone = false;
     modify: async (_f, text) => { written = text; },
   } };
   (async () => {
-    await p.updateBudgetSettingsMd('owners', yamlStr('Ruan, Christine'));
+    await p.updateBudgetSettingsMd('owners', yamlStr('Alex, Sam'));
     ok(written, 'the settings write reached the vault');
     ok(!/^\s+- /m.test(written), `no orphaned block lines survive the patch — got:\n${written}`);
     const { fm, body } = parseFrontmatter(written);
-    eq(fm.owners, 'Ruan, Christine', 'the patched key reads back as one scalar');
+    eq(fm.owners, 'Alex, Sam', 'the patched key reads back as one scalar');
     eq(fm.month_start_day, '23', 'keys before the block value are preserved');
     eq(fm.currency, 'R', 'and keys after it — the regex patcher stranded these');
     ok(body.includes('# Budget Settings'), 'the body below the fences is untouched');

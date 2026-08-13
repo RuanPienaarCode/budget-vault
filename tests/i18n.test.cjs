@@ -326,6 +326,40 @@ eq(settingsTab.split('ctl.applyLanguage()').length - 1, 2,
 ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
   'the active language must be seeded from defaultLanguage(), not hardcoded');
 
+/* ---- 9. TRANSLATED_VIEWS is the inventory, and the definition of "done" ----
+   The i18n migration is 4 views of 14, and until now nothing distinguished
+   "this view is translated" from "this view is next" — a contributor adding a
+   string to views/tax.js has no signal that hardcoding English there is fine
+   while doing it in views/accounts.js is a regression. This list is that
+   signal. Moving a view INTO the set is the definition of translating it.
+
+   Two directions, both pinned:
+   - a view in the set must stay substantially translated (a floor on its
+     i18n usage count — gutting the calls is a loud failure, and detecting
+     individual new English literals by regex would drown in false positives
+     from class names and data attributes);
+   - a view NOT in the set that grows real i18n usage must be promoted, so
+     the inventory cannot silently rot as views migrate. */
+{
+  const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js']);
+  const VIEWS = path.join(SRC, 'views');
+  const usage = f => {
+    const text = fs.readFileSync(path.join(VIEWS, f), 'utf8');
+    return (text.match(/\bi18n\.t\(/g) || []).length +
+           (text.match(/data-i18n(?:-(?:aria|title|placeholder))?="/g) || []).length;
+  };
+  for (const f of fs.readdirSync(VIEWS).filter(f => f.endsWith('.js'))) {
+    const n = usage(f);
+    if (TRANSLATED_VIEWS.has(f)) {
+      ok(n >= 30,
+        `views/${f} is in TRANSLATED_VIEWS but carries only ${n} i18n uses — translated views must stay translated`);
+    } else {
+      ok(n < 10,
+        `views/${f} now carries ${n} i18n uses — promote it into TRANSLATED_VIEWS so "done" stays defined`);
+    }
+  }
+}
+
 console.log(
   `PASS — i18n: ${Object.keys(TABLES).length} languages x ${enKeys.length} keys, ` +
   `${used.size} wired up, ${unused.length} staged for the next surface (${checks} checks).`);

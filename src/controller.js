@@ -15,6 +15,7 @@ const registerIo = require('./io');
 const registerPeriod = require('./period');
 const registerLoad = require('./load');
 const registerCategories = require('./categories');
+const registerTrendMath = require('./trend-math');
 const registerDashboard = require('./views/dashboard');
 const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
@@ -135,6 +136,18 @@ function mountApp(view) {
   const $$ = s => root.querySelectorAll(s);
 
   /* ------------------------------- state -------------------------------- */
+  /* This block is the SCHEMA — every key S carries appears here, with its
+     shape, and tests/shell-contract.test.cjs fails the build on any `S.<key>`
+     used in src/ that this declaration does not list. It used to omit eleven
+     keys (six of them canonical vault state written by the loader), so
+     checking reloadFromDisk's "whole-state reset" claim meant reading all of
+     load.js because the one place documenting the state told half the story.
+
+     TWO KINDS OF KEY, fenced below: everything above the marker is CANONICAL
+     VAULT STATE, cleared and refilled by loadVault() on every (re)load;
+     everything below it SURVIVES the reset — view UI state and debounce
+     handles that a vault re-read must not blank (a reload landing mid-search
+     should not lose the reader's filter). */
   const S = {
     loaded: false,
     settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '', overspend_lag: 1, owners: [] },
@@ -143,14 +156,19 @@ function mountApp(view) {
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
     budgetMeta: {},
     txFiles: {},               // 'label/YYYY-MM' -> {label, month, rows, dirty}
+    txFolders: [],             // account names whose Transactions/ folder exists on disk
     rules: [],                 // {pattern, category}
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
+    assetsFm: '',              // Assets.md verbatim frontmatter, re-emitted by the serializer
     assetsDirty: false,
     debts: [],                 // {name, lender, type, balance, original, rate, payment, extra, start, category, status, notes}
+    debtsFm: '',               // Debts.md verbatim frontmatter
     debtsDirty: false,
     owed: [],                  // {person, amount, description, due, status}
+    owedFm: '',                // Owed Money.md verbatim frontmatter
     owedDirty: false,
     services: [],              // {name, provider, amount, cycle, next, category, active, notes}
+    servicesFm: '',            // Services.md verbatim frontmatter
     servicesDirty: false,
     // basename -> {file, name, fmRaw, started, status, sources, envelopes, items}
     plans: {},
@@ -159,6 +177,7 @@ function mountApp(view) {
     tax: {},                   // 'YYYY' -> {fmRaw, taxpayer_type, assessment, deadlines, steps, docs}
     taxYear: null,
     taxDirty: false,
+    taxOrphanYears: [],        // Tax/<year>/ folders holding files but no Tax/<year>.md
     // {rel, name, kind, subject, created, title, excerpt} — one entry per file
     // in Notes/, filled by loadVault. Prose, not figures: nothing here feeds a
     // total. The Notes page's own filter state is seeded by views/notes.js,
@@ -167,6 +186,12 @@ function mountApp(view) {
     period: null,
     view: 'dashboard',
     pendingImport: null,
+    /* ---- survives loadVault(): UI state and debounce handles ---- */
+    acctView: null,            // Accounts page card/list mode, owned by views/accounts.js
+    noteFilter: null,          // Notes page {about, q}, seeded by views/notes.js
+    _q: 0,                     // transactions-search debounce timer handle
+    _acctQ: 0,                 // accounts-search debounce timer handle
+    _noteQ: 0,                 // notes-search debounce timer handle
   };
 
   function toast(msg, bad = false) {
@@ -261,6 +286,7 @@ function mountApp(view) {
   registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
   registerLoad(ctx);        // loadVault, txSegment
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
+  registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
   /* Before the views, because five of them render its noteButton() chip — they
      reach it through ctx at render time rather than by destructuring, so the
      order is belt-and-braces rather than load-bearing. loadVault calls

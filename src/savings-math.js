@@ -41,7 +41,7 @@
    Contributions deliberately have no category of their own. They wear the
    budget category they came FROM — in one real vault "Baby fund Jan" is
    uncategorised, "Emergency savings Dec" is a savings category, and
-   "Christine Jan 26 tax" is a personal one. Any rule keyed to a single
+   "Sam Jan 26 tax" is a personal one. Any rule keyed to a single
    contribution category would be wrong on real data.
 
    Excluded rows COUNT. Every transaction in a fund account is typically
@@ -151,8 +151,18 @@ function accountFlows(account, rows, typeOf, opts) {
     };
   }
 
-  const baseline = a.total_invested || a.starting_amount || 0;
-  if (baseline) {
+  /* The same two rules totalReturn applies below, in the same order —
+     starting_amount first, and a WRITTEN zero is a real baseline. This used
+     to read `a.total_invested || a.starting_amount || 0`, which both
+     reversed the precedence and falsy-skipped `starting_amount: 0` (an
+     account opened empty and funded by transfer fell through to 'none',
+     growth 0). Masked today only because the sole consumer prefers
+     totalReturn wherever the two would disagree — a new consumer would have
+     inherited the bug. fmNum writes null for an absent key and a number for
+     a written one, so `typeof` is the "was it written" test. */
+  const baseline = typeof a.starting_amount === 'number' ? a.starting_amount
+    : typeof a.total_invested === 'number' ? a.total_invested : null;
+  if (baseline !== null) {
     return {
       basis: 'stated',
       opening: baseline,

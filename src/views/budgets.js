@@ -388,11 +388,7 @@ module.exports = function registerBudgets(ctx) {
     // null removes the key outright rather than writing `assume_spent: false` —
     // absent is this flag's own default, so turning it off should leave the file
     // as it would have been had it never been turned on.
-    const next = patchFrontmatter(raw, { assume_spent: on ? 'true' : null });
-    // No newline before `body`: parseFrontmatter's body starts immediately after
-    // the closing fence and keeps its own leading break, so adding one here
-    // would grow the file by a blank line on every toggle.
-    await writeFile(cat.rel, `---\n${next}\n---${body}`);
+    await ctx.patchFile(cat.rel, raw, body, { assume_spent: on ? 'true' : null });
     cat.assumeSpent = on;
     renderBudgets();
     toast(i18n.t(on ? 'bud.assumed.on' : 'bud.assumed.off', { category: name }));

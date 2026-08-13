@@ -9,10 +9,10 @@
    Three decisions worth stating plainly, because each one is the kind that is
    painful to reverse once files carry the key:
 
-   • The NAMES come from Settings.md, not from the account files. `owners: Ruan,
-     Christine` declares the household's people once, and the account form
+   • The NAMES come from Settings.md, not from the account files. `owners: Alex,
+     Sam` declares the household's people once, and the account form
      offers a dropdown built from it. A free-text box on every account would let
-     "Ruan" and "ruan" and "Ruan " become three people who each own part of the
+     "Alex" and "alex" and "Alex " become three people who each own part of the
      total, and no filter chip could put them back together.
 
    • An account whose file names an owner the settings do NOT declare is still
@@ -45,12 +45,12 @@ const JOINT = 'joint';
    Takes a string or an array, because the two readers of Settings.md disagree
    about which one they hand over: load.js parses frontmatter line by line and
    always produces a string, while the settings tab reads Obsidian's own
-   metadataCache, which turns `owners: [Ruan, Christine]` into a real array.
+   metadataCache, which turns `owners: [Alex, Sam]` into a real array.
    Both spellings mean the same thing, so both are accepted rather than one of
-   them quietly reading as a single person named "[Ruan, Christine]".
+   them quietly reading as a single person named "[Alex, Sam]".
 
    Deduped case-insensitively and FIRST SPELLING WINS: a settings line reading
-   "Ruan, ruan" declares one person, spelled the way they first wrote it. */
+   "Alex, alex" declares one person, spelled the way they first wrote it. */
 function parseOwners(raw) {
   const parts = Array.isArray(raw)
     ? raw.map(v => String(v ?? ''))
@@ -77,7 +77,7 @@ function parseOwners(raw) {
 }
 
 /* The comparison key for an owner value. Everything that groups, filters or
-   totals goes through this, so "Ruan" in one file and "ruan" in another are one
+   totals goes through this, so "Alex" in one file and "alex" in another are one
    person on this page — the settings dropdown makes that rare, but a
    hand-edited vault is a supported way to use this app. '' means unassigned. */
 function ownerKey(v) {

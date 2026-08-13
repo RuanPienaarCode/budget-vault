@@ -20,7 +20,7 @@
 
 const { el, kpiTiles, icoEl } = require('../dom');
 const { askFields, confirmModal } = require('../modal');
-const { patchFrontmatter, yamlStr } = require('../markdown');
+const { yamlStr } = require('../markdown');
 const { todayIso } = require('../dates');
 const {
   NOTES_DIR, KIND_LABELS, NOTE_KINDS, hasOwnNote, isTracked,
@@ -44,6 +44,12 @@ const SEP = '\u001F';
 
 module.exports = function registerNotes(ctx) {
   const { S, $, app, vault, toast, writeFile, readFile, fileAt, mdFilesUnder } = ctx;
+
+  /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: every edit here
+     (new note, re-subject, delete) writes to disk in the same interaction, so
+     there is never an unsaved draft to protect from a reload. Recorded
+     because an absent registration otherwise reads as a view that forgot —
+     the fail-open shape registerDirty was built to end. */
 
   /* The filter's SHAPE belongs to this module, so this module seeds it — the
      same split accounts.js makes for S.acctView. It lived in controller.js's
@@ -350,7 +356,7 @@ module.exports = function registerNotes(ctx) {
          keeps a link to a note the file no longer claims any relationship to. */
       note_for: subject && hasOwnNote(kind) ? yamlStr(`[[${subject}]]`) : null,
     };
-    await writeFile(note.rel, `---\n${patchFrontmatter(raw, updates)}\n---${body}`);
+    await ctx.patchFile(note.rel, raw, body, updates);
     return true;
   }
 

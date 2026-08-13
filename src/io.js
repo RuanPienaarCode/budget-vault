@@ -16,6 +16,7 @@
 
 const { normalizePath, TFile, TFolder } = require('obsidian');
 const { collapsePath } = require('./vault-path');
+const { patchFrontmatter } = require('./markdown');
 
 function makeIo({ vault, plugin }) {
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
@@ -123,6 +124,24 @@ function makeIo({ vault, plugin }) {
     }
     stampWrite();
   }
+  /* THE body-preserving write, as a named operation. note-file.js calls this
+     invariant "THE ONE INVARIANT THAT MATTERS" — patch the frontmatter, never
+     touch the body — but it used to live at four call sites as a bare string
+     idiom, `writeFile(rel, \`---\n${patchFrontmatter(raw, u)}\n---${body}\`)`,
+     syntactically identical to the seven REBUILD writes that deliberately
+     stamp over the body. Two opposite contracts wearing the same syntax: a
+     new view copying the nearest example had a coin-flip chance of eating
+     user prose. The name is the whole value — "I am preserving the body" is
+     now greppable and reviewable. No newline before `body`: parseFrontmatter's
+     body starts immediately after the closing fence and keeps its own leading
+     break, so adding one would grow the file on every save. Returns the
+     patched block, because accounts.js must re-capture it (each patch is
+     computed against the PREVIOUS block, or saves undo each other). */
+  async function patchFile(rel, raw, body, updates) {
+    const fm = patchFrontmatter(raw, updates);
+    await writeFile(rel, `---\n${fm}\n---${body}`);
+    return fm;
+  }
   function fileAt(rel) {
     return vault.getFileByPath(relPath(rel));
   }
@@ -163,7 +182,7 @@ function makeIo({ vault, plugin }) {
   }
 
   return {
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, fileAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, fileAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder,
     lastWriteAt: () => plugin._lastWrite || 0,
   };

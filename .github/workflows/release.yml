@@ -23,7 +23,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 — SHA-pinned: this workflow mints provenance attestations with contents:write, so a moving tag is the one thing in it that could change without review
 
       # main.js is a committed build artifact and this workflow publishes the
       # COMMITTED file — so a src/ change released without rebuilding would ship
@@ -36,7 +36,7 @@ jobs:
       # pinned in the lockfile, so the byte comparison below cannot be broken by
       # a floating upgrade — a false alarm that would look identical to a real
       # stale bundle.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5 — SHA-pinned, same reason as checkout
         with:
           node-version: "22"
           cache: "npm"
@@ -80,7 +80,7 @@ jobs:
       # Lets anyone verify the shipped assets came from this repo and this
       # workflow: `gh attestation verify main.js -R RuanPienaarCode/budget-vault`
       - name: Attest release assets
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4 — SHA-pinned (peeled commit of the annotated tag), same reason as checkout
         with:
           subject-path: |
             main.js

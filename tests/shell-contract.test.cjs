@@ -168,6 +168,35 @@ ok(provided.get('writeFile') === 'io.js',
     'a register-time destructure must only reach keys that already exist — late-bind through ctx.x() instead');
 }
 
+/* ---- 5c. the S declaration is the schema, not a sample ---- */
+/* controller.js's S literal reads as authoritative — per-key shape comments,
+   a reset-vs-survives fence — so a key it omits is a key nobody can audit:
+   it once listed 22 keys while eleven more (six of them canonical vault
+   state written by load.js) lived only in the code that touched them.
+   Enforced: every `S.<key>` in src/ appears in the declaration. Comments are
+   stripped first — load.js documents the `S.x = []` shape in prose. */
+{
+  const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  const sLit = controller.match(/const S = \{([\s\S]*?)\n  \};/);
+  ok(sLit, 'controller.js still declares S as one literal');
+  const declared = new Set();
+  for (const l of stripComments(sLit[1]).split('\n')) {
+    const m = l.match(/^\s*([A-Za-z_$][\w$]*)\s*:/);
+    if (m) declared.add(m[1]);
+  }
+  ok(declared.size >= 30, `the schema block carries the full state (found ${declared.size})`);
+  const undeclared = new Set();
+  for (const file of walk(SRC)) {
+    const text = stripComments(fs.readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/\bS\.([A-Za-z_$][\w$]*)/g)) {
+      if (!declared.has(m[1])) undeclared.add(`${m[1]} (${path.relative(SRC, file)})`);
+    }
+  }
+  eq([...undeclared].sort(), [],
+    'every S.<key> used anywhere in src/ must be declared in the schema block');
+}
+
 /* ---- 6. the shell is DOMParser-safe ---- */
 // controller.js mounts via DOMParser (see the header note). A full-document
 // parse relocates table internals and head-only content that appear at the

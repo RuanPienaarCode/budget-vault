@@ -23,8 +23,8 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
    categories contributions arrive under are anything but. */
 const TYPES = {
   'Interest income': 'income',
-  'Ruan pay check': 'income',
-  'Christine personal': 'luxuries',
+  'Alex pay check': 'income',
+  'Sam personal': 'luxuries',
   'Discovery 32 Day notice savings': 'savings',
   'TFS Ninety One (R)': 'investment',
 };
@@ -38,7 +38,7 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
     row('2026-01-01', 84.41, 'Interest income'),     // growth
     row('2026-01-03', 4000, ''),                     // contribution — uncategorised
     row('2026-01-16', -2575, ''),                    // withdrawal
-    row('2026-01-31', 700, 'Christine personal'),    // contribution — wears its source category
+    row('2026-01-31', 700, 'Sam personal'),    // contribution — wears its source category
   ], typeOf);
 
   near(f.growth, 114.20, 0.001, 'interest is growth');
@@ -81,11 +81,11 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
 {
   const f = splitFlows([
     row('2026-01-01', 84.41, 'Interest income'),
-    row('2026-01-25', 30000, 'Ruan pay check'),
+    row('2026-01-25', 30000, 'Alex pay check'),
   ], typeOf);
   near(f.growth, 30084.41, 0.001, 'a salary into savings does land in growth');
   eq(f.growthCategories.length, 2, 'but both sources are named');
-  eq(f.growthCategories[0], { cat: 'Ruan pay check', amount: 30000 }, 'largest first, so the odd one is obvious');
+  eq(f.growthCategories[0], { cat: 'Alex pay check', amount: 30000 }, 'largest first, so the odd one is obvious');
   eq(f.growthCategories[1].cat, 'Interest income', 'alongside the real interest');
 }
 

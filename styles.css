@@ -2371,6 +2371,16 @@
   font-size: 0.78rem;
   min-height: 28px;
 }
+/* On a touch screen these rise to Apple's 44pt HIG floor instead. 28px clears
+   WCAG's 24px minimum but left the Notes page's three ADJACENT actions —
+   Open / Change subject / Delete — a near-miss apart, with Delete as the
+   neighbour. Gated on pointer coarseness (Safari 9+, far under the iOS 15
+   floor) so desktop table rows keep their density; the wider note-actions
+   gap makes a miss land on empty space rather than the button beside it. */
+@media (pointer: coarse) {
+  .budget-app-root .btn-ghost-sm { min-height: 44px; padding: 0.55rem 0.9rem; }
+  .budget-app-root .note-actions { gap: 10px; }
+}
 
 /* Date fields. iOS WKWebView's date control has a large intrinsic minimum that
    a bare `width` cannot shrink below — it clips the value instead of resizing —
