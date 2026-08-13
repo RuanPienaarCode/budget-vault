@@ -3,6 +3,34 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.18.0 — 2026-08-13
+
+Columns are now declared once. Nothing you can see changed — and this release
+exists to make that sentence provable.
+
+### Changed
+
+- **One declaration per flat table drives the loader, the serializers and
+  the tests** (`src/table-schema.js`, ADR-0003). Before this, the column
+  order of transactions, debts, owed, assets and services lived three times
+  — a positional mapping in the loader, a hand-built header and row template
+  in each view, and (for transactions) a hand-written mirror inside a test
+  whose comment politely asked future editors to keep both copies in sync.
+  Adding a column to the serializer but not the loader would have shifted
+  every later value into the wrong field of every file on disk, silently.
+  That edit is now impossible to make in one place.
+
+- **Append-only is enforced, not written down.** A tripwire test holds each
+  table's shipped column history and goes red on any reorder, rename or
+  mid-table insertion; a truncation sweep proves every column — current and
+  future — reads an absent cell as its documented default, which is what a
+  file written by an older version looks like.
+
+- **The on-disk format is pinned byte for byte.** A golden-gate test captures
+  1.17.5's exact serializer output and every entity must keep producing it:
+  no whitespace churn, no sync noise, no rewrite of your files on first save
+  after upgrading.
+
 ## 1.17.5 — 2026-08-13
 
 An architect's pass over the whole plugin answered "should we simplify?"
