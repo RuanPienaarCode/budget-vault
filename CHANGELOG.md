@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.17.4 — 2026-08-13
 
 A plumbing pass in the audit's wake: two more instances of this codebase's
 recurring bug shape — one rule spelled differently in two places — found by
