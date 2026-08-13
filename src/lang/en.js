@@ -774,6 +774,9 @@ module.exports = {
   'dash.stat.allocated': '{pct}% allocated',
   'dash.stat.used': '{pct}% used',
   'dash.stat.review': 'review in Transactions',
+  'dash.stat.notIncome': '{amount} in, not counted',
+  'dash.stat.missing': 'Missing categories',
+  'dash.stat.missingSub': { one: '{count} transaction — recategorise', other: '{count} transactions — recategorise' },
 
   'dash.col.category': 'Category',
   'dash.col.budget': 'Budget',

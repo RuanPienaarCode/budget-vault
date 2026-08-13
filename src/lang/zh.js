@@ -729,6 +729,9 @@ module.exports = {
   'dash.stat.allocated': '已分配 {pct}%',
   'dash.stat.used': '已用 {pct}%',
   'dash.stat.review': '在交易页面查看',
+  'dash.stat.notIncome': '已入账 {amount}，未计入',
+  'dash.stat.missing': '缺失的分类',
+  'dash.stat.missingSub': { other: '{count} 笔交易 — 需重新分类' },
 
   'dash.col.category': '分类',
   'dash.col.budget': '预算',

@@ -287,6 +287,21 @@ module.exports = function registerPeriod(ctx) {
     return out;
   }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
+  /* Does a category file actually answer to this name?
+
+     The companion to catType, and deliberately a SEPARATE question. catType
+     returns null both for "this row has no category" and for "this row names a
+     category that isn't there", and collapsing those two is the same mistake
+     detectHeaderlessColumns made with `verified:false` — "disproved" and "no
+     evidence" are different answers, and reading one as the other is how a
+     guess gets laundered into a number.
+
+     Both states are reachable on supported paths: promptDeleteCategory leaves
+     the name on existing rows on purpose, and there is no rename UI, so
+     renaming a category means editing its file and orphaning every row that
+     used it. Same exact-name match, through the same list, so catType and this
+     can never disagree about which categories exist. */
+  function catKnown(name) { return !!name && S.categories.some(c => c.name === name); }
   /* Is this category one whose budgeted amount IS its actual spend? See the
      comment on the flag in src/load.js. Its own lookup rather than a field on
      the budget row, because the answer belongs to the category and has to hold
@@ -318,10 +333,25 @@ module.exports = function registerPeriod(ctx) {
      counting it here would carry the same overspend forward a second time, and
      then a third, growing by itself every month with no bank line anywhere
      behind it. The money that dug the hole is already in `spend`, in whichever
-     period and category it actually left. */
+     period and category it actually left.
+
+     Read off `net` — the signed sum of every counted row — and NOT off
+     `spend - income`, which is the same sentence written a second way and drew
+     a different answer. `spend` is gross outgoings and counts an uncategorised
+     payment in full; `income` counts only income-TYPED rows, so the deposit
+     beside it was credited to nothing. Every period holding uncategorised money
+     in was therefore reported deeper in the hole than it was — on the vault
+     this was found against, two periods' stated overspend was out by R14 052
+     and R11 752, and a third was offered here as a hole to carry for a period
+     that had actually finished ahead. Two figures derived by different rules,
+     which is this codebase's recurring bug shape; there is now one rule and
+     one figure. */
   function periodDeficit(p) {
-    const sum = periodSummary(p);
-    return sum.spend - sum.income;
+    /* `0 - net`, not `-net`: negating a zero balance yields NEGATIVE zero,
+       which money() formats as "-R0.00" — the same break-even wart this repo
+       has already shipped once, on the Accounts hero. Subtracting from zero
+       gives the same answer everywhere else and a positive zero here. */
+    return 0 - periodSummary(p).net;
   }
 
   function periodSummary(p) {
@@ -334,18 +364,58 @@ module.exports = function registerPeriod(ctx) {
     // Transactions still lists every row, so nothing goes invisible.
     const skip = nonBudgetLabels();
     const tx = txInRange(start, end).filter(t => !t.excluded && !skip.has(t.label));
-    let income = 0, spend = 0, uncategorised = 0, uncatSpend = 0;
+    let income = 0, spend = 0, net = 0, uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
+    const unknown = { count: 0, spend: 0, income: 0, names: [] };
+    const unknownSeen = new Set();
     // Object.create(null): a category named "constructor" or "__proto__"
     // otherwise collides with Object.prototype instead of getting its own
     // slot — src/views/debts.js:224 does the same for the same reason.
     const byCat = Object.create(null);
     for (const t of tx) {
       const type = catType(t.cat);
-      if (!t.cat) uncategorised++;
+      /* A transfer is money moving between the reader's own pockets. It leaves
+         the arithmetic entirely rather than netting to zero inside it, because
+         the two legs need not land in the same period. */
       if (type === 'transfer') continue;
+
+      /* THE LEDGER LINE, taken before any classification can decline the row.
+
+         `net` is the signed sum of everything counted, and periodDeficit reads
+         nothing else. That is what stops a classification bug from becoming a
+         money bug: a wrong bucket is now a wrong LABEL, where it used to be a
+         missing rand. The chain below used to be `if income … else if negative`
+         with no final else, so an uncategorised deposit, a refund inside an
+         expense category, and money under a name no category file answers to
+         each matched nothing and were counted by nothing — while `spend`
+         counted their outgoing siblings in full. On the vault this was found
+         in, that put five figures of deposits beyond the reach of every total
+         built on `income`, and turned a period that had finished ahead into a
+         reported overspend — which is the figure the Budget page offers to
+         carry forward as money already spent.
+
+         tests/summary-conservation.test.cjs pins the buckets back to this sum,
+         so a future branch that swallows a row breaks arithmetic rather than
+         quietly shrinking a total. */
+      net += t.amount;
       byCat[t.cat || ''] = (byCat[t.cat || ''] || 0) + t.amount;
+
+      /* THREE states, not two. "" is a row nobody has categorised yet. A name
+         no category file answers to is a different thing entirely — see
+         catKnown above for why both are reachable — and it used to be invisible:
+         `uncategorised` did not count it, so nothing on screen said a word.
+         Neither state can ever resolve to a transfer type, so counting them
+         after that skip changes nothing. */
+      if (!t.cat) {
+        uncategorised++;
+        if (t.amount < 0) uncatSpend += -t.amount; else uncatIncome += t.amount;
+      } else if (!catKnown(t.cat)) {
+        unknown.count++;
+        if (t.amount < 0) unknown.spend += -t.amount; else unknown.income += t.amount;
+        if (!unknownSeen.has(t.cat)) { unknownSeen.add(t.cat); unknown.names.push(t.cat); }
+      }
+
       if (type === 'income') income += t.amount;
-      else if (t.amount < 0) { spend += -t.amount; if (!t.cat) uncatSpend += -t.amount; }
+      else if (t.amount < 0) spend += -t.amount;
     }
     /* `uncatSpend` is the GROSS outgoing half of the uncategorised bucket, and
        it is deliberately not derivable from byCat[''], which is a NET figure. A
@@ -353,8 +423,14 @@ module.exports = function registerPeriod(ctx) {
        uncategorised deposits nets POSITIVE, so byCat[''] reports nothing while
        `spend` above has already counted the whole R16 895. The Dashboard's
        donut discloses what it left out by subtracting from `spend`, so it needs
-       the same half of the bucket that `spend` counted — see renderSplit. */
-    return { income, spend, uncategorised, uncatSpend, byCat, count: tx.length };
+       the same half of the bucket that `spend` counted — see renderSplit.
+
+       `uncatIncome` is its other half, and the Dashboard's Income tile
+       discloses it for the same reason: money that arrived with no category is
+       NOT counted as income (it may be a transfer in from savings, and
+       guessing would inflate every ratio built on income), but a figure that
+       quietly omits R21 440 has to say so where it is read. */
+    return { income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat, count: tx.length };
   }
   /* A monthly income figure, for the one page that has to talk in months no
      matter what the period length is (Debt — an instalment is quoted monthly,
@@ -475,6 +551,6 @@ module.exports = function registerPeriod(ctx) {
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
     txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, accountsWithFolder, nonBudgetLabels,
-    intervalDays, periodKeyValid, catAssumeSpent, assumedSpend, periodDeficit,
+    intervalDays, periodKeyValid, catAssumeSpent, catKnown, assumedSpend, periodDeficit,
   });
 };

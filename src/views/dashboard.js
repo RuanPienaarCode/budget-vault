@@ -653,10 +653,24 @@ module.exports = function registerDashboard(ctx) {
     const meter = el('div', { class: `hero-meter${heroNegative ? ' over' : ''}` },
       el('i', { style: `width:${fillPct}%` }));
     if (markPct !== null) meter.append(el('span', { class: 'hero-mark', style: `left:${markPct}%`, 'aria-hidden': 'true' }));
+    /* Money that ARRIVED but is not in the Income figure: deposits nobody has
+       categorised, plus deposits under a category name no file answers to.
+
+       Not counted as income on purpose — an uncategorised deposit may be a
+       transfer in from savings, and guessing would inflate every ratio built on
+       income. But the tile is read as "what came in this period", and on the
+       vault this was found in one period was quietly R21 440 short of that. So
+       it says so, the way the donut below already discloses its own gap.
+       Refunds are deliberately NOT in here: they are money back inside a
+       category, already netted off that category's own actual, and calling
+       them uncounted income would be the noise that stops people reading the
+       line at all. Silent under a currency unit, where only rounding lives. */
+    const inUncounted = (sum.uncatIncome || 0) + ((sum.unknown && sum.unknown.income) || 0);
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
-        el('div', {}, el('div', { class: 'sv grad-txt' }, money(sum.income)))),
+        el('div', {}, el('div', { class: 'sv grad-txt' }, money(sum.income)),
+          inUncounted >= 1 ? el('div', { class: 'st' }, i18n.t('dash.stat.notIncome', { amount: money(inUncounted) })) : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.budgeted'))),
         el('div', {}, el('div', { class: 'sv' }, money(bud.spend)),
@@ -670,6 +684,24 @@ module.exports = function registerDashboard(ctx) {
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.uncategorised'))),
         el('div', {}, el('div', { class: 'sv', style: 'color: var(--color-warning)' }, String(sum.uncategorised)),
           el('div', { class: 'st' }, i18n.t('dash.stat.review')))));
+    /* A category name no category file answers to — its OWN state, not a
+       flavour of uncategorised, and the reason this tile exists at all.
+
+       Deleting a category leaves the name on its rows by design, and there is
+       no rename UI, so renaming one means editing the file and orphaning every
+       row that used it. Nothing said so: `catType` answered null, which reads
+       downstream as "not income", so an orphaned DEPOSIT was counted by
+       nothing, and an orphaned TRANSFER category silently turned every past
+       transfer into real spending. The count is of CATEGORIES, since that is
+       what the reader has to go and fix; the rows they touch are the sub-line,
+       and the names themselves ride on the title for a pointer without a wall
+       of text on a phone. */
+    if (sum.unknown && sum.unknown.count > 0) statCol.append(
+      el('div', { class: 'stat' },
+        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.missing'))),
+        el('div', {}, el('div', { class: 'sv', style: 'color: var(--color-warning)' }, String(sum.unknown.names.length)),
+          el('div', { class: 'st', title: sum.unknown.names.join(', ') },
+            i18n.t('dash.stat.missingSub', { count: sum.unknown.count })))));
     const hour = new Date().getHours();
     const greeting = i18n.t(hour < 5 ? 'dash.greet.evening' : hour < 12 ? 'dash.greet.morning' : hour < 18 ? 'dash.greet.afternoon' : 'dash.greet.evening');
     hero.append(el('div', { class: 'hero-grid' },
