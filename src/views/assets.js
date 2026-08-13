@@ -14,7 +14,6 @@
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd } = require('../markdown');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');

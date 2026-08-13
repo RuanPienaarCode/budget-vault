@@ -3,7 +3,7 @@
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd } = require('../markdown');
+const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
 /* The definitions of "outstanding" and "settled" now live in owed-math.js,
@@ -110,17 +110,18 @@ module.exports = function registerOwed(ctx) {
     toast(`${money(amount)} back from ${o.person}`);
   }
 
+  /* Columns, escaping and number formatting come from the same declaration
+     the loader reads with (table-schema.js, ADR-0003); only the prose is
+     this view's own. */
   function serializeOwed() {
-    const lines = ['---', ...(S.owedFm || 'kind: owed').split('\n'), '---', '', '# Owed Money', '',
-      'Money owed to the household. `status` is `outstanding` or `paid`.',
-      '`Repaid` is how much has come back; `Lent` is when it went out.', '',
-      '| Person | Amount | Description | Due date | Status | Repaid | Lent |',
-      '|--------|-------:|-------------|----------|--------|-------:|------|'];
-    for (const o of S.owed) {
-      lines.push(`| ${escMd(o.person)} | ${o.amount.toFixed(2)} | ${escMd(o.description)} | ${escMd(o.due)} | ${o.status} | ${(o.repaid || 0).toFixed(2)} | ${escMd(o.lent || '')} |`);
-    }
-    lines.push('');
-    return lines.join('\n');
+    return mdTableFile({
+      fm: S.owedFm, fallback: 'kind: owed', title: 'Owed Money',
+      prose: [
+        'Money owed to the household. `status` is `outstanding` or `paid`.',
+        '`Repaid` is how much has come back; `Lent` is when it went out.',
+      ],
+      schema: SCHEMAS.owed, rows: S.owed,
+    });
   }
 
   async function saveOwed() {

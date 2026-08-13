@@ -305,18 +305,7 @@ module.exports = function registerLoad(ctx) {
     S.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
     if (owedTxt) for (const c of parseMdTable(owedTxt).slice(1)) {
       if (!c[0]) continue;
-      /* Columns 5 and 6 (repaid, lent) are additive: a file written before they
-         existed has neither, and must mean exactly what it always meant —
-         nothing repaid, no lending date. Never reorder the first five. */
-      S.owed.push({
-        // parseNum, not parseFloat, for the reason spelled out on the debt
-        // balances below — and with the same consequence, because serializeOwed
-        // writes the parsed number straight back with toFixed(2).
-        person: unescMd(c[0]), amount: parseNum(c[1] || '0').value || 0, description: unescMd(c[2] || ''),
-        due: (c[3] || '').trim(), status: (c[4] || 'outstanding').trim().toLowerCase() === 'paid' ? 'paid' : 'outstanding',
-        repaid: parseNum(c[5] || '0').value || 0,
-        lent: (c[6] || '').trim(),
-      });
+      S.owed.push(rowToObject(SCHEMAS.owed, c));
     }
 
     S.debts = []; S.debtsDirty = false;
