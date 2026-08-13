@@ -45,13 +45,15 @@ module.exports = function registerSavings(ctx) {
     tile('Savings', money(totalSavings));
     tile('Investments', money(totalInvest));
     growthTile(tile, entries);
-    /* Was "Credit debt", and counted only credit-card accounts — which left it
-       disagreeing with the chart six inches below, and with a net worth that
-       now includes a home loan. One definition of owed, used everywhere. */
-    tile('Debt', money(-w.liabilities), 'text-danger',
-      w.fromDebts && w.fromAccounts
-        ? `${money(w.fromAccounts, 0)} accounts · ${money(w.fromDebts, 0)} debt page`
-        : null);
+    /* NO DEBT TILE HERE, deliberately — it was removed rather than lost.
+       This page is about what the household is putting away and what that has
+       earned; what it owes has a page of its own, and the composition chart
+       directly below already states the same liabilities figure inside the net
+       worth it breaks down. On a vault with no debts the tile was a red
+       "R 0,00" sitting in a strip of savings figures, which reads as a warning
+       about nothing. The definition it used — worth()'s liabilities, accounts
+       and debt page together — is the one that survives, on the chart and on
+       Debts; nothing about "one definition of owed" depended on this tile. */
 
     renderStaleNote();
     renderWorth();
