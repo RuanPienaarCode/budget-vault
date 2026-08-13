@@ -2380,6 +2380,58 @@
 @media (pointer: coarse) {
   .budget-app-root .btn-ghost-sm { min-height: 44px; padding: 0.55rem 0.9rem; }
   .budget-app-root .note-actions { gap: 10px; }
+
+  /* Every other control rises to the same 44pt floor, two ways.
+
+     OVERLAY — every button grows an invisible, centred ::after sized
+     max(100%, 44px) on both axes (min()/max() are Safari 13.1+, well under
+     the iOS 15 floor). The overlay hit-tests as part of the button but costs
+     zero layout, which is what the geometry-load-bearing spots need: the
+     topbar pill, the period chevrons, chips and note buttons inside dense
+     table rows. No rule anywhere — ours or Obsidian's app.css — puts content
+     in a button's ::after, so the slot is free. Where two neighbours'
+     overlays overlap, the later DOM sibling wins the shared strip; each
+     button's centre always stays its own, and the closest neighbours this
+     bites (the period chevrons) cost one reversible month-step on a miss.
+
+     GROW — toolbars, chip rows and list rows whose height is free to
+     thicken also get a real min-height, so the visible control (not just
+     its halo) reads finger-sized. <select> is a replaced element that
+     renders no pseudo, so growing is the only option it has. */
+  .budget-app-root button { position: relative; }
+  .budget-app-root button::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .budget-app-root .btn-ghost,
+  .budget-app-root .btn-gradient,
+  .budget-app-root select.form-select-sm,
+  .budget-app-root .chart-range-btn,
+  .budget-app-root .loan-tab,
+  .budget-app-root .acct-deck-btn,
+  .budget-app-root .acct-seg,
+  .budget-app-root .acct-drawer-act,
+  .budget-app-root .acct-recon-btn,
+  .budget-app-root .kpi-caveat-btn,
+  .budget-app-root .env-add,
+  .budget-app-root .donut-legend .dl-link,
+  .budget-app-root .note-title { min-height: 44px; }
+
+  /* Envelope checklist rows are ~18px apart at rest — stacked 44px overlays
+     there would claim each other's rows wholesale. Give the row itself the
+     44px, so each tick/name overlay lands inside its own row. */
+  .budget-app-root .env-item { min-height: 44px; align-items: center; }
+
+  /* Native-appearance checkboxes render no pseudo either, so the control
+     itself grows. 32px is the ceiling before WebKit's native tick starts to
+     look inflated; the surrounding row (which the overlay rule thickens for
+     its sibling buttons) carries the rest of the target. */
+  .budget-app-root input[type='checkbox'] { width: 32px; height: 32px; }
 }
 
 /* Date fields. iOS WKWebView's date control has a large intrinsic minimum that
