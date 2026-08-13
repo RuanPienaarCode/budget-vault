@@ -3,6 +3,34 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.17.3 — 2026-08-13
+
+Phase three closes the four-lane audit of 1.17.0: polish, latent traps, and
+housekeeping. Nothing here changes a figure you have already seen.
+
+### Fixed
+
+- **Bigger touch targets on a phone.** Row-action buttons ("Open", "Change
+  subject", "Delete" on a note card, and their siblings across the app) now
+  meet Apple's 44-point minimum on touch screens, with more space between
+  them — so a near-miss lands on nothing instead of on Delete. Desktop
+  spacing is unchanged.
+
+- **The fact-review reminder respects your timezone.** The banner asking you
+  to re-check a tax bracket or levy read the date in UTC, so it could appear
+  up to two hours before the review date actually arrived locally.
+
+- **Two latent traps closed before they could bite.** A savings account with
+  a deliberate starting amount of 0 now reads as a real baseline on every
+  code path (previously one path would have called it unmeasurable), and the
+  trend/comparison arithmetic moved into its own tested module — the maths
+  behind "how does this month compare" now has 20 assertions of its own.
+
+### Changed
+
+- **Neutral example names.** Placeholders and examples throughout the app
+  and its source now say "Alex, Sam" instead of the author's household.
+
 ## 1.17.2 — 2026-08-13
 
 Phase two of the four-lane audit: the credit-card rules on the "What's left"
