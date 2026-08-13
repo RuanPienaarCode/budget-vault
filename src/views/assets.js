@@ -15,6 +15,7 @@
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd } = require('../markdown');
+const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
 const { todayIso } = require('../dates');
@@ -163,18 +164,19 @@ module.exports = function registerAssets(ctx) {
     }
   }
 
+  /* Columns, escaping and number formatting come from the same declaration
+     the loader reads with (table-schema.js, ADR-0003); only the prose is
+     this view's own. */
   function serializeAssets() {
-    const lines = ['---', ...(S.assetsFm || 'kind: assets').split('\n'), '---', '', '# Assets', '',
-      'What the household owns that is not an account — property, vehicles, contents,',
-      'jewellery, metals. `Value` is what it would sell for today and `Valued` is when',
-      'that was last worked out. Money owed against any of these lives on the Debt page.', '',
-      '| Item | Kind | Value | Valued | Notes |',
-      '|------|------|------:|--------|-------|'];
-    for (const a of S.assets) {
-      lines.push(`| ${escMd(a.name)} | ${escMd(a.type)} | ${a.value.toFixed(2)} | ${escMd(a.valued)} | ${escMd(a.notes)} |`);
-    }
-    lines.push('');
-    return lines.join('\n');
+    return mdTableFile({
+      fm: S.assetsFm, fallback: 'kind: assets', title: 'Assets',
+      prose: [
+        'What the household owns that is not an account — property, vehicles, contents,',
+        'jewellery, metals. `Value` is what it would sell for today and `Valued` is when',
+        'that was last worked out. Money owed against any of these lives on the Debt page.',
+      ],
+      schema: SCHEMAS.assets, rows: S.assets,
+    });
   }
 
   async function saveAssets() {

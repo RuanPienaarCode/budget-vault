@@ -7,6 +7,10 @@ const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
 const { parseCsv } = require('./csv');
+/* One declaration per flat table drives this loader's reads AND the views'
+   writes — ADR-0003. The generic reader is called here ONLY; downstream
+   consumers of transaction rows still go through tx-role.js. */
+const { SCHEMAS, rowToObject } = require('./table-schema');
 const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
@@ -342,25 +346,15 @@ module.exports = function registerLoad(ctx) {
       });
     }
 
-    /* Assets — what the household owns that is not an account. Every column
-       after Name is optional and every one of them is additive, so an
-       Assets.md written by hand with nothing but a name and a value loads. */
+    /* Assets — what the household owns that is not an account. Columns,
+       defaults and the strict-parse rules live in table-schema.js (ADR-0003):
+       one declaration drives this read and the view's write. */
     S.assets = []; S.assetsDirty = false;
     const assetTxt = await readFile('Assets.md');
     S.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
     if (assetTxt) for (const c of parseMdTable(assetTxt).slice(1)) {
       if (!c[0]) continue;
-      S.assets.push({
-        name: unescMd(c[0]), type: unescMd(c[1] || 'other'),
-        // parseNum, not parseFloat, for the reason spelled out on the debt
-        // balances above: a hand-typed "15 000 000" read as 15 would be
-        // written straight back over a figure nobody was editing. No *Raw
-        // write-back though — like a debt balance this is arithmetic input,
-        // so a cell the strict parser rejects falls back to 0 and is
-        // rewritten canonically rather than preserved verbatim.
-        value: Math.max(0, parseNum(c[2] || '0').value || 0),
-        valued: (c[3] || '').trim(), notes: unescMd(c[4] || ''),
-      });
+      S.assets.push(rowToObject(SCHEMAS.assets, c));
     }
 
     S.services = []; S.servicesDirty = false;
