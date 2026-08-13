@@ -3,6 +3,89 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.19.0 — 2026-08-13
+
+Nothing in this app is one-way any more — and what made that urgent is a bug
+that had been quietly leaving money out of the record for two years.
+
+### Fixed
+
+- **Capitec's `Fee` column is read.** That export has THREE mutually exclusive
+  amount columns — Money In, Money Out and Fee — and the importer read two, so
+  every bank charge landed in the third and vanished. On the statement this was
+  found against that is **553 rows and R1,542.50 over 25 months**, all of it
+  spending, none of it visible anywhere to be missed: no error, no warning, no
+  skipped-row count, and a "bank fees" budget line built from data that was
+  short R62 a month. Fee is now read after the other two, honouring the cell's
+  own sign — 8 of those rows are reversals (`Correction: Cash Withdrawal Fee`,
+  +30.00), and negating by magnitude would invent money leaving, which is worse
+  than failing to see it leave. Rows with all three columns empty are still
+  skipped; they are notices, not transactions. **Vaults imported before this
+  are still short those rows — re-import the same statements and only the fee
+  rows land, because everything already on disk is skipped as an exact
+  duplicate.**
+
+- **Those fee rows also fixed the reconciliation.** A balance column that steps
+  across rows nothing has read cannot line up, so these files could never prove
+  their own sign convention. They do now.
+
+- **A statement can no longer land in the wrong account.** The file's own
+  account number — Capitec's `Account` column, Nedbank's preamble — is checked
+  against the account picked, and a disagreement BLOCKS the import rather than
+  warning about it. One wrong pick in that dropdown wrote 933 rows of one
+  account's history into another; it survived a year of daily use because the
+  result looks entirely normal, and was found only by hashing the monthly files
+  and noticing 25 byte-identical pairs across two folders. An account with no
+  number recorded is offered the one the file carries. A masked tail (`…0098`)
+  matches the full number; anything ambiguous stays silent rather than blocking.
+
+- **Rows the bank still marks `(Pending)` arrive unticked.** The marker is
+  stripped before the merchant comparison, so a settled row can absorb its
+  pending twin — but the pair's amounts can differ (a tip, a fuel pre-auth, a
+  currency conversion), and no rewriting rule matches across a changed amount.
+  The honest answer is to let the purchase arrive settled on the next statement.
+
+### Added
+
+- **Delete, everywhere this app can create.** A trash button on every
+  transaction row — deleting a split parent takes its parts with it, and
+  deleting a part says plainly that the remainder no longer sums to the
+  original. Accounts, plans and tax years get their own.
+
+- **Deleting an account asks about its transactions folder** rather than
+  assuming, with the row and file counts in the question. Kept, those rows
+  still count toward every period total under a folder no account claims — the
+  orphan folder `CONTEXT.md` names. It is a choice, not a default.
+
+- **Delete these rows** removes what the Transactions filters select, for the
+  wrong statement noticed a week later. It refuses without a filter, refuses
+  over unsaved edits, and writes the rows to `Data/Deleted transactions.csv`
+  first: the vault trash cannot undo a row delete, because the monthly file is
+  edited rather than removed.
+
+- **Undo import.** A commit now leaves a receipt holding the rows it added, so
+  an undo removes exactly those — even where every row has a twin. It appears
+  on the Transactions page, because that is where a mis-picked account is
+  actually noticed, and it does not survive a vault re-read (which rebuilds
+  every row) rather than becoming an undo that silently removes nothing.
+
+- **Deleting a tax year leaves `Tax/<year>/` alone.** The plugin wrote the
+  page; your bank wrote the certificates. The folder lands in the orphan-year
+  state this page already offers to build a fresh year around.
+
+- **Touch targets meet Apple's 44pt floor.** On coarse pointers every button
+  grows an invisible centred hit area, and toolbars, chip rows and list rows
+  free to thicken get a real `min-height`. Desktop density is untouched.
+
+### Changed
+
+- Two new guard suites. `delete-and-undo` drives the real views with the modals
+  stubbed, because the dialogs are where the decisions are taken.
+  `import-fee-column` reconciles a three-column statement row for row from
+  bytes to disk — the multiset of (date, amount) in both directions plus the
+  sums, which fails as loudly on a double-count or a flipped sign as on a
+  dropped row.
+
 ## 1.18.0 — 2026-08-13
 
 Columns are now declared once. Nothing you can see changed — and this release
