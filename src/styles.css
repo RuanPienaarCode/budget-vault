@@ -2394,12 +2394,20 @@
      button's centre always stays its own, and the closest neighbours this
      bites (the period chevrons) cost one reversible month-step on a miss.
 
+     The overlay CANNOT save a button that clips itself: overflow:hidden on
+     the button (`.cat-cell-btn`, for its text ellipsis) clips its own
+     ::after back to the border box, so any self-truncating button must be
+     in the GROW list instead. And :not(.mod-loading) keeps the slot clear
+     of Obsidian's async-button spinner, which is ALSO a button ::after —
+     unused in this plugin today, but a blanket rule here would stretch
+     that 12px spinner ring to the full 44px halo the day one appears.
+
      GROW — toolbars, chip rows and list rows whose height is free to
      thicken also get a real min-height, so the visible control (not just
      its halo) reads finger-sized. <select> is a replaced element that
      renders no pseudo, so growing is the only option it has. */
-  .budget-app-root button { position: relative; }
-  .budget-app-root button::after {
+  .budget-app-root button:not(.mod-loading) { position: relative; }
+  .budget-app-root button:not(.mod-loading)::after {
     content: '';
     position: absolute;
     left: 50%;
@@ -2421,11 +2429,21 @@
   .budget-app-root .env-add,
   .budget-app-root .donut-legend .dl-link,
   .budget-app-root .note-title { min-height: 44px; }
+  /* .cat-cell-btn grows too, but its rule lives beside its base rule below:
+     that base rule also sets min-height, and at equal specificity the later
+     declaration wins — parked here, the override loses the source-order tie. */
 
   /* Envelope checklist rows are ~18px apart at rest — stacked 44px overlays
-     there would claim each other's rows wholesale. Give the row itself the
-     44px, so each tick/name overlay lands inside its own row. */
-  .budget-app-root .env-item { min-height: 44px; align-items: center; }
+     there would claim each other's rows wholesale. Symmetric padding gives
+     the row the 44px so each tick/name overlay lands inside its own row —
+     and inside the .env card, whose overflow:hidden would clip any halo
+     that escaped the row. Padding, not align-items: the base .env-item
+     rule keeps flex-start deliberately (ticks must line up with a wrapped
+     label's FIRST line, see its comment) and sits later in the file at the
+     same specificity, so an align-items here would silently lose the tie
+     anyway. 13px + 17px tick + 13px = 43, and min-height carries the last
+     pixel with no stretch worth centering. */
+  .budget-app-root .env-item { min-height: 44px; padding-block: 13px; }
 
   /* Native-appearance checkboxes render no pseudo either, so the control
      itself grows. 32px is the ceiling before WebKit's native tick starts to
@@ -2579,6 +2597,16 @@
 }
 .budget-app-root .cat-cell-btn:hover { border-color: var(--border-color); background: var(--surface); }
 .budget-app-root .cat-cell-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+/* On touch this is the app's highest-frequency target (categorise a row), and
+   the overlay technique in the shared coarse block cannot reach it — the
+   ellipsis needs overflow:hidden above, which clips the button's own ::after
+   back to its border box. So it GROWS, and the override sits here rather than
+   in that block because the base rule above also sets min-height: at equal
+   specificity the later declaration wins the tie, and up there this would
+   lose it. */
+@media (pointer: coarse) {
+  .budget-app-root .cat-cell-btn { min-height: 44px; }
+}
 .budget-app-root .cat-cell-empty { color: var(--text-light); font-style: italic; }
 .budget-app-root .cat-cell .category-select { width: 100%; }
 
