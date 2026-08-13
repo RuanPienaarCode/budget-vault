@@ -3,6 +3,57 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.19.1 — 2026-08-13
+
+Money that arrived was being counted by nothing. Three different ways in,
+one cause, and the figure it corrupted is the one the Budget page offers
+to carry forward as already spent.
+
+### Fixed
+
+- **A period's overspend now credits every rand that came in.** The figure
+  behind "pull last month's overspend" was computed as total spent minus
+  total income — which is not the same thing as what went out less what came
+  in, because "total spent" counts an uncategorised payment in full while
+  "total income" counts only rows in an income category. So the deposit
+  beside it was credited to nothing. Any period holding uncategorised money
+  in, a refund inside a spending category, or money under a category that
+  had since been deleted was reported deeper in the hole than it was — on
+  the vault this was found against, **one period was overstated by R14,052
+  and another by R11,752, and a third reported an overspend in a month that
+  had comfortably finished ahead.** That number is written into an
+  assume-spent budget row, so the app was not merely mis-stating those
+  holes, it was funding them. If you have ever pulled an overspend forward,
+  the figure is worth re-checking against this release.
+
+- **Total Income says what it is leaving out.** Money that arrives with no
+  category is still not counted as income — it may be a transfer in from
+  your own savings, and guessing would inflate every ratio built on income —
+  but the tile now names the amount underneath itself, the way the spending
+  donut has always declared its own gap. Refunds are deliberately not in
+  that note: they are money back inside a category, already netted off that
+  category's own actual.
+
+- **A category that no longer exists is now visible.** Deleting a category
+  leaves its name on existing transactions on purpose, and renaming one
+  means editing the file, which orphans every row that used it. Nothing said
+  so. Those rows were treated as "not income", so an orphaned PAYMENT still
+  counted as spending while an orphaned DEPOSIT was counted by nothing at
+  all — and the "Uncategorised" tile never mentioned them, because it only
+  ever counted a blank category. A **Missing categories** tile now shows how
+  many categories have gone missing and how many transactions they touch.
+  Worth knowing if you use a transfer category: its rows stop being excluded
+  from your totals the moment its file is renamed.
+
+### Internal
+
+- The per-period summary now takes a single signed ledger total before it
+  classifies anything, and the overspend figure is derived from that and
+  nothing else — so a mistake in classification can now make a label wrong,
+  where it used to make a rand disappear. `tests/summary-conservation.test.cjs`
+  pins the buckets back to that total over 60 randomised rounds, checked
+  against an independent oracle rather than against the code under test.
+
 ## 1.19.0 — 2026-08-13
 
 Nothing in this app is one-way any more — and what made that urgent is a bug
