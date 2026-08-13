@@ -756,6 +756,9 @@ module.exports = {
   'dash.stat.allocated': '{pct}% zugeteilt',
   'dash.stat.used': '{pct}% genutzt',
   'dash.stat.review': 'in Transaktionen prüfen',
+  'dash.stat.notIncome': '{amount} eingegangen, nicht gezählt',
+  'dash.stat.missing': 'Fehlende Kategorien',
+  'dash.stat.missingSub': { one: '{count} Buchung — neu zuordnen', other: '{count} Buchungen — neu zuordnen' },
 
   'dash.col.category': 'Kategorie',
   'dash.col.budget': 'Budget',

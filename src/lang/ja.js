@@ -729,6 +729,9 @@ module.exports = {
   'dash.stat.allocated': '{pct}% 配分済み',
   'dash.stat.used': '{pct}% 使用',
   'dash.stat.review': '取引ページで確認',
+  'dash.stat.notIncome': '{amount} 入金、未計上',
+  'dash.stat.missing': '欠落カテゴリ',
+  'dash.stat.missingSub': { other: '{count} 件の取引 — 再分類が必要' },
 
   'dash.col.category': 'カテゴリ',
   'dash.col.budget': '予算',

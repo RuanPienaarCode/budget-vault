@@ -741,6 +741,55 @@ async function mount(files, period = '2026-07') {
     eq(sum.uncatSpend, 500, 'and periodSummary reports the outgoing half of the bucket separately');
     const shown = 1000;                       // Groceries: 1200 out, 200 back
     eq(shown + 500 + 200, sum.spend, 'donut + what it declared leaves nothing unexplained');
+
+    /* The SAME disclosure, one tile up. The donut had always declared its gap
+       on the spending side while the Income tile above it stayed silent about
+       the other half: the R900 that came in with no category is not counted as
+       income (it could be a transfer in from savings), so the figure is short
+       by exactly that and has to say so. The refund is deliberately NOT in the
+       note — it is money back inside a category, already netted off that
+       category's own actual. */
+    eq(sum.uncatIncome, 900, 'the incoming half of the uncategorised bucket is reported');
+    const hero = nodes.get('heroCard').textContent;
+    ok(/R 900\.00 in, not counted/.test(hero),
+      `the Income tile discloses money that arrived without a category — got: ${hero}`);
+    ok(!/1 100\.00 in, not counted/.test(hero),
+      'and does not sweep the refund in with it');
+  }
+
+  /* --- 13b. a category name no category file answers to ---------------- *
+     Its own state, and the one that used to be silent in every direction.
+     Deleting a category leaves the name on its rows on purpose, and there is
+     no rename UI — so renaming one orphans every row that used it. `catType`
+     answered null for those rows, which reads downstream as "not income", so
+     the outgoing ones landed in spend while the INCOMING ones were counted by
+     nothing at all and announced by nothing: the "Uncategorised" tile only
+     ever counted a BLANK category. */
+  {
+    const ORPHAN = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile([
+        ['2026-07-03', 'Woolworths', 'Groceries', -1200],
+        ['2026-07-05', 'Refund run', 'Grocries', 400],     // renamed away, money IN
+        ['2026-07-08', 'Old name', 'Grocries', -300],      // …and money out
+        ['2026-07-09', 'Case slip', 'groceries', -100],    // matching is exact: this is missing too
+      ]),
+    };
+    const { ctx, nodes } = await mount(ORPHAN);
+    ctx.renderDashboard();
+    const sum = ctx.periodSummary('2026-07');
+
+    eq(sum.unknown.count, 3, 'three rows name a category no file answers to');
+    eq(sum.unknown.names.slice().sort(), ['Grocries', 'groceries'], 'two distinct names, case included');
+    eq(sum.uncategorised, 0, 'and none of them is "uncategorised" — that word means a BLANK category');
+    eq(sum.unknown.income, 400, 'the incoming half is reported rather than vanishing');
+    eq(sum.spend, 1600, 'the outgoing halves are still gross spend — money out is money out');
+    eq(ctx.periodDeficit('2026-07'), 1200, 'and the deficit credits the R400 that came back in');
+
+    const hero = nodes.get('heroCard').textContent;
+    ok(/Missing categories/.test(hero), `the hero names the state out loud — got: ${hero}`);
+    ok(/3 transactions — recategorise/.test(hero), `and says how many rows it touches — got: ${hero}`);
+    ok(/R 400\.00 in, not counted/.test(hero), 'the orphaned deposit is disclosed beside Income too');
   }
 
   /* --- 14. spend nobody budgeted for is not a blank Remaining cell ------ *

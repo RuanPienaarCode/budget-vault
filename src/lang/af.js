@@ -755,6 +755,9 @@ module.exports = {
   'dash.stat.allocated': '{pct}% toegewys',
   'dash.stat.used': '{pct}% gebruik',
   'dash.stat.review': 'gaan na in Transaksies',
+  'dash.stat.notIncome': '{amount} in, nie getel nie',
+  'dash.stat.missing': 'Vermiste kategorieë',
+  'dash.stat.missingSub': { one: '{count} transaksie — herkategoriseer', other: '{count} transaksies — herkategoriseer' },
 
   'dash.col.category': 'Kategorie',
   'dash.col.budget': 'Begroting',
