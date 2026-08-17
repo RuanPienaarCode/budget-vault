@@ -365,6 +365,15 @@ module.exports = function registerPeriod(ctx) {
     const skip = nonBudgetLabels();
     const tx = txInRange(start, end).filter(t => !t.excluded && !skip.has(t.label));
     let income = 0, spend = 0, net = 0, uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
+    /* Consumer map, so no half of this object reads as orphaned on a cold
+       read: `count`/`names` drive the Dashboard's "Missing categories" stat,
+       and `income` its Income-tile disclosure — a deposit under a missing name
+       is NOT counted as income, so the omission has to be said where the
+       figure is read. `spend` has no tile on purpose: outgoings under a
+       missing name are already inside gross `spend` and drawn as their own
+       donut slices, so there is no omission to disclose. Its job is the
+       conservation identity in tests/summary-conservation.test.cjs, which
+       needs both halves to prove every rand landed somewhere. */
     const unknown = { count: 0, spend: 0, income: 0, names: [] };
     const unknownSeen = new Set();
     // Object.create(null): a category named "constructor" or "__proto__"

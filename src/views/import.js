@@ -733,7 +733,8 @@ module.exports = function registerImport(ctx) {
     for (const f of r.files) {
       const file = S.txFiles[f.key];
       if (!file) continue;
-      const doomed = new Set(f.rows.filter(row => file.rows.includes(row)));
+      const live = new Set(file.rows);
+      const doomed = new Set(f.rows.filter(row => live.has(row)));
       if (doomed.size) targets.push({ file, doomed, dirty: file.dirty });
     }
     const total = targets.reduce((n, t) => n + t.doomed.size, 0);

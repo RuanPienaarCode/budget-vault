@@ -476,8 +476,10 @@ module.exports = function registerDashboard(ctx) {
       say: i18n.t('dash.pos.netWorthSay', { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) }),
     });
 
-    /* Negated for display, like the Savings page's Debt tile, and split by
-       ledger for the same reason it is there: an overdrawn cheque account and a
+    /* Negated for display — owed money reads as a positive figure, the same
+       convention the Savings composition chart uses for its liability slices
+       (the Savings Debt tile that shared it is gone; savings.js says why).
+       Split by ledger for the same reason: an overdrawn cheque account and a
        home loan are both "owed" and live in different files, so a single total
        with no breakdown sends the reader to the wrong page to find it.
 
