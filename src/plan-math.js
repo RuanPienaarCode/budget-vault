@@ -25,7 +25,6 @@
 const SOURCE_KINDS = ['Salary', 'UIF', 'Tax', 'Bonus', 'Gift', 'Sale', 'Once-off', 'Other'];
 
 const ITEM_STATUSES = ['planned', 'part', 'done'];
-const SOURCE_STATUSES = ['received', 'expected'];
 
 const sum = (rows, pick) => rows.reduce((t, r) => t + (Number(pick(r)) || 0), 0);
 
@@ -116,4 +115,4 @@ function sharePct(value, pot) {
 }
 
 module.exports = { planSummary, barSegments, envelopeGap, sharePct, round2, isReceived,
-  SOURCE_KINDS, ITEM_STATUSES, SOURCE_STATUSES };
+  SOURCE_KINDS, ITEM_STATUSES };

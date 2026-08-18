@@ -138,10 +138,6 @@ function setLanguage(code) {
   return current;
 }
 
-function currentLanguage() {
-  return current;
-}
-
 /* Obsidian's own display language, for a vault that has never set `language`.
    Obsidian keeps it in localStorage under `language` (absent or empty for
    English). Both reads are guarded: localStorage throws in restricted contexts,
@@ -235,11 +231,9 @@ function applyDom(root) {
 module.exports = {
   t,
   setLanguage,
-  currentLanguage,
   resolveLanguage,
   defaultLanguage,
   pluralCategory,
-  ordinalDay,
   day,
   applyDom,
   TABLES,

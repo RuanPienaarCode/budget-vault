@@ -254,7 +254,9 @@ module.exports = function registerLoad(ctx) {
        about to be replaced, so after this line it could only ever remove
        nothing — and an undo button that quietly does nothing is worse than no
        button. Cleared HERE, beside the state it depends on, rather than in the
-       callers: reloadFromDisk is not the only door into loadVault. */
+       caller: reloadFromDisk (controller.js) is loadVault's only call site
+       today, but the reset belongs to loadVault regardless — a second caller
+       added later must not have to remember this line too. */
     S.lastImport = null;
     /* Every folder under Transactions/, whether or not it holds a month file.
 

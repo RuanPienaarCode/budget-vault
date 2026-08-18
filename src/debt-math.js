@@ -137,10 +137,15 @@ function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MO
   return { months: m, interest, payoff, settled: !stalled.length, stalled, series };
 }
 
-/* 'YYYY-MM' n months after `from` (a Date, default today). Day-of-month is
-   deliberately dropped: a payoff month is the honest resolution here, and
-   keeping the day would invent precision the model does not have. */
-function addMonths(n, from = new Date()) {
+/* 'YYYY-MM' n months after `from` (a Date, REQUIRED — no clock read here).
+   Day-of-month is deliberately dropped: a payoff month is the honest
+   resolution here, and keeping the day would invent precision the model does
+   not have. Every production caller lives in views/debts.js, which already
+   has an injected today (see its own todayIso() import) — a `new Date()`
+   default here would have been an untested branch no guard test could ever
+   exercise honestly, the same clock-in-a-pure-module trap this module's
+   header steers away from everywhere else. */
+function addMonths(n, from) {
   const d = new Date(from.getFullYear(), from.getMonth() + n, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }

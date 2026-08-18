@@ -10,6 +10,7 @@ const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
+const { todayIso, daysUntil } = require('../dates');
 
 module.exports = function registerTax(ctx) {
   const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
@@ -95,12 +96,11 @@ module.exports = function registerTax(ctx) {
   function activeDeadline(t) {
     return locale().activeDeadline(t);
   }
+  /* The date arithmetic itself lives in dates.js's daysUntil — pure, and
+     tested there. This is a thin view-side wrapper supplying the one thing a
+     pure module cannot: today's real date. */
   function daysTo(iso) {
-    const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return null;
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return Math.round((new Date(+m[1], +m[2] - 1, +m[3]) - today) / 86400000);
+    return daysUntil(iso, todayIso());
   }
 
   function renderTaxKpis(t) {

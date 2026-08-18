@@ -861,7 +861,7 @@ function mountApp(view) {
       if (plugin.settings.privacyLock) { lockGate(); return; }
       await connectVault();
     },
-    /* Called from BudgetView.onClose. These three timers are scheduled by hand
+    /* Called from BudgetView.onClose. These four timers are scheduled by hand
        rather than through Obsidian's register* helpers, so nothing unwinds them
        automatically — and a reload timer that fires after contentEl.empty()
        re-reads the whole vault into a dead view and then throws on the first
@@ -869,6 +869,7 @@ function mountApp(view) {
     destroy: () => {
       clearTimeout(reloadTimer);
       clearTimeout(S._q);
+      clearTimeout(S._acctQ);
       clearTimeout(S._noteQ);
       const t = $('#toast');
       if (t) clearTimeout(t._h);

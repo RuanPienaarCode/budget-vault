@@ -285,13 +285,34 @@ module.exports = function registerAccounts(ctx) {
 
   /* Accept the implied figure. Stamping today is what stops the rows just
      absorbed from being counted a second time: reconcile() only ever folds in
-     rows dated on or before today, so the next window starts clear of them. */
+     rows dated on or before today, so the next window starts clear of them.
+
+     Published on ctx (see the bottom of this file) rather than kept private:
+     Savings & Investments offers the identical "Use this" reconciliation
+     button off its own accounts, and used to carry a hand-copied twin of this
+     function that had drifted out of step with the guard below. One
+     implementation now backs both pages' buttons.
+
+     ctx.render, not renderAccounts — same reasoning as editBalance above:
+     this is reachable from the Savings page too, and renderAccounts() would
+     rebuild the page the reader is NOT looking at. */
   async function acceptImplied(a, implied) {
+    const priorBalance = a.balance, priorBalanceRaw = a.balanceRaw, priorUpdated = a.balance_updated;
     a.balance = implied;
     a.balanceRaw = null;
     a.balance_updated = todayIso();
-    if (!(await saveAccount(a))) return;
-    renderAccounts();
+    if (!(await saveAccount(a))) {
+      // Back the mutation out. Without this, a failed write left the model
+      // stamped with the implied balance and today's date even though the
+      // file on disk still held the old figure — invisible until the next
+      // render of this account, at which point it read "updated today" over
+      // a save that never landed.
+      a.balance = priorBalance;
+      a.balanceRaw = priorBalanceRaw;
+      a.balance_updated = priorUpdated;
+      return;
+    }
+    ctx.render();
     toast(i18n.t('acct.reconciled', { name: a.name, amount: acctMoney(a, implied) }));
   }
 
@@ -1599,12 +1620,13 @@ module.exports = function registerAccounts(ctx) {
   function acctSearch(q) { view().q = q; view().open = null; renderAccounts(); }
   function acctToggleGroup() { const v = view(); v.grouped = !v.grouped; renderAccounts(); }
 
-  /* editBalance and editAccount are shared with views/savings.js rather than
-     copied into it. One account form in this plugin, not two that drift — the
-     fields a type offers, the parsing, and the frontmatter keys written all have
-     exactly one owner. */
+  /* editBalance, editAccount and acceptImplied are shared with views/savings.js
+     rather than copied into it. One account form and one reconcile-accept
+     path in this plugin, not two that drift — the fields a type offers, the
+     parsing, the frontmatter keys written, and the failed-write back-out all
+     have exactly one owner. */
   ctx.provide({ renderAccounts, saveAccount, addAccount, editAccount, editBalance, deleteAccount,
-    openAccountFile, openAccountTransactions: openTransactions,
+    acceptImplied, openAccountFile, openAccountTransactions: openTransactions,
     acctSearch, acctToggleGroup,
     accountReconcile: reconcile, accountUtilisation: utilisationOf, ACCOUNT_FM_KEYS: EDITABLE_KEYS });
 };

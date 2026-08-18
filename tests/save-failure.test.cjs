@@ -284,16 +284,20 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     ok(S.accounts.length === before, 'addAccount: a failed save does not add a phantom account to memory');
   }
 
-  /* ---- 11: Savings' own acceptImplied — the reviewer's C1. It is
-     accounts.js's acceptImplied's twin (case 9) but reached through the
-     "Use this" reconciliation button rather than a Save button, and it was
-     missing the guard its twin already had: a failed write still re-rendered
-     the implied balance and toasted success for a figure that never landed.
-     Reached through the real rendered DOM, not a direct function call —
-     acceptImplied is not published on ctx, only wired to the button's click
-     handler, which is the only way anything outside savings.js can reach it. ---- */
+  /* ---- 11: Savings' own reconcile-accept — the reviewer's C1, now reached
+     through ctx.acceptImplied (accounts.js publishes the one implementation;
+     savings.js's "Use this" button calls straight into it — see
+     views/accounts.js's acceptImplied). It was missing the guard its accounts.js
+     call site already had: a failed write still re-rendered the implied
+     balance and toasted success for a figure that never landed. Reached
+     through the real rendered DOM, not a direct function call. ---- */
   {
-    const { ctx, $ } = await mount();
+    const { ctx, S, $ } = await mount();
+    // Stand-in for controller.js's render(), which dispatches on S.view —
+    // acceptImplied (views/accounts.js) calls ctx.render() rather than
+    // renderSavings()/renderAccounts() directly so the SAME function is
+    // correct from either page (see its header comment).
+    ctx.render = () => ctx.renderSavings();
     const fail = withFailingWrite(ctx);
     ctx.renderSavings();
     // Selector engine here is intentionally minimal (see dom-stub.cjs) and
@@ -303,6 +307,16 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     const btn = $('#savingsSections').querySelectorAll('.acct-recon-btn')[0];
     ok(!!bal && !!btn, 'Savings: the seeded Fund account renders both a balance button and a reconcile offer');
     const beforeText = bal.textContent;
+    const acct = S.accounts.find(a => a.name === 'Fund');
+    // Captured before the click so the guard below proves the in-memory model
+    // itself is left untouched by a failed write — not merely that the screen
+    // didn't repaint. A prior version of this fix stamped a.balance,
+    // a.balanceRaw and a.balance_updated to the implied figure BEFORE the
+    // write, and never backed them out on failure: the DOM stayed correct
+    // (no re-render happened) but the very next render of this account —
+    // triggered by anything else on the page — would have shown the implied
+    // balance stamped "updated today" over a file that never changed.
+    const priorBalance = acct.balance, priorBalanceRaw = acct.balanceRaw, priorUpdated = acct.balance_updated;
     fail.failOn(`${B}/Accounts/Fund.md`);
 
     await assert.doesNotReject(async () => { btn.click(); await flush(); },
@@ -314,6 +328,9 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
       'Savings: a failed reconcile never reports the "reconciled to" success toast');
     ok($('#savingsSections').querySelectorAll('.v')[0].textContent === beforeText,
       'Savings: a failed reconcile does not re-render — the old balance stays on screen, not the implied one');
+    ok(acct.balance === priorBalance, 'Savings: a failed reconcile backs a.balance out to its prior value');
+    ok(acct.balanceRaw === priorBalanceRaw, 'Savings: a failed reconcile backs a.balanceRaw out to its prior value');
+    ok(acct.balance_updated === priorUpdated, 'Savings: a failed reconcile backs a.balance_updated out to its prior value');
 
     // Retry: let the write through. Same button, same click.
     fail.clear();
@@ -323,6 +340,8 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
       'Savings: a retried reconcile that succeeds reports the "reconciled to" toast');
     ok($('#savingsSections').querySelectorAll('.v')[0].textContent !== beforeText,
       'Savings: a retried reconcile that succeeds re-renders the new figure');
+    ok(acct.balance !== priorBalance, 'Savings: a retried reconcile that succeeds actually updates a.balance');
+    ok(acct.balance_updated !== priorUpdated, 'Savings: a retried reconcile that succeeds stamps a.balance_updated');
   }
 
   /* ---- 12 + 13: startTax and newTaxYear — the reviewer's S3. Both seed a

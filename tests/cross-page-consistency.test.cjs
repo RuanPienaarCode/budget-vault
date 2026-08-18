@@ -156,8 +156,18 @@ async function vault(files) {
    renderSplit() (guarded, as ctx.renderSplit) writes #dashSplitSub as
    "{money(total)} across {n} categories · {month}{gapNote}" when total > 0,
    or just "{month}{gapNote}" when it is exactly 0 — so a missing "across"
-   match means the real total was 0, not that the test failed to find it. */
-function donutTotal(ctx) {
+   match means the real total was 0, not that the test failed to find it.
+
+   renderSplit() itself reads S.period, not an argument — this function takes
+   `p` and stamps it onto S.period before rendering so the donut it reads back
+   is provably for the SAME period assertIdentities is comparing against.
+   Every caller today happens to set S.period to the one `p` it ever passes
+   (see the mount() call sites below), so this was latent rather than live —
+   but nothing stopped a future multi-period case from calling this with a
+   `p` that had drifted from S.period and silently comparing one page's
+   current-period donut against another page's named-period identity. */
+function donutTotal(ctx, p) {
+  ctx.S.period = p;
   ctx.renderSplit();
   const dashSplit = ctx._dashNodes.get('dashSplit');
   ok(!hasClass(dashSplit, 'text-danger'),
@@ -190,7 +200,7 @@ function nettingOf(ctx, p, sum) {
 
 function assertIdentities(ctx, p, label) {
   const sum = ctx.periodSummary(p);
-  const donut = donutTotal(ctx);
+  const donut = donutTotal(ctx, p);
   const netting = nettingOf(ctx, p, sum);
 
   eqMoney(sum.spend, donut + sum.uncatSpend + netting,
@@ -243,7 +253,7 @@ function assertIdentities(ctx, p, label) {
 
   // Anchor the fixture before trusting identities proven on it.
   eqMoney(sum.spend, 9700, 'gross spend counts every outgoing: 5000+3000+200+700+800');
-  eqMoney(donutTotal(ctx), 8550, 'donut keeps Groceries net 7850 and Ghost net 700, drops Fun and the blanks');
+  eqMoney(donutTotal(ctx, '2026-08'), 8550, 'donut keeps Groceries net 7850 and Ghost net 700, drops Fun and the blanks');
   eqMoney(sum.uncatSpend, 700, 'uncategorised gross outgoing');
   eqMoney(nettingOf(ctx, '2026-08', sum), 450, 'netting: 150 in Groceries + all 200 of Fun + 100 of Ghost');
 

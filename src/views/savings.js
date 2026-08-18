@@ -8,7 +8,6 @@ const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthSeries } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
-const { symbolOf } = require('../currency');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -20,23 +19,15 @@ const i18n = require('../i18n');
 let worthSeq = 0;
 
 module.exports = function registerSavings(ctx) {
-  /* saveAccount is deliberately NOT destructured here. It is provided by
-     views/accounts.js, so pulling it out at register time made this the one
-     module whose correctness depended on registration ORDER in controller.js
-     — reorder the register calls and it silently became undefined, throwing
-     only when a user edited a savings balance a screen away from the cause.
-     Every other cross-view call (ctx.editBalance, ctx.editAccount,
-     ctx.noteButton) is late-bound through ctx at call time; this now is too. */
+  /* saveAccount and acceptImplied are deliberately NOT destructured here. Both
+     are provided by views/accounts.js, so pulling them out at register time
+     made this the one module whose correctness depended on registration ORDER
+     in controller.js — reorder the register calls and they silently became
+     undefined, throwing only when a user edited a savings balance a screen
+     away from the cause. Every other cross-view call (ctx.editBalance,
+     ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
+     these now are too. */
   const { S, $, root, money, moneyIn, toast, accountIndex, catType } = ctx;
-
-  /* One account's own figures, in its own symbol — the same shape as
-     views/accounts.js's acctMoney, kept as its own copy rather than shared
-     off ctx: it is three lines built from a pure module (currency.js) either
-     side, so a ctx export here would trade a one-line duplication for a
-     second cross-view coupling in a file that already goes out of its way
-     (see saveAccount above) to avoid registration-order dependencies. */
-  const acctMoney = (a, v, decimals = 2) =>
-    moneyIn(symbolOf(a, S.settings.currency), v, decimals);
 
   function renderSavings() {
     const savings = S.accounts.filter(a => a.type === 'savings');
@@ -119,21 +110,11 @@ module.exports = function registerSavings(ctx) {
       g.growth >= 0 ? 'text-success' : 'text-danger', sub || null);
   }
 
-  /* Accept the implied balance. Identical contract to the Accounts page: stamp
-     today, so the rows just absorbed cannot be counted a second time — the next
-     reconciliation window starts clear of them. */
-  async function acceptImplied(a, implied) {
-    a.balance = implied;
-    a.balanceRaw = null;
-    a.balance_updated = todayIso();
-    // saveAccount already toasted the failure — stop here rather than
-    // re-rendering the figure that never landed and telling the reader it
-    // reconciled when the file still holds the old balance. Same guard as
-    // accounts.js's acceptImplied.
-    if (!(await ctx.saveAccount(a))) return;
-    renderSavings();
-    toast(i18n.t('acct.reconciled', { name: a.name, amount: acctMoney(a, implied) }));
-  }
+  /* Reconciliation "Use this" button below calls ctx.acceptImplied directly —
+     see views/accounts.js's acceptImplied, published on ctx so this page and
+     Accounts share the one implementation (stamp today, so the rows just
+     absorbed cannot be counted a second time; back the mutation out on a
+     failed write). */
 
   /* ----------------------- how old is this number ------------------------
      Net worth is a sum of figures the reader TYPED, and the Accounts page
@@ -348,7 +329,7 @@ module.exports = function registerSavings(ctx) {
               rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
           const btn = el('button', { type: 'button', class: 'acct-recon-btn',
             'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` }, icoEl(['check']), 'Use this');
-          btn.addEventListener('click', () => acceptImplied(a, rec.implied));
+          btn.addEventListener('click', () => ctx.acceptImplied(a, rec.implied));
           line.append(btn);
           card.append(line);
           /* On a fund the implied figure is a FLOOR, not a correction, and the

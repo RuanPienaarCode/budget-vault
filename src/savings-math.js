@@ -505,4 +505,4 @@ function growthSeries(entries, typeOf, opts) {
   return { points, undated, closing, included, excluded, truncatedFrom };
 }
 
-module.exports = { splitFlows, accountFlows, totalReturn, growthSeries, monthlyFlows, classifyRow };
+module.exports = { splitFlows, accountFlows, totalReturn, growthSeries, classifyRow };

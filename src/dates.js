@@ -61,6 +61,19 @@ function daysBetween(aIso, bIso) {
   return isoDayNumber(bIso) - isoDayNumber(aIso);
 }
 
+/* Whole days from `today` until an ISO deadline — negative once it has
+   passed, counted the same UTC way daysBetween does so a DST boundary between
+   now and the deadline cannot round a day away. `today` is required rather
+   than defaulted to `new Date()`: this is a pure module, and its one caller
+   (views/tax.js's countdown tiles) already has a real "today" to hand in on
+   every call, so a clock-reading default would only have been an untested
+   branch. Thin wrapper kept here, not inlined at the call site, because the
+   UTC-day arithmetic is exactly daysBetween's and a second copy is how the
+   two would drift. */
+function daysUntil(iso, today) {
+  return daysBetween(today, iso);
+}
+
 /* The inverse: a UTC day number back to YYYY-MM-DD. UTC getters, to undo
    exactly what isoDayNumber did — reading a day number with local getters
    would shift the result by a day for anyone west of Greenwich. */
@@ -99,5 +112,5 @@ function periodDaysOrZero(v) {
   if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS) return 0;
   return n;
 }
-module.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero, daysBetween };
+module.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero, daysBetween, daysUntil };
 

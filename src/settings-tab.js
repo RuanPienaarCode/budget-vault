@@ -195,7 +195,7 @@ class BudgetSettingTab extends PluginSettingTab {
     const fmSection = containerEl.createDiv();
     this.renderMdSettings(fmSection);
   }
-  /* Obsidian calls this when the tab closes. The three text fields below debounce
+  /* Obsidian calls this when the tab closes. The six text fields below debounce
      their Settings.md write by 800ms, so closing the tab mid-keystroke otherwise
      left a write + reloadViews() to fire against a tab that no longer exists —
      the same teardown discipline the view controller applies in destroy(). */
@@ -204,6 +204,8 @@ class BudgetSettingTab extends PluginSettingTab {
     clearTimeout(this._ownersTimer);
     clearTimeout(this._msdTimer);
     clearTimeout(this._curTimer);
+    clearTimeout(this._lagTimer);
+    clearTimeout(this._anchorTimer);
   }
   async renderMdSettings(containerEl) {
     const md = await this.plugin.readBudgetSettingsMd();

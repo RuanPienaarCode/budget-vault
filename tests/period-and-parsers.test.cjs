@@ -242,6 +242,17 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   ok(!isRealIsoDate('0050-01-01'), 'a year Date would relocate to the 1900s is rejected');
 }
 
+/* ---- daysUntil: views/tax.js's countdown arithmetic, now pure ---- */
+{
+  const { daysUntil } = require('../src/dates');
+  eq(daysUntil('2026-08-20', '2026-08-15'), 5, 'a future deadline counts forward');
+  eq(daysUntil('2026-08-10', '2026-08-15'), -5, 'a passed deadline counts negative — "5 d overdue"');
+  eq(daysUntil('2026-08-15', '2026-08-15'), 0, 'today itself is zero days away');
+  eq(daysUntil('2027-01-05', '2026-12-28'), 8, 'a span crossing a year boundary stays a whole-day count');
+  eq(daysUntil('2026-08-20', 'not a date'), null, 'a malformed today refuses to guess');
+  eq(daysUntil('not a date', '2026-08-15'), null, 'a malformed deadline refuses to guess');
+}
+
 /* ---- a remembered period must also be ON PHASE, not merely date-shaped ---- */
 {
   /* The damage this prevents: on a 7-day cycle anchored 2026-08-07 the user is

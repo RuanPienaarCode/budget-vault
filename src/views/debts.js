@@ -47,6 +47,17 @@ module.exports = function registerDebts(ctx) {
     return `${MONTHS[m - 1]} ${y}`;
   }
 
+  /* debt-math's addMonths requires a `from` Date rather than defaulting to
+     `new Date()` internally — a clock read has no place in a pure module.
+     Every caller below is this view, so the clock is read here instead, once,
+     and built from todayIso() rather than `new Date(todayIso())` so it stays
+     a LOCAL calendar date the way dates.js's own header insists on, not a
+     fresh UTC-parse footgun. */
+  const todayForMonths = () => {
+    const [y, m, d] = todayIso().split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   /* ------------------------------- KPIs --------------------------------- */
   /* Split out so an edited balance can refresh the totals without rebuilding
      the row being typed into — on a phone `change` fires on blur, so a full
@@ -85,7 +96,7 @@ module.exports = function registerDebts(ctx) {
     const planAssumes = extra > 0
       ? `assumes ${money(extra, 0)}/mo extra and each cleared payment rolling into the next`
       : 'assumes each cleared payment rolls into the next';
-    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months)) : (total > 0 ? 'not at this payment' : '—'),
+    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months, todayForMonths())) : (total > 0 ? 'not at this payment' : '—'),
       plan.settled && plan.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
       plan.settled && plan.months ? `${humanMonths(plan.months)} — ${planAssumes}` : (total > 0 ? 'not within 50 years at the payments entered' : 'no debt tracked'));
   }
@@ -124,7 +135,7 @@ module.exports = function registerDebts(ctx) {
         el('div', { class: 'dp-h' }, el('b', {}, r.label),
           r.key === chosen ? el('span', { class: 'dp-tag' }, 'selected') : ''),
         el('div', { class: 'dp-note' }, r.note),
-        el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months)) : 'not at this payment'),
+        el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months, todayForMonths())) : 'not at this payment'),
         el('div', { class: 'dp-sub' }, r.res.settled && r.res.months ? humanMonths(r.res.months) : 'does not clear within 50 years'),
         el('div', { class: 'dp-row' }, el('span', {}, 'Interest'),
           el('b', { class: 'num' }, r.res.settled ? money(r.res.interest, 0) : '—')));
@@ -192,7 +203,7 @@ module.exports = function registerDebts(ctx) {
       ol.append(el('li', {},
         el('span', { class: 'do-n' }, d.name),
         el('span', { class: 'do-m num' }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`),
-        el('span', { class: 'do-d' }, at ? `clear ${monthLabel(addMonths(at))}` : 'not clearing')));
+        el('span', { class: 'do-d' }, at ? `clear ${monthLabel(addMonths(at, todayForMonths()))}` : 'not clearing')));
     }
     order.append(ol);
   }
@@ -408,7 +419,7 @@ module.exports = function registerDebts(ctx) {
             clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'not in 50 yrs' : 'no payment'));
             interestCell.append(el('span', { class: 'text-danger num' }, `+${money(monthlyInterest(d.balance, d.rate), 0)}/mo`));
           } else {
-            clearCell.append(el('span', {}, monthLabel(addMonths(a.months))),
+            clearCell.append(el('span', {}, monthLabel(addMonths(a.months, todayForMonths()))),
               el('div', { class: 'text-muted', style: 'font-size:11.5px' }, humanMonths(a.months)));
             interestCell.append(money(a.interest, 0));
           }
@@ -646,16 +657,17 @@ module.exports = function registerDebts(ctx) {
     /* A year's worth of months is 12 hit strips; ten years is 120, which is
        both useless to aim at and 120 nodes to build. Sample to at most 24. */
     const step = Math.max(1, Math.ceil(span / 24));
+    const chartToday = todayForMonths();   // one clock read for the whole chart, not one per strip
     for (let m = 0; m <= span; m += step) {
       const hit = add('rect', {
         x: s.x(m) - s.innerW / (span * 2), y: s.padT,
         width: s.innerW / span, height: s.innerH, fill: 'transparent',
       });
-      tip(add, hit, `${monthLabel(addMonths(m))} — ` +
+      tip(add, hit, `${monthLabel(addMonths(m, chartToday))} — ` +
         lines.map(l => `${l.label} ${money(at(l.series, m), 0)}`).join(' · '));
     }
 
-    axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthLabel(addMonths(m))), H);
+    axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthLabel(addMonths(m, chartToday))), H);
 
     wrap.append(svg);
   }

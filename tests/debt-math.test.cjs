@@ -191,6 +191,13 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   eq(addMonths(1, from), '2026-09', 'one month on');
   eq(addMonths(5, from), '2027-01', 'crossing the year boundary');
   eq(addMonths(29, from), '2029-01', 'crossing two years');
+  /* `from` is REQUIRED — no `new Date()` default. A pure module reading the
+     clock on a missing argument is exactly the untested branch this guards
+     against; every production caller (views/debts.js) now passes one it
+     derived from its own injected today. A missing `from` must fail loudly,
+     not silently substitute "now". */
+  assert.throws(() => addMonths(3), 'addMonths with no `from` throws rather than quietly reading the clock');
+  checks++;
   eq(humanMonths(1), '1 month', 'singular');
   eq(humanMonths(7), '7 months', 'under a year stays in months');
   eq(humanMonths(12), '1 year', 'exactly a year');
