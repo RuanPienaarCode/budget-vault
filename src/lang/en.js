@@ -971,6 +971,7 @@ module.exports = {
   'score.work.title': 'What would move it most',
   'score.work.sub': 'Biggest gap first — each shows where you are, what to aim for, and how to get there',
   'score.gap.points': '{points} points to gain',
+  'score.win.fullMarks': 'Full marks',
   'score.win.reserves': 'You could cover months of essentials with nothing coming in. That is the difference between a setback and a crisis.',
   'score.win.saving': 'You put real money aside every month, not just what happens to be left over.',
   'score.win.debt': 'Nothing is lost to interest. Every rand you earn is still yours to use.',

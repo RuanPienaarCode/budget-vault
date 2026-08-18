@@ -933,6 +933,7 @@ module.exports = {
   'score.work.title': 'Ce qui le ferait le plus bouger',
   'score.work.sub': 'Plus grand écart d’abord — chacun montre où vous en êtes, la cible, et comment y arriver',
   'score.gap.points': '{points} points à gagner',
+  'score.win.fullMarks': 'Maximum',
   'score.win.reserves': 'Vous pourriez couvrir des mois d’essentiel sans rien qui rentre. C’est la différence entre un accroc et une crise.',
   'score.win.saving': 'Vous mettez de côté de l’argent réel chaque mois, pas seulement ce qui reste.',
   'score.win.debt': 'Rien ne part en intérêts. Chaque euro gagné reste le vôtre.',

@@ -874,6 +874,7 @@ module.exports = {
   'score.work.title': '最能改善的地方',
   'score.work.sub': '差距最大的排在前面 — 每项都会显示现状、目标，以及怎么做',
   'score.gap.points': '可再得 {points} 分',
+  'score.win.fullMarks': '满分',
   'score.win.reserves': '即使没有收入，你也能支撑数个月的必要开销。这就是挫折与危机之间的差别。',
   'score.win.saving': '你每个月都真正存下钱，而不只是存剩下的。',
   'score.win.debt': '没有钱流向利息。你赚到的每一分仍然是你的。',

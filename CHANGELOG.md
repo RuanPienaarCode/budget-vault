@@ -24,6 +24,12 @@ you are already doing well, and what to do next.
   touching and holding on a phone — gives the money set aside against the money
   the goal actually asks for.
 
+- **A badge on each thing going well**, with a stamp and a "Full marks" ribbon
+  for a part that is genuinely finished rather than merely close.
+- **The score meter fills in and glows** as it lands, and the score tile on the
+  Dashboard is inverted — it is the card's conclusion, and the three beside it
+  are the inputs it is drawn from.
+
 ### Changed
 
 - **The cover figure carries its unit**: "3.9 months" rather than "3.9" with the

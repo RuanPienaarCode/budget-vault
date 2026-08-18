@@ -919,6 +919,7 @@ module.exports = {
   'score.work.title': 'Wat dit die meeste sal beweeg',
   'score.work.sub': 'Grootste gaping eerste — elkeen wys waar jy is, wat om te mik, en hoe om daar te kom',
   'score.gap.points': '{points} punte om te wen',
+  'score.win.fullMarks': 'Volpunte',
   'score.win.reserves': 'Jy kan maande se noodsaaklikhede dek met niks wat inkom nie. Dit is die verskil tussen ’n terugslag en ’n krisis.',
   'score.win.saving': 'Jy sit elke maand regte geld weg, nie net wat toevallig oorbly nie.',
   'score.win.debt': 'Niks gaan verlore aan rente nie. Elke rand wat jy verdien is steeds joune.',

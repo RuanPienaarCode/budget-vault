@@ -920,6 +920,7 @@ module.exports = {
   'score.work.title': 'Was am meisten bewegt',
   'score.work.sub': 'Größte Lücke zuerst — jede zeigt, wo du stehst, was das Ziel ist und wie du hinkommst',
   'score.gap.points': '{points} Punkte zu holen',
+  'score.win.fullMarks': 'Volle Punktzahl',
   'score.win.reserves': 'Du könntest Monate an Notwendigem decken, ohne dass etwas hereinkommt. Das ist der Unterschied zwischen Rückschlag und Krise.',
   'score.win.saving': 'Du legst jeden Monat echtes Geld zurück, nicht nur das, was zufällig übrig bleibt.',
   'score.win.debt': 'Nichts geht an Zinsen verloren. Jeder verdiente Betrag bleibt deiner.',

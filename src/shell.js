@@ -52,7 +52,7 @@ const SHELL_HTML = `
       <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
     <button class="drawer-link" data-view="score">
-      <span class="di"><span class="ico" data-ico="gauge|activity|heart-pulse"></span></span><span data-i18n="nav.score">Score</span>
+      <span class="di"><span class="ico" data-ico="gauge-circle|heart-pulse"></span></span><span data-i18n="nav.score">Score</span>
     </button>
     <button class="drawer-link" data-view="plan">
       <span class="di"><span class="ico" data-ico="target|goal|crosshair"></span></span><span data-i18n="nav.plan">Plan</span>

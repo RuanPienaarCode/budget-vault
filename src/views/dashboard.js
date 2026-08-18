@@ -213,9 +213,9 @@ module.exports = function registerDashboard(ctx) {
     const BAND_TONE = { strong: 'is-good', steady: 'is-fair', attention: 'is-poor' };
     const band = H.score ? scoreBand(H.score.value) : null;
     const scoreTile = H.score
-      ? fig(BAND_TONE[band], String(H.score.value),
+      ? fig(`${BAND_TONE[band]} is-score`, String(H.score.value),
         i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`))
-      : fig('', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
+      : fig('is-score', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
     if (H.score) {
       attachScoreExplainer(scoreTile, snap.breakdown, target);
     }

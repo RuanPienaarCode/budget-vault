@@ -96,10 +96,21 @@ module.exports = function registerScore(ctx) {
     if (sub) { sub.textContent = i18n.t('score.good.sub', { count: strong.length }); }
 
     for (const p of strong) {
-      good.append(el('div', { class: 'score-win' },
-        el('span', { class: 'score-win-ico', 'aria-hidden': 'true' }, icoEl('circle-check|check-circle|check')),
-        el('div', { class: 'score-win-body' },
-          el('div', { class: 'score-win-name' }, i18n.t(`dash.health.why.name.${p.key}`)),
+      /* Maxed out, or merely close? Both belong in this list — a household at
+         97% of its target does not think of itself as failing — but only the
+         first has actually finished, and a stamp that meant "nearly" would
+         stop meaning anything. */
+      const maxed = p.at >= 0.999;
+      const name = el('div', { class: 'score-win-name' }, i18n.t(`dash.health.why.name.${p.key}`));
+      if (maxed) {
+        name.append(el('span', { class: 'score-win-ribbon' }, i18n.t('score.win.fullMarks')));
+      }
+      good.append(el('div', { class: `score-win${maxed ? ' is-maxed' : ''}` },
+        /* The badge carries the icon AND the score, so the celebration and the
+           figure behind it are one object rather than a tick beside a number. */
+        el('span', { class: 'score-win-badge', 'aria-hidden': 'true' },
+          icoEl(maxed ? 'award|medal|circle-check' : 'circle-check|check-circle')),
+        el('div', { class: 'score-win-body' }, name,
           el('div', { class: 'score-win-say' }, i18n.t(`score.win.${p.key}`)),
           el('div', { class: 'score-win-pts num' },
             i18n.t('dash.health.why.points', { points: p.shownPoints, max: p.shownMax })))));

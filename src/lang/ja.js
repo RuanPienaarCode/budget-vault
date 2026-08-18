@@ -874,6 +874,7 @@ module.exports = {
   'score.work.title': '最も効くこと',
   'score.work.sub': '差の大きい順 — 現状、目標、そこへの進め方を示します',
   'score.gap.points': 'あと {points} 点',
+  'score.win.fullMarks': '満点',
   'score.win.reserves': '収入がなくても数か月分の必需品をまかなえます。これが後退と危機の分かれ目です。',
   'score.win.saving': '余った分ではなく、毎月きちんと貯めています。',
   'score.win.debt': '利息で失うものがありません。稼いだ分はそのまま手元に残ります。',

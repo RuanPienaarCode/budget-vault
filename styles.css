@@ -884,6 +884,40 @@
 .budget-app-root .health-fig.is-fair .lv { color: var(--color-warning-ink); }
 .budget-app-root .health-fig.is-poor .lv { color: var(--color-danger-ink); }
 .budget-app-root .health-meter { margin-top: 8px; min-width: 0; }
+
+/* The score tile is the card's CONCLUSION — the other three are the inputs it
+   is drawn from — so it is inverted to say so at a glance.
+
+   Composed from the sealed palette rather than a new colour, and stated once
+   per theme because --color-primary-dark is a deep green in the light theme and
+   a mid green in the dark one: a single rule would have put small light text on
+   a mid green in dark mode at roughly 3:1, which is a contrast failure hiding
+   behind a design choice. Light mode gets the deep-green slab; dark mode keeps
+   its own dark surface and earns the emphasis from a primary border instead. */
+.budget-app-root .health-fig.is-score {
+  background: linear-gradient(140deg, var(--color-primary), var(--color-primary-dark));
+  border: 1px solid transparent;
+}
+.budget-app-root .health-fig.is-score .lv,
+.budget-app-root .health-fig.is-score .lv .num { color: #ffffff; }
+.budget-app-root .health-fig.is-score .ll { color: rgba(255, 255, 255, .86); }
+.budget-app-root .health-fig.is-score .lm { color: rgba(255, 255, 255, .72); }
+/* The band tones colour the FIGURE on the other tiles; on this one the slab
+   already carries the meaning, and a red number on deep green is unreadable. */
+.budget-app-root .health-fig.is-score.is-good .lv,
+.budget-app-root .health-fig.is-score.is-fair .lv,
+.budget-app-root .health-fig.is-score.is-poor .lv { color: #ffffff; }
+.budget-app-root .health-fig.is-score .health-why-btn:focus-visible { outline-color: #ffffff; }
+.budget-app-root.bud-dark .health-fig.is-score {
+  background: var(--surface-glass); border-color: var(--color-primary);
+}
+.budget-app-root.bud-dark .health-fig.is-score .lv,
+.budget-app-root.bud-dark .health-fig.is-score.is-good .lv,
+.budget-app-root.bud-dark .health-fig.is-score.is-fair .lv,
+.budget-app-root.bud-dark .health-fig.is-score.is-poor .lv { color: var(--color-primary); }
+.budget-app-root.bud-dark .health-fig.is-score .ll { color: var(--text-muted); }
+.budget-app-root.bud-dark .health-fig.is-score .lm { color: var(--ink-faint); }
+.budget-app-root.bud-dark .health-fig.is-score .health-why-btn:focus-visible { outline-color: var(--color-primary); }
 @media (max-width: 900px) { .budget-app-root .health-grid { grid-template-columns: repeat(2, 1fr); } }
 
 /* The score tile explains itself on hover, focus or tap — see
@@ -1202,7 +1236,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .budget-app-root .score-confetti-bit,
+  .budget-app-root .score-win.is-maxed .score-win-badge,
   .budget-app-root .score-meter-fill { animation: none; }
+  /* The fill is scaled by its animation, so switching the animation off has to
+     put the bar back — otherwise reduced motion would show an empty meter. */
+  .budget-app-root .score-meter-fill { transform: scaleX(1); }
   .budget-app-root .score-confetti { display: none; }
 }
 
@@ -2735,6 +2773,8 @@
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .health-why-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
+  .budget-app-root .health-fig.is-score .health-why-btn:focus { outline-color: #ffffff; }
+  .budget-app-root.bud-dark .health-fig.is-score .health-why-btn:focus { outline-color: var(--color-primary); }
   .budget-app-root .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-bal:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-deck-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -3343,7 +3383,31 @@
 .budget-app-root .score-hero.is-attention .score-big { color: var(--color-danger-ink); }
 .budget-app-root .score-band { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-top: 6px; }
 .budget-app-root .score-meter { position: relative; height: 10px; border-radius: 10px; background: var(--border-color); overflow: hidden; max-width: 460px; margin: 14px auto 0; }
-.budget-app-root .score-meter-fill { display: block; height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); transition: width .6s ease; animation: bud-bar-grow .6s ease; }
+/* Fills in, then glows once as it lands.
+
+   scaleX rather than an animated width: the width is the SCORE, set inline, and
+   animating the same property the figure lives in means a reader who reloads
+   mid-animation sees a bar that disagrees with the number beside it. Scaling a
+   full-width bar from zero keeps the geometry honest at every frame and stays
+   on the compositor, which is what makes it smooth on the iOS 15 floor.
+
+   The glow is a second animation on the same element, delayed to start as the
+   fill finishes — one declaration rather than a JS callback waiting on
+   animationend, which would need cleaning up and would not fire at all if the
+   pane were hidden. */
+.budget-app-root .score-meter-fill {
+  display: block; height: 100%; border-radius: 10px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-primary));
+  transform-origin: left center;
+  animation: bud-score-fill 1.05s cubic-bezier(.22, .9, .28, 1) both,
+             bud-score-glow 1s ease-out 1s both;
+}
+@keyframes bud-score-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes bud-score-glow {
+  0%   { box-shadow: 0 0 0 0 var(--color-primary); }
+  45%  { box-shadow: 0 0 14px 2px var(--color-primary); }
+  100% { box-shadow: 0 0 0 0 var(--color-primary); }
+}
 .budget-app-root .score-hero-sub { font-size: 12px; color: var(--text-muted); margin: 12px 0 0; }
 .budget-app-root .score-hero-say { font-size: 13.5px; line-height: 1.5; margin: 8px auto 0; max-width: 52ch; }
 
@@ -3352,7 +3416,31 @@
 
 .budget-app-root .score-win { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border-color); }
 .budget-app-root .score-win:first-child { border-top: 0; }
-.budget-app-root .score-win-ico { color: var(--color-primary); flex: 0 0 auto; margin-top: 1px; }
+/* A stamp rather than a tick: a disc the eye reads as an award, sized to sit
+   against the two lines of text beside it. `is-maxed` earns the warmer tone —
+   see renderGood for why "nearly" and "finished" are told apart. */
+.budget-app-root .score-win-badge {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--surface-glass); color: var(--color-primary);
+  border: 1px solid var(--border-color); margin-top: 1px;
+}
+.budget-app-root .score-win.is-maxed .score-win-badge {
+  color: var(--color-warning-ink); border-color: var(--color-warning);
+  animation: bud-stamp 620ms cubic-bezier(.2, 1.5, .4, 1) both;
+}
+/* Lands like a stamp — overshoot, then settle. */
+@keyframes bud-stamp {
+  0%   { opacity: 0; transform: scale(.4) rotate(-12deg); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.budget-app-root .score-win-ribbon {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--color-warning-light); color: var(--color-warning-ink);
+  vertical-align: middle;
+}
 .budget-app-root .score-win-body { min-width: 0; }
 .budget-app-root .score-win-name { font-size: 13.5px; font-weight: 700; }
 .budget-app-root .score-win-say { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; margin-top: 2px; }

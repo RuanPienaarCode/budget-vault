@@ -921,6 +921,7 @@ module.exports = {
   'score.work.title': 'Lo que más la movería',
   'score.work.sub': 'Mayor diferencia primero — cada una muestra dónde estás, qué buscar y cómo llegar',
   'score.gap.points': '{points} puntos por ganar',
+  'score.win.fullMarks': 'Máxima',
   'score.win.reserves': 'Podrías cubrir meses de lo esencial sin que entre nada. Esa es la diferencia entre un tropiezo y una crisis.',
   'score.win.saving': 'Apartas dinero de verdad cada mes, no solo lo que sobra.',
   'score.win.debt': 'No se pierde nada en intereses. Cada euro que ganas sigue siendo tuyo.',
