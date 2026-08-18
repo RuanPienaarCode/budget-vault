@@ -3,6 +3,33 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+The score explanation shipped in 1.20.0 was hard to read: it was cut off, and it
+was wordier than it needed to be.
+
+### Fixed
+
+- **The score panel is no longer cut off.** Three things were wrong at once. It
+  was about a quarter of the card wide, which made it tall enough to overflow.
+  It flipped upward when it overran the bottom of the card without ever checking
+  whether upward had room, so it escaped one clipped edge into another — losing
+  the opening lines that say what the score is. And the card below it painted
+  straight over it, because a panel can only be raised within its own card's
+  stacking context. It is now wider, opens on whichever side has more room,
+  scrolls inside the room that side has, and brings its card forward while open.
+
+### Changed
+
+- **The score explanation is written more plainly.** "Full marks at 6 months of
+  essential spending set aside" is now "Aim for 6 months of essential spending
+  saved", and the panel opens with two short sentences instead of three long
+  ones.
+- **The emergency-cover line says what it is counting.** "target 6" became
+  "Goal 6 months" — and "Goal 1 month" when the target is set to one.
+- **"What's left" is now "What's left this period"**, so it reads as a different
+  question from the budget figure above it rather than a restatement of it.
+
 ## 1.20.0 — 2026-08-18
 
 The Dashboard could say what was left this period and what was budgeted, but

@@ -897,12 +897,30 @@
 .budget-app-root .health-fig { position: relative; }
 /* Hidden by default and revealed by a class rather than by :hover, because the
    same panel has to open for focus and for a tap — three triggers, one state. */
+/* Anchored to the tile's RIGHT edge and given a real reading width.
+
+   Stretched across its own column (`left:0; right:0`) the panel was about a
+   quarter of the card wide, which turned five scored rows and their
+   explanations into a column tall enough to run off the top of the card once
+   it flipped upward. Width is the cheaper half of that fix: the same words in
+   ~420px are roughly half the height.
+
+   Right-anchored because the tile that carries this is the LAST of the four,
+   so a panel wider than its column has to grow leftward to stay on the card.
+   The viewport clamp keeps that true on a narrow desktop pane too.
+
+   `overflow-y: auto` costs nothing while the panel fits, and is what makes the
+   measured max-height attachScoreExplainer sets a scroll rather than a clip. */
 .budget-app-root .health-why {
-  display: none; position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px);
-  min-width: 260px; padding: 12px 14px; border-radius: 12px;
+  display: none; position: absolute; z-index: 20; left: auto; right: 0; top: calc(100% + 6px);
+  width: 420px; max-width: calc(100vw - 24px);
+  padding: 12px 14px; border-radius: 12px; overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border-color);
   box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
 }
+/* Brought forward only while the panel is open — see attachScoreExplainer for
+   why raising the panel alone was not enough. */
+.budget-app-root .card.is-why-raised { position: relative; z-index: 30; }
 .budget-app-root .health-fig.is-why-open .health-why { display: block; }
 /* Flipped by attachScoreExplainer when the panel would fall past the bottom of
    the app's own scroll container. */
@@ -939,7 +957,8 @@
      the full width of the row rather than the tile's text column — it keeps its
      own padding, so the words inside still line up with the label above it. */
   .budget-app-root .health-why {
-    position: static; min-width: 0; margin: 10px -14px 0; box-shadow: none;
+    position: static; width: auto; max-width: none; max-height: none;
+    margin: 10px -14px 0; box-shadow: none;
   }
 }
 

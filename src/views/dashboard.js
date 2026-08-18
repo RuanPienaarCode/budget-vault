@@ -207,7 +207,7 @@ module.exports = function registerDashboard(ctx) {
       ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
         H.months.toFixed(1),
         i18n.t('dash.health.months'),
-        i18n.t('dash.health.monthsMeta', { target, amount: money(earmarks.total, 0) }))
+        i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }))
       : fig('', '—', i18n.t('dash.health.months'),
         earmarks.any ? i18n.t('dash.health.needHistory') : i18n.t('dash.health.setup'));
     if (H.months !== null) {
@@ -355,28 +355,67 @@ module.exports = function registerDashboard(ctx) {
     for (const kid of [...(tile.childNodes || tile.children || [])]) { btn.append(kid); }
     tile.append(btn, pop);
 
-    /* Open downward by default, upward when there is no room.
+    /* Place it where it actually fits, and never let it be cut off.
 
-       The popup is absolutely positioned inside `.bud-scroll`, which clips at
-       its own bottom edge — so a health card sitting low in the pane opened a
-       panel the reader could only see by scrolling, and scrolling is exactly
-       what loses the hover that opened it. Measured after the panel is
-       displayed, because its height depends on how many components scored and
-       whether there is a fix line; guessing a height here would flip the wrong
-       way on the two-component vaults. */
+       The first version only ever asked whether the panel fell past the BOTTOM
+       of `.bud-scroll` and flipped upward if it did — which swapped one clip
+       for another the moment the card sat high in the pane: the panel escaped
+       the bottom edge and ran off the top instead, losing its opening lines,
+       which is exactly where it explains what the score is.
+
+       So both gaps are measured and the roomier one wins; whichever side is
+       chosen, the panel is then capped to the room that side actually has and
+       scrolls inside it. A capped panel is readable, a clipped one is not.
+       Measured after it is displayed, because its height depends on how many
+       pillars scored and whether there is a fix line to close with. */
+    const GAP = 12;
+    const MIN_PANEL = 160;
+    /* The panel's own z-index only competes INSIDE its card: the card is the
+       stacking context, so the next card down the dashboard painted straight
+       over the panel however high the panel was raised. The card itself has to
+       come forward for the duration, and only for the duration — a card left
+       permanently raised would sit over whatever opens above IT later. */
+    /* Resolved on each open, NOT once at attach: this runs while the tile is
+       still detached — the view builds the four tiles and only then appends the
+       grid — so an eager lookup found no card and silently never raised one. */
+    const cardOf = () => (typeof tile.closest === 'function' ? tile.closest('.card') : null);
     const open = on => {
       tile.classList.toggle('is-why-open', on);
+      const card = cardOf();
+      if (card) { card.classList.toggle('is-why-raised', on); }
       btn.setAttribute('aria-expanded', on ? 'true' : 'false');
       tile.classList.remove('is-why-above');
-      if (!on || typeof pop.getBoundingClientRect !== 'function') { return; }
+      if (pop.style && typeof pop.style.removeProperty === 'function') {
+        pop.style.removeProperty('max-height');
+      }
+      if (!on || typeof pop.getBoundingClientRect !== 'function'
+          || typeof tile.getBoundingClientRect !== 'function') { return; }
+
       const scroller = typeof tile.closest === 'function' ? tile.closest('.bud-scroll') : null;
-      const limit = scroller && typeof scroller.getBoundingClientRect === 'function'
-        ? scroller.getBoundingClientRect().bottom
-        : (typeof window !== 'undefined' ? window.innerHeight : 0);
-      if (limit && pop.getBoundingClientRect().bottom > limit) {
-        tile.classList.add('is-why-above');
+      const bounds = scroller && typeof scroller.getBoundingClientRect === 'function'
+        ? scroller.getBoundingClientRect()
+        : { top: 0, bottom: typeof window !== 'undefined' ? window.innerHeight : 0 };
+      if (!bounds.bottom) { return; }
+
+      /* The TILE, not the button. The panel is positioned against the tile —
+         that is the element CSS gives `position: relative` — and the tile is
+         taller by its own padding. Measuring the room from the button left the
+         gap overstated by that padding, so a panel capped to "exactly the room
+         above" still ran a few pixels past the top edge. */
+      const anchor = tile.getBoundingClientRect();
+      const below = bounds.bottom - anchor.bottom - GAP;
+      const above = anchor.top - bounds.top - GAP;
+      const needed = pop.getBoundingClientRect().height;
+
+      /* Only move it upward when up is genuinely roomier — a panel that fits
+         below belongs below, where a reader's eye already is. */
+      if (needed > below && above > below) { tile.classList.add('is-why-above'); }
+      const room = tile.classList.contains('is-why-above') ? above : below;
+      if (needed > room && pop.style && typeof pop.style.setProperty === 'function') {
+        pop.style.setProperty('max-height', `${Math.max(MIN_PANEL, Math.floor(room))}px`);
       }
     };
+
     /* Hover only where hovering is real. matchMedia is checked live rather than
        cached at render, so a vault opened on a desktop and continued on an iPad
        is not still answering the desktop's question. */

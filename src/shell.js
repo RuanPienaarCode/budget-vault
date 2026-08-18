@@ -174,7 +174,7 @@ const SHELL_HTML = `
         <div class="card mb-4 hidden" id="leftCard">
           <div class="card-h">
             <div>
-              <h2 data-i18n="shell.dash.left">What's left</h2>
+              <h2 data-i18n="shell.dash.left">What's left this period</h2>
               <div class="sub" id="leftSub"></div>
             </div>
           </div>

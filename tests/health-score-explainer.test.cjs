@@ -150,7 +150,7 @@ const textOf = el => descend(el).map(e => e.textContent || '').join(' ') + (el.t
   const pop = pops[0];
   const text = textOf(pop);
   ok(/How this score works/.test(text), 'the panel leads with what the score is');
-  ok(/80 and up is strong/.test(text), 'gives the bands');
+  ok(/80\+ is strong/.test(text), 'gives the bands');
   ok(/Emergency cover/.test(text) && /Saving/.test(text) && /Debt/.test(text)
     && /Spending/.test(text) && /What you own/.test(text),
     'names every pillar it scored');
@@ -168,7 +168,7 @@ const textOf = el => descend(el).map(e => e.textContent || '').join(' ') + (el.t
   /* ---- 7. the one actionable line ---- */
   const fix = find(pop, 'health-why-fix');
   eq(fix.length, 1, 'exactly one closing instruction');
-  ok(/Costing you most/.test(textOf(fix[0])), 'which names what to fix first');
+  ok(/Biggest gap/.test(textOf(fix[0])), 'which names what to fix first');
   ok(/R /.test(textOf(fix[0])), 'and gives a figure rather than an adjective');
 
   /* ---- 8. a vault with nothing to fix gets praise, not a drag of zero ----
@@ -190,8 +190,8 @@ const textOf = el => descend(el).map(e => e.textContent || '').join(' ') + (el.t
     const { nodes: n2 } = await mount(rich);
     const fix2 = find(n2.get('#healthBody'), 'health-why-fix');
     eq(fix2.length, 1, 'the panel still closes with one line');
-    ok(!/Costing you most/.test(textOf(fix2[0])),
-      'but a fully covered household is not told it has a biggest drag');
+    ok(!/Biggest gap/.test(textOf(fix2[0])),
+      'but a fully covered household is not told it has a biggest gap');
     ok(/full marks/i.test(textOf(fix2[0])),
       'it is told the opposite');
   }
