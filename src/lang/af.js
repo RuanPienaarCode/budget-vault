@@ -766,6 +766,7 @@ module.exports = {
   'dash.stat.notIncome': '{amount} in, nie getel nie',
   'dash.stat.missing': 'Vermiste kategorieë',
   'dash.stat.missingSub': { one: '{count} transaksie — herkategoriseer', other: '{count} transaksies — herkategoriseer' },
+  'dash.stat.missingNames': '{names} +{count} meer',
 
   'dash.col.category': 'Kategorie',
   'dash.col.budget': 'Begroting',

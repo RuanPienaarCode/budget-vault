@@ -194,8 +194,8 @@
    specificity alone decides. */
 .budget-app-root .hidden.hidden { display: none; }
 .budget-app-root .text-success { color: var(--color-success); }
-.budget-app-root .text-danger { color: var(--color-danger); }
-.budget-app-root .text-warning { color: var(--color-warning); }
+.budget-app-root .text-danger { color: var(--color-danger-ink); }
+.budget-app-root .text-warning { color: var(--color-warning-ink); }
 .budget-app-root .text-muted { color: var(--text-muted); }
 .budget-app-root .num { font-variant-numeric: tabular-nums; }
 
@@ -751,7 +751,7 @@
   color: transparent;
 }
 .budget-app-root .hero-num small { font-size: 0.42em; font-weight: 500; -webkit-text-fill-color: var(--text-light); color: var(--text-light); margin-right: 4px; }
-.budget-app-root .hero-num--negative { background: none; -webkit-text-fill-color: var(--color-danger); color: var(--color-danger); }
+.budget-app-root .hero-num--negative { background: none; -webkit-text-fill-color: var(--color-danger-ink); color: var(--color-danger-ink); }
 .budget-app-root .hero-sub { font-size: 14px; color: var(--text-muted); margin-top: 16px; max-width: 400px; }
 .budget-app-root .hero-sub b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* ------------------------------ what's left -------------------------------
@@ -768,8 +768,8 @@
 .budget-app-root .left-fig .lv { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .budget-app-root .left-fig .ll { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 .budget-app-root .left-fig .lm { font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; }
-.budget-app-root .left-fig.is-committed .lv { color: var(--color-warning); }
-.budget-app-root .left-fig.is-short .lv { color: var(--color-danger); }
+.budget-app-root .left-fig.is-committed .lv { color: var(--color-warning-ink); }
+.budget-app-root .left-fig.is-short .lv { color: var(--color-danger-ink); }
 .budget-app-root .left-fig.is-free { background: var(--surface-glass); border-radius: 12px; }
 .budget-app-root .left-fig.is-free .lv { color: var(--color-primary); }
 .budget-app-root .left-op { font-size: 20px; color: var(--ink-faint); padding: 0 6px; }
@@ -779,7 +779,7 @@
    spending coming home and a debit order is a fixed instalment somebody else
    takes, and summed together the larger one hides the smaller. */
 .budget-app-root .left-grid--card { grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; }
-.budget-app-root .left-fig.is-card .lv { color: var(--color-danger); }
+.budget-app-root .left-fig.is-card .lv { color: var(--color-danger-ink); }
 
 /* The settlement cycle — card spending against the income that clears it.
    Neutral until it crosses 100%, because a card settled every month is working
@@ -800,7 +800,7 @@
 .budget-app-root .left-cycle .lc-s { font-size: 11.5px; color: var(--ink-faint); }
 .budget-app-root .left-cycle.is-over { border-color: var(--color-danger); }
 .budget-app-root .left-cycle.is-over .lc-p,
-.budget-app-root .left-cycle.is-over .lc-s { color: var(--color-danger); }
+.budget-app-root .left-cycle.is-over .lc-s { color: var(--color-danger-ink); }
 .budget-app-root .left-cycle.is-over .lc-bar > i { background: var(--color-danger); }
 
 /* What is due to land. Green because it resolves the figure above it, quiet
@@ -870,7 +870,7 @@
   background-clip: text;
   color: transparent;
 }
-.budget-app-root .tag.warn { color: var(--color-warning); font-weight: 600; }
+.budget-app-root .tag.warn { color: var(--color-warning-ink); font-weight: 600; }
 
 /* ============================================================
    TABLES
@@ -1185,7 +1185,7 @@
   border: 1px solid var(--border-color); color: var(--text-muted);
 }
 .budget-app-root .acct-badge.warn {
-  color: var(--color-warning); border-color: var(--color-warning);
+  color: var(--color-warning-ink); border-color: var(--color-warning);
   background: var(--color-warning-light);
 }
 .budget-app-root .acct-badge.muted { opacity: .8; }
@@ -1452,7 +1452,7 @@
   font-variant-numeric: tabular-nums; border: 1px solid var(--border-color); color: var(--text-muted);
 }
 .budget-app-root .acct-chip.up { color: var(--color-success); border-color: var(--color-success); background: var(--color-success-light); }
-.budget-app-root .acct-chip.down { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-light); }
+.budget-app-root .acct-chip.down { color: var(--color-danger-ink); border-color: var(--color-danger); background: var(--color-danger-light); }
 .budget-app-root svg.acct-spark { display: block; width: 96px; height: 24px; }
 .budget-app-root .acct-goal { display: inline-flex; align-items: center; }
 .budget-app-root .acct-mbar {
@@ -1512,7 +1512,7 @@
 }
 .budget-app-root .acct-pill.ok { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-primary-light); }
 .budget-app-root .acct-pill.warn { color: var(--color-warning-ink); border-color: var(--color-warning); background: var(--color-warning-light); }
-.budget-app-root .acct-pill.danger { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-light); }
+.budget-app-root .acct-pill.danger { color: var(--color-danger-ink); border-color: var(--color-danger); background: var(--color-danger-light); }
 /* A warning the reader has told this account to keep quiet about. It keeps the
    words — the state is still true — and gives up the alarm colour, which is
    the only part that was asking for a decision. Dashed, so a muted pill is
@@ -1727,7 +1727,7 @@
 .budget-app-root .tax-busy, .budget-app-root .tax-needed { background: var(--color-warning-light); color: var(--color-warning); }
 .budget-app-root .tax-done, .budget-app-root .tax-uploaded { background: var(--color-success-light); color: var(--color-success); }
 .budget-app-root .tax-na { background: var(--border-color); color: var(--ink-faint); }
-.budget-app-root .tax-overdue { border-color: var(--color-danger); color: var(--color-danger); }
+.budget-app-root .tax-overdue { border-color: var(--color-danger); color: var(--color-danger-ink); }
 .budget-app-root .tax-doc-link { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 0.2rem 0.6rem; }
 .budget-app-root .tax-doc-link .ico svg { width: 0.8rem; height: 0.8rem; }
 .budget-app-root .tax-season-row { align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
@@ -1760,7 +1760,7 @@
   font-size: 11.5px; color: var(--ink-faint); margin-top: 3px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.budget-app-root .bud-remaining.over { color: var(--color-danger); }
+.budget-app-root .bud-remaining.over { color: var(--color-danger-ink); }
 
 /* Assume-spent rows — a budget whose amount IS the actual spend, because the
    money left in an earlier period. Deliberately NOT red: nothing is wrong here,
@@ -1797,7 +1797,7 @@
   font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums; margin-top: 4px;
 }
-.budget-app-root .bud-total-v.over { color: var(--color-danger); }
+.budget-app-root .bud-total-v.over { color: var(--color-danger-ink); }
 .budget-app-root .bud-total-n { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 /* Four tiles get cramped before they get narrow — drop to 2×2 first, then to a
    single column on phones. */
@@ -1853,7 +1853,7 @@
    inline reason naming the row it collided with. */
 .budget-app-root #impTable tbody tr.imp-near { background: var(--color-warning-light); }
 .budget-app-root #impTable tbody tr.imp-near td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
-.budget-app-root .badge-near { background: var(--color-warning-light); color: var(--color-warning); margin-left: 6px; }
+.budget-app-root .badge-near { background: var(--color-warning-light); color: var(--color-warning-ink); margin-left: 6px; }
 .budget-app-root .imp-near-why { font-size: .78rem; color: var(--text-muted); margin-top: 2px; max-width: 46ch; }
 /* Rows in the current financial period get an emerald accent + faint tint. */
 .budget-app-root #impTable tbody tr.imp-current td:first-child { box-shadow: inset 3px 0 0 var(--color-primary); }
@@ -1891,8 +1891,8 @@
 .budget-app-root .imp-map-hint { font-size: .74rem; color: var(--text-muted); }
 .budget-app-root .imp-map-preview { font-size: .78rem; }
 .budget-app-root .imp-map-preview td, .budget-app-root .imp-map-preview th { white-space: nowrap; }
-.budget-app-root #impMapWarn { color: var(--color-warning); margin-top: 8px; }
-.budget-app-root .imp-reconcile-warn { color: var(--color-warning); }
+.budget-app-root #impMapWarn { color: var(--color-warning-ink); margin-top: 8px; }
+.budget-app-root .imp-reconcile-warn { color: var(--color-warning-ink); }
 .budget-app-root .imp-legend-swatch {
   width: 22px; height: 10px; border-radius: 3px; flex: none;
   background: color-mix(in srgb, var(--color-primary) 30%, transparent);
@@ -2001,7 +2001,7 @@
 .budget-app-root .trend-tip-val { margin-left: auto; padding-left: 14px; color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
 .budget-app-root .trend-tip-delta { font-size: 11.5px; color: var(--text-muted); margin-top: 5px; }
 .budget-app-root .trend-tip-delta:empty { display: none; }
-.budget-app-root .trend-tip-delta.is-over { color: var(--color-danger); }
+.budget-app-root .trend-tip-delta.is-over { color: var(--color-danger-ink); }
 
 /* All decoration — the readout still appears and still carries every figure,
    it just stops fading and the line stops easing. */
@@ -2129,7 +2129,7 @@
    percentage — "−R 2 681" needs the room "−39%" did not, and wrapping it would
    put half a figure on its own line. */
 .budget-app-root .donut-legend .dl-delta { width: 84px; text-align: right; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.budget-app-root .donut-legend .dl-delta.is-up { color: var(--color-danger); }
+.budget-app-root .donut-legend .dl-delta.is-up { color: var(--color-danger-ink); }
 .budget-app-root .donut-legend .dl-delta.is-down { color: var(--color-success); }
 /* Inside the deadband, and for a bucket with no single history: a figure, but
    no colour. Colouring a 1% move teaches the reader the colour means nothing. */
@@ -3035,7 +3035,7 @@
   font-size: 34px; font-weight: 700; letter-spacing: -.025em; margin-top: 6px;
   color: var(--color-gold); font-variant-numeric: tabular-nums;
 }
-.budget-app-root .plan-free.is-over .free-fig { color: var(--color-danger); }
+.budget-app-root .plan-free.is-over .free-fig { color: var(--color-danger-ink); }
 .budget-app-root .plan-free p { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; max-width: 56ch; }
 .budget-app-root .plan-free .free-acts { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 16px; }
 

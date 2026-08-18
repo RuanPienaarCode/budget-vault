@@ -739,6 +739,7 @@ module.exports = {
   'dash.stat.notIncome': '{amount} 入金、未計上',
   'dash.stat.missing': '欠落カテゴリ',
   'dash.stat.missingSub': { other: '{count} 件の取引 — 再分類が必要' },
+  'dash.stat.missingNames': '{names} 他{count}件',
 
   'dash.col.category': 'カテゴリ',
   'dash.col.budget': '予算',

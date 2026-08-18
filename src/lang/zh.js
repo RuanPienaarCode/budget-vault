@@ -739,6 +739,7 @@ module.exports = {
   'dash.stat.notIncome': '已入账 {amount}，未计入',
   'dash.stat.missing': '缺失的分类',
   'dash.stat.missingSub': { other: '{count} 笔交易 — 需重新分类' },
+  'dash.stat.missingNames': '{names} 另外{count}个',
 
   'dash.col.category': '分类',
   'dash.col.budget': '预算',

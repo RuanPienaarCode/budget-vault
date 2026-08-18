@@ -780,6 +780,7 @@ module.exports = {
   'dash.stat.notIncome': '{amount} reçus, non comptés',
   'dash.stat.missing': 'Catégories manquantes',
   'dash.stat.missingSub': { one: '{count} transaction — à recatégoriser', other: '{count} transactions — à recatégoriser' },
+  'dash.stat.missingNames': '{names} +{count} de plus',
 
   'dash.col.category': 'Catégorie',
   'dash.col.budget': 'Budget',

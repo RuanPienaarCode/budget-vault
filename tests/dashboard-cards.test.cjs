@@ -790,6 +790,38 @@ async function mount(files, period = '2026-07') {
     ok(/Missing categories/.test(hero), `the hero names the state out loud — got: ${hero}`);
     ok(/3 transactions — recategorise/.test(hero), `and says how many rows it touches — got: ${hero}`);
     ok(/R 400\.00 in, not counted/.test(hero), 'the orphaned deposit is disclosed beside Income too');
+    /* WHICH categories used to ride only on a hover title — unreachable by a
+       tap, on the platform this plugin explicitly targets. They must be
+       readable TEXT, not merely present as an attribute a touch never fires. */
+    ok(/Grocries/.test(hero) && /groceries/.test(hero),
+      `both orphaned names are visible text on the tile, not only a title — got: ${hero}`);
+  }
+
+  /* --- 13c. more orphaned names than the tile has room for --------------- *
+     Five distinct names would run a phone-width card off its own edge, so the
+     tile shows the first few and folds the rest into a "+N more" tail — the
+     same shape acct.deck.more already uses for an overflowing list. The title
+     still carries every name, for a mouse hovering the tile. */
+  {
+    const cats = ['Aa', 'Bb', 'Cc', 'Dd', 'Ee'];
+    const MANY_ORPHANS = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile(
+        cats.map((c, i) => [`2026-07-0${i + 1}`, `Row ${c}`, c, -100])),
+    };
+    const { ctx, nodes } = await mount(MANY_ORPHANS);
+    ctx.renderDashboard();
+    const sum = ctx.periodSummary('2026-07');
+    eq(sum.unknown.count, 5, 'all five rows name a category no file answers to');
+    eq(sum.unknown.names.slice().sort(), cats, 'all five distinct names are counted');
+
+    const hero = nodes.get('heroCard').textContent;
+    ok(/Aa/.test(hero) && /Bb/.test(hero) && /Cc/.test(hero),
+      `the first names shown are visible text — got: ${hero}`);
+    ok(/\+2 more/.test(hero), `the rest fold into a "+N more" tail — got: ${hero}`);
+    const missingStat = all(nodes.get('heroCard'), n => n._cls && n._cls.has('st'))
+      .find(n => (n.attrs && n.attrs.title || '').includes('Ee'));
+    ok(missingStat, 'the full name list still rides on the title, for a mouse hover');
   }
 
   /* --- 14. spend nobody budgeted for is not a blank Remaining cell ------ *

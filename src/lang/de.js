@@ -767,6 +767,7 @@ module.exports = {
   'dash.stat.notIncome': '{amount} eingegangen, nicht gezählt',
   'dash.stat.missing': 'Fehlende Kategorien',
   'dash.stat.missingSub': { one: '{count} Buchung — neu zuordnen', other: '{count} Buchungen — neu zuordnen' },
+  'dash.stat.missingNames': '{names} +{count} weitere',
 
   'dash.col.category': 'Kategorie',
   'dash.col.budget': 'Budget',

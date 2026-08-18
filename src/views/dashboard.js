@@ -684,7 +684,7 @@ module.exports = function registerDashboard(ctx) {
     if (sum.uncategorised > 0) statCol.append(
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.uncategorised'))),
-        el('div', {}, el('div', { class: 'sv', style: 'color: var(--color-warning)' }, String(sum.uncategorised)),
+        el('div', {}, el('div', { class: 'sv text-warning' }, String(sum.uncategorised)),
           el('div', { class: 'st' }, i18n.t('dash.stat.review')))));
     /* A category name no category file answers to — its OWN state, not a
        flavour of uncategorised, and the reason this tile exists at all.
@@ -695,15 +695,31 @@ module.exports = function registerDashboard(ctx) {
        downstream as "not income", so an orphaned DEPOSIT was counted by
        nothing, and an orphaned TRANSFER category silently turned every past
        transfer into real spending. The count is of CATEGORIES, since that is
-       what the reader has to go and fix; the rows they touch are the sub-line,
-       and the names themselves ride on the title for a pointer without a wall
-       of text on a phone. */
-    if (sum.unknown && sum.unknown.count > 0) statCol.append(
-      el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.missing'))),
-        el('div', {}, el('div', { class: 'sv', style: 'color: var(--color-warning)' }, String(sum.unknown.names.length)),
-          el('div', { class: 'st', title: sum.unknown.names.join(', ') },
-            i18n.t('dash.stat.missingSub', { count: sum.unknown.count })))));
+       what the reader has to go and fix.
+
+       The names used to ride ONLY on a hover title — a pointer with no wall of
+       text on a phone, the comment used to say, except a phone has no hover:
+       touch never fires it, so the one thing a reader needs to actually go and
+       fix (WHICH categories) was unreachable on the platform this plugin
+       explicitly targets. They are visible text on the tile now, truncated to
+       MISSING_NAMES_SHOWN with a "+N more" tail so a vault with many orphaned
+       names still fits the card; the title stays too, as a full-list fallback
+       where hover does exist. */
+    if (sum.unknown && sum.unknown.count > 0) {
+      const MISSING_NAMES_SHOWN = 3;
+      const names = sum.unknown.names;
+      const shown = names.slice(0, MISSING_NAMES_SHOWN).join(', ');
+      const restCount = names.length - MISSING_NAMES_SHOWN;
+      const namesLine = restCount > 0
+        ? i18n.t('dash.stat.missingNames', { names: shown, count: restCount })
+        : shown;
+      statCol.append(
+        el('div', { class: 'stat' },
+          el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.missing'))),
+          el('div', {}, el('div', { class: 'sv text-warning' }, String(names.length)),
+            el('div', { class: 'st' }, i18n.t('dash.stat.missingSub', { count: sum.unknown.count })),
+            el('div', { class: 'st', title: names.join(', ') }, namesLine))));
+    }
     const hour = new Date().getHours();
     const greeting = i18n.t(hour < 5 ? 'dash.greet.evening' : hour < 12 ? 'dash.greet.morning' : hour < 18 ? 'dash.greet.afternoon' : 'dash.greet.evening');
     hero.append(el('div', { class: 'hero-grid' },
