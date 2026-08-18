@@ -33,6 +33,7 @@
 
 const assert = require('assert');
 const Module = require('module');
+const i18n = require('../src/i18n');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -406,6 +407,27 @@ async function runClose() {
     eq(p.settings.onboarded, true, 'closing partway through IS a decision, and is honoured');
     ok(NOTICES.some(n => /Settings/.test(n) && /setup wizard/i.test(n)),
       'and the skip Notice points at the settings button, not only the command palette');
+  }
+  /* ---- 7b: a rejected saveSettings() on close must not be an unhandled
+     rejection. Modal.close() (the FakeEl stub above) fires onClose() without
+     awaiting it, same as Obsidian's real Modal — so this calls onClose()
+     directly to get a promise worth asserting on. onboarded is already true
+     in memory the moment it's assigned, ahead of the guarded save, so the
+     wizard still will not reopen this session even though the write failed;
+     only the toast differs. ---- */
+  {
+    const p = makePlugin();
+    p.saveSettings = async () => { throw new Error('simulated disk error'); };
+    const w = open(makeApp(), p);
+    w.stepIdx = 2; w.renderStep();
+    NOTICES.length = 0;
+
+    await assert.doesNotReject(() => w.onClose(),
+      'onClose: a rejected saveSettings() must not escape as an unhandled rejection');
+    checks++;
+    eq(p.settings.onboarded, true, 'onClose: a failed save does not undo the in-memory decision to skip');
+    ok(NOTICES.some(n => n === i18n.t('settings.err.save', { error: 'simulated disk error' })),
+      `onClose: a failed save reports the shared settings-save error Notice, got ${JSON.stringify(NOTICES)}`);
   }
   await runApply();
 }

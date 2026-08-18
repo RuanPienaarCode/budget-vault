@@ -130,6 +130,7 @@ module.exports = {
     other: 'Budget : ceci décale chaque limite de période. {count} fichiers de budget nommés par date ne correspondront plus — ils restent dans votre coffre, et remettre cette date à {prev} les ramène aussitôt.',
   },
   'settings.dateNotReal': 'Budget : « {value} » n\'est pas une date — utilisez le sélecteur, ou saisissez AAAA-MM-JJ.',
+  'settings.err.save': 'Impossible d\'enregistrer ce paramètre ({error})',
   'settings.monthStartReslices': {
     one: 'Budget : ceci déplace la fenêtre par rapport à laquelle chaque fichier de budget mensuel est mesuré, sans renommer le fichier — le budget vs réel de {count} période passée va changer. Rien n\'est supprimé, et remettre le jour comme avant l\'annule.',
     other: 'Budget : ceci déplace la fenêtre par rapport à laquelle chaque fichier de budget mensuel est mesuré, sans renommer le fichier — le budget vs réel de {count} périodes passées va changer. Rien n\'est supprimé, et remettre le jour comme avant l\'annule.',

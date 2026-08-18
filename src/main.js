@@ -50,7 +50,20 @@ class BudgetPlugin extends Plugin {
       this.app.workspace.onLayoutReady(async () => {
         if (this.hasBudgetData()) {
           this.settings.onboarded = true;
-          await this.saveSettings();
+          // Guarded like every other write in this app: this callback is
+          // fired by onLayoutReady and never awaited by anything, so a
+          // rejected saveSettings() used to be an unhandled rejection with
+          // nothing on screen. `onboarded` is already true in memory, so the
+          // wizard will not open this session regardless of whether the write
+          // landed — a failed save only means the adoption is retried (and
+          // may fail the same way) on the next launch. No i18n import here,
+          // same as the rest of this file — see settings.err.save for the
+          // string this mirrors.
+          try {
+            await this.saveSettings();
+          } catch (e) {
+            new Notice(`Budget: could not save that setting (${e.message || e})`, 5000);
+          }
           return;
         }
         new OnboardingWizard(this.app, this).open();

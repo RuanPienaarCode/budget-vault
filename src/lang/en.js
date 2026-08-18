@@ -130,6 +130,12 @@ module.exports = {
     other: 'Budget: this shifts every period boundary. {count} budget files named by date will stop matching — they stay in your vault, and setting this date back to {prev} brings them straight back.',
   },
   'settings.dateNotReal': 'Budget: "{value}" is not a date — use the picker, or type YYYY-MM-DD.',
+  // Shared by every plugin-data setting that saves through plugin.saveSettings()
+  // outside controller.js (which keeps its own un-i18n'd copy of this same
+  // wording, since controller.js has no i18n import at all) — the settings
+  // tab's folder/theme/palette/startup/privacy toggles, the dashboard's chart
+  // range pills, the export-folder setting and the wizard's skip-and-remember.
+  'settings.err.save': 'Could not save that setting ({error})',
   'settings.monthStartReslices': {
     one: 'Budget: this moves the window each monthly budget file is measured against, without renaming the file — budget vs actual for {count} past period will change. Nothing is deleted, and setting the day back restores it.',
     other: 'Budget: this moves the window each monthly budget file is measured against, without renaming the file — budget vs actual for {count} past periods will change. Nothing is deleted, and setting the day back restores it.',

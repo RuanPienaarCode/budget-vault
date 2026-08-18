@@ -33,6 +33,7 @@ const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
+const i18n = require('../src/i18n');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -397,6 +398,44 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     await ctx.saveTax();
     ok(S.taxDirty === false, 'handleTaxFile: a retried save (via the lit Save button) clears taxDirty');
     ok($('#taxSave').disabled === true, 'handleTaxFile: a retried save disables the Save button');
+    answers.fields = null;
+  }
+
+  /* ---- 15: plugin.saveSettings() — the same shape as every write above, but
+     writing plugin data (data.json) rather than a vault file, and reached
+     from a view that never went through the nine-save-path sweep: the
+     export-folder setting transactions.js remembers after a successful
+     export. Called from inside an async click handler that is itself
+     fired-and-forgotten by the DOM (txExport's click listener) — same "fire
+     and forget" shape as Savings' acceptImplied above, so the same flush()
+     pattern would apply, except exportTransactions() is published on ctx and
+     can be awaited directly. Unlike a vault write, there is no dirty flag or
+     Save button riding on this: the setting is already real in memory the
+     moment it's assigned, and the whole point of the guard is that a failed
+     data.json write must not stop the screen it drives — the export that
+     already landed must still say so. ---- */
+  {
+    const { ctx } = await mount();
+    ctx.plugin.settings.exportFolder = '';
+    answers.fields = { folder: 'MyExports' };
+    ctx.plugin.saveSettings = async () => { throw new Error('simulated disk error'); };
+
+    await assert.doesNotReject(() => ctx.exportTransactions(),
+      'exportTransactions: a rejected saveSettings() for the remembered folder must not escape as an unhandled rejection');
+    checks++;
+    let lastToast = ctx._toasts[ctx._toasts.length - 1];
+    // The export itself landed (four real vault writes, all left unforced) —
+    // only remembering the folder for next time failed. The export's own
+    // success toast must still be the LAST word on screen, not buried under
+    // an error about a detail the reader never asked to see mid-export.
+    ok(lastToast && lastToast.bad !== true,
+      `exportTransactions: the export's own success toast still fires after a failed remembered-folder save, got ${JSON.stringify(lastToast)}`);
+    ok(ctx._toasts.some(t => t.bad === true && t.msg === i18n.t('settings.err.save', { error: 'simulated disk error' })),
+      'exportTransactions: the failed remembered-folder save still reports its own error toast');
+    ok(ctx.plugin.settings.exportFolder !== '',
+      'exportTransactions: the folder just typed is still real in memory even though it could not be remembered to disk');
+
+    ctx.plugin.saveSettings = async () => {};
     answers.fields = null;
   }
 

@@ -125,6 +125,7 @@ module.exports = {
     other: 'Budget: das verschiebt jede Zeitraumgrenze. {count} nach Datum benannte Budgetdateien passen dann nicht mehr — sie bleiben in deinem Vault, und dieses Datum zurück auf {prev} zu setzen bringt sie sofort wieder.',
   },
   'settings.dateNotReal': 'Budget: „{value}“ ist kein Datum — nutze die Auswahl oder tippe JJJJ-MM-TT.',
+  'settings.err.save': 'Diese Einstellung konnte nicht gespeichert werden ({error})',
   'settings.monthStartReslices': {
     one: 'Budget: das verschiebt den Zeitraum, an dem jede monatliche Budgetdatei gemessen wird, ohne die Datei umzubenennen — Budget vs. Tatsächlich für {count} vergangenen Zeitraum ändert sich. Nichts wird gelöscht, und den Tag zurückzustellen macht es rückgängig.',
     other: 'Budget: das verschiebt den Zeitraum, an dem jede monatliche Budgetdatei gemessen wird, ohne die Datei umzubenennen — Budget vs. Tatsächlich für {count} vergangene Zeiträume ändert sich. Nichts wird gelöscht, und den Tag zurückzustellen macht es rückgängig.',

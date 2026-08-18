@@ -161,7 +161,11 @@ class OnboardingWizard extends Modal {
     this.titleEl.setText(i18n.t('wiz.title'));
     this.renderStep();
   }
-  onClose() {
+  // async, though Obsidian never awaits a Modal's onClose(): the shared
+  // Plugin.onClose() precedent (view.js) already runs async, and returning a
+  // promise here is harmless since nothing reads it — the alternative is a
+  // fire-and-forget saveSettings() call with nowhere to attach a catch.
+  async onClose() {
     this.contentEl.empty();
     if (this.finished) return;
     // Closing on the welcome screen is not a decision — it's a tap outside the
@@ -172,7 +176,16 @@ class OnboardingWizard extends Modal {
     if (this.stepIdx === 0) return;
     new Notice(i18n.t('wiz.skipped'), 8000);
     this.plugin.settings.onboarded = true;
-    this.plugin.saveSettings();
+    // Guarded like every other write in this app: a rejected saveSettings()
+    // used to be an unhandled rejection. Nothing else here depends on it
+    // landing — onboarded is already true in memory, so the wizard will not
+    // reopen this session regardless; a failed write only means it reopens
+    // again next launch, which the toast below explains rather than hides.
+    try {
+      await this.plugin.saveSettings();
+    } catch (e) {
+      new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+    }
   }
 
   /* ------------------------------ navigation ------------------------------ */

@@ -126,6 +126,7 @@ module.exports = {
     other: 'Presupuesto: esto desplaza cada límite de periodo. {count} archivos de presupuesto con nombre de fecha dejarán de coincidir — permanecen en tu bóveda, y volver a poner esta fecha en {prev} los trae enseguida de vuelta.',
   },
   'settings.dateNotReal': 'Presupuesto: «{value}» no es una fecha — usa el selector, o escribe AAAA-MM-DD.',
+  'settings.err.save': 'No se pudo guardar ese ajuste ({error})',
   'settings.monthStartReslices': {
     one: 'Presupuesto: esto desplaza la ventana con la que se mide cada archivo de presupuesto mensual, sin renombrar el archivo — presupuesto frente a real de {count} periodo pasado cambiará. No se elimina nada, y volver a poner el día como estaba lo restaura.',
     other: 'Presupuesto: esto desplaza la ventana con la que se mide cada archivo de presupuesto mensual, sin renombrar el archivo — presupuesto frente a real de {count} periodos pasados cambiará. No se elimina nada, y volver a poner el día como estaba lo restaura.',

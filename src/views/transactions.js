@@ -619,7 +619,16 @@ module.exports = function registerTransactions(ctx) {
        for every future export. */
     if (plugin.settings.exportFolder !== paths.dir) {
       plugin.settings.exportFolder = paths.dir;
-      await plugin.saveSettings();
+      // Guarded like every other write in this app: a rejected saveSettings()
+      // used to be an unhandled rejection. The export itself already landed —
+      // four real vault writes, above, none of them guarded by this branch —
+      // so only remembering the folder for next time failed, and the export's
+      // own success toast below must still be the last word on screen.
+      try {
+        await plugin.saveSettings();
+      } catch (e) {
+        toast(i18n.t('settings.err.save', { error: e.message || e }), true);
+      }
     }
     toast(i18n.t('tx.export.done', { count: rows.length, cats: S.categories.length, path: written.split('/').slice(0, -1).join('/') }));
   }

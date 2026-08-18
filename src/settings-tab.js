@@ -91,7 +91,16 @@ class BudgetSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.budgetFolder)
         .onChange(async v => {
           this.plugin.settings.budgetFolder = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);
-          await this.plugin.saveSettings();
+          // Guarded like every other write in this tab: a rejected
+          // saveSettings() used to be an unhandled rejection. reloadViews()
+          // still runs either way — the folder picked is real in memory even
+          // if it did not reach data.json, and refusing to reload the views
+          // over a persistence failure would make one problem look like two.
+          try {
+            await this.plugin.saveSettings();
+          } catch (e) {
+            new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+          }
           this.plugin.reloadViews();
         }));
 
@@ -105,7 +114,11 @@ class BudgetSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.theme)
         .onChange(async v => {
           this.plugin.settings.theme = v;
-          await this.plugin.saveSettings();
+          try {
+            await this.plugin.saveSettings();
+          } catch (e) {
+            new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+          }
           this.plugin.forEachView(ctl => ctl.applyTheme());
         }));
 
@@ -117,7 +130,11 @@ class BudgetSettingTab extends PluginSettingTab {
         d.setValue(this.plugin.settings.palette)
           .onChange(async v => {
             this.plugin.settings.palette = v;
-            await this.plugin.saveSettings();
+            try {
+              await this.plugin.saveSettings();
+            } catch (e) {
+              new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+            }
             this.plugin.forEachView(ctl => ctl.applyTheme());
           });
       });
@@ -136,7 +153,11 @@ class BudgetSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.openOnStartup)
         .onChange(async v => {
           this.plugin.settings.openOnStartup = v;
-          await this.plugin.saveSettings();
+          try {
+            await this.plugin.saveSettings();
+          } catch (e) {
+            new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+          }
         }));
 
     new Setting(containerEl)
@@ -146,7 +167,11 @@ class BudgetSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.privacyLock)
         .onChange(async v => {
           this.plugin.settings.privacyLock = v;
-          await this.plugin.saveSettings();
+          try {
+            await this.plugin.saveSettings();
+          } catch (e) {
+            new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+          }
           this.plugin.forEachView(ctl => ctl.applyPrivacyLock());
         }));
 

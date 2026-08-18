@@ -818,7 +818,16 @@ module.exports = function registerDashboard(ctx) {
       label: i18n.t('dash.trend.range'),
       onPick: async key => {
         plugin.settings.chartTrendRange = key;
-        await plugin.saveSettings();
+        // Guarded like every other write in this app: a rejected
+        // saveSettings() used to be an unhandled rejection. The chart still
+        // redraws either way — the range picked is real in memory even if it
+        // did not reach data.json, and refusing to redraw over a persistence
+        // failure would make one problem look like two.
+        try {
+          await plugin.saveSettings();
+        } catch (e) {
+          toast(i18n.t('settings.err.save', { error: e.message || e }), true);
+        }
         renderTrend();
       },
     }));
@@ -1171,7 +1180,12 @@ module.exports = function registerDashboard(ctx) {
       label: i18n.t('dash.split.rangeAria'),
       onPick: async k => {
         plugin.settings.splitCompareRange = k;
-        await plugin.saveSettings();
+        // Same guard as the trend range pills above.
+        try {
+          await plugin.saveSettings();
+        } catch (e) {
+          toast(i18n.t('settings.err.save', { error: e.message || e }), true);
+        }
         guardedSplit();
       },
     })); }

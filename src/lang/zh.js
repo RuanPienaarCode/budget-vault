@@ -127,6 +127,7 @@ module.exports = {
     other: '预算：这会移动每一个周期的边界。以日期命名的 {count} 个预算文件将不再匹配 — 它们仍保留在你的仓库中，把这个日期改回 {prev} 就会立即恢复。',
   },
   'settings.dateNotReal': '预算：「{value}」不是日期 — 请使用日期选择器，或输入 YYYY-MM-DD。',
+  'settings.err.save': '无法保存该设置（{error}）',
   'settings.monthStartReslices': {
     other: '预算：这会在不重命名文件的情况下移动每个月度预算文件的测量区间 — 过去 {count} 个周期的预算与实际数值将会改变。不会删除任何内容，把日期改回原值即可恢复。',
   },

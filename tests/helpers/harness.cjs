@@ -159,7 +159,13 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
   const ctx = {
     vault,
     app: { vault },
-    plugin: { settings: { budgetFolder }, _lastWrite: 0 },
+    // A no-op by default so a view calling plugin.saveSettings() (the chart
+    // range pills, the export-folder setting, …) does not throw "not a
+    // function" in a test that never means to exercise the failure path.
+    // Tests that DO want to force a rejection reassign this property
+    // directly — it is a plain object, not a class method, so `ctx.plugin
+    // .saveSettings = async () => { throw … }` is all that is needed.
+    plugin: { settings: { budgetFolder }, _lastWrite: 0, saveSettings: async () => {} },
     S: {
       settings: { month_start_day: 23, currency: 'R', country: 'za', ...settings },
       categories: [], accounts: [], budgets: {}, budgetMeta: {}, txFiles: {},
