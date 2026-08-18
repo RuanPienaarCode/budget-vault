@@ -340,6 +340,7 @@ module.exports = {
   'bud.title.delete': 'Diese Kategorie überall löschen',
 
   'bud.saved': 'Budget gespeichert unter Budgets/{period}.md',
+  'bud.err.save': 'Das Budget konnte nicht gespeichert werden ({error})',
   'bud.copy.none': 'Kein Budget für den vorherigen Zeitraum gefunden',
   'bud.copy.done': {
     one: '{count} Kategorie aus dem vorherigen Zeitraum kopiert',
@@ -458,6 +459,10 @@ module.exports = {
   'tx.err.account': 'Ungültiger Kontoname',
   'tx.err.amount': 'Der Betrag muss eine Zahl ungleich 0 sein',
   'tx.err.save': 'Die Transaktion konnte nicht gespeichert werden ({error})',
+  'tx.err.saveMany': {
+    one: '1 Datei gespeichert, dann fehlgeschlagen ({error}) — der Rest ist weiterhin als ungespeichert markiert',
+    other: '{count} Dateien gespeichert, dann fehlgeschlagen ({error}) — der Rest ist weiterhin als ungespeichert markiert',
+  },
 
   'tx.saved': { one: '{count} Datei gespeichert', other: '{count} Dateien gespeichert' },
   'tx.savedLearned': { one: ' · {count} neue Regel gelernt', other: ' · {count} neue Regeln gelernt' },
@@ -495,6 +500,7 @@ module.exports = {
   'acct.err.notNumber': '{field} ist keine Zahl',
   'acct.err.nameRequired': 'Kontoname erforderlich',
   'acct.err.exists': 'Konto existiert bereits',
+  'acct.err.save': '{name} konnte nicht gespeichert werden ({error})',
 
   'acct.edit.title': 'Konto bearbeiten — {name}',
   'acct.new.title': 'Neues Konto',

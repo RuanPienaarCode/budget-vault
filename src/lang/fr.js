@@ -345,6 +345,7 @@ module.exports = {
   'bud.title.delete': 'Supprimer cette catégorie partout',
 
   'bud.saved': 'Budget enregistré dans Budgets/{period}.md',
+  'bud.err.save': 'Impossible d\'enregistrer le budget ({error})',
   'bud.copy.none': 'Aucun budget trouvé pour la période précédente',
   'bud.copy.done': {
     one: '{count} catégorie copiée depuis la période précédente',
@@ -463,6 +464,10 @@ module.exports = {
   'tx.err.account': 'Nom de compte invalide',
   'tx.err.amount': 'Le montant doit être un nombre différent de 0',
   'tx.err.save': 'Impossible d\'enregistrer la transaction ({error})',
+  'tx.err.saveMany': {
+    one: '1 fichier enregistré, puis échec ({error}) — le reste est toujours marqué non enregistré',
+    other: '{count} fichiers enregistrés, puis échec ({error}) — le reste est toujours marqué non enregistré',
+  },
 
   'tx.saved': { one: '{count} fichier enregistré', other: '{count} fichiers enregistrés' },
   'tx.savedLearned': { one: ' · {count} nouvelle règle apprise', other: ' · {count} nouvelles règles apprises' },
@@ -500,6 +505,7 @@ module.exports = {
   'acct.err.notNumber': '{field} n\'est pas un nombre',
   'acct.err.nameRequired': 'Le nom du compte est obligatoire',
   'acct.err.exists': 'Ce compte existe déjà',
+  'acct.err.save': 'Impossible d\'enregistrer {name} ({error})',
 
   'acct.edit.title': 'Modifier le compte — {name}',
   'acct.new.title': 'Nouveau compte',

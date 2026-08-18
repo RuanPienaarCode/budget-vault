@@ -339,6 +339,7 @@ module.exports = {
   'bud.title.delete': 'Skrap hierdie kategorie oral',
 
   'bud.saved': 'Begroting gestoor na Budgets/{period}.md',
+  'bud.err.save': 'Kon nie die begroting stoor nie ({error})',
   'bud.copy.none': 'Geen begroting vir die vorige tydperk gevind nie',
   'bud.copy.done': {
     one: '{count} kategorie uit die vorige tydperk gekopieer',
@@ -457,6 +458,10 @@ module.exports = {
   'tx.err.account': 'Ongeldige rekeningnaam',
   'tx.err.amount': 'Bedrag moet \'n getal anders as 0 wees',
   'tx.err.save': 'Kon nie die transaksie stoor nie ({error})',
+  'tx.err.saveMany': {
+    one: '1 lêer gestoor, toe misluk ({error}) — die res word steeds as ongestoor gemerk',
+    other: '{count} lêers gestoor, toe misluk ({error}) — die res word steeds as ongestoor gemerk',
+  },
 
   'tx.saved': { one: '{count} lêer gestoor', other: '{count} lêers gestoor' },
   'tx.savedLearned': { one: ' · {count} nuwe reël geleer', other: ' · {count} nuwe reëls geleer' },
@@ -494,6 +499,7 @@ module.exports = {
   'acct.err.notNumber': '{field} is nie \'n getal nie',
   'acct.err.nameRequired': 'Rekeningnaam is verpligtend',
   'acct.err.exists': 'Rekening bestaan reeds',
+  'acct.err.save': 'Kon nie {name} stoor nie ({error})',
 
   'acct.edit.title': 'Wysig rekening — {name}',
   'acct.new.title': 'Nuwe rekening',

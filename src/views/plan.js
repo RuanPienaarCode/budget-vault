@@ -569,12 +569,20 @@ module.exports = function registerPlan(ctx) {
     return lines.join('\n');
   }
 
+  /* Guarded for the same reason as every save on this page's Save button: a
+     rejected write used to be an unhandled rejection, dirty state already
+     gone, the button dark over data that never landed. Left dirty and lit on
+     failure so the same click retries. */
   async function savePlan() {
     const p = P();
     if (!p) return;
     // From `file`, never from a re-sanitised name — see the note in load.js.
     const path = `Plans/${p.file}.md`;
-    await writeFile(path, serializePlan(S.planName));
+    try {
+      await writeFile(path, serializePlan(S.planName));
+    } catch (e) {
+      return toast(`Could not save ${path} (${e.message || e})`, true);
+    }
     clearDirty();
     toast(`Saved ${path}`);
   }

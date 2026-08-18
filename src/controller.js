@@ -609,7 +609,14 @@ function mountApp(view) {
     const move = classifyRename(ctx.basePath(), oldPath, file?.path, S.categories);
     if (!move) return;
     let moved = 0;
-    try { moved = await ctx.repointNotes(move.kind, move.from, move.to); } catch (e) { return; }
+    /* Reported rather than swallowed: a bare `return` here used to drop a
+       failed re-point on the floor with nothing on screen to say a rename just
+       silently orphaned a note's note_subject. The rename itself already
+       happened in Obsidian — this is only the plugin's own follow-up write —
+       so the early return still stands, just no longer silent about it. */
+    try { moved = await ctx.repointNotes(move.kind, move.from, move.to); } catch (e) {
+      return toast(`Could not re-point notes for the "${move.from}" → "${move.to}" rename (${e.message || e})`, true);
+    }
     if (!moved) return;
     toast(`Re-pointed ${moved} note${moved === 1 ? '' : 's'} from "${move.from}" to "${move.to}"`);
     if (S.view === 'notes') ctx.renderNotes();
@@ -694,7 +701,16 @@ function mountApp(view) {
   }
   $('#reloadLink').addEventListener('click', async () => {
     if (!S.loaded) return closeDrawer();
-    await reloadFromDisk(); closeDrawer(); render(); toast('Reloaded from disk');
+    // Same guard connectVault() already gives the FIRST read of the vault —
+    // a rejected reload here used to be an unhandled rejection with the
+    // drawer left open and nothing on screen explaining why nothing moved.
+    try {
+      await reloadFromDisk();
+    } catch (e) {
+      closeDrawer();
+      return toast(`Could not reload from disk (${e.message || e})`, true);
+    }
+    closeDrawer(); render(); toast('Reloaded from disk');
   });
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
@@ -738,7 +754,16 @@ function mountApp(view) {
   // about the household, only about how this reader likes to look at it.
   $('#debtRange').addEventListener('change', async e => {
     plugin.settings.chartDebtRange = e.target.value;
-    await plugin.saveSettings();
+    /* Guarded like every other write in this file: a rejected saveSettings()
+       used to be an unhandled rejection. The chart still redraws either way —
+       the range picked is real in memory even if it did not reach data.json,
+       and refusing to redraw over a persistence failure would make one problem
+       look like two. */
+    try {
+      await plugin.saveSettings();
+    } catch (err) {
+      toast(`Could not save that setting (${err.message || err})`, true);
+    }
     ctx.replan();
   });
   $('#noteAdd').addEventListener('click', () => ctx.addNote());

@@ -499,8 +499,16 @@ module.exports = function registerDebts(ctx) {
     });
   }
 
+  /* Guarded for the same reason as every save on this page's Save button: a
+     rejected write used to be an unhandled rejection, dirty state already
+     gone, the button dark over data that never landed. Left dirty and lit on
+     failure so the same click retries. */
   async function saveDebts() {
-    await writeFile('Debts.md', serializeDebts());
+    try {
+      await writeFile('Debts.md', serializeDebts());
+    } catch (e) {
+      return toast(`Could not save Debts.md (${e.message || e})`, true);
+    }
     clearDirty();
     toast('Saved Debts.md');
   }

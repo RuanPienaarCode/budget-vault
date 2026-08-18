@@ -341,6 +341,7 @@ module.exports = {
   'bud.title.delete': 'Eliminar esta categoría en todas partes',
 
   'bud.saved': 'Presupuesto guardado en Budgets/{period}.md',
+  'bud.err.save': 'No se pudo guardar el presupuesto ({error})',
   'bud.copy.none': 'No se encontró presupuesto del periodo anterior',
   'bud.copy.done': {
     one: 'Copiada {count} categoría del periodo anterior',
@@ -459,6 +460,10 @@ module.exports = {
   'tx.err.account': 'Nombre de cuenta no válido',
   'tx.err.amount': 'El importe debe ser un número distinto de 0',
   'tx.err.save': 'No se pudo guardar la transacción ({error})',
+  'tx.err.saveMany': {
+    one: 'Se guardó 1 archivo y luego falló ({error}) — el resto sigue marcado como sin guardar',
+    other: 'Se guardaron {count} archivos y luego falló ({error}) — el resto sigue marcado como sin guardar',
+  },
 
   'tx.saved': { one: '{count} archivo guardado', other: '{count} archivos guardados' },
   'tx.savedLearned': { one: ' · aprendida {count} regla nueva', other: ' · aprendidas {count} reglas nuevas' },
@@ -496,6 +501,7 @@ module.exports = {
   'acct.err.notNumber': '{field} no es un número',
   'acct.err.nameRequired': 'El nombre de la cuenta es obligatorio',
   'acct.err.exists': 'La cuenta ya existe',
+  'acct.err.save': 'No se pudo guardar {name} ({error})',
 
   'acct.edit.title': 'Editar cuenta — {name}',
   'acct.new.title': 'Nueva cuenta',

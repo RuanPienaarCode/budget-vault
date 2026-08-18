@@ -591,9 +591,17 @@ module.exports = function registerTax(ctx) {
     return lines.join('\n');
   }
 
+  /* Guarded for the same reason as every save on this page's Save button: a
+     rejected write used to be an unhandled rejection, dirty state already
+     gone, the button dark over data that never landed. Left dirty and lit on
+     failure so the same click retries. */
   async function saveTax() {
     if (!S.taxYear) return;
-    await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
+    try {
+      await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
+    } catch (e) {
+      return toast(`Could not save Tax/${S.taxYear}.md (${e.message || e})`, true);
+    }
     clearDirty();
     toast(`Saved Tax/${S.taxYear}.md`);
   }
@@ -748,7 +756,16 @@ module.exports = function registerTax(ctx) {
       confirmText: 'Discard & switch',
     });
     if (!go) return false;
-    await ctx.reloadFromDisk();
+    /* A rejected reload here used to be an unhandled rejection that left the
+       year switch half-finished with no explanation. Declined rather than
+       silently swallowed — same shape as a cancelled confirm — so the caller
+       re-renders the year the reader was actually still looking at. */
+    try {
+      await ctx.reloadFromDisk();
+    } catch (e) {
+      toast(`Could not reload the vault (${e.message || e})`, true);
+      return false;
+    }
     return true;
   }
 

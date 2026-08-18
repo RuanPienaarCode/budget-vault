@@ -525,12 +525,25 @@ module.exports = function registerTransactions(ctx) {
     toast(`Added ${money(amount)} · ${label} · ${month}`);
   }
 
+  /* Guarded per-file, deliberately not around the whole loop-plus-learn: a
+     rejected write used to be an unhandled rejection AND — because f.dirty was
+     cleared in the same breath as the write started — every file already
+     written before the failure looked clean while the ones after it sat
+     unmarked and silently unsaved. The catch stops the loop at the file that
+     actually failed, so what landed stays landed (dirty:false) and what did
+     not stays dirty for a retry to pick up; clearSaveButton() and the success
+     toast are skipped on that path since the button must stay lit while any
+     file is still unsaved. */
   async function saveTransactions() {
     let n = 0;
-    for (const f of Object.values(S.txFiles)) {
-      if (!f.dirty) continue;
-      await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile(f));
-      f.dirty = false; n++;
+    try {
+      for (const f of Object.values(S.txFiles)) {
+        if (!f.dirty) continue;
+        await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile(f));
+        f.dirty = false; n++;
+      }
+    } catch (err) {
+      return toast(i18n.t('tx.err.saveMany', { count: n, error: err.message || err }), true);
     }
     let learned = 0;
     if (pendingLearns.size) {

@@ -364,7 +364,16 @@ module.exports = function registerBudgets(ctx) {
     lines.push('');
     // The period name IS the filename, for both shapes — no reassembling it
     // from parts, which is what limited this to 'YYYY-MM'.
-    await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
+    /* Guarded for the same reason as every other save on this page's Save
+       button: a rejected write used to be an unhandled rejection, budDirty
+       already gone (it is set below, not above), the button dark over a
+       budget that never landed. Left dirty and lit on failure so the same
+       click retries. */
+    try {
+      await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
+    } catch (e) {
+      return toast(i18n.t('bud.err.save', { error: e.message || e }), true);
+    }
     budDirty = false;
     $('#budSave').disabled = true;
     toast(i18n.t('bud.saved', { period: S.period }));

@@ -337,6 +337,7 @@ module.exports = {
   'bud.title.delete': 'このカテゴリをすべての場所から削除',
 
   'bud.saved': '予算を Budgets/{period}.md に保存しました',
+  'bud.err.save': '予算を保存できませんでした（{error}）',
   'bud.copy.none': '前の期間の予算が見つかりません',
   'bud.copy.done': {
     other: '前の期間から {count} 件のカテゴリをコピーしました',
@@ -440,6 +441,9 @@ module.exports = {
   'tx.err.account': '口座名が正しくありません',
   'tx.err.amount': '金額は 0 以外の数値にしてください',
   'tx.err.save': '取引を保存できませんでした（{error}）',
+  'tx.err.saveMany': {
+    other: '{count} 件のファイルを保存した後に失敗しました（{error}）— 残りは未保存のままです',
+  },
 
   'tx.saved': { other: '{count} 件のファイルを保存しました' },
   'tx.savedLearned': { other: ' · 新しいルールを {count} 件学習しました' },
@@ -475,6 +479,7 @@ module.exports = {
   'acct.err.notNumber': '{field} が数値ではありません',
   'acct.err.nameRequired': '口座名は必須です',
   'acct.err.exists': 'その口座はすでに存在します',
+  'acct.err.save': '{name} を保存できませんでした（{error}）',
 
   'acct.edit.title': '口座を編集 — {name}',
   'acct.new.title': '新しい口座',

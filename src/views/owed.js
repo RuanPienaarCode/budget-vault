@@ -124,8 +124,16 @@ module.exports = function registerOwed(ctx) {
     });
   }
 
+  /* Guarded like every other write on this page's Save button: a rejected
+     write — a full disk, a sync lock — used to be an unhandled rejection with
+     the dirty flag already gone and the Save button dark over data that was
+     never written. Left dirty and lit on failure, so the same click retries. */
   async function saveOwed() {
-    await writeFile('Owed Money.md', serializeOwed());
+    try {
+      await writeFile('Owed Money.md', serializeOwed());
+    } catch (e) {
+      return toast(`Could not save Owed Money.md (${e.message || e})`, true);
+    }
     clearDirty();
     toast('Saved Owed Money.md');
   }

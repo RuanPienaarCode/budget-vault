@@ -272,7 +272,9 @@ module.exports = function registerAccounts(ctx) {
     a.balance = num;
     a.balanceRaw = null;   // the user just gave us a clean figure
     a.balance_updated = todayIso();
-    await saveAccount(a);
+    // saveAccount already toasted the failure — stop here rather than telling
+    // the reader it updated when the file never changed.
+    if (!(await saveAccount(a))) return;
     /* ctx.render, not renderAccounts: this dialog is opened from the Savings &
        Investments page too, and renderAccounts() would rebuild the page the
        reader is NOT looking at — leaving the figure they just typed absent from
@@ -288,7 +290,7 @@ module.exports = function registerAccounts(ctx) {
     a.balance = implied;
     a.balanceRaw = null;
     a.balance_updated = todayIso();
-    await saveAccount(a);
+    if (!(await saveAccount(a))) return;
     renderAccounts();
     toast(i18n.t('acct.reconciled', { name: a.name, amount: acctMoney(a, implied) }));
   }
@@ -381,7 +383,7 @@ module.exports = function registerAccounts(ctx) {
     if (shown.includes('target_date')) a.target_date = (r.target_date || '').trim();
     if (shown.includes('inception_date')) a.inception_date = (r.inception_date || '').trim();
 
-    await saveAccount(a, EDITABLE_KEYS);
+    if (!(await saveAccount(a, EDITABLE_KEYS))) return;
     // ctx.render, not renderAccounts: a type change moves the account between
     // groups here AND changes whether Savings & Investments shows it at all.
     ctx.render();
@@ -390,7 +392,7 @@ module.exports = function registerAccounts(ctx) {
 
   async function toggleBudget(a) {
     a.in_budget = !a.in_budget;
-    await saveAccount(a);
+    if (!(await saveAccount(a))) return;
     renderAccounts();
     toast(i18n.t(a.in_budget ? 'acct.budget.on' : 'acct.budget.off', { name: a.name }));
   }
@@ -1294,7 +1296,20 @@ module.exports = function registerAccounts(ctx) {
   /* `keys` names the extra frontmatter fields to write from the model — the
      edit form passes EDITABLE_KEYS, everything else passes nothing. The balance,
      its date and the budget flag are always patched, because they are the only
-     three the tile itself can change. */
+     three the tile itself can change.
+
+     Returns true on a write that landed, false on one that did not. This is
+     the ONE save function in the app with no dirty flag or Save button of its
+     own — every edit here writes through immediately from five different
+     callers (editBalance, acceptImplied, editAccount, toggleBudget,
+     addAccount) — so a caller cannot tell "did it land" from a bare await the
+     way the dirty-flag pages can. Guarded here, once, rather than five times:
+     a rejected write used to be an unhandled rejection AND every caller fell
+     straight through to its own success toast and re-render regardless,
+     telling the reader something saved that never did. addAccount goes
+     further still on a false return — it must not push the account it just
+     failed to write into S.accounts, or the app would show an account with no
+     file behind it. */
   async function saveAccount(a, keys = []) {
     // Everything NOT patched — block-style tags, aliases, any hand-added key —
     // is left byte for byte. The body was already preserved via a.body.
@@ -1316,8 +1331,13 @@ module.exports = function registerAccounts(ctx) {
          and the limit goes back to whatever the file said when the vault was
          opened. Our own writes are deliberately not re-read by the file
          watcher, so nothing else would put this back in step. */
-      a.fmRaw = await ctx.patchFile(`Accounts/${a.name}.md`, a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
-      return;
+      try {
+        a.fmRaw = await ctx.patchFile(`Accounts/${a.name}.md`, a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
+      } catch (e) {
+        toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
+        return false;
+      }
+      return true;
     }
     // Legacy fallback: no captured frontmatter (a file the loader never saw) —
     // rebuild from the model.
@@ -1354,10 +1374,16 @@ module.exports = function registerAccounts(ctx) {
     // Not ctx.patchFile — this branch REBUILDS the frontmatter from the model
     // (there is no raw block to patch), but the trailing `a.body ||` still
     // preserves the body, same invariant as the patch branch above.
-    await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
+    try {
+      await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
+    } catch (e) {
+      toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
+      return false;
+    }
     // Adopt what was just written, so the NEXT save takes the patch branch
     // above and preserves anything the user has added to the file since.
     a.fmRaw = lines.slice(1, -1).join('\n');
+    return true;
   }
 
   /* Create an account file + its in-memory record. Reachable from the Accounts
@@ -1441,7 +1467,11 @@ module.exports = function registerAccounts(ctx) {
     };
     // No fmRaw — saveAccount's build-from-model branch writes the full
     // frontmatter block and skips every null field.
-    await saveAccount(acct);
+    // saveAccount already toasted the failure. Returning null here — same as
+    // every validation failure above — matters more than usual: the account
+    // below is never pushed into S.accounts, so a failed write never leaves
+    // the app showing an account with no file behind it.
+    if (!(await saveAccount(acct))) return null;
     // Match the setup wizard: pre-create the account's transactions folder so
     // it's importable and visible in the file explorer right away.
     await ensureFolder(relPath(`Transactions/${name}`));

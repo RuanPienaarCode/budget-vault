@@ -337,6 +337,7 @@ module.exports = {
   'bud.title.delete': '在所有位置删除这个分类',
 
   'bud.saved': '预算已保存到 Budgets/{period}.md',
+  'bud.err.save': '无法保存预算（{error}）',
   'bud.copy.none': '找不到上一周期的预算',
   'bud.copy.done': {
     other: '已从上一周期复制 {count} 个分类',
@@ -440,6 +441,9 @@ module.exports = {
   'tx.err.account': '账户名称无效',
   'tx.err.amount': '金额必须是不等于 0 的数字',
   'tx.err.save': '无法保存该交易（{error}）',
+  'tx.err.saveMany': {
+    other: '已保存 {count} 个文件后失败（{error}）— 其余仍标记为未保存',
+  },
 
   'tx.saved': { other: '已保存 {count} 个文件' },
   'tx.savedLearned': { other: ' · 学习了 {count} 条新规则' },
@@ -475,6 +479,7 @@ module.exports = {
   'acct.err.notNumber': '{field} 不是数字',
   'acct.err.nameRequired': '账户名称为必填项',
   'acct.err.exists': '该账户已存在',
+  'acct.err.save': '无法保存 {name}（{error}）',
 
   'acct.edit.title': '编辑账户 — {name}',
   'acct.new.title': '新建账户',

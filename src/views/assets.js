@@ -178,8 +178,16 @@ module.exports = function registerAssets(ctx) {
     });
   }
 
+  /* Guarded for the same reason as every save on this page's Save button: a
+     rejected write used to be an unhandled rejection, dirty state already
+     gone, the button dark over data that never landed. Left dirty and lit on
+     failure so the same click retries. */
   async function saveAssets() {
-    await writeFile('Assets.md', serializeAssets());
+    try {
+      await writeFile('Assets.md', serializeAssets());
+    } catch (e) {
+      return toast(`Could not save Assets.md (${e.message || e})`, true);
+    }
     clearDirty();
     toast('Saved Assets.md');
   }

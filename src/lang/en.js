@@ -353,6 +353,7 @@ module.exports = {
   'bud.title.delete': 'Delete this category everywhere',
 
   'bud.saved': 'Budget saved to Budgets/{period}.md',
+  'bud.err.save': 'Could not save the budget ({error})',
   'bud.copy.none': 'No budget found for the previous period',
   'bud.copy.done': {
     one: 'Copied {count} category from the previous period',
@@ -470,6 +471,10 @@ module.exports = {
   'tx.err.account': 'Invalid account name',
   'tx.err.amount': 'Amount must be a number other than 0',
   'tx.err.save': 'Could not save the transaction ({error})',
+  'tx.err.saveMany': {
+    one: 'Saved 1 file, then failed ({error}) — the rest are still marked unsaved',
+    other: 'Saved {count} files, then failed ({error}) — the rest are still marked unsaved',
+  },
 
   'tx.saved': { one: 'Saved {count} file', other: 'Saved {count} files' },
   'tx.savedLearned': { one: ' · learned {count} new rule', other: ' · learned {count} new rules' },
@@ -507,6 +512,7 @@ module.exports = {
   'acct.err.notNumber': '{field} is not a number',
   'acct.err.nameRequired': 'Account name required',
   'acct.err.exists': 'Account already exists',
+  'acct.err.save': 'Could not save {name} ({error})',
 
   'acct.edit.title': 'Edit account — {name}',
   'acct.new.title': 'New account',
