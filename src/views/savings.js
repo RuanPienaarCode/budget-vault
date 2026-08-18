@@ -27,7 +27,7 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, moneyIn, toast, accountIndex, catType } = ctx;
+  const { S, $, root, money, accountIndex, catType } = ctx;
 
   function renderSavings() {
     const savings = S.accounts.filter(a => a.type === 'savings');
