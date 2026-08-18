@@ -3,6 +3,46 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.20.0 — 2026-08-18
+
+The Dashboard could say what was left this period and what was budgeted, but
+nothing said whether the household was actually all right. This adds the card
+that answers the years rather than the month.
+
+### Added
+
+- **A Financial health card**, between the hero and What's left — the two above
+  it answer this period; this one answers the years. Four figures lead: how many
+  months of essential spending the emergency fund covers, the savings rate, the
+  share of income going to debt interest, and a 0–100 score. It hides itself
+  until the vault can say something honest, rather than showing four dashes.
+- **An explanation for the score.** Hover it, tap it or focus it and a panel
+  says how the score is built, where this household's points went, and the one
+  thing costing the most — with a figure to act on rather than an adjective.
+  Hover only where a fine pointer exists; a tap opens the same panel everywhere,
+  so nothing hover-only is invented for a finger.
+- **`emergency_fund` on an account** — `true` for the whole balance, or an
+  amount to earmark part of it. An earmark larger than the balance counts only
+  what is really there, and says so instead of quietly correcting the claim.
+  Editable from the Accounts page; its third option appears only when a partial
+  earmark already exists, so the form can never wipe one it did not offer.
+- **`emergency_target_months` in Settings.md**, with a control in the settings
+  tab, for households aiming at three months rather than six.
+- **`fixed: true` on a category**, marking money that cannot be stopped this
+  month, which the score reads as the household's committed share of income.
+
+### The two measurements that are easy to get confidently wrong
+
+- **Consumption is not total spend.** Moving money into a savings account leaves
+  the cheque account as an ordinary debit, so a household saving a fifth of its
+  income reads as spending more than it earns. The ratio excludes what was saved
+  or invested; it measures what living actually cost.
+- **Fixed costs need a flag, not a type test.** The biggest fixed cost most
+  households have is rent, and rent is an ordinary expense. Deriving the set
+  from category type omitted it entirely and reported less than half the true
+  figure. A ratio that silently drops its largest term is worse than no ratio,
+  so the measure stays unscored until at least one category is flagged.
+
 ## 1.19.1 — 2026-08-13
 
 Money that arrived was being counted by nothing. Three different ways in,
