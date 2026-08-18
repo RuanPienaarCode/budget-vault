@@ -220,7 +220,8 @@ module.exports = function registerDashboard(ctx) {
       attachScoreExplainer(scoreTile, snap.breakdown, target);
     }
 
-    body.append(el('div', { class: 'health-grid' }, emergency, savingsTile, debtTile, scoreTile));
+    /* The conclusion leads, then the three figures it is drawn from. */
+    body.append(el('div', { class: 'health-grid' }, scoreTile, emergency, savingsTile, debtTile));
   }
 
   /* Turn the score tile into something that explains itself.

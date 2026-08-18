@@ -942,14 +942,17 @@
    it flipped upward. Width is the cheaper half of that fix: the same words in
    ~420px are roughly half the height.
 
-   Right-anchored because the tile that carries this is the LAST of the four,
-   so a panel wider than its column has to grow leftward to stay on the card.
-   The viewport clamp keeps that true on a narrow desktop pane too.
+   LEFT-anchored because the tile that carries this is the FIRST of the four, so
+   a panel wider than its column has to grow rightward to stay on the card. This
+   pairs with the tile's position: it was right-anchored while the score sat
+   last, and moving the tile without moving the anchor would have hung the panel
+   off the card's left edge. The viewport clamp keeps it honest on a narrow
+   desktop pane either way.
 
    `overflow-y: auto` costs nothing while the panel fits, and is what makes the
    measured max-height attachScoreExplainer sets a scroll rather than a clip. */
 .budget-app-root .health-why {
-  display: none; position: absolute; z-index: 20; left: auto; right: 0; top: calc(100% + 6px);
+  display: none; position: absolute; z-index: 20; left: 0; right: auto; top: calc(100% + 6px);
   width: 420px; max-width: calc(100vw - 24px);
   padding: 12px 14px; border-radius: 12px; overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border-color);

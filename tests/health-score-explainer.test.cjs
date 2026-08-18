@@ -162,7 +162,15 @@ const textOf = el => descend(el).map(e => e.textContent || '').join(' ') + (el.t
   const shown = find(pop, 'health-why-pts').map(e => textOf(e));
   ok(shown.length >= 3, `every scorable pillar gets a row (got ${shown.length})`);
   const sum = shown.reduce((t, s) => t + parseInt(s, 10), 0);
-  const headline = parseInt(textOf(find(body, 'health-fig')[3]), 10);
+  /* By IDENTITY, not position. This read the 4th tile until the score moved to
+     first, at which point it was cheerfully comparing the rows against a
+     different tile's number — a test that breaks on a layout change it should
+     not care about is a test that will be "fixed" by loosening it. */
+  /* Straight off the value node's own text children. The double's textContent
+     concatenates its own text AND its children's, so reading it gives "5353"
+     for a score of 53 — harmless where parseInt stops at a space (the rows
+     below), and silently wrong for a bare number. */
+  const headline = parseInt((find(tile, 'lv')[0].children || []).map(c => c._text || '').join(''), 10);
   eq(sum, headline, `the rows sum to the headline on screen (${shown.join(' + ')} vs ${headline})`);
 
   /* ---- 7. the one actionable line ---- */
