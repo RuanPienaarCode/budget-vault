@@ -19,8 +19,8 @@ to carry forward as already spent.
   beside it was credited to nothing. Any period holding uncategorised money
   in, a refund inside a spending category, or money under a category that
   had since been deleted was reported deeper in the hole than it was — on
-  the vault this was found against, **one period was overstated by R14,052
-  and another by R11,752, and a third reported an overspend in a month that
+  the vault this was found against, **two periods' stated overspend was
+  materially overstated, and a third reported an overspend in a month that
   had comfortably finished ahead.** That number is written into an
   assume-spent budget row, so the app was not merely mis-stating those
   holes, it was funding them. If you have ever pulled an overspend forward,
