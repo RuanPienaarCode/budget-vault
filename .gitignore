@@ -14,6 +14,9 @@ dev-docs/
 # Local design-preview harness (browser mock of the plugin) — dev-only, never shipped
 _preview/
 
+# Claude Code agent files — backed up in the Claude-config repo, never committed here
+.claude/agents/
+
 # OS noise
 .DS_Store
 
