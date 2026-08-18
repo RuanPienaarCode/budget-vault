@@ -463,6 +463,7 @@ module.exports = {
     one: '1 Datei gespeichert, dann fehlgeschlagen ({error}) — der Rest ist weiterhin als ungespeichert markiert',
     other: '{count} Dateien gespeichert, dann fehlgeschlagen ({error}) — der Rest ist weiterhin als ungespeichert markiert',
   },
+  'tx.err.saveNone': 'Speichern fehlgeschlagen ({error}) — nichts wurde gespeichert, alle Dateien sind weiterhin als ungespeichert markiert',
 
   'tx.saved': { one: '{count} Datei gespeichert', other: '{count} Dateien gespeichert' },
   'tx.savedLearned': { one: ' · {count} neue Regel gelernt', other: ' · {count} neue Regeln gelernt' },

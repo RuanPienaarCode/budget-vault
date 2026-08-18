@@ -444,6 +444,7 @@ module.exports = {
   'tx.err.saveMany': {
     other: '已保存 {count} 个文件后失败（{error}）— 其余仍标记为未保存',
   },
+  'tx.err.saveNone': '保存失败（{error}）— 没有任何内容被保存，所有文件仍标记为未保存',
 
   'tx.saved': { other: '已保存 {count} 个文件' },
   'tx.savedLearned': { other: ' · 学习了 {count} 条新规则' },

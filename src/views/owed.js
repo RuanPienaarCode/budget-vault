@@ -125,9 +125,13 @@ module.exports = function registerOwed(ctx) {
   }
 
   /* Guarded like every other write on this page's Save button: a rejected
-     write — a full disk, a sync lock — used to be an unhandled rejection with
-     the dirty flag already gone and the Save button dark over data that was
-     never written. Left dirty and lit on failure, so the same click retries. */
+     write — a full disk, a sync lock — used to be an unhandled rejection.
+     With no try/catch there was no toast and no cleanup to run, so the dirty
+     flag was left exactly as it was (clearDirty() sits AFTER the write and
+     never ran on a rejection) with nothing on screen to say the save had
+     failed. The button stayed lit and the flag stayed dirty by ACCIDENT, not
+     by design — the only bug was the silence. Now the failure toasts and the
+     same left-dirty state is kept on purpose, so the same click retries. */
   async function saveOwed() {
     try {
       await writeFile('Owed Money.md', serializeOwed());

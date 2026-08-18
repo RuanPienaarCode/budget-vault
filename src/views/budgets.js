@@ -365,10 +365,13 @@ module.exports = function registerBudgets(ctx) {
     // The period name IS the filename, for both shapes — no reassembling it
     // from parts, which is what limited this to 'YYYY-MM'.
     /* Guarded for the same reason as every other save on this page's Save
-       button: a rejected write used to be an unhandled rejection, budDirty
-       already gone (it is set below, not above), the button dark over a
-       budget that never landed. Left dirty and lit on failure so the same
-       click retries. */
+       button: before this, a rejected write was an unhandled rejection — no
+       try/catch meant no toast and no code path to run at all, so budDirty
+       was left exactly as it was (it is only set false below, on success,
+       never above) with nothing on screen to say the save had failed. The
+       button stayed lit and budDirty stayed true by ACCIDENT, not by design;
+       the only bug was the silence. Now the failure toasts and the same
+       left-dirty state is kept on purpose, so the same click retries. */
     try {
       await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
     } catch (e) {

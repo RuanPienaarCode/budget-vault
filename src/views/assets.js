@@ -178,10 +178,14 @@ module.exports = function registerAssets(ctx) {
     });
   }
 
-  /* Guarded for the same reason as every save on this page's Save button: a
-     rejected write used to be an unhandled rejection, dirty state already
-     gone, the button dark over data that never landed. Left dirty and lit on
-     failure so the same click retries. */
+  /* Guarded for the same reason as every save on this page's Save button:
+     before this, a rejected write was an unhandled rejection — no try/catch
+     meant no toast and no code path to run at all, so the dirty flag was left
+     exactly as it was (clearDirty() sits AFTER the write and never ran on a
+     rejection) with nothing on screen to say the save had failed. The button
+     stayed lit and the flag stayed dirty by ACCIDENT, not by design; the only
+     bug was the silence. Now the failure toasts and the same left-dirty state
+     is kept on purpose, so the same click retries. */
   async function saveAssets() {
     try {
       await writeFile('Assets.md', serializeAssets());

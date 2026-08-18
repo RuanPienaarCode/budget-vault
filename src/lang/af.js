@@ -462,6 +462,7 @@ module.exports = {
     one: '1 lêer gestoor, toe misluk ({error}) — die res word steeds as ongestoor gemerk',
     other: '{count} lêers gestoor, toe misluk ({error}) — die res word steeds as ongestoor gemerk',
   },
+  'tx.err.saveNone': 'Kon nie stoor nie ({error}) — niks het gestoor nie, alle lêers word steeds as ongestoor gemerk',
 
   'tx.saved': { one: '{count} lêer gestoor', other: '{count} lêers gestoor' },
   'tx.savedLearned': { one: ' · {count} nuwe reël geleer', other: ' · {count} nuwe reëls geleer' },

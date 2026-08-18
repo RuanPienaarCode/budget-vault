@@ -444,6 +444,7 @@ module.exports = {
   'tx.err.saveMany': {
     other: '{count} 件のファイルを保存した後に失敗しました（{error}）— 残りは未保存のままです',
   },
+  'tx.err.saveNone': '保存に失敗しました（{error}）— 何も保存されていません。すべてのファイルが未保存のままです',
 
   'tx.saved': { other: '{count} 件のファイルを保存しました' },
   'tx.savedLearned': { other: ' · 新しいルールを {count} 件学習しました' },

@@ -112,7 +112,11 @@ module.exports = function registerSavings(ctx) {
     a.balance = implied;
     a.balanceRaw = null;
     a.balance_updated = todayIso();
-    await ctx.saveAccount(a);
+    // saveAccount already toasted the failure — stop here rather than
+    // re-rendering the figure that never landed and telling the reader it
+    // reconciled when the file still holds the old balance. Same guard as
+    // accounts.js's acceptImplied.
+    if (!(await ctx.saveAccount(a))) return;
     renderSavings();
     toast(`${a.name} reconciled to ${money(implied)}`);
   }

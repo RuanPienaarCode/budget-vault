@@ -707,8 +707,16 @@ function mountApp(view) {
     try {
       await reloadFromDisk();
     } catch (e) {
+      // reloadFromDisk() mutates state (invalidateBudgetDraft, S.pendingImport
+      // = null, #importReview hidden) BEFORE the awaited loadVault() that can
+      // actually reject — so a rejected reload here used to leave the screen
+      // drawn from before those resets ran, out of step with what S now holds
+      // underneath it. render() lands on a known-good screen rebuilt from the
+      // current state rather than trusting a stale draw.
       closeDrawer();
-      return toast(`Could not reload from disk (${e.message || e})`, true);
+      toast(`Could not reload from disk (${e.message || e})`, true);
+      render();
+      return;
     }
     closeDrawer(); render(); toast('Reloaded from disk');
   });

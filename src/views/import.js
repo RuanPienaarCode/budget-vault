@@ -603,12 +603,15 @@ module.exports = function registerImport(ctx) {
       });
       if (go) {
         ident.acct.account_number = ident.ours;
-        try {
-          await ctx.saveAccount(ident.acct, ['account_number']);
-        } catch (e) {
-          // Not fatal to the import: the rows are still going to the account
-          // the reader picked. Say what did not happen and carry on.
-          toast(`Could not record the account number (${e.message || e}) — importing anyway`, true);
+        // saveAccount no longer throws on a disk error — it toasts its own
+        // failure and resolves false, so a try/catch here would never see
+        // one. Check the return instead: not fatal to the import either way,
+        // the rows are still going to the account the reader picked, but
+        // account_number stays set in memory regardless of whether the write
+        // landed, so a failed save is worth its own word on top of
+        // saveAccount's toast rather than being silently swallowed.
+        if (!(await ctx.saveAccount(ident.acct, ['account_number']))) {
+          toast('Could not record the account number — importing anyway', true);
         }
       }
       // Either way, not again for this file.

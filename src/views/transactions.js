@@ -543,7 +543,14 @@ module.exports = function registerTransactions(ctx) {
         f.dirty = false; n++;
       }
     } catch (err) {
-      return toast(i18n.t('tx.err.saveMany', { count: n, error: err.message || err }), true);
+      // n===0 is the likeliest failure — a dirty batch saves in file order, so
+      // the earliest file is the one most likely to still be locked or
+      // mid-sync — and it gets its own key rather than saveMany's count:0
+      // form: no count to state, so no language-specific zero handling
+      // (French's ZERO_IS_SINGULAR rule) to get wrong.
+      return toast(n
+        ? i18n.t('tx.err.saveMany', { count: n, error: err.message || err })
+        : i18n.t('tx.err.saveNone', { error: err.message || err }), true);
     }
     let learned = 0;
     if (pendingLearns.size) {

@@ -77,9 +77,15 @@ module.exports = function registerTax(ctx) {
         // previous year's unsaved edits were still sitting in memory —
         // unreachable, unwarned, and gone at the next reload.
         if (!await confirmDiscard()) return;
+        const prevYear = S.taxYear;
         seedTaxYear(+y);
         S.taxYear = y;
-        await saveTax();
+        // saveTax() already toasted the failure. Back the phantom year out —
+        // same as startTax/newTaxYear — rather than leaving a tax page on
+        // screen with no Tax/<y>.md behind it and no Save button lit to
+        // retry it with: this path never calls mark(), so taxDirty was never
+        // set. The orphan stays offered next render, exactly as it was.
+        if (!(await saveTax())) { delete S.tax[y]; S.taxYear = prevYear; renderTax(); return; }
         renderTax();
       });
       box.append(b);
@@ -488,8 +494,12 @@ module.exports = function registerTax(ctx) {
     // the row was only in memory until now, so nothing on screen reflected it.
     renderDocs(t); renderTaxKpis(t);
     // The binary is already on disk — save the markdown too so the two never
-    // drift apart (an unsaved row pointing at a saved file, or vice versa).
-    await saveTax();
+    // drift apart. If THAT write fails they drift apart anyway, for now:
+    // saveTax() has already toasted it, and mark() lights the Save button so
+    // the same edit retries without re-uploading — the binary must not be
+    // un-linked over a markdown write failure, since nothing wrote it to be
+    // thrown away.
+    if (!(await saveTax())) mark();
   }
 
   /* SHA-256 over the upload, compared against everything already filed for the
@@ -535,7 +545,12 @@ module.exports = function registerTax(ctx) {
     }
     if (!fileList(target).includes(name)) setFileList(target, [...fileList(target), name]);
     target.status = 'uploaded';
-    await saveTax();
+    // saveTax() already toasted a failure. The link itself is real either way
+    // — no second copy was ever written, so there is nothing to back out —
+    // but mark() so the Save button lights and the metadata mismatch can be
+    // retried, and hold back the "Linked" toast so a failure doesn't read as
+    // a success landing right under its own error.
+    if (!(await saveTax())) { mark(); renderTax(); return; }
     renderTax();
     toast(`Linked ${name} — no second copy written.`);
   }
@@ -591,19 +606,28 @@ module.exports = function registerTax(ctx) {
     return lines.join('\n');
   }
 
-  /* Guarded for the same reason as every save on this page's Save button: a
-     rejected write used to be an unhandled rejection, dirty state already
-     gone, the button dark over data that never landed. Left dirty and lit on
-     failure so the same click retries. */
+  /* Guarded for the same reason as every save on this page's Save button: an
+     unhandled rejection here used to leave the dirty flag exactly as it was
+     — never cleared, since clearDirty() sits below the write — with no toast
+     to say the write had failed. Left dirty and lit on failure so the same
+     click retries.
+
+     Returns true/false — landed or not — same contract as saveAccount. Five
+     callers below write through immediately (renderOrphanYears, handleTaxFile,
+     attachExisting, startTax, newTaxYear) without ever going through mark(),
+     so taxDirty was never true to begin with; without a signal to check, a
+     failed write there left no lit Save button for anyone to retry with. */
   async function saveTax() {
-    if (!S.taxYear) return;
+    if (!S.taxYear) return true;
     try {
       await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
     } catch (e) {
-      return toast(`Could not save Tax/${S.taxYear}.md (${e.message || e})`, true);
+      toast(`Could not save Tax/${S.taxYear}.md (${e.message || e})`, true);
+      return false;
     }
     clearDirty();
     toast(`Saved Tax/${S.taxYear}.md`);
+    return true;
   }
 
   /* ------------------------------ actions -------------------------------- */
@@ -659,9 +683,15 @@ module.exports = function registerTax(ctx) {
 
   async function startTax() {
     const year = currentTaxYear();
+    const prevYear = S.taxYear;
     seedTaxYear(year);
     S.taxYear = String(year);
-    await saveTax();
+    // saveTax() already toasted the failure. Back the phantom year out rather
+    // than leaving a tax page on screen with no Tax/<year>.md behind it — this
+    // path never calls mark(), so there is no lit Save button to retry with
+    // otherwise. Matches the addAccount precedent: never leave a tracked
+    // record standing with no successful write behind it.
+    if (!(await saveTax())) { delete S.tax[String(year)]; S.taxYear = prevYear; renderTax(); return; }
     renderTax();
   }
 
@@ -676,9 +706,11 @@ module.exports = function registerTax(ctx) {
     if (!year || year < 2000 || year > 2100) return toast('Not a valid year', true);
     if (S.tax[String(year)]) return changeTaxYear(String(year));
     if (!await confirmDiscard()) return;
+    const prevYear = S.taxYear;
     seedTaxYear(year);
     S.taxYear = String(year);
-    await saveTax();
+    // Back the phantom year out on a failed save — see startTax.
+    if (!(await saveTax())) { delete S.tax[String(year)]; S.taxYear = prevYear; renderTax(); return; }
     renderTax();
   }
 

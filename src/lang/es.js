@@ -464,6 +464,7 @@ module.exports = {
     one: 'Se guardó 1 archivo y luego falló ({error}) — el resto sigue marcado como sin guardar',
     other: 'Se guardaron {count} archivos y luego falló ({error}) — el resto sigue marcado como sin guardar',
   },
+  'tx.err.saveNone': 'No se pudo guardar ({error}) — nada se guardó, todos los archivos siguen marcados como sin guardar',
 
   'tx.saved': { one: '{count} archivo guardado', other: '{count} archivos guardados' },
   'tx.savedLearned': { one: ' · aprendida {count} regla nueva', other: ' · aprendidas {count} reglas nuevas' },

@@ -475,6 +475,11 @@ module.exports = {
     one: 'Saved 1 file, then failed ({error}) — the rest are still marked unsaved',
     other: 'Saved {count} files, then failed ({error}) — the rest are still marked unsaved',
   },
+  // Reached when the very first write failed — the common case, since a
+  // dirty batch is usually saved in order and the earliest file is the one
+  // most likely to still be locked or mid-sync. No count to state at all,
+  // so no plural form and no language-specific zero handling to get wrong.
+  'tx.err.saveNone': 'Save failed ({error}) — nothing landed, all files are still marked unsaved',
 
   'tx.saved': { one: 'Saved {count} file', other: 'Saved {count} files' },
   'tx.savedLearned': { one: ' · learned {count} new rule', other: ' · learned {count} new rules' },

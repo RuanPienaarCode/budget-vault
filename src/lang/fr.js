@@ -464,10 +464,19 @@ module.exports = {
   'tx.err.account': 'Nom de compte invalide',
   'tx.err.amount': 'Le montant doit être un nombre différent de 0',
   'tx.err.save': 'Impossible d\'enregistrer la transaction ({error})',
+  /* French is ZERO_IS_SINGULAR (i18n.js: count < 2 -> 'one'), so this form is
+     reached at count:0 as well as count:1 — it must never hardcode "1". A
+     literal "1 fichier" here rendered "1 fichier enregistré, puis échec"
+     when the FIRST file failed and zero files actually landed. */
   'tx.err.saveMany': {
-    one: '1 fichier enregistré, puis échec ({error}) — le reste est toujours marqué non enregistré',
+    one: '{count} fichier enregistré, puis échec ({error}) — le reste est toujours marqué non enregistré',
     other: '{count} fichiers enregistrés, puis échec ({error}) — le reste est toujours marqué non enregistré',
   },
+  // Reached when the very first write failed — the common case, since a
+  // dirty batch is usually saved in order and the earliest file is the one
+  // most likely to still be locked or mid-sync. No count to state at all,
+  // so no plural form and no language-specific zero handling to get wrong.
+  'tx.err.saveNone': 'Échec de l\'enregistrement ({error}) — rien n\'a été enregistré, tous les fichiers restent marqués non enregistrés',
 
   'tx.saved': { one: '{count} fichier enregistré', other: '{count} fichiers enregistrés' },
   'tx.savedLearned': { one: ' · {count} nouvelle règle apprise', other: ' · {count} nouvelles règles apprises' },

@@ -62,6 +62,12 @@ const FILES = () => ({
   [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\n---\n',
   [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#33aa66"\n---\n',
   [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\nbalance: 12000.00\nbalance_updated: 2026-07-01\n---\n',
+  // A savings account with a reconciliation drift, for the C1 case below —
+  // Savings' own acceptImplied, reached through the "Use this" button rather
+  // than a Save button, needs an account reconcile() actually disagrees with.
+  [`${B}/Accounts/Fund.md`]: '---\ntype: savings\nbalance: 5000.00\nbalance_updated: 2026-07-01\n---\n',
+  [`${B}/Transactions/Fund/2026-07.md`]: `---\n${TX_FM}\n---\n\n${HEAD}`
+    + '| 2026-07-15 | Interest | Salary | 200.00 |  |  |  |\n',
   [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 | |\n',
   [`${B}/Transactions/Cheque/2026-07.md`]: `---\n${TX_FM}\n---\n\n${HEAD}`
     + '| 2026-07-01 | Salary | Salary | 40000.00 |  |  |  |\n',
@@ -92,7 +98,7 @@ async function mount() {
   const { el } = require('../src/dom');
   ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
   require('../src/categories')(ctx);
-  for (const f of ['transactions', 'budgets', 'plan', 'accounts', 'assets', 'debts', 'owed', 'services', 'tax']) {
+  for (const f of ['transactions', 'budgets', 'plan', 'accounts', 'assets', 'debts', 'owed', 'services', 'tax', 'savings']) {
     require(`../src/views/${f}`)(ctx);
   }
   // A plan with nothing in it — savePlan only needs a current plan to exist,
@@ -122,6 +128,15 @@ function withFailingWrite(ctx) {
   };
   return { failOn: p => { failPath = p; }, clear: () => { failPath = null; } };
 }
+
+/* Lets a click handler's own async work settle before assertions run. click()
+   invokes the listener synchronously (see dom-stub.cjs), but the listener
+   itself is `() => acceptImplied(a, rec.implied)` — fired, not awaited — so
+   its promise is not handed back to the caller. One macrotask tick is enough:
+   everything acceptImplied awaits (saveAccount, patchFile, vault.modify) is
+   native promise chaining underneath, which drains on the microtask queue
+   ahead of any timer. */
+const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
 (async () => {
   /* ---- 1-6: the six dirtyFlag-backed single-file saves — Owed, Debts,
@@ -264,6 +279,125 @@ function withFailingWrite(ctx) {
     const created = await ctx.addAccount();
     ok(created === null, 'addAccount: a failed underlying save returns null, matching every other validation failure');
     ok(S.accounts.length === before, 'addAccount: a failed save does not add a phantom account to memory');
+  }
+
+  /* ---- 11: Savings' own acceptImplied — the reviewer's C1. It is
+     accounts.js's acceptImplied's twin (case 9) but reached through the
+     "Use this" reconciliation button rather than a Save button, and it was
+     missing the guard its twin already had: a failed write still re-rendered
+     the implied balance and toasted success for a figure that never landed.
+     Reached through the real rendered DOM, not a direct function call —
+     acceptImplied is not published on ctx, only wired to the button's click
+     handler, which is the only way anything outside savings.js can reach it. ---- */
+  {
+    const { ctx, $ } = await mount();
+    const fail = withFailingWrite(ctx);
+    ctx.renderSavings();
+    // Selector engine here is intentionally minimal (see dom-stub.cjs) and
+    // matches a single class, not a compound selector — '.v' alone is
+    // renderSections' own editable-balance button class, unique on this page.
+    const bal = $('#savingsSections').querySelectorAll('.v')[0];
+    const btn = $('#savingsSections').querySelectorAll('.acct-recon-btn')[0];
+    ok(!!bal && !!btn, 'Savings: the seeded Fund account renders both a balance button and a reconcile offer');
+    const beforeText = bal.textContent;
+    fail.failOn(`${B}/Accounts/Fund.md`);
+
+    await assert.doesNotReject(async () => { btn.click(); await flush(); },
+      'Savings: a rejected write inside acceptImplied must not escape as an unhandled rejection');
+    checks++;
+    let lastToast = ctx._toasts[ctx._toasts.length - 1];
+    ok(lastToast && lastToast.bad === true, 'Savings: a failed reconcile reports an error toast (from saveAccount)');
+    ok(!ctx._toasts.some(t => /reconciled/.test(t.msg || '')),
+      'Savings: a failed reconcile never reports the "reconciled to" success toast');
+    ok($('#savingsSections').querySelectorAll('.v')[0].textContent === beforeText,
+      'Savings: a failed reconcile does not re-render — the old balance stays on screen, not the implied one');
+
+    // Retry: let the write through. Same button, same click.
+    fail.clear();
+    btn.click(); await flush();
+    lastToast = ctx._toasts[ctx._toasts.length - 1];
+    ok(lastToast && lastToast.bad !== true && /reconciled/.test(lastToast.msg || ''),
+      'Savings: a retried reconcile that succeeds reports the "reconciled to" toast');
+    ok($('#savingsSections').querySelectorAll('.v')[0].textContent !== beforeText,
+      'Savings: a retried reconcile that succeeds re-renders the new figure');
+  }
+
+  /* ---- 12 + 13: startTax and newTaxYear — the reviewer's S3. Both seed a
+     phantom tax year into S.tax and switch S.taxYear to it BEFORE saveTax()
+     confirms the write landed; this path never calls mark(), so a failed
+     write used to leave a Tax page on screen backed by no file and no lit
+     Save button to retry with. Fixed by backing the phantom year out on
+     failure, matching the addAccount precedent (case 10). ---- */
+  {
+    const { ctx, S } = await mount();
+    S.tax = {}; S.taxYear = null;   // the empty state startTax() actually fires from
+    const fail = withFailingWrite(ctx);
+    fail.failOn(`${B}/Tax/2026.md`);
+
+    await assert.doesNotReject(() => ctx.startTax(), 'startTax: a rejected write must not escape as an unhandled rejection');
+    checks++;
+    ok(S.tax['2026'] === undefined, 'startTax: a failed save backs the phantom tax year out of S.tax');
+    ok(S.taxYear === null, 'startTax: a failed save reverts S.taxYear to what it was before');
+
+    fail.clear();
+    await ctx.startTax();
+    ok(!!S.tax['2026'], 'startTax: a retried save that succeeds seeds the tax year for real');
+    ok(S.taxYear === '2026', 'startTax: a retried save that succeeds switches to it');
+  }
+  {
+    const { ctx, S } = await mount();
+    S.tax = { '2025': { fmRaw: '', steps: [], docs: [], figures: [] } };
+    S.taxYear = '2025';
+    const fail = withFailingWrite(ctx);
+    fail.failOn(`${B}/Tax/2026.md`);
+    answers.fields = { year: '2026' };
+
+    await assert.doesNotReject(() => ctx.newTaxYear(), 'newTaxYear: a rejected write must not escape as an unhandled rejection');
+    checks++;
+    ok(S.tax['2026'] === undefined, 'newTaxYear: a failed save backs the phantom tax year out of S.tax');
+    ok(S.taxYear === '2025', 'newTaxYear: a failed save reverts S.taxYear to the year the reader was actually on');
+
+    fail.clear();
+    await ctx.newTaxYear();
+    ok(!!S.tax['2026'], 'newTaxYear: a retried save that succeeds seeds the tax year for real');
+    ok(S.taxYear === '2026', 'newTaxYear: a retried save that succeeds switches to it');
+    answers.fields = null;
+  }
+
+  /* ---- 14: handleTaxFile — the sharpest of the five, per the reviewer: the
+     binary lands on disk (writeBinary is a different vault call, untouched by
+     withFailingWrite here) while the markdown row pointing at it fails to
+     save. Unlike startTax/newTaxYear, nothing here is backed out — the file
+     really was written, so mark() is the fix: light the Save button so the
+     drifted metadata can be retried without re-uploading. ---- */
+  {
+    const { ctx, S, $ } = await mount();
+    S.taxYear = '2026';
+    const fail = withFailingWrite(ctx);
+    S.taxDirty = false;
+    $('#taxSave').disabled = true;
+    fail.failOn(`${B}/Tax/2026.md`);
+    // The seeded IRP5 row has no file yet, so it is the one open row —
+    // askFields' stubbed answer picks it by index, same as the "Attach to"
+    // dropdown would.
+    answers.fields = { to: '0' };
+    const file = { name: 'IRP5.pdf', arrayBuffer: async () => new TextEncoder().encode('%PDF-1.4 test certificate').buffer };
+
+    await assert.doesNotReject(() => ctx.handleTaxFile(file), 'handleTaxFile: a rejected markdown write must not escape as an unhandled rejection');
+    checks++;
+    ok(S.taxDirty === true, 'handleTaxFile: a failed internal save marks the page dirty, so the Save button has something to retry');
+    ok($('#taxSave').disabled === false, 'handleTaxFile: a failed internal save lights the Save button');
+    ok(S.tax['2026'].docs.find(d => d.name === 'IRP5').status === 'uploaded',
+      'handleTaxFile: the uploaded file is not un-linked over a markdown write failure — the binary really is on disk');
+    let lastToast = ctx._toasts[ctx._toasts.length - 1];
+    ok(lastToast && lastToast.bad === true, 'handleTaxFile: a failed internal save reports an error toast');
+
+    // Retry via the now-lit Save button.
+    fail.clear();
+    await ctx.saveTax();
+    ok(S.taxDirty === false, 'handleTaxFile: a retried save (via the lit Save button) clears taxDirty');
+    ok($('#taxSave').disabled === true, 'handleTaxFile: a retried save disables the Save button');
+    answers.fields = null;
   }
 
   console.log(`PASS — save paths fail out loud (${checks} assertions).`);
