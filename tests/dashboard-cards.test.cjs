@@ -287,6 +287,7 @@ function legendRows(node) {
    not what anyone reading this file would assume. Add new cards here as they
    land. */
 const IDS = ['heroCard', 'dashStale', 'trendChart', 'trendSub', 'trendRange',
+  'healthCard', 'healthBody', 'healthSub',
   'leftCard', 'leftBody', 'leftSub',
   'dashSplit', 'dashSplitSub', 'splitRange', 'dashBudget', 'dashBudgetSub',
   'dashPositionCard', 'dashPositionKpis', 'dashPositionSub', 'dashPositionNote'];
@@ -337,6 +338,14 @@ async function mount(files, period = '2026-07') {
        throwing, and says so through the hidden class either way. Its
        arithmetic is covered in tests/committed.test.cjs. */
     ok(!has(nodes.get('leftBody'), 'text-danger'), "what's left reports no failure");
+    /* Financial health is conditional the same way what's left is — no fund,
+       no history, no debts means the card hides rather than showing four
+       dashes — so the contract here is the same one: it decides without
+       throwing, and reports no failure. Its arithmetic is covered in
+       tests/health-math.test.cjs. */
+    ok(!has(nodes.get('healthBody'), 'text-danger'), 'financial health reports no failure');
+    ok(typeof nodes.get('healthCard')._cls.has('hidden') === 'boolean',
+      'and the health card decided whether to show itself');
     ok(typeof nodes.get('leftCard')._cls.has('hidden') === 'boolean',
       "what's left decided whether it has anything to show");
     ok(has(nodes.get('dashStale'), 'kpi-caveat-txt'), 'staleness card draws');

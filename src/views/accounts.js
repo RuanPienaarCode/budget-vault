@@ -133,10 +133,10 @@ module.exports = function registerAccounts(ctx) {
     checking:    [],
     cash:        [],
     credit_card: ['credit_limit'],
-    savings:     ['goal_amount', 'target_date', 'monthly_contribution', 'starting_amount', 'inception_date'],
-    investment:  ['total_invested', 'starting_amount', 'inception_date', 'goal_amount', 'target_date', 'monthly_contribution'],
+    savings:     ['emergency_fund', 'goal_amount', 'target_date', 'monthly_contribution', 'starting_amount', 'inception_date'],
+    investment:  ['emergency_fund', 'total_invested', 'starting_amount', 'inception_date', 'goal_amount', 'target_date', 'monthly_contribution'],
   };
-  const ALL_OPTIONAL = ['credit_limit', 'goal_amount', 'target_date',
+  const ALL_OPTIONAL = ['emergency_fund', 'credit_limit', 'goal_amount', 'target_date',
     'monthly_contribution', 'total_invested', 'starting_amount', 'inception_date'];
 
   /* A field is shown when the type calls for it — OR when the account already
@@ -180,6 +180,15 @@ module.exports = function registerAccounts(ctx) {
     owner: a => (a.owner ? yamlStr(a.owner) : null),
     tx_label: a => (a.tx_label ? yamlStr(a.tx_label) : null),
     credit_limit: a => (a.credit_limit ? a.credit_limit.toFixed(2) : null),
+    /* Written RAW, not through yamlStr, for the same reason ignore_warnings is:
+       the value is either the bare word `true` or a number, and quoting either
+       turns it into a string that the loader's fmBool/fmNum pair both refuse —
+       earmarking the account in the dialog would then read back as no earmark
+       at all. null removes the key, which is what "not the emergency fund"
+       means: the absence of a claim, not a claim of zero. */
+    emergency_fund: a => (a.emergency_fund === true ? 'true'
+      : typeof a.emergency_fund === 'number' && a.emergency_fund > 0 ? a.emergency_fund.toFixed(2)
+        : null),
     goal_amount: a => (a.goal_amount ? a.goal_amount.toFixed(2) : null),
     target_date: a => a.target_date || null,
     monthly_contribution: a => (a.monthly_contribution ? a.monthly_contribution.toFixed(2) : null),
@@ -325,6 +334,25 @@ module.exports = function registerAccounts(ctx) {
     /* The optional half of the form, built per type. Keyed so the shown list
        below can pick from it by name and keep ALL_OPTIONAL's order. */
     const optional = {
+      /* Three states, and the third only when it already applies.
+
+         `emergency_fund: 50000` — earmarking PART of an account — is a
+         hand-edited power case with no dialog affordance of its own, so a
+         two-option yes/no control would read a partial earmark as "no" and
+         wipe it on the first unrelated save of the account. Offering the
+         current figure back as its own option means the form can only ever
+         preserve or deliberately change it. The whole-account case is the
+         common one and stays a plain choice. */
+      emergency_fund: { key: 'emergency_fund', label: i18n.t('acct.field.emergency'), type: 'select',
+        value: a.emergency_fund === true ? 'all' : typeof a.emergency_fund === 'number' ? 'part' : 'no',
+        options: [
+          { value: 'no', label: i18n.t('acct.emergency.no') },
+          { value: 'all', label: i18n.t('acct.emergency.all') },
+          ...(typeof a.emergency_fund === 'number'
+            ? [{ value: 'part', label: i18n.t('acct.emergency.part', { amount: acctMoney(a, a.emergency_fund, 0) }) }]
+            : []),
+        ],
+        desc: i18n.t('acct.field.emergencyDesc') },
       credit_limit: { key: 'credit_limit', label: i18n.t('acct.field.limit'), type: 'number',
         value: a.credit_limit != null ? String(a.credit_limit) : '',
         desc: i18n.t('acct.field.limitDesc') },
@@ -373,7 +401,10 @@ module.exports = function registerAccounts(ctx) {
        unchanged on their own. */
     const nums = {};
     for (const k of shown) {
-      if (k === 'target_date' || k === 'inception_date') continue;
+      // The two dates and the earmark are not amounts — the earmark's control
+      // is a select whose values are words, and parseAmount('all') is NaN,
+      // which would reject the whole save as "not a number".
+      if (k === 'target_date' || k === 'inception_date' || k === 'emergency_fund') continue;
       const n = parseAmount(r[k]);
       if (n !== null && isNaN(n)) return toast(i18n.t('acct.err.notNumber', { field: k.replace(/_/g, ' ') }), true);
       nums[k] = n;
@@ -403,6 +434,16 @@ module.exports = function registerAccounts(ctx) {
     Object.assign(a, nums);
     if (shown.includes('target_date')) a.target_date = (r.target_date || '').trim();
     if (shown.includes('inception_date')) a.inception_date = (r.inception_date || '').trim();
+    /* Same only-when-shown rule as the dates: a cheque account never renders
+       this control, and reading its absent result as "no" would quietly clear
+       the earmark off a savings account the moment its type was changed. The
+       `part` branch keeps the number already on the model rather than
+       re-deriving it from a control that only ever showed its label. */
+    if (shown.includes('emergency_fund')) {
+      a.emergency_fund = r.emergency_fund === 'all' ? true
+        : r.emergency_fund === 'part' ? a.emergency_fund
+          : null;
+    }
 
     if (!(await saveAccount(a, EDITABLE_KEYS))) return;
     // ctx.render, not renderAccounts: a type change moves the account between

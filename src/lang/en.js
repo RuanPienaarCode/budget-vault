@@ -547,6 +547,11 @@ module.exports = {
   'acct.counts.yes': 'Yes — normal spending account',
   'acct.counts.no': 'No — investment or savings wrapper',
   'acct.field.countsDesc': 'Choose No for an account whose interest is not household income and whose contributions are not household spending. Its transactions still import and show in Transactions.',
+  'acct.field.emergency': 'Emergency fund',
+  'acct.field.emergencyDesc': 'Counts this account toward the emergency-fund cover on the Dashboard\'s Financial health card. Set the months you are aiming for in Settings → Budget Vault.',
+  'acct.emergency.no': 'Not the emergency fund',
+  'acct.emergency.all': 'All of this account',
+  'acct.emergency.part': 'Keep the {amount} earmark',
   'acct.field.limit': 'Credit limit',
   'acct.field.limitDesc': 'Shows a utilisation bar on credit cards.',
   'acct.field.balance': 'Current balance',
@@ -886,6 +891,57 @@ module.exports = {
      gross figure above it. This one is categorised spend with refunds netted
      off inside their category, which the subtitle already discloses. */
   'dash.split.centerLabel': 'Categorised spend',
+
+  /* -------------------------- financial health ---------------------- */
+  'shell.dash.health': 'Financial health',
+  'dash.health.sub': {
+    one: 'Averaged over your last completed period',
+    other: 'Averaged over your last {count} completed periods',
+  },
+  'dash.health.subNone': 'No completed periods to average yet',
+  'dash.health.months': 'months of essential spending covered',
+  'dash.health.monthsMeta': 'target {target} · {amount} earmarked',
+  /* The setup hint doubles as the only documentation most readers will meet, so
+     it names the CONTROL rather than the frontmatter key it writes: the key is
+     still hand-editable, but sending a reader to YAML when a dropdown exists
+     reads as the app admitting it has no UI for its own feature. */
+  'dash.health.setup': 'Mark a savings account as your Emergency fund on the Accounts page to start tracking this',
+  'dash.health.needHistory': 'needs income history',
+  'dash.health.over': '{name} earmarks more than it holds',
+  'dash.health.savings': 'of income saved',
+  'dash.health.perMonth': '{amount} / month',
+  'dash.health.debt': 'of income to debt interest',
+  'dash.health.debtFree': 'debt-free',
+  'dash.health.score': 'financial score',
+  'dash.health.strong': 'strong',
+  'dash.health.steady': 'steady',
+  'dash.health.attention': 'needs attention',
+  /* The explanation popup. It answers three questions in order — what the score
+     is, where this household's points went, and what to do next — because a
+     reader who opens it is asking the third one and will not find it under a
+     wall of methodology. */
+  'dash.health.why.title': 'How this score works',
+  'dash.health.why.intro': 'One number out of 100, built from five parts of your finances. Each part is worth a share of the total, and you earn its points in proportion to how close you are to full marks. A part your files cannot answer is left out rather than scored zero.',
+  'dash.health.why.bands': '{strong} and up is strong · {steady}–{strongLess} is steady · below {steady} needs attention',
+  'dash.health.why.name.reserves': 'Emergency cover',
+  'dash.health.why.name.saving': 'Saving',
+  'dash.health.why.name.debt': 'Debt',
+  'dash.health.why.name.spending': 'Spending',
+  'dash.health.why.name.wealth': 'What you own',
+  'dash.health.why.fullReserves': 'Full marks at {target} months of essential spending set aside.',
+  'dash.health.why.fullSaving': 'Full marks at {pct}% of your income saved.',
+  'dash.health.why.fullDebt': 'Full marks with nothing going to interest and no instalments to carry.',
+  'dash.health.why.fullSpending': 'Full marks with under {fixed}% of income committed to fixed costs, living costs under {living}%, and spending inside your budget.',
+  'dash.health.why.fullWealth': 'Full marks at a net worth of {times}× your annual income — everything you own, less everything you owe.',
+  'dash.health.why.fixTrim': 'Bringing living costs down by {amount} a month would put them under {pct}% of income.',
+  'dash.health.why.fixBuild': 'Another {amount} of net worth would reach {times}× your annual income.',
+  'dash.health.why.points': '{points} of {max}',
+  'dash.health.why.dragLabel': 'Costing you most: {name}, {points} points.',
+  'dash.health.why.fixFund': 'Adding {amount} to an earmarked account would reach {target} months and earn those points back.',
+  'dash.health.why.fixMonthly': 'Putting another {amount} a month into savings would reach {pct}% and earn those points back.',
+  'dash.health.why.fixInterest': 'That is {amount} a month buying you nothing — every rand of it you clear comes back as points.',
+  'dash.health.why.allFull': 'Every part that can be measured is at full marks. Nothing here is holding you back.',
+  'dash.health.why.aria': 'Financial score — how it is worked out and what would improve it',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'What\'s left',

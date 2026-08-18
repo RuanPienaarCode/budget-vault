@@ -8,6 +8,9 @@ const { TYPE_ORDER } = require('../constants');
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
+const { healthMetrics, resolveEarmarks, debtInterestMonthly, essentialTotal, DAYS_PER_MONTH,
+  scoreBand, scoreBreakdown, SCORE_BANDS, FULL_MARKS, NON_ESSENTIAL_TYPES } = require('../health-math');
+const { splitFlows } = require('../savings-math');
 const { todayIso } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
@@ -24,7 +27,7 @@ const {
 const { sharePercents } = require('../share-percents');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, compareTotals } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -73,6 +76,7 @@ module.exports = function registerDashboard(ctx) {
 
   function renderDashboard() {
     guard('#heroCard', 'summary', renderHero);
+    guard('#healthBody', 'financial health', renderHealth);
     guard('#leftBody', "what's left", renderLeft);
     guardedTrend();
     guardedSplit();
@@ -84,6 +88,343 @@ module.exports = function registerDashboard(ctx) {
     guard('#dashPositionKpis', 'position summary', renderPosition);
     guard('#dashPositionNote', 'double-count note', renderOverlapNote);
     guard('#dashStale', 'balance staleness', renderStale);
+  }
+
+  /* ------------------------- financial health ---------------------------
+     The hero is this period's budget and What's left is this period's money;
+     this card is the household's years — emergency cover, the savings rate,
+     the interest bill, and the composite score. All arithmetic lives in
+     src/health-math.js; this function only assembles the raw material from
+     the ctx helpers that already exist and renders what comes back.
+
+     ANCHORED AT THE CURRENT PERIOD, whatever period is on screen. Every input
+     is present tense — the fund is today's balances, the debts are today's
+     book, and the averages trail back from now — so paging to March must not
+     rewrite the household's readiness. The same reasoning renderLeft applies,
+     resolved the opposite way: that card goes inert off the current period
+     because its inputs would lie; this one stays live because its inputs
+     never consulted the period on screen in the first place.
+
+     TRAILING COMPLETED PERIODS ONLY, deliberately excluding the running one.
+     A part-month's income against a whole month's savings target is the
+     part-period trap elapsedDays() documents; completed periods are whole
+     figures that no longer move. periodsForMonths(6) turns "six months" into
+     however many periods that is on this vault's pay cycle. */
+  function renderHealth() {
+    const card = $('#healthCard');
+    const body = $('#healthBody'); body.empty();
+
+    /* Which categories the household has declared it cannot stop paying. A Set
+       of NAMES because that is what a transaction row carries; the flag itself
+       lives on the category file (see load.js for why it is a flag and not a
+       type test). */
+    const fixedCats = new Set(S.categories.filter(c => c.fixed).map(c => c.name));
+
+    const cur = currentPeriod();
+    const want = periodsForMonths(6);
+    const idx = accountIndex();
+    /* Contributions into savings AND investment accounts both count as saving
+       — the savings rate measures money the household kept, not which wrapper
+       it kept it in. splitFlows already knows a contribution from growth and
+       from a split parent, so no raw-row reading happens here. */
+    const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
+    const periods = [];
+    for (let i = 1; i <= want; i++) {
+      const p = shiftPeriod(cur, -i);
+      const spend = periodSpend(p, null);
+      const { start, end } = periodRange(p);
+      let savings = 0;
+      for (const a of savers) {
+        const rows = (idx.get(a) || {}).rows || [];
+        savings += splitFlows(rows, catType, { from: start, to: end }).contributions;
+      }
+      /* Three different slices of the same period, because they answer three
+         different questions. `essential` is what must be paid with no income
+         (the emergency divisor). `consumption` is what living cost — everything
+         except money moved into the household's own funds, without which
+         funding an investment reads as overspending. `fixed` is the part that
+         cannot be stopped this month, taken from the categories flagged as
+         such rather than guessed from their type. */
+      let consumption = 0, fixed = 0;
+      for (const [cat, amt] of Object.entries(spend.whole)) {
+        const type = catType(cat);
+        if (type !== 'savings' && type !== 'investment') { consumption += amt; }
+        if (fixedCats.has(cat)) { fixed += amt; }
+      }
+      periods.push({
+        income: periodSummary(p).income,
+        essential: essentialTotal(spend.whole, catType),
+        savings, consumption, fixed,
+        budgeted: budgetTotals(p).spend,
+        counted: spend.count > 0,
+      });
+    }
+
+    const earmarks = resolveEarmarks(S.accounts);
+    const target = S.settings.emergency_target_months || 6;
+    /* Once, not three times. The score, the debt tile's own figure and the
+       explainer's "this is costing you" line are all the same monthly interest
+       bill, and computing it per consumer is how two of them end up disagreeing
+       after someone changes the filter in only one place. */
+    const debtInterest = debtInterestMonthly(S.debts);
+    const H = healthMetrics({
+      periods,
+      monthsPerPeriod: (Number(S.settings.period_days) || 0) ? S.settings.period_days / DAYS_PER_MONTH : 1,
+      earmarks,
+      targetMonths: target,
+      debtInterest,
+      /* Null, not zero, when the Debt page does not exist: a vault that has
+         never listed a debt has not declared it has none, and full marks for
+         an unanswered question is the one thing this card must not hand out. */
+      debtInstalments: S.debts.length ? S.debts.reduce((t, d) => t + (d.payment || 0), 0) : null,
+      netWorth: worth(S.accounts, S.debts, S.assets).net,
+      hasFixed: fixedCats.size > 0,
+    });
+
+    /* Nothing honest to say: no fund to measure and nothing computable from
+       history. A vault one week old gets no card rather than four dashes. */
+    const nothing = !earmarks.any && !H.score;
+    if (card) card.classList.toggle('hidden', nothing);
+    if (nothing) return;
+
+    const sub = $('#healthSub');
+    if (sub) {
+      sub.textContent = H.countedPeriods
+        ? i18n.t('dash.health.sub', { count: H.countedPeriods })
+        : i18n.t('dash.health.subNone');
+    }
+
+    const fig = (cls, value, label, meta) => el('div', { class: `health-fig ${cls}` },
+      el('div', { class: 'lv num' }, value),
+      el('div', { class: 'll' }, label),
+      meta ? el('div', { class: 'lm' }, meta) : '');
+    const pct = r => `${Math.round(r * 100)}%`;
+
+    /* Emergency cover. The meter fills toward the target and re-tones at the
+       halfway mark — under half a fund is a different fact from nearly-there,
+       and colour is how this dashboard says so elsewhere (hero, cat-bars). */
+    const emergency = H.months !== null
+      ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
+        H.months.toFixed(1),
+        i18n.t('dash.health.months'),
+        i18n.t('dash.health.monthsMeta', { target, amount: money(earmarks.total, 0) }))
+      : fig('', '—', i18n.t('dash.health.months'),
+        earmarks.any ? i18n.t('dash.health.needHistory') : i18n.t('dash.health.setup'));
+    if (H.months !== null) {
+      const fill = Math.min(100, (H.months / target) * 100);
+      /* The same bar component the budget table fills, and the same three
+         tones: emerald at the target, amber past halfway, red below it. */
+      const tone = H.months >= target ? '' : H.months >= target / 2 ? ' bg-warning' : ' bg-danger';
+      emergency.append(el('div', { class: 'cat-bar health-meter', 'aria-hidden': 'true' },
+        el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` })));
+    }
+    /* The over-claim, argued rather than corrected: the figure above already
+       capped at what the account holds, so the claim itself must stay visible
+       or the reader has no way to know their instruction was not followed. */
+    if (earmarks.over.length) {
+      emergency.append(el('div', { class: 'lm text-danger' },
+        i18n.t('dash.health.over', { name: earmarks.over[0].name })));
+    }
+
+    const savingsTile = H.savingsRate !== null
+      ? fig(H.savingsRate >= 0.2 ? 'is-good' : H.savingsRate >= 0.1 ? 'is-fair' : 'is-poor',
+        pct(H.savingsRate),
+        i18n.t('dash.health.savings'),
+        i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }))
+      : fig('', '—', i18n.t('dash.health.savings'), i18n.t('dash.health.needHistory'));
+
+    /* Zero interest with an income to measure against is a fact worth its own
+       word — "debt-free" reads as an achievement where "0%" reads as a rounding
+       error. The share being null (no income history) still shows the monthly
+       cost when there is one: the rand figure is real even when the ratio
+       cannot be. */
+    const debtTile = H.interestShare !== null
+      ? fig(H.interestShare <= 0 ? 'is-good' : H.interestShare < 0.05 ? 'is-fair' : 'is-poor',
+        pct(H.interestShare),
+        i18n.t('dash.health.debt'),
+        debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) }) : i18n.t('dash.health.debtFree'))
+      : fig('', '—', i18n.t('dash.health.debt'),
+        debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) }) : i18n.t('dash.health.needHistory'));
+
+    /* One band lookup for the colour AND the word — health-math owns the
+       thresholds now, so the tile and the popup explaining it cannot disagree
+       about whether 79 is steady. */
+    const BAND_TONE = { strong: 'is-good', steady: 'is-fair', attention: 'is-poor' };
+    const band = H.score ? scoreBand(H.score.value) : null;
+    const scoreTile = H.score
+      ? fig(BAND_TONE[band], String(H.score.value),
+        i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`))
+      : fig('', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
+    if (H.score) {
+      attachScoreExplainer(scoreTile, scoreBreakdown(H, target), target);
+    }
+
+    body.append(el('div', { class: 'health-grid' }, emergency, savingsTile, debtTile, scoreTile));
+  }
+
+  /* Turn the score tile into something that explains itself.
+
+     WHY A BUTTON AND NOT A `title`. The house rule (see views/savings.js) is
+     that hover is a capability question: a rich tooltip where there is a fine
+     pointer, the native `title` for fingers, and never a hover-only affordance
+     invented for a phone. That rule is kept here — but the fallback is a real
+     popup rather than a `title`, because this content is a heading, three
+     scored rows and an instruction. Collapsed into one title string it becomes
+     a paragraph nobody reads, and on the phone where this plugin mostly lives
+     that paragraph would be the ONLY version anyone gets.
+
+     So: one popup, reachable three ways. Hover opens it where hovering exists,
+     focus opens it for the keyboard, and a tap toggles it everywhere — which is
+     also what makes it work for a finger without a second implementation to
+     keep in step. `aria-expanded` says which state it is in, and the popup is
+     named by the button through aria-controls rather than being read as loose
+     text after it. */
+  let explainSeq = 0;
+  function attachScoreExplainer(tile, breakdown, target) {
+    if (!breakdown) { return; }
+    const id = `bud-score-why-${++explainSeq}`;
+
+    const pop = el('div', { class: 'health-why', id, role: 'group' });
+    pop.append(el('div', { class: 'health-why-h' }, i18n.t('dash.health.why.title')),
+      el('p', { class: 'health-why-p' }, i18n.t('dash.health.why.intro')),
+      el('p', { class: 'health-why-p' }, i18n.t('dash.health.why.bands', {
+        strong: SCORE_BANDS.strong, steady: SCORE_BANDS.steady,
+        // The top of the middle band, derived rather than written twice — the
+        // bands are contiguous, so this is strong's threshold minus one.
+        strongLess: SCORE_BANDS.strong - 1,
+      })));
+
+    /* Each component, worst first, with the points it earned of the points it
+       could. `max` is the renormalised figure, so these always add to the
+       headline — see scoreBreakdown for why that matters. */
+    const rows = el('div', { class: 'health-why-rows' });
+    /* What full marks means for each pillar, in the reader's own units rather
+       than as a weight. A row that said "worth 25 points" explains the scoring
+       and not the money; these say what the household would have to be doing. */
+    const FULL = {
+      reserves: () => i18n.t('dash.health.why.fullReserves', { target }),
+      saving: () => i18n.t('dash.health.why.fullSaving', { pct: Math.round(FULL_MARKS.savingsRate * 100) }),
+      debt: () => i18n.t('dash.health.why.fullDebt'),
+      spending: () => i18n.t('dash.health.why.fullSpending', {
+        fixed: Math.round(FULL_MARKS.fixedFloor * 100),
+        living: Math.round(FULL_MARKS.consumptionFloor * 100),
+      }),
+      wealth: () => i18n.t('dash.health.why.fullWealth', { times: FULL_MARKS.netWorthMultiple }),
+    };
+    for (const p of breakdown.pillars) {
+      const tone = p.at >= 0.999 ? ' is-full' : p.at < 0.5 ? ' is-weak' : '';
+      rows.append(el('div', { class: `health-why-row${tone}` },
+        el('div', { class: 'health-why-name' }, i18n.t(`dash.health.why.name.${p.key}`)),
+        el('div', { class: 'health-why-pts num' },
+          i18n.t('dash.health.why.points', { points: p.shownPoints, max: p.shownMax })),
+        el('div', { class: 'health-why-note' }, FULL[p.key]())));
+    }
+    pop.append(rows);
+
+    /* The closing line is the only actionable sentence in the popup, so it gets
+       the concrete figure rather than an adjective. Nothing to fix gets praise
+       instead — "biggest drag: nothing" is not a sentence. */
+    if (breakdown.drag && breakdown.drag.gap) {
+      const g = breakdown.drag.gap;
+      const amount = money(g.amount, 0);
+      const fix = g.kind === 'fund' ? i18n.t('dash.health.why.fixFund', { amount, target })
+        : g.kind === 'monthly' ? i18n.t('dash.health.why.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
+          : g.kind === 'interest' ? i18n.t('dash.health.why.fixInterest', { amount })
+            : g.kind === 'trim' ? i18n.t('dash.health.why.fixTrim', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
+              : i18n.t('dash.health.why.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple });
+      pop.append(el('p', { class: 'health-why-fix' },
+        el('b', {}, i18n.t('dash.health.why.dragLabel', {
+          name: i18n.t(`dash.health.why.name.${breakdown.drag.key}`),
+          points: breakdown.drag.shownLost,
+        })), ' ', fix));
+    } else {
+      pop.append(el('p', { class: 'health-why-fix' }, i18n.t('dash.health.why.allFull')));
+    }
+
+    /* The tile becomes the control. Its existing contents stay exactly as they
+       were — the button wraps rather than replaces, so the four tiles keep
+       reading as one row instead of one of them growing a chrome of its own. */
+    const btn = el('button', { type: 'button', class: 'health-why-btn',
+      'aria-expanded': 'false', 'aria-controls': id,
+      'aria-label': i18n.t('dash.health.why.aria') });
+    /* Snapshot the children BEFORE moving any of them. A live DOM relocates a
+       node on append, so walking `tile.firstChild` would terminate — but only
+       because of that side effect, which is a fragile thing for a loop's exit
+       condition to lean on and is not something a test double reproduces. The
+       array says outright which nodes are being moved. */
+    for (const kid of [...(tile.childNodes || tile.children || [])]) { btn.append(kid); }
+    tile.append(btn, pop);
+
+    /* Open downward by default, upward when there is no room.
+
+       The popup is absolutely positioned inside `.bud-scroll`, which clips at
+       its own bottom edge — so a health card sitting low in the pane opened a
+       panel the reader could only see by scrolling, and scrolling is exactly
+       what loses the hover that opened it. Measured after the panel is
+       displayed, because its height depends on how many components scored and
+       whether there is a fix line; guessing a height here would flip the wrong
+       way on the two-component vaults. */
+    const open = on => {
+      tile.classList.toggle('is-why-open', on);
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      tile.classList.remove('is-why-above');
+      if (!on || typeof pop.getBoundingClientRect !== 'function') { return; }
+      const scroller = typeof tile.closest === 'function' ? tile.closest('.bud-scroll') : null;
+      const limit = scroller && typeof scroller.getBoundingClientRect === 'function'
+        ? scroller.getBoundingClientRect().bottom
+        : (typeof window !== 'undefined' ? window.innerHeight : 0);
+      if (limit && pop.getBoundingClientRect().bottom > limit) {
+        tile.classList.add('is-why-above');
+      }
+    };
+    /* Hover only where hovering is real. matchMedia is checked live rather than
+       cached at render, so a vault opened on a desktop and continued on an iPad
+       is not still answering the desktop's question. */
+    const fine = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    btn.addEventListener('pointerenter', () => { if (fine()) { open(true); } });
+    btn.addEventListener('pointerleave', () => { if (fine()) { open(false); } });
+    /* Toggle, so a finger can dismiss it again without hunting for elsewhere —
+       and this is the KEYBOARD path too, because a <button> fires click on both
+       Enter and Space.
+
+       Deliberately NO open-on-focus. It was there first and it silently broke
+       the tap: focus lands before click, so the sequence was open-then-toggle,
+       which left the panel exactly as shut as it started. Every tap on a phone
+       did nothing at all, while the desktop looked fine because hover had
+       already opened it without a click ever happening. */
+    btn.addEventListener('click', () => open(!tile.classList.contains('is-why-open')));
+    /* Tabbing away closes it. A FINGER LANDING ON THE PANEL MUST NOT.
+
+       The panel is a sibling of the button and holds nothing focusable, so a
+       touch on its own text — to read a figure, or to begin the drag that
+       scrolls the card it sits inside below 900px — blurs the button. Closing on
+       a bare blur therefore dismissed the panel the reader had just opened, at
+       the first touch, on the device this plugin mostly lives on: the one place
+       the whole explanation was unreadable past its first line.
+
+       Focus does not move INTO the panel in that case, because there is nothing
+       there to take it — it falls to <body>. So the close waits a tick and then
+       asks where focus actually went. A real element somewhere else means the
+       reader left and the panel should go; <body> means nothing took focus at
+       all and it stays open. That is the same distinction src/dom.js's setInert
+       already draws between a real focus owner and none. */
+    btn.addEventListener('blur', () => {
+      const settle = () => {
+        const at = typeof document === 'undefined' ? null : document.activeElement;
+        if (!at || at === document.body || tile.contains(at)) { return; }
+        open(false);
+      };
+      if (typeof setTimeout === 'function') { setTimeout(settle, 0); } else { settle(); }
+    });
+    /* Escape closes it and hands focus back, the one keyboard convention a
+       reader will try without being told. */
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && tile.classList.contains('is-why-open')) {
+        e.stopPropagation();
+        open(false);
+      }
+    });
   }
 
   /* --------------------------- what's left ------------------------------

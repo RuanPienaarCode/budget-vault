@@ -20,17 +20,30 @@
    the "if it can be pure, it is" rule, and one more copy for the donut test
    to remember. Both views re-export it, so the test still reads each view's
    own door. Pure — no DOM, no obsidian import. */
+/* The allocation itself, over already-scaled values and an arbitrary target.
+
+   Extracted so the health card's score breakdown can share it: those parts are
+   points out of a score, not percentages out of 100, but the failure is
+   identical — rounding each one alone printed "0 + 26 + 17" beside a headline
+   of 42, and a panel whose whole claim is that the parts explain the number
+   cannot visibly disagree with it. Percentages were simply the first place this
+   bit; the module header's argument for ONE copy applies just as much to the
+   second caller. */
+function largestRemainder(values, target) {
+  const floors = values.map(v => Math.floor(v));
+  const remainders = values
+    .map((v, i) => ({ i, frac: v - floors[i] }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  let left = Math.round(target) - floors.reduce((s, v) => s + v, 0);
+  const out = floors.slice();
+  for (let k = 0; k < remainders.length && left > 0; k++, left--) out[remainders[k].i]++;
+  return out;
+}
+
 function sharePercents(amounts) {
   const total = amounts.reduce((s, v) => s + v, 0);
   if (total <= 0) return amounts.map(() => 0);
-  const floors = amounts.map(v => Math.floor((v / total) * 100));
-  const remainders = amounts
-    .map((v, i) => ({ i, frac: (v / total) * 100 - floors[i] }))
-    .sort((a, b) => b.frac - a.frac || a.i - b.i);
-  let left = 100 - floors.reduce((s, v) => s + v, 0);
-  const pct = floors.slice();
-  for (let k = 0; k < remainders.length && left > 0; k++, left--) pct[remainders[k].i]++;
-  return pct;
+  return largestRemainder(amounts.map(v => (v / total) * 100), 100);
 }
 
-module.exports = { sharePercents };
+module.exports = { sharePercents, largestRemainder };

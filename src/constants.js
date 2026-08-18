@@ -106,7 +106,25 @@ function overspendLag(v) {
   return Math.min(OVERSPEND_LAG_MAX, Math.max(1, n));
 }
 
+/* Months of essential spending the emergency fund is aiming for. Six is the
+   conventional target and the default; three is the other figure households
+   plan around, which is why it is a setting rather than a constant.
+
+   Clamped 1–24 for the same reason overspendLag is: a zero target makes the
+   cover meter divide by nothing, and past two years the meter stops reading as
+   a target and starts reading as a ceiling nobody reaches. One definition,
+   because the loader and the settings tab both have to agree about what a
+   hand-edited value means — two clamps is how the screen ends up showing a
+   figure the app is not running. */
+const EMERGENCY_TARGET_DEFAULT = 6;
+const EMERGENCY_TARGET_MAX = 24;
+function emergencyTarget(v) {
+  const n = parseInt((v ?? '').toString().trim(), 10);
+  if (!Number.isFinite(n)) return EMERGENCY_TARGET_DEFAULT;
+  return Math.min(EMERGENCY_TARGET_MAX, Math.max(1, n));
+}
+
 const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX };

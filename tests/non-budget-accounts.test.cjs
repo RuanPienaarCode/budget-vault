@@ -54,8 +54,14 @@ const FILES = {
   [`${B}/Accounts/FNB Cheque.md`]:
     '---\ntype: checking\ninstitution: "FNB"\nbalance: 1000.00\nbalance_updated: 2026-07-10\ntags: [finance]\n---\n\n# FNB Cheque\n\nBody survives.\n',
   // Out of the budget — the case this test exists for.
+  /* `emergency_fund` is hand-edited ONLY — no dialog writes it and no
+     FM_WRITERS entry knows about it — so it rides the fmRaw branch's
+     unmodelled-key promise or it does not survive at all. It sits on this
+     account deliberately: a real household earmarks a fund that is also
+     `budget: false`, so the key has to survive the one save path that DOES
+     rewrite a neighbouring line. */
   [`${B}/Accounts/Ninety One TFSA.md`]:
-    '---\ntype: investment\ninstitution: "Ninety One"\nbalance: 50000.00\nbalance_updated: 2026-07-01\nbudget: false\n---\n',
+    '---\ntype: investment\ninstitution: "Ninety One"\nbalance: 50000.00\nbalance_updated: 2026-07-01\nbudget: false\nemergency_fund: 20000\n---\n',
   // The folder is named differently from the account file, via tx_label.
   [`${B}/Accounts/Discovery Notice.md`]:
     '---\ntype: savings\ntx_label: "Discovery 32-day"\nbalance: 20000.00\nbudget: no\n---\n',
@@ -198,6 +204,56 @@ const FILES = {
   await ctx.saveAccount(tfsa);
   ok(/institution: "Ninety One"/.test(ctx.vault._store.get(`${B}/Accounts/Ninety One TFSA.md`)),
     'a save with no key list leaves editable fields untouched on disk');
+
+  /* --------- 8b. the emergency-fund earmark survives every save ---------
+     Nothing in the UI can retype this key, so losing it once loses it for
+     good — and silently, because the health card's answer to "no earmark
+     anywhere" is a setup hint that looks exactly like a vault that never had
+     one. The full-edit-form save below is the dangerous path (it hands over
+     every modelled key at once), so the earmark is checked after BOTH. */
+  ok(/^emergency_fund: 20000$/m.test(ctx.vault._store.get(`${B}/Accounts/Ninety One TFSA.md`)),
+    'the hand-edited emergency_fund earmark survives a keyless save');
+  tfsa.in_budget = true;
+  await ctx.saveAccount(tfsa, ctx.ACCOUNT_FM_KEYS);
+  const earmarked = ctx.vault._store.get(`${B}/Accounts/Ninety One TFSA.md`);
+  ok(/^emergency_fund: 20000\.00$/m.test(earmarked),
+    'and survives a full edit-form save that rewrites every modelled key around it');
+  const Searmark = await loadInto(makeCtx({ ...FILES, [`${B}/Accounts/Ninety One TFSA.md`]: earmarked }, { settings: SETTINGS }));
+  eq(Searmark.accounts.find(a => a.name === 'Ninety One TFSA').emergency_fund, 20000,
+    'and round-trips back through the real loader as a number, not a string');
+
+  /* The three states the dialog's select can leave behind, each written and
+     read back through the real pair. `true` is the common case and must land as
+     the bare word — quoted, the loader's fmBool refuses it and the account
+     silently stops counting toward the fund it was just marked as holding. */
+  /* The edit dialog persists exactly the keys in ACCOUNT_FM_KEYS. Drop the
+     earmark from FM_WRITERS and the select would still render, still collect an
+     answer, and still throw it away on save — a control that looks like it
+     works is worse than no control, so the key's membership is pinned here
+     rather than left implied by the writes below. */
+  ok(ctx.ACCOUNT_FM_KEYS.includes('emergency_fund'),
+    'the edit dialog persists the emergency-fund earmark');
+
+  /* Undo the deliberate bad value block 8 put on the model to prove a keyless
+     save ignores it. These saves DO hand over every modelled key, so leaving it
+     would have them correctly write "Should Not Be Written" — and the
+     neighbour-untouched check below would then be failing on this test's own
+     setup rather than on anything the earmark did. */
+  tfsa.institution = 'Ninety One';
+  tfsa.emergency_fund = true;
+  await ctx.saveAccount(tfsa, ctx.ACCOUNT_FM_KEYS);
+  const whole = ctx.vault._store.get(`${B}/Accounts/Ninety One TFSA.md`);
+  ok(/^emergency_fund: true$/m.test(whole), 'earmarking the whole account writes the bare word true');
+  const Swhole = await loadInto(makeCtx({ ...FILES, [`${B}/Accounts/Ninety One TFSA.md`]: whole }, { settings: SETTINGS }));
+  eq(Swhole.accounts.find(a => a.name === 'Ninety One TFSA').emergency_fund, true,
+    'and the loader reads it back as true, not as the string "true"');
+
+  tfsa.emergency_fund = null;
+  await ctx.saveAccount(tfsa, ctx.ACCOUNT_FM_KEYS);
+  const cleared = ctx.vault._store.get(`${B}/Accounts/Ninety One TFSA.md`);
+  ok(!/emergency_fund:/.test(cleared),
+    'and clearing it REMOVES the key rather than writing a line that asserts zero cover');
+  ok(/institution: "Ninety One"/.test(cleared), 'without disturbing the rest of the frontmatter');
 
   Object.assign(notice, {
     type: 'investment', institution: 'Discovery Invest', account_number: '998877',

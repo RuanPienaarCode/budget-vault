@@ -866,6 +866,83 @@
   .budget-app-root .left-op { display: none; }
 }
 
+/* Financial health — four figures on the same visual grammar as What's left
+   (big value, muted label, faint meta), but with no operators between them:
+   these are four independent facts, not one subtraction. Tones reuse the
+   tokens the left-figs already established — primary for good, warning-ink
+   for fair, danger-ink for poor — so "this colour means this" stays one rule
+   across the two adjacent cards. */
+.budget-app-root .health-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.budget-app-root .health-fig { padding: 12px 14px; min-width: 0; background: var(--surface-glass); border-radius: 12px; }
+.budget-app-root .health-fig .lv { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.budget-app-root .health-fig .ll { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.budget-app-root .health-fig .lm { font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; }
+.budget-app-root .health-fig.is-good .lv { color: var(--color-primary); }
+.budget-app-root .health-fig.is-fair .lv { color: var(--color-warning-ink); }
+.budget-app-root .health-fig.is-poor .lv { color: var(--color-danger-ink); }
+.budget-app-root .health-meter { margin-top: 8px; min-width: 0; }
+@media (max-width: 900px) { .budget-app-root .health-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* The score tile explains itself on hover, focus or tap — see
+   attachScoreExplainer for why this is a real popup and not a `title`.
+
+   The button is transparent and inherits everything: it wraps the tile's
+   existing contents so the four tiles keep reading as one row, rather than one
+   of them sprouting a border and a background nobody asked for. `text-align`
+   and `font` are reset explicitly because a <button> brings its own. */
+.budget-app-root .health-why-btn {
+  display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: help;
+}
+.budget-app-root .health-fig { position: relative; }
+/* Hidden by default and revealed by a class rather than by :hover, because the
+   same panel has to open for focus and for a tap — three triggers, one state. */
+.budget-app-root .health-why {
+  display: none; position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px);
+  min-width: 260px; padding: 12px 14px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border-color);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+}
+.budget-app-root .health-fig.is-why-open .health-why { display: block; }
+/* Flipped by attachScoreExplainer when the panel would fall past the bottom of
+   the app's own scroll container. */
+.budget-app-root .health-fig.is-why-above .health-why { top: auto; bottom: calc(100% + 6px); }
+.budget-app-root .health-why-h { font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
+.budget-app-root .health-why-p { font-size: 11.5px; color: var(--text-muted); margin: 0 0 6px; line-height: 1.45; }
+.budget-app-root .health-why-rows { margin: 8px 0; }
+.budget-app-root .health-why-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  padding: 6px 0; border-top: 1px solid var(--border-color);
+}
+.budget-app-root .health-why-name { font-size: 12px; font-weight: 600; }
+.budget-app-root .health-why-pts { font-size: 12px; font-weight: 700; text-align: right; }
+.budget-app-root .health-why-row.is-full .health-why-pts { color: var(--color-primary); }
+.budget-app-root .health-why-row.is-weak .health-why-pts { color: var(--color-danger-ink); }
+/* Spans both columns: the explanation is about the row above it, not a third
+   value to be read against the points. */
+.budget-app-root .health-why-note { grid-column: 1 / -1; font-size: 11px; color: var(--ink-faint); line-height: 1.4; }
+.budget-app-root .health-why-fix { font-size: 11.5px; margin: 6px 0 0; line-height: 1.45; }
+.budget-app-root .health-why-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
+/* Below the four-up grid a tile is half a card wide, which is too narrow to host
+   a floating panel: anchored to its own column the panel either wraps every
+   line to a few words or, held open by its min-width, grows straight off the
+   card's right edge. So from the two-up grid down it stops floating and becomes
+   part of the card — the open tile spans the row and the panel fills it, which
+   also reads correctly as "this is the one that is expanded".
+
+   Bound to the same 900px the grid switches at, deliberately: two rules that
+   both describe "the grid is two-up" must not be able to disagree about where
+   that starts. */
+@media (max-width: 900px) {
+  .budget-app-root .health-fig.is-why-open { grid-column: 1 / -1; }
+  /* Negative side margins cancel the tile's own 14px padding so the panel is
+     the full width of the row rather than the tile's text column — it keeps its
+     own padding, so the words inside still line up with the label above it. */
+  .budget-app-root .health-why {
+    position: static; min-width: 0; margin: 10px -14px 0; box-shadow: none;
+  }
+}
+
 .budget-app-root .hero-meter { position: relative; height: 8px; border-radius: 8px; background: var(--border-color); margin-top: 20px; overflow: hidden; max-width: 440px; }
 /* Same first-paint problem and same fix as .cat-bar-fill — see bud-bar-grow. */
 .budget-app-root .hero-meter i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); transition: width 0.6s ease; animation: bud-bar-grow 0.6s ease; }
@@ -2629,6 +2706,7 @@
   .budget-app-root .upload-area:focus  { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+  .budget-app-root .health-why-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
   .budget-app-root .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-bal:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-deck-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }

@@ -97,7 +97,15 @@ class FakeEl {
   blur() {}
   click() { return this._fire('click'); }
   closest() { return null; }
-  contains() { return false; }
+  /* A real answer, walked up the parent chain. It returned a flat `false`
+     while nothing asked it anything that mattered — but the score explainer
+     decides whether to stay open by asking whether focus is still inside its
+     tile, and a double that always says "no" cannot tell a correct fix from
+     the bug it replaced. */
+  contains(node) {
+    for (let n = node; n; n = n._parent) { if (n === this) { return true; } }
+    return false;
+  }
   scrollIntoView() {}
   getBoundingClientRect() { return { top: 0, left: 0, width: 800, height: 400, right: 800, bottom: 400 }; }
   // Depth-first, matching only the shapes the views actually query for.
@@ -131,6 +139,11 @@ function installDom() {
       body: new FakeEl('body'),
       documentElement: new FakeEl('html'),
     };
+    /* Focus has to have somewhere to BE, and <body> is where a browser parks
+       it when a touch lands on something unfocusable — the exact state the
+       score explainer has to tell apart from "the reader tabbed away". A test
+       assigns document.activeElement directly to rehearse either one. */
+    global.document.activeElement = global.document.body;
   }
   if (!global.getComputedStyle) {
     // Empty throughout, so themeColors() takes its documented hex fallbacks

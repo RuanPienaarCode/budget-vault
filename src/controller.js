@@ -196,7 +196,7 @@ function mountApp(view) {
      should not lose the reader's filter). */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '', overspend_lag: 1, owners: [] },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, owners: [] },
     categories: [],            // {name, type, color, assumeSpent, rel}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]

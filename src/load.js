@@ -2,7 +2,7 @@
 /* loadVault — reads every budget file into the in-memory state S. */
 
 const { TFile } = require('obsidian');
-const { TYPE_ORDER, overspendLag } = require('./constants');
+const { TYPE_ORDER, overspendLag, emergencyTarget } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
@@ -143,6 +143,13 @@ module.exports = function registerLoad(ctx) {
          would change every time you pressed the button) and a negative one
          would read the future. */
       S.settings.overspend_lag = overspendLag(fm.overspend_lag);
+      /* Months of essential spending the emergency fund aims to cover.
+         Assigned unconditionally, unlike month_start_day above: a hand-deleted
+         line has to fall back to the default on the next load rather than
+         keeping the old value alive in memory. The clamp lives in constants.js
+         because the settings tab applies the same one on the way out — see
+         emergencyTarget() there for what the bounds are protecting. */
+      S.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
     }
     S.categories = [];
     for (const { file, text } of await read(mdFilesIn('Categories'))) {
@@ -163,6 +170,14 @@ module.exports = function registerLoad(ctx) {
            without re-deriving a filename from a display name (two names can
            sanitise to one file — see promptCreateCategory). */
         assumeSpent: fmBool(fm.assume_spent) === true,
+        /* Money the household cannot stop paying this month — rent or a bond,
+           medical aid, the debit orders. Its own flag rather than a guess from
+           `type`, because the biggest fixed cost most households have is rent,
+           and rent is an ordinary `expense`: deriving the set from type would
+           have reported 19.9% of income committed on the vault this was built
+           against, where the real figure including rent is 44.4%. A ratio that
+           silently omits the largest term is worse than no ratio. */
+        fixed: fmBool(fm.fixed) === true,
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */
@@ -220,6 +235,20 @@ module.exports = function registerLoad(ctx) {
            serialises that back over the user's own figure — silent destruction
            of a number nobody was even editing. */
         credit_limit: fmNum(fm.credit_limit),
+        /* Which part of this account is the household's emergency fund:
+           `true` earmarks the whole balance, a number earmarks that slice,
+           absent means "never asked" — three different answers, so all three
+           survive the read. health-math.js owns what each one is worth (the
+           cap at the held balance, the over-claim report); this only carries
+           the claim across. An unreadable value is unset rather than zero,
+           for the same reason fmNum refuses parseNum's fallback: "I could not
+           read this" must stay distinguishable from "the user earmarked
+           nothing". */
+        emergency_fund: (v => {
+          if (fmBool(v) === true) { return true; }
+          const n = fmNum(v);
+          return n !== null && n > 0 ? n : null;
+        })(fm.emergency_fund),
         goal_amount: fmNum(fm.goal_amount),
         target_date: fm.target_date || '',
         monthly_contribution: fmNum(fm.monthly_contribution),

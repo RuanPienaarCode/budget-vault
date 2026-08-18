@@ -159,6 +159,7 @@ function vaultOf(months) {
 }
 
 const IDS = ['heroCard', 'dashStale', 'trendChart', 'trendSub', 'trendRange',
+  'healthCard', 'healthBody', 'healthSub',
   'leftCard', 'leftBody', 'leftSub', 'dashSplit', 'dashSplitSub', 'splitRange',
   'dashBudget', 'dashBudgetSub', 'dashPositionCard', 'dashPositionKpis',
   'dashPositionSub', 'dashPositionNote'];

@@ -719,7 +719,14 @@ class OnboardingWizard extends Modal {
           `- **currency** — symbol shown before every amount in the Budget Vault plugin.\n` +
           `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).\n` +
           `- **language** — the language the app is written in (${LANGUAGE_ORDER.join(', ')}). Separate from country: neither decides the other.\n` +
-          `- **household** — name shown in the dashboard greeting.\n\n` +
+          `- **household** — name shown in the dashboard greeting.\n` +
+          /* Documented although the wizard does not WRITE it: absent means the
+             default of 6, and materialising a line that says nothing would
+             freeze today's default into the file. A reader learns which keys
+             exist from this list, so a settable key left out of it is a key
+             nobody finds — and this one only does anything once an account is
+             earmarked, which is the half that needs saying out loud. */
+          `- **emergency_target_months** — months of essential spending your emergency fund aims to cover (default 6). Mark the account holding it with "Emergency fund" on the Accounts page.\n\n` +
           `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
         for (const cat of STARTER_CATEGORIES) {

@@ -150,6 +150,22 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title" data-i18n="nav.dashboard">Dashboard</h1>
         </div>
         <div class="card hero mb-4" id="heroCard"></div>
+        <!-- Financial health. Between the hero and What's left because it sits
+             between their time-scales: the hero is this period's budget, What's
+             left is this period's money, and this is the household's YEARS —
+             the fund that outlasts a bad month, the saving rate that compounds,
+             the interest bill that does too. Hidden until the vault can say
+             something honest: a brand-new vault has no history to average and
+             no fund to measure, and four dashes read as a broken card. -->
+        <div class="card mb-4 hidden" id="healthCard">
+          <div class="card-h">
+            <div>
+              <h2 data-i18n="shell.dash.health">Financial health</h2>
+              <div class="sub" id="healthSub"></div>
+            </div>
+          </div>
+          <div class="body-pad" id="healthBody"></div>
+        </div>
         <!-- What's left. Directly below the hero because it answers the question
              the hero's number is mistaken for: the hero says how much BUDGET is
              left, this says how much MONEY is. Hidden until there is a figure
