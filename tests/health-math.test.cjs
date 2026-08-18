@@ -215,6 +215,53 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   eq(H.budgetUsed, null, 'and an absent budget is not adherence of zero');
 }
 
+/* ---- 7b. THE DEBT PILLAR, and what an empty Debt page is allowed to mean ----
+   Two readings of an empty Debt page are defensible and they score oppositely,
+   so the choice is pinned rather than left to whichever coercion happened to
+   be in the way. It used to be the latter: a `?? 0` made the "cannot measure"
+   branch unreachable, so a caller passing null and a caller passing zero got
+   identical scores while meaning opposite things. */
+{
+  /* CHOSEN: no debts recorded EARNS the pillar. Refusing to credit it would
+     leave a genuinely debt-free household unscored on the one thing it has
+     actually finished. The surfaces disclose the assumption — see the
+     debtsRecorded flag — but the arithmetic rewards it. */
+  const P = { income: 40000, essential: 20000, savings: 0, consumption: 20000, fixed: 0, budgeted: 0, counted: true };
+  const H = healthMetrics({
+    periods: [P], monthsPerPeriod: 1, earmarks: { any: false, total: 0, over: [] },
+    targetMonths: 6, debtInterest: 0, debtInstalments: null, netWorth: 0, hasFixed: false,
+  });
+  eq(H.interestShare, 0, 'no interest is a measured zero, and scores');
+  eq(H.instalmentShare, null, 'while unstated instalments stay unmeasured');
+  const debt = H.score.pillars.find(p => p.key === 'debt');
+  ok(!!debt, 'the debt pillar is present for a debt-free household');
+  eq(debt.at, 1, 'and earns full marks');
+}
+{
+  /* And the branch that WAS unreachable: a caller that genuinely cannot measure
+     interest must not be scored as if it measured zero. */
+  const P = { income: 40000, essential: 20000, savings: 0, consumption: 20000, fixed: 0, budgeted: 0, counted: true };
+  const H = healthMetrics({
+    periods: [P], monthsPerPeriod: 1, earmarks: { any: false, total: 0, over: [] },
+    targetMonths: 6, debtInterest: null, debtInstalments: null, netWorth: 0, hasFixed: false,
+  });
+  eq(H.interestShare, null, 'null in, null out — no longer coerced to a measured zero');
+  ok(!H.score.pillars.some(p => p.key === 'debt'),
+    'and with neither measure answerable the pillar drops out entirely');
+}
+{
+  /* A household carrying real debt is scored on it, and hard. */
+  const P = { income: 40000, essential: 20000, savings: 0, consumption: 20000, fixed: 0, budgeted: 0, counted: true };
+  const H = healthMetrics({
+    periods: [P], monthsPerPeriod: 1, earmarks: { any: false, total: 0, over: [] },
+    targetMonths: 6, debtInterest: 4000, debtInstalments: 14000, netWorth: 0, hasFixed: false,
+  });
+  eq(H.interestShare, 0.1, '10% of income to interest');
+  eq(H.instalmentShare, 0.35, 'and 35% to instalments');
+  const debt = H.score.pillars.find(p => p.key === 'debt');
+  eq(debt.at, 0, 'both at their ceilings scores the pillar nothing');
+}
+
 /* ---- 8. the bands, shared by the tile's colour and the popup ---- */
 {
   eq(scoreBand(100), 'strong', '100 is strong');

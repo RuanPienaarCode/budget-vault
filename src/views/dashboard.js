@@ -199,13 +199,17 @@ module.exports = function registerDashboard(ctx) {
        error. The share being null (no income history) still shows the monthly
        cost when there is one: the rand figure is real even when the ratio
        cannot be. */
+    /* "Debt-free" is a claim about the household; "none recorded" is a claim
+       about the vault. Saying the first when only the second is known is the
+       one place this tile could mislead, and it costs a word to be right. */
+    const debtMeta = debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) })
+      : snap.debtsRecorded ? i18n.t('dash.health.debtFree')
+        : i18n.t('dash.health.debtNone');
     const debtTile = H.interestShare !== null
       ? fig(H.interestShare <= 0 ? 'is-good' : H.interestShare < 0.05 ? 'is-fair' : 'is-poor',
         pct(H.interestShare),
         i18n.t('dash.health.debt'),
-        debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) }) : i18n.t('dash.health.debtFree'))
-      : fig('', '—', i18n.t('dash.health.debt'),
-        debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) }) : i18n.t('dash.health.needHistory'));
+        debtMeta) : fig('', '—', i18n.t('dash.health.debt'), debtMeta);
 
     /* One band lookup for the colour AND the word — health-math owns the
        thresholds now, so the tile and the popup explaining it cannot disagree

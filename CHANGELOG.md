@@ -3,6 +3,28 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+- **A debt whose repayment you never filled in no longer scores as no
+  repayment.** The Debts table reads a blank `Payment` cell as zero, so a
+  household that listed its debts and left that column empty was told it carried
+  none of the burden — full marks on a question it had not answered. A blank
+  now means unmeasured, and the score reflects only what the file actually
+  says.
+- **The score no longer claims you are debt-free when it only means it found no
+  debts.** An empty Debt page still earns those points — refusing to credit it
+  would leave a genuinely debt-free household unscored on the one thing it has
+  finished — but the card now says "no debts recorded" rather than "debt-free",
+  and the Score page says the same in words. The app argues; it does not assume
+  in silence.
+
+### Changed
+
+- **Full marks now earns a gold badge with a crown**, so the parts that are
+  genuinely finished stand apart from the ones that are merely close.
+
 ## 1.21.0 — 2026-08-18
 
 The Dashboard says what your score is. This adds the page that says why, what

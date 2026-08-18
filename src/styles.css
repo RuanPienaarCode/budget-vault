@@ -3428,9 +3428,22 @@
   background: var(--surface-glass); color: var(--color-primary);
   border: 1px solid var(--border-color); margin-top: 1px;
 }
+/* Full marks gets a solid gold disc with the crown knocked out of it. The
+   glyph is white rather than a lighter gold: lucide icons are STROKED, not
+   filled, so a low-contrast knockout would thin to nothing at this size — the
+   cutout has to be the strongest colour on the disc to read as a cutout at
+   all. currentColor is what setIcon's stroke follows, so setting the colour is
+   what knocks it out. */
 .budget-app-root .score-win.is-maxed .score-win-badge {
-  color: var(--color-warning-ink); border-color: var(--color-warning);
+  background: linear-gradient(140deg, var(--color-warning), var(--color-gold));
+  border-color: var(--color-gold);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, .28);
   animation: bud-stamp 620ms cubic-bezier(.2, 1.5, .4, 1) both;
+}
+/* The stroke does the drawing, so it carries the weight rather than a fill. */
+.budget-app-root .score-win.is-maxed .score-win-badge svg {
+  stroke: currentColor; stroke-width: 2.1; fill: none;
 }
 /* Lands like a stamp — overshoot, then settle. */
 @keyframes bud-stamp {

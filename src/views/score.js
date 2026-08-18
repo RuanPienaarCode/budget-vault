@@ -36,6 +36,7 @@ module.exports = function registerScore(ctx) {
 
     const snap = healthSnapshot();
     const { metrics: M, breakdown, target, earmarks } = snap;
+    const debtsRecorded = snap.debtsRecorded;
 
     /* No score at all: a vault too new to average anything. It gets an
        explanation of what the page will show once there is history, not an
@@ -52,7 +53,7 @@ module.exports = function registerScore(ctx) {
     }
 
     renderHero(hero, breakdown, M);
-    renderGood(good, breakdown);
+    renderGood(good, breakdown, debtsRecorded);
     renderWork(work, breakdown, M, target, earmarks);
     renderHow(how);
   }
@@ -86,7 +87,7 @@ module.exports = function registerScore(ctx) {
   }
 
   /* ---------------------------- what is going well ----------------------- */
-  function renderGood(good, breakdown) {
+  function renderGood(good, breakdown, debtsRecorded) {
     const card = $('#scoreGoodCard');
     const strong = breakdown.pillars.filter(p => p.at >= GOOD_ENOUGH);
     card.classList.toggle('hidden', !strong.length);
@@ -109,9 +110,13 @@ module.exports = function registerScore(ctx) {
         /* The badge carries the icon AND the score, so the celebration and the
            figure behind it are one object rather than a tick beside a number. */
         el('span', { class: 'score-win-badge', 'aria-hidden': 'true' },
-          icoEl(maxed ? 'award|medal|circle-check' : 'circle-check|check-circle')),
+          icoEl(maxed ? 'crown|award|medal' : 'circle-check|check-circle')),
         el('div', { class: 'score-win-body' }, name,
-          el('div', { class: 'score-win-say' }, i18n.t(`score.win.${p.key}`)),
+          /* The debt win is the only one that can rest on an absence rather
+             than an achievement. Where nothing is recorded it says so, instead
+             of congratulating a household on a fact the vault never saw. */
+          el('div', { class: 'score-win-say' },
+            i18n.t(p.key === 'debt' && !debtsRecorded ? 'score.win.debtNone' : `score.win.${p.key}`)),
           el('div', { class: 'score-win-pts num' },
             i18n.t('dash.health.why.points', { points: p.shownPoints, max: p.shownMax })))));
     }

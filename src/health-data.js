@@ -20,6 +20,7 @@ const {
   healthMetrics, resolveEarmarks, debtInterestMonthly, essentialTotal,
   scoreBreakdown, DAYS_PER_MONTH,
 } = require('./health-math');
+const { activeDebts } = require('./worth');
 const { splitFlows } = require('./savings-math');
 const { worth } = require('./worth');
 
@@ -89,6 +90,25 @@ module.exports = function registerHealthData(ctx) {
        changes the filter in only one place. */
     const debtInterest = debtInterestMonthly(S.debts);
 
+    /* What the household is committed to repaying each month — or null when
+       nothing says.
+
+       The Debts table reads a blank `Payment` cell as 0 (see table-schema.js's
+       money() reader), so a household that listed its debts and left that
+       column empty produced instalments of 0 — full marks, and indistinguishable
+       from a household with no repayments at all. A stated 0 is treated the
+       same as a blank here deliberately: a debt you repay nothing on states no
+       commitment either way, so there is nothing the two could mean differently
+       for this measure.
+
+       Some payments known and others blank still totals what IS known rather
+       than refusing to answer: understating a burden is the safe direction, and
+       a partial figure moves the score toward the truth where null leaves it
+       untouched. */
+    const active = activeDebts(S.debts);
+    const stated = active.filter(d => (d.payment || 0) > 0);
+    const instalments = stated.length ? stated.reduce((t, d) => t + d.payment, 0) : null;
+
     const metrics = healthMetrics({
       periods,
       monthsPerPeriod: (Number(S.settings.period_days) || 0) ? S.settings.period_days / DAYS_PER_MONTH : 1,
@@ -98,7 +118,7 @@ module.exports = function registerHealthData(ctx) {
       /* Null, not zero, when the Debt page does not exist: a vault that has
          never listed a debt has not declared it has none, and full marks for
          an unanswered question is the one thing this must not hand out. */
-      debtInstalments: S.debts.length ? S.debts.reduce((t, d) => t + (d.payment || 0), 0) : null,
+      debtInstalments: instalments,
       netWorth: worth(S.accounts, S.debts, S.assets).net,
       hasFixed: fixedCats.size > 0,
     });
@@ -106,6 +126,11 @@ module.exports = function registerHealthData(ctx) {
     return {
       metrics, earmarks, target, debtInterest,
       hasFixed: fixedCats.size > 0,
+      /* Whether the debt score rests on anything the household actually wrote.
+         False means the pillar's full marks are an ASSUMPTION — see the note in
+         health-math's PILLARS block — and the surfaces say so rather than
+         letting a reader believe the vault checked. */
+      debtsRecorded: active.length > 0,
       breakdown: scoreBreakdown(metrics, target),
       /* Nothing honest to say: no fund to measure and nothing computable from
          history. A week-old vault gets no card rather than a row of dashes. */

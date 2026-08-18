@@ -132,9 +132,19 @@ const scoreBand = value => (value >= SCORE_BANDS.strong ? 'strong'
    degenerates into eight near-ties.
 
    Grouping fixes that. Each pillar keeps a weight worth caring about, and the
-   measures inside it share that weight between them. So `debt` is worth 20
-   whether the vault can see one aspect of it or both, and a household with no
-   debts at all drops the pillar entirely rather than being scored zero on it.
+   measures inside it share that weight between them — so `debt` is worth 20
+   whether the vault can see one aspect of it or both.
+
+   A household with NO DEBTS keeps the pillar and earns it. That is a deliberate
+   choice between two defensible readings of an empty Debt page: "unanswered",
+   which would drop the pillar and give a genuinely debt-free household no
+   credit for it, or "debt-free", which rewards them and flatters anyone whose
+   debts are simply unrecorded. The second is chosen because the vault is the
+   source of truth everywhere else in this app, and because refusing to credit
+   the one thing many households have actually achieved reads as the score being
+   broken. The assumption does not hide: healthSnapshot reports `debtsRecorded`
+   so the surfaces say the score assumes no debts, rather than quietly
+   asserting it. The app argues; it does not assume in silence.
 
    Weights are a judgement, not a derivation, and they are here in one literal
    so they can be argued with rather than hunted for. Reserves leads because
@@ -295,11 +305,14 @@ function healthMetrics({
     countedPeriods: avg.counted,
     months,
     savingsRate: hasIncome && avg.savings !== null ? avg.savings / avg.income : null,
-    interestShare: share(debtInterest ?? 0),
-    /* Null rather than zero when there is no debt page at all: a vault that has
-       never listed a debt has not told us it has none, and "0% of income to
-       instalments" is a claim. `debtInstalments` arrives as a number only when
-       the Debt page exists. */
+    /* Passed straight through, NOT coerced. `?? 0` here made the null branch
+       unreachable: a caller saying "I cannot measure this" got the same score
+       as one saying "this is zero", and the two mean opposite things. */
+    interestShare: share(debtInterest),
+    /* Null rather than zero when nothing states a repayment. A vault whose
+       debts carry no `Payment` has told us it HAS debt but not what it costs
+       to service, and "0% of income to instalments" would be full marks for an
+       unanswered question. health-data.js decides when that is the case. */
     instalmentShare: share(debtInstalments),
     fixedShare: share(fixedMonthly),
     consumptionShare: share(avg.consumption),
