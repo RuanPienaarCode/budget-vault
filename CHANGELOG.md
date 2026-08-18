@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.20.1 — 2026-08-18
 
 The score explanation shipped in 1.20.0 was hard to read: it was cut off, and it
 was wordier than it needed to be.
