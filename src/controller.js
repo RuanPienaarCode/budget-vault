@@ -16,7 +16,9 @@ const registerPeriod = require('./period');
 const registerLoad = require('./load');
 const registerCategories = require('./categories');
 const registerTrendMath = require('./trend-math');
+const registerHealthData = require('./health-data');
 const registerDashboard = require('./views/dashboard');
+const registerScore = require('./views/score');
 const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
 const registerPlan = require('./views/plan');
@@ -341,12 +343,16 @@ function mountApp(view) {
   registerLoad(ctx);        // loadVault, txSegment
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
   registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
+  // After trend-math, whose periodsForMonths it uses, and before the two views
+  // that read the snapshot it assembles.
+  registerHealthData(ctx);  // healthSnapshot
   /* Before the views, because five of them render its noteButton() chip — they
      reach it through ctx at render time rather than by destructuring, so the
      order is belt-and-braces rather than load-bearing. loadVault calls
      ctx.loadNotes(), which is late-bound for the same reason. */
   registerNotes(ctx);
   registerDashboard(ctx);
+  registerScore(ctx);
   registerTransactions(ctx);
   registerBudgets(ctx);
   registerPlan(ctx);
@@ -380,7 +386,8 @@ function mountApp(view) {
   function render() {
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
-    ({ dashboard: ctx.renderDashboard, transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
+    ({ dashboard: ctx.renderDashboard, score: ctx.renderScore,
+       transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
        plan: ctx.renderPlan, notes: ctx.renderNotes,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
        debts: ctx.renderDebts, owed: ctx.renderOwed,

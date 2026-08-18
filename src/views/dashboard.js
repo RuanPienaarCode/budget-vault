@@ -8,9 +8,7 @@ const { TYPE_ORDER } = require('../constants');
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
-const { healthMetrics, resolveEarmarks, debtInterestMonthly, essentialTotal, DAYS_PER_MONTH,
-  scoreBand, scoreBreakdown, SCORE_BANDS, FULL_MARKS, NON_ESSENTIAL_TYPES } = require('../health-math');
-const { splitFlows } = require('../savings-math');
+const { scoreBand, SCORE_BANDS, FULL_MARKS } = require('../health-math');
 const { todayIso } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
@@ -27,7 +25,7 @@ const {
 const { sharePercents } = require('../share-percents');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -114,76 +112,12 @@ module.exports = function registerDashboard(ctx) {
     const card = $('#healthCard');
     const body = $('#healthBody'); body.empty();
 
-    /* Which categories the household has declared it cannot stop paying. A Set
-       of NAMES because that is what a transaction row carries; the flag itself
-       lives on the category file (see load.js for why it is a flag and not a
-       type test). */
-    const fixedCats = new Set(S.categories.filter(c => c.fixed).map(c => c.name));
+    /* One assembly, shared with the Score page — see health-data.js for why
+       this is not gathered here. */
+    const snap = healthSnapshot();
+    const { metrics: H, earmarks, target, debtInterest } = snap;
 
-    const cur = currentPeriod();
-    const want = periodsForMonths(6);
-    const idx = accountIndex();
-    /* Contributions into savings AND investment accounts both count as saving
-       — the savings rate measures money the household kept, not which wrapper
-       it kept it in. splitFlows already knows a contribution from growth and
-       from a split parent, so no raw-row reading happens here. */
-    const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
-    const periods = [];
-    for (let i = 1; i <= want; i++) {
-      const p = shiftPeriod(cur, -i);
-      const spend = periodSpend(p, null);
-      const { start, end } = periodRange(p);
-      let savings = 0;
-      for (const a of savers) {
-        const rows = (idx.get(a) || {}).rows || [];
-        savings += splitFlows(rows, catType, { from: start, to: end }).contributions;
-      }
-      /* Three different slices of the same period, because they answer three
-         different questions. `essential` is what must be paid with no income
-         (the emergency divisor). `consumption` is what living cost — everything
-         except money moved into the household's own funds, without which
-         funding an investment reads as overspending. `fixed` is the part that
-         cannot be stopped this month, taken from the categories flagged as
-         such rather than guessed from their type. */
-      let consumption = 0, fixed = 0;
-      for (const [cat, amt] of Object.entries(spend.whole)) {
-        const type = catType(cat);
-        if (type !== 'savings' && type !== 'investment') { consumption += amt; }
-        if (fixedCats.has(cat)) { fixed += amt; }
-      }
-      periods.push({
-        income: periodSummary(p).income,
-        essential: essentialTotal(spend.whole, catType),
-        savings, consumption, fixed,
-        budgeted: budgetTotals(p).spend,
-        counted: spend.count > 0,
-      });
-    }
-
-    const earmarks = resolveEarmarks(S.accounts);
-    const target = S.settings.emergency_target_months || 6;
-    /* Once, not three times. The score, the debt tile's own figure and the
-       explainer's "this is costing you" line are all the same monthly interest
-       bill, and computing it per consumer is how two of them end up disagreeing
-       after someone changes the filter in only one place. */
-    const debtInterest = debtInterestMonthly(S.debts);
-    const H = healthMetrics({
-      periods,
-      monthsPerPeriod: (Number(S.settings.period_days) || 0) ? S.settings.period_days / DAYS_PER_MONTH : 1,
-      earmarks,
-      targetMonths: target,
-      debtInterest,
-      /* Null, not zero, when the Debt page does not exist: a vault that has
-         never listed a debt has not declared it has none, and full marks for
-         an unanswered question is the one thing this card must not hand out. */
-      debtInstalments: S.debts.length ? S.debts.reduce((t, d) => t + (d.payment || 0), 0) : null,
-      netWorth: worth(S.accounts, S.debts, S.assets).net,
-      hasFixed: fixedCats.size > 0,
-    });
-
-    /* Nothing honest to say: no fund to measure and nothing computable from
-       history. A vault one week old gets no card rather than four dashes. */
-    const nothing = !earmarks.any && !H.score;
+    const nothing = snap.empty;
     if (card) card.classList.toggle('hidden', nothing);
     if (nothing) return;
 
@@ -203,9 +137,18 @@ module.exports = function registerDashboard(ctx) {
     /* Emergency cover. The meter fills toward the target and re-tones at the
        halfway mark — under half a fund is a different fact from nearly-there,
        and colour is how this dashboard says so elsewhere (hero, cat-bars). */
+    /* The unit rides WITH the figure rather than only in the label below it.
+       "3.9" alone is the one tile whose number means nothing on sight — the
+       other three are a percentage or a score, which read as themselves — so a
+       reader meeting the card for the first time had to look down a line to
+       learn what 3.9 counted. Set smaller and lighter, the way the hero already
+       carries its currency symbol. */
     const emergency = H.months !== null
       ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
-        H.months.toFixed(1),
+        /* A REAL space, not only the margin below it: the tile's accessible
+           name is its text content, and "3.9months" is what a screen reader
+           would have said. */
+        [H.months.toFixed(1), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
         i18n.t('dash.health.months'),
         i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }))
       : fig('', '—', i18n.t('dash.health.months'),
@@ -215,8 +158,26 @@ module.exports = function registerDashboard(ctx) {
       /* The same bar component the budget table fills, and the same three
          tones: emerald at the target, amber past halfway, red below it. */
       const tone = H.months >= target ? '' : H.months >= target / 2 ? ' bg-warning' : ' bg-danger';
-      emergency.append(el('div', { class: 'cat-bar health-meter', 'aria-hidden': 'true' },
-        el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` })));
+      /* What the bar is a picture OF: the money set aside against the money the
+         goal actually asks for. The tile above says the goal in months, which
+         is the unit to plan in, but not what it costs — and the bar's own
+         fullness is the one place that figure belongs.
+
+         A native `title` rather than a styled tooltip, per the rule in
+         views/savings.js: it works under a touch-and-hold on a phone and is
+         read by a screen reader, which a CSS-only tooltip is not. So the bar
+         stops being decorative — it now carries the only copy of this figure,
+         and `aria-hidden` would hide exactly that. role="img" plus the same
+         text as its label is what createChart already does for a chart. */
+      const goalAmount = target * H.monthlyEssential;
+      const meterTip = i18n.t('dash.health.meterTip', {
+        count: target,
+        earmarked: money(earmarks.total, 0),
+        goal: money(goalAmount, 0),
+      });
+      emergency.append(el('div', {
+        class: 'cat-bar health-meter', role: 'img', title: meterTip, 'aria-label': meterTip,
+      }, el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` })));
     }
     /* The over-claim, argued rather than corrected: the figure above already
        capped at what the account holds, so the claim itself must stay visible
@@ -256,7 +217,7 @@ module.exports = function registerDashboard(ctx) {
         i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`))
       : fig('', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
     if (H.score) {
-      attachScoreExplainer(scoreTile, scoreBreakdown(H, target), target);
+      attachScoreExplainer(scoreTile, snap.breakdown, target);
     }
 
     body.append(el('div', { class: 'health-grid' }, emergency, savingsTile, debtTile, scoreTile));

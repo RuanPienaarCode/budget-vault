@@ -224,6 +224,11 @@ async function loadInto(ctx) {
   // views — the same slot controller.js gives it. The dashboard's trend chart
   // and comparison column read these off ctx.
   require('../../src/trend-math')(ctx);
+  /* After trend-math (whose periodsForMonths it uses) and before the views:
+     the Dashboard's health card and the Score page both read healthSnapshot off
+     ctx, so a harness without it renders neither — and the card's own guard
+     would swallow the reason. */
+  require('../../src/health-data')(ctx);
   require('../../src/load')(ctx);
   require('../../src/views/notes')(ctx);
   await ctx.loadVault();

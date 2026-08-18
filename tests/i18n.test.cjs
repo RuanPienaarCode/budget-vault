@@ -341,7 +341,7 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
    - a view NOT in the set that grows real i18n usage must be promoted, so
      the inventory cannot silently rot as views migrate. */
 {
-  const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js']);
+  const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js', 'score.js']);
   const VIEWS = path.join(SRC, 'views');
   const usage = f => {
     const text = fs.readFileSync(path.join(VIEWS, f), 'utf8');

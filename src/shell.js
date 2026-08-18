@@ -51,6 +51,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
+    <button class="drawer-link" data-view="score">
+      <span class="di"><span class="ico" data-ico="gauge|activity|heart-pulse"></span></span><span data-i18n="nav.score">Score</span>
+    </button>
     <button class="drawer-link" data-view="plan">
       <span class="di"><span class="ico" data-ico="target|goal|crosshair"></span></span><span data-i18n="nav.plan">Plan</span>
     </button>
@@ -237,6 +240,31 @@ const SHELL_HTML = `
           <div class="mini-grid mini-kpis-4 mini-grid--linked" id="dashPositionKpis"></div>
           <div class="kpi-caveat" id="dashPositionNote"></div>
           <div class="kpi-caveat" id="dashStale"></div>
+        </div>
+      </section>
+
+      <section id="view-score" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title" data-i18n="nav.score">Score</h1>
+          <div class="sub-note" data-i18n="score.subNote">How your financial score is worked out, what is going well, and what would move it</div>
+        </div>
+        <div class="card mb-4" id="scoreHeroCard">
+          <div class="body-pad" id="scoreHero"></div>
+        </div>
+        <div class="card mb-4 hidden" id="scoreGoodCard">
+          <div class="card-h"><div><h2 data-i18n="score.good.title">What is going well</h2>
+            <div class="sub" id="scoreGoodSub"></div></div></div>
+          <div class="body-pad" id="scoreGood"></div>
+        </div>
+        <div class="card mb-4 hidden" id="scoreWorkCard">
+          <div class="card-h"><div><h2 data-i18n="score.work.title">What would move it most</h2>
+            <div class="sub" data-i18n="score.work.sub">Biggest gap first — each one shows where you are, what to aim for, and how to get there</div></div></div>
+          <div class="body-pad" id="scoreWork"></div>
+        </div>
+        <div class="card mb-4">
+          <div class="card-h"><div><h2 data-i18n="score.how.title">How the score is built</h2>
+            <div class="sub" data-i18n="score.how.sub">Five parts, each worth a share of 100</div></div></div>
+          <div class="body-pad" id="scoreHow"></div>
         </div>
       </section>
 

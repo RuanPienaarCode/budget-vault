@@ -3,6 +3,34 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+The Dashboard says what your score is. This adds the page that says why, what
+you are already doing well, and what to do next.
+
+### Added
+
+- **A Score page**, in the menu below Budget. It opens with the score and a
+  reading of it, then celebrates what is going well BEFORE listing what to work
+  on — the parts at full marks are finished work, and a page that opens with
+  five failures is one nobody comes back to. Each gap shows where you are, the
+  concrete step, and how anyone actually does that thing. A closing section
+  explains all five parts of the score and why a part your files cannot answer
+  is left out rather than marked zero.
+- **A small celebration** when something is at full marks, skipped entirely when
+  the system asks for reduced motion, and never shown to a household that has
+  nothing to celebrate yet.
+- **The emergency-cover bar says what it is a picture of.** Hovering it — or
+  touching and holding on a phone — gives the money set aside against the money
+  the goal actually asks for.
+
+### Changed
+
+- **The cover figure carries its unit**: "3.9 months" rather than "3.9" with the
+  word a line below. It was the only tile whose number meant nothing on sight.
+- **"target 6" is now "Goal 6 months"**, and "What's left" is "What's left this
+  period", so each says what it is counting.
+
 ## 1.20.1 — 2026-08-18
 
 The score explanation shipped in 1.20.0 was hard to read: it was cut off, and it
