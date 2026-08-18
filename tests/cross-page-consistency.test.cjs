@@ -33,11 +33,26 @@
    asked of the code under test — same policy as summary-conservation's
    oracle, for the same reason.
 
+   donutTotal() USED TO be a second restatement in that same spirit: named
+   categories, not income-typed, not transfer-typed, net negative — a hand
+   copy of renderSplit's own selection rule (src/views/dashboard.js). That
+   made this file's own header claim ("the seams a reader can actually see")
+   false for exactly this leg: renderSplit could drift from the copy and this
+   suite would stay green, because neither side was ever the shipped code.
+   `netting`'s independent-oracle policy is fine for a NUMBER nothing else
+   computes; it was the wrong call for a SELECTION RULE something else already
+   implements and ships. donutTotal() now mounts the REAL registerDashboard
+   view (same DOM-stub approach as tests/dashboard-cards.test.cjs) and reads
+   the total straight out of #dashSplitSub, the element renderSplit itself
+   writes — so a change to the selection rule shows up here whether or not
+   anyone thought to update a second copy of it.
+
    A future edit to either module's veto handling now breaks arithmetic here
    rather than silently drifting the comparison column away from the hero
    while every per-module test stays green.
 
-   Runs in bare node against the REAL loader, period and trend-math modules.
+   Runs in bare node against the REAL loader, period, trend-math and
+   dashboard-view modules.
      node tests/cross-page-consistency.test.cjs      # non-zero exit on failure */
 
 const assert = require('assert');
@@ -49,6 +64,56 @@ const ok = (cond, m) => { assert.ok(cond, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const c = v => { const n = Math.round(v * 100); return n === 0 ? 0 : n; };
 const eqMoney = (a, b, m) => eq(c(a), c(b), `${m} (got ${a}, want ${b})`);
+
+/* --------------------------- minimal DOM stub ---------------------------
+   Same shape as tests/dashboard-cards.test.cjs's FakeEl/FakeText — copied
+   rather than shared, matching this repo's convention of each bare-node test
+   file being self-contained. Only what registerDashboard's renderSplit
+   actually touches: element creation, classList, textContent, append/empty,
+   attributes and event listeners. */
+class FakeText {
+  constructor(t) { this.nodeType = 3; this.textContent = String(t); this.children = []; }
+}
+class FakeEl {
+  constructor(tag) {
+    this.nodeType = 1;
+    this.tagName = String(tag).toUpperCase();
+    this.children = [];
+    this.attrs = {};
+    this.style = {};
+    this._cls = new Set();
+    this._text = '';
+    this._listeners = {};
+    const self = this;
+    this.classList = {
+      add: (...cl) => cl.forEach(x => self._cls.add(x)),
+      remove: (...cl) => cl.forEach(x => self._cls.delete(x)),
+      toggle: (cl, on) => (on ? self._cls.add(cl) : self._cls.delete(cl)),
+      contains: cl => self._cls.has(cl),
+    };
+  }
+  get className() { return [...this._cls].join(' '); }
+  set className(v) { this._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }
+  get textContent() { return this._text + this.children.map(ch => ch.textContent).join(''); }
+  set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
+  empty() { this.children = []; this._text = ''; }
+  append(...kids) { for (const k of kids) this.children.push(k); }
+  setAttribute(k, v) { this.attrs[k] = String(v); }
+  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  addEventListener(ev, fn) { (this._listeners[ev] = this._listeners[ev] || []).push(fn); }
+}
+global.document = {
+  createElement: t => new FakeEl(t),
+  createElementNS: (_ns, t) => new FakeEl(t),
+  createTextNode: t => new FakeText(t),
+};
+// Empty throughout, so chart.js's themeColors() takes its documented hex
+// fallbacks rather than depending on a stylesheet this test does not load.
+global.getComputedStyle = () => ({ getPropertyValue: () => '' });
+function hasClass(el, cls) {
+  if (el._cls && el._cls.has(cls)) return true;
+  return (el.children || []).some(c => hasClass(c, cls));
+}
 
 const B = 'Budget';
 const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
@@ -70,18 +135,36 @@ async function vault(files) {
   const ctx = makeCtx({ ...BASE, ...files }, { settings: { month_start_day: 1 } });
   await loadInto(ctx);
   ctx.S.period = '2026-08';
+
+  /* Mount the real dashboard view onto this same ctx, so donutTotal() below
+     reads renderSplit's own output rather than a second copy of its rule.
+     Minimal wiring: only #dashSplit/#splitRange/#dashSplitSub are ever
+     touched by renderSplit's happy path. money() is overridden to a plain,
+     exactly-invertible format — same trick tests/dashboard-cards.test.cjs
+     uses — so the rendered figure can be parsed back without fighting the
+     locale's thousands/decimal separators. */
+  const nodes = new Map(['dashSplit', 'splitRange', 'dashSplitSub'].map(id => [id, new FakeEl('div')]));
+  ctx.$ = sel => nodes.get(sel.slice(1)) || null;
+  ctx.root = new FakeEl('div');
+  ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
+  require('../src/views/dashboard')(ctx);
+  ctx._dashNodes = nodes;
   return ctx;
 }
 
-/* The donut's slice set, restated from renderSplit's own selection rule:
-   named categories, not income-typed, not transfer-typed, net negative. */
-function donutTotal(ctx, sum) {
-  let t = 0;
-  for (const [cat, amt] of Object.entries(sum.byCat)) {
-    if (!cat || ctx.catType(cat) === 'income' || ctx.catType(cat) === 'transfer') continue;
-    if (amt < 0) t += -amt;
-  }
-  return t;
+/* The donut's total, read from the REAL rendered view rather than restated.
+   renderSplit() (guarded, as ctx.renderSplit) writes #dashSplitSub as
+   "{money(total)} across {n} categories · {month}{gapNote}" when total > 0,
+   or just "{month}{gapNote}" when it is exactly 0 — so a missing "across"
+   match means the real total was 0, not that the test failed to find it. */
+function donutTotal(ctx) {
+  ctx.renderSplit();
+  const dashSplit = ctx._dashNodes.get('dashSplit');
+  ok(!hasClass(dashSplit, 'text-danger'),
+    'the donut card rendered without its guard catching a failure — a caught failure would silently read as a R0 total below');
+  const sub = ctx._dashNodes.get('dashSplitSub').textContent;
+  const m = /^R\s*(-?[\d.]+)\s+across/.exec(sub);
+  return m ? Number(m[1]) : 0;
 }
 
 /* Independent netting: for each named non-income/non-transfer category, gross
@@ -107,7 +190,7 @@ function nettingOf(ctx, p, sum) {
 
 function assertIdentities(ctx, p, label) {
   const sum = ctx.periodSummary(p);
-  const donut = donutTotal(ctx, sum);
+  const donut = donutTotal(ctx);
   const netting = nettingOf(ctx, p, sum);
 
   eqMoney(sum.spend, donut + sum.uncatSpend + netting,
@@ -160,7 +243,7 @@ function assertIdentities(ctx, p, label) {
 
   // Anchor the fixture before trusting identities proven on it.
   eqMoney(sum.spend, 9700, 'gross spend counts every outgoing: 5000+3000+200+700+800');
-  eqMoney(donutTotal(ctx, sum), 8550, 'donut keeps Groceries net 7850 and Ghost net 700, drops Fun and the blanks');
+  eqMoney(donutTotal(ctx), 8550, 'donut keeps Groceries net 7850 and Ghost net 700, drops Fun and the blanks');
   eqMoney(sum.uncatSpend, 700, 'uncategorised gross outgoing');
   eqMoney(nettingOf(ctx, '2026-08', sum), 450, 'netting: 150 in Groceries + all 200 of Fun + 100 of Ghost');
 

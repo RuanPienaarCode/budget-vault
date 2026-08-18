@@ -8,6 +8,11 @@ const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthSeries } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
+const { symbolOf } = require('../currency');
+/* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
+   as a local in several sibling files, so every view in this app imports i18n
+   the same way regardless of whether this particular file happens to clash. */
+const i18n = require('../i18n');
 
 /* Bumped once per composition chart drawn, to keep its clipPath and gradient
    ids unique across every render AND across every open leaf. Module scope
@@ -22,7 +27,16 @@ module.exports = function registerSavings(ctx) {
      only when a user edited a savings balance a screen away from the cause.
      Every other cross-view call (ctx.editBalance, ctx.editAccount,
      ctx.noteButton) is late-bound through ctx at call time; this now is too. */
-  const { S, $, root, money, toast, accountIndex, catType } = ctx;
+  const { S, $, root, money, moneyIn, toast, accountIndex, catType } = ctx;
+
+  /* One account's own figures, in its own symbol — the same shape as
+     views/accounts.js's acctMoney, kept as its own copy rather than shared
+     off ctx: it is three lines built from a pure module (currency.js) either
+     side, so a ctx export here would trade a one-line duplication for a
+     second cross-view coupling in a file that already goes out of its way
+     (see saveAccount above) to avoid registration-order dependencies. */
+  const acctMoney = (a, v, decimals = 2) =>
+    moneyIn(symbolOf(a, S.settings.currency), v, decimals);
 
   function renderSavings() {
     const savings = S.accounts.filter(a => a.type === 'savings');
@@ -118,7 +132,7 @@ module.exports = function registerSavings(ctx) {
     // accounts.js's acceptImplied.
     if (!(await ctx.saveAccount(a))) return;
     renderSavings();
-    toast(`${a.name} reconciled to ${money(implied)}`);
+    toast(i18n.t('acct.reconciled', { name: a.name, amount: acctMoney(a, implied) }));
   }
 
   /* ----------------------- how old is this number ------------------------

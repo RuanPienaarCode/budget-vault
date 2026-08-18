@@ -1025,10 +1025,10 @@
   white-space: nowrap;
 }
 .budget-app-root .badge-income      { background: var(--color-info-light); color: var(--color-info); }
-.budget-app-root .badge-expense     { background: var(--color-danger-light); color: var(--color-danger); }
+.budget-app-root .badge-expense     { background: var(--color-danger-light); color: var(--color-danger-ink); }
 .budget-app-root .badge-debt        { background: color-mix(in srgb, #f97316 14%, transparent); color: #fb923c; }
 .budget-app-root .badge-services    { background: var(--color-info-light); color: var(--color-info); }
-.budget-app-root .badge-insurance   { background: var(--color-warning-light); color: var(--color-warning); }
+.budget-app-root .badge-insurance   { background: var(--color-warning-light); color: var(--color-warning-ink); }
 .budget-app-root .badge-giving      { background: color-mix(in srgb, var(--color-giving) 14%, transparent); color: var(--color-giving); }
 .budget-app-root .badge-savings     { background: var(--color-success-light); color: var(--color-success); }
 .budget-app-root .badge-investment  { background: color-mix(in srgb, var(--color-investment) 14%, transparent); color: color-mix(in srgb, var(--color-investment) 70%, var(--text-primary)); }
@@ -1038,12 +1038,18 @@
 
 /* Light-mode badge foregrounds: the bright accent colours only clear AA on the
    dark theme's tints. On the pale light tints this ~11.7px bold text needs
-   darker ink (all ≥ 4.5:1 on a near-white tint). Dark theme keeps the brights. */
+   darker ink (all ≥ 4.5:1 on a near-white tint). Dark theme keeps the brights.
+   .badge-expense and .badge-insurance used to have their own entries here
+   (#be123c, #a16207) — removed once the base rules above switched from the
+   raw fill token to --color-danger-ink / --color-warning-ink, which already
+   redirect to these same near-identical, AA-clearing values in light mode
+   (verified: --color-warning-ink's #9a5c09 measures 5.18:1 on
+   --color-warning-light, better than the #a16207 it replaces) and to the raw
+   fill in dark mode. Keeping both here would have been two mechanisms doing
+   the same job. */
 .budget-app-root:not(.bud-dark) .badge-income,
 .budget-app-root:not(.bud-dark) .badge-services   { color: #0369a1; }
-.budget-app-root:not(.bud-dark) .badge-expense    { color: #be123c; }
 .budget-app-root:not(.bud-dark) .badge-debt       { color: #c2410c; }
-.budget-app-root:not(.bud-dark) .badge-insurance  { color: #a16207; }
 .budget-app-root:not(.bud-dark) .badge-savings    { color: #15803d; }
 .budget-app-root:not(.bud-dark) .badge-giving     { color: #be185d; }
 .budget-app-root:not(.bud-dark) .badge-luxuries   { color: #0f766e; }
@@ -1605,7 +1611,7 @@
   border: 0; cursor: pointer; font-family: var(--font-sans);
 }
 .budget-app-root .status-pill .ico svg { width: 0.75rem; height: 0.75rem; }
-.budget-app-root .status-outstanding { background: var(--color-warning-light); color: var(--color-warning); }
+.budget-app-root .status-outstanding { background: var(--color-warning-light); color: var(--color-warning-ink); }
 .budget-app-root .status-paid { background: var(--color-success-light); color: var(--color-success); }
 .budget-app-root.bud-dark .status-paid { color: var(--color-success); }
 
@@ -1724,7 +1730,7 @@
 /* Tax view: step statuses (todo/busy/done/n-a) + document statuses
    (needed/uploaded/n-a — needed shares .tax-busy's warning look). */
 .budget-app-root .tax-todo { background: var(--border-color); color: var(--text-muted); }
-.budget-app-root .tax-busy, .budget-app-root .tax-needed { background: var(--color-warning-light); color: var(--color-warning); }
+.budget-app-root .tax-busy, .budget-app-root .tax-needed { background: var(--color-warning-light); color: var(--color-warning-ink); }
 .budget-app-root .tax-done, .budget-app-root .tax-uploaded { background: var(--color-success-light); color: var(--color-success); }
 .budget-app-root .tax-na { background: var(--border-color); color: var(--ink-faint); }
 .budget-app-root .tax-overdue { border-color: var(--color-danger); color: var(--color-danger-ink); }
@@ -2418,10 +2424,15 @@
 /* Light-mode status pills. The .badge-* family already carries darker inks for
    the pale light tints (see "Light-mode badge foregrounds" above); the pills
    were missed and sat at ~2.1:1 against their own backgrounds. Dark theme keeps
-   the brights, which clear AA on the dark tints. */
-.budget-app-root:not(.bud-dark) .status-outstanding,
-.budget-app-root:not(.bud-dark) .tax-busy,
-.budget-app-root:not(.bud-dark) .tax-needed    { color: #92610a; }
+   the brights, which clear AA on the dark tints.
+   .status-outstanding / .tax-busy / .tax-needed used to have their own entry
+   here (#92610a) — removed once their base rules switched to
+   --color-warning-ink, which resolves to an equivalent AA-clearing ink
+   (#9a5c09, 5.18:1 vs the removed override's 5.14:1 — a wash, not a
+   regression) in light mode and to the raw fill in dark mode. Two mechanisms
+   doing the same job; this one is now redundant.
+   .status-paid / .tax-done / .tax-uploaded still need this override — their
+   base rules use --color-success directly, not an -ink token. */
 .budget-app-root:not(.bud-dark) .status-paid,
 .budget-app-root:not(.bud-dark) .tax-done,
 .budget-app-root:not(.bud-dark) .tax-uploaded  { color: #15803d; }

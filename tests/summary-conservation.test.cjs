@@ -17,8 +17,8 @@
    computed as `spend - income`, so it inherited the whole gap.
 
    Measured on the vault this was found in: two periods' stated overspend was
-   out by R14 052 and R11 752, and a third reported a hole for a period that
-   had finished ahead — the uncategorised deposits that paid for it were
+   materially wrong, and a third reported a hole for a period that had
+   finished ahead — the uncategorised deposits that paid for it were
    credited to nothing. That figure is what pullPreviousOverspend writes into
    an assume-spent budget row, which is treated as money already spent — so
    the holes were not merely mis-stated, they were funded.
@@ -212,6 +212,35 @@ function oracle(ctx, p) {
     'a break-even period yields positive zero, so nothing renders "-R0.00"');
   ok(Object.is(ctx.periodDeficit('2026-01'), 0),
     'and so does a period with no transactions at all');
+}
+
+/* ---- 4c. a two-legged Contribution cancels on its own, when both legs count
+   The fourth thing `net`'s flat "every row, one rule" count covers for free —
+   see the periodDeficit header. CONTEXT.md: a Contribution "wears the budget
+   category it came from rather than one of its own", so both legs sit under
+   the SAME ordinary, non-transfer category rather than a transfer-typed one.
+   The savings account here is deliberately left WITHOUT `budget: false` (test
+   4 above already covers what a non-budget account's OWN vetoed row looks
+   like) — "in_budget", so neither leg is skipped and they cancel on their
+   own. periodDeficit never has to know a Contribution happened at all. */
+{
+  const ctx = await vault({
+    [`${B}/Accounts/Savings.md`]: '---\ntype: savings\ntx_label: "Savings"\nbalance: 500.00\nbalance_updated: 2026-08-01\n---\n',
+    [`${B}/Transactions/Cheque/2026-08.md`]: txFile([
+      ['2026-08-02', 'Contribution out', 'Groceries', -10000],
+    ]),
+    [`${B}/Transactions/Savings/2026-08.md`]: txFile([
+      ['2026-08-02', 'Contribution in', 'Groceries', 10000],
+    ]),
+  });
+  const sum = ctx.periodSummary('2026-08');
+
+  eqMoney(sum.spend, 10000, 'the outgoing leg is still gross spend — money left the cheque account');
+  eqMoney(sum.net, 0, 'the incoming leg on the savings side cancels it exactly, in the same category');
+  ok(Object.is(ctx.periodDeficit('2026-08'), 0),
+    'periodDeficit reports no hole for a Contribution it was never told about — the cancellation is automatic, not a special case');
+  eqMoney(sum.net, oracle(ctx, '2026-08').reduce((t, r) => t + r.amount, 0),
+    'and the independent oracle agrees — both legs are ordinary, non-transfer rows to it too');
 }
 
 /* ---- 5. the identity over randomised row sets --------------------------- */

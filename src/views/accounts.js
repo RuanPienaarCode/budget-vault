@@ -1304,12 +1304,17 @@ module.exports = function registerAccounts(ctx) {
      callers (editBalance, acceptImplied, editAccount, toggleBudget,
      addAccount) — so a caller cannot tell "did it land" from a bare await the
      way the dirty-flag pages can. Guarded here, once, rather than five times:
-     a rejected write used to be an unhandled rejection AND every caller fell
-     straight through to its own success toast and re-render regardless,
-     telling the reader something saved that never did. addAccount goes
-     further still on a false return — it must not push the account it just
-     failed to write into S.accounts, or the app would show an account with no
-     file behind it. */
+     a rejected write used to be an unhandled rejection that patchFile
+     propagates straight through saveAccount and out through whichever
+     caller's `await` was waiting on it — so, before this, a failed save did
+     NOT fall through to a false success toast; it silently aborted the
+     caller at that line, with nothing after it ever running and nothing
+     telling the reader why. The fix is not a corrected result but a shared,
+     controlled stopping point: one try/catch here, a plain boolean every
+     caller can check, instead of five copies of the same catch (or five
+     places that could forget one). addAccount goes further still on a false
+     return — it must not push the account it just failed to write into
+     S.accounts, or the app would show an account with no file behind it. */
   async function saveAccount(a, keys = []) {
     // Everything NOT patched — block-style tags, aliases, any hand-added key —
     // is left byte for byte. The body was already preserved via a.body.

@@ -710,9 +710,9 @@ async function mount(files, period = '2026-07') {
        uncategorised at all; and
 
        a period holding more uncategorised money IN than OUT nets positive, so
-       `-Math.min(0, …)` clamped the note to zero — on a real vault, R16 895
-       out against R21 440 in, printing nothing while the two figures sat
-       R17 195 apart.
+       `-Math.min(0, …)` clamped the note to zero — on a real vault, money out
+       was smaller than money in, printing nothing while the two figures sat
+       materially apart.
 
      The note is now measured against `spend` itself, so it covers the whole
      difference by construction rather than by a rule that has to be kept in
@@ -822,6 +822,31 @@ async function mount(files, period = '2026-07') {
     const missingStat = all(nodes.get('heroCard'), n => n._cls && n._cls.has('st'))
       .find(n => (n.attrs && n.attrs.title || '').includes('Ee'));
     ok(missingStat, 'the full name list still rides on the title, for a mouse hover');
+  }
+
+  /* --- 13d. exactly MISSING_NAMES_SHOWN orphaned names — the boundary ---- *
+     restCount = names.length - MISSING_NAMES_SHOWN is the guard deciding
+     whether a "+N more" tail is appended at all (dashboard.js:713). 13c only
+     ever exercised the restCount > 0 side (five names, "+2 more"); nothing
+     pinned the restCount === 0 side, so a `>` that quietly became `>=` (or a
+     boundary shifted by one) would still show every test green while an
+     exactly-full tile grew a bogus "+0 more" tail. */
+  {
+    const cats = ['Aa', 'Bb', 'Cc'];
+    const EXACT_ORPHANS = {
+      [`${B}/Settings.md`]: SETTINGS, ...CATS, ...ACCOUNT, ...BUDGET,
+      [`${B}/Transactions/Cheque/2026-07.md`]: txFile(
+        cats.map((c, i) => [`2026-07-0${i + 1}`, `Row ${c}`, c, -100])),
+    };
+    const { ctx, nodes } = await mount(EXACT_ORPHANS);
+    ctx.renderDashboard();
+    const sum = ctx.periodSummary('2026-07');
+    eq(sum.unknown.count, 3, 'all three rows name a category no file answers to');
+    eq(sum.unknown.names.slice().sort(), cats, 'all three distinct names are counted');
+
+    const hero = nodes.get('heroCard').textContent;
+    ok(/Aa/.test(hero) && /Bb/.test(hero) && /Cc/.test(hero), `all three names are visible text — got: ${hero}`);
+    ok(!/\+\d+ more/.test(hero), `exactly three names is a bare join, no "+N more" tail — got: ${hero}`);
   }
 
   /* --- 14. spend nobody budgeted for is not a blank Remaining cell ------ *

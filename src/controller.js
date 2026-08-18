@@ -108,6 +108,52 @@ function classifyRename(basePath, oldPath, newPath, categories) {
   return { kind, from, to };
 }
 
+/* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
+   reset — it replaces S.budgets, S.owed, S.services and S.tax and clears
+   their dirty flags — so everything holding a pre-reload draft or snapshot
+   has to be dropped in the same breath or it gets saved over the fresh data
+   later. Three callers used to do this cleanup by hand, and the tax-year
+   switch forgot, which silently discarded Owed/Services edits and left a
+   stale budget draft armed behind an enabled Save button.
+
+   Extracted to a standalone, ctx-free function (rather than left as a
+   closure inside mountApp) so this seam can be guard-tested directly instead
+   of through a full DOMParser mount — see tests/reload-from-disk.test.cjs.
+
+   disableSaveButtons() runs in a `finally`, not after a plain `await`. Every
+   S.<section> reset inside loadVault's load.js clears the array and its
+   dirty flag TOGETHER before its own read resolves (S.owed = []; S.owedDirty
+   = false; then `await readFile(...)`), so a rejection partway through
+   leaves some sections already emptied while the Save buttons for them are
+   still whatever they were before the reload started. Without the finally, a
+   rejected loadVault() skipped this cleanup entirely and left an enabled
+   Save button sitting over an emptied array — one click away from writing a
+   blank table over the user's real file. `finally` closes that regardless of
+   which section failed or how load.js's internals change later: every
+   reload attempt, success or failure, ends with no Save button left armed
+   over data that might not be what it claims to be.
+
+   This does not restore S.<section> to its pre-reload contents on failure —
+   that would need load.js itself to defer each swap until its own read
+   resolves, so a failure downstream never empties a section that already
+   read fine. That is a real, separate hardening (tracked, not done here):
+   this fix's job is narrower and more urgent — make sure nothing on screen
+   can be SAVED while the state underneath it is unknown. Disabling the
+   buttons does that outright; it does not also need to guess at what the
+   "right" in-memory data would have been. */
+async function reloadFromDisk(ctx, S, $, disableSaveButtons) {
+  ctx.invalidateBudgetDraft();
+  // The import review's dedup snapshot was taken against the pre-reload
+  // transactions; keeping it would re-import every row as "new".
+  S.pendingImport = null;
+  $('#importReview').classList.add('hidden');
+  try {
+    await ctx.loadVault();
+  } finally {
+    disableSaveButtons();
+  }
+}
+
 function mountApp(view) {
   const plugin = view.plugin;
   const app = view.app;
@@ -422,27 +468,14 @@ function mountApp(view) {
   }
 
   /* ------------------------------ bootstrap ------------------------------ */
-  /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
-     reset — it replaces S.budgets, S.owed, S.services and S.tax and clears
-     their dirty flags — so everything holding a pre-reload draft or snapshot
-     has to be dropped in the same breath or it gets saved over the fresh data
-     later. Three callers used to do this cleanup by hand, and the tax-year
-     switch forgot, which silently discarded Owed/Services edits and left a
-     stale budget draft armed behind an enabled Save button. */
-  async function reloadFromDisk() {
-    ctx.invalidateBudgetDraft();
-    // The import review's dedup snapshot was taken against the pre-reload
-    // transactions; keeping it would re-import every row as "new".
-    S.pendingImport = null;
-    $('#importReview').classList.add('hidden');
-    await ctx.loadVault();
-    disableSaveButtons();
-  }
-  ctx.reloadFromDisk = reloadFromDisk;
+  // See the module-level reloadFromDisk above (and tests/reload-from-disk.test.cjs)
+  // for what this does and why disableSaveButtons runs in a finally.
+  const doReloadFromDisk = () => reloadFromDisk(ctx, S, $, disableSaveButtons);
+  ctx.reloadFromDisk = doReloadFromDisk;
 
   async function connectVault() {
     try {
-      await reloadFromDisk();
+      await doReloadFromDisk();
     } catch (e) {
       S.loaded = false;
       $('#connectErr').textContent = e.message || String(e);
@@ -705,17 +738,30 @@ function mountApp(view) {
     // a rejected reload here used to be an unhandled rejection with the
     // drawer left open and nothing on screen explaining why nothing moved.
     try {
-      await reloadFromDisk();
+      await doReloadFromDisk();
     } catch (e) {
       // reloadFromDisk() mutates state (invalidateBudgetDraft, S.pendingImport
       // = null, #importReview hidden) BEFORE the awaited loadVault() that can
-      // actually reject — so a rejected reload here used to leave the screen
-      // drawn from before those resets ran, out of step with what S now holds
-      // underneath it. render() lands on a known-good screen rebuilt from the
-      // current state rather than trusting a stale draw.
+      // actually reject — and loadVault()'s own sections each reset their
+      // array before their own read resolves, so a rejected reload can leave
+      // some sections already emptied while later ones still hold pre-reload
+      // data. render() is NOT a "known-good" screen here — it repaints from
+      // whatever S holds right now, which this catch has just established may
+      // be a genuine mix of fresh, stale and emptied sections. Painting that
+      // is still better than leaving the screen drawn from before the resets
+      // ran (out of step with S underneath it), but it is a best-effort
+      // picture of an admittedly incomplete state, not a claim that the
+      // picture is correct. Guarded because render() painting a half-reset
+      // state is exactly the kind of render() that is more likely to throw,
+      // and a throw here — inside a catch that is already reporting a failure
+      // — must not become a second, unhandled one on top of the first.
       closeDrawer();
       toast(`Could not reload from disk (${e.message || e})`, true);
-      render();
+      try {
+        render();
+      } catch (renderErr) {
+        console.error('Budget: render() failed while recovering from a failed reload', renderErr);
+      }
       return;
     }
     closeDrawer(); render(); toast('Reloaded from disk');
@@ -876,4 +922,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename };
+module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk };

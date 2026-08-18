@@ -341,11 +341,33 @@ module.exports = function registerPeriod(ctx) {
      payment in full; `income` counts only income-TYPED rows, so the deposit
      beside it was credited to nothing. Every period holding uncategorised money
      in was therefore reported deeper in the hole than it was — on the vault
-     this was found against, two periods' stated overspend was out by R14 052
-     and R11 752, and a third was offered here as a hole to carry for a period
+     this was found against, two periods' stated overspend was materially
+     wrong, and a third was offered here as a hole to carry for a period
      that had actually finished ahead. Two figures derived by different rules,
      which is this codebase's recurring bug shape; there is now one rule and
-     one figure. */
+     one figure.
+
+     `net`'s flat "every row, one rule" count is what makes THREE separate leak
+     classes disappear at once, not three separate fixes: an uncategorised
+     deposit (credited to nothing under `spend - income`), a refund inside an
+     expense category (nets off inside `byCat` but was never reachable from
+     `income` or `spend` either), and a deposit under a category name no file
+     answers to (see catKnown — same "credited to nothing" shape as the first).
+
+     It also COVERS a fourth, for free, that was never a bug to fix: a
+     two-legged Contribution (CONTEXT.md — money the household moves into
+     savings, which "wears the budget category it came from rather than one of
+     its own"). The outgoing leg is a real negative row under an ordinary
+     category, and the incoming leg on the savings side is a real positive row
+     under that same category — neither is transfer-typed, so neither is
+     skipped, and `net` counts both. Equal and opposite, they cancel on their
+     own; periodDeficit does not need to know a Contribution happened at all.
+     That cancellation only holds while both legs are actually counted, though
+     — a savings account carrying `budget: false` (a non-budget account, its
+     own veto, unrelated to this one) drops its own leg out of `net` entirely,
+     which turns a Contribution's outgoing half into what LOOKS like real
+     spend. See tests/summary-conservation.test.cjs's two-legged-contribution
+     case for both shapes pinned side by side. */
   function periodDeficit(p) {
     /* `0 - net`, not `-net`: negating a zero balance yields NEGATIVE zero,
        which money() formats as "-R0.00" — the same break-even wart this repo
@@ -420,6 +442,15 @@ module.exports = function registerPeriod(ctx) {
       } else if (!catKnown(t.cat)) {
         unknown.count++;
         if (t.amount < 0) unknown.spend += -t.amount; else unknown.income += t.amount;
+        /* `names` is first-seen order over this period's transaction rows, not
+           a sort — deliberately: the dashboard tile only ever shows the first
+           MISSING_NAMES_SHOWN of them (dashboard.js) and any deterministic
+           order would do equally well there, so this stays whatever order the
+           rows happen to iterate in rather than paying to sort a list nobody
+           has asked to read in a particular order. If a future reader needs
+           this stable (e.g. two renders of the same period disagreeing on
+           which names got cut by "+N more"), sort it here — this comment is
+           that decision recorded, not an oversight. */
         if (!unknownSeen.has(t.cat)) { unknownSeen.add(t.cat); unknown.names.push(t.cat); }
       }
 
@@ -428,17 +459,17 @@ module.exports = function registerPeriod(ctx) {
     }
     /* `uncatSpend` is the GROSS outgoing half of the uncategorised bucket, and
        it is deliberately not derivable from byCat[''], which is a NET figure. A
-       period holding R16 895 of uncategorised payments and R21 440 of
-       uncategorised deposits nets POSITIVE, so byCat[''] reports nothing while
-       `spend` above has already counted the whole R16 895. The Dashboard's
-       donut discloses what it left out by subtracting from `spend`, so it needs
-       the same half of the bucket that `spend` counted — see renderSplit.
+       period holding more uncategorised deposits than uncategorised payments
+       nets POSITIVE, so byCat[''] reports nothing while `spend` above has
+       already counted the whole outgoing half. The Dashboard's donut discloses
+       what it left out by subtracting from `spend`, so it needs the same half
+       of the bucket that `spend` counted — see renderSplit.
 
        `uncatIncome` is its other half, and the Dashboard's Income tile
        discloses it for the same reason: money that arrived with no category is
        NOT counted as income (it may be a transfer in from savings, and
        guessing would inflate every ratio built on income), but a figure that
-       quietly omits R21 440 has to say so where it is read. */
+       quietly omits a real deposit has to say so where it is read. */
     return { income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat, count: tx.length };
   }
   /* A monthly income figure, for the one page that has to talk in months no

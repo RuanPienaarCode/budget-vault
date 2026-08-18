@@ -526,14 +526,17 @@ module.exports = function registerTransactions(ctx) {
   }
 
   /* Guarded per-file, deliberately not around the whole loop-plus-learn: a
-     rejected write used to be an unhandled rejection AND — because f.dirty was
-     cleared in the same breath as the write started — every file already
-     written before the failure looked clean while the ones after it sat
-     unmarked and silently unsaved. The catch stops the loop at the file that
-     actually failed, so what landed stays landed (dirty:false) and what did
-     not stays dirty for a retry to pick up; clearSaveButton() and the success
-     toast are skipped on that path since the button must stay lit while any
-     file is still unsaved. */
+     rejected write used to be an UNHANDLED rejection — nothing caught it, so
+     nothing told the user their save had failed. That was the whole bug, not
+     a marking one: `f.dirty = false` only ever runs AFTER its own write
+     resolves, so a file already written before the failure was correctly
+     clean, and a throw stops a for-loop at the failing iteration, so every
+     file after it was simply never reached and stayed exactly as dirty as it
+     already was. The catch here does not fix a dirty-flag bug that never
+     existed; it turns the silence into a toast and a controlled stop, so the
+     file that actually failed is visible and a retry knows where to resume.
+     clearSaveButton() and the success toast are skipped on that path since
+     the button must stay lit while any file is still unsaved. */
   async function saveTransactions() {
     let n = 0;
     try {

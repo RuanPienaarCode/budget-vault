@@ -661,8 +661,9 @@ module.exports = function registerDashboard(ctx) {
        Not counted as income on purpose — an uncategorised deposit may be a
        transfer in from savings, and guessing would inflate every ratio built on
        income. But the tile is read as "what came in this period", and on the
-       vault this was found in one period was quietly R21 440 short of that. So
-       it says so, the way the donut below already discloses its own gap.
+       vault this was found in, one period was quietly, materially short of
+       that. So it says so, the way the donut below already discloses its own
+       gap.
        Refunds are deliberately NOT in here: they are money back inside a
        category, already netted off that category's own actual, and calling
        them uncounted income would be the noise that stops people reading the
@@ -1235,10 +1236,10 @@ module.exports = function registerDashboard(ctx) {
        Measured against `spend` rather than derived independently, so the note
        accounts for the WHOLE difference by construction and cannot fall behind
        a change to either figure. It used to state the uncategorised half only,
-       and to state it NET: a period holding R16 895 of uncategorised payments
-       against R21 440 of uncategorised deposits nets positive, so the note said
-       nothing at all while the two figures sat R17 195 apart. Rounding is the
-       only thing left under a currency unit, so that is where it goes quiet. */
+       and to state it NET: a period holding more uncategorised deposits than
+       uncategorised payments nets positive, so the note said nothing at all
+       while the two figures sat materially apart. Rounding is the only thing
+       left under a currency unit, so that is where it goes quiet. */
     const notShown = Math.max(0, sum.spend - total);
     const uncat = Math.min(sum.uncatSpend || 0, notShown);
     const netted = notShown - uncat;
