@@ -99,7 +99,9 @@ async function mount() {
   const { el } = require('../src/dom');
   ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
   require('../src/categories')(ctx);
-  for (const f of ['transactions', 'budgets', 'plan', 'accounts', 'assets', 'debts', 'owed', 'services', 'tax', 'savings']) {
+  // dashboard is here only for its two chart-range pills (cases 15-16 below)
+  // — every other case in this file never touches it.
+  for (const f of ['dashboard', 'transactions', 'budgets', 'plan', 'accounts', 'assets', 'debts', 'owed', 'services', 'tax', 'savings']) {
     require(`../src/views/${f}`)(ctx);
   }
   // A plan with nothing in it — savePlan only needs a current plan to exist,
@@ -401,19 +403,62 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     answers.fields = null;
   }
 
-  /* ---- 15: plugin.saveSettings() — the same shape as every write above, but
-     writing plugin data (data.json) rather than a vault file, and reached
-     from a view that never went through the nine-save-path sweep: the
-     export-folder setting transactions.js remembers after a successful
-     export. Called from inside an async click handler that is itself
-     fired-and-forgotten by the DOM (txExport's click listener) — same "fire
-     and forget" shape as Savings' acceptImplied above, so the same flush()
-     pattern would apply, except exportTransactions() is published on ctx and
-     can be awaited directly. Unlike a vault write, there is no dirty flag or
-     Save button riding on this: the setting is already real in memory the
-     moment it's assigned, and the whole point of the guard is that a failed
-     data.json write must not stop the screen it drives — the export that
-     already landed must still say so. ---- */
+  /* ---- 15-17: plugin.saveSettings() — the same shape as every write above,
+     but writing plugin data (data.json) rather than a vault file, and reached
+     from views that never went through the nine-save-path sweep: the
+     dashboard's two chart-range pills and the export-folder setting
+     transactions.js remembers after a successful export. All three call
+     plugin.saveSettings() from inside an async click/onPick handler that is
+     itself fired-and-forgotten by the DOM (rangePills' onclick, txExport's
+     click listener) — same "fire and forget" shape as Savings' acceptImplied
+     above, so the same flush() pattern applies. Unlike a vault write, there is
+     no dirty flag or Save button riding on this: the setting is already real
+     in memory the moment it's assigned, and the whole point of the guard is
+     that a failed data.json write must not stop the screen it drives (the
+     chart still needs to redraw against the range just picked; the export
+     that already landed must still say so) from finishing its job. ---- */
+  {
+    const { ctx, $ } = await mount();
+    ctx.renderDashboard();
+    const pills = $('#trendRange').querySelectorAll('.chart-range-btn');
+    const target = pills.find(b => b.attrs['aria-pressed'] !== 'true');
+    ok(!!target, 'Dashboard trend: at least one non-active range pill is rendered to click');
+    ctx.plugin.saveSettings = async () => { throw new Error('simulated disk error'); };
+
+    await assert.doesNotReject(async () => { target.click(); await flush(); },
+      'Dashboard trend range: a rejected saveSettings() must not escape as an unhandled rejection');
+    checks++;
+    ok(ctx.plugin.settings.chartTrendRange != null,
+      'Dashboard trend range: the picked range is still real in memory even though the write failed');
+    let lastToast = ctx._toasts[ctx._toasts.length - 1];
+    ok(lastToast && lastToast.bad === true && lastToast.msg === i18n.t('settings.err.save', { error: 'simulated disk error' }),
+      `Dashboard trend range: a failed saveSettings() reports the shared settings-save error toast, got ${JSON.stringify(lastToast)}`);
+    // The chart still redrew over the failed write — the picked range is not
+    // stuck showing the old one just because it could not be remembered.
+    ok($('#trendRange').querySelectorAll('.chart-range-btn').some(b => b.attrs['aria-pressed'] === 'true'),
+      'Dashboard trend range: the pill row re-rendered with an active pill after the failed save');
+
+    ctx.plugin.saveSettings = async () => {};
+  }
+  {
+    const { ctx, $ } = await mount();
+    ctx.renderDashboard();
+    const pills = $('#splitRange').querySelectorAll('.chart-range-btn');
+    const target = pills.find(b => b.attrs['aria-pressed'] !== 'true');
+    ok(!!target, 'Dashboard split: at least one non-active range pill is rendered to click');
+    ctx.plugin.saveSettings = async () => { throw new Error('simulated disk error'); };
+
+    await assert.doesNotReject(async () => { target.click(); await flush(); },
+      'Dashboard split range: a rejected saveSettings() must not escape as an unhandled rejection');
+    checks++;
+    ok(ctx.plugin.settings.splitCompareRange != null,
+      'Dashboard split range: the picked range is still real in memory even though the write failed');
+    let lastToast = ctx._toasts[ctx._toasts.length - 1];
+    ok(lastToast && lastToast.bad === true && lastToast.msg === i18n.t('settings.err.save', { error: 'simulated disk error' }),
+      'Dashboard split range: a failed saveSettings() reports the shared settings-save error toast');
+
+    ctx.plugin.saveSettings = async () => {};
+  }
   {
     const { ctx } = await mount();
     ctx.plugin.settings.exportFolder = '';
