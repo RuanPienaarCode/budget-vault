@@ -68,9 +68,13 @@ ok(impNames.size >= 8, `expected at least 8 settings, found ${impNames.size}`);
 const mdKeys = new Set(
   [...src.matchAll(/const MD_KEYS = new Set\(\[([^\]]*)\]\)/g)]
     .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])));
+/* Spelled out rather than derived, so ADDING a Settings.md key is a
+   deliberate edit here as well as in settings-tab.js — the list is the
+   inventory of what syncs with the vault rather than with the device. */
 eq([...mdKeys].sort(),
-  ['country', 'currency', 'emergency_target_months', 'household', 'language', 'month_start_day',
-    'overspend_lag', 'owners', 'period_anchor', 'period_days'],
+  ['country', 'currency', 'emergency_target_months', 'groups', 'household', 'input_mode',
+    'language', 'month_start_day', 'nonessential_groups', 'overspend_lag', 'owners',
+    'period_anchor', 'period_days'],
   'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');
