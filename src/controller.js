@@ -110,6 +110,38 @@ function classifyRename(basePath, oldPath, newPath, categories) {
   return { kind, from, to };
 }
 
+/* Which CSV-import affordances the shell ADVERTISES, given the household's
+   `input_mode` from Settings.md.
+
+   Standalone and exported for the same reason classifyRename above is: this is
+   the whole of the manual-mode shell decision, and as a closure inside
+   mountApp it could only ever be reached through a full DOMParser mount, which
+   no bare-node test performs — so a selector that stopped matching would ship
+   with every suite green.
+
+   HIDES, IT DOES NOT DISABLE. switchView('import') stays reachable, and
+   there are exactly two routes left to it: the command palette's "Import a
+   bank statement (CSV)" (registered in main.js for this reason) and turning
+   the setting back to CSV. The Accounts page's own "Import transactions"
+   button is NOT a third — it only appears on an account with no transactions
+   yet — so a manual household that later receives a CSV for an account that
+   already has rows would otherwise have had no route at all. Manual mode is a
+   statement about what to put in front of someone on day one, not about what
+   they are allowed to do.
+
+   Toggled rather than only added, because a household can change its mind:
+   flipping the setting back to CSV and reloading has to bring the link back,
+   and an add-only version would leave the drawer permanently short of an entry
+   the settings screen says is on. */
+function applyInputMode(root, mode) {
+  const manual = mode === 'manual';
+  for (const sel of ['[data-view="import"]', '#topbarImport']) {
+    const el = root.querySelector(sel);
+    if (el) el.classList.toggle('hidden', manual);
+  }
+  return manual;
+}
+
 /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
    reset — it replaces S.budgets, S.owed, S.services and S.tax and clears
    their dirty flags — so everything holding a pre-reload draft or snapshot
@@ -198,7 +230,7 @@ function mountApp(view) {
      should not lose the reader's filter). */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, owners: [] },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', input_mode: 'csv', period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, owners: [], groups: [], nonessential_groups: [] },
     categories: [],            // {name, type, color, assumeSpent, rel}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
@@ -505,6 +537,11 @@ function mountApp(view) {
     $('#view-connect').classList.add('hidden');
     $('#periodPill').classList.remove('hidden');
     $('#topbarImport').classList.remove('hidden');
+    /* AFTER the unconditional un-hide above, and here rather than at mount,
+       because Settings.md is only read once the vault has loaded — and because
+       reload() routes through this function, so changing the setting and
+       reloading takes effect without re-mounting the shell. */
+    applyInputMode(root, S.settings.input_mode);
     switchView(S.view === 'connect' ? 'dashboard' : S.view);
     toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
   }
@@ -926,8 +963,23 @@ function mountApp(view) {
        one of these screens forever explaining itself to users who never need
        it. Reads the loaded state, so it needs a view that has connected. */
     cleanupRules: () => ctx.cleanupRules(),
+    /* The command palette's route to the import screen — see applyInputMode
+       above for why manual mode has to leave one open.
+
+       Parks the route rather than refusing when the vault has not finished
+       loading. A command run from a cold start opens the view and arrives
+       here microseconds later, long before connectVault() has read the
+       folder; switching pages then would show an empty Import screen behind
+       the connect gate. connectVault ends by switching to S.view, so setting
+       it is enough — the reader lands on Import the moment the vault is up,
+       which is what they asked for rather than a Notice telling them to try
+       again. */
+    showImport: () => {
+      if (S.loaded) switchView('import');
+      else S.view = 'import';
+    },
     hasDirty,
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk };
+module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk, applyInputMode };

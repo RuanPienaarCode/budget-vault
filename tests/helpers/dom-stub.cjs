@@ -121,6 +121,12 @@ function matches(el, sel) {
   const s = String(sel).trim();
   if (s.startsWith('.')) return el._cls.has(s.slice(1));
   if (s.startsWith('#')) return el.attrs.id === s.slice(1);
+  /* [attr="value"] — the shell addresses its drawer links by data-view, and
+     controller.js's applyInputMode() hides one of them by exactly that
+     selector. Without this shape here, that query would match nothing and a
+     test could "prove" a hide that never happened. */
+  const attr = s.match(/^\[([\w-]+)="([^"]*)"\]$/);
+  if (attr) return el.attrs[attr[1]] === attr[2];
   return el.tagName === s.toUpperCase();
 }
 

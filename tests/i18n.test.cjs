@@ -213,6 +213,30 @@ for (const file of srcFiles) {
   for (const m of text.matchAll(/\bi18n\.t\(\s*'((?:[^'\\]|\\.)*)'/g)) {
     used.set(m[1], rel);
   }
+  /* i18n.t(cond ? 'a' : 'b') — the form the manual-mode empty states use, and
+     the one the pattern above CANNOT see, because the first thing after the
+     open bracket is a condition rather than a quote. Three real keys were
+     invisible to this check that way (dash.trend.empty.manual,
+     score.empty.body.manual, wiz.finish.nextBody.manual): a typo in any of
+     them would have rendered the raw key at the user with the whole suite
+     green, which is precisely the failure invariant 6 exists to prevent.
+
+     Deliberately narrow: one ternary, two string literals, one line, and a
+     condition that is either paren-free and comma-free (which still allows
+     `S.settings.input_mode === 'manual'`, quotes and all) or a single no-arg
+     method call (`this.isManual()`). Both shapes are bounded so the scan
+     cannot run past the closing bracket of the i18n.t() call and pair up with
+     an unrelated ternary further along the same line — an earlier, looser
+     version did exactly that and reported three CSS class names as missing
+     translation keys. A general expression parser here would be a second
+     language implementation to maintain; anything more complicated than these
+     two shapes should be hoisted to a named constant in src/ and picked up by
+     the plain form above. */
+  for (const m of text.matchAll(
+    /\bi18n\.t\(\s*(?:[^(),\n]*|this\.\w+\(\))\s*\?\s*'((?:[^'\\]|\\.)*)'\s*:\s*'((?:[^'\\]|\\.)*)'/g)) {
+    used.set(m[1], rel);
+    used.set(m[2], rel);
+  }
 }
 ok(used.size >= 25, `expected the shell + settings tab to use at least 25 keys, found ${used.size}`);
 
@@ -249,14 +273,21 @@ for (const k of acctList) {
   ok(('acctType.' + k) in en, `ACCOUNT_TYPE_KEYS has '${k}' but lang/en.js has no 'acctType.${k}'`);
 }
 
-/* Only the strings inside the two ARRAY literals steps() returns — a loose
-   scan over the whole method also picks up the `this.mode === 'connect'` test
-   and asks for a 'wiz.step.connect' that should not exist. */
+/* Only the strings inside the ARRAY literals steps() returns — a loose scan
+   over the whole method also picks up the `this.mode === 'connect'` test and
+   asks for a 'wiz.step.connect' that should not exist.
+
+   [a-zA-Z], not [a-z]: 'firstBudget' is camelCase and a lower-case-only
+   pattern skipped it silently, which is the worst possible outcome for a
+   check like this — it kept passing while the one step whose title was most
+   likely to be forgotten went unexamined. */
 const stepsBody = (onboarding.match(/steps\(\)\s*\{[\s\S]*?\n  \}/) || [''])[0];
 const stepList = [...new Set(
   [...stepsBody.matchAll(/\[([^\]]*)\]/g)]
-    .flatMap(arr => [...arr[1].matchAll(/'([a-z]+)'/g)].map(m => m[1])))];
+    .flatMap(arr => [...arr[1].matchAll(/'([a-zA-Z]+)'/g)].map(m => m[1])))];
 ok(stepList.length >= 6, `steps() parsed (${stepList.length} step names)`);
+ok(stepList.includes('firstBudget'),
+  'the manual path\'s first-budget step must be visible to this scan — see the camelCase note above');
 for (const step of stepList) {
   // 'welcome' is the one step with no title — it is not numbered either.
   if (step === 'welcome') continue;
@@ -291,7 +322,14 @@ for (const [label, text] of [['settings-tab.js', settingsTab], ['onboarding.js',
    vault's Settings.md, not only in the dropdown's onChange. */
 ok(/onOpen\(\)\s*\{[\s\S]{0,600}?setLanguage\(/.test(onboarding),
   'the wizard must apply the language in onOpen(), before its first render');
-ok(/prefillFromSettingsMd[\s\S]{0,2000}?setLanguage\(/.test(onboarding),
+/* Scoped to the METHOD BODY rather than to "somewhere in the next 2000
+   characters". The proximity form failed the moment the method grew a longer
+   comment, which is a false alarm dressed as a regression — and it would
+   equally have passed on a setLanguage() call that belonged to the method
+   AFTER this one. Same `\n  }` method-end anchor the steps() scan uses. */
+const prefillBody = (onboarding.match(/async prefillFromSettingsMd\(\)\s*\{[\s\S]*?\n  \}/) || [''])[0];
+ok(prefillBody.length > 200, 'prefillFromSettingsMd() is still parseable as one method');
+ok(/setLanguage\(/.test(prefillBody),
   'the wizard must apply the language it adopts from an existing Settings.md');
 /* And the wizard must persist it on BOTH paths — create writes the file
    itself, connect goes through updateBudgetSettingsMd. */

@@ -51,6 +51,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="budgets">
       <span class="di"><span class="ico" data-ico="bookmark"></span></span><span data-i18n="nav.budgets">Budget</span>
     </button>
+    <button class="drawer-link" data-view="services">
+      <span class="di"><span class="ico" data-ico="layers"></span></span><span data-i18n="nav.services">Services</span>
+    </button>
     <button class="drawer-link" data-view="score">
       <span class="di"><span class="ico" data-ico="gauge-circle|heart-pulse"></span></span><span data-i18n="nav.score">Score</span>
     </button>
@@ -64,23 +67,30 @@ const SHELL_HTML = `
     <div class="drawer-divider"></div>
 
     <div class="drawer-section-label" data-i18n="nav.section.accounts">Accounts</div>
-    <button class="drawer-link" data-view="savings">
-      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; Investments</span>
-    </button>
     <button class="drawer-link" data-view="accounts">
       <span class="di"><span class="ico" data-ico="landmark"></span></span><span data-i18n="nav.accounts">Accounts</span>
+    </button>
+    <button class="drawer-link" data-view="savings">
+      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; Investments</span>
     </button>
     <button class="drawer-link" data-view="assets">
       <span class="di"><span class="ico" data-ico="gem|diamond"></span></span><span data-i18n="nav.assets">Assets</span>
     </button>
-    <button class="drawer-link" data-view="debts">
-      <span class="di"><span class="ico" data-ico="credit-card"></span></span><span data-i18n="nav.debts">Debt</span>
-    </button>
     <button class="drawer-link" data-view="owed">
       <span class="di"><span class="ico" data-ico="users"></span></span><span data-i18n="nav.owed">Owed Money</span>
     </button>
-    <button class="drawer-link" data-view="services">
-      <span class="di"><span class="ico" data-ico="layers"></span></span><span data-i18n="nav.services">Services</span>
+    <button class="drawer-link" data-view="debts">
+      <span class="di"><span class="ico" data-ico="credit-card"></span></span><span data-i18n="nav.debts">Debt</span>
+    </button>
+
+    <div class="drawer-divider"></div>
+
+    <div class="drawer-section-label" data-i18n="nav.section.tools">Tools</div>
+    <button class="drawer-link" data-view="import">
+      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span><span data-i18n="nav.import">Import CSV</span>
+    </button>
+    <button class="drawer-link" data-view="loans">
+      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
     </button>
     <button class="drawer-link" data-view="tax">
       <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span><span data-i18n="nav.tax">Tax</span>
@@ -88,13 +98,6 @@ const SHELL_HTML = `
 
     <div class="drawer-divider"></div>
 
-    <div class="drawer-section-label" data-i18n="nav.section.tools">Tools</div>
-    <button class="drawer-link" data-view="loans">
-      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
-    </button>
-    <button class="drawer-link" data-view="import">
-      <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span><span data-i18n="nav.import">Import CSV</span>
-    </button>
     <button class="drawer-link" id="reloadLink">
       <span class="di"><span class="ico" data-ico="refresh-cw|rotate-cw"></span></span><span data-i18n="nav.reload">Reload from disk</span>
     </button>

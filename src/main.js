@@ -38,6 +38,28 @@ class BudgetPlugin extends Plugin {
         if (!ran) new Notice('Budget: open the budget first, then run this again.', 5000);
       },
     });
+    this.addCommand({
+      id: 'import-transactions',
+      name: 'Import a bank statement (CSV)',
+      callback: async () => {
+        /* The way back to the import screen when the drawer is not offering
+           it. Manual mode HIDES that link and the top-bar button, and the
+           Accounts page's own "Import transactions" button only appears on an
+           account with nothing in it yet — so without this command a manual
+           household that later gets a CSV, on an account that already has
+           rows, has no route to the screen at all. The setting is the other
+           way back, and both are named in the setting's own description.
+
+           Opens the view first, unlike tidy-categorisation-rules above: that
+           one needs a vault already read into memory to have anything to
+           replay, while this one is a navigation and should work from a cold
+           start rather than telling the reader to go and open the budget. */
+        await this.activateView();
+        let went = false;
+        this.forEachView(ctl => { if (!went) { went = true; ctl.showImport(); } });
+        if (!went) new Notice('Budget: open the budget first, then run this again.', 5000);
+      },
+    });
     this.addSettingTab(new BudgetSettingTab(this.app, this));
     if (this.settings.openOnStartup) {
       this.app.workspace.onLayoutReady(() => {

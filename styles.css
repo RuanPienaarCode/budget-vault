@@ -2400,6 +2400,12 @@
 .budget-onb-catbar { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; }
 .budget-onb-catcount { margin-right: auto; font-size: 12.5px; opacity: .7; }
 .budget-onb-catbtn { font-size: 12px; padding: 3px 9px; cursor: pointer; }
+/* A small heading over a run of controls inside one step — the "about you"
+   screen's language/country/currency group. Same treatment as the category
+   group headers below, because it is the same kind of thing: a label, not a
+   title. Kept as its own selector rather than reusing the category one, so a
+   change to the category step cannot silently restyle this. */
+.budget-onb-group { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .5; margin: 16px 0 1px; }
 .budget-onb-cat-group { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .5; margin: 13px 0 1px; }
 .budget-onb-cats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; margin: 4px 0 6px; }
 .budget-onb-cats label { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 3px 0; }
@@ -2408,6 +2414,71 @@
    Back or Next — the two buttons it would otherwise sit between. */
 .budget-onb-nav .setting-item-control > :first-child { margin-right: auto; }
 @media (max-width: 480px) { .budget-onb-cats { grid-template-columns: 1fr; } }
+
+/* The "how will you add your spending?" cards. A whole card is the hit target,
+   not just the 12px radio beside it — this is the first real decision the
+   wizard asks for and it is often taken one-handed on a phone. */
+.budget-onb-choices { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 6px; }
+.budget-onb-choice {
+  display: flex; align-items: flex-start; gap: 11px; cursor: pointer;
+  padding: 12px 13px; border-radius: 8px;
+  border: 1px solid var(--background-modifier-border, rgba(128, 128, 128, .25));
+  background: var(--background-secondary, rgba(127, 127, 127, .08));
+}
+.budget-onb-choice.is-on { border-color: var(--interactive-accent, #7c6cf5); }
+/* Keyboard focus shows on the CARD, not on the 12px radio inside it. The whole
+   card is the hit target, so the whole card is what focus has to be visible on
+   — a ring around the radio alone, on a card this size, reads as nothing at
+   all. :focus-within rather than :focus-visible: the focusable node is the
+   radio and the thing that must light up is its <label> parent, and
+   :focus-within is Safari 10.1 while :focus-visible only lands at 15.4 — below
+   this plugin's iOS 15.0 floor, where an unknown pseudo-class invalidates the
+   whole rule and would take the ring with it. */
+.budget-onb-choice:focus-within {
+  outline: 2px solid var(--interactive-accent, #7c6cf5);
+  outline-offset: 2px;
+  border-color: var(--interactive-accent, #7c6cf5);
+}
+.budget-onb-choice input { margin-top: 3px; flex: 0 0 auto; }
+.budget-onb-choice-body { min-width: 0; }
+.budget-onb-choice-title { font-size: 14px; font-weight: 650; }
+.budget-onb-choice-desc { font-size: 12.5px; line-height: 1.5; opacity: .72; margin-top: 3px; }
+
+/* The celebration screen, and its confetti.
+
+   The score page's shower is scoped under .budget-app-root and its four tones
+   come from the plugin's own palette variables, which are declared on that same
+   root — a modal renders in Obsidian's container, OUTSIDE it, so neither the
+   selectors nor the colours are reachable here. These rules therefore lean on
+   Obsidian's own theme variables with literal fallbacks, exactly like every
+   other .budget-onb-* rule above. The @keyframes are shared: bud-confetti is
+   declared at the top level of this stylesheet, so it is reachable from
+   anywhere, and a second copy would be a second thing to keep in step.
+
+   See celebrate() in views/score.js for why this is CSS keyframes and not
+   requestAnimationFrame. */
+.budget-onb-celebrate { position: relative; overflow: hidden; text-align: center; padding: 18px 6px 22px; }
+.budget-onb-celebrate-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+.budget-onb-celebrate-body { font-size: 13.5px; line-height: 1.55; opacity: .8; margin: 0 auto; max-width: 44ch; }
+.budget-onb-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.budget-onb-confetti-bit {
+  position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px;
+  opacity: 0; pointer-events: none;
+  animation: bud-confetti 1.9s cubic-bezier(.24, .78, .4, 1) forwards;
+}
+.budget-onb-confetti-bit.tone-0 { background: var(--interactive-accent, #7c6cf5); }
+.budget-onb-confetti-bit.tone-1 { background: var(--text-success, #2e9b64); }
+.budget-onb-confetti-bit.tone-2 { background: var(--text-warning, #e0a800); }
+.budget-onb-confetti-bit.tone-3 { background: var(--text-accent, #7c6cf5); }
+/* The mirror of the .score-confetti rule in the reduced-motion block above:
+   confetti() already declines to build the burst when the preference is set,
+   but that is asked once at render — this covers a reader who turns it on
+   while the screen is open, and it is the rule that would still be right if
+   the JS guard were ever dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-onb-confetti-bit { animation: none; }
+  .budget-onb-confetti { display: none; }
+}
 
 /* ---- Split modal ------------------------------------------------------
    Modals render in Obsidian's own container, OUTSIDE .budget-app-root, so
@@ -3439,7 +3510,20 @@
   border-color: var(--color-gold);
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(180, 83, 9, .28);
-  animation: bud-stamp 620ms cubic-bezier(.2, 1.5, .4, 1) both;
+  /* Lands as a stamp, then keeps a slow gold breathing glow — a completed
+     part stays visibly alive on the page. The glow starts after the stamp so
+     the two never fight over the same frame; reduced-motion (above) switches
+     both off via the one animation property. */
+  animation: bud-stamp 620ms cubic-bezier(.2, 1.5, .4, 1) both,
+             bud-glow 2.6s ease-in-out 620ms infinite;
+}
+/* Reduced motion, restated HERE rather than only in the shared block near the
+   top of the file: that block's guard has the same specificity as the rule
+   above and sits earlier in the file, so it loses the source-order tie — it
+   always had, but a lost 620ms stamp was invisible, and a lost INFINITE glow
+   is not. The later declaration wins, so this one does. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .score-win.is-maxed .score-win-badge { animation: none; }
 }
 /* The stroke does the drawing, so it carries the weight rather than a fill. */
 .budget-app-root .score-win.is-maxed .score-win-badge svg {
@@ -3451,6 +3535,14 @@
   60%  { opacity: 1; }
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
+/* The breathing glow. Two shadows: the resting drop-shadow stays put so the
+   disc never looks like it lifts off, and the outer halo is the only thing
+   that swells. */
+@keyframes bud-glow {
+  0%, 100% { box-shadow: 0 2px 8px rgba(180, 83, 9, .28), 0 0 0 0 rgba(245, 158, 11, 0); }
+  50%      { box-shadow: 0 2px 10px rgba(180, 83, 9, .34), 0 0 18px 5px rgba(245, 158, 11, .42); }
+}
+
 .budget-app-root .score-win-ribbon {
   display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
@@ -3501,6 +3593,94 @@
 
 @media (max-width: 600px) {
   .budget-app-root .score-big { font-size: 54px; }
+}
+
+/* ---------------------------- money-flow card ----------------------------
+   "Where the money went" — the Sankey-shaped picture the Score page opens
+   with, plus the score rail it re-uses twice more (once dividing the 100
+   points by weight in the hero, once per gap in the work list below). Palette
+   variables only, same discipline as the rest of this section. */
+.budget-app-root .score-flow-card { overflow: hidden; }
+.budget-app-root .score-flow-top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+.budget-app-root .score-flow-eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.budget-app-root .score-flow-in { font-size: 30px; font-weight: 750; letter-spacing: -.02em; }
+.budget-app-root .score-flow-in small { font-size: .42em; font-weight: 600; color: var(--text-muted); margin-left: 8px; letter-spacing: 0; }
+
+/* Desktop: the SVG Sankey. Hidden below 560px in favour of the stacked-bar
+   fallback — see the @media block below. */
+.budget-app-root .score-flow-sankey { display: block; width: 100%; height: auto; margin-top: 14px; }
+.budget-app-root .score-flow-sankey text { font-family: var(--font-sans); }
+.budget-app-root .score-flow-name { font-size: 13px; font-weight: 650; fill: var(--text-primary); }
+.budget-app-root .score-flow-amt { font-size: 13px; font-weight: 700; fill: var(--text-primary); }
+.budget-app-root .score-flow-amt.is-zero { fill: var(--color-danger-ink); }
+.budget-app-root .score-flow-caption { font-size: 11px; fill: var(--ink-faint); font-weight: 500; }
+.budget-app-root .score-flow-node { fill: var(--text-primary); opacity: .9; }
+.budget-app-root .score-flow-rib { opacity: .82; }
+.budget-app-root .score-flow-rib.is-committed { fill: var(--color-warning); }
+.budget-app-root .score-flow-rib.is-living { fill: var(--color-info); }
+.budget-app-root .score-flow-rib.is-saving { fill: var(--color-accent); }
+.budget-app-root .score-flow-rib.is-notYetSpent { fill: var(--color-primary); }
+.budget-app-root .score-flow-zero { stroke: var(--color-danger); stroke-width: 2; stroke-dasharray: 5 5; opacity: .85; fill: none; }
+
+/* Phone: the stacked-bar fallback — same four bands, same shares, no 960-unit
+   viewBox squeezed into ~360px turning 13px labels into 5px ones. The two
+   trees always render; this @media swap decides which one is on screen, so
+   the floor stays iOS 15 (no container query). */
+.budget-app-root .score-flow-mobile-wrap { display: none; }
+.budget-app-root .score-flow-mobile { margin-top: 12px; }
+.budget-app-root .score-flow-m-row { padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.budget-app-root .score-flow-m-row:first-child { border-top: 0; }
+.budget-app-root .score-flow-m-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.budget-app-root .score-flow-m-name { font-size: 13px; font-weight: 650; }
+.budget-app-root .score-flow-m-amt { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.budget-app-root .score-flow-m-bar { height: 12px; border-radius: 999px; background: var(--border-color); margin-top: 6px; overflow: hidden; }
+.budget-app-root .score-flow-m-bar i { display: block; height: 100%; border-radius: 999px; }
+.budget-app-root .score-flow-m-bar i.is-committed { background: var(--color-warning); }
+.budget-app-root .score-flow-m-bar i.is-living { background: var(--color-info); }
+.budget-app-root .score-flow-m-bar i.is-saving { background: var(--color-accent); }
+.budget-app-root .score-flow-m-bar i.is-notYetSpent { background: var(--color-primary); }
+.budget-app-root .score-flow-m-bar.is-empty { border: 2px dashed var(--color-danger); background: none; height: 12px; }
+.budget-app-root .score-flow-m-sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 5px; }
+.budget-app-root .score-flow-m-row.is-zero .score-flow-m-amt { color: var(--color-danger-ink); }
+
+@media (max-width: 560px) {
+  .budget-app-root .score-flow-sankey-wrap { display: none; }
+  .budget-app-root .score-flow-mobile-wrap { display: block; }
+}
+
+/* The three small tables under the flow, built on `.mini` (already sealed for
+   reuse across the app) rather than a new card component. */
+.budget-app-root .score-flow-chips { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+.budget-app-root .score-flow-chip { flex: 1 1 200px; min-width: 0; padding: 14px 16px; }
+.budget-app-root .score-flow-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; margin-top: 8px; }
+.budget-app-root .score-flow-chip .l + .score-flow-row { margin-top: 10px; }
+.budget-app-root .score-flow-row b { font-weight: 700; white-space: nowrap; }
+.budget-app-root .score-flow-row.is-warn b { color: var(--color-danger-ink); }
+@media (max-width: 640px) {
+  .budget-app-root .score-flow-chip { flex: 1 1 100%; }
+}
+
+/* ---------------------------------- the rail ------------------------------
+   The 100-point bar in the hero, and its per-gap twin below the work list.
+   Reused colours only: full marks = primary, partial = warning, nothing = a
+   dashed outline rather than a filled wedge — the same "do not draw a slice
+   that implies a rand where there is none" rule the flow's zero band follows
+   above. */
+.budget-app-root .score-rail-wrap { margin-top: 20px; }
+.budget-app-root .score-rail { display: flex; gap: 3px; height: 30px; }
+.budget-app-root .score-rail-seg { position: relative; height: 100%; border-radius: 8px; background: var(--border-color); overflow: hidden; min-width: 0; }
+.budget-app-root .score-rail-fill { display: block; height: 100%; border-radius: 8px; background: var(--color-warning); }
+.budget-app-root .score-rail-seg.is-full .score-rail-fill { background: var(--color-primary); }
+.budget-app-root .score-rail-seg.is-none .score-rail-fill { background: none; border: 2px dashed var(--color-danger); box-sizing: border-box; border-radius: 8px; }
+.budget-app-root .score-rail-marks { position: relative; height: 16px; margin-top: 6px; }
+.budget-app-root .score-rail-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: var(--ink-faint); white-space: nowrap; }
+
+.budget-app-root .score-gap-rail { position: relative; height: 20px; border-radius: 999px; background: var(--border-color); overflow: hidden; margin-top: 10px; border: 1px solid var(--border-color); }
+.budget-app-root .score-gap-rail i { position: absolute; top: 0; bottom: 0; display: block; }
+.budget-app-root .score-gap-rail-now { left: 0; background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary)); border-radius: 999px 0 0 999px; }
+.budget-app-root .score-gap-rail-gain {
+  background: repeating-linear-gradient(135deg, var(--color-primary-light) 0 7px, transparent 7px 14px);
+  border-left: 2px solid var(--color-accent);
 }
 /* ============================================================
    GENERATED FILE — do not edit.

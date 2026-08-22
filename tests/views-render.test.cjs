@@ -190,5 +190,49 @@ async function mountAll(files = FILES, period = '2026-07') {
     eq(new Set(names).size, names.length, 'no view is dispatched twice');
   }
 
+  /* ---- 6. manual mode hides the CSV affordances, and only advertises ----
+     A household that types its transactions in by hand should not be handed a
+     drawer link and a top-bar button for a screen that asks them for a file
+     they do not have. applyInputMode() is exported from controller.js rather
+     than living as a closure inside mountApp() for exactly this reason: as a
+     closure the only way to reach it would be a full DOMParser shell mount,
+     which no bare-node suite performs, so a selector that stopped matching
+     would ship with every suite green.
+
+     Both directions, because a household can change its mind: flipping the
+     setting back to CSV and reloading has to bring the link back, and an
+     add-only implementation would leave the drawer permanently short of an
+     entry the settings screen says is on. */
+  {
+    const { applyInputMode } = require('../src/controller.js');
+    const { FakeEl } = require('./helpers/dom-stub.cjs');
+    const root = new FakeEl('div');
+    const link = new FakeEl('button');
+    link.attrs['data-view'] = 'import';
+    const btn = new FakeEl('button');
+    btn.attrs.id = 'topbarImport';
+    root.append(link, btn);
+
+    eq(applyInputMode(root, 'manual'), true, 'manual mode reports itself as manual');
+    ok(link._cls.has('hidden'), 'manual mode hides the Import CSV drawer link');
+    ok(btn._cls.has('hidden'), 'and the top-bar import button');
+
+    eq(applyInputMode(root, 'csv'), false, 'csv mode reports itself as not manual');
+    ok(!link._cls.has('hidden'), 'and puts the drawer link back — the setting is reversible');
+    ok(!btn._cls.has('hidden'), 'and the top-bar button with it');
+
+    /* An unknown value from a hand-edited Settings.md behaves as CSV, which is
+       what every vault written before input_mode existed says. */
+    applyInputMode(root, 'manual');
+    eq(applyInputMode(root, 'nonsense'), false, 'an unrecognised mode is not manual');
+    ok(!link._cls.has('hidden'), 'so the drawer link stays where it has always been');
+
+    /* Missing nodes are not an error: the wizard's own modal and the connect
+       screen both mount before the top bar exists. */
+    assert.doesNotThrow(() => applyInputMode(new FakeEl('div'), 'manual'),
+      'a root without the import affordances must not throw');
+    checks++;
+  }
+
   console.log(`PASS — all ${DISPATCH.length} views render, empty and populated (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

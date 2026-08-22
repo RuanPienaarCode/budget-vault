@@ -249,4 +249,73 @@ eq(shellSaveIds.filter(id => !registeredSave.has(id)), [],
   'every Save button in shell.js must be registered via ctx.dirtyFlag or ' +
   'ctx.registerSaveButton, or reloadFromDisk will leave it enabled over discarded edits');
 
+/* ---- 8. manual mode's selectors still address something ----
+   applyInputMode() in controller.js hides the CSV affordances for a household
+   that types its transactions in by hand. It reaches for them by SELECTOR, not
+   by id, so shell-contract's check 1 above (which only follows `$('#id')`)
+   cannot see it: rename the drawer link's data-view and the hide becomes a
+   no-op that leaves an Import link in front of exactly the reader manual mode
+   exists to keep it away from, with every suite green.
+
+   Parsed out of controller.js rather than typed here, so the two lists cannot
+   drift — adding a third affordance to the loop is enough. */
+{
+  const fn = controller.match(/function applyInputMode\(root, mode\) \{([\s\S]*?)\n\}/);
+  ok(fn, 'controller.js must still export applyInputMode as a standalone function');
+  /* Only the strings inside the selector ARRAY — a loose scan over the whole
+     body also picks up 'manual' and 'hidden', which are not selectors and
+     which no shell markup will ever satisfy. */
+  const list = fn[1].match(/for \(const sel of \[([\s\S]*?)\]\)/);
+  ok(list, 'applyInputMode still loops over one array of selectors');
+  const selectors = [...list[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
+  ok(selectors.length >= 2, `applyInputMode hides at least the drawer link and the top-bar button (found ${selectors.length})`);
+  for (const sel of selectors) {
+    const attr = sel.match(/^\[([\w-]+)="([^"]*)"\]$/);
+    const idSel = sel.match(/^#([\w-]+)$/);
+    if (attr) {
+      ok(shell.includes(`${attr[1]}="${attr[2]}"`),
+        `applyInputMode hides '${sel}' but nothing in shell.js carries that attribute`);
+    } else if (idSel) {
+      ok(shellIds.has(idSel[1]), `applyInputMode hides '${sel}' but shell.js defines no such id`);
+    } else {
+      ok(false, `applyInputMode uses a selector shape this check cannot verify: ${sel}`);
+    }
+  }
+  /* HIDES, never removes: the node has to come back when the household flips
+     the setting to CSV again. */
+  ok(/classList\.toggle\('hidden'/.test(fn[1]),
+    'applyInputMode must toggle the hidden class — a removed node cannot come back when the setting is flipped');
+
+  /* ...and there must still BE a way in. The Accounts page's own "Import
+     transactions" button is not one: it only appears on an account with no
+     transactions yet, so a manual household that later receives a CSV for an
+     account that already has rows would have no route to the screen at all.
+     The command palette is that route, and the setting is the other — both
+     are claimed in the setting's description, so both are pinned here. A
+     hidden affordance whose documented way back does not exist is worse than
+     no affordance. */
+  const main = fs.readFileSync(path.join(SRC, 'main.js'), 'utf8');
+  ok(/id: 'import-transactions'/.test(main),
+    'main.js must register a command that reaches the import screen when the drawer link is hidden');
+  ok(/ctl\.showImport\(\)/.test(main),
+    'and it must go through the controller rather than poking at the DOM');
+  ok(/showImport:/.test(controller),
+    'controller.js must expose showImport for it — the view dispatcher is not public');
+  /* Parks the route when the vault has not loaded rather than refusing: the
+     command opens the view and arrives microseconds later, long before
+     connectVault() has finished, and connectVault ends by switching to
+     S.view. Refusing there would make the command fail from a cold start,
+     which is the state most readers run it in. */
+  ok(/showImport:[\s\S]{0,400}?S\.view = 'import'/.test(controller),
+    'showImport must park the route for connectVault when the vault has not loaded yet');
+
+  const settingsTabSrc = fs.readFileSync(path.join(SRC, 'settings-tab.js'), 'utf8');
+  const desc = (settingsTabSrc.match(/const INPUT_MODE_DESC = '([^']*(?:\\.[^']*)*)'/) || [''])[1];
+  ok(desc.length > 60, 'the input-mode setting still carries a description');
+  ok(/command palette/i.test(desc),
+    'and it must name the command palette as the way back to the import screen');
+  ok(!/reachable from the Accounts page/i.test(desc),
+    'the old claim is gone — the Accounts page button only exists on an account with no transactions');
+}
+
 console.log(`PASS — shell id contract + ctx namespace + DOMParser safety intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys, ${shellSaveIds.length} save buttons).`);
