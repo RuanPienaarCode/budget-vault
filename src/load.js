@@ -2,7 +2,7 @@
 /* loadVault — reads every budget file into the in-memory state S. */
 
 const { TFile } = require('obsidian');
-const { TYPE_ORDER, overspendLag, emergencyTarget } = require('./constants');
+const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
@@ -15,6 +15,7 @@ const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
 const { parseOwners } = require('./owners');
+const { parseGroups, parseNonEssential, typeOrder, typeRank } = require('./groups');
 const { NOTES_DIR, parseNote, sortNotes } = require('./note-file');
 
 /* An optional numeric frontmatter key: absent or blank → null ("not set"),
@@ -129,12 +130,26 @@ module.exports = function registerLoad(ctx) {
          falls back to English for an unknown hand-edited value, the same
          contract localeFor gives country. */
       S.settings.language = setLanguage(fm.language || defaultLanguage());
+      /* How this household gets transactions in: 'csv' or 'manual'. Absent
+         means 'csv', so every vault written before this key existed keeps the
+         import affordances it has always had — see inputMode() in constants.js,
+         which is the ONE normaliser the loader, the settings tab and the wizard
+         share. Assigned unconditionally, like emergency_target_months below: a
+         hand-deleted line has to fall back to the default on the next load
+         rather than leaving the old value alive in memory. */
+      S.settings.input_mode = inputMode(fm.input_mode);
       S.settings.household = fm.household || '';
       /* The people the household's accounts can belong to. Absent means "one
          person", which is what every vault written before this key existed
          says — and the Accounts page then hides the owner controls entirely
          rather than offering a question with one possible answer. */
       S.settings.owners = parseOwners(fm.owners);
+      /* The household's own category groups and which groups the emergency
+         maths may drop — see src/groups.js for the shape and the rules. Both
+         absent means the built-in types only, which is what every vault
+         written before these keys existed says. */
+      S.settings.groups = parseGroups(fm.groups);
+      S.settings.nonessential_groups = parseNonEssential(fm.nonessential_groups, S.settings.groups);
       /* How many periods back "pull last period's overspend" reads from. 1 is
          the obvious answer and the default; it is a setting because a credit
          card settles a month in arrears, so the hole you are funding in August
@@ -184,7 +199,8 @@ module.exports = function registerLoad(ctx) {
         rel: `Categories/${file.name}`,
       });
     }
-    S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
+    const order = typeOrder(S.settings.groups);
+    S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
 
     S.accounts = [];
     for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {

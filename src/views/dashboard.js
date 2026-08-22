@@ -3,7 +3,7 @@
 
 const { el, icoEl } = require('../dom');
 const { safeSeg } = require('../vault-path');
-const { TYPE_ORDER } = require('../constants');
+const { typeOrder, typeRank } = require('../groups');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
@@ -1105,8 +1105,9 @@ module.exports = function registerDashboard(ctx) {
       const r = rows.get(cat) || rows.set(cat, { budget: 0, type: type || 'expense', actual: 0, notes: '' }).get(cat);
       r.actual += type === 'income' ? amt : -amt;
     }
+    const order = typeOrder(S.settings.groups);
     const sorted = [...rows.entries()].sort((a, b) =>
-      TYPE_ORDER.indexOf(a[1].type) - TYPE_ORDER.indexOf(b[1].type) || a[0].localeCompare(b[0]));
+      typeRank(a[1].type, order) - typeRank(b[1].type, order) || a[0].localeCompare(b[0]));
     let lastType = null;
     for (const [cat, r] of sorted) {
       if (r.type !== lastType) {
@@ -1204,8 +1205,13 @@ module.exports = function registerDashboard(ctx) {
       + (clamped ? i18n.t('dash.trend.clamped') : '');
 
     if (data.length < 2) {
+      /* The nudge has to name a move the reader can actually make. Told to
+         "import a second period" a manual household would go looking for an
+         Import page that manual mode does not put in front of them — a first
+         run that ends by pointing at a door it just closed. Chosen at render
+         time rather than at load, so flipping the setting is enough. */
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
-        i18n.t('dash.trend.empty')));
+        i18n.t(S.settings.input_mode === 'manual' ? 'dash.trend.empty.manual' : 'dash.trend.empty')));
       return;
     }
 

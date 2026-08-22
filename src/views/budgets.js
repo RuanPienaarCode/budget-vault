@@ -3,8 +3,16 @@
    Budgets/<period>.md. */
 
 const { el, icoEl } = require('../dom');
-const { escMd, patchFrontmatter, parseFrontmatter } = require('../markdown');
-const { TYPE_ORDER } = require('../constants');
+const { parseFrontmatter } = require('../markdown');
+/* The Budgets/<period>.md format lives in one pure module, shared with the
+   setup wizard — see the header of budget-file.js for why it stopped being
+   inline here. */
+const { serializeBudgetFile, budgetRangeNote } = require('../budget-file');
+/* Row order must agree with serializeBudgetFile() and the Dashboard: a custom
+   group slots in before `expense` and an undeclared type sorts LAST. Plain
+   indexOf() over the built-in order cannot express that — it returns -1 for
+   a custom group, which sorted it above income on this page alone. */
+const { typeOrder, typeRank } = require('../groups');
 const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
@@ -251,7 +259,9 @@ module.exports = function registerBudgets(ctx) {
       el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.amount')), el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.actual')), el('th', { scope: 'col' }, i18n.t('bud.col.notes')), el('th', { scope: 'col' }, ''))));
     const body = el('tbody', {});
     const mark = () => { budDirty = true; $('#budSave').disabled = false; };
-    const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
+    const order = typeOrder(S.settings.groups);
+    const rows = [...draft].sort((a, b) =>
+      typeRank(a.type, order) - typeRank(b.type, order) || a.category.localeCompare(b.category));
     let lastType = null;
     for (const d of rows) {
       if (d.type !== lastType) { lastType = d.type; body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, d.type))); }
@@ -338,30 +348,26 @@ module.exports = function registerBudgets(ctx) {
     const draft = budgetDraft().filter(d => d.category && (d.inFile || d.amount || (d.notes && d.notes.trim())));
     for (const d of draft) d.inFile = true;
     S.budgets[S.period] = draft.map(d => ({ ...d }));
-    const n = S.settings.month_start_day;
     const meta = S.budgetMeta[S.period];
-    const fm = patchFrontmatter((meta && meta.raw) || '', { period: S.period });
-    // Correct English ordinal for any day (1st, 2nd, 3rd, 21st, 22nd, 23rd, …) —
-    // the old hardcoded "rd"/"nd" only read right for the default day 23.
-    const ordinal = d => { const v = d % 100; return d + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
-    const iv = ctx.intervalDays();
-    const rangeNote = iv
-      ? 'With `period_days: ' + iv + '`, this period runs for ' + iv + ' days from ' +
-        periodRange(S.period).start + ', counted from `period_anchor: ' +
-        S.settings.period_anchor + '`.'
-      : n === 1
-        ? 'With `month_start_day: 1`, this period is the calendar month — the 1st to the last day of the month.'
-        : 'With `month_start_day: ' + n + '`, this period runs from the ' + ordinal(n) +
-          ' of the previous month to the ' + ordinal(n - 1) + ' of this month.';
-    const lines = ['---', fm, '---', '', `# Budget — ${S.period}`, '',
-      rangeNote, '',
-      '| Category | Type | Amount | Notes |', '|----------|------|-------:|-------|'];
-    const rows = [...draft].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.category.localeCompare(b.category));
-    for (const d of rows) {
-      const amt = d.amountRaw != null ? d.amountRaw : d.amount.toFixed(2);
-      lines.push(`| ${escMd(d.category)} | ${d.type} | ${amt} | ${escMd(d.notes)} |`);
-    }
-    lines.push('');
+    /* Both the range note and the file itself come out of src/budget-file.js.
+       This used to be built here, inline — frontmatter patch, heading, range
+       note, column header, separator and row template all as literals inside a
+       function no bare-node test can call. The setup wizard now seeds a
+       household's first budget as well, and two hand-built copies of one table
+       format is this repo's recurring bug shape: two things derived by
+       different rules, agreeing right up until one of them is edited. */
+    const text = serializeBudgetFile({
+      period: S.period,
+      rawFrontmatter: (meta && meta.raw) || '',
+      rows: draft,
+      groups: S.settings.groups,
+      rangeNote: budgetRangeNote({
+        monthStartDay: S.settings.month_start_day,
+        intervalDays: ctx.intervalDays(),
+        periodStart: periodRange(S.period).start,
+        periodAnchor: S.settings.period_anchor,
+      }),
+    });
     // The period name IS the filename, for both shapes — no reassembling it
     // from parts, which is what limited this to 'YYYY-MM'.
     /* Guarded for the same reason as every other save on this page's Save
@@ -373,7 +379,7 @@ module.exports = function registerBudgets(ctx) {
        the only bug was the silence. Now the failure toasts and the same
        left-dirty state is kept on purpose, so the same click retries. */
     try {
-      await writeFile(`Budgets/${S.period}.md`, lines.join('\n'));
+      await writeFile(`Budgets/${S.period}.md`, text);
     } catch (e) {
       return toast(i18n.t('bud.err.save', { error: e.message || e }), true);
     }

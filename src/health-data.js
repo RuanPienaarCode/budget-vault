@@ -75,7 +75,7 @@ module.exports = function registerHealthData(ctx) {
       }
       periods.push({
         income: periodSummary(p).income,
-        essential: essentialTotal(spend.whole, catType),
+        essential: essentialTotal(spend.whole, catType, S.settings.nonessential_groups),
         savings, consumption, fixed,
         budgeted: budgetTotals(p).spend,
         counted: spend.count > 0,

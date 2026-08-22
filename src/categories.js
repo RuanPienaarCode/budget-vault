@@ -7,7 +7,7 @@ const { parseFrontmatter, yamlStr } = require('./markdown');
 const { csvCell } = require('./csv');
 const { learnPattern, prepareRules, autoCategorise } = require('./rules');
 const { safeSeg } = require('./vault-path');
-const { TYPE_ORDER } = require('./constants');
+const { typeOrder, typeRank } = require('./groups');
 const { todayIso } = require('./dates');
 const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
@@ -41,13 +41,13 @@ module.exports = function registerCategories(ctx) {
   async function promptCreateCategory() {
     const r = await askFields(app, 'New category', [
       { key: 'name', label: 'Name', type: 'text', placeholder: 'e.g. Coffee budget' },
-      { key: 'type', label: 'Type', type: 'select', options: TYPE_ORDER, value: 'expense' },
+      { key: 'type', label: 'Type', type: 'select', options: typeOrder(S.settings.groups), value: 'expense' },
     ]);
     if (!r || !r.name.trim()) return null;
     const realName = r.name.trim();
     if (S.categories.some(c => c.name.toLowerCase() === realName.toLowerCase())) { toast('Category already exists', true); return null; }
     const type = r.type;
-    if (!TYPE_ORDER.includes(type)) { toast('Invalid type', true); return null; }
+    if (!typeOrder(S.settings.groups).includes(type)) { toast('Invalid type', true); return null; }
     // safeSeg, not a local copy of it: a name like ".hidden" would otherwise
     // write a dotfile Obsidian never indexes, so the category vanishes on the
     // next load and promptDeleteCategory can never find it again.
@@ -63,7 +63,8 @@ module.exports = function registerCategories(ctx) {
       `---\n${nameLine}type: ${type}\ncolor: "#888888"\ntags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${realName}\n\nBudget category of type **${type}**.\n`);
     const cat = { name: realName, type, color: '#888888' };
     S.categories.push(cat);
-    S.categories.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
+    const order = typeOrder(S.settings.groups);
+    S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
     catsVersion++;
     toast(`Created Categories/${safe}.md`);
     return cat;

@@ -124,7 +124,36 @@ function emergencyTarget(v) {
   return Math.min(EMERGENCY_TARGET_MAX, Math.max(1, n));
 }
 
-const TYPE_ORDER = ['income', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
+/* How the household gets transactions into the vault: 'csv' (download a
+   statement and import it) or 'manual' (type each line on the Transactions
+   page). A Settings.md key rather than plugin data, for the same reason
+   `country` and `language` are — it is a fact about the household, not about
+   this device, and it has to travel with the vault to the phone.
+
+   ABSENT MEANS 'csv', and that is the whole compatibility story: every vault
+   written before this key existed goes on behaving exactly as it did, because
+   CSV import is what the app has always assumed. An unknown hand-edited value
+   falls back the same way rather than throwing — the same contract localeFor
+   gives country and resolveLanguage gives language.
+
+   One definition, because the loader, the settings tab and the wizard all have
+   to agree about what a hand-edited value means. Two normalisers is how the
+   drawer ends up hiding the Import link on a vault the settings screen is
+   still describing as a CSV household. */
+const INPUT_MODES = ['csv', 'manual'];
+const INPUT_MODE_DEFAULT = 'csv';
+function inputMode(v) {
+  const s = (v ?? '').toString().trim().toLowerCase();
+  return INPUT_MODES.includes(s) ? s : INPUT_MODE_DEFAULT;
+}
+
+/* Page order for the Budget and Dashboard group headers, and the optgroup
+   order in every category picker. The household buckets (housing through
+   fees) split what used to be one flat `expense` group; `expense` stays as
+   the catch-all so a vault typed before the split keeps loading unchanged.
+   health-math treats every type not in NON_ESSENTIAL_TYPES as essential, so
+   the new buckets count toward emergency cover without being listed there. */
+const TYPE_ORDER = ['income', 'housing', 'utilities', 'food', 'transport', 'health', 'family', 'personal', 'fees', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODES, INPUT_MODE_DEFAULT, inputMode };

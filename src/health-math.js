@@ -37,11 +37,15 @@ const NON_ESSENTIAL_TYPES = new Set(['luxuries', 'giving', 'savings', 'investmen
    deliberately: an uncategorised debit is far more likely a bill than a treat,
    and guessing the other way would report more months of cover than the
    household may actually have. */
-function essentialTotal(byCategory, typeOf) {
+function essentialTotal(byCategory, typeOf, alsoNonEssential) {
+  /* `alsoNonEssential` is the vault's own nonessential_groups list
+     (src/groups.js): it can only ADD to the built-in set, so a setting can
+     make the cover figure read fewer months, never more. */
+  const extra = alsoNonEssential instanceof Set ? alsoNonEssential : new Set(alsoNonEssential || []);
   let sum = 0;
   for (const [cat, amt] of Object.entries(byCategory || {})) {
     const type = typeOf ? typeOf(cat) : null;
-    if (type && NON_ESSENTIAL_TYPES.has(type)) { continue; }
+    if (type && (NON_ESSENTIAL_TYPES.has(type) || extra.has(type))) { continue; }
     sum += amt;
   }
   return sum;
