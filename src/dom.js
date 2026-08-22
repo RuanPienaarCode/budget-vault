@@ -61,9 +61,17 @@ function keepScroll(elm, rebuild) {
 }
 
 /* Lucide icons: try each name until one renders (icon names occasionally get
-   renamed between the lucide versions Obsidian ships). */
+   renamed between the lucide versions Obsidian ships).
+
+   Accepts an array of names OR the shell's data-ico form, 'a|b|c' — a
+   fallback chain written as one string. Splitting here, not at the call
+   sites: icoEl('crown|award|medal') once reached Obsidian's setIcon as a
+   single name containing two pipes, which it silently no-ops on, so the
+   Score page's full-marks badge shipped blank on every device. Any caller
+   may write the chain the way the shell already does and get the walk. */
 function setIco(elm, names) {
-  for (const n of Array.isArray(names) ? names : [names]) {
+  const list = Array.isArray(names) ? names : String(names).split('|');
+  for (const n of list) {
     try { setIcon(elm, n); } catch (e) { /* unknown icon name */ }
     if (elm.firstElementChild) return;
   }

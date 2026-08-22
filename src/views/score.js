@@ -17,6 +17,8 @@
 const { el, icoEl } = require('../dom');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
+const { periodFlow, railSegments } = require('../money-flow');
+const { splitFlows } = require('../savings-math');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -24,7 +26,10 @@ const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math'
 const GOOD_ENOUGH = 0.9;
 
 module.exports = function registerScore(ctx) {
-  const { S, $, money, healthSnapshot, periodMonthName, currentPeriod } = ctx;
+  const {
+    S, $, money, healthSnapshot, periodMonthName, currentPeriod,
+    periodRange, periodSpend, periodSummary, budgetTotals, catType, accountIndex,
+  } = ctx;
 
   function renderScore() {
     const hero = $('#scoreHero');
@@ -33,6 +38,14 @@ module.exports = function registerScore(ctx) {
     const how = $('#scoreHow');
     if (!hero) { return; }
     hero.empty(); good.empty(); work.empty(); how.empty();
+
+    /* Independent of the score breakdown below — the flow card describes what
+       THIS period's income did, which a vault too new to average six periods
+       can still answer. Rebuilt fresh every render (remove-then-append) the
+       same way hero/good/work/how are emptied-then-rebuilt; the shell has no
+       static container for this card, so the node itself is the thing that
+       gets thrown away and remade rather than a div that gets emptied. */
+    renderFlowCard();
 
     const snap = healthSnapshot();
     const { metrics: M, breakdown, target, earmarks } = snap;
@@ -45,7 +58,12 @@ module.exports = function registerScore(ctx) {
     if (!breakdown) {
       hero.append(el('div', { class: 'score-empty' },
         el('div', { class: 'score-empty-h' }, i18n.t('score.empty.title')),
-        el('p', { class: 'score-empty-p' }, i18n.t('score.empty.body'))));
+        /* Same reason as the trend card's empty state on the Dashboard: a
+           manual household has no Import page in front of them, so "import a
+           statement" names a move they cannot make. Read at render time off
+           the loaded setting, so flipping it is enough. */
+        el('p', { class: 'score-empty-p' },
+          i18n.t(S.settings.input_mode === 'manual' ? 'score.empty.body.manual' : 'score.empty.body'))));
       $('#scoreGoodCard').classList.add('hidden');
       $('#scoreWorkCard').classList.add('hidden');
       renderHow(how);
@@ -81,9 +99,48 @@ module.exports = function registerScore(ctx) {
     /* The one sentence a reader takes away, pitched at the band they are in
        rather than a single generic line. */
     wrap.append(el('p', { class: 'score-hero-say' }, i18n.t(`score.say.${band}`)));
+
+    /* The score rail — the same 100-point bar the mockup carries into the gap
+       list below, drawn once here as "how the 100 is made". Segment width is
+       the pillar's own weight, fill is the points actually earned; the filled
+       width across all five segments sums to `breakdown.total`, the number
+       printed above it, because both come out of the one scoreBreakdown()
+       call (see money-flow.js's railSegments for why that identity holds
+       structurally rather than by two figures happening to agree). */
+    wrap.append(buildScoreRail(breakdown));
     hero.append(wrap);
 
     celebrate(hero, breakdown);
+  }
+
+  /* One full-width bar, five segments. Plain divs rather than SVG — the same
+     choice renderHero already made for the ring above it (a bar draws nothing
+     an SVG arc would show more of, and every SVG on this page would have to
+     re-resolve its colours at render time; see the theme-flip note in
+     views/dashboard.js), so the segments are flex children sized by
+     percentage width and CSS carries every colour via the sealed palette. */
+  function buildScoreRail(breakdown) {
+    const segs = railSegments(breakdown);
+    if (!segs.length) { return el('div', {}); }
+
+    const parts = segs.map(s => `${i18n.t(`dash.health.why.name.${s.key}`)} ` +
+      i18n.t('dash.health.why.points', { points: s.fill, max: s.width }));
+    const aria = i18n.t('score.rail.aria', { score: breakdown.total, parts: parts.join(', ') });
+
+    const rail = el('div', { class: 'score-rail', role: 'img', 'aria-label': aria });
+    for (const s of segs) {
+      const ratio = s.width > 0 ? s.fill / s.width : 0;
+      const cls = ratio >= 0.999 ? 'is-full' : ratio <= 0.001 ? 'is-none' : 'is-partial';
+      const seg = el('div', { class: `score-rail-seg ${cls}`, style: `width:${s.width}%` });
+      seg.append(el('i', { class: 'score-rail-fill', style: `width:${Math.max(0, Math.min(100, ratio * 100))}%` }));
+      rail.append(seg);
+    }
+    const marks = el('div', { class: 'score-rail-marks' },
+      el('span', { class: 'score-rail-mark', style: `left:${SCORE_BANDS.steady}%` },
+        i18n.t('score.rail.mark', { score: SCORE_BANDS.steady, band: i18n.t('dash.health.steady') })),
+      el('span', { class: 'score-rail-mark', style: `left:${SCORE_BANDS.strong}%` },
+        i18n.t('score.rail.mark', { score: SCORE_BANDS.strong, band: i18n.t('dash.health.strong') })));
+    return el('div', { class: 'score-rail-wrap' }, rail, marks);
   }
 
   /* ---------------------------- what is going well ----------------------- */
@@ -136,6 +193,14 @@ module.exports = function registerScore(ctx) {
         el('div', { class: 'score-gap-pts num' },
           i18n.t('score.gap.points', { points: p.shownLost }))));
 
+      /* The rail again, this time as ONE pillar's own points: solid = what is
+         already earned, hatched = what closing the gap buys. Percentages are
+         of the PILLAR's own shownMax, not of the overall 100 — the same
+         percentages score.js already has on `p` from scoreBreakdown, so
+         nothing here re-derives a fraction the breakdown did not already
+         compute. */
+      row.append(buildGapRail(p));
+
       /* Where you are, in the reader's own figures — the same numbers the
          Dashboard tiles show, so moving between the two never means
          re-reading a different measure of the same thing. */
@@ -163,6 +228,23 @@ module.exports = function registerScore(ctx) {
       row.append(el('p', { class: 'score-gap-how' }, i18n.t(`score.guide.${p.key}`)));
       work.append(row);
     }
+  }
+
+  /* One pillar's own rail: solid up to what is already earned, hatched from
+     there to its own full marks. `p` is a `breakdown.pillars` entry, already
+     carrying `shownPoints`/`shownMax` from scoreBreakdown — the same two
+     numbers "score.gap.points" above already prints, so the rail cannot show
+     a gap the text does not. */
+  function buildGapRail(p) {
+    const max = p.shownMax || 0;
+    const pts = Math.max(0, Math.min(max, p.shownPoints || 0));
+    const pct = max > 0 ? (pts / max) * 100 : 0;
+    const aria = i18n.t('score.gap.railAria', {
+      name: i18n.t(`dash.health.why.name.${p.key}`), points: pts, max,
+    });
+    return el('div', { class: 'score-gap-rail', role: 'img', 'aria-label': aria },
+      el('i', { class: 'score-gap-rail-now', style: `left:0;width:${pct}%` }),
+      el('i', { class: 'score-gap-rail-gain', style: `left:${pct}%;width:${100 - pct}%` }));
   }
 
   /* The reader's current standing on one pillar, or null where the vault has
@@ -193,6 +275,281 @@ module.exports = function registerScore(ctx) {
       : i18n.t('score.now.wealth', {
         times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
       });
+  }
+
+  /* ------------------------- where the money went ------------------------ */
+  /* "Where the money went" — the money-flow card the page opens with. Lives
+     entirely outside the hero/good/work/how containers shell.js hands out,
+     because there is no static container for it: shell.js is off limits for
+     id churn (shell-contract.test.cjs counts them), so the card is built here
+     at render time and spliced in front of #scoreHeroCard, the same way a
+     view that owns its own markup always has. Removed and rebuilt on every
+     render rather than emptied-in-place, because there is nothing durable to
+     empty — see the note on renderScore() above. */
+  function renderFlowCard() {
+    const view = $('#view-score');
+    const heroCard = $('#scoreHeroCard');
+    if (!view || !heroCard) { return; }
+    const old = view.querySelector('.score-flow-card');
+    if (old && old.remove) { old.remove(); }
+    view.insertBefore(buildFlowCard(buildFlow()), heroCard);
+  }
+
+  /* This period's income, split into committed & fixed bills, living costs,
+     saving and what is not yet spent — money-flow.js's periodFlow(), fed the
+     SAME raw material health-data.js assembles for the score (periodSummary,
+     periodSpend, budgetTotals, splitFlows, S.categories' own `fixed` flag),
+     just for one period instead of the trailing six. Nothing about "what
+     counts as committed" or "what counts as saving" is decided twice — see
+     the header comment in money-flow.js for why that matters. */
+  function buildFlow() {
+    const cur = currentPeriod();
+    const { start, end } = periodRange(cur);
+    const summary = periodSummary(cur);
+    const spend = periodSpend(cur, null);
+    const budget = budgetTotals(cur);
+    const fixedCats = new Set(S.categories.filter(c => c.fixed).map(c => c.name));
+
+    /* Contributions into savings/investment accounts THIS period — the same
+       signal health-data.js averages over six periods for the score's own
+       saving pillar, read here for one. */
+    const idx = accountIndex();
+    const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
+    let savingContribution = 0;
+    for (const a of savers) {
+      const rows = (idx.get(a) || {}).rows || [];
+      savingContribution += splitFlows(rows, catType, { from: start, to: end }).contributions;
+    }
+
+    return periodFlow({
+      income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,
+      spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
+    });
+  }
+
+  /* The four band descriptors, built ONCE and read by both the desktop Sankey
+     and the phone's stacked-bar fallback — the exact figures they show can
+     never drift apart because there is only one place either of them reads
+     from. */
+  function buildFlowRows(flow) {
+    const b = flow.bands, d = flow.committedDetail, lefts = flow.lefts;
+    const pct = v => `${v}%`;
+    return [
+      {
+        key: 'committed', cls: 'is-committed',
+        name: i18n.t('score.flow.committed'), amount: b.committed, pct: b.percents.committed,
+        sub: d.debtRepayments > 0
+          ? i18n.t('score.flow.sub.committedDebt', { pct: pct(b.percents.committed), amount: money(d.debtRepayments, 0) })
+          : i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.committed) }),
+      },
+      {
+        key: 'living', cls: 'is-living',
+        name: i18n.t('score.flow.living'), amount: b.living, pct: b.percents.living,
+        sub: i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.living) }),
+      },
+      {
+        key: 'saving', cls: 'is-saving',
+        name: i18n.t('score.flow.saving'), amount: b.saving, pct: b.percents.saving,
+        sub: b.saving > 0
+          ? i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.saving) })
+          : i18n.t('score.flow.sub.savingZero'),
+      },
+      {
+        key: 'notYetSpent', cls: 'is-notYetSpent',
+        name: i18n.t('score.flow.notYetSpent'), amount: b.notYetSpent, pct: b.percents.notYetSpent,
+        sub: i18n.t('score.flow.sub.notYetSpent', {
+          inBudget: money(lefts.leftInBudget, 0), neverBudgeted: money(lefts.neverBudgeted, 0),
+        }),
+      },
+    ];
+  }
+
+  function buildFlowCard(flow) {
+    const rows = buildFlowRows(flow);
+    const card = el('div', { class: 'card mb-4 score-flow-card' });
+    card.append(el('div', { class: 'card-h' },
+      el('div', {},
+        el('h2', {}, i18n.t('score.flow.title')),
+        el('div', { class: 'sub' }, i18n.t('score.flow.sub')))));
+
+    const body = el('div', { class: 'body-pad' });
+    body.append(el('div', { class: 'score-flow-top' },
+      el('div', { class: 'score-flow-eyebrow' }, i18n.t('score.flow.moneyIn')),
+      el('div', { class: 'score-flow-in num' }, money(flow.income, 0),
+        el('small', {}, i18n.t('score.flow.thisPeriod')))));
+
+    /* Both trees always render; styles.css decides which one is on screen via
+       a plain `@media (max-width: 560px)` swap — no container query, so the
+       floor stays iOS 15. The Sankey is the one thing on this page that
+       cannot survive the squeeze: a 960-unit viewBox at a phone's ~360px CSS
+       width turns 13px label text into ~5px. */
+    body.append(el('div', { class: 'score-flow-sankey-wrap' }, buildFlowSankey(flow, rows)));
+    body.append(el('div', { class: 'score-flow-mobile-wrap' }, buildFlowMobile(rows)));
+    body.append(buildFlowChips(flow));
+
+    card.append(body);
+    return card;
+  }
+
+  /* The desktop picture: an inline SVG with the income on the left and the
+     four bands running to the right of it. Ribbons are drawn as plain rects
+     rather than curved sankey ribbons — deliberately: the source-side slice
+     and the destination-side slice are stacked in the SAME order, so a real
+     sankey curve would bow between two points at the same height and draw a
+     straight line anyway. Colours are CSS classes reading the sealed
+     palette's custom properties (`.score-flow-rib.is-committed` etc in
+     styles.css), never resolved in JS — an SVG respects the stylesheet's
+     var() the same as any other element, so there is nothing here for
+     chart.js's themeColors() to do. */
+  function buildFlowSankey(flow, rows) {
+    const W = 960, H = 280;
+    const PAD_T = 14, PAD_B = 14, GAP = 8, NODE_W = 14, RIB_X0 = NODE_W, DEST_X = 460, DEST_W = 14;
+    const LABEL_X = DEST_X + DEST_W + 20;
+    const innerH = H - PAD_T - PAD_B - GAP * (rows.length - 1);
+
+    let y = PAD_T;
+    const laid = rows.map(r => {
+      const h = Math.max(0, (r.pct / 100) * innerH);
+      const top = y, bottom = y + h;
+      y = bottom + GAP;
+      return { ...r, top, bottom, h };
+    });
+    const plotTop = laid[0].top, plotBottom = laid[laid.length - 1].bottom;
+
+    const label = i18n.t('score.flow.ariaLabel', {
+      income: money(flow.income, 0),
+      committed: money(flow.bands.committed, 0),
+      living: money(flow.bands.living, 0),
+      saving: money(flow.bands.saving, 0),
+      notYetSpent: money(flow.bands.notYetSpent, 0),
+    });
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', label);
+    svg.setAttribute('class', 'score-flow-sankey');
+    const add = (tag, attrs = {}) => {
+      const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [k, v] of Object.entries(attrs)) { if (v !== null && v !== undefined) { n.setAttribute(k, v); } }
+      svg.append(n);
+      return n;
+    };
+
+    add('rect', { x: 0, y: plotTop, width: NODE_W, height: Math.max(1, plotBottom - plotTop), rx: 4, class: 'score-flow-node' });
+
+    for (const r of laid) {
+      /* The zero band: money-flow.js's own comment on `notYetSpent` argues a
+         period that spent everything it earned must not draw a slice that
+         implies a rand went somewhere it didn't — the same argument applies
+         to any of the four bands reading exactly zero, not only saving. A
+         hairline says "measured, and it was nothing" where an absent band
+         would just look like a rendering bug. */
+      if (r.h < 3) {
+        const midY = (r.top + r.bottom) / 2;
+        add('line', { x1: RIB_X0, x2: DEST_X + DEST_W, y1: midY, y2: midY, class: 'score-flow-zero' });
+        add('text', { x: LABEL_X, y: midY + 4, class: 'score-flow-name' }).textContent = r.name;
+        add('text', { x: W - 8, y: midY + 4, 'text-anchor': 'end', class: 'score-flow-amt is-zero' }).textContent =
+          i18n.t('score.flow.amountPct', { amount: money(r.amount, 0), pct: `${r.pct}%` });
+        continue;
+      }
+      add('rect', { x: RIB_X0, y: r.top, width: DEST_X + DEST_W - RIB_X0, height: r.h, rx: 4, class: `score-flow-rib ${r.cls}` });
+      add('text', { x: LABEL_X, y: r.top + 18, class: 'score-flow-name' }).textContent = r.name;
+      add('text', { x: W - 8, y: r.top + 18, 'text-anchor': 'end', class: 'score-flow-amt' }).textContent =
+        i18n.t('score.flow.amountPct', { amount: money(r.amount, 0), pct: `${r.pct}%` });
+      if (r.h >= 34) {
+        add('text', { x: LABEL_X, y: r.top + 34, class: 'score-flow-caption' }).textContent = r.sub;
+      }
+    }
+    return svg;
+  }
+
+  /* The phone picture: the same four rows as proportional bars, no SVG — see
+     the comment on buildFlowCard() for why the Sankey cannot make this
+     squeeze. Reads the exact same `rows` the desktop tree built, so nothing
+     about a band's figure is re-derived for the narrow layout. */
+  function buildFlowMobile(rows) {
+    const wrap = el('div', { class: 'score-flow-mobile' });
+    for (const r of rows) {
+      const zero = Math.abs(r.amount) < 0.005;
+      const row = el('div', { class: `score-flow-m-row${zero ? ' is-zero' : ''}` });
+      row.append(el('div', { class: 'score-flow-m-head' },
+        el('span', { class: 'score-flow-m-name' }, r.name),
+        el('span', { class: 'score-flow-m-amt num' }, money(r.amount, 0))));
+      row.append(zero
+        ? el('div', { class: 'score-flow-m-bar is-empty' })
+        : el('div', { class: 'score-flow-m-bar' }, el('i', { class: r.cls, style: `width:${r.pct}%` })));
+      row.append(el('div', { class: 'score-flow-m-sub' }, r.sub));
+      wrap.append(row);
+    }
+    return wrap;
+  }
+
+  /* The three small tables under the flow: what committed breaks down into,
+     the budget comparison, and the two different "left" figures — every
+     number pulled straight off `flow`, nothing recomputed. */
+  function buildFlowChips(flow) {
+    const d = flow.committedDetail, bud = flow.budget, lefts = flow.lefts;
+    const wrap = el('div', { class: 'score-flow-chips' });
+
+    /* Nothing flagged fixed at ALL is a different question from "flagged, but
+       nothing landed there this period": the first is an unanswered setup
+       step (three ¥0 rows under it read as broken rather than as "you have
+       not told us yet"), the second is a real ¥0 the household actually
+       produced and the rows stay, honest per the shared rule. Read off
+       S.categories the SAME way buildFlow()'s own `fixedCats` Set is built,
+       so the empty state and the table it replaces can never disagree about
+       which case the vault is in. */
+    const hasFixedCats = S.categories.some(c => c.fixed);
+    if (!hasFixedCats) {
+      wrap.append(buildChipEmpty(i18n.t('score.flow.chip.committed'), i18n.t('score.flow.committed.empty')));
+    } else {
+      const committedRows = [[i18n.t('score.flow.chip.debtRepayments'), money(d.debtRepayments, 0)]];
+      if (d.interest > 0) { committedRows.push([i18n.t('score.flow.chip.ofWhichInterest'), money(d.interest, 0), true]); }
+      committedRows.push([i18n.t('score.flow.chip.housing'), money(d.housing, 0)]);
+      committedRows.push([i18n.t('score.flow.chip.subscriptions'), money(d.subscriptions, 0)]);
+      if (d.other > 0) { committedRows.push([i18n.t('score.flow.chip.other'), money(d.other, 0)]); }
+      wrap.append(buildChip(i18n.t('score.flow.chip.committed'), committedRows));
+    }
+
+    const budgetRows = [[i18n.t('score.flow.chip.budgeted'), money(bud.budgeted, 0)]];
+    if (bud.allocatedOfIncome !== null) {
+      budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${Math.round(bud.allocatedOfIncome * 100)}%`]);
+    }
+    budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spentTotal, 0)]);
+    if (bud.budgetUsed !== null) {
+      budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${Math.round(bud.budgetUsed * 100)}%`]);
+    }
+    wrap.append(buildChip(i18n.t('score.flow.chip.budget'), budgetRows));
+
+    wrap.append(buildChip(i18n.t('score.flow.chip.lefts'), [
+      [i18n.t('score.flow.chip.leftInBudget'), money(lefts.leftInBudget, 0)],
+      [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.neverBudgeted, 0)],
+      [i18n.t('score.flow.chip.together'), money(lefts.together, 0)],
+    ]));
+
+    return wrap;
+  }
+
+  /* One chip: the `.mini` KPI-tile look the rest of the app already uses
+     (explicitly reusable per the sealed-palette rule) with plain label/value
+     rows inside it, rather than a second card component. */
+  function buildChip(title, rows) {
+    const chip = el('div', { class: 'mini score-flow-chip' }, el('div', { class: 'l' }, title));
+    for (const [label, value, warn] of rows) {
+      chip.append(el('div', { class: `score-flow-row${warn ? ' is-warn' : ''}` },
+        el('span', {}, label), el('b', { class: 'num' }, value)));
+    }
+    return chip;
+  }
+
+  /* The same chip shell with a single sentence instead of rows, for a table
+     that has nothing to break down yet — not a numeric zero, an unanswered
+     setup step. `.mini .s` is already the sealed note style every other KPI
+     tile uses under its own value, so this needs no new CSS. */
+  function buildChipEmpty(title, note) {
+    return el('div', { class: 'mini score-flow-chip' },
+      el('div', { class: 'l' }, title),
+      el('div', { class: 's' }, note));
   }
 
   /* ----------------------------- the method ------------------------------ */
