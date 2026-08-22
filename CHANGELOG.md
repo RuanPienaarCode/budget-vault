@@ -3,6 +3,49 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.0 — 2026-08-22
+
+The Score page now shows, not tells. Where the money went leads the page, the
+score is drawn as the five parts that build it, and every gap shows the lift
+closing it buys.
+
+### Added
+
+- **Where the money went.** The Score page opens with this period's income
+  split into committed & fixed bills, living costs, saving, and what is not yet
+  spent — drawn as a flow on a desktop and as stacked bars on a phone — with
+  what sits inside "committed", the figures against the budget, and the two
+  genuinely different "left" numbers (what the plan still allows, and what the
+  plan never claimed) named apart rather than one standing in for the other.
+  Every figure comes from the same place the Dashboard reads it; nothing is
+  worked out twice.
+- **The score as a rail.** One bar, five parts sized by what each is worth and
+  filled by what was earned, so the number is the visible amount of bar that
+  is coloured in. Each gap below shows that rail again with the points closing
+  it would add.
+- **Manual-mode onboarding.** The first-run wizard now carries households that
+  enter their figures by hand rather than importing statements — welcome, a
+  word about how the plugin works, then categories and an account or a first
+  budget, then finish. `input_mode` is a Settings.md key.
+- **Category groups.** Categories sort and roll up by group on the Budget page,
+  the Dashboard and in the health model, from one declared order.
+
+### Changed
+
+- **Completed goals glow.** A part at full marks keeps its gold crown, lands
+  with the same stamp, and now breathes a slow gold glow; the ribbon beside it
+  reads "Completed". Reduced-motion settings switch both off.
+
+### Fixed
+
+- **The full-marks crown was blank.** Since 1.21.0 the badge asked for its icon
+  as one name with two pipes in it, which Obsidian quietly ignores. Fallback
+  chains written that way now work everywhere an icon is set.
+- **No categories marked fixed no longer shows three zero rows.** "Inside
+  committed" says what to do instead — set `fixed: true` at the top of the
+  category file for rent, debt repayments and policies — because that is the
+  only control there is.
+
 ## 1.21.1 — 2026-08-18
 
 ### Fixed
