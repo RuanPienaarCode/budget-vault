@@ -3,6 +3,15 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.2 — 2026-08-23
+
+### Changed
+
+- **The score leads the Score page again.** The number, its band and the rail
+  of five parts come first; what is going well, what would move it and how the
+  score is built follow; "Where the money went" closes the page as the context
+  underneath all of that rather than the thing you meet before the answer.
+
 ## 1.22.1 — 2026-08-23
 
 ### Fixed
