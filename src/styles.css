@@ -874,6 +874,19 @@
    across the two adjacent cards. */
 .budget-app-root .health-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .budget-app-root .health-fig { padding: 12px 14px; min-width: 0; background: var(--surface-glass); border-radius: 12px; }
+/* A tile that routes somewhere is a real button filling its own tile, so the
+   whole card is the target rather than the text inside it. Reset to inherit
+   the tile's own look — this is a link wearing a figure, not a control. */
+.budget-app-root .health-fig-btn {
+  display: block; width: 100%; padding: 0; margin: 0;
+  background: none; border: 0; font: inherit; color: inherit; text-align: inherit;
+  cursor: pointer;
+}
+.budget-app-root .health-fig.is-link { transition: transform .16s ease, box-shadow .16s ease; }
+.budget-app-root .health-fig.is-link:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .health-fig.is-link { transition: none; }
+}
 .budget-app-root .health-fig .lv { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .budget-app-root .health-fig .ll { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 /* The unit beside the cover figure — smaller and lighter so the number still
@@ -907,7 +920,8 @@
 .budget-app-root .health-fig.is-score.is-good .lv,
 .budget-app-root .health-fig.is-score.is-fair .lv,
 .budget-app-root .health-fig.is-score.is-poor .lv { color: #ffffff; }
-.budget-app-root .health-fig.is-score .health-why-btn:focus-visible { outline-color: #ffffff; }
+.budget-app-root .health-fig-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
+.budget-app-root .health-fig.is-score .health-fig-btn:focus-visible { outline-color: #ffffff; }
 .budget-app-root.bud-dark .health-fig.is-score {
   background: var(--surface-glass); border-color: var(--color-primary);
 }
@@ -917,7 +931,7 @@
 .budget-app-root.bud-dark .health-fig.is-score.is-poor .lv { color: var(--color-primary); }
 .budget-app-root.bud-dark .health-fig.is-score .ll { color: var(--text-muted); }
 .budget-app-root.bud-dark .health-fig.is-score .lm { color: var(--ink-faint); }
-.budget-app-root.bud-dark .health-fig.is-score .health-why-btn:focus-visible { outline-color: var(--color-primary); }
+.budget-app-root.bud-dark .health-fig.is-score .health-fig-btn:focus-visible { outline-color: var(--color-primary); }
 @media (max-width: 900px) { .budget-app-root .health-grid { grid-template-columns: repeat(2, 1fr); } }
 
 /* The score tile explains itself on hover, focus or tap — see
@@ -927,7 +941,6 @@
    existing contents so the four tiles keep reading as one row, rather than one
    of them sprouting a border and a background nobody asked for. `text-align`
    and `font` are reset explicitly because a <button> brings its own. */
-.budget-app-root .health-why-btn {
   display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none;
   font: inherit; color: inherit; text-align: left; cursor: help;
 }
@@ -951,7 +964,6 @@
 
    `overflow-y: auto` costs nothing while the panel fits, and is what makes the
    measured max-height attachScoreExplainer sets a scroll rather than a clip. */
-.budget-app-root .health-why {
   display: none; position: absolute; z-index: 20; left: 0; right: auto; top: calc(100% + 6px);
   width: 420px; max-width: calc(100vw - 24px);
   padding: 12px 14px; border-radius: 12px; overflow-y: auto;
@@ -961,26 +973,13 @@
 /* Brought forward only while the panel is open — see attachScoreExplainer for
    why raising the panel alone was not enough. */
 .budget-app-root .card.is-why-raised { position: relative; z-index: 30; }
-.budget-app-root .health-fig.is-why-open .health-why { display: block; }
 /* Flipped by attachScoreExplainer when the panel would fall past the bottom of
    the app's own scroll container. */
-.budget-app-root .health-fig.is-why-above .health-why { top: auto; bottom: calc(100% + 6px); }
-.budget-app-root .health-why-h { font-size: 12.5px; font-weight: 700; margin-bottom: 6px; }
-.budget-app-root .health-why-p { font-size: 11.5px; color: var(--text-muted); margin: 0 0 6px; line-height: 1.45; }
-.budget-app-root .health-why-rows { margin: 8px 0; }
-.budget-app-root .health-why-row {
   display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
   padding: 6px 0; border-top: 1px solid var(--border-color);
 }
-.budget-app-root .health-why-name { font-size: 12px; font-weight: 600; }
-.budget-app-root .health-why-pts { font-size: 12px; font-weight: 700; text-align: right; }
-.budget-app-root .health-why-row.is-full .health-why-pts { color: var(--color-primary); }
-.budget-app-root .health-why-row.is-weak .health-why-pts { color: var(--color-danger-ink); }
 /* Spans both columns: the explanation is about the row above it, not a third
    value to be read against the points. */
-.budget-app-root .health-why-note { grid-column: 1 / -1; font-size: 11px; color: var(--ink-faint); line-height: 1.4; }
-.budget-app-root .health-why-fix { font-size: 11.5px; margin: 6px 0 0; line-height: 1.45; }
-.budget-app-root .health-why-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
 /* Below the four-up grid a tile is half a card wide, which is too narrow to host
    a floating panel: anchored to its own column the panel either wraps every
    line to a few words or, held open by its min-width, grows straight off the
@@ -992,12 +991,10 @@
    both describe "the grid is two-up" must not be able to disagree about where
    that starts. */
 @media (max-width: 900px) {
-  .budget-app-root .health-fig.is-why-open { grid-column: 1 / -1; }
   /* Negative side margins cancel the tile's own 14px padding so the panel is
      the full width of the row rather than the tile's text column — it keeps its
      own padding, so the words inside still line up with the label above it. */
-  .budget-app-root .health-why {
-    position: static; width: auto; max-width: none; max-height: none;
+      position: static; width: auto; max-width: none; max-height: none;
     margin: 10px -14px 0; box-shadow: none;
   }
 }
@@ -1609,6 +1606,40 @@
    per line. A floor here pushes the table past its container instead, which
    .table-responsive already scrolls. Names longer than the floor still wrap,
    just at a readable width rather than at every space. */
+/* ---- resizable columns (views/accounts.js) ----
+   The grip is a 9px strip on the trailing edge of each header, invisible until
+   the header is hovered so six of them do not turn the head row into a comb.
+   touch-action:none is load-bearing on iOS: without it the first finger move
+   scrolls the table instead of dragging the column. */
+.budget-app-root #acctTable th { position: relative; }
+.budget-app-root .acct-grip {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 9px;
+  cursor: col-resize; touch-action: none; z-index: 2;
+  opacity: 0; transition: opacity .14s ease;
+}
+.budget-app-root .acct-grip::after {
+  content: ''; position: absolute; top: 6px; bottom: 6px; right: 3px;
+  width: 2px; border-radius: 2px; background: var(--color-primary);
+}
+.budget-app-root #acctTable th:hover .acct-grip,
+.budget-app-root .acct-grip.is-dragging { opacity: .55; }
+.budget-app-root .acct-grip.is-dragging { opacity: 1; }
+/* Only a table that has actually been sized takes a fixed layout — see the
+   COL_MIN note in views/accounts.js for why a stored width is meaningless
+   without it, and why the automatic layout stays the default. */
+.budget-app-root #acctTable.is-sized { table-layout: fixed; }
+.budget-app-root #acctTable.is-sized td { overflow: hidden; text-overflow: ellipsis; }
+/* The floor below is for the AUTOMATIC layout, where the engine gets to
+   shrink this column to min-content. A reader who has explicitly dragged it
+   has overruled that, so the floor must not fight their own width back. */
+.budget-app-root #acctTable.is-sized th:first-child,
+.budget-app-root #acctTable.is-sized td:first-child { min-width: 0; }
+/* A phone drops three columns entirely; a desktop width applied there would be
+   shared among a different set. Grips go with them. */
+@media (max-width: 760px) {
+  .budget-app-root .acct-grip { display: none; }
+  .budget-app-root #acctTable.is-sized { table-layout: auto; }
+}
 .budget-app-root #acctTable th:first-child,
 .budget-app-root #acctTable td:first-child { min-width: 210px; }
 .budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
@@ -2866,9 +2897,9 @@
   .budget-app-root .upload-area:focus  { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
-  .budget-app-root .health-why-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
-  .budget-app-root .health-fig.is-score .health-why-btn:focus { outline-color: #ffffff; }
-  .budget-app-root.bud-dark .health-fig.is-score .health-why-btn:focus { outline-color: var(--color-primary); }
+  .budget-app-root .health-fig-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
+  .budget-app-root .health-fig.is-score .health-fig-btn:focus { outline-color: #ffffff; }
+  .budget-app-root.bud-dark .health-fig.is-score .health-fig-btn:focus { outline-color: var(--color-primary); }
   .budget-app-root .acct-name-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-bal:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .acct-deck-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -3540,7 +3571,26 @@
   100% { box-shadow: 0 0 0 0 var(--color-primary); }
 }
 .budget-app-root .score-hero-sub { font-size: 12px; color: var(--text-muted); margin: 12px 0 0; }
-.budget-app-root .score-hero-say { font-size: 13.5px; line-height: 1.5; margin: 8px auto 0; max-width: 52ch; }
+/* 76ch, not the 52ch a body-copy measure would want. These are single centred
+   sentences under a 1030px hero, not paragraphs — and at 52ch this one broke
+   across two lines with ~590px of empty card on either side, which reads as a
+   narrow column of text rather than a caption. Measured: it needs 73ch to sit
+   on one line, so 76ch is that plus slack for a longer translation. Still a
+   max — a phone shrinks it to the card and wraps as before. */
+.budget-app-root .score-hero-say { font-size: 13.5px; line-height: 1.5; margin: 8px auto 0; max-width: 76ch; }
+/* The two facts the removed "How the score is built" card owned: the band
+   scale, and that an unanswerable part is left out rather than scored zero.
+   Footnote-sized on purpose — they qualify the number above them, and the
+   card they came from gave them a heading and a third of a screen. */
+.budget-app-root .score-hero-note {
+  font-size: 11.5px; color: var(--ink-faint); line-height: 1.5;
+  /* Same reasoning as .score-hero-say above. The longer of the two notes wants
+     134ch to sit on ONE line, which would fill the hero edge to edge and wrap
+     the moment the pane narrowed — so this is sized for TWO (97ch measured)
+     rather than chasing one. Three lines was the thing worth fixing. */
+  margin: 6px auto 0; max-width: 98ch;
+}
+.budget-app-root .score-hero-note + .score-hero-note { margin-top: 3px; }
 
 .budget-app-root .score-empty-h { font-size: 15px; font-weight: 700; }
 .budget-app-root .score-empty-p { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 6px 0 0; max-width: 60ch; }
@@ -3620,22 +3670,26 @@
 .budget-app-root .score-gap-do { font-size: 13px; font-weight: 600; margin: 8px 0 0; line-height: 1.45; }
 .budget-app-root .score-gap-how { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 0; line-height: 1.5; max-width: 64ch; }
 
-.budget-app-root .score-how-intro { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin: 0 0 8px; max-width: 64ch; }
-.budget-app-root .score-how-rows { margin-top: 10px; }
-.budget-app-root .score-how-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 9px 0; border-top: 1px solid var(--border-color); }
-.budget-app-root .score-how-name { font-size: 13px; font-weight: 700; }
-.budget-app-root .score-how-weight { font-size: 12px; font-weight: 700; color: var(--text-muted); text-align: right; }
-.budget-app-root .score-how-note { grid-column: 1 / -1; font-size: 12px; color: var(--ink-faint); line-height: 1.45; }
-.budget-app-root .score-how-foot { font-size: 12px; color: var(--ink-faint); line-height: 1.5; margin: 12px 0 0; max-width: 64ch; }
 
 /* Confetti. Driven entirely by CSS keyframes — see celebrate() in
    views/score.js for why this is not requestAnimationFrame. Pointer-events
    none throughout: it falls over the hero's own text and must never eat a tap
    meant for what is underneath. */
-.budget-app-root .score-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+/* Over the whole plugin pane, not over the hero card it is thrown for.
+   Appended to #root (views/score.js), which is position:relative and does not
+   scroll, so inset:0 is the pane itself — a burst parented to the card was
+   clipped to ~200px of it and read as a fizzle rather than a celebration.
+   pointer-events:none throughout, so nothing under it is ever blocked. */
+.budget-app-root .score-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 8; }
 .budget-app-root .score-confetti-bit {
   position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px;
   opacity: 0; pointer-events: none;
+  /* The keyframe's 260px default is the ONBOARDING celebration's distance —
+     that burst lives in a small card and shares this animation (see the note
+     above .budget-onb-celebrate). Overridden here rather than changed there:
+     this one has a whole pane to fall through. Beyond the pane is clipped by
+     the container's own overflow. */
+  --bud-fall: 105vh;
   animation: bud-confetti 1.9s cubic-bezier(.24, .78, .4, 1) forwards;
 }
 .budget-app-root .score-confetti-bit.tone-0 { background: var(--color-primary); }
@@ -3645,7 +3699,7 @@
 @keyframes bud-confetti {
   0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
   10%  { opacity: 1; }
-  100% { opacity: 0; transform: translate3d(var(--bud-drift, 0), 260px, 0) rotate(var(--bud-spin, 360deg)); }
+  100% { opacity: 0; transform: translate3d(var(--bud-drift, 0), var(--bud-fall, 260px), 0) rotate(var(--bud-spin, 360deg)); }
 }
 
 @media (max-width: 600px) {
@@ -3753,12 +3807,83 @@
 .budget-app-root .score-ring-seg.is-dim { opacity: .16; }
 .budget-app-root .score-ring-track.is-dim { opacity: .1; }
 
+/* Hover: pointing at one part quiets the rest, the same way focus mode does
+   but lighter — this is a look, not a choice, so it must not read as loudly
+   as the state a tap commits to.
+
+   Scoped to :not(.is-focus) deliberately. These selectors carry one more
+   class than `.is-dim` above and would otherwise WIN over it, so sweeping the
+   cursor across a ring that is already focused on one part would undo the
+   dimming focus exists to draw. Focus is the reader's decision; hover must
+   never overrule it. The tooltip still follows the pointer either way, which
+   is the part they actually came for. */
+.budget-app-root .score-ring-wrap:not(.is-focus) .score-ring-hold.is-hover .score-ring-seg { opacity: .34; }
+.budget-app-root .score-ring-wrap:not(.is-focus) .score-ring-hold.is-hover .score-ring-seg.is-hot { opacity: 1; }
+
+/* Pointer-follow readout. Only ever built where there is a fine pointer — on
+   a phone the segment's own <title> carries the same sentence instead.
+   translate(-50%,-100%) puts it above the cursor and margin-top lifts it off
+   the arc; pointer-events:none so it can never eat the hover that spawned it. */
+.budget-app-root .score-ring-tip {
+  position: absolute; left: 0; top: 0;
+  transform: translate(-50%, -100%);
+  z-index: 3;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  /* `width: max-content` is load-bearing, not a tidy-up. An absolutely
+     positioned box shrink-to-fits against the space left between its own
+     `left` and the containing block's right edge — and the containing block
+     here is the 320px ring holder. Pointing at the right-hand side of the
+     ring left ~84px of room, so the readout rendered 89px wide and 285px
+     tall: one word per line. max-content sizes it to its text instead and
+     lets it overflow the holder, which is safe — nothing clips until the
+     page's own scroll container. max-width then caps the long sentence. */
+  width: max-content;
+  max-width: 232px;
+  pointer-events: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity .14s ease;
+}
+/* Placement is set from JS (it needs the pointer AND the box's own measured
+   size); these are the two offsets that ride along with the flip. */
+.budget-app-root .score-ring-tip { margin-top: -14px; }
+.budget-app-root .score-ring-tip.is-below { transform: translate(-50%, 0); margin-top: 16px; }
+.budget-app-root .score-ring-tip.is-on { opacity: 1; visibility: visible; }
+.budget-app-root .score-ring-tip-name { font-size: 12.5px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .score-ring-tip-pts { font-size: 12px; font-weight: 700; color: var(--color-primary); margin-top: 1px; }
+/* The one line that can run long ("2.9 months covered · R 55 000 set aside ·
+   goal 6 months"), so this is the one that wraps rather than being clipped. */
+.budget-app-root .score-ring-tip-now { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.35; }
+/* And what it measures, under where you stand in it — the pointer gets the
+   whole answer in one place, which is what let the method card go. */
+.budget-app-root .score-ring-tip-how {
+  font-size: 11px; color: var(--ink-faint); line-height: 1.4;
+  margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line-soft);
+}
+.budget-app-root .score-ring-tip-how:empty { display: none; }
+.budget-app-root .score-ring-tip-now:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .score-ring-tip { transition: none; }
+}
+
 /* The centre is a real <button> (tap clears focus mode), sized by its own
    text and centred over the ring with the same "ignore layout, sit on top"
    trick a donut's centre label already uses elsewhere in this app. */
 .budget-app-root .score-ring-mid {
   position: absolute; top: 50%; left: 0; width: 100%; transform: translateY(-50%);
   text-align: center; padding: 0 18%; background: none; border: 0; cursor: pointer; color: inherit; font: inherit;
+  /* `display: block` is the whole point of this line, not tidiness. This is a
+     <button>, and BOTH Obsidian's app.css and this file's own `.budget-app-root
+     button` rule set buttons to inline-flex — so its two children became flex
+     ITEMS in a row and the band sat beside the number instead of under it,
+     crowding "58 / 100 STEADY" onto one line inside a circle. Block puts them
+     back to two stacked divs, which is what text-align and the band's own
+     margin-top were always written for. */
+  display: block;
 }
 .budget-app-root .score-ring-num { font-size: 52px; font-weight: 800; letter-spacing: -.035em; line-height: .95; font-variant-numeric: tabular-nums; }
 .budget-app-root .score-hero.is-strong .score-ring-num { color: var(--color-primary); }
@@ -3791,6 +3916,16 @@
 .budget-app-root .score-ring-row-body { min-width: 0; flex: 1 1 auto; }
 .budget-app-root .score-ring-row-name { font-size: 13.5px; font-weight: 700; }
 .budget-app-root .score-ring-row-now { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; line-height: 1.35; }
+/* What the part MEASURES — the method card's own sentence, now living in the
+   row it describes. Hidden until the row is the one being asked about, so the
+   legend stays a legend at rest: five of these open at once is the wall of
+   text the card was. Keyed off aria-pressed, which the row already carries for
+   assistive tech, rather than a second state class meaning the same thing. */
+.budget-app-root .score-ring-row-how { display: none; }
+.budget-app-root .score-ring-row[aria-pressed="true"] .score-ring-row-how {
+  display: block; font-size: 11.5px; color: var(--text-muted);
+  margin-top: 5px; line-height: 1.4;
+}
 .budget-app-root .score-ring-row-pts { flex: none; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .budget-app-root .score-ring-row.is-full .score-ring-row-pts { color: var(--color-primary); }
 .budget-app-root .score-ring-row.is-none .score-ring-row-pts { color: var(--color-danger-ink); }
@@ -3813,3 +3948,19 @@
   background: repeating-linear-gradient(135deg, var(--color-primary-light) 0 7px, transparent 7px 14px);
   border-left: 2px solid var(--color-accent);
 }
+
+/* Transactions header: filters on their own line, actions under them.
+   .card-h is a space-between row everywhere else in this app, so this turns
+   it into a column here rather than redefining what .card-h means. */
+.budget-app-root .tx-head { flex-direction: column; align-items: stretch; gap: 10px; }
+.budget-app-root .tx-filters { flex-wrap: wrap; align-items: center; gap: 8px; }
+/* The two selects size to their content; the search takes what is left, so
+   the four controls fill one line instead of leaving a ragged gap. It still
+   wraps on a phone — the row is a wrap container, not a nowrap one. */
+.budget-app-root .tx-filters #txSearch { flex: 1 1 170px; min-width: 0; }
+.budget-app-root .tx-filters .form-select-sm { flex: 0 1 auto; width: auto; }
+.budget-app-root .tx-whole {
+  font-size: 13px; display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap; flex: none;
+}
+.budget-app-root .tx-actions { flex-wrap: wrap; align-items: center; gap: 8px; }

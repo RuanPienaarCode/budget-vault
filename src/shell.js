@@ -264,11 +264,6 @@ const SHELL_HTML = `
             <div class="sub" data-i18n="score.work.sub">Biggest gap first — each one shows where you are, what to aim for, and how to get there</div></div></div>
           <div class="body-pad" id="scoreWork"></div>
         </div>
-        <div class="card mb-4">
-          <div class="card-h"><div><h2 data-i18n="score.how.title">How the score is built</h2>
-            <div class="sub" data-i18n="score.how.sub">Five parts, each worth a share of 100</div></div></div>
-          <div class="body-pad" id="scoreHow"></div>
-        </div>
       </section>
 
       <section id="view-transactions" class="hidden">
@@ -284,16 +279,19 @@ const SHELL_HTML = `
              S.lastImport; hidden when there is nothing to undo. -->
         <div class="tx-undo hidden" id="txUndoBar" role="status"></div>
         <div class="card">
-          <div class="card-h" style="align-items:center">
-            <div class="row" style="flex:1">
+          <!-- Two stacked rows, not two columns. Side by side, the four filters
+               and the five actions fought for one line and the filters lost:
+               each select dropped onto its own line and the header became a
+               narrow stack four deep. Filters get the full width of the card
+               on one line; the actions sit under them. -->
+          <div class="card-h tx-head">
+            <div class="row tx-filters">
               <select id="txAccount" class="form-select form-select-sm"><option value="" data-i18n="tx.allAccounts">All accounts</option></select>
               <select id="txCategory" class="form-select form-select-sm"><option value="" data-i18n="tx.allCategories">All categories</option><option value="__none__" data-i18n="tx.uncategorised">Uncategorised</option></select>
               <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…" data-i18n-placeholder="shell.tx.search">
-              <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
-                <input type="checkbox" id="txWholeHistory"> <span data-i18n="shell.tx.wholeHistory">whole history</span>
-              </label>
+              <label class="text-muted tx-whole"><input type="checkbox" id="txWholeHistory"> <span data-i18n="shell.tx.wholeHistory">whole history</span></label>
             </div>
-            <div class="row">
+            <div class="row tx-actions">
               <span id="txCount" class="count-note"></span>
               <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
               <button class="btn-ghost" id="txDeleteFiltered"><span class="ico" data-ico="trash-2|trash"></span> <span data-i18n="shell.tx.deleteFiltered">Delete these rows</span></button>
