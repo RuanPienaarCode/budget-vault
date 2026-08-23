@@ -965,28 +965,18 @@ module.exports = {
      is, where this household's points went, and what to do next — because a
      reader who opens it is asking the third one and will not find it under a
      wall of methodology. */
-  'dash.health.why.title': 'How this score works',
-  'dash.health.why.intro': 'Your score out of 100, built from five parts of your money. Anything your files cannot show is simply left out — it never counts against you.',
   'dash.health.why.bands': '{strong}+ is strong · {steady}–{strongLess} is steady · under {steady} needs attention',
   'dash.health.why.name.reserves': 'Emergency cover',
   'dash.health.why.name.saving': 'Saving',
   'dash.health.why.name.debt': 'Debt',
   'dash.health.why.name.spending': 'Spending',
   'dash.health.why.name.wealth': 'What you own',
-  'dash.health.why.fullReserves': 'Money set aside for emergencies. Full marks when it could cover {target} months of must-pay costs (rent, food, transport) if your income stopped.',
-  'dash.health.why.fullSaving': 'How much of your income you put away. Full marks when you save {pct}% of what you earn each month.',
-  'dash.health.why.fullDebt': 'What your debt costs you. Full marks when you pay no interest and have no loan or card repayments.',
-  'dash.health.why.fullSpending': 'How your spending compares with your income. Full marks when fixed bills (rent, insurance, subscriptions) take under {fixed}%, all day-to-day living takes under {living}%, and you stay inside your budget.',
-  'dash.health.why.fullWealth': 'Everything you own (savings, investments, property) minus everything you owe (loans, cards). Full marks when that adds up to {times} years of your income.',
   'dash.health.why.fixTrim': 'Spend {amount} less a month on day-to-day living to bring it under {pct}% of your income.',
   'dash.health.why.fixBuild': 'Grow your savings, investments or property by {amount} — or pay down debt by the same — to reach {times} years of income.',
   'dash.health.why.points': '{points} of {max}',
-  'dash.health.why.dragLabel': 'Biggest gap: {name}, {points} points.',
   'dash.health.why.fixFund': 'Put {amount} more into your emergency savings to cover {target} months.',
   'dash.health.why.fixMonthly': 'Save {amount} more each month to reach {pct}% of your income.',
   'dash.health.why.fixInterest': 'You pay {amount} a month in interest that gets you nothing. Clear that debt and the points come back.',
-  'dash.health.why.allFull': 'Everything we can measure is at full marks. Nothing is holding you back.',
-  'dash.health.why.aria': 'Financial score — how it is worked out and what would improve it',
 
   /* ------------------------------ score page ----------------------------- */
   'nav.score': 'Score',
@@ -1022,9 +1012,6 @@ module.exports = {
   'score.now.living': 'living costs {pct}',
   'score.now.budget': 'budget used {pct}',
   'score.now.wealth': 'Now: {amount} net worth · {times}× a year of income',
-  'score.how.title': 'How the score is built',
-  'score.how.sub': 'Five parts, each worth a share of 100',
-  'score.how.worth': 'worth {points}',
   'score.how.reserves': 'Money set aside that could carry the household with no income, counted in months of essential spending.',
   'score.how.saving': 'What reaches your savings and investments each month, as a share of what you earn.',
   'score.how.debt': 'What debt costs you — interest, and the repayments you are committed to.',
