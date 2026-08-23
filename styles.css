@@ -934,70 +934,11 @@
 .budget-app-root.bud-dark .health-fig.is-score .health-fig-btn:focus-visible { outline-color: var(--color-primary); }
 @media (max-width: 900px) { .budget-app-root .health-grid { grid-template-columns: repeat(2, 1fr); } }
 
-/* The score tile explains itself on hover, focus or tap — see
-   attachScoreExplainer for why this is a real popup and not a `title`.
-
-   The button is transparent and inherits everything: it wraps the tile's
-   existing contents so the four tiles keep reading as one row, rather than one
-   of them sprouting a border and a background nobody asked for. `text-align`
-   and `font` are reset explicitly because a <button> brings its own. */
-  display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none;
-  font: inherit; color: inherit; text-align: left; cursor: help;
-}
+/* The tile is a positioning context for nothing in particular now — the
+   popup it anchored is gone (see views/dashboard.js). Kept because it costs
+   nothing and an absolutely positioned child added here later would
+   otherwise silently resolve against the card. */
 .budget-app-root .health-fig { position: relative; }
-/* Hidden by default and revealed by a class rather than by :hover, because the
-   same panel has to open for focus and for a tap — three triggers, one state. */
-/* Anchored to the tile's RIGHT edge and given a real reading width.
-
-   Stretched across its own column (`left:0; right:0`) the panel was about a
-   quarter of the card wide, which turned five scored rows and their
-   explanations into a column tall enough to run off the top of the card once
-   it flipped upward. Width is the cheaper half of that fix: the same words in
-   ~420px are roughly half the height.
-
-   LEFT-anchored because the tile that carries this is the FIRST of the four, so
-   a panel wider than its column has to grow rightward to stay on the card. This
-   pairs with the tile's position: it was right-anchored while the score sat
-   last, and moving the tile without moving the anchor would have hung the panel
-   off the card's left edge. The viewport clamp keeps it honest on a narrow
-   desktop pane either way.
-
-   `overflow-y: auto` costs nothing while the panel fits, and is what makes the
-   measured max-height attachScoreExplainer sets a scroll rather than a clip. */
-  display: none; position: absolute; z-index: 20; left: 0; right: auto; top: calc(100% + 6px);
-  width: 420px; max-width: calc(100vw - 24px);
-  padding: 12px 14px; border-radius: 12px; overflow-y: auto;
-  background: var(--surface); border: 1px solid var(--border-color);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
-}
-/* Brought forward only while the panel is open — see attachScoreExplainer for
-   why raising the panel alone was not enough. */
-.budget-app-root .card.is-why-raised { position: relative; z-index: 30; }
-/* Flipped by attachScoreExplainer when the panel would fall past the bottom of
-   the app's own scroll container. */
-  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
-  padding: 6px 0; border-top: 1px solid var(--border-color);
-}
-/* Spans both columns: the explanation is about the row above it, not a third
-   value to be read against the points. */
-/* Below the four-up grid a tile is half a card wide, which is too narrow to host
-   a floating panel: anchored to its own column the panel either wraps every
-   line to a few words or, held open by its min-width, grows straight off the
-   card's right edge. So from the two-up grid down it stops floating and becomes
-   part of the card — the open tile spans the row and the panel fills it, which
-   also reads correctly as "this is the one that is expanded".
-
-   Bound to the same 900px the grid switches at, deliberately: two rules that
-   both describe "the grid is two-up" must not be able to disagree about where
-   that starts. */
-@media (max-width: 900px) {
-  /* Negative side margins cancel the tile's own 14px padding so the panel is
-     the full width of the row rather than the tile's text column — it keeps its
-     own padding, so the words inside still line up with the label above it. */
-      position: static; width: auto; max-width: none; max-height: none;
-    margin: 10px -14px 0; box-shadow: none;
-  }
-}
 
 .budget-app-root .hero-meter { position: relative; height: 8px; border-radius: 8px; background: var(--border-color); margin-top: 20px; overflow: hidden; max-width: 440px; }
 /* Same first-paint problem and same fix as .cat-bar-fill — see bud-bar-grow. */
