@@ -378,13 +378,31 @@ module.exports = function registerScore(ctx) {
       el('div', { class: 'score-flow-in num' }, money(flow.income, 0),
         el('small', {}, i18n.t('score.flow.thisPeriod')))));
 
-    /* Both trees always render; styles.css decides which one is on screen via
-       a plain `@media (max-width: 560px)` swap — no container query, so the
-       floor stays iOS 15. The Sankey is the one thing on this page that
-       cannot survive the squeeze: a 960-unit viewBox at a phone's ~360px CSS
-       width turns 13px label text into ~5px. */
-    body.append(el('div', { class: 'score-flow-sankey-wrap' }, buildFlowSankey(flow, rows)));
-    body.append(el('div', { class: 'score-flow-mobile-wrap' }, buildFlowMobile(rows)));
+    /* Nothing has HAPPENED yet is a different picture from a picture with
+       nothing IN it. With no income at all, every band is exactly zero and a
+       Sankey drawn from four zero-height bands is not a chart, it is four
+       labels fighting for the same few pixels — see buildFlowSankey's own
+       hardening below for what that looked like when it shipped in 1.22.0.
+       With income but nothing spent or saved yet, the chart would technically
+       render (one full-width "not yet spent" band), but it draws a whole
+       page of chrome around a single fact one sentence already states.
+       Neither state gets a chart; both get one honest line instead, in the
+       shape of the page's own `score-empty-p` pattern. */
+    const noIncome = flow.income <= 0;
+    const noSpend = !noIncome && flow.budget.spentTotal <= 0.005 && flow.bands.saving <= 0.005;
+    if (noIncome || noSpend) {
+      body.append(el('p', { class: 'score-empty-p score-flow-empty' },
+        noIncome ? i18n.t('score.flow.empty.noIncome')
+          : i18n.t('score.flow.empty.noSpend', { amount: money(flow.income, 0) })));
+    } else {
+      /* Both trees always render; styles.css decides which one is on screen
+         via a plain `@media (max-width: 560px)` swap — no container query, so
+         the floor stays iOS 15. The Sankey is the one thing on this page that
+         cannot survive the squeeze: a 960-unit viewBox at a phone's ~360px
+         CSS width turns 13px label text into ~5px. */
+      body.append(el('div', { class: 'score-flow-sankey-wrap' }, buildFlowSankey(flow, rows)));
+      body.append(el('div', { class: 'score-flow-mobile-wrap' }, buildFlowMobile(rows)));
+    }
     body.append(buildFlowChips(flow));
 
     card.append(body);
@@ -402,16 +420,30 @@ module.exports = function registerScore(ctx) {
      var() the same as any other element, so there is nothing here for
      chart.js's themeColors() to do. */
   function buildFlowSankey(flow, rows) {
-    const W = 960, H = 280;
+    const W = 960;
     const PAD_T = 14, PAD_B = 14, GAP = 8, NODE_W = 14, RIB_X0 = NODE_W, DEST_X = 460, DEST_W = 14;
     const LABEL_X = DEST_X + DEST_W + 20;
+
+    /* Hardened against ever being called with four zero-height bands — the
+       caller above already skips this entirely for that case, but a chart
+       that only behaves when its caller behaves is a chart waiting to ship
+       the bug that shipped in 1.22.0: a plot proportioned for real bands
+       collapsed every row into an 8px-apart cluster near the top, so four
+       13px text labels piled on top of each other, the income node rendered
+       as a barely-visible stub, and the SVG still reserved a full 280-unit
+       plot's worth of dead space beneath the cluster. Here "nothing to draw"
+       gets a full ROW_H of vertical room per row instead of a GAP's worth,
+       and the viewBox shrinks to fit that instead of always claiming 280. */
+    const allZero = rows.every(r => r.pct <= 0 && Math.abs(r.amount) < 0.005);
+    const ROW_H = 40;
+    const H = allZero ? PAD_T + PAD_B + rows.length * ROW_H : 280;
     const innerH = H - PAD_T - PAD_B - GAP * (rows.length - 1);
 
     let y = PAD_T;
     const laid = rows.map(r => {
-      const h = Math.max(0, (r.pct / 100) * innerH);
+      const h = allZero ? 0 : Math.max(0, (r.pct / 100) * innerH);
       const top = y, bottom = y + h;
-      y = bottom + GAP;
+      y = allZero ? top + ROW_H : bottom + GAP;
       return { ...r, top, bottom, h };
     });
     const plotTop = laid[0].top, plotBottom = laid[laid.length - 1].bottom;
@@ -500,9 +532,17 @@ module.exports = function registerScore(ctx) {
        so the empty state and the table it replaces can never disagree about
        which case the vault is in. */
     const hasFixedCats = S.categories.some(c => c.fixed);
+    /* Nothing here to show is a different question from nothing here to
+       EXPLAIN. Even with categories properly flagged fixed, a table of four
+       ¥0 rows says nothing the MONEY IN figure above did not already say —
+       drop it rather than pad the page with zeros nobody asked to see.
+       `flow.bands.committed` is the same total the sub-chips below sum to at
+       most (money-flow.js), so checking it once here cannot disagree with
+       what the rows themselves would have shown. */
+    const committedAllZero = flow.bands.committed <= 0.005;
     if (!hasFixedCats) {
       wrap.append(buildChipEmpty(i18n.t('score.flow.chip.committed'), i18n.t('score.flow.committed.empty')));
-    } else {
+    } else if (!committedAllZero) {
       const committedRows = [[i18n.t('score.flow.chip.debtRepayments'), money(d.debtRepayments, 0)]];
       if (d.interest > 0) { committedRows.push([i18n.t('score.flow.chip.ofWhichInterest'), money(d.interest, 0), true]); }
       committedRows.push([i18n.t('score.flow.chip.housing'), money(d.housing, 0)]);
@@ -511,6 +551,9 @@ module.exports = function registerScore(ctx) {
       wrap.append(buildChip(i18n.t('score.flow.chip.committed'), committedRows));
     }
 
+    /* Kept unconditionally — budgeted can be non-zero even on a period with
+       no income or no spend yet, and that comparison is exactly what a
+       reader opening the page early in a period wants to see. */
     const budgetRows = [[i18n.t('score.flow.chip.budgeted'), money(bud.budgeted, 0)]];
     if (bud.allocatedOfIncome !== null) {
       budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${Math.round(bud.allocatedOfIncome * 100)}%`]);
@@ -521,11 +564,19 @@ module.exports = function registerScore(ctx) {
     }
     wrap.append(buildChip(i18n.t('score.flow.chip.budget'), budgetRows));
 
-    wrap.append(buildChip(i18n.t('score.flow.chip.lefts'), [
-      [i18n.t('score.flow.chip.leftInBudget'), money(lefts.leftInBudget, 0)],
-      [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.neverBudgeted, 0)],
-      [i18n.t('score.flow.chip.together'), money(lefts.together, 0)],
-    ]));
+    /* Same rule as committed: real when any of the three differs from zero —
+       an over-budget period reads leftInBudget negative, which is a fact
+       worth a row — silent when the household's plan, its spend and its
+       income all landed on nothing this period. */
+    const leftsAllZero = Math.abs(lefts.leftInBudget) < 0.005
+      && Math.abs(lefts.neverBudgeted) < 0.005 && Math.abs(lefts.together) < 0.005;
+    if (!leftsAllZero) {
+      wrap.append(buildChip(i18n.t('score.flow.chip.lefts'), [
+        [i18n.t('score.flow.chip.leftInBudget'), money(lefts.leftInBudget, 0)],
+        [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.neverBudgeted, 0)],
+        [i18n.t('score.flow.chip.together'), money(lefts.together, 0)],
+      ]));
+    }
 
     return wrap;
   }

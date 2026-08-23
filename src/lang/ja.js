@@ -951,6 +951,8 @@ module.exports = {
   'score.flow.living': '生活費',
   'score.flow.saving': '貯蓄',
   'score.flow.notYetSpent': 'まだ使っていない分',
+  'score.flow.empty.noIncome': 'この期間はまだ何も入っていません — 収入や支出が記録されると内訳が埋まります。',
+  'score.flow.empty.noSpend': '{amount} が入りましたが、まだ何も使われたり貯蓄に回されたりしていません。',
   'score.flow.sub.pctOfIncome': '収入の {pct}',
   'score.flow.sub.committedDebt': '収入の {pct} · うち {amount} は返済',
   'score.flow.sub.savingZero': 'この期間、貯蓄や投資には何も入っていません',

@@ -997,6 +997,8 @@ module.exports = {
   'score.flow.living': 'Lewenskoste',
   'score.flow.saving': 'Spaar',
   'score.flow.notYetSpent': 'Nog nie bestee nie',
+  'score.flow.empty.noIncome': 'Nog niks het hierdie tydperk ingekom nie — die prent vul in soos inkomste en besteding inkom.',
+  'score.flow.empty.noSpend': '{amount} het ingekom, maar niks is nog bestee of opsy gesit nie.',
   'score.flow.sub.pctOfIncome': '{pct} van inkomste',
   'score.flow.sub.committedDebt': '{pct} van inkomste · sluit in {amount} skuldpaaiemente',
   'score.flow.sub.savingZero': 'Niks het hierdie tydperk by spaar of beleggings uitgekom nie',

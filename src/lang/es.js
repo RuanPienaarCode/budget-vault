@@ -999,6 +999,8 @@ module.exports = {
   'score.flow.living': 'Gastos de vida',
   'score.flow.saving': 'Ahorro',
   'score.flow.notYetSpent': 'Aún sin gastar',
+  'score.flow.empty.noIncome': 'Todavía no ha entrado nada este período — el panorama se completa a medida que llegan ingresos y gastos.',
+  'score.flow.empty.noSpend': 'Entraron {amount}, pero todavía no se ha gastado ni apartado nada.',
   'score.flow.sub.pctOfIncome': '{pct} de los ingresos',
   'score.flow.sub.committedDebt': '{pct} de los ingresos · incl. {amount} de cuotas de deuda',
   'score.flow.sub.savingZero': 'Nada llegó a ahorro o inversiones este período',

@@ -3606,6 +3606,11 @@
 .budget-app-root .score-flow-in { font-size: 30px; font-weight: 750; letter-spacing: -.02em; }
 .budget-app-root .score-flow-in small { font-size: .42em; font-weight: 600; color: var(--text-muted); margin-left: 8px; letter-spacing: 0; }
 
+/* The two empty states buildFlowCard swaps the Sankey/mobile pair for —
+   .score-empty-p already carries the right typography; this only restores
+   the breathing room the chart trees themselves used to open with. */
+.budget-app-root .score-flow-empty { margin-top: 14px; }
+
 /* Desktop: the SVG Sankey. Hidden below 560px in favour of the stacked-bar
    fallback — see the @media block below. */
 .budget-app-root .score-flow-sankey { display: block; width: 100%; height: auto; margin-top: 14px; }

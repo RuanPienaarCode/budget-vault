@@ -30,6 +30,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
+const i18n = require('../src/i18n');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
 
@@ -232,6 +233,60 @@ async function mountAll(files = FILES, period = '2026-07') {
     assert.doesNotThrow(() => applyInputMode(new FakeEl('div'), 'manual'),
       'a root without the import affordances must not throw');
     checks++;
+  }
+
+  /* ---- 7. the money-flow card's own empty states ----
+     Shipped broken in 1.22.0: a period with no income at all sent four
+     zero-height bands into buildFlowSankey, and the proportional layout that
+     is fine for real bands collapsed all four rows into an 8px-apart cluster
+     near the top — piling their 13px text labels on top of each other — while
+     the SVG still reserved a full plot's worth of empty space beneath the
+     pile. Fixed by skipping the chart entirely for that state (and for the
+     sibling "income arrived, nothing spent yet" state) in favour of one
+     honest sentence; this pins BOTH the rendered text and the absence of the
+     chart, so a regression that brings the Sankey back for either state fails
+     here rather than waiting for the next real vault to hit it. */
+  {
+    /* 7a. no income at all. The flow card is anchored to `currentPeriod()`
+       (the real calendar period containing today), the same way
+       health-data.js's own healthSnapshot() is — NOT to `S.period`, the
+       navigated period the Dashboard reads. FILES only carries transactions
+       dated 2026-07, so whatever period actually contains "today" when this
+       suite runs has none, which is exactly the state this pins. */
+    const { ctx, nodes } = await mountAll(FILES);
+    ctx.renderScore();
+    const flowCard = nodes.get('#view-score').querySelector('.score-flow-card');
+    ok(flowCard, 'the money-flow card still renders on a period with no data at all');
+    ok(flowCard.textContent.includes(i18n.t('score.flow.empty.noIncome')),
+      'a period with no income gets the honest empty-state line, not a blank Sankey');
+    ok(!flowCard.querySelector('.score-flow-sankey'),
+      'no Sankey is drawn over four zero-height bands');
+    checks += 3;
+  }
+  {
+    /* 7b. income landed, nothing has been spent or saved yet. Same
+       `currentPeriod()` anchor as 7a, so the income transaction has to be
+       dated inside TODAY's real calendar month rather than a fixed historical
+       one — a hardcoded 2026-07 row would land in an ordinary populated
+       period on every run except the one month it happens to match. */
+    const today = new Date();
+    const periodKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const NO_SPEND_FILES = {
+      [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nhousehold: "Test"\n---\n',
+      [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#33aa66"\n---\n',
+      [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\ninstitution: "Bank A"\naccount_number: "12345678901"\ntx_label: "Cheque"\nbalance: 12000.00\nbalance_updated: 2026-07-01\n---\n',
+      [`${B}/Transactions/Cheque/${periodKey}.md`]: `---\n${TX_FM}\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n`
+        + `| ${periodKey}-01 | Salary | Salary | 40000.00 |  |  |  |\n`,
+    };
+    const { ctx, nodes } = await mountAll(NO_SPEND_FILES);
+    ctx.renderScore();
+    const flowCard = nodes.get('#view-score').querySelector('.score-flow-card');
+    ok(flowCard, 'the money-flow card renders when income arrived and nothing has moved yet');
+    ok(flowCard.textContent.includes(i18n.t('score.flow.empty.noSpend', { amount: ctx.money(40000, 0) })),
+      'income with no spend or saving gets the honest empty line naming what came in');
+    ok(!flowCard.querySelector('.score-flow-sankey'),
+      'no Sankey is drawn for an all-in, nothing-out period either');
+    checks += 3;
   }
 
   console.log(`PASS — all ${DISPATCH.length} views render, empty and populated (${checks} assertions).`);

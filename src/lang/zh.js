@@ -951,6 +951,8 @@ module.exports = {
   'score.flow.living': '生活成本',
   'score.flow.saving': '储蓄',
   'score.flow.notYetSpent': '尚未花掉',
+  'score.flow.empty.noIncome': '本周期还没有任何收入 — 等收入和支出记录后，这里就会显示出来。',
+  'score.flow.empty.noSpend': '已收入 {amount}，但还没有任何支出或存入储蓄。',
   'score.flow.sub.pctOfIncome': '占收入 {pct}',
   'score.flow.sub.committedDebt': '占收入 {pct} · 其中含 {amount} 债务还款',
   'score.flow.sub.savingZero': '本周期没有钱进入储蓄或投资',

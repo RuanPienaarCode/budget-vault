@@ -998,6 +998,8 @@ module.exports = {
   'score.flow.living': 'Lebenshaltung',
   'score.flow.saving': 'Sparen',
   'score.flow.notYetSpent': 'Noch nicht ausgegeben',
+  'score.flow.empty.noIncome': 'In diesem Zeitraum ist noch nichts eingegangen — das Bild füllt sich, sobald Einkommen und Ausgaben eintreffen.',
+  'score.flow.empty.noSpend': '{amount} ist eingegangen, aber es wurde noch nichts ausgegeben oder zurückgelegt.',
   'score.flow.sub.pctOfIncome': '{pct} des Einkommens',
   'score.flow.sub.committedDebt': '{pct} des Einkommens · davon {amount} Ratenzahlungen',
   'score.flow.sub.savingZero': 'In diesem Zeitraum ging nichts ins Sparen oder Investieren',

@@ -1011,6 +1011,8 @@ module.exports = {
   'score.flow.living': 'Coût de la vie',
   'score.flow.saving': 'Épargne',
   'score.flow.notYetSpent': 'Pas encore dépensé',
+  'score.flow.empty.noIncome': 'Rien n’est encore entré cette période — le tableau se remplit au fur et à mesure que les revenus et les dépenses arrivent.',
+  'score.flow.empty.noSpend': '{amount} sont entrés, mais rien n’a encore été dépensé ni mis de côté.',
   'score.flow.sub.pctOfIncome': '{pct} des revenus',
   'score.flow.sub.committedDebt': '{pct} des revenus · dont {amount} de mensualités de dette',
   'score.flow.sub.savingZero': 'Rien n’est arrivé à l’épargne ou aux investissements cette période',
