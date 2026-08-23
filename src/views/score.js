@@ -278,11 +278,14 @@ module.exports = function registerScore(ctx) {
   }
 
   /* ------------------------- where the money went ------------------------ */
-  /* "Where the money went" — the money-flow card the page opens with. Lives
+  /* "Where the money went" — the money-flow card that closes the page. The
+     score is the page's answer and leads; the wins, the gaps and how the score
+     is built explain it; the money picture is the context underneath all of
+     that, so it comes last (Ruan, 23 Aug 2026). Lives
      entirely outside the hero/good/work/how containers shell.js hands out,
      because there is no static container for it: shell.js is off limits for
      id churn (shell-contract.test.cjs counts them), so the card is built here
-     at render time and spliced in front of #scoreHeroCard, the same way a
+     at render time and appended after the last static card, the same way a
      view that owns its own markup always has. Removed and rebuilt on every
      render rather than emptied-in-place, because there is nothing durable to
      empty — see the note on renderScore() above. */
@@ -292,7 +295,7 @@ module.exports = function registerScore(ctx) {
     if (!view || !heroCard) { return; }
     const old = view.querySelector('.score-flow-card');
     if (old && old.remove) { old.remove(); }
-    view.insertBefore(buildFlowCard(buildFlow()), heroCard);
+    view.appendChild(buildFlowCard(buildFlow()));
   }
 
   /* This period's income, split into committed & fixed bills, living costs,
