@@ -1601,6 +1601,16 @@
 .budget-app-root .table tbody tr.acct-row.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
 .budget-app-root .acct-cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
+/* The account name is the row's identity, so it must never be the column that
+   gives way. Every other column in this table is nowrap — figures, dates, the
+   state pills ("nothing imported · ignored") — so when their combined width
+   passes the pane, auto table layout has only this column left to squeeze and
+   collapses it to min-content: "FNB Business Account (Ruan)" rendered one word
+   per line. A floor here pushes the table past its container instead, which
+   .table-responsive already scrolls. Names longer than the floor still wrap,
+   just at a readable width rather than at every space. */
+.budget-app-root #acctTable th:first-child,
+.budget-app-root #acctTable td:first-child { min-width: 210px; }
 .budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .budget-app-root .acct-cell-sub { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
 .budget-app-root .acct-bal {
@@ -3141,6 +3151,14 @@
   font-variant-numeric: tabular-nums;
 }
 .budget-app-root .plan-free-fig { color: var(--color-gold); }
+/* The subtotal, not a fourth segment: no swatch, so the border-inline-start is
+   the only thing marking it off from the three bands above it — it must not
+   read as a fourth slice of the bar it sits under. */
+.budget-app-root .sk-left {
+  border-inline-start: 1px solid var(--border-color);
+  padding-inline-start: 22px;
+}
+.budget-app-root .sk-left .sk-top { font-style: italic; }
 
 /* ---- money in: any source at all, and when it actually lands ---- */
 .budget-app-root .src-row {
@@ -3188,6 +3206,16 @@
 }
 .budget-app-root .env:hover { border-color: var(--color-primary); transform: translateY(-2px); }
 .budget-app-root .env:focus-within { border-color: var(--color-primary); }
+/* The whole card reads as in-trouble, not just one line of text buried in the
+   rail note — border AND a faint tint, so it is visible in peripheral vision
+   the way the tint wash below already is. Declared AFTER :hover/:focus-within
+   (same specificity, later wins) so a card that is in trouble stays visibly so
+   even while hovered — hover must not hide the warning it is sitting on.
+   is-overspent is declared after is-overcommitted so a card that is BOTH (the
+   list claims more than the bucket AND the money is actually gone) reads as
+   the more urgent of the two rather than an arbitrary one. */
+.budget-app-root .env.is-overcommitted { border-color: var(--color-warning); background: var(--color-warning-light); }
+.budget-app-root .env.is-overspent { border-color: var(--color-danger); background: var(--color-danger-light); }
 /* A tint wash keyed to the envelope — the fastest way to tell "Settle up" from
    "For the baby" in peripheral vision, and it costs no vertical space. */
 .budget-app-root .env::before {
@@ -3204,6 +3232,18 @@
 }
 .budget-app-root .env-name:hover { color: var(--text-primary); text-decoration: underline; }
 .budget-app-root .env-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* The pencil that says this name is editable. Visible at rest — not a
+   hover-only affordance, which a touch device can never trigger — and quiet
+   about it (low opacity, no colour) so six cards don't turn into a row of
+   pencils; hover/focus (mouse and keyboard, not touch) bring it to full
+   strength as the reader's attention actually lands on one card. Plain
+   :hover/:focus rather than :focus-visible: this is a decoration riding along
+   with the button's own focus state, not a new ring that needs an iOS-15
+   fallback of its own. */
+.budget-app-root .env-name-ico { margin-inline-start: 5px; opacity: .45; }
+.budget-app-root .env-name-ico svg { width: 11px; height: 11px; }
+.budget-app-root .env-name:hover .env-name-ico,
+.budget-app-root .env-name:focus .env-name-ico { opacity: 1; color: var(--color-primary); }
 .budget-app-root .env-share {
   font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; flex: none;
   background: rgba(127, 127, 127, .16); color: var(--text-muted);
@@ -3243,6 +3283,13 @@
   display: flex; justify-content: space-between; gap: 10px;
   font-size: 11.5px; color: var(--ink-faint); margin-top: 7px;
 }
+/* Up to two flags side by side — overspent and overcommitted are independent
+   facts, so a card can show both rather than the last one written winning an
+   if/else. Wrap rather than clip: two short figures never overflow a 280px
+   card, but the words ("over-committed") are long enough to want the option. */
+.budget-app-root .env-rail-flags { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.budget-app-root .env-rail-flag { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+.budget-app-root .env-rail-flag-ico svg { width: 11px; height: 11px; }
 .budget-app-root .env-items {
   list-style: none; margin: 16px 0 0; padding: 14px 0 0;
   border-top: 1px solid var(--line-soft);

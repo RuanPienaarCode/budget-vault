@@ -33,7 +33,8 @@ const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
-const { planSummary, barSegments, envelopeGap, SOURCE_KINDS, sharePct } = require('../plan-math');
+const { planSummary, barSegments, SOURCE_KINDS, sharePct,
+  envelopeOverState } = require('../plan-math');
 
 module.exports = function registerPlan(ctx) {
   const { S, $, app, money, toast, writeFile, fileAt } = ctx;
@@ -105,10 +106,13 @@ module.exports = function registerPlan(ctx) {
           : [])),
       /* One bar, three states of the same rand. role=img with the figures in
          the label: a screen reader gets the split as a sentence rather than
-         three unlabelled divs, and the visual key below repeats it in text. */
+         three unlabelled divs, and the visual key below repeats it in text.
+         `left` closes the sentence — the one question the three segments
+         never answer on their own. */
       el('div', { class: 'plan-split', role: 'img',
         'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
-          `${money(sum.committed)} allocated but unspent, ${money(sum.free)} not yet allocated` },
+          `${money(sum.committed)} allocated but unspent, ${money(sum.free)} not yet allocated. ` +
+          `${money(sum.left)} still left.` },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
         el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
@@ -116,7 +120,14 @@ module.exports = function registerPlan(ctx) {
         splitKey('Already spent', sum.spent, 'var(--color-primary)'),
         splitKey('Spoken for', sum.committed, 'var(--color-accent)'),
         splitKey('Not spoken for', sum.free, 'var(--color-gold)',
-          sum.free < 0 ? 'text-danger' : 'plan-free-fig')));
+          sum.free < 0 ? 'text-danger' : 'plan-free-fig'),
+        /* A SUBTOTAL, not a fourth band: `left` equals spoken-for + not-spoken-
+           for in the normal case, so it gets no swatch and reads as the sum of
+           the three above it rather than a fourth slice of the bar — the
+           border-inline-start is the only thing that sets it apart. */
+        el('div', { class: 'sk-left' },
+          el('div', { class: 'sk-top' }, 'Still left'),
+          el('div', { class: `sk-fig num ${sum.left < 0 ? 'text-danger' : ''}` }, money(sum.left)))));
   }
 
   const splitKey = (label, value, swatch, cls = '') => el('div', {},
@@ -171,45 +182,108 @@ module.exports = function registerPlan(ctx) {
   /* ---- the envelopes: the act of dividing, made draggable ---- */
   function renderEnvelopes(p, sum) {
     $('#planEnvSub').textContent = p.envelopes.length
-      ? `Drag a slider to move money in or out · ${p.envelopes.length} envelope${p.envelopes.length === 1 ? '' : 's'}, ${money(sum.allocated)} placed`
-      : 'Nothing placed yet — an envelope is one intent, and the items are what it buys.';
+      ? `Drag a slider to move money in or out · ${p.envelopes.length} spending bucket${p.envelopes.length === 1 ? '' : 's'}, ${money(sum.allocated)} placed`
+      : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
     const host = $('#planEnvelopes');
     keepScroll(host, () => {
       host.empty();
       for (const e of p.envelopes) host.append(envelopeCard(p, e, sum));
       if (!p.envelopes.length) {
         host.append(el('div', { class: 'text-muted plan-empty-row' },
-          'No envelopes yet.'));
+          'No spending buckets yet.'));
       }
     });
   }
 
+  /* Right-hand side of the rail note: up to two status flags rather than one
+     message, because overspent and overcommitted are independent facts and a
+     card can be both at once — collapsing them into a single line would
+     silently drop whichever lost the if/else. Wording carries the meaning as
+     much as colour does (a11y): "over" and "over-committed" are never just a
+     swatch. Takes a STATE (from envelopeOverState) rather than an envelope, so
+     the drag handler below can call it with the live slider value and get
+     back exactly the markup a full render would have produced — one function,
+     not a copy kept in sync by hand. */
+  function railFlags(state, spent) {
+    const { overAmt, isOverspent, gap, isOvercommitted } = state;
+    const flags = [];
+    if (isOverspent) {
+      flags.push(el('span', { class: 'num text-danger env-rail-flag' },
+        icoEl(['alert-triangle', 'triangle-alert'], 'env-rail-flag-ico'), `${money(overAmt)} over`));
+    }
+    if (isOvercommitted) {
+      flags.push(el('span', { class: 'num text-warning env-rail-flag' }, `${money(-gap)} over-committed`));
+    }
+    if (!isOverspent && !isOvercommitted) {
+      flags.push(el('span', { class: `num ${gap > 0 ? 'text-warning' : ''}` },
+        gap > 0 ? `${money(gap)} unassigned` : spent > 0 ? `${money(spent)} spent` : ''));
+    }
+    return flags;
+  }
+
+  /* The slider's own background, painted as the overshoot: a red segment
+     starting exactly where the bucket's own amount sits and ending where the
+     money actually stopped — clamped through pctOf so it can never run past
+     the track or paint backwards. null on a healthy bucket, so the ordinary
+     flat track (styles.css) is untouched: this is the ONE thing that should
+     look different, not a redesign of every slider. Same function on first
+     render and on every drag tick, for the same reason as railFlags above. */
+  function overFillStyle(state, amount, spent, pctOf) {
+    if (!state.isOverspent) return null;
+    return `background:linear-gradient(90deg, rgba(127,127,127,.2) 0%, rgba(127,127,127,.2) ${pctOf(amount)}%, ` +
+      `var(--color-danger) ${pctOf(amount)}%, var(--color-danger) ${pctOf(spent)}%, ` +
+      `rgba(127,127,127,.2) ${pctOf(spent)}%, rgba(127,127,127,.2) 100%)`;
+  }
+
   function envelopeCard(p, env, sum) {
     const items = p.items.filter(i => i.envelope === env.name);
-    const gap = envelopeGap(env, items);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
+    const state = envelopeOverState(env.amount, items, spent);
 
     /* The slider's ceiling is this envelope's amount plus everything not yet
        spoken for — i.e. the most it could possibly hold without the plan going
        negative. A fixed max would either stop short of what the pot allows or
        invite dragging past it. */
     const ceiling = Math.max(env.amount, env.amount + Math.max(0, sum.free), 100);
+    const sliderMax = Math.ceil(ceiling);
+    const pctOf = v => (sliderMax > 0 ? Math.max(0, Math.min(100, (v / sliderMax) * 100)) : 0);
 
     const amtEl = el('div', { class: 'env-amt num' }, money(env.amount));
     const shareEl = el('span', { class: 'env-share num' }, `${sharePct(env.amount, sum.pot)}%`);
 
+    const initialFill = overFillStyle(state, env.amount, spent, pctOf);
     const slider = el('input', {
-      class: 'env-slider', type: 'range', min: '0', max: String(Math.ceil(ceiling)),
+      class: 'env-slider', type: 'range', min: '0', max: String(sliderMax),
       step: '10', value: String(env.amount),
       'aria-label': `Amount allocated to ${env.name}`,
+      ...(initialFill ? { style: initialFill } : {}),
     });
-    /* input repaints only this card's own figures — cheap, and it keeps the
-       drag smooth. change commits and re-renders the page, because the pot bar
-       and the free card above depend on this number too. */
+
+    /* Assigned once the elements below exist — the listener is attached now,
+       but only FIRES later, by which point both closures-over are set. */
+    let card, flagsHost;
+
+    /* input repaints this card's own figures AND its overspend state — cheap,
+       and it keeps the drag smooth. What it must NOT do is call renderPlan():
+       that is the whole reason `change` exists as a separate, page-wide commit
+       below. Before this, dragging a bucket's amount DOWN past what it had
+       already spent left the card reading "healthy" until release — the exact
+       moment the warning should appear is the moment the drag makes it true,
+       not the moment the mouse comes up. envelopeOverState/railFlags/
+       overFillStyle are the same three calls the initial render made, just
+       fed the live value instead of env.amount, so drag and release can never
+       disagree about what a given number means. */
     slider.addEventListener('input', () => {
       const v = Number(slider.value);
       amtEl.textContent = money(v);
       shareEl.textContent = `${sharePct(v, sum.pot)}%`;
+
+      const liveState = envelopeOverState(v, items, spent);
+      card.classList.toggle('is-overspent', liveState.isOverspent);
+      card.classList.toggle('is-overcommitted', liveState.isOvercommitted);
+      flagsHost.replaceChildren(...railFlags(liveState, spent));
+      const fill = overFillStyle(liveState, v, spent, pctOf);
+      if (fill) slider.setAttribute('style', fill); else slider.removeAttribute('style');
     });
     slider.addEventListener('change', () => {
       env.amount = Number(slider.value);
@@ -223,21 +297,24 @@ module.exports = function registerPlan(ctx) {
       'aria-label': `Set the amount for ${env.name} by typing it`,
       onclick: () => editEnvelopeAmount(env) }, amtEl);
 
-    return el('div', { class: 'env', style: `--tint:${env.tint || 'transparent'}` },
+    flagsHost = el('div', { class: 'env-rail-flags' }, ...railFlags(state, spent));
+
+    card = el('div', {
+      class: `env${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
+      style: `--tint:${env.tint || 'transparent'}`,
+    },
       el('div', { class: 'env-top' },
         el('button', { class: 'env-name', type: 'button',
-          'aria-label': `Rename envelope ${env.name}`,
-          onclick: () => renameEnvelope(p, env) }, env.name),
+          'aria-label': `Rename spending bucket ${env.name}`,
+          onclick: () => renameEnvelope(p, env) },
+          env.name, icoEl(['pencil', 'square-pen', 'pen-line'], 'env-name-ico')),
         shareEl),
       amtBtn,
       el('div', { class: 'env-rail' },
         slider,
         el('div', { class: 'env-rail-note' },
           el('span', {}, env.note || ''),
-          el('span', { class: `num ${gap ? 'text-warning' : ''}` },
-            gap > 0 ? `${money(gap)} unassigned`
-              : gap < 0 ? `${money(-gap)} over`
-              : spent > 0 ? `${money(spent)} spent` : ''))),
+          flagsHost)),
       el('ul', { class: 'env-items' },
         ...items.map(i => itemRow(p, i)),
         el('li', { class: 'env-item env-item-add' },
@@ -249,8 +326,10 @@ module.exports = function registerPlan(ctx) {
             ? `${items.filter(i => i.status === 'done').length} of ${items.length} done`
             : 'no items yet'),
         el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button',
-          'aria-label': `Remove envelope ${env.name}`,
+          'aria-label': `Remove spending bucket ${env.name}`,
           onclick: () => removeEnvelope(p, env) }, '✕')));
+
+    return card;
   }
 
   function itemRow(p, i) {
@@ -306,11 +385,11 @@ module.exports = function registerPlan(ctx) {
       el('div', { class: 'free-fig num' },
         `${sharePct(Math.abs(sum.free), sum.pot)}% of the plan`),
       el('p', {}, over
-        ? 'The envelopes add up to more than the money coming in. Take some back out, or add the source that covers it.'
+        ? 'The spending buckets add up to more than the money coming in. Take some back out, or add the source that covers it.'
         : 'Leaving money unplaced is a decision too — but it should be one you made, not one you forgot.'),
       el('div', { class: 'free-acts' },
         ...(over ? [] : [el('button', { class: 'btn-gradient', type: 'button',
-          onclick: () => addEnvelope(p, sum.free) }, 'Put it in a new envelope')]),
+          onclick: () => addEnvelope(p, sum.free) }, 'Put it in a new spending bucket')]),
         el('button', { class: 'btn-ghost', type: 'button',
           onclick: () => addSource(p) }, '＋ Add a source')));
   }
@@ -342,7 +421,7 @@ module.exports = function registerPlan(ctx) {
 
   async function addEnvelope(p = P(), suggested = 0) {
     if (!p) return;
-    const r = await askFields(app, 'New envelope', [
+    const r = await askFields(app, 'New spending bucket', [
       { key: 'name', label: 'What is this money for?', type: 'text', placeholder: 'For the baby' },
       { key: 'amount', label: 'How much goes in it?', type: 'number',
         value: suggested > 0 ? suggested.toFixed(2) : '0' },
@@ -350,7 +429,7 @@ module.exports = function registerPlan(ctx) {
     ]);
     if (!r || !r.name.trim()) return;
     const name = r.name.trim();
-    if (p.envelopes.some(e => e.name === name)) return toast('That envelope already exists', true);
+    if (p.envelopes.some(e => e.name === name)) return toast('That spending bucket already exists', true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     p.envelopes.push({ name, amount, note: (r.note || '').trim(), tint: nextTint(p) });
@@ -358,14 +437,14 @@ module.exports = function registerPlan(ctx) {
   }
 
   async function renameEnvelope(p, env) {
-    const r = await askFields(app, 'Rename envelope', [
+    const r = await askFields(app, 'Rename spending bucket', [
       { key: 'name', label: 'Name', type: 'text', value: env.name },
       { key: 'note', label: 'Note', type: 'text', value: env.note || '' },
     ]);
     if (!r || !r.name.trim()) return;
     const name = r.name.trim();
     if (name !== env.name) {
-      if (p.envelopes.some(e => e.name === name)) return toast('That envelope already exists', true);
+      if (p.envelopes.some(e => e.name === name)) return toast('That spending bucket already exists', true);
       // Items key off the envelope NAME, so a rename that skipped this would
       // orphan every item in it — they would vanish from the page while still
       // sitting in the file.
@@ -378,7 +457,7 @@ module.exports = function registerPlan(ctx) {
 
   async function editEnvelopeAmount(env) {
     const r = await askFields(app, env.name, [
-      { key: 'amount', label: 'Amount in this envelope', type: 'number', value: env.amount.toFixed(2) },
+      { key: 'amount', label: 'Amount in this spending bucket', type: 'number', value: env.amount.toFixed(2) },
     ]);
     if (!r) return;
     const amount = normalizeAmount(r.amount);
@@ -423,7 +502,7 @@ module.exports = function registerPlan(ctx) {
       { key: 'amount', label: 'Planned', type: 'number', value: item.amount.toFixed(2) },
       { key: 'spent', label: 'Actually spent', type: 'number', value: (item.spent || 0).toFixed(2),
         desc: 'Leave at 0 until the money has actually gone.' },
-      { key: 'envelope', label: 'Envelope', type: 'select',
+      { key: 'envelope', label: 'Spending bucket', type: 'select',
         options: p.envelopes.map(e => e.name), value: item.envelope },
       { key: 'category', label: 'Budget category', type: 'text', value: item.category || '' },
       { key: 'notes', label: 'Notes', type: 'text', value: item.notes || '' },
@@ -498,7 +577,7 @@ module.exports = function registerPlan(ctx) {
       message: (file
         ? `Move Plans/${key}.md to your vault trash? `
         : 'This plan has never been saved, so there is no file to trash — it is dropped from the app. ')
-        + `“${p.name}” holds ${n(p.sources, 'source')}, ${n(p.envelopes, 'envelope')} and ${n(p.items, 'item')}. `
+        + `“${p.name}” holds ${n(p.sources, 'source')}, ${n(p.envelopes, 'spending bucket')} and ${n(p.items, 'item')}. `
         + 'No transaction, account or budget changes: a plan only ever described how money already '
         + 'in your accounts was meant to be divided.',
       confirmText: 'Delete plan',

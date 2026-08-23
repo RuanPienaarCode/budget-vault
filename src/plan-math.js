@@ -15,7 +15,13 @@
    and the bar the page draws is spent + committed + free = pot, where
    committed = allocated − spent. That identity is what makes the three
    segments meaningful side by side; planSummary is the only place it is
-   computed, so it is the only place it can break. */
+   computed, so it is the only place it can break.
+
+   A fifth figure, `left` = pot − spent, answers a question the four above
+   never do on their own: "how much do I still have?" It agrees with
+   committed + free only while nothing is clamped — see the note on `left`
+   below for why it is derived independently rather than added from those
+   two. */
 
 /* The presets offered when adding a source. Deliberately NOT an enum the rest
    of the code branches on — a source's kind is a label for grouping and colour
@@ -63,6 +69,15 @@ function planSummary(plan) {
        The overspend is still visible: it pushes `free` down. */
     committed: round2(Math.max(0, allocated - spent)),
     free: round2(pot - allocated),
+    /* What is still left to spend, full stop — pot minus what has actually
+       gone. Answers the question the split key never used to: "how much do I
+       still have?" Deliberately NOT committed + free: that sum only agrees
+       with pot − spent while nothing is clamped (committed clamps at zero once
+       an envelope is overspent), and this repo's recurring bug shape is two
+       figures for the same thing derived by two different rules. `left` is
+       derived here, once, from the same two sums as everything else on this
+       page, so the view only ever prints it. */
+    left: round2(pot - spent),
     sources: sources.length,
     envelopes: envelopes.length,
     items: items.length,
@@ -114,5 +129,27 @@ function sharePct(value, pot) {
   return Math.round((value / pot) * 100);
 }
 
+/* TWO DISTINCT OVERSPEND SIGNALS for one envelope, not one — and the reason
+   this is pure and exported rather than inlined in the view: the slider drags
+   `amount` live, one input event at a time, well before `change` commits it
+   and a full renderPlan() would recompute this from the plan. Both the initial
+   card render and the drag handler call this SAME function with the live
+   amount, so the two paths can never say different things about the same
+   number — the failure shape this repo keeps repeating.
+
+     overspent:     actual money gone (spent) exceeds what the bucket holds.
+                     Already happened — the one a reader needs to see first.
+     overcommitted: the item LIST claims more than the bucket holds
+                     (envelopeGap < 0), whether or not any of it has been
+                     spent yet — a promise, not yet a fact.
+
+   Neither is `sum.free < 0` (the plan-wide card below the pot bar), which is
+   about the pot, not this one bucket. */
+function envelopeOverState(amount, items, spent) {
+  const gap = envelopeGap({ amount }, items);
+  const overAmt = round2(spent - amount);
+  return { overAmt, isOverspent: overAmt > 0.005, gap, isOvercommitted: gap < -0.005 };
+}
+
 module.exports = { planSummary, barSegments, envelopeGap, sharePct, round2, isReceived,
-  SOURCE_KINDS, ITEM_STATUSES };
+  envelopeOverState, SOURCE_KINDS, ITEM_STATUSES };

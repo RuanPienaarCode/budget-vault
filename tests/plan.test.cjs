@@ -35,7 +35,7 @@ Module._load = function (request) {
 };
 
 const { planSummary, barSegments, envelopeGap, sharePct, round2, isReceived,
-  SOURCE_KINDS } = require('../src/plan-math');
+  envelopeOverState, SOURCE_KINDS } = require('../src/plan-math');
 const { escMd, unescMd, parseMdTable, parseFrontmatter } = require('../src/markdown');
 const { normalizeAmount } = require('../src/amount');
 const registerPlan = require('../src/views/plan');
@@ -86,9 +86,22 @@ eq(s.allocated, 49450, 'allocated is the sum of envelope amounts, not of items')
 eq(s.spent, 10872.99, 'spent is the sum of item spent');
 eq(s.committed, 38577.01, 'committed is allocated minus spent');
 eq(s.free, 6550, 'free is pot minus allocated');
+eq(s.left, 45127.01, 'left is pot minus spent');
 eq(s.sources, 4, 'source count');
 eq(s.envelopes, 6, 'envelope count');
 eq(s.items, 10, 'item count');
+
+/* THE SPLIT KEY'S SUBTOTAL. `left` must be pot − spent, full stop — never
+   derived from committed/free in the view, because those two clamp and this
+   repo's recurring bug shape is exactly that: two figures for the same thing,
+   derived by two different rules, that quietly disagree the moment one of
+   them clamps. On an unclamped plan the two ways of asking the question still
+   agree, which is what makes "Still left" a legible subtotal rather than a
+   fourth mystery number — but agreement here is a consequence, not the
+   definition. */
+eq(s.left, round2(s.pot - s.spent), 'left is defined as pot minus spent, not derived from committed/free');
+eq(s.left, round2(s.committed + s.free),
+  'on a plan where nothing is clamped, left happens to equal committed + free too');
 
 /* THE IDENTITY the bar depends on. On a healthy plan the summary satisfies it
    directly; barSegments is what guarantees it on every plan, healthy or not. */
@@ -122,6 +135,8 @@ for (let n = 0; n < 400; n++) {
   assert.strictEqual(round2(q.received + q.expected), q.pot,
     `received + expected must equal pot (n=${n}, seed 20260811)`);
   assert.ok(q.committed >= 0, `committed is clamped at zero (n=${n})`);
+  assert.strictEqual(q.left, round2(q.pot - q.spent),
+    `left is pot minus spent on every plan, clamped or not (n=${n})`);
 
   /* The one that matters: whatever the plan looks like — overspent envelopes,
      more allocated than the pot holds, both at once — the three widths the bar
@@ -136,7 +151,7 @@ for (let n = 0; n < 400; n++) {
     assert.ok(b[k] <= q.pot + 0.005, `bar segment ${k} must never exceed the pot (n=${n})`);
   }
 }
-checks += 4;
+checks += 5;
 
 /* A pot of zero must not divide by anything. */
 eq(barSegments({ pot: 0, spent: 100, allocated: 200 }), { spent: 0, committed: 0, free: 0 },
@@ -154,6 +169,13 @@ eq(over.free, 600, 'free still reports pot minus allocated');
 eq(barSegments(over), { spent: 900, committed: 0, free: 100 },
   'the bar treats money already gone as committed, so R 900 spent against R 400 placed ' +
   'still leaves only R 100 of the R 1 000 pot unaccounted for');
+/* `left` stays honest here even though committed just clamped to zero: R 1 000
+   pot minus R 900 actually spent is R 100 left, which is NOT committed + free
+   (0 + 600 = 600) — proof that left is derived independently rather than by
+   summing the two clamped bar figures. */
+eq(over.left, 100, 'left is pot minus spent even when an envelope is overspent');
+ok(over.left !== round2(over.committed + over.free),
+  'left deliberately disagrees with committed + free once clamping kicks in — that gap is the point');
 
 /* Allocated beyond the pot: free goes negative in the summary (which is what
    lights the loud card) and clamps to zero in the bar. */
@@ -165,9 +187,15 @@ const stretched = planSummary({
 eq(stretched.free, -400, 'placing more than the pot holds reports a negative free');
 eq(barSegments(stretched), { spent: 200, committed: 800, free: 0 },
   'the bar fills to the pot and no further');
+eq(stretched.left, 800, 'left still reports pot minus spent when the plan itself is overspent (free < 0)');
 
-/* A plan with nothing in it must not produce NaN anywhere. */
+/* A plan with nothing in it must not produce NaN anywhere — and must not
+   throw either: `left` has no division in it, but it is checked explicitly
+   rather than only riding along in the Number.isFinite loop below, because a
+   change that reintroduced a ratio (e.g. "left as % of pot") is exactly the
+   kind of edit that would divide by this plan's zero pot. */
 const empty = planSummary({ sources: [], envelopes: [], items: [] });
+eq(empty.left, 0, 'an empty plan has nothing spent, so nothing left to report — not NaN, not a throw');
 for (const [k, v] of Object.entries(empty)) {
   ok(Number.isFinite(v), `empty plan: ${k} must be a finite number, got ${v}`);
 }
@@ -191,6 +219,45 @@ eq(isReceived({ status: 'received' }), true, 'received is received');
 eq(isReceived({}), true, 'a source with no status at all reads as received');
 ok(SOURCE_KINDS.includes('Salary') && SOURCE_KINDS.includes('UIF') && SOURCE_KINDS.includes('Tax'),
   'the kind presets cover the ones the design was built around');
+
+/* ------------------------------------------------------------------ *
+ * 3b. envelopeOverState — the drag path and the render path share it   *
+ * ------------------------------------------------------------------ */
+
+/* "Settle up" as it sits in PLAN: R 11 600 placed, items claiming exactly
+   that (R 8 420 + R 3 180 = R 11 600, so no gap), R 8 420 already spent —
+   healthy on every axis. */
+const settleItems = PLAN.items.filter(i => i.envelope === 'Settle up');
+const settleSpent = settleItems.reduce((t, i) => t + (i.spent || 0), 0);
+eq(settleSpent, 8420, 'precondition: Settle up has R 8 420 actually spent');
+eq(envelopeOverState(11600, settleItems, settleSpent),
+  { overAmt: -3180, isOverspent: false, gap: 0, isOvercommitted: false },
+  'Settle up at its placed amount is neither overspent nor overcommitted');
+
+/* The exact regression a live drag produced: dragging the slider DOWN to
+   R 7 000 while R 8 420 is already spent must read as overspent (money is
+   already gone past the new amount) AND overcommitted (the item list, R 11
+   600 unchanged, now claims more than the R 7 000 the slider proposes) —
+   the two conditions this function exists to tell apart, both true from one
+   drag. Pinned to the actual figures a live drag showed: R 1 420,00 over and
+   R 4 600,00 over-committed. envelopeOverState is the ONLY thing both the
+   initial render and the slider's `input` handler call for this, so a value
+   checked here is a value the drag path cannot get out of step with. */
+eq(envelopeOverState(7000, settleItems, settleSpent),
+  { overAmt: 1420, isOverspent: true, gap: -4600, isOvercommitted: true },
+  'dragging the amount below what is already spent is overspent AND overcommitted mid-drag, not just on release');
+
+/* A bucket can be overcommitted (the list over-promises) with nothing spent
+   yet at all — the two signals are independent, not two names for one thing. */
+eq(envelopeOverState(1000, [{ amount: 800 }, { amount: 700 }], 0),
+  { overAmt: -1000, isOverspent: false, gap: -500, isOvercommitted: true },
+  'overcommitted with nothing spent is not overspent');
+
+/* And a bucket can be overspent with its item list perfectly balanced — the
+   `over` fixture used for barSegments above, restated as a state. */
+eq(envelopeOverState(400, [{ amount: 400, spent: 900 }], 900),
+  { overAmt: 500, isOverspent: true, gap: 0, isOvercommitted: false },
+  'overspent with a balanced item list is not overcommitted');
 
 /* ------------------------------------------------------------------ *
  * 4. Round-trip: serialize → parse → identical record                  *

@@ -347,7 +347,7 @@ const SHELL_HTML = `
               salary surplus, something you sold — and answers one question: where does every rand
               of it land.</p>
             <p class="text-muted">Different from the Budget page, which sets a rate per period.
-              A plan is a fixed sum, divided into envelopes, spent down until there is none left.</p>
+              A plan is a fixed sum, divided into spending buckets, spent down until there is none left.</p>
             <p style="margin-top:1.4rem"><button class="btn-gradient" id="planStart" style="padding:0.55rem 1.5rem">Start a plan…</button></p>
           </div>
         </div>
@@ -399,10 +399,10 @@ const SHELL_HTML = `
                  literal, so one in a comment ends the string.) -->
             <div class="plan-env-head">
               <div class="section-h">
-                <h2>Envelopes</h2>
+                <h2>Spending buckets</h2>
                 <div class="sub" id="planEnvSub"></div>
               </div>
-              <button class="btn-ghost" id="planAddEnvelope"><span class="ico" data-ico="plus"></span> New envelope</button>
+              <button class="btn-ghost" id="planAddEnvelope"><span class="ico" data-ico="plus"></span> New spending bucket</button>
             </div>
             <div class="mini-grid" id="planEnvelopes"></div>
           </div>
