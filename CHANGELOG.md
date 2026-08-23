@@ -3,6 +3,36 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.4 — 2026-08-23
+
+### Added
+
+- **The Plan page says what is still left.** The split under the pot bar gains
+  a "Still left" subtotal — what came in, minus what has actually gone —
+  answering the one question "already spent / spoken for / not spoken for"
+  never answered on its own.
+- **A spending bucket now says when it is over, while you drag it.** Two
+  separate signals rather than one: money already spent past what the bucket
+  holds, and an item list that claims more than it holds. A bucket can be both
+  at once, so both show. Dragging a bucket's amount below what it has already
+  spent warns on the drag rather than only when you let go.
+
+### Changed
+
+- **"Envelopes" are now "spending buckets"** throughout the Plan page.
+
+### Fixed
+
+- **A newly created period file now carries the vault's tags.** Saving a month
+  that had no budget file yet wrote only its `period:` key, so the new file sat
+  outside every `finance/budget/budgets` search in the vault while looking
+  perfectly ordinary on the page that made it. New files are now born with the
+  same tag line and the same key order as every file already on disk; a file
+  that already has frontmatter is untouched, `hub:` and aliases included.
+- **The Accounts table stopped squeezing the name column.** With every other
+  column set not to wrap, a narrow pane collapsed account names to one word per
+  line; the column now keeps a readable floor and the table scrolls instead.
+
 ## 1.22.3 — 2026-08-23
 
 ### Changed
