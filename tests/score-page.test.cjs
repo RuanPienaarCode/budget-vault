@@ -74,10 +74,10 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
 
 (async () => {
   const { nodes } = await mount();
+  const ctxRoot = nodes.get('#root');
   const hero = nodes.get('#scoreHero');
   const good = nodes.get('#scoreGood');
   const work = nodes.get('#scoreWork');
-  const how = nodes.get('#scoreHow');
 
   /* ---- 1. the hero states a score, a band and a reading of it ---- */
   const big = find(hero, 'score-ring-num');
@@ -110,21 +110,33 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
   ok(dos.length > 0 && dos.some(t => /R /.test(t)),
     'and at least one names a concrete amount rather than an adjective');
 
-  /* ---- 5. the method explains EVERY pillar ---- */
-  const method = textsOf(how, 'score-how-name');
-  eq(method.length, PILLARS.length,
-    `the method section covers all ${PILLARS.length} pillars (got ${method.length})`);
+  /* ---- 5. EVERY pillar still explains itself ----
+     The standalone "How the score is built" card is gone: it restated the
+     ring's own five names and weights in prose further down the page. Its one
+     irreplaceable part — the sentence saying what each pillar MEASURES — moved
+     into that pillar's own legend row. This is the same guarantee the method
+     section carried (no pillar goes unexplained), asserted where it now lives,
+     so deleting the card cannot quietly delete the explanations with it. */
+  const explained = textsOf(hero, 'score-ring-row-how');
+  eq(explained.length, PILLARS.length,
+    `every one of the ${PILLARS.length} pillars carries its own explanation (got ${explained.length})`);
+  ok(explained.every(t => t.trim().length > 20),
+    'and each is a real sentence rather than an empty node holding the row open');
 
   /* ---- 6. no untranslated key reaches the page ---- */
-  for (const [name, node] of [['hero', hero], ['wins', good], ['gaps', work], ['method', how]]) {
+  for (const [name, node] of [['hero', hero], ['wins', good], ['gaps', work]]) {
     ok(!/score\.|dash\.health\./.test(textOf(node)), `${name} leaks no i18n key`);
   }
 
   /* ---- 7. THE CELEBRATION, both directions ----
      Confetti is punctuation for something real. A page of only gaps must not
      get it, and a page with a win must. */
-  ok(find(hero, 'score-confetti-bit').length > 0,
-    'a household with a win gets its confetti');
+  /* Looked for on the PANE, not in the hero: the burst is appended to #root so
+     it can fall the height of what the reader sees rather than being clipped to
+     the card. Asserting it inside the hero would pass only for the clipped
+     version this replaced. */
+  ok(find(ctxRoot, 'score-confetti-bit').length > 0,
+    'a household with a win gets its confetti, thrown over the whole pane');
 
   {
     /* Nothing at full marks anywhere. Note what this fixture NEEDS to be bleak:
@@ -149,7 +161,7 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
         + `| ${m}-05 | Groceries | Groceries | -40000.00 | | | |\n`;
     }
     const { nodes: n2 } = await mount(bleak);
-    eq(find(n2.get('#scoreHero'), 'score-confetti-bit').length, 0,
+    eq(find(n2.get('#root'), 'score-confetti-bit').length, 0,
       'a household with nothing at full marks is NOT confettied at');
   }
 
@@ -160,7 +172,7 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
     global.matchMedia = q => ({ matches: /prefers-reduced-motion/.test(q), addEventListener() {}, removeEventListener() {} });
     if (global.window) { global.window.matchMedia = global.matchMedia; }
     const { nodes: n3 } = await mount();
-    eq(find(n3.get('#scoreHero'), 'score-confetti-bit').length, 0,
+    eq(find(n3.get('#root'), 'score-confetti-bit').length, 0,
       'and reduced motion means no confetti at all, not merely a shorter one');
     global.matchMedia = real;
     if (global.window) { global.window.matchMedia = real; }

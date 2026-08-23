@@ -27,7 +27,7 @@ const GOOD_ENOUGH = 0.9;
 
 module.exports = function registerScore(ctx) {
   const {
-    S, $, money, healthSnapshot, periodMonthName, currentPeriod,
+    S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
     periodRange, periodSpend, periodSummary, budgetTotals, catType, accountIndex,
   } = ctx;
 
@@ -35,14 +35,13 @@ module.exports = function registerScore(ctx) {
     const hero = $('#scoreHero');
     const good = $('#scoreGood');
     const work = $('#scoreWork');
-    const how = $('#scoreHow');
     if (!hero) { return; }
-    hero.empty(); good.empty(); work.empty(); how.empty();
+    hero.empty(); good.empty(); work.empty();
 
     /* Independent of the score breakdown below — the flow card describes what
        THIS period's income did, which a vault too new to average six periods
        can still answer. Rebuilt fresh every render (remove-then-append) the
-       same way hero/good/work/how are emptied-then-rebuilt; the shell has no
+       same way hero/good/work are emptied-then-rebuilt; the shell has no
        static container for this card, so the node itself is the thing that
        gets thrown away and remade rather than a div that gets emptied. */
     renderFlowCard();
@@ -66,14 +65,12 @@ module.exports = function registerScore(ctx) {
           i18n.t(S.settings.input_mode === 'manual' ? 'score.empty.body.manual' : 'score.empty.body'))));
       $('#scoreGoodCard').classList.add('hidden');
       $('#scoreWorkCard').classList.add('hidden');
-      renderHow(how);
       return;
     }
 
     renderHero(hero, breakdown, M, target, earmarks);
     renderGood(good, breakdown, debtsRecorded);
     renderWork(work, breakdown, M, target, earmarks);
-    renderHow(how);
   }
 
   /* ------------------------------- the hero ------------------------------ */
@@ -99,6 +96,24 @@ module.exports = function registerScore(ctx) {
     /* The one sentence a reader takes away, pitched at the band they are in
        rather than a single generic line. */
     wrap.append(el('p', { class: 'score-hero-say' }, i18n.t(`score.say.${band}`)));
+
+    /* What the standalone "How the score is built" card used to carry, minus
+       everything the ring beside it already says.
+
+       That card explained five parts in a table of name / worth / sentence —
+       but the legend right above prints every one of those names, and "12 of
+       25" IS the weight, so two thirds of it was the ring restated in prose
+       further down the page. Only two facts were its own: the band scale, and
+       that an unanswerable part is left out rather than counted as zero. They
+       are footnotes to the number, so they read as footnotes to it. The
+       per-pillar sentences moved into the rows themselves — see the legend
+       in buildScoreRing, where a part explains itself at the moment a reader
+       asks about that part rather than in a list of five they must match up
+       by eye. */
+    wrap.append(el('p', { class: 'score-hero-note' }, i18n.t('dash.health.why.bands', {
+      strong: SCORE_BANDS.strong, steady: SCORE_BANDS.steady, strongLess: SCORE_BANDS.strong - 1,
+    })));
+    wrap.append(el('p', { class: 'score-hero-note' }, i18n.t('score.how.foot')));
     hero.append(wrap);
 
     celebrate(hero, breakdown);
@@ -151,6 +166,12 @@ module.exports = function registerScore(ctx) {
         key: s.key, width: s.width, fill: s.fill, at, cls,
         name: i18n.t(`dash.health.why.name.${s.key}`),
         now: whereYouAre(s.key, M, target, earmarks),
+        /* What this part MEASURES, as opposed to `now`, which is where the
+           household stands in it. Read straight off the same score.how.<key>
+           strings the removed "How the score is built" card printed, so the
+           explanation did not get rewritten on the way here — it just moved
+           to where the part itself is. */
+        how: i18n.t(`score.how.${s.key}`),
       };
     });
 
@@ -221,6 +242,96 @@ module.exports = function registerScore(ctx) {
       }));
     }
 
+    /* Created here rather than at the end beside its children: the hover
+       wiring below measures and class-toggles it, and a closure reaching
+       forward to a `const` declared later works only by TDZ timing. */
+    const hold = el('div', { class: 'score-ring-hold' });
+
+    /* What a part says when the reader points at it: the SAME three things
+       its legend row prints — name, points, and whereYouAre — read off `laid`
+       rather than re-derived, so the ring and the list beside it can never
+       describe one pillar two ways. No new lang keys either: both halves are
+       strings the legend already renders in all seven languages. */
+    const tipPts = r => i18n.t('dash.health.why.points', { points: r.fill, max: r.width });
+
+    /* Hover is a capability question, not a screen-size one — the rule
+       views/savings.js states for the worth chart, kept here for the same
+       reason. Where there is a fine pointer, a readout that follows the
+       cursor carries a name, a score and a sentence; where there is not
+       (every phone, which is where this plugin mostly lives) each segment
+       keeps the native <title> that touch-and-hold has always shown, and no
+       hover-only affordance is invented for a finger. Never both: two
+       tooltips for one segment is worse than either. */
+    const hoverable = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+    const tipBox = el('div', { class: 'score-ring-tip', 'aria-hidden': 'true' });
+    const tipName = el('div', { class: 'score-ring-tip-name' });
+    const tipPtsEl = el('div', { class: 'score-ring-tip-pts num' });
+    const tipNow = el('div', { class: 'score-ring-tip-now' });
+    const tipHow = el('div', { class: 'score-ring-tip-how' });
+    tipBox.append(tipName, tipPtsEl, tipNow, tipHow);
+
+    if (hoverable) {
+      /* Keyed on data-k, so the TRACK and the fill arc of one pillar are one
+         hover target between them: the grey remainder of a part is still that
+         part, and a reader pointing at the half of "Emergency cover" it has
+         not earned yet must not fall through to nothing. */
+      const hotten = key => {
+        hold.classList.toggle('is-hover', !!key);
+        for (const seg of segEls) {
+          seg.classList.toggle('is-hot', !!key && seg.getAttribute('data-k') === key);
+        }
+      };
+      for (const seg of segEls) {
+        seg.addEventListener('pointerenter', () => {
+          const r = laid.find(x => x.key === seg.getAttribute('data-k'));
+          if (!r) { return; }
+          hotten(r.key);
+          tipName.textContent = r.name;
+          tipPtsEl.textContent = tipPts(r);
+          tipNow.textContent = r.now || '';
+          tipHow.textContent = r.how || '';
+          tipBox.classList.add('is-on');
+        });
+      }
+      /* Positioned from the POINTER, not from the arc: a segment can be a
+         quarter of the ring long and a readout parked at its midpoint ends up
+         nowhere near the cursor. Measured at pointer time — the one moment
+         the ring is guaranteed to be on screen, which is what keeps this
+         clear of the standing rule against measuring a hidden tab. */
+      svg.addEventListener('pointermove', e => {
+        if (!tipBox.classList.contains('is-on')) { return; }
+        const box = hold.getBoundingClientRect();
+        const tw = tipBox.offsetWidth, th = tipBox.offsetHeight;
+        const x = e.clientX - box.left, y = e.clientY - box.top;
+        /* Kept inside the holder rather than parked exactly on the pointer:
+           the box is centred on `left`, so a part near either edge would
+           otherwise hang half the readout off the card. Guarded for a box
+           wider than the holder — there the clamp would invert and pin it to
+           the wrong side, so it just centres. */
+        const half = tw / 2;
+        tipBox.style.left = `${tw >= box.width ? box.width / 2 : Math.max(half, Math.min(box.width - half, x))}px`;
+        /* Above the pointer where there is room, below it where there is not:
+           the top of the ring sits ~40px below the holder's own top edge, and
+           a readout anchored above it there would be off the card entirely. */
+        tipBox.classList.toggle('is-below', y - th - 14 < 0);
+        tipBox.style.top = `${y}px`;
+      });
+      svg.addEventListener('pointerleave', () => {
+        hotten(null);
+        tipBox.classList.remove('is-on');
+      });
+    } else {
+      for (const seg of segEls) {
+        const r = laid.find(x => x.key === seg.getAttribute('data-k'));
+        if (!r) { continue; }
+        const t = document.createElementNS(RING_NS, 'title');
+        t.textContent = r.now ? `${r.name} — ${tipPts(r)} · ${r.now}` : `${r.name} — ${tipPts(r)}`;
+        seg.append(t);
+      }
+    }
+
     const midNum = el('div', { class: 'score-ring-num num' });
     const midBand = el('div', { class: 'score-ring-band' });
     const showTotal = () => {
@@ -277,6 +388,13 @@ module.exports = function registerScore(ctx) {
       }
       const bodyKids = [nameEl];
       if (r.now) { bodyKids.push(el('span', { class: 'score-ring-row-now' }, r.now)); }
+      /* What this part measures, revealed by the tap that focuses it — the
+         one place the removed method card's prose now lives on a phone.
+         Rendered always and shown by CSS off aria-pressed rather than
+         appended on click: the row's pressed state is already the single
+         source of truth for "this part is the one being asked about", and a
+         second JS path toggling the same idea is how the two drift. */
+      if (r.how) { bodyKids.push(el('span', { class: 'score-ring-row-how' }, r.how)); }
       const btn = el('button', {
         type: 'button', class: `score-ring-row ${r.cls}`, 'aria-pressed': 'false', 'data-k': r.key,
       },
@@ -292,7 +410,9 @@ module.exports = function registerScore(ctx) {
       legend.append(btn);
     }
 
-    const hold = el('div', { class: 'score-ring-hold' }, svg, midBtn);
+    hold.append(svg, midBtn);
+    // Only where it can ever be shown — see the hover-capability note above.
+    if (hoverable) { hold.append(tipBox); }
     wrap.append(hold, legend);
     return wrap;
   }
@@ -761,23 +881,6 @@ module.exports = function registerScore(ctx) {
   }
 
   /* ----------------------------- the method ------------------------------ */
-  function renderHow(how) {
-    how.append(el('p', { class: 'score-how-intro' }, i18n.t('dash.health.why.intro')));
-    how.append(el('p', { class: 'score-how-intro' }, i18n.t('dash.health.why.bands', {
-      strong: SCORE_BANDS.strong, steady: SCORE_BANDS.steady, strongLess: SCORE_BANDS.strong - 1,
-    })));
-    const list = el('div', { class: 'score-how-rows' });
-    /* Straight off PILLARS, so a pillar added to the score cannot be forgotten
-       here — the page would otherwise explain four of five and look complete. */
-    for (const p of PILLARS) {
-      list.append(el('div', { class: 'score-how-row' },
-        el('div', { class: 'score-how-name' }, i18n.t(`dash.health.why.name.${p.key}`)),
-        el('div', { class: 'score-how-weight num' }, i18n.t('score.how.worth', { points: p.weight })),
-        el('div', { class: 'score-how-note' }, i18n.t(`score.how.${p.key}`))));
-    }
-    how.append(list);
-    how.append(el('p', { class: 'score-how-foot' }, i18n.t('score.how.foot')));
-  }
 
   /* ----------------------------- celebration ----------------------------- */
   /* Confetti, on the way in, when there is something real to celebrate.
@@ -816,7 +919,11 @@ module.exports = function registerScore(ctx) {
         style: `left:${left}%;animation-delay:${delay}ms;--bud-drift:${drift}px;--bud-spin:${spin}deg`,
       }));
     }
-    hero.append(burst);
+    /* The PANE, not the card. Parented to the hero the burst was clipped to
+       the card's own box — a shower two hundred pixels tall that stopped at a
+       rounded corner. #root is position:relative and does not scroll, so this
+       covers what the reader is actually looking at. */
+    (root || hero).append(burst);
     /* Taken down rather than left in the DOM. The card re-renders on a period
        change and a vault reload, and a page that quietly accumulated a hundred
        spent confetti nodes would be this view's own slow leak. */
