@@ -80,10 +80,11 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
   const how = nodes.get('#scoreHow');
 
   /* ---- 1. the hero states a score, a band and a reading of it ---- */
-  const big = find(hero, 'score-big');
-  eq(big.length, 1, 'one headline score');
+  const big = find(hero, 'score-ring-num');
+  eq(big.length, 1, 'one headline score, now in the ring\'s own centre');
   ok(/\d/.test(textOf(big[0])), 'which is a number');
-  eq(find(hero, 'score-band').length, 1, 'with the band it falls in');
+  eq(find(hero, 'score-ring-band').length, 1, 'with the band it falls in');
+  eq(find(hero, 'score-ring').length, 1, 'drawn as the ring, not the old segmented bar');
   eq(find(hero, 'score-meter').length, 1, 'and a meter');
   ok(find(hero, 'score-hero-say').length === 1, 'and one sentence pitched at that band');
 
@@ -170,7 +171,7 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
     const bare = { [`${B}/Settings.md`]: FILES[`${B}/Settings.md`] };
     const { nodes: n4 } = await mount(bare);
     const h = n4.get('#scoreHero');
-    eq(find(h, 'score-big').length, 0, 'no history means no headline number');
+    eq(find(h, 'score-ring-num').length, 0, 'no history means no headline number');
     eq(find(h, 'score-empty-h').length, 1, 'it says why instead');
     ok(!/score\./.test(textOf(h)), 'and that explanation is translated too');
   }

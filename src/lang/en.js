@@ -1073,8 +1073,9 @@ module.exports = {
   'score.flow.chip.leftInBudget': 'Left in the budget',
   'score.flow.chip.neverBudgeted': 'Income never budgeted',
   'score.flow.chip.together': 'Together',
-  'score.rail.aria': 'Score of {score} out of 100 built from five parts: {parts}.',
-  'score.rail.mark': '{score} · {band}',
+  'score.ring.aria': 'Score {score} of 100. {parts}.',
+  'score.ring.showAll': 'Show all five parts',
+  'score.ring.hint': 'Tap a part to see it on its own.',
   'score.gap.railAria': '{name}: {points} of {max} points earned.',
 
 

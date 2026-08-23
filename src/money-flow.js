@@ -155,22 +155,29 @@ function periodFlow({
   };
 }
 
-/* The score rail — one 0-100 bar, five segments. Each segment's WIDTH is the
-   pillar's own share of 100 (`shownMax`, already renormalised and integer-
-   allocated by health-math's scoreBreakdown so the widths sum to exactly
-   100), and its FILL is the points actually earned (`shownPoints`), so the
-   filled width across every segment sums to the score printed above the bar
-   — the same figure, told twice, and the two are structurally unable to
-   disagree because both come out of the same scoreBreakdown() call.
+/* The score's segmented picture — one set of five weighted shares of 100,
+   read in PILLARS' own weight order rather than breakdown.pillars' gap-sorted
+   order. Was drawn as a bar under the hero number; is now the arithmetic
+   behind the hero's ring (views/score.js's buildScoreRing) and nothing else
+   reads it as a rail any more, but the shape of the data has not changed and
+   neither has its guarantee.
 
-   Read in PILLARS' own weight order (reserves, saving, debt, spending,
-   wealth) rather than breakdown.pillars' gap-sorted order: the rail answers
-   "how is the 100 made", not "what to fix first" — that question belongs to
-   the gap list, which keeps its own biggest-first order untouched. A pillar
-   the vault cannot answer is simply absent from breakdown.pillars already
-   (health-math drops it and lets the rest share its weight), so filtering
-   PILLARS down to the keys breakdown actually has keeps the two in step
-   without a pillar ever appearing at width zero. */
+   Each segment's WIDTH is the pillar's own share of 100 (`shownMax`, already
+   renormalised and integer-allocated by health-math's scoreBreakdown so the
+   widths sum to exactly 100), and FILL is the points actually earned
+   (`shownPoints`) — the two rounded figures a reader sees printed. `at` rides
+   alongside them UNROUNDED (health-math's own continuous fraction, 0..1): a
+   ring segment's fill ARC is `at` of that segment's own track length, not
+   `shownPoints / shownMax` of it — using the rounded pair there would draw a
+   visibly different angle than the exact fraction scoreBreakdown actually
+   computed, for no reason but that two integers happened to be handy. The
+   printed "16 of 25" and the arc's own sweep are allowed to be the same
+   fraction told two ways, not two roundings of it.
+
+   A pillar the vault cannot answer is simply absent from breakdown.pillars
+   already (health-math drops it and lets the rest share its weight), so
+   filtering PILLARS down to the keys breakdown actually has keeps the two in
+   step without a pillar ever appearing at width zero. */
 function railSegments(breakdown) {
   if (!breakdown || !breakdown.pillars || !breakdown.pillars.length) { return []; }
   const byKey = new Map(breakdown.pillars.map(p => [p.key, p]));
@@ -179,7 +186,7 @@ function railSegments(breakdown) {
   for (const def of PILLARS) {
     const p = byKey.get(def.key);
     if (!p) { continue; }
-    out.push({ key: p.key, x, width: p.shownMax, fill: p.shownPoints });
+    out.push({ key: p.key, x, width: p.shownMax, fill: p.shownPoints, at: p.at });
     x += p.shownMax;
   }
   return out;

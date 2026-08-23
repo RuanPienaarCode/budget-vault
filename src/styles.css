@@ -1240,10 +1240,15 @@
 @media (prefers-reduced-motion: reduce) {
   .budget-app-root .score-confetti-bit,
   .budget-app-root .score-win.is-maxed .score-win-badge,
-  .budget-app-root .score-meter-fill { animation: none; }
+  .budget-app-root .score-meter-fill,
+  .budget-app-root .score-ring-fill { animation: none; }
   /* The fill is scaled by its animation, so switching the animation off has to
      put the bar back — otherwise reduced motion would show an empty meter. */
   .budget-app-root .score-meter-fill { transform: scaleX(1); }
+  /* Same idea for the ring: its resting stroke-dashoffset IS the animation's
+     `to` value, so pinning it there directly is what an un-animated arc looks
+     like — not a blank ring. */
+  .budget-app-root .score-ring-fill { stroke-dashoffset: var(--seg-to); }
   .budget-app-root .score-confetti { display: none; }
 }
 
@@ -2717,7 +2722,12 @@
      thicken also get a real min-height, so the visible control (not just
      its halo) reads finger-sized. <select> is a replaced element that
      renders no pseudo, so growing is the only option it has. */
-  .budget-app-root button:not(.mod-loading) { position: relative; }
+  /* :where() so this carries NO specificity: a component that positions its
+     own button (the score ring's centre button is position:absolute inside
+     the ring) must keep that — with a bare selector this rule outranked it on
+     touch screens only and dropped the number out of the ring into flow.
+     :where() is Safari 14+, under the iOS 15 floor. */
+  .budget-app-root :where(button:not(.mod-loading)) { position: relative; }
   .budget-app-root button:not(.mod-loading)::after {
     content: '';
     position: absolute;
@@ -2892,6 +2902,12 @@
   .budget-app-root .note-title:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
   .budget-app-root .note-orphan:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .note-chip:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+  /* Score ring — the legend rows and the centre "show all" button are new
+     controls, and both need the ring listed here or 15.0-15.3 loses their
+     focus ring entirely; see the file header on why that is not cosmetic. */
+  .budget-app-root .score-ring-row:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .score-ring-mid:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 50%; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
@@ -3450,12 +3466,6 @@
    only — every colour here is one the plugin defines on .budget-app-root
    itself, never an Obsidian core token (see the sealed-palette rule). */
 .budget-app-root .score-hero { position: relative; text-align: center; padding: 8px 0 4px; }
-.budget-app-root .score-big { font-size: 68px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
-.budget-app-root .score-big small { font-size: 0.26em; font-weight: 600; color: var(--text-muted); margin-left: 6px; }
-.budget-app-root .score-hero.is-strong .score-big { color: var(--color-primary); }
-.budget-app-root .score-hero.is-steady .score-big { color: var(--color-warning-ink); }
-.budget-app-root .score-hero.is-attention .score-big { color: var(--color-danger-ink); }
-.budget-app-root .score-band { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-top: 6px; }
 .budget-app-root .score-meter { position: relative; height: 10px; border-radius: 10px; background: var(--border-color); overflow: hidden; max-width: 460px; margin: 14px auto 0; }
 /* Fills in, then glows once as it lands.
 
@@ -3592,7 +3602,7 @@
 }
 
 @media (max-width: 600px) {
-  .budget-app-root .score-big { font-size: 54px; }
+  .budget-app-root .score-ring-num { font-size: 44px; }
 }
 
 /* ---------------------------- money-flow card ----------------------------
@@ -3665,20 +3675,89 @@
   .budget-app-root .score-flow-chip { flex: 1 1 100%; }
 }
 
-/* ---------------------------------- the rail ------------------------------
-   The 100-point bar in the hero, and its per-gap twin below the work list.
-   Reused colours only: full marks = primary, partial = warning, nothing = a
-   dashed outline rather than a filled wedge — the same "do not draw a slice
-   that implies a rand where there is none" rule the flow's zero band follows
-   above. */
-.budget-app-root .score-rail-wrap { margin-top: 20px; }
-.budget-app-root .score-rail { display: flex; gap: 3px; height: 30px; }
-.budget-app-root .score-rail-seg { position: relative; height: 100%; border-radius: 8px; background: var(--border-color); overflow: hidden; min-width: 0; }
-.budget-app-root .score-rail-fill { display: block; height: 100%; border-radius: 8px; background: var(--color-warning); }
-.budget-app-root .score-rail-seg.is-full .score-rail-fill { background: var(--color-primary); }
-.budget-app-root .score-rail-seg.is-none .score-rail-fill { background: none; border: 2px dashed var(--color-danger); box-sizing: border-box; border-radius: 8px; }
-.budget-app-root .score-rail-marks { position: relative; height: 16px; margin-top: 6px; }
-.budget-app-root .score-rail-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; font-weight: 600; color: var(--ink-faint); white-space: nowrap; }
+/* ---------------------------------- the ring -------------------------------
+   The hero's own picture — arc length is the pillar's weight, fill is the
+   points earned, and the number that used to sit above a segmented bar now
+   sits in the ring's own centre. Replaced the bar after Ruan found it hard to
+   read; .score-gap-rail below is untouched, it answers a different question
+   (what closing THIS one gap buys) and stays a rail on purpose. */
+.budget-app-root .score-ring-wrap { display: flex; gap: 26px; flex-wrap: wrap; align-items: center; margin-top: 4px; text-align: left; }
+.budget-app-root .score-ring-hold { flex: 1 1 260px; min-width: 0; max-width: 320px; position: relative; margin: 0 auto; }
+.budget-app-root .score-ring { display: block; width: 100%; height: auto; }
+.budget-app-root .score-ring-seg { fill: none; stroke-linecap: butt; transition: opacity .16s; }
+.budget-app-root .score-ring-track { stroke: var(--border-color); }
+.budget-app-root .score-ring-fill.is-full { stroke: var(--color-primary); }
+.budget-app-root .score-ring-fill.is-partial { stroke: var(--color-warning); }
+.budget-app-root .score-ring-zero { stroke: var(--color-danger); stroke-width: 3; stroke-dasharray: 5 6; }
+/* Draw-in, on the fill arcs only — the tracks are background chrome and the
+   zero-hairline is a fact stated once, neither needs to arrive with motion.
+   `--seg-from`/`--seg-to` are set inline per segment (views/score.js) because
+   each arc's own length is different; the keyframe just animates between
+   them. Reduced-motion turns this off and pins the resting value directly,
+   the same two-step pattern .score-meter-fill already uses below. */
+.budget-app-root .score-ring-fill { animation: bud-ring-draw .9s cubic-bezier(.22, .9, .28, 1) both; }
+@keyframes bud-ring-draw {
+  from { stroke-dashoffset: var(--seg-from); }
+  to   { stroke-dashoffset: var(--seg-to); }
+}
+/* Focus mode: dims every OTHER segment, JS-driven (views/score.js applyFocus)
+   rather than a per-pillar CSS selector, so a sixth pillar would not need a
+   sixth rule here. */
+.budget-app-root .score-ring-seg.is-dim { opacity: .16; }
+.budget-app-root .score-ring-track.is-dim { opacity: .1; }
+
+/* The centre is a real <button> (tap clears focus mode), sized by its own
+   text and centred over the ring with the same "ignore layout, sit on top"
+   trick a donut's centre label already uses elsewhere in this app. */
+.budget-app-root .score-ring-mid {
+  position: absolute; top: 50%; left: 0; width: 100%; transform: translateY(-50%);
+  text-align: center; padding: 0 18%; background: none; border: 0; cursor: pointer; color: inherit; font: inherit;
+}
+.budget-app-root .score-ring-num { font-size: 52px; font-weight: 800; letter-spacing: -.035em; line-height: .95; font-variant-numeric: tabular-nums; }
+.budget-app-root .score-hero.is-strong .score-ring-num { color: var(--color-primary); }
+.budget-app-root .score-hero.is-steady .score-ring-num { color: var(--color-warning-ink); }
+.budget-app-root .score-hero.is-attention .score-ring-num { color: var(--color-danger-ink); }
+.budget-app-root .score-ring-num small { font-size: .26em; font-weight: 600; color: var(--text-muted); margin-left: 5px; letter-spacing: 0; }
+.budget-app-root .score-ring-band { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-top: 7px; }
+.budget-app-root .score-ring-band.is-part { text-transform: none; letter-spacing: .01em; font-size: 13px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .score-ring-mid.is-part .score-ring-num { color: var(--text-primary); font-size: 40px; }
+
+/* The legend IS the control surface — each row is a real button, ≥44px tall
+   with the coarse-pointer overlay already applied to every <button> in this
+   app (see the touch-target block), tapping it focuses its own arc. */
+.budget-app-root .score-ring-legend { flex: 1 1 300px; min-width: 0; }
+.budget-app-root .score-ring-hint { font-size: 11.5px; color: var(--ink-faint); margin: 0 0 8px; }
+.budget-app-root .score-ring-row {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit;
+  cursor: pointer; min-height: 56px; padding: 11px 12px; border-radius: var(--radius); border: 1px solid transparent;
+  background: transparent; color: inherit;
+}
+.budget-app-root .score-ring-row + .score-ring-row { margin-top: 2px; }
+.budget-app-root .score-ring-row:hover { background: var(--border-color); }
+.budget-app-root .score-ring-row[aria-pressed="true"] { background: var(--border-color); border-color: var(--line-soft); }
+.budget-app-root .score-ring-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .score-ring-mid:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 50%; }
+.budget-app-root .score-ring-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; margin-top: 4px; }
+.budget-app-root .score-ring-dot.is-full { background: var(--color-primary); }
+.budget-app-root .score-ring-dot.is-partial { background: var(--color-warning); }
+.budget-app-root .score-ring-dot.is-none { background: var(--color-danger); }
+.budget-app-root .score-ring-row-body { min-width: 0; flex: 1 1 auto; }
+.budget-app-root .score-ring-row-name { font-size: 13.5px; font-weight: 700; }
+.budget-app-root .score-ring-row-now { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; line-height: 1.35; }
+.budget-app-root .score-ring-row-pts { flex: none; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.budget-app-root .score-ring-row.is-full .score-ring-row-pts { color: var(--color-primary); }
+.budget-app-root .score-ring-row.is-none .score-ring-row-pts { color: var(--color-danger-ink); }
+.budget-app-root .score-ring-row-tag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-primary); margin-left: 7px; white-space: nowrap; vertical-align: 1px;
+}
+
+/* Phone: the ring-wrap is already a flex-wrap with two flex-bases, so the
+   legend stacks under the ring on its own at 366px with no extra rule — this
+   only trims the ring itself down a little further. */
+@media (max-width: 560px) {
+  .budget-app-root .score-ring-hold { max-width: 260px; }
+}
 
 .budget-app-root .score-gap-rail { position: relative; height: 20px; border-radius: 999px; background: var(--border-color); overflow: hidden; margin-top: 10px; border: 1px solid var(--border-color); }
 .budget-app-root .score-gap-rail i { position: absolute; top: 0; bottom: 0; display: block; }

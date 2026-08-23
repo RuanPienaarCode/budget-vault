@@ -129,6 +129,21 @@ const base = {
   const expected = PILLARS.map(p => p.key).filter(k => keysInOrder.includes(k));
   assert.deepStrictEqual(keysInOrder, expected, 'the rail reads pillars in weight order, not gap order');
 
+  /* `at` is the UNROUNDED fraction the ring's arc geometry draws — a full-
+     marks segment reads exactly 1, and every segment's `at` has to agree with
+     its own rounded shownPoints/shownMax pair to within the rounding that
+     produced them (never more than one whole point of slack). A segment
+     drawing a visibly different angle than the number printed beside it is
+     the exact bug this guards. */
+  for (const seg of rail) {
+    ok(typeof seg.at === 'number' && seg.at >= 0 && seg.at <= 1, `${seg.key}'s at is a real fraction in [0,1]`);
+    if (seg.width > 0) {
+      close(seg.at * seg.width, seg.fill, `${seg.key}'s at matches its own rounded fill/width pair`, 1.01);
+    }
+  }
+  const wealth = rail.find(s => s.key === 'wealth');
+  close(wealth.at, 1, 'a full-marks pillar (wealth, net worth well past 3x income) reads at = 1');
+
   ok(railSegments(null).length === 0, 'a null breakdown yields no segments, not a throw');
   checks++;
 }

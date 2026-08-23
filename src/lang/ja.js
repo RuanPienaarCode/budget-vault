@@ -975,8 +975,9 @@ module.exports = {
   'score.flow.chip.leftInBudget': '予算内の残り',
   'score.flow.chip.neverBudgeted': '予算に入れていない収入',
   'score.flow.chip.together': '合計',
-  'score.rail.aria': 'スコア {score} / 100 の内訳（5つの要素）: {parts}。',
-  'score.rail.mark': '{score} · {band}',
+  'score.ring.aria': 'スコア {score} / 100。{parts}。',
+  'score.ring.showAll': '5つの要素すべてを表示',
+  'score.ring.hint': '部分をタップすると、それだけを表示します。',
   'score.gap.railAria': '{name}: {points} / {max} ポイント獲得。',
 
 

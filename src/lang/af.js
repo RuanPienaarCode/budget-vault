@@ -1021,8 +1021,9 @@ module.exports = {
   'score.flow.chip.leftInBudget': 'Oor in die begroting',
   'score.flow.chip.neverBudgeted': 'Inkomste nooit begroot nie',
   'score.flow.chip.together': 'Saam',
-  'score.rail.aria': 'Telling van {score} uit 100, opgebou uit vyf dele: {parts}.',
-  'score.rail.mark': '{score} · {band}',
+  'score.ring.aria': 'Telling {score} van 100. {parts}.',
+  'score.ring.showAll': 'Wys al vyf dele',
+  'score.ring.hint': 'Tik op \'n deel om dit op sy eie te sien.',
   'score.gap.railAria': '{name}: {points} van {max} punte verdien.',
 
 

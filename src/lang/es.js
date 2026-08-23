@@ -1023,8 +1023,9 @@ module.exports = {
   'score.flow.chip.leftInBudget': 'Resto del presupuesto',
   'score.flow.chip.neverBudgeted': 'Ingresos nunca presupuestados',
   'score.flow.chip.together': 'Juntos',
-  'score.rail.aria': 'Puntuación de {score} sobre 100, construida a partir de cinco partes: {parts}.',
-  'score.rail.mark': '{score} · {band}',
+  'score.ring.aria': 'Puntuación {score} de 100. {parts}.',
+  'score.ring.showAll': 'Mostrar las cinco partes',
+  'score.ring.hint': 'Toca una parte para verla por separado.',
   'score.gap.railAria': '{name}: {points} de {max} puntos ganados.',
 
 

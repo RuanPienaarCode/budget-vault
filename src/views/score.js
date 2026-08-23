@@ -70,24 +70,24 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
-    renderHero(hero, breakdown, M);
+    renderHero(hero, breakdown, M, target, earmarks);
     renderGood(good, breakdown, debtsRecorded);
     renderWork(work, breakdown, M, target, earmarks);
     renderHow(how);
   }
 
   /* ------------------------------- the hero ------------------------------ */
-  function renderHero(hero, breakdown, M) {
+  function renderHero(hero, breakdown, M, target, earmarks) {
     const band = breakdown.band;
     const wrap = el('div', { class: `score-hero is-${band}` });
 
-    /* The number, its band, and a ring drawn as a plain bar rather than an SVG
-       arc: the arc buys nothing a reader cannot read off a bar, and every SVG
-       on this page would have to bake its colours in at render time (see the
-       theme-flip note in views/dashboard.js). */
-    wrap.append(el('div', { class: 'score-big num' }, String(breakdown.total),
-      el('small', {}, i18n.t('score.outOf'))));
-    wrap.append(el('div', { class: 'score-band' }, i18n.t(`dash.health.${band}`)));
+    /* The number, its band and all five parts, together — Ruan's call after
+       the segmented bar shipped and read as hard to follow: one ring says in
+       a glance what the bar said in a row of unlabelled rectangles. The
+       number and band move INTO the ring's own centre; the meter and the
+       supporting lines stay below it exactly as they were. */
+    wrap.append(buildScoreRing(breakdown, M, target, earmarks));
+
     wrap.append(el('div', { class: 'score-meter', role: 'img',
       'aria-label': i18n.t('score.meterAria', { score: breakdown.total }) },
     el('i', { class: 'score-meter-fill', style: `width:${breakdown.total}%` })));
@@ -99,48 +99,202 @@ module.exports = function registerScore(ctx) {
     /* The one sentence a reader takes away, pitched at the band they are in
        rather than a single generic line. */
     wrap.append(el('p', { class: 'score-hero-say' }, i18n.t(`score.say.${band}`)));
-
-    /* The score rail — the same 100-point bar the mockup carries into the gap
-       list below, drawn once here as "how the 100 is made". Segment width is
-       the pillar's own weight, fill is the points actually earned; the filled
-       width across all five segments sums to `breakdown.total`, the number
-       printed above it, because both come out of the one scoreBreakdown()
-       call (see money-flow.js's railSegments for why that identity holds
-       structurally rather than by two figures happening to agree). */
-    wrap.append(buildScoreRail(breakdown));
     hero.append(wrap);
 
     celebrate(hero, breakdown);
   }
 
-  /* One full-width bar, five segments. Plain divs rather than SVG — the same
-     choice renderHero already made for the ring above it (a bar draws nothing
-     an SVG arc would show more of, and every SVG on this page would have to
-     re-resolve its colours at render time; see the theme-flip note in
-     views/dashboard.js), so the segments are flex children sized by
-     percentage width and CSS carries every colour via the sealed palette. */
-  function buildScoreRail(breakdown) {
+  /* ------------------------------ the ring -------------------------------
+     r=120, stroke-width 26, rotated -90° so length 0 sits at 12 o'clock
+     rather than 3. Read PILLARS' own weight order off railSegments() — same
+     data the old bar read, still true that the widths sum to 100 and the
+     fills sum to the score, just drawn as arcs instead of rectangles. */
+  const RING_R = 120, RING_CX = 150, RING_CY = 150, RING_STROKE = 26, RING_GAP = 6;
+  const RING_C = 2 * Math.PI * RING_R;
+  const RING_NS = 'http://www.w3.org/2000/svg';
+
+  /* The point at raw path-length `len` along a circle of radius RING_R
+     centred on (RING_CX, RING_CY), BEFORE the <g>'s own -90° rotation is
+     applied — the transform rotates whatever this returns exactly the same
+     way it rotates the <circle> elements, so a path built from this lines up
+     with them without hand-applying the rotation twice. */
+  function ringPoint(len) {
+    const theta = len / RING_R;
+    return [RING_CX + RING_R * Math.cos(theta), RING_CY + RING_R * Math.sin(theta)];
+  }
+
+  /* An SVG arc `d` spanning exactly one segment's own length, for the "earned
+     nothing" case — a <path>, not a dashed <circle>: a dash pattern on a full
+     circle repeats all the way round, which would put danger-red dashes
+     across every OTHER segment too. The designer's mockup hit exactly this
+     and drew a path instead; this is that fix, generalised to any segment. */
+  function ringZeroPath(startLen, len) {
+    const [x0, y0] = ringPoint(startLen);
+    const [x1, y1] = ringPoint(startLen + len);
+    const large = len / RING_R > Math.PI ? 1 : 0;
+    return `M ${x0.toFixed(2)},${y0.toFixed(2)} A ${RING_R},${RING_R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
+  }
+
+  function buildScoreRing(breakdown, M, target, earmarks) {
+    const wrap = el('div', { class: 'score-ring-wrap' });
     const segs = railSegments(breakdown);
-    if (!segs.length) { return el('div', {}); }
+    if (!segs.length) { return wrap; }
 
-    const parts = segs.map(s => `${i18n.t(`dash.health.why.name.${s.key}`)} ` +
-      i18n.t('dash.health.why.points', { points: s.fill, max: s.width }));
-    const aria = i18n.t('score.rail.aria', { score: breakdown.total, parts: parts.join(', ') });
+    /* One row per part, built once and read by the SVG, the legend AND the
+       ring centre's tap-to-focus swap — the exact figures and words can never
+       drift apart because there is only one place any of them reads from,
+       the same discipline the flow card's buildFlowRows keeps. */
+    const rows = segs.map(s => {
+      const at = s.at || 0;
+      const cls = at >= 0.999 ? 'is-full' : at <= 0.001 ? 'is-none' : 'is-partial';
+      return {
+        key: s.key, width: s.width, fill: s.fill, at, cls,
+        name: i18n.t(`dash.health.why.name.${s.key}`),
+        now: whereYouAre(s.key, M, target, earmarks),
+      };
+    });
 
-    const rail = el('div', { class: 'score-rail', role: 'img', 'aria-label': aria });
-    for (const s of segs) {
-      const ratio = s.width > 0 ? s.fill / s.width : 0;
-      const cls = ratio >= 0.999 ? 'is-full' : ratio <= 0.001 ? 'is-none' : 'is-partial';
-      const seg = el('div', { class: `score-rail-seg ${cls}`, style: `width:${s.width}%` });
-      seg.append(el('i', { class: 'score-rail-fill', style: `width:${Math.max(0, Math.min(100, ratio * 100))}%` }));
-      rail.append(seg);
+    /* Track lengths share (RING_C minus one gap per segment) in proportion
+       to weight — the same "widths sum to 100" guarantee railSegments already
+       carries, just measured in arc units instead of percent. Fill lengths
+       are `at` (the UNROUNDED fraction) of each segment's OWN track length,
+       not shownPoints/shownMax of it — see money-flow.js's own note on why
+       that pairing is the one that cannot visibly disagree with the rounded
+       numbers printed beside it. */
+    const totalWeight = rows.reduce((s, r) => s + r.width, 0) || 100;
+    const usable = RING_C - rows.length * RING_GAP;
+    const perWeight = usable / totalWeight;
+    let cum = 0;
+    const laid = rows.map(r => {
+      const trackLen = r.width * perWeight;
+      const laidRow = { ...r, trackLen, trackStart: cum };
+      cum += trackLen + RING_GAP;
+      return laidRow;
+    });
+
+    const parts = laid.map(r => `${r.name} ` + i18n.t('dash.health.why.points', { points: r.fill, max: r.width }));
+    const ariaAll = i18n.t('score.ring.aria', { score: breakdown.total, parts: parts.join(', ') });
+
+    const svg = document.createElementNS(RING_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 300 300');
+    svg.setAttribute('class', 'score-ring');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', ariaAll);
+    const g = document.createElementNS(RING_NS, 'g');
+    g.setAttribute('transform', `rotate(-90 ${RING_CX} ${RING_CY})`);
+    g.setAttribute('stroke-width', String(RING_STROKE));
+    svg.append(g);
+    const addArc = (tag, attrs) => {
+      const n = document.createElementNS(RING_NS, tag);
+      for (const [k, v] of Object.entries(attrs)) { if (v !== null && v !== undefined) { n.setAttribute(k, v); } }
+      g.append(n);
+      return n;
+    };
+
+    const segEls = [];
+    // Tracks first (background), then fills/zero-hairlines on top.
+    for (const r of laid) {
+      segEls.push(addArc('circle', {
+        class: 'score-ring-seg score-ring-track', 'data-k': r.key,
+        cx: RING_CX, cy: RING_CY, r: RING_R, fill: 'none',
+        'stroke-dasharray': `${r.trackLen.toFixed(2)} ${(RING_C - r.trackLen).toFixed(2)}`,
+        'stroke-dashoffset': (-r.trackStart).toFixed(2),
+      }));
     }
-    const marks = el('div', { class: 'score-rail-marks' },
-      el('span', { class: 'score-rail-mark', style: `left:${SCORE_BANDS.steady}%` },
-        i18n.t('score.rail.mark', { score: SCORE_BANDS.steady, band: i18n.t('dash.health.steady') })),
-      el('span', { class: 'score-rail-mark', style: `left:${SCORE_BANDS.strong}%` },
-        i18n.t('score.rail.mark', { score: SCORE_BANDS.strong, band: i18n.t('dash.health.strong') })));
-    return el('div', { class: 'score-rail-wrap' }, rail, marks);
+    for (const r of laid) {
+      if (r.cls === 'is-none') {
+        segEls.push(addArc('path', {
+          class: 'score-ring-seg score-ring-zero', 'data-k': r.key, fill: 'none',
+          d: ringZeroPath(r.trackStart, r.trackLen),
+        }));
+        continue;
+      }
+      const fillLen = r.trackLen * r.at;
+      const to = -r.trackStart;
+      const from = -(r.trackStart + fillLen);
+      segEls.push(addArc('circle', {
+        class: `score-ring-seg score-ring-fill ${r.cls}`, 'data-k': r.key,
+        cx: RING_CX, cy: RING_CY, r: RING_R, fill: 'none',
+        'stroke-dasharray': `${fillLen.toFixed(2)} ${(RING_C - fillLen).toFixed(2)}`,
+        'stroke-dashoffset': to.toFixed(2),
+        style: `--seg-from:${from.toFixed(2)};--seg-to:${to.toFixed(2)}`,
+      }));
+    }
+
+    const midNum = el('div', { class: 'score-ring-num num' });
+    const midBand = el('div', { class: 'score-ring-band' });
+    const showTotal = () => {
+      midNum.empty();
+      midNum.append(String(breakdown.total), el('small', {}, i18n.t('score.outOf')));
+      midBand.className = 'score-ring-band';
+      midBand.textContent = i18n.t(`dash.health.${breakdown.band}`);
+    };
+    const showPart = r => {
+      midNum.empty();
+      midNum.append(String(r.fill));
+      midBand.className = 'score-ring-band is-part';
+      midBand.textContent = r.name;
+    };
+    /* The centre is a real button too — tapping it clears the focused part
+       the same as tapping that part's own row again does. Always labelled
+       with the "show all" action rather than only while focused: idle, the
+       action is a no-op (already showing all), but the label stays true
+       either way and the control does not need its own extra state to track. */
+    const midBtn = el('button', {
+      type: 'button', class: 'score-ring-mid', 'aria-label': i18n.t('score.ring.showAll'),
+    }, midNum, midBand);
+    showTotal();
+
+    const legend = el('div', { class: 'score-ring-legend' },
+      el('p', { class: 'score-ring-hint' }, i18n.t('score.ring.hint')));
+    const buttons = [];
+
+    /* Dims every OTHER segment (both tracks and fills/zero-hairlines) and
+       swaps the centre between the total and one part's own figure. Direct
+       classList/attribute writes on the elements actually built above,
+       rather than a CSS cascade keyed off a per-pillar modifier class: that
+       would need one rule per PILLARS entry and silently stop covering a
+       sixth pillar the day one is added, where this covers whatever
+       `rows` actually holds. No :has() either way — the iOS 15 floor this
+       page already keeps. */
+    function applyFocus(key) {
+      wrap.classList.toggle('is-focus', !!key);
+      for (const seg of segEls) {
+        seg.classList.toggle('is-dim', !!key && seg.getAttribute('data-k') !== key);
+      }
+      for (const btn of buttons) {
+        btn.setAttribute('aria-pressed', btn.getAttribute('data-k') === key ? 'true' : 'false');
+      }
+      const row = key ? laid.find(r => r.key === key) : null;
+      if (row) { showPart(row); midBtn.classList.add('is-part'); } else { showTotal(); midBtn.classList.remove('is-part'); }
+    }
+    midBtn.addEventListener('click', () => applyFocus(null));
+
+    for (const r of rows) {
+      const nameEl = el('span', { class: 'score-ring-row-name' }, r.name);
+      if (r.cls === 'is-full') {
+        nameEl.append(el('span', { class: 'score-ring-row-tag' }, i18n.t('score.win.fullMarks')));
+      }
+      const bodyKids = [nameEl];
+      if (r.now) { bodyKids.push(el('span', { class: 'score-ring-row-now' }, r.now)); }
+      const btn = el('button', {
+        type: 'button', class: `score-ring-row ${r.cls}`, 'aria-pressed': 'false', 'data-k': r.key,
+      },
+        el('span', { class: `score-ring-dot ${r.cls}`, 'aria-hidden': 'true' }),
+        el('span', { class: 'score-ring-row-body' }, ...bodyKids),
+        el('span', { class: 'score-ring-row-pts num' },
+          i18n.t('dash.health.why.points', { points: r.fill, max: r.width })));
+      btn.addEventListener('click', () => {
+        const on = btn.getAttribute('aria-pressed') === 'true';
+        applyFocus(on ? null : r.key);
+      });
+      buttons.push(btn);
+      legend.append(btn);
+    }
+
+    const hold = el('div', { class: 'score-ring-hold' }, svg, midBtn);
+    wrap.append(hold, legend);
+    return wrap;
   }
 
   /* ---------------------------- what is going well ----------------------- */

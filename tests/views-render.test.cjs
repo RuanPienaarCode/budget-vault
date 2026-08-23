@@ -31,12 +31,14 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 const i18n = require('../src/i18n');
+const { healthMetrics, scoreBreakdown } = require('../src/health-math');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
+const close = (a, b, m, eps = 0.01) => { assert.ok(Math.abs(a - b) < eps, `${m} (got ${a}, want ~${b})`); checks++; };
 
 /* ---- the list, read from the app ---------------------------------------
    controller.js dispatches on S.view through an object literal mapping each
@@ -287,6 +289,94 @@ async function mountAll(files = FILES, period = '2026-07') {
     ok(!flowCard.querySelector('.score-flow-sankey'),
       'no Sankey is drawn for an all-in, nothing-out period either');
     checks += 3;
+  }
+
+  /* ---- 8. the hero ring ----
+     Ruan's verdict on the segmented bar: hard to read. Replaced with the ring
+     from mockup B — arc length is a pillar's weight, fill is what it earned.
+     Driven off a HAND-BUILT breakdown (the same six-period fixture
+     money-flow.test.cjs's own rail-segment test uses) rather than a real
+     vault, because the real one is anchored to wall-clock "today" and would
+     make this suite's pass/fail depend on which real calendar month it
+     happens to run in. `ctx.healthSnapshot` is overwritten by plain
+     assignment (not `ctx.provide`, which throws on a key already defined) and
+     views/score is required exactly once, after the override, so its
+     `renderHero` closes over the swapped-in snapshot instead of the real
+     loader's. */
+  {
+    const ctx = makeCtx(FILES);
+    const S = await loadInto(ctx);
+    S.period = '2026-07';
+    const { $, nodes } = makeDom();
+    ctx.$ = $;
+    ctx.$$ = () => [];
+    ctx.root = $('#root');
+    ctx.view = { containerEl: $('#root') };
+    ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
+    ctx.moneyIn = (sym, v, dp = 2) => `${sym} ${Number(v).toFixed(dp)}`;
+    const { el } = require('../src/dom');
+    ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
+    ctx.plugin.settings = { ...ctx.plugin.settings, chartTrendRange: '6m' };
+    require('../src/categories')(ctx);
+
+    const periods = [];
+    for (let i = 0; i < 6; i++) {
+      periods.push({ income: 45000, essential: 20000, savings: 0, consumption: 25860, fixed: 14400, budgeted: 33100, counted: true });
+    }
+    const m = healthMetrics({
+      periods, monthsPerPeriod: 1,
+      earmarks: { total: 55000, any: true, over: [] }, targetMonths: 6,
+      debtInterest: 2015, debtInstalments: 7140, netWorth: 1836000, hasFixed: true,
+    });
+    const breakdown = scoreBreakdown(m, 6);
+    eq(breakdown.pillars.length, 5, 'the fixture answers all five pillars');
+    const zeroPillars = breakdown.pillars.filter(p => p.at <= 0.001);
+    ok(zeroPillars.length >= 1, 'and at least one of them (saving, 0% saved) earned nothing');
+
+    ctx.healthSnapshot = () => ({
+      metrics: m, breakdown, target: 6,
+      earmarks: { total: 55000, any: true, over: [] },
+      debtsRecorded: true,
+    });
+    require('../src/views/score')(ctx);
+    ctx.renderScore();
+
+    const hero = nodes.get('#scoreHero');
+    ok(hero.querySelector('.score-ring'), 'the hero renders the score ring');
+
+    const tracks = hero.querySelectorAll('.score-ring-track');
+    eq(tracks.length, 5, 'one track arc per live pillar');
+    for (const t of tracks) { eq(t.tagName, 'CIRCLE', 'a track is a plain circle'); }
+
+    const fills = hero.querySelectorAll('.score-ring-fill');
+    const zeros = hero.querySelectorAll('.score-ring-zero');
+    eq(fills.length + zeros.length, tracks.length,
+      'every pillar draws exactly one fill or one zero-hairline, never both and never neither');
+    eq(zeros.length, zeroPillars.length,
+      'exactly the pillars that earned nothing get the dashed-hairline treatment');
+    for (const z of zeros) {
+      eq(z.tagName, 'PATH',
+        'a zero-earned pillar is a <path> arc, never a dashed <circle> — a dash pattern on a full ' +
+        'circle repeats all the way round and would paint danger-red dashes across every OTHER part too');
+    }
+
+    /* The fill each segment draws agrees with the fraction health-math.js
+       says it earned — not with the rounded shownPoints/shownMax pair, the
+       UNROUNDED `at`, per money-flow.js's own railSegments note. Checked per
+       segment (fill-on-length / track-on-length) rather than by re-deriving
+       an expected absolute arc length here, which would just be a second
+       copy of buildScoreRing's own geometry with nothing to catch a
+       divergence between them. */
+    const onLength = elm => Number((elm.getAttribute('stroke-dasharray') || '0 0').split(' ')[0]);
+    const byKey = new Map(tracks.map(t => [t.getAttribute('data-k'), t]));
+    for (const f of fills) {
+      const key = f.getAttribute('data-k');
+      const track = byKey.get(key);
+      ok(track, `fill ${key} has a matching track`);
+      const p = breakdown.pillars.find(x => x.key === key);
+      const ratio = onLength(f) / onLength(track);
+      close(ratio, p.at, `${key}'s fill spans exactly its own earned fraction of its track`);
+    }
   }
 
   console.log(`PASS — all ${DISPATCH.length} views render, empty and populated (${checks} assertions).`);

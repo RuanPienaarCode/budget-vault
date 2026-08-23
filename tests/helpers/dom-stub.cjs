@@ -68,7 +68,18 @@ class FakeEl {
   removeChild(k) { this.children = this.children.filter(c => c !== k); return k; }
   remove() { if (this._parent) this._parent.removeChild(this); }
   replaceChildren(...kids) { this.children = []; this._text = ''; this.append(...kids); }
-  setAttribute(k, v) { this.attrs[k] = String(v); }
+  /* `class` is reflected into _cls the same way the `className` setter
+     already does — real DOM does this too, for HTML *and* SVG elements
+     (setAttribute('class', ...) is the ONLY correct way to set an SVG
+     element's class; assigning .className directly is unreliable there,
+     since SVGElement.className is an SVGAnimatedString in a spec-strict
+     engine). The score ring is the first stub SVG built entirely through
+     setAttribute rather than the `class` shorthand in dom.js's el(), and
+     without this its every class query came back empty. */
+  setAttribute(k, v) {
+    this.attrs[k] = String(v);
+    if (k === 'class') { this.className = String(v); }
+  }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   removeAttribute(k) { delete this.attrs[k]; }
   hasAttribute(k) { return k in this.attrs; }

@@ -975,8 +975,9 @@ module.exports = {
   'score.flow.chip.leftInBudget': '预算内剩余',
   'score.flow.chip.neverBudgeted': '从未纳入预算的收入',
   'score.flow.chip.together': '合计',
-  'score.rail.aria': '评分 {score} / 100，由五部分构成：{parts}。',
-  'score.rail.mark': '{score} · {band}',
+  'score.ring.aria': '评分 {score} / 100。{parts}。',
+  'score.ring.showAll': '显示全部五个部分',
+  'score.ring.hint': '点按某一部分即可单独查看。',
   'score.gap.railAria': '{name}：已获得 {points} / {max} 分。',
 
 
