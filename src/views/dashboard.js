@@ -128,10 +128,22 @@ module.exports = function registerDashboard(ctx) {
         : i18n.t('dash.health.subNone');
     }
 
-    const fig = (cls, value, label, meta) => el('div', { class: `health-fig ${cls}` },
-      el('div', { class: 'lv num' }, value),
-      el('div', { class: 'll' }, label),
-      meta ? el('div', { class: 'lm' }, meta) : '');
+    /* A tile with a `to` becomes a real <button> that routes there. These
+       four figures are summaries of pages that argue them in full, and a
+       reader who wants more from one of them wants that page — not a popup
+       restating it on the page they are already on. No aria-label: the
+       button's own text ("58 financial score steady") already reads as the
+       thing being activated, and a label would talk over it. */
+    const fig = (cls, value, label, meta, to) => {
+      const kids = [
+        el('div', { class: 'lv num' }, value),
+        el('div', { class: 'll' }, label),
+        meta ? el('div', { class: 'lm' }, meta) : ''];
+      return to
+        ? el('div', { class: `health-fig ${cls} is-link` },
+          el('button', { type: 'button', class: 'health-fig-btn', onclick: () => ctx.switchView(to) }, ...kids))
+        : el('div', { class: `health-fig ${cls}` }, ...kids);
+    };
     const pct = r => `${Math.round(r * 100)}%`;
 
     /* Emergency cover. The meter fills toward the target and re-tones at the
@@ -209,228 +221,28 @@ module.exports = function registerDashboard(ctx) {
       ? fig(H.interestShare <= 0 ? 'is-good' : H.interestShare < 0.05 ? 'is-fair' : 'is-poor',
         pct(H.interestShare),
         i18n.t('dash.health.debt'),
-        debtMeta) : fig('', '—', i18n.t('dash.health.debt'), debtMeta);
+        debtMeta, 'debts') : fig('', '—', i18n.t('dash.health.debt'), debtMeta, 'debts');
 
     /* One band lookup for the colour AND the word — health-math owns the
        thresholds now, so the tile and the popup explaining it cannot disagree
        about whether 79 is steady. */
     const BAND_TONE = { strong: 'is-good', steady: 'is-fair', attention: 'is-poor' };
     const band = H.score ? scoreBand(H.score.value) : null;
+    /* Routes to the Score page rather than opening the explainer popup it
+       used to carry. That popup held a heading, three scored rows and an
+       instruction — the whole of which the Score page now says better, in the
+       ring's own legend, since the standalone "How the score is built" card
+       was folded into it. Two surfaces explaining one number is how they come
+       to disagree about it; the tile states the figure and hands off. */
     const scoreTile = H.score
       ? fig(`${BAND_TONE[band]} is-score`, String(H.score.value),
-        i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`))
-      : fig('is-score', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
-    if (H.score) {
-      attachScoreExplainer(scoreTile, snap.breakdown, target);
-    }
+        i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`), 'score')
+      : fig('is-score', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'), 'score');
 
     /* The conclusion leads, then the three figures it is drawn from. */
     body.append(el('div', { class: 'health-grid' }, scoreTile, emergency, savingsTile, debtTile));
   }
 
-  /* Turn the score tile into something that explains itself.
-
-     WHY A BUTTON AND NOT A `title`. The house rule (see views/savings.js) is
-     that hover is a capability question: a rich tooltip where there is a fine
-     pointer, the native `title` for fingers, and never a hover-only affordance
-     invented for a phone. That rule is kept here — but the fallback is a real
-     popup rather than a `title`, because this content is a heading, three
-     scored rows and an instruction. Collapsed into one title string it becomes
-     a paragraph nobody reads, and on the phone where this plugin mostly lives
-     that paragraph would be the ONLY version anyone gets.
-
-     So: one popup, reachable three ways. Hover opens it where hovering exists,
-     focus opens it for the keyboard, and a tap toggles it everywhere — which is
-     also what makes it work for a finger without a second implementation to
-     keep in step. `aria-expanded` says which state it is in, and the popup is
-     named by the button through aria-controls rather than being read as loose
-     text after it. */
-  let explainSeq = 0;
-  function attachScoreExplainer(tile, breakdown, target) {
-    if (!breakdown) { return; }
-    const id = `bud-score-why-${++explainSeq}`;
-
-    const pop = el('div', { class: 'health-why', id, role: 'group' });
-    pop.append(el('div', { class: 'health-why-h' }, i18n.t('dash.health.why.title')),
-      el('p', { class: 'health-why-p' }, i18n.t('dash.health.why.intro')),
-      el('p', { class: 'health-why-p' }, i18n.t('dash.health.why.bands', {
-        strong: SCORE_BANDS.strong, steady: SCORE_BANDS.steady,
-        // The top of the middle band, derived rather than written twice — the
-        // bands are contiguous, so this is strong's threshold minus one.
-        strongLess: SCORE_BANDS.strong - 1,
-      })));
-
-    /* Each component, worst first, with the points it earned of the points it
-       could. `max` is the renormalised figure, so these always add to the
-       headline — see scoreBreakdown for why that matters. */
-    const rows = el('div', { class: 'health-why-rows' });
-    /* What full marks means for each pillar, in the reader's own units rather
-       than as a weight. A row that said "worth 25 points" explains the scoring
-       and not the money; these say what the household would have to be doing. */
-    const FULL = {
-      reserves: () => i18n.t('dash.health.why.fullReserves', { target }),
-      saving: () => i18n.t('dash.health.why.fullSaving', { pct: Math.round(FULL_MARKS.savingsRate * 100) }),
-      debt: () => i18n.t('dash.health.why.fullDebt'),
-      spending: () => i18n.t('dash.health.why.fullSpending', {
-        fixed: Math.round(FULL_MARKS.fixedFloor * 100),
-        living: Math.round(FULL_MARKS.consumptionFloor * 100),
-      }),
-      wealth: () => i18n.t('dash.health.why.fullWealth', { times: FULL_MARKS.netWorthMultiple }),
-    };
-    for (const p of breakdown.pillars) {
-      const tone = p.at >= 0.999 ? ' is-full' : p.at < 0.5 ? ' is-weak' : '';
-      rows.append(el('div', { class: `health-why-row${tone}` },
-        el('div', { class: 'health-why-name' }, i18n.t(`dash.health.why.name.${p.key}`)),
-        el('div', { class: 'health-why-pts num' },
-          i18n.t('dash.health.why.points', { points: p.shownPoints, max: p.shownMax })),
-        el('div', { class: 'health-why-note' }, FULL[p.key]())));
-    }
-    pop.append(rows);
-
-    /* The closing line is the only actionable sentence in the popup, so it gets
-       the concrete figure rather than an adjective. Nothing to fix gets praise
-       instead — "biggest drag: nothing" is not a sentence. */
-    if (breakdown.drag && breakdown.drag.gap) {
-      const g = breakdown.drag.gap;
-      const amount = money(g.amount, 0);
-      const fix = g.kind === 'fund' ? i18n.t('dash.health.why.fixFund', { amount, target })
-        : g.kind === 'monthly' ? i18n.t('dash.health.why.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
-          : g.kind === 'interest' ? i18n.t('dash.health.why.fixInterest', { amount })
-            : g.kind === 'trim' ? i18n.t('dash.health.why.fixTrim', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
-              : i18n.t('dash.health.why.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple });
-      pop.append(el('p', { class: 'health-why-fix' },
-        el('b', {}, i18n.t('dash.health.why.dragLabel', {
-          name: i18n.t(`dash.health.why.name.${breakdown.drag.key}`),
-          points: breakdown.drag.shownLost,
-        })), ' ', fix));
-    } else {
-      pop.append(el('p', { class: 'health-why-fix' }, i18n.t('dash.health.why.allFull')));
-    }
-
-    /* The tile becomes the control. Its existing contents stay exactly as they
-       were — the button wraps rather than replaces, so the four tiles keep
-       reading as one row instead of one of them growing a chrome of its own. */
-    const btn = el('button', { type: 'button', class: 'health-why-btn',
-      'aria-expanded': 'false', 'aria-controls': id,
-      'aria-label': i18n.t('dash.health.why.aria') });
-    /* Snapshot the children BEFORE moving any of them. A live DOM relocates a
-       node on append, so walking `tile.firstChild` would terminate — but only
-       because of that side effect, which is a fragile thing for a loop's exit
-       condition to lean on and is not something a test double reproduces. The
-       array says outright which nodes are being moved. */
-    for (const kid of [...(tile.childNodes || tile.children || [])]) { btn.append(kid); }
-    tile.append(btn, pop);
-
-    /* Place it where it actually fits, and never let it be cut off.
-
-       The first version only ever asked whether the panel fell past the BOTTOM
-       of `.bud-scroll` and flipped upward if it did — which swapped one clip
-       for another the moment the card sat high in the pane: the panel escaped
-       the bottom edge and ran off the top instead, losing its opening lines,
-       which is exactly where it explains what the score is.
-
-       So both gaps are measured and the roomier one wins; whichever side is
-       chosen, the panel is then capped to the room that side actually has and
-       scrolls inside it. A capped panel is readable, a clipped one is not.
-       Measured after it is displayed, because its height depends on how many
-       pillars scored and whether there is a fix line to close with. */
-    const GAP = 12;
-    const MIN_PANEL = 160;
-    /* The panel's own z-index only competes INSIDE its card: the card is the
-       stacking context, so the next card down the dashboard painted straight
-       over the panel however high the panel was raised. The card itself has to
-       come forward for the duration, and only for the duration — a card left
-       permanently raised would sit over whatever opens above IT later. */
-    /* Resolved on each open, NOT once at attach: this runs while the tile is
-       still detached — the view builds the four tiles and only then appends the
-       grid — so an eager lookup found no card and silently never raised one. */
-    const cardOf = () => (typeof tile.closest === 'function' ? tile.closest('.card') : null);
-    const open = on => {
-      tile.classList.toggle('is-why-open', on);
-      const card = cardOf();
-      if (card) { card.classList.toggle('is-why-raised', on); }
-      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
-      tile.classList.remove('is-why-above');
-      if (pop.style && typeof pop.style.removeProperty === 'function') {
-        pop.style.removeProperty('max-height');
-      }
-      if (!on || typeof pop.getBoundingClientRect !== 'function'
-          || typeof tile.getBoundingClientRect !== 'function') { return; }
-
-      const scroller = typeof tile.closest === 'function' ? tile.closest('.bud-scroll') : null;
-      const bounds = scroller && typeof scroller.getBoundingClientRect === 'function'
-        ? scroller.getBoundingClientRect()
-        : { top: 0, bottom: typeof window !== 'undefined' ? window.innerHeight : 0 };
-      if (!bounds.bottom) { return; }
-
-      /* The TILE, not the button. The panel is positioned against the tile —
-         that is the element CSS gives `position: relative` — and the tile is
-         taller by its own padding. Measuring the room from the button left the
-         gap overstated by that padding, so a panel capped to "exactly the room
-         above" still ran a few pixels past the top edge. */
-      const anchor = tile.getBoundingClientRect();
-      const below = bounds.bottom - anchor.bottom - GAP;
-      const above = anchor.top - bounds.top - GAP;
-      const needed = pop.getBoundingClientRect().height;
-
-      /* Only move it upward when up is genuinely roomier — a panel that fits
-         below belongs below, where a reader's eye already is. */
-      if (needed > below && above > below) { tile.classList.add('is-why-above'); }
-      const room = tile.classList.contains('is-why-above') ? above : below;
-      if (needed > room && pop.style && typeof pop.style.setProperty === 'function') {
-        pop.style.setProperty('max-height', `${Math.max(MIN_PANEL, Math.floor(room))}px`);
-      }
-    };
-
-    /* Hover only where hovering is real. matchMedia is checked live rather than
-       cached at render, so a vault opened on a desktop and continued on an iPad
-       is not still answering the desktop's question. */
-    const fine = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    btn.addEventListener('pointerenter', () => { if (fine()) { open(true); } });
-    btn.addEventListener('pointerleave', () => { if (fine()) { open(false); } });
-    /* Toggle, so a finger can dismiss it again without hunting for elsewhere —
-       and this is the KEYBOARD path too, because a <button> fires click on both
-       Enter and Space.
-
-       Deliberately NO open-on-focus. It was there first and it silently broke
-       the tap: focus lands before click, so the sequence was open-then-toggle,
-       which left the panel exactly as shut as it started. Every tap on a phone
-       did nothing at all, while the desktop looked fine because hover had
-       already opened it without a click ever happening. */
-    btn.addEventListener('click', () => open(!tile.classList.contains('is-why-open')));
-    /* Tabbing away closes it. A FINGER LANDING ON THE PANEL MUST NOT.
-
-       The panel is a sibling of the button and holds nothing focusable, so a
-       touch on its own text — to read a figure, or to begin the drag that
-       scrolls the card it sits inside below 900px — blurs the button. Closing on
-       a bare blur therefore dismissed the panel the reader had just opened, at
-       the first touch, on the device this plugin mostly lives on: the one place
-       the whole explanation was unreadable past its first line.
-
-       Focus does not move INTO the panel in that case, because there is nothing
-       there to take it — it falls to <body>. So the close waits a tick and then
-       asks where focus actually went. A real element somewhere else means the
-       reader left and the panel should go; <body> means nothing took focus at
-       all and it stays open. That is the same distinction src/dom.js's setInert
-       already draws between a real focus owner and none. */
-    btn.addEventListener('blur', () => {
-      const settle = () => {
-        const at = typeof document === 'undefined' ? null : document.activeElement;
-        if (!at || at === document.body || tile.contains(at)) { return; }
-        open(false);
-      };
-      if (typeof setTimeout === 'function') { setTimeout(settle, 0); } else { settle(); }
-    });
-    /* Escape closes it and hands focus back, the one keyboard convention a
-       reader will try without being told. */
-    btn.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && tile.classList.contains('is-why-open')) {
-        e.stopPropagation();
-        open(false);
-      }
-    });
-  }
 
   /* --------------------------- what's left ------------------------------
      The hero above says how much BUDGET is left. This says how much MONEY is —
