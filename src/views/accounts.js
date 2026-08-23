@@ -52,7 +52,7 @@ const { worth } = require('../worth');
 const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt,
+  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
 
   /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: this page writes
@@ -1224,6 +1224,93 @@ module.exports = function registerAccounts(ctx) {
     return line;
   }
 
+  /* ------------------------- resizable columns ---------------------------
+     The reader drags a column edge; the width is remembered in plugin data
+     (settings.acctColWidths) and re-applied on every later render.
+
+     WIDTHS ARE ONLY HONOURED UNDER `table-layout: fixed`. Under the automatic
+     layout this table ships with, a `width` on a `th` is a suggestion the
+     engine is free to ignore the moment the content disagrees — which is
+     exactly what a reader narrowing a column is asking it to do. So the table
+     switches to a fixed layout the first time ANY column is sized, and stays
+     automatic for a household that never drags one. That keeps the default
+     behaviour (and the name-column min-width floor that fixed the one-word-
+     per-line wrap) untouched for everyone who never asks for this.
+
+     Not applied on a phone: the three `acct-col-drop` columns are display:none
+     under 760px, so a width dragged on a desktop would be shared out among a
+     different set of columns and read as a broken table. The stored figure is
+     kept, not cleared — going back to the desktop restores it. */
+  const COL_MIN = 64;
+  const RESIZE_AT = 761;   // one past the 760px drop breakpoint in styles.css
+
+  function widths() { return plugin.settings.acctColWidths || {}; }
+  function resizingOn() {
+    return typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+      ? true : window.matchMedia(`(min-width: ${RESIZE_AT}px)`).matches;
+  }
+
+  /* Persisted on RELEASE, not on every pointermove: a drag is one decision,
+     and writing data.json per frame would put hundreds of writes into a vault
+     that syncs. Guarded like every other settings write in this app. */
+  async function saveWidth(key, px) {
+    const w = { ...widths() };
+    if (px === null) { delete w[key]; } else { w[key] = Math.round(px); }
+    plugin.settings.acctColWidths = w;
+    try { await plugin.saveSettings(); }
+    catch (e) { toast(i18n.t('settings.err.save', { error: e.message || e }), true); }
+  }
+
+  /* One grip per header. pointerdown/move/up with setPointerCapture rather
+     than document-level listeners: capture keeps the drag alive when the
+     pointer leaves the 6px grip, which it does immediately, and releases it
+     automatically if the pointer is cancelled. touch-action:none is what stops
+     the table scrolling under a finger instead of resizing. */
+  function addGrip(th, key) {
+    const grip = el('span', { class: 'acct-grip', 'aria-hidden': 'true' });
+    let startX = 0, startW = 0, live = null;
+    grip.addEventListener('pointerdown', e => {
+      if (!resizingOn()) { return; }
+      e.preventDefault(); e.stopPropagation();       // never sorts the column it grips
+      startX = e.clientX; startW = th.getBoundingClientRect().width; live = startW;
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add('is-dragging');
+      $('#acctTable').classList.add('is-sized');
+    });
+    grip.addEventListener('pointermove', e => {
+      if (!grip.hasPointerCapture || !grip.classList.contains('is-dragging')) { return; }
+      live = Math.max(COL_MIN, startW + (e.clientX - startX));
+      th.style.width = `${live}px`;
+    });
+    const end = e => {
+      if (!grip.classList.contains('is-dragging')) { return; }
+      grip.classList.remove('is-dragging');
+      try { grip.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      if (live !== null) { saveWidth(key, live); }
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+    /* Double-click resets this one column — the standard escape hatch, and the
+       only way back to automatic sizing for a column dragged somewhere silly. */
+    grip.addEventListener('dblclick', e => {
+      e.preventDefault(); e.stopPropagation();
+      th.style.width = '';
+      saveWidth(key, null);
+      renderAccounts();
+    });
+    th.append(grip);
+  }
+
+  /* Stamped on the th at build time so both the restore and the drag read one
+     name for a column. */
+  function colHeader(th, key) {
+    th.setAttribute('data-col', key);
+    const px = widths()[key];
+    if (px && resizingOn()) { th.style.width = `${px}px`; }
+    addGrip(th, key);
+    return th;
+  }
+
   function sortHeader(key, label) {
     const v = view();
     const on = v.sort === key;
@@ -1236,7 +1323,7 @@ module.exports = function registerAccounts(ctx) {
       renderAccounts();
     });
     th.append(b);
-    return th;
+    return colHeader(th, key);
   }
 
   function renderTable(rows) {
@@ -1250,10 +1337,10 @@ module.exports = function registerAccounts(ctx) {
       sortHeader('name', i18n.t('acct.col.account')),
       sortHeader('balance', i18n.t('acct.col.balance')),
       sortHeader('flow', periodMonthName(S.period)),
-      el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')),
-      el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')),
+      colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')), 'month'),
+      colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')), 'goal'),
       sortHeader('stale', i18n.t('acct.col.confirmed')),
-      el('th', { scope: 'col' }, i18n.t('acct.col.state')),
+      colHeader(el('th', { scope: 'col' }, i18n.t('acct.col.state')), 'state'),
       /* The label is for a screen reader, not for the eye. Spelling "Notes"
          out visibly made the column 76px wide to hold a 26px chip, which
          pushed the whole table 24px past its card at 1280 — and the column it
@@ -1264,6 +1351,9 @@ module.exports = function registerAccounts(ctx) {
         el('span', { class: 'sr-only' }, i18n.t('acct.col.notes'))));
     head.children[2].classList.add('acct-col-drop', 'num');
     head.children[5].classList.add('acct-col-drop');
+    /* See the note on COL_MIN above: fixed layout is what makes a stored width
+       real, and it is switched on only for a table that has one. */
+    table.classList.toggle('is-sized', resizingOn() && Object.keys(widths()).length > 0);
     table.append(el('thead', {}, head));
 
     const body = el('tbody', {});

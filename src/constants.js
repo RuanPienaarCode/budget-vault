@@ -36,6 +36,16 @@ const DEFAULT_SETTINGS = {
      upgrade changes nothing until it is asked to. */
   palette: DEFAULT_PALETTE,
   openOnStartup: false,
+  /* Accounts-table column widths the reader dragged, keyed by column and
+     measured in px. Plugin data for the same reason the chart ranges below
+     are: display state, and Settings.md is the user's own hand-editable file.
+
+     An empty object is the default and MEANS something — the table keeps its
+     automatic layout until a column is actually dragged, at which point it
+     switches to a fixed one so the widths are honoured exactly. So "never
+     touched" and "dragged back to roughly the default" stay distinguishable,
+     and a household that never wants this never pays for it. */
+  acctColWidths: {},
   onboarded: false,       // first-run wizard shown (or an existing budget was detected)
   privacyLock: true,      // splash gate: nothing loads or paints until "Enter budget" is tapped
   /* Chart time ranges (keys from RANGES in chart.js). Plugin data rather than
