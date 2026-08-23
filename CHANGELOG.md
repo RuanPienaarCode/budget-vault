@@ -3,6 +3,19 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.1 — 2026-08-23
+
+### Fixed
+
+- **A period with nothing in it no longer draws a broken flow.** On a period
+  with no income yet — the new current period, before anything has landed —
+  every band in "Where the money went" had no height, so its four labels
+  printed on top of each other, four empty-band hairlines stacked on one row,
+  and the chart kept the full height of a picture it was not drawing. The card
+  now says plainly that nothing has come in yet (or that money came in but
+  nothing has been spent or set aside), drops the figures that would only say
+  zero, and keeps the budget against which the period will be measured.
+
 ## 1.22.0 — 2026-08-22
 
 The Score page now shows, not tells. Where the money went leads the page, the
