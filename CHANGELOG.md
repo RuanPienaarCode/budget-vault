@@ -3,6 +3,15 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.7 — 2026-08-23
+
+### Changed
+
+- **Pointing at the score ring is cheaper.** The readout measured itself on
+  every mouse movement, which made the browser recalculate the page layout
+  three times per pixel of travel. It now measures once when you move onto a
+  part. Nothing looks different; it just stops doing work it never needed to.
+
 ## 1.22.6 — 2026-08-23
 
 ### Fixed
