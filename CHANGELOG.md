@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.3 — 2026-08-23
+
+### Changed
+
+- **The score is drawn as a ring.** The five parts that build it are arcs
+  whose lengths are what each part is worth and whose fills are what was
+  earned, with the number and its band in the centre — so the score is the
+  visible amount of ring that is coloured in. A legend beside it carries the
+  figures; tap a part to see it on its own. This replaces the row of five
+  small bars, which was hard to read.
+
 ## 1.22.2 — 2026-08-23
 
 ### Changed
