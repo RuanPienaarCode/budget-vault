@@ -3,6 +3,18 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.6 — 2026-08-23
+
+### Fixed
+
+- **A thin dark line ran down the Dashboard hero card.** 1.22.5 left three
+  orphaned rule bodies in the stylesheet when it removed the score-explainer
+  popup, which made the browser silently drop the rules that followed —
+  including the one that keeps the budget bar's pace mark inside the bar. The
+  mark escaped and painted a line down the whole card. The stylesheet is
+  repaired, and a new check fails the build if a rule body is ever orphaned
+  again.
+
 ## 1.22.5 — 2026-08-23
 
 ### Added
