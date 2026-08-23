@@ -273,6 +273,11 @@ module.exports = function registerScore(ctx) {
     tipBox.append(tipName, tipPtsEl, tipNow, tipHow);
 
     if (hoverable) {
+      /* The holder's box and the readout's own size, taken once per hovered
+         part rather than once per pointermove. Null until the first enter,
+         which is what the move handler's guard reads. */
+      let hostBox = null, tipW = 0, tipH = 0;
+
       /* Keyed on data-k, so the TRACK and the fill arc of one pillar are one
          hover target between them: the grey remainder of a part is still that
          part, and a reader pointing at the half of "Emergency cover" it has
@@ -293,6 +298,17 @@ module.exports = function registerScore(ctx) {
           tipNow.textContent = r.now || '';
           tipHow.textContent = r.how || '';
           tipBox.classList.add('is-on');
+          /* Measured HERE, once, not on every pointermove. Reading
+             getBoundingClientRect/offsetWidth forces a synchronous layout, and
+             doing it per mouse-move — on a box whose text was just rewritten —
+             is the layout thrash a profile of this page actually caught: three
+             forced reflows per pixel of travel. The readout's size can only
+             change when its CONTENT does, and that is this handler; the
+             holder's box can only change on a scroll or resize, neither of
+             which can happen without the pointer leaving the ring first. */
+          hostBox = hold.getBoundingClientRect();
+          tipW = tipBox.offsetWidth;
+          tipH = tipBox.offsetHeight;
         });
       }
       /* Positioned from the POINTER, not from the arc: a segment can be a
@@ -301,9 +317,8 @@ module.exports = function registerScore(ctx) {
          the ring is guaranteed to be on screen, which is what keeps this
          clear of the standing rule against measuring a hidden tab. */
       svg.addEventListener('pointermove', e => {
-        if (!tipBox.classList.contains('is-on')) { return; }
-        const box = hold.getBoundingClientRect();
-        const tw = tipBox.offsetWidth, th = tipBox.offsetHeight;
+        if (!tipBox.classList.contains('is-on') || !hostBox) { return; }
+        const box = hostBox, tw = tipW, th = tipH;   // measured on enter — see above
         const x = e.clientX - box.left, y = e.clientY - box.top;
         /* Kept inside the holder rather than parked exactly on the pointer:
            the box is centred on `left`, so a part near either edge would
@@ -321,6 +336,7 @@ module.exports = function registerScore(ctx) {
       svg.addEventListener('pointerleave', () => {
         hotten(null);
         tipBox.classList.remove('is-on');
+        hostBox = null;   // a measurement must never outlive the hover it was taken for
       });
     } else {
       for (const seg of segEls) {
