@@ -3,6 +3,36 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.22.5 — 2026-08-23
+
+### Added
+
+- **The score ring explains itself.** Point at a part and a readout follows
+  your cursor with its name, its score, where you stand in it, and what it
+  measures. On a phone, touch-and-hold a part for the same thing.
+- **Tap a part in the legend** and it now tells you what that part measures,
+  under its own row.
+- **The Dashboard's score and debt tiles are links.** The score tile opens the
+  Score page; the debt-interest tile opens Debt.
+- **Accounts columns can be dragged wider or narrower**, and the widths are
+  remembered next time you open the vault. Double-click a column edge to reset
+  that one. Not applied on a phone, where three of the columns are hidden — the
+  widths are kept and come back on a desktop.
+
+### Changed
+
+- **"How the score is built" is no longer a separate card.** What each part
+  measures now lives on that part; the band scale and the note about parts your
+  files cannot answer sit under the score as footnotes.
+- **The Dashboard's score popup is gone** — the tile opens the Score page,
+  which says all of it and more.
+- **Transactions filters sit on their own line** above Export and the other
+  buttons, instead of being squeezed beside them.
+- The band under the score ("steady") now sits **below** the number rather than
+  beside it, and the lines under the score run wider, so fewer of them wrap.
+- The celebration confetti falls across the whole page rather than inside the
+  score card.
+
 ## 1.22.4 — 2026-08-23
 
 ### Added
