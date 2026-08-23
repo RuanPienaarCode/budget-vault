@@ -12,7 +12,7 @@
    is edited — so the format moved into src/budget-file.js and both writers
    call it.
 
-   Four claims, in the order they would break:
+   Five claims, in the order they would break:
 
      1. what serializeBudgetFile writes, the REAL loader reads back — driven
         through loadVault(), never through a mirror of its column mapping
@@ -22,9 +22,14 @@
         note, and an amount the strict parser rejected, which must go back as
         the verbatim string the reader typed rather than a number they did not,
      3. rows come out in the vault's own type order, custom groups included,
-     4. neither writer still carries a copy of the table header — a source
-        grep, the same shape settings-parity uses, because a second copy would
-        pass every assertion above right up until someone edited one of them.
+     4. neither writer still carries a copy of the table header OR of the
+        frontmatter a new file is born with — a source grep, the same shape
+        settings-parity uses, because a second copy would pass every assertion
+        above right up until someone edited one of them,
+     5. a period file created with nothing to patch is still born with the
+        vault's tag line and the same key order as every file already on disk —
+        the Budget page's first save of a new month has no frontmatter to
+        preserve, and used to write `period:` and nothing else.
 
    Bare node. Wired into ./build.sh by the tests/*.test.cjs glob.
      node tests/budget-file.test.cjs        # non-zero exit on failure
@@ -36,7 +41,7 @@ const path = require('path');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER } = require('../src/budget-file');
+const { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER, BUDGET_FRONTMATTER } = require('../src/budget-file');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -123,12 +128,51 @@ const text = serializeBudgetFile({
   ok(!/month_start_day/.test(cycle),
     'and never quotes a month start day it is not running on — the note only ever says what Settings.md says');
 
+  /* ---- 5: a period file is BORN with the vault's tag line ----------------
+     The Budget page's first save of a NEW month has no S.budgetMeta entry to
+     patch — the file was not on disk when the vault loaded — so it reaches the
+     serializer with rawFrontmatter ''. That branch used to emit `period:` and
+     nothing else, which put every newly-created month outside the
+     `finance/budget/budgets` tag search while looking perfectly normal on the
+     page that wrote it. A silent omission in a file the user never opens is
+     exactly the kind that survives a release. */
+  const born = serializeBudgetFile({ period: '2026-10', rows: [], rangeNote: 'note' });
+  ok(/tags: \[finance, finance\/budget, finance\/budget\/budgets\]/.test(born),
+    'a period file created with no frontmatter to patch still carries the vault tag line');
+  ok(/^---\nperiod: 2026-10\ntags: /.test(born),
+    'and leads with the period, in the same key order as every budget file already on disk');
+  ok(!/^period:\s*$/m.test(born),
+    'the placeholder that reserves that slot never ships as a valueless key');
+
+  /* An existing block still WINS: the default is a fallback, never an
+     overwrite. `hub` is the case that matters — the plugin has no notion of a
+     hub note, so if a save ever stopped preserving it, the budget files would
+     drop out of the vault's graph with nothing in the app to put them back. */
+  const patched = serializeBudgetFile({
+    period: '2026-10', rows: [], rangeNote: 'note',
+    rawFrontmatter: 'period: 2026-09\ntags: [mine]\nhub: "[[Smart Budget]]"\naliases: [Oct]',
+  });
+  ok(/hub: "\[\[Smart Budget\]\]"/.test(patched) && /aliases: \[Oct\]/.test(patched),
+    'hand-added keys survive a save — the default never replaces a real block');
+  ok(/tags: \[mine\]/.test(patched) && !patched.includes(BUDGET_FRONTMATTER),
+    'and the vault keeps its OWN tags rather than having the default pushed over them');
+  ok(/period: 2026-10/.test(patched) && !/period: 2026-09/.test(patched),
+    'while `period` is still patched to the file being written');
+
   /* ---- 4: nobody kept a copy of the format ---- */
   const SRC = path.join(__dirname, '..', 'src');
   for (const rel of ['views/budgets.js', 'onboarding.js']) {
     const src = fs.readFileSync(path.join(SRC, rel), 'utf8');
     ok(!src.includes(BUDGET_HEADER),
       `${rel} must not carry its own copy of "${BUDGET_HEADER}" — the format lives in budget-file.js`);
+    /* Same rule, now for the frontmatter: the wizard used to spell the tag
+       line out itself, which is how the two writers came to disagree about
+       what a new file is born with in the first place. Matched on the tag line
+       alone rather than on BUDGET_FRONTMATTER whole, because the constant now
+       carries a `period:` placeholder and a newline that no source literal
+       would ever contain — a check nothing can fail is not a check. */
+    ok(!/tags: \[finance, finance\/budget, finance\/budget\/budgets\]/.test(src),
+      `${rel} must not carry its own copy of the default frontmatter — it lives in budget-file.js`);
     ok(/serializeBudgetFile\(/.test(src),
       `${rel} writes budget files, so it must go through serializeBudgetFile()`);
   }

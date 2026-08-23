@@ -39,7 +39,7 @@ const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS, inputMode } = r
    its own literals, which was survivable while nothing else built the file
    from scratch; the manual path now seeds real rows into it, so a second copy
    of the format would be two writers of one file derived by different rules. */
-const { serializeBudgetFile, budgetRangeNote } = require('./budget-file');
+const { serializeBudgetFile, budgetRangeNote, BUDGET_FRONTMATTER } = require('./budget-file');
 const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
 const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
@@ -1313,7 +1313,7 @@ class OnboardingWizard extends Modal {
         this.budgetWritten = await this.writeIfAbsent(normalizePath(`${folder}/Budgets/${period}.md`),
           serializeBudgetFile({
             period,
-            rawFrontmatter: 'tags: [finance, finance/budget, finance/budget/budgets]',
+            rawFrontmatter: BUDGET_FRONTMATTER,
             rows: this.isManual() ? this.firstBudgetRows() : [],
             rangeNote: budgetRangeNote({
               monthStartDay: day,

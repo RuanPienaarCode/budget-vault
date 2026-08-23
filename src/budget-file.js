@@ -34,6 +34,38 @@ const { typeOrder, typeRank } = require('./groups');
 const BUDGET_HEADER = '| Category | Type | Amount | Notes |';
 const BUDGET_SEPARATOR = '|----------|------|-------:|-------|';
 
+/* The frontmatter a period file is BORN with, for the case where there is no
+   existing block to patch.
+
+   `rawFrontmatter` is normally the verbatim block the loader captured, and
+   patching it is what keeps tags, aliases, `hub` and any hand-added key
+   through a save. But S.budgetMeta only holds an entry for a period whose
+   file was on disk at load, so the very first save of a NEW period arrives
+   here with nothing to patch — and patchFrontmatter's empty-input branch
+   builds a block out of `updates` alone, i.e. `period:` and not one thing
+   more. Every budget file this vault has ever written carries the tag line;
+   the ones the Budget page creates for a new month did not, so a new period
+   silently dropped out of every `finance/budget/budgets` search while looking
+   fine on the page that made it.
+
+   The wizard already knew the right answer and wrote this exact string as a
+   literal of its own — which is the same two-spellings-of-one-format shape
+   this whole module exists to close, just in the frontmatter instead of the
+   table. One declaration; both writers reach it through here.
+
+   Deliberately tags ONLY. `hub:` is in this vault's files because a human put
+   it there, and the plugin has no notion of a hub note to derive it from —
+   patchFrontmatter preserves it once present, which is the whole contract. A
+   default that invented a wikilink would be asserting a note exists.
+
+   The valueless `period:` is a PLACEHOLDER, not an empty key that ships: it
+   reserves the slot so patchFrontmatter fills the period IN PLACE, at the top,
+   where every budget file already on disk carries it. Without it, `period` is
+   an unknown key and gets appended BELOW the tags — leaving a household with
+   two shapes of the same file depending on which month created which, forever,
+   since every later save preserves the order it found. */
+const BUDGET_FRONTMATTER = 'period:\ntags: [finance, finance/budget, finance/budget/budgets]';
+
 /* The sentence under the heading that says what window this period covers.
 
    Pure in its inputs — the month start day, the interval length, the period's
@@ -90,7 +122,10 @@ function amountCell(row) {
    household's custom groups slot in before `expense`, and a type nobody
    declared sorts last rather than above income. */
 function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote = '', groups = [] }) {
-  const fm = patchFrontmatter(rawFrontmatter, { period });
+  /* Defaulted HERE rather than at each call site, so a writer that forgets
+     cannot produce a file the vault's own tag searches never see — see
+     BUDGET_FRONTMATTER above. A caller with a real block still patches it. */
+  const fm = patchFrontmatter(rawFrontmatter || BUDGET_FRONTMATTER, { period });
   const order = typeOrder(groups);
   const sorted = [...rows].sort((a, b) =>
     typeRank(a.type, order) - typeRank(b.type, order) || a.category.localeCompare(b.category));
@@ -104,4 +139,4 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
   return lines.join('\n');
 }
 
-module.exports = { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER, BUDGET_SEPARATOR };
+module.exports = { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER, BUDGET_SEPARATOR, BUDGET_FRONTMATTER };
