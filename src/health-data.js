@@ -60,20 +60,33 @@ module.exports = function registerHealthData(ctx) {
       for (const a of savers) {
         const rows = (idx.get(a) || {}).rows || [];
         const flow = splitFlows(rows, catType, { from: start, to: end });
-        /* Contributions ALONE double-counted two real cases: a rand moved
-           from one savings account to another read as fresh saving in the
-           receiving account with nothing netted off the sending one, and a
-           deposit reversed the same month (or an ordinary withdrawal) still
-           added its gross inflow with the money that then left never taken
-           back off. `withdrawals` is the same field splitFlows already
-           reports for the account's own story on the Savings page, so
-           netting it here is not a new judgement about what counts as a
-           withdrawal — it is applying one that already exists. Growth
-           (interest, dividends) is deliberately NOT added in alongside
-           contributions: the rate answers what the household itself put
-           aside, not what the market did for it, the same distinction
-           accountFlows' own 'basis' field draws for the Savings page. */
-        savings += flow.contributions - flow.withdrawals;
+        /* Contributions ALONE overstated saving: a rand moved from one savings
+           account to another read as fresh saving in the receiving account
+           with nothing netted off the sending one, and a deposit reversed the
+           same month still added its gross inflow with the money that then
+           left never taken back off. So the outflows have to come off.
+
+           But netting them off `contributions` alone is BOTH-WAYS UNFAIR, and
+           1.23.0 shipped it that way. classifyRow sorts a positive row into
+           `growth` whenever its category is income-typed, while a negative row
+           is a `withdrawal` unconditionally — so an inflow can be dropped from
+           the figure the outflow is then subtracted from. On a real vault a
+           R40 000 UIF reimbursement landing in a savings account under an
+           income-typed "Reimbursements" category was classified as growth and
+           excluded, while every rand that later left counted in full. The
+           household read "-19% of income saved", which is not a sentence that
+           can be true.
+
+           `net` is the symmetric figure: everything that arrived, less
+           everything that left. The doctrine this used to cite — "what the
+           household put aside, not what the market did for it" — is about
+           growth the account never POSTED, which is exactly what totalReturn
+           derives backwards from the balance and is never in these rows at
+           all. A posted income-typed row inside a savings account is a cash
+           event (a reimbursement, a transfer in, a cent of interest), not a
+           market return, and dropping it while keeping the matching outflow is
+           how the rate went negative for a household that is not overspending. */
+        savings += flow.net;
       }
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency

@@ -209,11 +209,20 @@ module.exports = function registerDashboard(ctx) {
         i18n.t('dash.health.over', { name: earmarks.over[0].name })));
     }
 
+    /* A window where more came out of savings than went in is a real thing to
+       report, but not as a negative SHARE — "-19% of income saved" cannot be
+       true of anybody. The tile shows 0% (nothing was saved, which is the
+       honest reading) and the sub-line says which way the money actually went.
+       Same rule as the Score page's own saving line; see its comment. */
+    const drawingDown = H.savingsRate !== null && H.monthlySavings < 0;
     const savingsTile = H.savingsRate !== null
-      ? fig(H.savingsRate >= 0.2 ? 'is-good' : H.savingsRate >= 0.1 ? 'is-fair' : 'is-poor',
-        pct(H.savingsRate),
-        i18n.t('dash.health.savings'),
-        i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }))
+      ? fig(drawingDown ? 'is-poor'
+        : H.savingsRate >= 0.2 ? 'is-good' : H.savingsRate >= 0.1 ? 'is-fair' : 'is-poor',
+      pct(drawingDown ? 0 : H.savingsRate),
+      i18n.t('dash.health.savings'),
+      drawingDown
+        ? i18n.t('dash.health.savingDown', { amount: money(Math.abs(H.monthlySavings), 0) })
+        : i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }))
       : fig('', '—', i18n.t('dash.health.savings'), i18n.t('dash.health.needHistory'));
 
     /* Zero interest with an income to measure against is a fact worth its own

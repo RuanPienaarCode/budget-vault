@@ -228,4 +228,44 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   ok(heights.every(h => h >= 0), 'and none of them is drawn backwards');
 }
 
+
+/* ---- HOTFIX 1.23.1. The savings rate was unfair in both directions ----
+
+   1.23.0 netted withdrawals off CONTRIBUTIONS, which sounds symmetric and is
+   not: classifyRow sorts a positive row into `growth` whenever its category is
+   income-typed, while a negative row is a `withdrawal` unconditionally. So an
+   inflow can be dropped from the very figure the outflow is then subtracted
+   from.
+
+   Caught on a real vault: a R40 000 UIF reimbursement landing in a savings
+   account under an income-typed "Reimbursements" category was classified as
+   growth and excluded, while every rand that later left counted in full. The
+   household was told it had saved -19% of its income. The rows below are that
+   month, unchanged. */
+{
+  const { splitFlows } = require('../src/savings-math');
+  const rows = [
+    { date: '2026-08-07', desc: 'UIF', cat: 'Reimbursements', amount: 40000 },
+    { date: '2026-08-11', desc: 'demand savings', cat: 'Discovery 32 Day', amount: 4300 },
+    { date: '2026-08-11', desc: 'Subaru maintenance', cat: 'Car maintenance', amount: -11514 },
+    { date: '2026-08-23', desc: 'Emergency savings', cat: 'Discovery 32 Day', amount: -4270 },
+    { date: '2026-08-23', desc: 'settling up', cat: 'Settle Credit Card', amount: -5200 },
+  ];
+  const catType = c => (c === 'Reimbursements' || c === 'Interest income' ? 'income' : 'expense');
+  const f = splitFlows(rows, catType, {});
+
+  eq(f.growth, 40000, 'the reimbursement is classified as growth — that is the trap, not the bug');
+  eq(f.withdrawals, 20984, 'and every outflow counts in full');
+  ok(f.contributions - f.withdrawals < 0,
+    'so contributions-minus-withdrawals reports a LOSS on a month that gained R23 316');
+  eq(f.net, 23316, 'net is the symmetric figure: everything in, less everything out');
+  ok(f.net > 0, 'and it gets the direction right, which is the whole point');
+
+  /* The asymmetry itself, stated as an invariant rather than as one example:
+     a positive row may leave `contributions`, but no row ever leaves
+     `withdrawals`, so any figure built on contributions alone is biased down
+     by exactly the growth-classified inflows. */
+  eq(f.contributions + f.growth - f.withdrawals, f.net,
+    'net accounts for every classified row, in both directions');
+}
 console.log(`audit-criticals.test.cjs — ${checks} checks OK`);

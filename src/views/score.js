@@ -587,8 +587,18 @@ module.exports = function registerScore(ctx) {
       });
     }
     if (key === 'saving') {
-      return M.savingsRate === null ? null
-        : i18n.t('score.now.saving', { pct: pct(M.savingsRate), amount: money(M.monthlySavings || 0, 0) });
+      if (M.savingsRate === null) { return null; }
+      /* A household really can take more out of its savings than it put in over
+         a window, and that is worth saying — but it cannot save a NEGATIVE
+         share of its income, and "-19% of income saved · R -8 203 a month" is
+         not a sentence that can be true. Said the way round it happened, with
+         the magnitude positive. The pillar scores 0 either way, so nothing
+         about the number in the ring moves; this is only about the sentence
+         under it not contradicting itself. */
+      if (M.monthlySavings < 0) {
+        return i18n.t('score.now.savingDown', { amount: money(Math.abs(M.monthlySavings), 0) });
+      }
+      return i18n.t('score.now.saving', { pct: pct(M.savingsRate), amount: money(M.monthlySavings || 0, 0) });
     }
     if (key === 'debt') {
       return M.interestShare === null ? null
