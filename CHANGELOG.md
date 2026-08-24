@@ -3,6 +3,29 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.24.0 — 2026-08-25
+
+### Added
+
+- **The interface now speaks isiXhosa and isiZulu.** Two more of South Africa's
+  home languages, bringing the total to nine. Pick either under Settings →
+  Budget Vault → Language, or in the setup wizard. As with every other language,
+  this is independent of Country: living somewhere does not decide what you want
+  to read, and your own budget text — category names, notes, account names — is
+  never translated.
+
+  Both tables carry all 845 interface strings, so nothing falls back to English
+  on a translated page. Day-of-month reads the way the languages actually build
+  it — "ngomhla we-25" rather than a bare English "25th" dropped into a Nguni
+  sentence — and every sentence carrying a count is written out in full per
+  form, because the plural of a noun here is a changed class prefix rather than
+  a suffix.
+
+  These two translations are machine-assisted and have not yet been read by
+  first-language speakers. The everyday wording is sound; the financial
+  vocabulary is the part most worth a native reader's eye. Corrections are
+  welcome through Settings → Send feedback.
+
 ## 1.23.3 — 2026-08-25
 
 ### Fixed
@@ -54,6 +77,7 @@ All notable changes to Budget Vault. Versions match the plugin version in
 - **A brand-new vault no longer shows an empty ring under a R0,00 heading**, two
   health tiles that looked like links now are, and several error messages that
   named a problem now say what to do about it.
+
 
 ## 1.23.2 — 2026-08-24
 
@@ -118,6 +142,7 @@ below.
   render sensibly on all 15 pages, that a blank field is never quietly read as
   a zero, and that no untranslated text or raw placeholder reaches the screen in
   any language. Most were written to fail against the old behaviour first.
+
 
 ## 1.23.1 — 2026-08-24
 
