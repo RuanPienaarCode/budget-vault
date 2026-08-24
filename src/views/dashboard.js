@@ -1657,8 +1657,13 @@ module.exports = function registerDashboard(ctx) {
     if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted) }));
     const gapNote = parts.join('');
 
+    // Was hand-built English plural surgery on the word "category" (an 'y'
+    // vs 'ies' suffix chosen by a ternary on spend.length), inside a view
+    // that IS translated — every other language rendered the English noun
+    // regardless of language setting. dash.split.summary carries the whole
+    // sentence per plural form instead.
     $('#dashSplitSub').textContent = (total > 0
-      ? `${money(total)} across ${spend.length} categor${spend.length === 1 ? 'y' : 'ies'} · ${periodMonthName(S.period)}`
+      ? i18n.t('dash.split.summary', { amount: money(total), count: spend.length, month: periodMonthName(S.period) })
       : periodMonthName(S.period)) + gapNote;
 
     if (!total) {

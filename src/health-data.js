@@ -48,8 +48,22 @@ module.exports = function registerHealthData(ctx) {
     /* Contributions into savings AND investment accounts both count as saving —
        the rate measures money the household kept, not which wrapper it kept it
        in. splitFlows already knows a contribution from growth and from a split
-       parent, so no raw-row reading happens here. */
-    const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
+       parent, so no raw-row reading happens here.
+
+       Case-folded and trimmed against the account's own type, not compared
+       raw — the same trap views/savings.js's own `typeIs` documents (and
+       worth.js:122-141 names by name): `load.js` only defaults `type` when
+       the key is ABSENT, so `type: Savings` or `type: ' savings '` reached
+       here exactly as written and dropped straight out of the saving-rate
+       pillar while worth() still counted the same balance toward net worth
+       elsewhere on the same score. Kept as its own copy here rather than a
+       shared helper — health-data.js and views/savings.js are siblings, not
+       a shared module, and each carries this comment for a reader who lands
+       in only one of them. */
+    const savers = S.accounts.filter(a => {
+      const t = String((a && a.type) || '').trim().toLowerCase();
+      return t === 'savings' || t === 'investment';
+    });
 
     const periods = [];
     for (let i = 1; i <= want; i++) {

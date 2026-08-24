@@ -164,7 +164,15 @@ function accountGroups(accounts, knownTypes) {
   const order = new Map(known.map((t, i) => [t, i]));
   const owned = new Map(), owed = new Map();
   for (const a of accounts || []) {
-    const t = (a && typeof a.type === 'string' && a.type.trim()) || 'other';
+    /* Case-folded as well as trimmed. This file's own header (see the note
+       above accountGroups' siblings) named `type: Savings` with a capital S as
+       "the same bug wearing a hat" after it cost the composition chart R80 000
+       — and then this function kept comparing `.trim()` alone, so a
+       capital-S account still missed the sealed `savings` bucket and drew as
+       its own unlisted group under its own label. views/savings.js and
+       health-data.js were folded first; this was the last raw reading of the
+       field, and the one that decides which colour a segment gets. */
+    const t = (a && typeof a.type === 'string' && a.type.trim().toLowerCase()) || 'other';
     const bal = (a && a.balance) || 0;
     if (bal > 0) owned.set(t, (owned.get(t) || 0) + bal);
     else if (bal < 0) owed.set(t, (owed.get(t) || 0) - bal);

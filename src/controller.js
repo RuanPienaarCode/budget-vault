@@ -9,6 +9,10 @@ const { SHELL_HTML } = require('./shell');
 const { confirmModal } = require('./modal');
 const { localeFor } = require('./locale');
 const { applyDom } = require('./i18n');
+// Namespaced import, not a bare `t` — this file already uses `t` as a local
+// variable name inside toast() ($('#toast')), and the rest of src/ resolves
+// the same shadowing risk the same way (see lang/en.js's own header).
+const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const registerIo = require('./io');
@@ -305,7 +309,18 @@ function mountApp(view) {
      Only the symbol moves. */
   function moneyIn(symbol, v, decimals = 2) { return formatMoney(symbol, v, decimals, locale()); }
   function money(v, decimals = 2) { return moneyIn(S.settings.currency, v, decimals); }
-  const typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
+  /* wiz.type.* keys exist and are translated in every language, but a
+     household can name its own custom category group — a raw string with no
+     matching key. i18n.t() returns the key itself when nothing matches (its
+     documented worst case, see i18n.js), and rendering THAT would show
+     "wiz.type.mygroup" on screen — worse than the raw word it replaced. So the
+     fallback compares the result against the key it asked for, not against
+     `undefined`, and falls back to the raw enum value either way. */
+  const typeBadge = type => {
+    const key = 'wiz.type.' + type;
+    const label = i18n.t(key);
+    return el('span', { class: `category-badge badge-${type}` }, label === key ? type : label);
+  };
 
   /* --------------------------- assemble ctx ----------------------------- */
   const ctx = { plugin, app, vault, view, root, $, $$, S, toast, money, moneyIn, typeBadge, locale };

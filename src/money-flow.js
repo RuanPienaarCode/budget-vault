@@ -39,7 +39,15 @@
      THE TWO LEFTS are a separate identity from the four bands above, and are
      allowed to disagree with the "not yet spent" band's own width whenever
      saving is non-zero — see the comment on `lefts` below for why that is
-     correct rather than a bug. */
+     correct rather than a bug.
+
+     `budgetUsed` divides `consumptionThisPeriod` (spend minus every rand of
+     savings/investment-typed spend, THIS period) by `budgeted` — the same
+     numerator RULE health-math.js's score-facing budgetUsed applies to its
+     own six-period trailing average, so a rand excluded from one is excluded
+     from the other. The WINDOW still differs on purpose (this period here,
+     six periods there) — see the comment on `budgetUsed` below for why that
+     one difference is kept, and disclosed, rather than collapsed. */
 
 const { activeDebts } = require('./worth');
 const { monthlyInterest } = require('./debt-math');
@@ -156,7 +164,36 @@ function periodFlow({
   const together = leftInBudget + neverBudgeted;
 
   const allocatedOfIncome = inc > 0 ? bud / inc : null;
-  const budgetUsed = bud > 0 ? spent / bud : null;
+  /* NOT `spent / bud`. `spent` is periodSummary().spend, which the comment
+     on `living` two blocks above already documents as INCLUDING
+     savings-typed spend — the outgoing leg of a category categorised
+     `savings`/`investment`. health-math.js's own score-facing budgetUsed
+     (avg.consumptionForBudget / avg.budgeted) excludes that same leg, the
+     way its `consumption` figure always has ("what living cost: everything
+     except money moved into the household's own funds" — health-data.js).
+     Dividing the raw, unadjusted `spent` here made the two numerators
+     disagree under one label ("Budget used", tests/vocabulary.test.cjs's
+     GAP A) — a household funding an investment inside a budgeted category
+     read as having blown its budget on THIS card while the ring above it,
+     reading the adjusted figure, said the opposite. `consumptionThisPeriod`
+     applies the SAME adjustment `living` already does — the full
+     `savingsTypedSpend`, committed or not, never just the non-committed
+     remainder `living` nets off — so the numerator answers "what did living
+     actually cost, against what was planned for it" on both surfaces.
+
+     What is DELIBERATELY still different is the WINDOW: this is one
+     period's ratio, the ring above reads a six-period trailing average
+     restricted to periods that actually carried a plan (health-math.js's
+     own `avg.consumptionForBudget` comment explains why a narrower,
+     matched-to-`budgeted` window is the correct one to average). A single
+     grocery-heavy period swinging this figure without moving the score's
+     own steadier read is a feature, not a second disagreement — the score
+     is deliberately smoothed against exactly that kind of one-period
+     noise. The chip's own note (score.js's buildFlowChips) says so on
+     screen, right under this row, rather than leaving two differently-timed
+     numbers unexplained under one word. */
+  const consumptionThisPeriod = Math.max(0, spent - savingsTypedSpend);
+  const budgetUsed = bud > 0 ? consumptionThisPeriod / bud : null;
 
   /* Percentages OF INCOME — which in a deficit period legitimately come to
      more than 100: living costs really can be 180% of what came in, and
@@ -171,8 +208,16 @@ function periodFlow({
   const bandAmounts = [committed, living, saving, notYetSpent];
   const rawPercents = bandAmounts.map(a => (a / inc) * 100);
   const rawSum = rawPercents.reduce((s, v) => s + v, 0);
+  /* The epsilon is load-bearing, not decoration. These are four quotients of
+     the same divisor summed back up, so an ordinary SURPLUS period — bands
+     adding to exactly income — lands one ULP over: 100.00000000000001 was
+     measured in a fuzz round. A bare `<= 100` sent that period down the
+     deficit branch and rounded each band on its own, which is precisely the
+     "17 + 17 + 17 = 102%" defect largestRemainder exists to prevent, on a
+     household that was never in deficit at all. A hundredth of a percent is
+     far below anything this card can render and far above float noise. */
   const bandPercents = inc > 0
-    ? (rawSum <= 100 ? largestRemainder(rawPercents, 100) : rawPercents.map(v => Math.round(v)))
+    ? (rawSum <= 100.0001 ? largestRemainder(rawPercents, 100) : rawPercents.map(v => Math.round(v)))
     : bandAmounts.map(() => 0);
 
   return {

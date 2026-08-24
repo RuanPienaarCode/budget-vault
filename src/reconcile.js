@@ -47,10 +47,22 @@ function daysSince(iso, today) {
 
 /* Is a stated figure old enough to stop trusting? `null` (never confirmed, or
    a date this can't read) counts as stale — an unconfirmed balance and one
-   confirmed before records began are the same thing to a reader. */
+   confirmed before records began are the same thing to a reader.
+
+   A NEGATIVE `d` is a `balance_updated` typo'd into the future (2027 for
+   2026), and it must count as stale too, not fresh. `d > STALE_DAYS` alone is
+   false for a negative number — that was the exact hole reconcile() and
+   stalenessSummary() were patched for in 1.23.1, and it survived here because
+   this is a third function answering "is this date usable?" by its own rule.
+   dashboard.js and savings.js both call this directly (no `today`, no
+   reconcile() in between), so the guard has to live here too rather than only
+   upstream in statusOf(). `daysSince` itself stays signed — callers doing
+   their own arithmetic on a real elapsed count (there are none today, but the
+   name promises it) still get the true number; only the true/false verdict
+   folds the future in with the unreadable. */
 function isStale(iso, today) {
   const d = daysSince(iso, today);
-  return d === null || d > STALE_DAYS;
+  return d === null || d < 0 || d > STALE_DAYS;
 }
 
 /* What the balance should read RIGHT NOW: the last confirmed figure plus

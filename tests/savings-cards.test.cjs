@@ -1,7 +1,7 @@
 'use strict';
 /* Savings & Investments — the claims the cards make about money, pinned.
 
-   Five invariants, each one a bug that shipped:
+   Six invariants, each one a bug that shipped:
 
      1. NO ACCOUNT FALLS OUT OF THE CHART. `worth()` counts every account by
         sign; the composition chart used to walk a fixed list of six types. An
@@ -34,6 +34,15 @@
         a fixed deposit that posts its interest reconciles exactly — but it may
         never read as a correction.
 
+     6. A CAPITALISED SPELLING OF A KNOWN TYPE FOLDS INTO IT, NOT A GROUP OF ITS
+        OWN. `type: Savings` used to earn a segment separate from every
+        `type: savings` account beside it — an improvement on invariant 1's bug
+        (it no longer vanished from the chart) that was still, in worth.js's own
+        words, "the same bug wearing a hat": one household's savings split
+        across two labels that differ only by a reader's capitalisation, which
+        cost the composition chart R80 000 of a reader's confidence before it
+        was case-folded to merge on read.
+
      node tests/savings-cards.test.cjs
 */
 
@@ -50,7 +59,7 @@ const SRC = path.join(__dirname, '..', 'src');
 const { worth, accountGroups } = require(path.join(SRC, 'worth.js'));
 const { reconcile } = require(path.join(SRC, 'reconcile.js'));
 
-/* ------------------------- 1 + 2: the grouping -------------------------- */
+/* ------------------------- 1 + 2 + 6: the grouping ----------------------- */
 /* The six the chart carries labels and colours for. Duplicated from the view
    ON PURPOSE: if someone adds a type there and not here, invariant 1 below
    still holds (the new type simply arrives unlisted), which is the whole point
@@ -62,7 +71,7 @@ const ACCOUNTS = [
   { name: 'Pot', type: 'savings', balance: 50000 },
   { name: 'UnitTrust', type: 'investment', balance: 200000 },
   { name: 'TFSA', type: 'tfsa', balance: 80000 },          // unlisted, hand-typed
-  { name: 'Old', type: 'Savings', balance: 5000 },          // unlisted: capital S
+  { name: 'Old', type: 'Savings', balance: 5000 },          // capitalised — folds into 'savings'
   { name: 'Visa', type: 'credit_card', balance: -12000 },
   { name: 'Store', type: 'store card', balance: -3000 },    // unlisted liability
 ];
@@ -78,13 +87,24 @@ const ACCOUNTS = [
 
   const types = g.owned.map(x => x.type);
   ok(types.includes('tfsa'), 'an unlisted type is drawn, not dropped');
-  ok(types.includes('Savings'), 'a capitalised type is its own group, not silently merged');
+  /* Invariant 6: the capitalised 'Savings' account does NOT survive as its own
+     group — it case-folds into the same bucket as every lowercase 'savings'
+     account beside it. Asserting the negative here (no fifth/'Savings' group)
+     alongside the positive (the folded total) is the negative control: either
+     one alone would pass if the fold silently stopped working and the merge
+     regressed back to a split. */
+  ok(!types.includes('Savings'), 'a capitalised spelling does not survive as a group of its own');
+  const savingsGroup = g.owned.find(x => x.type === 'savings');
+  eq(savingsGroup.amount, 55000,
+    'the capitalised account\'s balance lands in the SAME "savings" total (50000 + 5000), not a total of its own');
   ok(g.owed.map(x => x.type).includes('store card'), 'an unlisted liability is drawn too');
   eq(g.owned.find(x => x.type === 'tfsa').known, false, 'an unlisted type is marked unlisted');
-  eq(g.owned.find(x => x.type === 'savings').known, true, 'a listed type is marked listed');
+  eq(savingsGroup.known, true, 'a listed type is marked listed');
 
-  /* Known types keep the caller's order; the rest follow, largest first. */
-  eq(types, ['investment', 'savings', 'checking', 'tfsa', 'Savings'],
+  /* Known types keep the caller's order; the rest follow, largest first. The
+     capitalised account is folded INSIDE 'savings' above, so it contributes no
+     fifth entry here. */
+  eq(types, ['investment', 'savings', 'checking', 'tfsa'],
     'listed types in the caller order, unlisted after, largest first');
 
   /* An account with no type at all is the one case that may be renamed: the

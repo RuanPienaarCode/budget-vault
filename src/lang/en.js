@@ -376,7 +376,14 @@ module.exports = {
   'bud.assumed.noFile': 'Could not read the note for {category}',
 
   'bud.pull.label': 'Pull overspend',
-  'bud.pull.title': 'Fill this in from the overspend {lag} period(s) back',
+  /* Object form, not the '(s)' string this key carried before — but the
+     call site (views/budgets.js:480, a teammate-owned file) passes `lag`
+     only, no `count`, so pluralCategory() never sees the real value and
+     always resolves 'other' here. The 'one' form is written correctly and
+     ready the moment that call site adds `count: S.settings.overspend_lag`
+     alongside `lag` — reported, not fixed here, since budgets.js is out of
+     this lane's owner-file list. */
+  'bud.pull.title': { one: 'Fill this in from the overspend {lag} period back', other: 'Fill this in from the overspend {lag} periods back' },
   'bud.pull.none': '{period} did not overspend — it ended {amount} up',
   'bud.pull.confirmTitle': 'Pull previous overspend',
   'bud.pull.confirmBody': '{period} spent {amount} more than it received. Set {category} to {amount}? It currently reads {current}.',
@@ -553,10 +560,10 @@ module.exports = {
   'acct.balance.field': 'New balance',
   'acct.balance.inCurrency': 'Entered in {symbol}.',
   'acct.balance.updated': '{name} balance updated',
-  'acct.balance.impliedHint': 'Your transactions imply {amount} after {count} row(s) since you last confirmed.',
+  'acct.balance.impliedHint': { one: 'Your transactions imply {amount} after {count} row since you last confirmed.', other: 'Your transactions imply {amount} after {count} rows since you last confirmed.' },
   'acct.balance.asAt': 'As at which date?',
   'acct.balance.asAtDesc': 'The date this figure was true — the date on the statement, not necessarily today. Anything dated after it still counts toward the balance.',
-  'acct.balance.updatedDrift': '{name} balance saved — but {count} row(s) since that date differ by {amount}. Open the account to see them.',
+  'acct.balance.updatedDrift': { one: '{name} balance saved — but {count} row since that date differs by {amount}. Open the account to see it.', other: '{name} balance saved — but {count} rows since that date differ by {amount}. Open the account to see them.' },
   'acct.balance.unreadable': 'Could not read "{raw}" — click to fix',
   'acct.reconciled': '{name} reconciled to {amount}',
   'acct.err.nan': 'Not a number',
@@ -925,6 +932,7 @@ module.exports = {
   'dash.trend.tip.over': '{amount} over budget',
   'dash.trend.tip.under': '{amount} under budget',
 
+  'dash.split.summary': { one: '{amount} across {count} category · {month}', other: '{amount} across {count} categories · {month}' },
   'dash.split.uncatNote': ' · {amount} uncategorised, not shown',
   /* The other half of the difference between this donut and "Total Spent":
      refunds and credits that shrank a slice instead of drawing one. */
@@ -1072,6 +1080,7 @@ module.exports = {
   'score.flow.chip.allocatedOfIncome': 'Allocated of income',
   'score.flow.chip.spent': 'Spent',
   'score.flow.chip.budgetUsed': 'Budget used',
+  'score.flow.chip.budgetUsedNote': 'This period only — the score above uses a six-period average.',
   'score.flow.chip.lefts': 'Two different "left"',
   'score.flow.chip.leftInBudget': 'Left in the budget',
   'score.flow.chip.neverBudgeted': 'Income never budgeted',

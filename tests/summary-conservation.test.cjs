@@ -48,6 +48,8 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+const { periodFlow } = require('../src/money-flow');
+const { growthSeries } = require('../src/savings-math');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -274,6 +276,205 @@ function oracle(ctx, p) {
     rounds++;
   }
   ok(rounds === 60, 'all 60 randomised rounds ran');
+}
+
+/* ===========================================================================
+   6. MONEY-FLOW BANDS CONSERVE INCOME — AND ARE ALLOWED NOT TO, IN A DEFICIT
+
+   periodFlow()'s own header states the identity and its one exception in the
+   same breath: the four bands (committed, living, saving, notYetSpent) sum
+   to income whenever the household stayed inside it, because notYetSpent is
+   built to absorb exactly the remainder — but `notYetSpent` FLOORS at zero,
+   so a period that committed, lived and saved MORE than it earned cannot pay
+   that floor back. The bands then sum to what actually left the household,
+   not to income — and money-flow.js's own comment on `bandPercents` says the
+   percentages are allowed past 100 for the same reason and must not be
+   force-fitted back to it.
+
+   Restated independently: `net += periodFlow()` is not asked what its own
+   sum is — this derives the expected total from the SAME clamp rule
+   (`Math.max(income, committed+living+saving)`) written out here, and checks
+   the four bands against it, and separately checks that a deficit round's
+   OWN rounded percentages are never silently renormalised to 100. */
+{
+  let seed = 0x5eed01 ^ 20260824;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000;
+
+  // ---- anchor: a hand-picked deficit, spelled out ----
+  {
+    const flow = periodFlow({
+      income: 20000, spentTotal: 25000, budgeted: 22000,
+      spendByCat: { Rent: 8000, Groceries: 17000 },
+      fixedCats: new Set(['Rent']), catType: cat => (cat === 'Rent' ? 'housing' : null),
+      savingContribution: 0, debts: [],
+    });
+    const { committed, living, saving, notYetSpent } = flow.bands;
+    eqMoney(committed + living + saving + notYetSpent, 25000,
+      'anchor: a deficit period is spent MORE than it earned; the bands sum to what left, not to income');
+    eqMoney(notYetSpent, 0, 'anchor: nothing is left unspent to report');
+    const pctSum = flow.bands.percents.committed + flow.bands.percents.living
+      + flow.bands.percents.saving + flow.bands.percents.notYetSpent;
+    ok(pctSum > 100, `anchor: the percentages of income legitimately exceed 100 (got ${pctSum})`);
+  }
+
+  // ---- randomised rounds — zero income, a period with no budget at all,
+  //      a household that saves more than it spends, a pure surplus ----
+  let rounds = 0, deficits = 0, gateSlips = 0;
+  for (let round = 0; round < 60; round++) {
+    const income = rnd() < 0.1 ? 0 : Math.round(rnd() * 45000 * 100) / 100;
+    const spentTotal = Math.round(rnd() * 55000 * 100) / 100;
+    const budgeted = rnd() < 0.15 ? 0 : Math.round(rnd() * 40000 * 100) / 100;
+    const savingContribution = rnd() < 0.4 ? 0 : Math.round(rnd() * 8000 * 100) / 100;
+    const rentSpend = Math.round(rnd() * spentTotal * 100) / 100;
+    const spendByCat = { Rent: rentSpend, Other: Math.max(0, spentTotal - rentSpend) };
+    const fixedCats = new Set(rnd() < 0.5 ? ['Rent'] : []);
+    const catType = cat => (cat === 'Rent' ? 'housing' : null);
+    const debts = rnd() < 0.3 ? [{ status: 'active', balance: Math.round(rnd() * 80000), rate: 20 }] : [];
+
+    const flow = periodFlow({ income, spentTotal, budgeted, spendByCat, fixedCats, catType, savingContribution, debts });
+    const { committed, living, saving, notYetSpent } = flow.bands;
+
+    eqMoney(notYetSpent, Math.max(0, income - committed - living - saving),
+      `flow round ${round}: notYetSpent is exactly the income remainder, floored at zero`);
+    const expectedSum = Math.max(income, committed + living + saving);
+    eqMoney(committed + living + saving + notYetSpent, expectedSum,
+      `flow round ${round}: the four bands sum to income, or to what actually left in a deficit — never silently short`);
+
+    const p = flow.bands.percents;
+    const pctSum = p.committed + p.living + p.saving + p.notYetSpent;
+    /* Mirrors money-flow.js's OWN gate EXACTLY — `rawSum <= 100.0001`, not the
+       mathematically-equivalent `committed+living+saving > income`. The two
+       are equal on paper but NOT in floating point: `rawSum` is summed from
+       FOUR independent divisions rather than derived from the amounts the
+       equality above proves equal, and an ordinary SURPLUS period can still
+       land a float ULP over 100 — 100.00000000000001 was measured on the
+       exact fixture round 22 below used to reproduce. A bare `<= 100` gate
+       took the DEFICIT branch (independent Math.round per band) on that
+       period, reintroducing the "17+17+17=102%" defect largestRemainder
+       exists to prevent on a household that was never in deficit at all.
+       Fixed by widening the gate to a hundredth of a percent — far below
+       anything the card renders and far above float noise — rather than by
+       deriving `rawSum` differently, so this mirror has to widen with it or
+       it goes on asserting the OLD, narrower boundary against the NEW code. */
+    const GATE_EPS = 100.0001;
+    const rawPercents = [committed, living, saving, notYetSpent].map(a => (income > 0 ? (a / income) * 100 : 0));
+    const rawSum = rawPercents.reduce((s, v) => s + v, 0);
+    const isDeficit = income > 0 && committed + living + saving > income;
+    if (isDeficit) deficits++;
+    const takesDeficitBranch = income > 0 && rawSum > GATE_EPS;
+    /* Now a genuine regression guard rather than a tally to report and move
+       on from: with the gate epsilon-widened, a round that is NOT a real
+       deficit by the bands' own money should never still exceed GATE_EPS —
+       float noise here is documented at one ULP, thirteen orders of
+       magnitude below the epsilon. A round landing here would mean the float
+       gap has grown past what the epsilon absorbs, which is worth failing
+       loudly on rather than logging quietly. */
+    if (income > 0 && !isDeficit && takesDeficitBranch) gateSlips++;
+
+    if (takesDeficitBranch) {
+      // The deficit branch rounds each percentage on its OWN, independent of
+      // the others — see money-flow.js's own comment on why largestRemainder
+      // (which only means something over one shared whole) is skipped here.
+      // Reached only by a REAL deficit now that the gate is epsilon-wide, so
+      // this is pinned as a general claim without a gate-slip carve-out.
+      eq([p.committed, p.living, p.saving, p.notYetSpent], rawPercents.map(v => Math.round(v)),
+        `flow round ${round}: once the code's own gate falls through, percentages are each rounded independently, not force-fit to 100`);
+      ok(isDeficit, `flow round ${round}: the independent-rounding branch was reached by a round that is `
+        + 'NOT a real deficit — the exact gate-slip this suite\'s epsilon exists to absorb');
+      ok(pctSum > 99, `flow round ${round}: a real deficit's percentages of income are allowed past 100 (got ${pctSum})`);
+    } else if (income > 0) {
+      // Inside the gate now includes the marginal, epsilon-sized "deficits"
+      // that only clear zero by float noise — the code force-fits those to
+      // 100 exactly like an ordinary surplus, which is the correct call: a
+      // deficit too small for the card to render is not one worth giving its
+      // own rounding rule.
+      eq(pctSum, 100, `flow round ${round}: inside the code's own gate, the percentages still sum to exactly 100`);
+    } else {
+      eq(pctSum, 0, `flow round ${round}: no income means no percentage of it to report`);
+    }
+    rounds++;
+  }
+  ok(rounds === 60, 'money-flow: all 60 randomised rounds ran');
+  ok(deficits >= 5, `money-flow: enough of the 60 rounds actually landed in deficit to exercise the >100% branch (got ${deficits})`);
+  ok(gateSlips === 0, `money-flow: no ordinary-surplus round was mis-routed into the deficit rounding branch `
+    + `(got ${gateSlips}/${rounds}) — a non-zero count here means the epsilon gate needs widening again`);
+  console.log(`  ok — money-flow bands conserve income, or openly exceed it in a deficit (${rounds} randomised rounds, ${deficits} deficits, plus the anchor)`);
+}
+
+/* ===========================================================================
+   7. SAVINGS GROWTH CHART: capital + posted + undated === closing, FUZZED
+      OVER THE INPUT CLASS THAT BROKE IT
+
+   src/savings-math.js's own header on `monthOf` names the exact defect: a
+   row dated with a shape-valid but not-real month ('2025-13-05' — ISO_DATE
+   is shape-only, per its own comment in dates.js) used to bucket under an
+   unwalkable key that growthSeries' month walk (which only ever produces
+   REAL months, 01-12) could never reach — so that row's money left `closing`
+   (it is still inside the account's own balance) but joined neither a band
+   nor `undated`. It just vanished. Fixed by having monthOf fall back to ''
+   (routing the row into the same UNDATABLE/pending path a truly undated row
+   already takes) whenever isRealIsoDate rejects the shape.
+
+   tests/savings-math.test.cjs already covers this identity over well-formed
+   dates; this is the one input class that broke it and was untested — month
+   numbers from 13 to 99, which the shape-only regex accepts without
+   complaint, mixed in with ordinary real dates so a fuzzed vault is not ALL
+   one or the other. */
+{
+  let seed = 0x9017 ^ 20260824;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000;
+  // ~35% of dates carry a shape-valid, not-real month (13-99) — mixed with
+  // ordinary real ones so the fixture is not a pathological all-invalid case.
+  const randDate = () => {
+    const year = 2020 + Math.floor(rnd() * 6);
+    const month = String(1 + Math.floor(rnd() * (rnd() < 0.35 ? 99 : 12))).padStart(2, '0');
+    const day = String(1 + Math.floor(rnd() * 28)).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const typeOf = cat => (cat === 'Growth' ? 'income' : null);
+
+  // ---- anchor: the exact shape the header names ----
+  {
+    const entries = [{
+      account: { balance: 10450, starting_amount: 10000, inception_date: '2025-01-01' },
+      rows: [
+        { date: '2025-02-01', amount: 300, cat: 'Fund' },
+        { date: '2025-13-05', amount: 150, cat: 'Fund' },   // the row that used to vanish
+      ],
+    }];
+    const s = growthSeries(entries, typeOf, { today: '2030-01-01' });
+    const last = s.points[s.points.length - 1] || { capital: 0, posted: 0 };
+    eqMoney(last.capital + last.posted + s.undated, s.closing,
+      'anchor: a row dated month 13 is folded into the first point instead of falling out of every total');
+  }
+
+  let rounds = 0;
+  for (let round = 0; round < 50; round++) {
+    const numAccounts = 1 + Math.floor(rnd() * 3);
+    const entries = [];
+    for (let a = 0; a < numAccounts; a++) {
+      const account = {
+        balance: Math.round(rnd() * 80000 * 100) / 100,
+        starting_amount: Math.round(rnd() * 50000 * 100) / 100,
+        inception_date: rnd() < 0.8 ? randDate() : undefined,
+      };
+      const rows = [];
+      const n = 1 + Math.floor(rnd() * 14);
+      for (let i = 0; i < n; i++) {
+        const amount = Math.round((rnd() * 4000 - 1000) * 100) / 100;
+        if (!amount) continue;
+        rows.push({ date: randDate(), amount, cat: rnd() < 0.3 ? 'Growth' : 'Fund' });
+      }
+      entries.push({ account, rows });
+    }
+    const s = growthSeries(entries, typeOf, { today: '2030-01-01' });
+    const last = s.points[s.points.length - 1] || { capital: 0, posted: 0 };
+    eqMoney(last.capital + last.posted + s.undated, s.closing,
+      `growth round ${round}: capital + posted + undated === closing, with month-13-to-99 rows mixed in`);
+    rounds++;
+  }
+  ok(rounds === 50, 'savings-growth: all 50 randomised rounds ran');
+  console.log(`  ok — capital + posted + undated === closing, fuzzed over shape-valid-but-not-real months (${rounds} randomised rounds, plus the anchor)`);
 }
 
 console.log(`PASS — every rand lands somewhere: the summary buckets add back up to the ledger (${checks} assertions, 60 randomised rounds).`);

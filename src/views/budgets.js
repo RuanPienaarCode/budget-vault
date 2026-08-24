@@ -256,7 +256,15 @@ module.exports = function registerBudgets(ctx) {
          total down. */
       const raw = sum.byCat[d.category] || 0;
       const realSpend = -raw;
-      if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - realSpend);
+      /* Clamped at zero BEFORE the shortfall is taken, matching the row's own
+         Actual cell (`Math.max(d.amount, realSpend)` further down). A category
+         that nets POSITIVE — a refund larger than the month's spending — gives
+         `realSpend` a negative value, and subtracting a negative inflated the
+         overlay by the refund's own excess: budgeted R1 000 against a net
+         refund of R700 computed an overlay of R1 700 for a row the table
+         itself showed at R1 000. The two figures are the same quantity and
+         must clamp the same way. */
+      if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - Math.max(0, realSpend));
       // Net per-category spend, refunds folded in — the same figure each row
       // below reads as its own Actual. Summed here so "Total spent" (gross)
       // can disclose exactly how it differs from the table under it.
@@ -477,7 +485,11 @@ module.exports = function registerBudgets(ctx) {
             // contradict.
             assumed ? el('button', {
               class: 'btn-ghost btn-ghost-sm bud-pull', type: 'button',
-              title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag }),
+              /* `count` as well as `lag`: the key is a plural entry now (it
+                 used to carry a literal "period(s)", which en.js's own header
+                 forbids), and without a count t() can only ever resolve the
+                 `other` form — so "1 period back" would read as "1 periods". */
+              title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag, count: S.settings.overspend_lag }),
               onclick: () => pullPreviousOverspend(d),
             }, i18n.t('bud.pull.label')) : '')),
           actualTd,

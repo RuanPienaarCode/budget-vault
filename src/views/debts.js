@@ -11,6 +11,7 @@ const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
+const { activeDebts } = require('../worth');
 const { todayIso } = require('../dates');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
@@ -80,6 +81,24 @@ module.exports = function registerDebts(ctx) {
       box.append(el('p', { style: 'margin:0;font-weight:600' }, 'No debt tracked — nothing owing here.'),
         el('p', { class: 'text-muted', style: 'margin:4px 0 0' },
           'Add a debt below if that changes, and this page will track the balance, the interest and a payoff plan for it.'));
+      return;
+    }
+    /* The sibling case the comment above never covered: a household that HAS
+       recorded debt but has paid every row of it off still has S.debts.length
+       > 0, so the `!S.debts.length` gate above never fires for it — it fell
+       through to the ordinary tile path and rendered "Total debt R0,00 · 0
+       active · N tracked" plus a "Debt-free — no debt tracked" tile, the exact
+       four-hollow-zero-tiles shape this function exists to eliminate, aimed at
+       the one reader who most deserves the congratulation: the one who just
+       finished paying. Gate on activeDebts (src/worth.js) — zero debts still
+       COSTING anything — not on row count, and use different wording: "never
+       recorded a debt" and "cleared everything recorded" are not the same
+       sentence, and only the second is an achievement. */
+    if (!activeDebts(S.debts).length) {
+      const box = $('#debtKpis'); box.empty();
+      box.append(el('p', { style: 'margin:0;font-weight:600' }, 'Debt-free — every debt you tracked has been paid off.'),
+        el('p', { class: 'text-muted', style: 'margin:4px 0 0' },
+          `${S.debts.length} debt${S.debts.length === 1 ? '' : 's'} paid in full. Add a new one below if that changes.`));
       return;
     }
     const list = active();

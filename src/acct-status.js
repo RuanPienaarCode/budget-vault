@@ -74,7 +74,20 @@ function statusOf(a, rows, today, hasFolder) {
   let state;
   if (!list.length) state = hasFolder ? 'notx' : 'nofolder';
   else if (rec.state === 'drift') state = 'drift';
-  else if (days === null) state = 'nodate';
+  /* Consult reconcile()'s OWN verdict for "is this date usable at all" rather
+     than re-deriving one from `days === null` — the two used to disagree.
+     `days` is `daysSince()`'s signed count, null only when the date is
+     unreadable; reconcile() also calls a date 'no-date' when it is a real ISO
+     string dated in the FUTURE (a typo'd year), which left `days` a real
+     negative number that `days === null` let straight through to the `stale`
+     check below. `d > STALE_DAYS` is false for a negative `d`, so the account
+     read as freshly confirmed and vanished from the attention queue — the
+     exact hole 1.23.1 closed in reconcile() and stalenessSummary() but missed
+     here, because this was a second function answering the same question by
+     a different rule. reconcile() already worked this out three lines above;
+     asking it again by a different test is how the two answers drifted apart
+     in the first place. */
+  else if (rec.state === 'no-date') state = 'nodate';
   else if (isStale(a.balance_updated, today)) state = 'stale';
   else state = 'ok';
   /* Resolved against the state that was actually reached, not against every

@@ -818,13 +818,20 @@ module.exports = function registerAccounts(ctx) {
          household that owes more than it holds has none. Said now, either
          way, so the card never renders blank. */
       if (negative.length) {
+        /* States the AMOUNT as well as the names, the way the partial-negative
+           path further down already does. Naming which groups were left out
+           while withholding how much they came to is half a disclosure: on a
+           vault whose hero reads -R7 000 this said only "1 group is net
+           negative — Bank accounts", and the reader had no way to tie that
+           sentence to the figure above it. */
+        const excludedAll = negative.reduce((s, g) => s + Math.abs(g.total), 0);
         body.append(el('div', { class: 'acct-ring-note' },
           i18n.t('acct.where.negative', {
             count: negative.length,
             names: negative.map(g => i18n.t(g.key)).join(', '),
-          })));
+          }),
+          ' ', i18n.t('acct.where.excluded', { amount: money(excludedAll) })));
       } else {
-        // TODO(i18n): acct.where.empty — "Nothing to show yet."
         body.append(el('div', { class: 'acct-ring-note' }, i18n.t('acct.where.empty')));
       }
       card.append(body);

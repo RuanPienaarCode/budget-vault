@@ -354,7 +354,8 @@ module.exports = {
   'bud.assumed.noFile': '{category} のノートを読めませんでした',
 
   'bud.pull.label': '超過分を取り込む',
-  'bud.pull.title': '{lag} 期間前の超過支出から入力します',
+  /* One form only — see the header. No plural distinction in Japanese. */
+  'bud.pull.title': { other: '{lag} 期間前の超過支出から入力します' },
   'bud.pull.none': '{period} に超過はありません — {amount} 残して終わりました',
   'bud.pull.confirmTitle': '前期の超過分を取り込む',
   'bud.pull.confirmBody': '{period} は収入より {amount} 多く使いました。{category} を {amount} にしますか？現在は {current} です。',
@@ -510,10 +511,10 @@ module.exports = {
   'acct.balance.field': '新しい残高',
   'acct.balance.inCurrency': '{symbol} で入力します。',
   'acct.balance.updated': '{name} の残高を更新しました',
-  'acct.balance.impliedHint': '前回の確認以降の{count}件から、取引が示す残高は{amount}です。',
+  'acct.balance.impliedHint': { other: '前回の確認以降の{count}件から、取引が示す残高は{amount}です。' },
   'acct.balance.asAt': 'いつ時点の残高ですか？',
   'acct.balance.asAtDesc': 'この金額が正しかった日付です。明細書の日付であり、必ずしも今日とは限りません。それより後の日付の取引は引き続き残高に反映されます。',
-  'acct.balance.updatedDrift': '{name}の残高を保存しました。ただしその日付以降の{count}件が{amount}ずれています。口座を開いて確認してください。',
+  'acct.balance.updatedDrift': { other: '{name}の残高を保存しました。ただしその日付以降の{count}件が{amount}ずれています。口座を開いて確認してください。' },
   'acct.balance.unreadable': '「{raw}」を読み取れませんでした — タップして修正',
   'acct.reconciled': '{name} を {amount} に照合しました',
   'acct.err.nan': '数値ではありません',
@@ -844,6 +845,7 @@ module.exports = {
   'dash.trend.tip.over': '予算を {amount} 超過',
   'dash.trend.tip.under': '予算より {amount} 少ない',
 
+  'dash.split.summary': { other: '{count} 件のカテゴリで {amount} · {month}' },
   'dash.split.uncatNote': ' · カテゴリなし {amount} は未表示',
   'dash.split.nettedNote': ' · 返金 {amount} を相殺',
   'dash.split.onlyUncat': 'この期間に {amount} が出ていますが、まだどれもカテゴリ分けされていません — 取引ページでカテゴリを設定すると、ここに内訳が表示されます。',
@@ -973,6 +975,7 @@ module.exports = {
   'score.flow.chip.allocatedOfIncome': '収入に対する配分',
   'score.flow.chip.spent': '使った額',
   'score.flow.chip.budgetUsed': '予算消化',
+  'score.flow.chip.budgetUsedNote': 'この期間のみ — 上のスコアは6期間の平均を使っています。',
   'score.flow.chip.lefts': '2種類の「残り」',
   'score.flow.chip.leftInBudget': '予算内の残り',
   'score.flow.chip.neverBudgeted': '予算に入れていない収入',

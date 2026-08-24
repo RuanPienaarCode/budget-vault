@@ -939,7 +939,21 @@ module.exports = function registerScore(ctx) {
     if (bud.budgetUsed !== null) {
       budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${Math.round(bud.budgetUsed * 100)}%`]);
     }
-    wrap.append(buildChip(i18n.t('score.flow.chip.budget'), budgetRows));
+    /* The DISCLOSURE half of "declared" (tests/vocabulary.test.cjs's
+       GAP A — "Budget used", twice, on one page). This chip's own
+       `budgetUsed` and the ring above it (score.now.budget) now share one
+       numerator rule (money-flow.js excludes the same savings/investment
+       spend health-math.js's consumptionForBudget always has), but they
+       still answer different WINDOWS on purpose — this period here, a
+       six-period trailing average up in the ring — and a reader who
+       glances at both and sees two different percentages under the same
+       three words deserves to be told why, the same way the Budget page's
+       own income/spend tiles disclose their narrower reading right under
+       the number (Terms 3-4 in that same test file). Shown only when the
+       row above it actually rendered — a note explaining a figure that
+       is not on screen explains nothing. */
+    wrap.append(buildChip(i18n.t('score.flow.chip.budget'), budgetRows,
+      bud.budgetUsed !== null ? i18n.t('score.flow.chip.budgetUsedNote') : null));
 
     /* Same rule as committed: real when any of the three differs from zero —
        an over-budget period reads leftInBudget negative, which is a fact
@@ -961,12 +975,19 @@ module.exports = function registerScore(ctx) {
   /* One chip: the `.mini` KPI-tile look the rest of the app already uses
      (explicitly reusable per the sealed-palette rule) with plain label/value
      rows inside it, rather than a second card component. */
-  function buildChip(title, rows) {
+  function buildChip(title, rows, note) {
     const chip = el('div', { class: 'mini score-flow-chip' }, el('div', { class: 'l' }, title));
     for (const [label, value, warn] of rows) {
       chip.append(el('div', { class: `score-flow-row${warn ? ' is-warn' : ''}` },
         el('span', {}, label), el('b', { class: 'num' }, value)));
     }
+    /* Optional, and appended AFTER every row rather than under the one row it
+       is actually about — `.s` is already the sealed note style every `.mini`
+       tile uses under its own value (buildChipEmpty below reuses the same
+       class for the same reason), so this needs no new CSS and no per-row
+       note slot that the other three chips calling this function do not
+       need. */
+    if (note) { chip.append(el('div', { class: 's' }, note)); }
     return chip;
   }
 

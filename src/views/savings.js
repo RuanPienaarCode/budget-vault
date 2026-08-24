@@ -30,9 +30,25 @@ module.exports = function registerSavings(ctx) {
      these now are too. */
   const { S, $, root, money, accountIndex, catType } = ctx;
 
+  /* Case-folded and trimmed against the account's own type, not compared
+     raw — the same trap views/dashboard.js's own accountsOfType documents,
+     and worth.js:122-141 names outright ("`type: Savings` with a capital S,
+     which is the same bug wearing a hat"). `load.js` only defaults `type`
+     when the key is ABSENT, so `type: Savings`, `type: ' savings '` or
+     `type: SAVINGS` reach here exactly as written — and worth() sums every
+     account into net worth by balance SIGN regardless of type, so an account
+     like that used to count toward the net-worth tile on this very page
+     while showing 0 accounts on the savings/investment tile beside it.
+
+     Every account-type test in this file goes through this one function —
+     including the per-account `investment` checks further down, which read
+     the same possibly-mixed-case field a second time — so the next reader
+     cannot add a sixth raw `=== 'savings'`. */
+  const typeIs = (a, type) => String((a && a.type) || '').trim().toLowerCase() === type;
+
   function renderSavings() {
-    const savings = S.accounts.filter(a => a.type === 'savings');
-    const investments = S.accounts.filter(a => a.type === 'investment');
+    const savings = S.accounts.filter(a => typeIs(a, 'savings'));
+    const investments = S.accounts.filter(a => typeIs(a, 'investment'));
     const totalSavings = savings.reduce((s, a) => s + a.balance, 0);
     const totalInvest = investments.reduce((s, a) => s + a.balance, 0);
     const w = worth(S.accounts, S.debts, S.assets);
@@ -153,12 +169,36 @@ module.exports = function registerSavings(ctx) {
      balance does — see the header of views/assets.js. Reported as its own line
      rather than folded into the account count above: the two say "unconfirmed"
      about different lengths of time, and one sentence covering both would be
-     true of neither. */
-  const ASSET_STALE_DAYS = 365;
+     true of neither.
+
+     The THRESHOLD is read from views/assets.js's own `VALUED_STALE_DAYS`
+     rather than hand-declared here a second time — assets.js's header says
+     this file exists specifically so nothing else re-declares that number,
+     and until now this was the one place that still did. Read through
+     `ctx.VALUED_STALE_DAYS` rather than destructured at registration time:
+     views/assets.js registers AFTER this module (see controller.js), so the
+     key does not exist on `ctx` yet when `registerSavings(ctx)` runs — the
+     same registration-order trap this file's own header names for
+     saveAccount/acceptImplied above, hit a second time.
+
+     The `a.value > 0` clause DOES stay, and deliberately diverges from
+     assets.js's own `isStaleValuation`, which has no such guard. The two
+     predicates answer different questions on purpose: assets.js is asking
+     "is this row's date current", and a R0 house with a year-old date is a
+     real answer to that. This caveat is asking "how much of what you own is
+     resting on a stale figure", stated in Rand ("R X of what you own...") —
+     and a zero-valued asset owns nothing, so counting it here would either
+     pad the count with an entry that changes no money figure, or — on a
+     vault whose only stale asset is worth nothing — surface a caveat reading
+     "R 0,00 of what you own was last valued over a year ago", which is not a
+     sentence that helps anyone. So a zero-valued stale asset is real and
+     visible on the Assets page (where the question is "is the date good")
+     and silent here (where the question is "how much money is at stake") —
+     two pages counting different rows on purpose, not by drift. */
   function staleAssets() {
     return (S.assets || []).filter(a => {
       const d = daysSince(a.valued);
-      return (d === null || d > ASSET_STALE_DAYS) && a.value > 0;
+      return (d === null || d > ctx.VALUED_STALE_DAYS) && a.value > 0;
     });
   }
 
@@ -305,7 +345,7 @@ module.exports = function registerSavings(ctx) {
              Only for investments, and only when no growth was recorded at all —
              a savings account crediting monthly interest has a real figure
              above and needs no explanation of one it does not have. */
-          if (a.type === 'investment' && !g) {
+          if (typeIs(a, 'investment') && !g) {
             card.append(el('div', { class: 's2 s2-caveat',
               title: 'Growth only appears here when the account posts it as a transaction the vault can read. '
                 + 'A fund whose value moves with the market posts nothing, so its growth is inside the balance '
@@ -374,7 +414,7 @@ module.exports = function registerSavings(ctx) {
              transaction reconciles exactly, and taking the offer away from those
              accounts to protect the others helps nobody. What it gets is the one
              sentence that stops it reading as a correction. */
-          if (a.type === 'investment') {
+          if (typeIs(a, 'investment')) {
             card.append(el('div', { class: 's2 s2-caveat',
               title: 'The implied figure adds up recorded movements only. Growth that never posted a '
                 + 'transaction is not in it, so on a market-linked fund this figure is a floor rather '
@@ -468,7 +508,7 @@ module.exports = function registerSavings(ctx) {
         title: 'No transactions in the vault for this account, so this is the balance less what the '
           + 'account file records as put in. Import its statements and the split becomes real.' },
       'from the account file'));
-    } else if (r.undatedGrowth && a.type === 'investment') {
+    } else if (r.undatedGrowth && typeIs(a, 'investment')) {
       /* Named because the chart above cannot draw it. A fund's value moved every
          day for years and the vault holds one number — today's — so this growth
          is real, is in the balance, and has no date anywhere. */

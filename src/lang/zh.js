@@ -354,7 +354,8 @@ module.exports = {
   'bud.assumed.noFile': '无法读取 {category} 的笔记',
 
   'bud.pull.label': '取回超支',
-  'bud.pull.title': '用 {lag} 个周期前的超支金额填入',
+  /* One form only — see the header. No plural distinction in Chinese. */
+  'bud.pull.title': { other: '用 {lag} 个周期前的超支金额填入' },
   'bud.pull.none': '{period} 没有超支 — 结余 {amount}',
   'bud.pull.confirmTitle': '取回上期超支',
   'bud.pull.confirmBody': '{period} 的支出比收入多 {amount}。把 {category} 设为 {amount}？当前是 {current}。',
@@ -510,10 +511,10 @@ module.exports = {
   'acct.balance.field': '新余额',
   'acct.balance.inCurrency': '以 {symbol} 输入。',
   'acct.balance.updated': '已更新 {name} 的余额',
-  'acct.balance.impliedHint': '自上次确认以来的 {count} 笔记录显示余额应为 {amount}。',
+  'acct.balance.impliedHint': { other: '自上次确认以来的 {count} 笔记录显示余额应为 {amount}。' },
   'acct.balance.asAt': '截至哪一天？',
   'acct.balance.asAtDesc': '该金额成立的日期——对账单的日期，不一定是今天。此后日期的交易仍会计入余额。',
-  'acct.balance.updatedDrift': '已保存 {name} 的余额，但该日期之后的 {count} 笔记录相差 {amount}。打开账户查看。',
+  'acct.balance.updatedDrift': { other: '已保存 {name} 的余额，但该日期之后的 {count} 笔记录相差 {amount}。打开账户查看。' },
   'acct.balance.unreadable': '无法读取“{raw}” — 点按修正',
   'acct.reconciled': '已把 {name} 对账为 {amount}',
   'acct.err.nan': '不是数字',
@@ -844,6 +845,7 @@ module.exports = {
   'dash.trend.tip.over': '超出预算 {amount}',
   'dash.trend.tip.under': '低于预算 {amount}',
 
+  'dash.split.summary': { other: '{amount}，涉及 {count} 个分类 · {month}' },
   'dash.split.uncatNote': ' · 未分类 {amount}，未显示',
   'dash.split.nettedNote': ' · 已抵扣退款 {amount}',
   'dash.split.onlyUncat': '本周期支出了 {amount}，但还没有任何一笔被归类 — 在交易页面设置分类后，这里就会显示占比。',
@@ -973,6 +975,7 @@ module.exports = {
   'score.flow.chip.allocatedOfIncome': '收入分配比例',
   'score.flow.chip.spent': '已支出',
   'score.flow.chip.budgetUsed': '预算已用',
+  'score.flow.chip.budgetUsedNote': '仅本期 — 上方的分数使用六个周期的平均值。',
   'score.flow.chip.lefts': '两种不同的“剩余”',
   'score.flow.chip.leftInBudget': '预算内剩余',
   'score.flow.chip.neverBudgeted': '从未纳入预算的收入',

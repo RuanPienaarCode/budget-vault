@@ -13,7 +13,13 @@
    18.5%), compounded monthly — how a lender quotes it and how it is stored in
    Debts.md. Amounts are positive numbers; a balance is what is still owed. */
 
-const { ISO_DATE } = require('./dates');
+/* isRealIsoDate, not ISO_DATE: ISO_DATE is shape-only (dates.js:19 — "2026-13-45
+   passes") and expectedBalance walks `start` as real elapsed months. A
+   shape-valid, impossible start date used to sail through and get projected as
+   though it had actually happened, feeding views/debts.js's "schedule says …
+   since {date}" line a fabricated figure dressed as arithmetic — the same trap
+   savings-math.js's monthOf hit in 1.23.0, fixed there the same way. */
+const { ISO_DATE, isRealIsoDate } = require('./dates');
 
 /* Below this, a balance is settled. Floating-point interest leaves fractions
    of a cent behind, and comparing to exactly 0 makes the loop run to the cap. */
@@ -183,7 +189,11 @@ function expectedBalance(debt, today) {
   const original = Number(d.original) || 0;
   const pay = (Number(d.payment) || 0) + (Number(d.extra) || 0);
   if (!original || pay <= 0) return null;
-  if (!ISO_DATE.test(d.start || '') || !ISO_DATE.test(today || '')) return null;
+  /* `today` is caller-supplied (views/debts.js's own todayIso()), always
+     real — but `d.start` comes off a hand-editable file, so only IT needs the
+     real-calendar check; today still only needs the shape check to keep this
+     symmetric with the rest of the module's "missing input → null" contract. */
+  if (!isRealIsoDate(d.start) || !ISO_DATE.test(today || '')) return null;
 
   const [sy, sm, sd] = d.start.split('-').map(Number);
   const [ty, tm, td] = today.split('-').map(Number);
