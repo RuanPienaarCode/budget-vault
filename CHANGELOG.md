@@ -3,6 +3,70 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+Six new kinds of test were added after the 1.23.0 audit, and they immediately
+found nine more real problems — two of them in the audit's own fixes. All are
+below.
+
+### Fixed
+
+- **A balance date typed in the future could still silence an account.** 1.23.1
+  fixed two of the three places this was read; the third was missed, so an
+  account with a typo'd year could still report "agrees with your transactions"
+  and quietly drop off the list of accounts wanting a look.
+
+- **Savings and investment accounts were still missed if their type was
+  capitalised** — on the Savings page's own tiles, in the saving part of your
+  score, and in the colours of the net-worth breakdown. Only the Dashboard had
+  been fixed. An account written `type: Savings` counted toward your net worth
+  while showing as nothing on the savings tile beside it.
+
+- **A household that had just paid off everything still saw four zeros.** The
+  congratulatory panel only appeared when no debt had ever been recorded, not
+  when every recorded debt was settled. Those are different things and now read
+  differently — the second one is an achievement.
+
+- **An impossible date like 30 February produced a real-looking projection.**
+  The debt page's "the schedule says…" line checked only that a date was
+  shaped right, not that it existed, and then measured elapsed time from it.
+
+- **"Budget used" was two different figures on one screen.** The one in your
+  score averages six periods; the one on the money-flow card is this period
+  only. That difference is deliberate and now says so — but they were also
+  measuring different things, counting money moved into savings as spending in
+  one and not the other. They no longer disagree about that.
+
+- **A refund could inflate "Total spent".** For a category marked "assume
+  spent", a refund bigger than the month's spending pushed the total UP instead
+  of leaving it alone — R1 700 reported on a R1 000 budget the table itself
+  showed at R1 000.
+
+- **The money-flow bands could round to 102%** on a perfectly ordinary month.
+  The check that decides how to round them could be tipped by a rounding error
+  far too small to see, sending a normal month down the path meant for months
+  that overspend. Introduced by 1.23.0's fix for the same symptom.
+
+- **Category types showed as internal words.** "expense", "housing" and the
+  rest appeared as-is in the budget table, though translations for them already
+  existed in every language.
+
+- **Three messages said "period(s)" and "row(s)".** They now say "period" or
+  "periods" as appropriate, in all seven languages. Two of the three were
+  introduced by 1.23.0.
+
+- **The accounts ring now says how much it left out** when every group is
+  overdrawn, instead of only naming which ones.
+
+### Internal
+
+- The guard suite goes from 78 to 103 files. The new ones check that one word
+  means one thing across pages, that figures on different pages still reconcile,
+  that no chart can draw outside its own frame, that 36 awkward vault shapes
+  render sensibly on all 15 pages, that a blank field is never quietly read as
+  a zero, and that no untranslated text or raw placeholder reaches the screen in
+  any language. Most were written to fail against the old behaviour first.
+
 ## 1.23.1 — 2026-08-24
 
 ### Fixed
