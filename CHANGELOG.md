@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.23.2 — 2026-08-24
 
 Six new kinds of test were added after the 1.23.0 audit, and they immediately
 found nine more real problems — two of them in the audit's own fixes. All are
