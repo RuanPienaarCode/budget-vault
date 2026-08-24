@@ -3,6 +3,33 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+- **Your savings rate could read as a negative share of your income.** 1.23.0
+  started subtracting what you took out of savings from what you put in, which
+  was the right idea and the wrong sum. Money arriving in a savings account
+  under an income-typed category — a reimbursement, a refund, interest — was
+  being set aside as "growth" and left out of the total, while every rand that
+  left was counted in full. So the inflow could vanish from the very figure the
+  outflow was subtracted from.
+
+  On one real month that meant the page reported R16 684 taken out of savings
+  when R23 316 had gone in. The rate now counts everything that arrived against
+  everything that left.
+
+- **And a window where more came out than went in now says so in words.** It is
+  a real thing to report, but not as "-19% of income saved" — nobody can save a
+  negative share of their income. The figure reads 0% and the line beneath it
+  says which way the money actually went. The score was already 0 for that case
+  and has not changed.
+
+- **Confetti is for a strong score, not for any finished part.** It used to
+  fire whenever any single part hit full marks — and a household with no debts
+  recorded gets full marks on interest by default, so a page that was otherwise
+  all gaps still got a shower.
+
 ## 1.23.0 — 2026-08-24
 
 A wide correctness pass. Every figure on the Dashboard, Budget, Score, Debt,
