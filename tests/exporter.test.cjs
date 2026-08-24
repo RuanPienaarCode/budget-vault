@@ -30,6 +30,18 @@
         cell, and the markdown export — which always uses the parsed number —
         disagrees with the CSV over the very rows a reader is most likely to
         have hand-corrected.
+     9. A wrapped cell (a real newline, the shape unescMd hands back on load —
+        src/load.js) must not terminate the markdown table. This module used
+        to carry its own pipes-only escMd instead of markdown.js's shared one,
+        so a raw `\n` inside a cell reached the row write untouched, and the
+        continuation line — not starting with `|` — ended the table; every
+        row after it rendered as plain paragraph text. Proven against the
+        same fixture value tests/vault-roundtrip.test.cjs uses on disk
+        ("multi<br>line").
+    10. The exported column order is read from SCHEMAS.transactions
+        (src/table-schema.js), not a fourth hand-written copy — so a column
+        appended there cannot silently reach the vault file, the loader and
+        the byte-golden gate while never reaching either export.
 
    Pure — no DOM, no obsidian, no vault. */
 
@@ -38,6 +50,7 @@ const {
   transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown,
   exportPaths, safeName, EXPORT_DIR,
 } = require('../src/exporter');
+const { SCHEMAS } = require('../src/table-schema');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -181,6 +194,40 @@ const SPLIT_ROWS = [
   // (?<!\\) is a plain node-side test helper, not shipped src/ — src/ itself
   // never uses lookbehind (it is a parse-time SyntaxError before iOS 16.4).
   eq(line.split(/(?<!\\)\|/).length - 2, 8, 'so the row still has exactly eight cells (Split is the 8th)');
+}
+
+/* ---- 5b. a wrapped cell cannot break the table either ----
+
+   Same fixture value tests/vault-roundtrip.test.cjs writes to disk
+   ("multi<br>line"), so this pins the SAME newline shape the real loader
+   hands back through unescMd — not a value chosen only for this test. */
+{
+  const wrapped = [
+    { date: '2026-07-03', desc: 'café ¥', label: 'FNB Cheque', cat: '', amount: 42000.5, excluded: false, note: 'multi\nline' },
+    { date: '2026-07-04', desc: 'next row', label: 'FNB Cheque', cat: 'Groceries', amount: -10, excluded: false, note: '' },
+  ];
+  const md = transactionsMarkdown(wrapped, { range: 'Jul 2026', filters: [], generated: 'x' }, money);
+  const lines = md.split('\n');
+  ok(lines.some(l => l.includes('multi<br>line')), 'the newline is escaped to <br>, not left raw');
+  ok(!lines.some(l => l.trim() === 'line |' || /^line\b/.test(l.trim())),
+    'so it never lands as a second, pipe-less continuation line');
+  const rowIdx = lines.findIndex(l => l.includes('café'));
+  ok(lines[rowIdx + 1].includes('2026-07-04'), 'and the next transaction is still the very next table row');
+}
+
+/* ---- 10. the export column order is read from SCHEMAS.transactions, not a
+   fourth hand-written copy ---- */
+{
+  const expectedHead = SCHEMAS.transactions.columns.map(c => c.header);
+  expectedHead.splice(2, 0, 'Account');
+
+  const csvHead = transactionsCsv([]).trim().split('\n')[0].split(',');
+  eq(csvHead, expectedHead, 'the CSV header matches the schema plus Account');
+
+  const md = transactionsMarkdown([], { range: 'x', filters: [], generated: 'x' }, money);
+  const headerLine = md.split('\n').find(l => l.startsWith('| Date'));
+  const mdHead = headerLine.split('|').slice(1, -1).map(s => s.trim());
+  eq(mdHead, expectedHead, 'the markdown header matches the schema plus Account');
 }
 
 /* ---- 6. filters are disclosed in the document ---- */

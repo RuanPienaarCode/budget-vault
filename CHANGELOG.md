@@ -3,6 +3,184 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+A wide correctness pass. Every figure on the Dashboard, Budget, Score, Debt,
+Assets, Savings and Accounts pages was re-derived and checked against the
+module it claims to come from. All of the below shipped green through the
+existing guard suites — the maths was never hard, nothing was asking these
+particular questions — so each one now has a test that fails without its fix.
+
+### Fixed
+
+- **A household with no recognised income scored 100 out of 100, "Strong".**
+  Budget adherence was the one part of the score not gated on income, so when
+  every other part went unmeasurable it inherited the whole 100 on its own. A
+  vault whose salary sat under a mistyped category name, or arrived in an
+  account marked as not part of the budget, was congratulated while overdrawn.
+  Nothing measurable now means no score at all, which is the honest answer.
+
+- **Debt with no interest rate recorded earned full marks, under the words
+  "Nothing is lost to interest."** A blank `Rate` cell was read as a rate of
+  zero rather than as an unanswered question — the same distinction the score
+  already drew for a blank `Payment`, never carried across to `Rate`. Debts
+  with no rate now count as unmeasured, and both the Dashboard tile and the
+  Score page say so instead of implying the debt is free.
+
+- **A rate written as `18.5%` was read as zero, then overwritten with `0.00`.**
+  The column is headed `Rate` and the file describes it as a percentage, so
+  typing the percent sign is the obvious thing to do. It now parses, and the
+  interest, payoff date and score that depend on it are right.
+
+- **Updating a balance never checked it against your transactions, then said it
+  matched them.** The one screen where a real bank figure enters the vault took
+  the number, stamped today, and compared nothing — after which the account
+  reported "This figure matches your transactions", which was untrue by
+  construction whenever it did not. It now shows what your transactions imply
+  before you type, asks which date the figure was true on, and says plainly
+  when the two disagree. You can still save whatever you typed: the app argues,
+  it does not correct.
+
+- **Accepting a drift buried every transaction between the last one counted and
+  today.** Confirming on the 24th when the newest row was the 20th made rows
+  dated the 21st to the 24th unreachable for ever, so a statement imported
+  later was silently never folded in. The confirmation is now dated by the rows
+  it actually absorbed.
+
+- **A balance date typed in the future silenced the account completely.** A year
+  slip put every real transaction behind the confirmation window, so the
+  account went green and dropped out of the attention list over real spending.
+  A date the vault has not reached is now treated as no date at all.
+
+- **Money out and straight back was reported as a disagreement.** Two
+  transactions that cancel each other produced "2 transactions imply
+  R1 000,00, not R1 000,00", and sorted above accounts that genuinely needed
+  looking at.
+
+- **The "arriving soon" line spent your salary twice.** When a credit card is
+  settled monthly, the card's own band is already funded by that salary — and
+  the line below added it to your free cash a second time, overstating what is
+  safe to spend by the whole card balance. With R13 000 free, an R18 000 card
+  and a R20 000 salary it read R33 000; the answer is R15 000.
+
+- **The savings growth chart hid most of its own history.** The plot was scaled
+  to its final point, so a fund that peaked before a large withdrawal drew
+  everything above that closing figure off the top of the chart and discarded
+  it — on one real shape, 31 of 44 months were invisible. That chart has no
+  vertical axis, so nothing on screen revealed it.
+
+- **Bands on "Where the money went" could be drawn off the bottom of the
+  chart.** In any period that spent more than it earned the bands come to more
+  than 100% of income — which is true, and worth saying — but they were laid
+  out as though they always summed to exactly 100, pushing real bands and their
+  labels outside the picture. The percentages are unchanged; the drawing now
+  fits them.
+
+- **Finishing setup with no categories selected landed on "Budget folder not
+  found".** One second after "Budget folder created — welcome!", and the error
+  was not even true: the folder was there, and empty. The wizard now asks for
+  at least one category, and a newly created budget opens on the Budgets page —
+  which already lists every category you just chose — rather than on a
+  dashboard with nothing on it yet.
+
+#### One figure, one rule
+
+Several numbers were being worked out two different ways in two different
+places, so the same thing could read differently depending on which page you
+were on. Each of these now has a single definition.
+
+- **"Growth" meant two different things.** Savings & Investments worked out
+  what an account had actually earned; the Accounts drawer used an older rule
+  that counts every deposit you have made since as growth. The same account
+  could read R8 000 on one page and R68 000 on the other, one click apart.
+  Accounts now uses the same figure the Savings page does.
+
+- **Marking a category "assume spent" double-counted it if it also had
+  transactions.** The assumption was added on top of the real spending rather
+  than covering the gap, so a R4 000 grocery budget with R3 000 actually spent
+  reported R7 000 and "175% of budget used". It now counts the shortfall only.
+
+- **A category's type was read from the budget file on one page and from the
+  category file on another.** Since correcting a category means editing its
+  file, the budget file's copy went permanently stale — one row could read
+  −R5 000 on the Budget page and +R5 000 on the Dashboard.
+
+- **Savings and investment accounts were missed if their type was capitalised.**
+  `type: Savings` counted toward net worth but not toward the savings tile
+  beside it, so a household holding R85 000 saw R5 000.
+
+- **The emergency-fund figure divided by the wrong thing.** It counted every
+  account's earmarked money, but measured your essential spending only from
+  accounts inside the budget — so bills paid from a joint account marked "not
+  in budget" vanished from the divisor. A household with two months of cover
+  was told it had six, and given full marks for it.
+
+- **"Budget used" divided by periods that never had a budget.** Start budgeting
+  partway through the window and the figure read 273% for a household that was
+  9% under budget.
+
+- **Money moved into savings was counted as both spending and saving** on the
+  "Where the money went" chart, drawing the same rand twice.
+
+- **The tax page printed money in a different format from every other page** —
+  and took its currency symbol from your country rather than your chosen
+  currency, so a household using dollars saw rands there and dollars elsewhere.
+
+#### Numbers that were wrong, or wrongly presented
+
+- **A rate cell containing a percent sign is now read properly**, and 0% loans
+  no longer report a small negative "total interest" from rounding.
+- **A negative "owed to you" entry no longer eats the Recovered total.**
+- **The Accounts ring** now says when it spans more than one currency, states
+  what it left out of its centre figure, and explains itself instead of drawing
+  an empty card when every group is overdrawn.
+- **An unreadable balance** (`TBC`, `about 15 000`) is shown as unreadable
+  rather than silently counted as R0,00 in five different totals.
+- **Money belonging to one account** is printed in that account's own currency
+  in six more places that were using the household symbol.
+- **Percentages that must add to 100 now do**, on the net-worth breakdown and
+  the donut's money column as well as the slices.
+- **The trend chart no longer draws a drop to zero** across months you never
+  imported, and marks the period still in progress instead of showing it as a
+  finished one.
+- **Spending in a category with no budget** now shows as over budget instead of
+  a blank cell that read as "nothing to report".
+- **The "left to spend" sum adds up.** Its terms were each rounded separately,
+  so the arithmetic on screen could be out by a rand.
+- **Assets:** "Unvalued" counted things that had a value but an old one, and is
+  now "Needs a new valuation"; a valuation exactly 18 months old no longer
+  jumps to "2 years ago"; and typing a value the app cannot read no longer
+  silently sets it to zero.
+
+#### Easier to use
+
+- **Categorise many transactions at once**, beside the existing bulk delete.
+- **See which rule categorised a row**, and change that rule from the
+  Transactions page when you correct it — previously a rule learned once could
+  never be corrected from inside the app.
+- **Corrections no longer silently re-teach the categoriser** — only rows that
+  arrived uncategorised do.
+- **Dropping a PDF on the import area** now says so, instead of showing you
+  garbled text and blaming the file's columns.
+- **The Score page's advice now links to the page it names.**
+- **The uncategorised count on the Dashboard is now a button** that takes you
+  to exactly those transactions.
+- **A household with no debt** gets told that is a good position, rather than
+  four zeros and a dash under the word "Debt-free".
+- **The Accounts table no longer jumps back to the left** when you sort it or
+  open an account on a phone.
+- **The Budget page** groups its rows correctly when a category has an
+  unrecognised type, and shows an empty state instead of a bare header.
+
+#### Under the hood
+
+- **Exporting to markdown could truncate the table.** A transaction whose note
+  or description wrapped onto a second line ended the table, and everything
+  after it exported as plain text. Both export formats now also take their
+  columns from the same declaration the vault files use, so they cannot drift.
+- 15 new guard suites and several hundred new assertions, most written to fail
+  against the old behaviour first.
+
 ## 1.22.7 — 2026-08-23
 
 ### Changed

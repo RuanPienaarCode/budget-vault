@@ -131,6 +131,48 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(L.amortise(0, 11, 0, 0).length, 0, 'an empty loan has an empty schedule');
 }
 
+/* ---- a 0% loan never reports interest, in either direction ----
+   The true answer at i = 0 is exactly 0, but `exact` (the unrounded
+   instalment) is rarely an integer, so rounding it to the instalment shown
+   multiplied a few cents of drift by every month in the term and produced an
+   arbitrary, often negative, "Total interest" underneath an amortisation
+   table that showed R0 in every row. Pinned on the SHIPPED vehicle defaults
+   (previously "Total interest R -18", "Total repaid R 314 982" borrowing
+   R315 000), plus a sweep so this cannot regress through some OTHER
+   principal/term combination the worked examples don't happen to hit. */
+{
+  const price = 350000, deposit = price * 0.10, finance = price - deposit;
+  const t = L.totalsFor(finance, 0, 54);
+  eq(t.totalInterest, 0, 'a 0% loan reports exactly zero interest, not a rounding artefact');
+  eq(t.totalRepaid, finance, 'a 0% loan repays exactly what was borrowed');
+
+  let sawNonZero = 0;
+  for (let principal = 1000; principal <= 500000; principal += 1373) {
+    for (let months = 6; months <= 72; months += 7) {
+      const r = L.totalsFor(principal, 0, months);
+      if (r.totalInterest !== 0 || r.totalRepaid !== principal) sawNonZero++;
+    }
+  }
+  eq(sawNonZero, 0, 'no 0% loan in the sweep reports non-zero interest or a repaid total off the principal');
+}
+
+/* ---- the amortisation schedule stops at the balloon floor, never past it ----
+   A rounded instalment on a small principal can clear the loan before the
+   final month; with no early exit the schedule kept "repaying" a balance
+   already at zero, driving it negative and reporting NEGATIVE interest for
+   every remaining month. R11 000 over 360 months at 11% used to go negative
+   from month 354, bottoming at -R575.23, and `byYear` folded that into year
+   30 reading +R0.87 where the truth is roughly R18. */
+{
+  const principal = 11000, rate = 11, months = 360;
+  const payment = L.totalsFor(principal, rate, months).payment;
+  const rows = L.amortise(principal, rate, months, payment);
+  ok(rows.every(r => r.closing >= 0), 'the schedule never carries a negative balance');
+  ok(rows.every(r => r.interest >= 0), 'the schedule never reports negative interest');
+  ok(rows.length < months, 'a rounded instalment that overshoots ends the schedule before the nominal term');
+  eq(rows[rows.length - 1].closing, 0, 'the schedule still lands exactly on zero');
+}
+
 /* ---- SARS bracket boundaries ---- */
 {
   eq(L.zaTransferDuty(1210000), 0, 'nothing is due at the top of the nil band');

@@ -51,9 +51,19 @@ function amortise(principal, annualRatePct, months, payment, balloon = 0) {
     const interest = bal * i;
     let capital = payment - interest;
     let closing = bal - capital;
-    if (m === n) { capital = bal - b; closing = b; }
+    /* A rounded instalment on a small principal can clear the loan before
+       month `n` — with no early exit the schedule kept "repaying" a balance
+       already at (or past) the balloon floor, driving `closing` negative and
+       turning every remaining row's interest negative too (R11 000 over 360
+       months at 11% went negative from month 354, bottoming at -R575.23;
+       byYear then folded that into a year that understated its own interest
+       by an order of magnitude). Clamped here exactly like the FORCED last
+       row below, and for the same reason: this row didn't know in advance it
+       would be the last one, but the moment it overshoots the floor, it is. */
+    if (m === n || closing <= b) { capital = bal - b; closing = b; }
     rows.push({ month: m, opening: bal, interest, capital, closing });
     bal = closing;
+    if (bal <= b) break;
   }
   return rows;
 }
@@ -83,9 +93,22 @@ function totalsFor(principal, annualRatePct, months, balloon = 0) {
   const n = Math.round(Number(months) || 0);
   const b = Math.min(Math.max(Number(balloon) || 0, 0), principal);
   const totalRepaid = payment * n + b;
+  const p = Number(principal) || 0;
+  /* A 0% loan borrows exactly what it repays — that is what 0% MEANS — but
+     `exact` is rarely an integer of its own, so rounding it to the instalment
+     actually shown (payment = Math.round(exact)) multiplies a few cents of
+     rounding drift by every month in the term. On the shipped vehicle
+     defaults (R350 000, 10% deposit, 54 months, 0%) that produced "Total
+     interest R -18" in warning-coloured text sitting directly above an
+     amortisation table that shows R0 interest in every single row — the page
+     contradicting itself. There is no equivalent drift to hide at a real
+     rate: the interest itself dwarfs a few rounded cents. So this is special-
+     cased rather than generalised into a tolerance band. */
+  const totalInterest = (Number(annualRatePct) || 0) <= 0 ? 0 : totalRepaid - p;
   return {
-    payment, exact, months: n, balloon: b, totalRepaid,
-    totalInterest: totalRepaid - (Number(principal) || 0),
+    payment, exact, months: n, balloon: b,
+    totalRepaid: (Number(annualRatePct) || 0) <= 0 ? p : totalRepaid,
+    totalInterest,
   };
 }
 

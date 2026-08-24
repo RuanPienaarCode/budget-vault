@@ -17,6 +17,7 @@
    hand-typed `Credit_Card` as not-a-card while the committed chain trimmed and
    case-folded — the same account, a card to one page and not the other. */
 const { isCreditCard } = require('./committed');
+const { currenciesIn } = require('./currency');
 
 /* Only `active` debts count. A debt marked paid is history; leaving it in
    reports a bond as still owed years after it was settled. */
@@ -49,8 +50,24 @@ function assetTotal(assets) {
    shipped and renaming them buys nothing.
 
    A house here and its bond on the Debt page is NOT a double count: one is
-   owned and one is owed, which is exactly the arithmetic net worth is. */
-function worth(accounts, debts, assets) {
+   owned and one is owed, which is exactly the arithmetic net worth is.
+
+   `household`, if given, is the household's own currency symbol
+   (S.settings.currency) — passed through to currenciesIn() so the returned
+   `currencies` list names it first. Optional and defaults through to
+   currenciesIn()'s own "R" fallback so every existing caller (none of which
+   pass it yet) keeps working unchanged; a caller that wants the disclosure to
+   actually name the household's real symbol should start passing it.
+
+   `currencies` walks ACCOUNTS only, the same list currenciesIn() already
+   covers everywhere else in the app (views/accounts.js:589 is the one other
+   call site). Assets have no currency field at all — SCHEMAS.assets is
+   name/type/value/valued/notes, and table-schema.js is append-only with a
+   byte-golden gate, so adding one is a bigger decision than this fix; a
+   R-valued house and a €20 000 account are summed together either way (as
+   documented above they always have been) and this only gives a caller
+   something to name the mix with. */
+function worth(accounts, debts, assets, household) {
   const list = accounts || [];
   const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
   const ownedAssets = assetTotal(assets);
@@ -76,6 +93,7 @@ function worth(accounts, debts, assets) {
     assets: owned, ownedAccounts, ownedAssets,
     liabilities, fromAccounts, fromDebts,
     net, active,
+    currencies: currenciesIn(list, household),
   };
 }
 

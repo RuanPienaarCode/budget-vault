@@ -978,6 +978,17 @@ function mountApp(view) {
       if (S.loaded) switchView('import');
       else S.view = 'import';
     },
+    /* Same parking trick as showImport, for any view. The setup wizard uses it
+       to land a brand-new CSV vault on Budgets rather than on a Dashboard with
+       nothing in it: budgetDraft() seeds a zero row per category, so Budgets
+       opens already listing every category the reader just chose — which is
+       exactly what the wizard's closing sentence tells them to do first —
+       while the Dashboard at that moment is four zeros and three empty states,
+       and reads as a setup that did not take. */
+    parkView: (v) => {
+      if (S.loaded) switchView(v);
+      else S.view = v;
+    },
     hasDirty,
   };
 }

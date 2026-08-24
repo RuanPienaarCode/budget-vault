@@ -2,12 +2,13 @@
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
 const { el, kpiTiles, icoEl } = require('../dom');
-const { themeColors, createChart, tip, parseColor } = require('../chart');
+const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
 const { isStale, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthSeries } = require('../savings-math');
+const { accountFlows, totalReturn, growthSeries, chartable } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
+const { sharePercents } = require('../share-percents');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -81,14 +82,34 @@ module.exports = function registerSavings(ctx) {
 
   const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
+  /* `measured`/`unmeasured` are counted by `chartable()` — the SAME predicate
+     growthSeries uses to decide what it draws — rather than a looser
+     `basis !== 'none'`, which also counted a 'stated' account (no
+     transactions, balance − total_invested) as measured. The chart has always
+     excluded those, so the tile used to disagree with the chart's own
+     subtitle about how many of the same accounts were measurable.
+
+     `rateCapital`/`rateGrowth` sum only accounts with a POSITIVE `capitalIn` —
+     the same guard totalReturn puts on `returnPct` itself, applied to the
+     aggregate. Without it one drawn-down account (a living annuity mid
+     withdrawal, `capitalIn` negative) shrinks the total capital the rate is
+     measured against and inflates the headline percentage for every other
+     account riding along with it — a fund with R60 000 real growth on
+     R160 000 put in reading "+183.3% on R30 000 put in" once a −R30 000
+     account was folded into the same sum. `growth` itself is unaffected: it
+     is a plain total, not a ratio, and every measured account's growth is
+     real money regardless of which way its capital line went. */
   function growthTotals(entries) {
-    let growth = 0, capital = 0, measured = 0, unmeasured = 0;
+    let growth = 0, rateGrowth = 0, rateCapital = 0, measured = 0, unmeasured = 0, negCapital = 0;
     for (const e of entries) {
       const r = ret(e);
-      if (r.basis === 'none') { unmeasured++; continue; }
-      measured++; growth += r.growth; capital += r.capitalIn;
+      if (!chartable(e.account, r)) { unmeasured++; continue; }
+      measured++;
+      growth += r.growth;
+      if (r.capitalIn > 0) { rateGrowth += r.growth; rateCapital += r.capitalIn; }
+      else negCapital++;
     }
-    return { growth, capital, measured, unmeasured, total: measured + unmeasured };
+    return { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total: measured + unmeasured };
   }
 
   /* The tile is drawn even when NOTHING is measurable, saying so. A tile that
@@ -103,8 +124,9 @@ module.exports = function registerSavings(ctx) {
         'no account records what it started at, so none can be measured');
     }
     const sub = [
-      g.capital > 0 ? `${pct((g.growth / g.capital) * 100)} on ${money(g.capital, 0)} put in` : null,
+      g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
       g.unmeasured ? `${g.unmeasured} of ${g.total} not measurable` : null,
+      g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
     ].filter(Boolean).join(' · ');
     tile('Growth', `${g.growth >= 0 ? '▲' : '▼'} ${money(Math.abs(g.growth))}`,
       g.growth >= 0 ? 'text-success' : 'text-danger', sub || null);
@@ -112,9 +134,11 @@ module.exports = function registerSavings(ctx) {
 
   /* Reconciliation "Use this" button below calls ctx.acceptImplied directly —
      see views/accounts.js's acceptImplied, published on ctx so this page and
-     Accounts share the one implementation (stamp today, so the rows just
-     absorbed cannot be counted a second time; back the mutation out on a
-     failed write). */
+     Accounts share the one implementation (stamp the last row the figure
+     absorbed, so those rows cannot be counted a second time WITHOUT burying
+     the days between them and now; back the mutation out on a failed write).
+     The verdict is passed along with the figure because the stamp is derived
+     from the rows it counted. */
 
   /* ----------------------- how old is this number ------------------------
      Net worth is a sum of figures the reader TYPED, and the Accounts page
@@ -178,7 +202,11 @@ module.exports = function registerSavings(ctx) {
   }
 
   function renderGoals() {
-    const withGoals = S.accounts.filter(a => a.goal_amount);
+    /* `> 0`, not truthy: a negative `goal_amount` (a typo, or a hand-edited
+       file) passed the truthy filter, clamped `pct` to 0 below, and then
+       `a.balance >= a.goal_amount` was true for ANY balance — a goal nobody
+       could miss, reading "Goal reached!" on an account with nothing in it. */
+    const withGoals = S.accounts.filter(a => a.goal_amount > 0);
     const goalsWrap = $('#savingsGoals'); goalsWrap.empty();
     if (!withGoals.length) {
       goalsWrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
@@ -193,8 +221,12 @@ module.exports = function registerSavings(ctx) {
            April" is still worth knowing, and a bar that silently vanishes when
            a balance ages is a worse answer than one that admits its age. */
         const stale = isStale(a.balance_updated);
+        /* Floored, and capped one short of 100, unless the goal is actually
+           reached — `Math.round` on 99.6% printed "100%" beside a bar that was
+           not full and a `reached` flag that was false, the one combination
+           that should never appear together on a progress bar. */
         const pctLine = reached ? 'Goal reached!'
-          : `${Math.round(pct)}%${a.target_date ? ' · target ' + a.target_date : ''}`;
+          : `${Math.min(99, Math.floor(pct))}%${a.target_date ? ' · target ' + a.target_date : ''}`;
         g.append(el('div', {},
           el('div', { class: 'goal-h' },
             el('div', { class: 'gn' }, a.name),
@@ -329,7 +361,7 @@ module.exports = function registerSavings(ctx) {
               rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
           const btn = el('button', { type: 'button', class: 'acct-recon-btn',
             'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` }, icoEl(['check']), 'Use this');
-          btn.addEventListener('click', () => ctx.acceptImplied(a, rec.implied));
+          btn.addEventListener('click', () => ctx.acceptImplied(a, rec.implied, rec));
           line.append(btn);
           card.append(line);
           /* On a fund the implied figure is a FLOOR, not a correction, and the
@@ -369,11 +401,17 @@ module.exports = function registerSavings(ctx) {
      `.s2` line in the shape the card already used, a bar, and the rate. */
   function renderReturn(card, a, r) {
     const up = r.growth >= 0;
-    const line = el('div', { class: 's2' }, `in ${money(r.capitalIn, 0)}`);
+    /* `capitalIn` can be legitimately negative — more has been withdrawn than
+       was ever put in — and "in -R30 000" reads as a typo, not a fact.
+       returnBar() already refuses to draw a bar for this case; the line gets
+       the same relabelling rather than printing a negative "in" figure. */
+    const line = el('div', { class: 's2' }, r.capitalIn > 0
+      ? `in ${money(r.capitalIn, 0)}`
+      : `${money(Math.abs(r.capitalIn), 0)} taken out more than put in`);
     /* Withdrawals are ALREADY netted out of capitalIn, so this names them
        rather than subtracting them a second time — a card reading "in R150 000
        · out R20 000" invites exactly that arithmetic. */
-    if (r.withdrawals) line.append(` after ${money(r.withdrawals, 0)} out`);
+    if (r.capitalIn > 0 && r.withdrawals) line.append(` after ${money(r.withdrawals, 0)} out`);
     line.append(' · ', el('span', { class: `num ${up ? 'text-success' : 'text-danger'}` },
       `${up ? '▲' : '▼'} ${money(Math.abs(r.growth), 0)}`));
     card.append(line);
@@ -569,11 +607,25 @@ module.exports = function registerSavings(ctx) {
     const gap = undated ? 16 : 0;
     const blockW = undated ? 78 : 0;
     const plotW = innerW - gap - blockW;
-    const top = Math.max(dated + Math.max(0, undated), dated, 1);
-    const scale = top * 1.08;
+    /* Scaled to the WHOLE series, not just its final point. `capital` is
+       contributions less withdrawals and `posted` can go negative in a losing
+       month, so the stack is not monotonic: a run that peaked at R180 000
+       before a R150 000 house-deposit withdrawal closed at R30 000, the plot
+       was scaled to that R30 000, and 32 of 44 points mapped ABOVE padT where
+       the worth-wipe clip discarded them silently. The reader saw a flat line
+       hugging the floor that materialised out of nowhere near the end. With no
+       y-axis and no gridline labels on this chart there is nothing else on
+       screen to reveal a wrong scale, so it has to be right here.
+
+       The floor follows for the same reason: a cumulative capital that has
+       gone negative belongs on the plot, not below its bottom edge. */
+    const stacks = s.points.map(p => p.capital + p.posted);
+    const seriesTop = Math.max(...stacks, dated + Math.max(0, undated), dated, 1);
+    const seriesFloor = Math.min(0, ...stacks);
+    const span = (seriesTop - seriesFloor) * 1.08 || 1;
 
     const X = i => padL + (i / (s.points.length - 1)) * plotW;
-    const Y = v => padT + innerH - (v / scale) * innerH;
+    const Y = v => padT + innerH - ((v - seriesFloor) / span) * innerH;
 
     const uid = `bud-growth-${++growthSeq}`;
     const listFor = `${money(last.capital, 0)} put in`
@@ -671,10 +723,15 @@ module.exports = function registerSavings(ctx) {
        the one thing that could make this disagree with the tiles above, and a
        reader who cannot see that it happened has no way to check. */
     if (s.excluded) {
+      /* Not "nothing records what they started at" — an account can carry a
+         `total_invested` figure (basis 'stated') and still be excluded here,
+         because it has no transactions to hang a date on. The true reason an
+         account is left out of THIS chart is always about placement, not
+         about whether anything was recorded. */
       wrap.append(el('div', { class: 'kpi-caveat-txt', style: 'margin-top:10px' },
         icoEl(['info', 'alert-circle']),
         `${s.excluded} account${s.excluded === 1 ? '' : 's'} left out — `
-        + 'nothing records what they started at, so their growth cannot be placed here.'));
+        + 'their growth carries no date it can be placed at.'));
     }
   }
 
@@ -740,9 +797,15 @@ module.exports = function registerSavings(ctx) {
       }
       return extraColors.get(type);
     };
+    /* `known` rides along on the returned segment — see the distinctColors
+       pass below, which must never reassign a sealed account-type colour.
+       `acctType` rides along too, unlisted types only: the SAME unlisted type
+       can reach both bars (a tfsa in credit and a tfsa overdrawn), and the
+       colour pass below has to recognise those two segments as one decision,
+       not two — see its own comment. */
     const segFor = g => (g.known
-      ? { label: meta.get(g.type).label, amount: g.amount, color: meta.get(g.type).color }
-      : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: colorFor(g.type) });
+      ? { label: meta.get(g.type).label, amount: g.amount, color: meta.get(g.type).color, known: true }
+      : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: colorFor(g.type), known: false, acctType: g.type });
     const groups = accountGroups(S.accounts, WORTH_TYPES.map(([type]) => type));
     const assets = groups.owned.map(segFor);
     const debts = groups.owed.map(segFor);
@@ -774,9 +837,55 @@ module.exports = function registerSavings(ctx) {
       debts.push({ label: d.type, amount: d.amount, color, fromDebtPage: true });
     });
 
-    const totalAssets = assets.reduce((t, x) => t + x.amount, 0);
-    const totalDebts = debts.reduce((t, x) => t + x.amount, 0);
-    const net = totalAssets - totalDebts;
+    /* The four colour schemes above (the account-type table, its own
+       unlisted-type walk, the Assets-page walk, the Debt-page walk) each pick
+       from a FIXED list with no idea what the other three chose — the same
+       "--color-accent" landed on both a Cash account and a house asset,
+       drawing identical adjacent rects with no stroke or gap between them, so
+       they merged into one indivisible block and the legend carried two rows
+       with one swatch. One pass, over every segment on the chart together, in
+       size order (distinctColors' own requirement — see chart.js), fixes
+       that. The six sealed account-type colours are `reserved` rather than
+       run through the resolver: they are the one palette this file may not
+       touch (`scripts/presets.cjs` generates it), so they keep whatever this
+       row assigned them regardless of what else is on the chart, and nothing
+       else may be placed close enough to be confused with one. */
+    const sealedColors = [...meta.values()].map(m => m.color);
+    const resizable = [...assets, ...debts].filter(seg => !seg.known);
+    /* Grouped so the SAME unlisted account type collapses to ONE colour
+       decision even though it can appear once in each bar. distinctColors
+       knows nothing about "same type" — without this, the two occurrences
+       are resolved independently and can walk away with different colours,
+       which reads as two different things rather than one type split across
+       credit and overdraft. Every OTHER segment (asset-page and debt-page
+       rows) keys on itself, so genuinely different things that happen to
+       share a colour by coincidence of two unrelated fixed lists — the bug
+       this whole pass exists to fix — are still free to be told apart. */
+    const colorGroups = new Map();
+    for (const seg of resizable) {
+      const key = seg.acctType !== undefined ? `acct:${seg.acctType}` : seg;
+      if (!colorGroups.has(key)) colorGroups.set(key, { amount: 0, wanted: seg.color, members: [] });
+      const grp = colorGroups.get(key);
+      grp.amount += seg.amount;
+      grp.members.push(seg);
+    }
+    const ordered = [...colorGroups.values()].sort((a, b) => b.amount - a.amount);
+    const resolved = distinctColors(ordered.map(g => g.wanted), { reserved: sealedColors });
+    ordered.forEach((grp, i) => { for (const m of grp.members) m.color = resolved[i]; });
+
+    /* worth.js is the one place net worth is computed — see its own header —
+       and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
+       the very same grouped arrays instead of reading it, which meant it also
+       skipped the `Math.round(…* 100) / 100 || 0` guard worth() applies to
+       `net`: a household sitting at exactly zero read "R 0,00" in the KPI
+       tile above and "R -0,00" in this chart's own aria-label, on the same
+       screen. The grouped arrays stay — they still drive the segment
+       geometry — but the headline figures now come from the one function
+       that is allowed to state them. */
+    const w = worth(S.accounts, S.debts, S.assets);
+    const totalAssets = w.assets;
+    const totalDebts = w.liabilities;
+    const net = w.net;
 
     const active = activeDebts(S.debts);
     const overlap = cardOverlap(S.accounts, S.debts);
@@ -879,10 +988,28 @@ module.exports = function registerSavings(ctx) {
       }, clip);
       const band = add('g', { 'clip-path': `url(#${uid}-wipe-${idx})` });
 
+      /* One allocation for the whole row, not `Math.round` per segment — the
+         exact defect share-percents.js exists to eradicate, and its own test
+         keeps a naive per-slice rounder as a NEGATIVE CONTROL specifically
+         because this stack (the two net-worth donuts) had already fixed it
+         once and this bar chart was missed: three equal segments used to
+         announce 33/33/33 = 99% between them, and — worse, since the segment
+         `<title>` is the only reading a touch user gets — a real R60 000
+         segment could announce "0% of what you own" while a rounding-up
+         neighbour absorbed the missing point. */
+      const shares = sharePercents(segs.map(s => s.amount));
+
       let x = padL;
-      for (const seg of segs) {
+      segs.forEach((seg, i) => {
         const w = (seg.amount / scale) * innerW;
-        const share = Math.round((seg.amount / total) * 100);
+        /* Drawn width, clamped so a sliver of a segment still has SOME ink —
+           and the cursor advances by that SAME clamped width, not the raw
+           one. It used to advance by `w` while drawing `Math.max(2, w)`: a
+           handful of sub-2px segments drew wider than the gap the walk left
+           for them and ate into their neighbour, so the drawn bar disagreed
+           with the data it was drawn from. */
+        const dw = Math.max(2, w);
+        const share = shares[i];
         /* The glow is the segment's OWN colour at low alpha, so it reads as the
            block lighting up rather than a generic highlight landing on it. The
            fill arrives as a resolved rgb() from getComputedStyle or as a hex
@@ -897,7 +1024,7 @@ module.exports = function registerSavings(ctx) {
             : null,
         }, band);
         const node = add('rect', {
-          x, y, width: Math.max(2, w), height: barH,
+          x, y, width: dw, height: barH,
           fill: seg.color, rx: w > 20 ? 10 : 2,
         }, g);
         if (hoverable) {
@@ -915,18 +1042,22 @@ module.exports = function registerSavings(ctx) {
         // Only label a segment wide enough to hold the text without clipping.
         if (w > 96) {
           add('text', {
-            x: x + w / 2, y: y + barH / 2 + 5, 'text-anchor': 'middle',
+            x: x + dw / 2, y: y + barH / 2 + 5, 'text-anchor': 'middle',
             'font-size': '13', 'font-weight': '600', fill: c.hole, 'font-family': 'inherit',
           }, g).textContent = seg.label;
         }
-        x += w;
-      }
+        x += dw;
+      });
 
       /* Laid over the finished row, and only as far as the row actually runs —
          a sheen across the empty track would draw a ghost bar the full width of
-         the chart. Inert to the pointer so it cannot steal a segment's hover. */
+         the chart. Inert to the pointer so it cannot steal a segment's hover.
+         Width is the row's ACTUAL drawn extent (`x` after the walk above),
+         not a fresh `(total / scale) * innerW` — that recomputed figure is the
+         UNclamped sum, so once any segment above was sub-2px and clamped
+         wider, the sheen fell short of the last segment's real right edge. */
       add('rect', {
-        x: padL, y, width: (total / scale) * innerW, height: barH, rx: 10,
+        x: padL, y, width: x - padL, height: barH, rx: 10,
         fill: `url(#${uid}-sheen)`, 'pointer-events': 'none',
       }, band);
     };

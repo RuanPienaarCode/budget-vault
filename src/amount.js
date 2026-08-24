@@ -61,6 +61,15 @@ function normalizeAmount(raw) {
   const bare = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, '');
   if (bare !== s) { s = bare; sign(); }
   s = s.replace(/[\s\u00A0\u202F']/g, '');
+  /* A trailing percent is a unit suffix, exactly like the currency prefix
+     stripped above, and it is dropped for the same reason. Debts.md's `Rate`
+     column reads through this function under a header literally named "Rate",
+     next to prose describing it as "the annual interest rate as a percentage"
+     \u2014 so "18.5%" is the obvious hand-edit. Without this it failed the decimal
+     test below, came back null, and was served as a rate of ZERO: no interest
+     on the Debts page, no interest in the score, and full marks for the debt
+     pillar on a quarter-million rand of debt. */
+  s = s.replace(/%$/, '');
   if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');  // decimal comma
   else s = s.replace(/,/g, '');                                                       // thousands comma
   // A bare ".50" is a real cell (some exports drop the leading zero), and it

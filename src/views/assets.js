@@ -31,7 +31,13 @@ const ASSET_TYPES = ['property', 'vehicle', 'household contents', 'jewellery',
    and badly wrong here — nobody has a house valued monthly, so a 30-day rule
    would flag every row of every vault forever, which is not a warning, it is
    noise that teaches the reader to ignore the one row that matters. A year is
-   the interval at which a valuation genuinely stops meaning anything. */
+   the interval at which a valuation genuinely stops meaning anything.
+
+   THE single source for this number. Published below via ctx.provide so any
+   other view that needs "what counts as a stale asset valuation" reads it
+   from here rather than re-declaring its own 365 — that already happened
+   once (views/savings.js's own ASSET_STALE_DAYS), and the two copies had
+   already drifted apart on which rows counted before anyone noticed. */
 const VALUED_STALE_DAYS = 365;
 
 module.exports = function registerAssets(ctx) {
@@ -39,12 +45,35 @@ module.exports = function registerAssets(ctx) {
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('assetsDirty', '#assetSave');
 
-  /* Never valued, or valued so long ago the figure is a memory. Same shape as
-     reconcile's isStale, on the longer clock above. */
-  const isUnvalued = a => {
+  /* Two different claims, kept apart, because conflating them says a page
+     knows something it does not:
+
+     - dateUnreadable: daysSince() came back null, which covers BOTH a
+       genuinely blank Valued cell AND one it could not parse — the golden
+       fixture's "when we bought it" is a real example, and it is a row this
+       page cannot date at all.
+     - isStaleValuation: daysSince() read a real date, and it is over a year
+       old — a fact this page CAN state.
+
+     Before this split, "over a year old" was asserted about both, which
+     means a row this page has no date for at all was told to its face that
+     its figure is a specific kind of old. valuedAge() below already made
+     this distinction for the per-row caption ("never valued" vs no caption);
+     the KPI tile and the caveat under it did not. */
+  const dateUnreadable = a => daysSince(a.valued) === null;
+  const neverValued = a => !a.valued;
+  const isStaleValuation = a => {
     const d = daysSince(a.valued);
-    return d === null || d > VALUED_STALE_DAYS;
+    return d !== null && d > VALUED_STALE_DAYS;
   };
+  /* "Not current" for the KPI tile and the row's age styling: never valued,
+     unreadable, or valued so long ago the figure is a memory. Same shape as
+     reconcile's isStale, on the longer clock above. Named for what it MEANS
+     to the reader (needs a fresh number) rather than for the predicate shape,
+     because the KPI used to be labelled "Unvalued" while counting rows that
+     plainly HAVE a value — a house priced 400 days ago read as "Unvalued 1"
+     next to its own price. */
+  const needsRevaluation = a => dateUnreadable(a) || isStaleValuation(a);
 
   /* "3 years ago" rather than "1104 days ago". Days are the right unit for an
      account balance and the wrong one here — the whole point of the line is
@@ -56,7 +85,11 @@ module.exports = function registerAssets(ctx) {
     if (d < 31) return d <= 1 ? 'valued today' : `valued ${d} days ago`;
     const months = Math.round(d / 30.44);
     if (months < 18) return `valued ${months} month${months === 1 ? '' : 's'} ago`;
-    const years = Math.round(d / 365.25);
+    // Floor, not round: rounding jumped from "1 year ago" to "2 years ago" in
+    // a single day at the 18-month gate above (Math.round(547/365.25) = 1,
+    // Math.round(548/365.25) = 2), overstating a valuation's age by up to six
+    // months right at the boundary the caption exists to communicate.
+    const years = Math.floor(d / 365.25);
     return `valued ${years} year${years === 1 ? '' : 's'} ago`;
   }
 
@@ -70,36 +103,59 @@ module.exports = function registerAssets(ctx) {
     /* Seeded from the first row rather than from null. `a.value > (b?.value||0)`
        never advances past null when every value is 0, so a household that has
        listed the house, the car and the ring but priced none of them yet — a
-       state this page explicitly expects, and the one the Unvalued tile beside
-       this is about — read "Largest: —" as though it owned nothing. */
+       state this page explicitly expects, and the one the tile beside this is
+       about — read "Largest: —" as though it owned nothing. */
     const biggest = S.assets.length
       ? S.assets.reduce((b, a) => (a.value > b.value ? a : b))
       : null;
-    const unvalued = S.assets.filter(isUnvalued).length;
+    const revaluationCount = S.assets.filter(needsRevaluation).length;
 
     const tile = kpiTiles($('#assetKpis'));
     tile('Total value', money(total), total > 0 ? 'text-success' : '');
     tile('Items', String(S.assets.length));
     tile('Largest', biggest ? money(biggest.value, 0) : '—', '', biggest ? biggest.name : null);
-    tile('Unvalued', String(unvalued), unvalued > 0 ? 'text-warning' : '',
-      unvalued > 0 ? 'not valued in the last year' : 'every value is current');
+    // Labelled by what it means to do about it, not by the predicate shape —
+    // this used to read "Unvalued" while counting rows that plainly HAVE a
+    // value (a house priced 400 days ago), which reads as though the app
+    // lost the reader's own figures.
+    tile('Needs a new valuation', String(revaluationCount), revaluationCount > 0 ? 'text-warning' : '',
+      revaluationCount > 0 ? 'not valued in the last year' : 'every value is current');
   }
 
   /* The caveat under the tiles, for the same reason Savings carries one: a
      total this large built from figures the reader typed once should not be
-     printed as though it were measured this morning. */
+     printed as though it were measured this morning.
+
+     Two sentences, not one, because they assert two different things: "over
+     a year old" is provable from a parsed date, and "never valued or the
+     date can't be read" is the honest thing to say about a row this page has
+     no date for at all. Folding both into one "over a year old" claim is
+     exactly the bug fix 6 closes. */
   function renderAssetStale() {
     const wrap = $('#assetStale'); wrap.empty();
-    const stale = S.assets.filter(isUnvalued);
-    if (!stale.length) return;
-    const all = stale.length === S.assets.length;
-    const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
-    const subject = all
-      ? (S.assets.length === 1 ? 'This value is' : 'Every value here is')
-      : `${stale.length} of ${S.assets.length} values are`;
-    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${subject} over a year old` +
-      (share > 0.5 ? ` — and that is ${Math.round(share * 100)}% of the total.` : '.')));
+    const stale = S.assets.filter(isStaleValuation);
+    const unreadable = S.assets.filter(dateUnreadable);
+    if (!stale.length && !unreadable.length) return;
+
+    const bits = [];
+    if (stale.length) {
+      const all = stale.length === S.assets.length;
+      const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
+      const subject = all
+        ? (S.assets.length === 1 ? 'This value is' : 'Every value here is')
+        : `${stale.length} of ${S.assets.length} values are`;
+      bits.push(`${subject} over a year old` +
+        (share > 0.5 ? ` — ${Math.round(share * 100)}% of the total` : ''));
+    }
+    if (unreadable.length) {
+      const never = unreadable.filter(neverValued).length;
+      const unreadableDate = unreadable.length - never;
+      bits.push([
+        never ? `${never} ${never === 1 ? 'has' : 'have'} never been valued` : null,
+        unreadableDate ? `${unreadableDate} ${unreadableDate === 1 ? 'has' : 'have'} a Valued date this page can't read` : null,
+      ].filter(Boolean).join(', and '));
+    }
+    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']), `${bits.join('. ')}.`));
   }
 
   function renderAssets(focusRow) {
@@ -120,27 +176,41 @@ module.exports = function registerAssets(ctx) {
         const age = valuedAge(a);
         body.append(el('tr', {},
           el('td', { style: 'font-weight:600' }, a.name, ctx.noteButton('asset', a.name),
-            ...(age ? [el('div', { class: `asset-age${isUnvalued(a) ? ' asset-age-old' : ''}` }, age)] : [])),
+            ...(age ? [el('div', { class: `asset-age${needsRevaluation(a) ? ' asset-age-old' : ''}` }, age)] : [])),
           // A kind that no longer appears in the preset list (a hand-edited
           // Assets.md, or a list trimmed between versions) keeps an option of
           // its own — without it the select silently rewrites the file's own
           // value to whichever preset happens to be first.
           el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Kind of ${a.name}`,
-            onchange: e => { a.type = e.target.value; mark(); renderAssets(); } },
+            // focusRow: rebuilding the table drops focus to <body> otherwise —
+            // see the restore block below. Same fix as Owed Money and Debt.
+            onchange: e => { a.type = e.target.value; mark(); renderAssets(S.assets.indexOf(a)); } },
             ...(a.type && !ASSET_TYPES.includes(a.type)
               ? [el('option', { value: a.type, selected: '' }, a.type)] : []),
             ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, k)))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
             class: 'form-control form-control-sm', value: a.value || '',
             'aria-label': `Value of ${a.name}`,
-            onchange: e => { a.value = Math.max(0, parseFloat(e.target.value) || 0); mark(); renderAssetKpis(); } })),
+            // Routed through normalizeAmount, matching addAsset — an invalid
+            // cell (an SA-locale phone's numeric keypad writes "15 000 000,00"
+            // into a plain number input, which the browser reports as an
+            // empty string) used to fall through `parseFloat('') || 0` and
+            // silently ZERO a real value with no toast, dropping net worth on
+            // every page that reads it. Left untouched on a bad parse, and the
+            // row is redrawn so the field shows the real stored value instead
+            // of the invalid text still sitting in it.
+            onchange: e => {
+              const value = normalizeAmount(e.target.value);
+              if (value === null) { toast('Value must be a number', true); renderAssets(); return; }
+              a.value = Math.max(0, value); mark(); renderAssetKpis();
+            } })),
           /* Editing the value does NOT stamp this date. A valuation is a
              separate act from correcting a typo, and stamping today on every
              keystroke would make the staleness column agree with itself
              forever while meaning nothing. */
           el('td', {}, dateInput(a.valued, { class: 'form-control form-control-sm',
             'aria-label': `Date ${a.name} was valued` },
-            v => { a.valued = v; mark(); renderAssets(); })),
+            v => { a.valued = v; mark(); renderAssets(S.assets.indexOf(a)); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm',
             value: a.notes, 'aria-label': `Notes for ${a.name}`,
             onchange: e => { a.notes = e.target.value; mark(); } })),
@@ -149,8 +219,9 @@ module.exports = function registerAssets(ctx) {
       }
       if (!S.assets.length) {
         body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' },
-          'Nothing listed yet. Add the house, the car, the contents, anything with a ' +
-          'resale value — net worth counts what you owe on them either way.')));
+          'Nothing listed yet. Add the house, the car, the contents — anything with a ' +
+          'resale value. If a bond or a loan is already on the Debt page, listing what it ' +
+          'bought here is what balances it in net worth, rather than only the amount owed.')));
       }
       t.append(body);
     });

@@ -49,6 +49,10 @@ module.exports = function registerScore(ctx) {
     const snap = healthSnapshot();
     const { metrics: M, breakdown, target, earmarks } = snap;
     const debtsRecorded = snap.debtsRecorded;
+    /* Debts listed, but not one of them states a rate — so the debt pillar can
+       only be standing on its instalments, and "Nothing is lost to interest"
+       would be a claim about a figure nobody supplied. */
+    const debtRateUnknown = debtsRecorded && snap.debtInterest === null;
 
     /* No score at all: a vault too new to average anything. It gets an
        explanation of what the page will show once there is history, not an
@@ -69,7 +73,7 @@ module.exports = function registerScore(ctx) {
     }
 
     renderHero(hero, breakdown, M, target, earmarks);
-    renderGood(good, breakdown, debtsRecorded);
+    renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
   }
 
@@ -434,9 +438,13 @@ module.exports = function registerScore(ctx) {
   }
 
   /* ---------------------------- what is going well ----------------------- */
-  function renderGood(good, breakdown, debtsRecorded) {
+  function renderGood(good, breakdown, debtsRecorded, debtRateUnknown) {
     const card = $('#scoreGoodCard');
-    const strong = breakdown.pillars.filter(p => p.at >= GOOD_ENOUGH);
+    /* Best first. These arrive sorted by biggest shortfall, which is right for
+       renderWork below and backwards here — it sank the pillars carrying the
+       full-marks crown to the bottom of the celebration card. */
+    const strong = breakdown.pillars.filter(p => p.at >= GOOD_ENOUGH)
+      .slice().sort((a, b) => b.at - a.at || b.max - a.max);
     card.classList.toggle('hidden', !strong.length);
     if (!strong.length) { return; }
 
@@ -463,7 +471,9 @@ module.exports = function registerScore(ctx) {
              than an achievement. Where nothing is recorded it says so, instead
              of congratulating a household on a fact the vault never saw. */
           el('div', { class: 'score-win-say' },
-            i18n.t(p.key === 'debt' && !debtsRecorded ? 'score.win.debtNone' : `score.win.${p.key}`)),
+            i18n.t(p.key === 'debt' && !debtsRecorded ? 'score.win.debtNone'
+              : p.key === 'debt' && debtRateUnknown ? 'score.win.debtNoRate'
+                : `score.win.${p.key}`)),
           el('div', { class: 'score-win-pts num' },
             i18n.t('dash.health.why.points', { points: p.shownPoints, max: p.shownMax })))));
     }
@@ -516,6 +526,36 @@ module.exports = function registerScore(ctx) {
          below. Two different jobs; one key name serving both was a collision
          waiting to print the wrong sentence in one of the two places. */
       row.append(el('p', { class: 'score-gap-how' }, i18n.t(`score.guide.${p.key}`)));
+
+      /* The one page whose entire purpose is "what would move it most" used
+         to hand out instructions with nowhere to act on them — the reserves
+         guide above literally says "on the Accounts page" without a way to
+         get there. Every gap names a page that can actually change the
+         figure, wired through the same ctx.switchView every other
+         cross-page jump in this app already uses (compare the Dashboard's
+         health-fig-btn). `saving` and `reserves` both land on Accounts —
+         funding the fund and starting a saving habit are the same first
+         action, opening or marking an account — `debt` on Debts, `spending`
+         on Services (subscriptions and debit orders are what the guide text
+         actually points at), `wealth` on Savings, where net worth's own
+         moving parts live. */
+      const GAP_DESTS = { reserves: 'accounts', saving: 'accounts', debt: 'debts', spending: 'services', wealth: 'savings' };
+      const dest = GAP_DESTS[p.key];
+      if (dest) {
+        /* TODO(i18n): ideally `score.gap.goto` = "Go to {page}" — one string
+           reused across all five rows with the destination's own `nav.*`
+           label interpolated in — but that key does not exist yet and this
+           lane cannot add one (tests/i18n.test.cjs enforces key parity
+           across all 7 languages, so a key added to en.js alone goes RED).
+           Reusing the destination's own already-translated `nav.*` label
+           gets a real button into every language today rather than shipping
+           an untranslated one; whoever owns src/lang/*.js can add the
+           richer phrasing and swap this one line later. */
+        row.append(el('button', {
+          type: 'button', class: 'btn-ghost btn-ghost-sm score-gap-go',
+          onclick: () => ctx.switchView(dest),
+        }, i18n.t(`nav.${dest}`)));
+      }
       work.append(row);
     }
   }
@@ -732,9 +772,29 @@ module.exports = function registerScore(ctx) {
     const H = allZero ? PAD_T + PAD_B + rows.length * ROW_H : 280;
     const innerH = H - PAD_T - PAD_B - GAP * (rows.length - 1);
 
+    /* Proportion the plot against what the bands ACTUALLY come to, not a hard
+       100. They are percentages of income, and in any overspent period they
+       sum past it — a state this app supports and argues about elsewhere via
+       periodDeficit. Dividing by 100 regardless walked `y` straight out of the
+       viewBox: at a 124% sum a real R5 000 saving band, its name and its
+       amount all laid out below y=280 and were clipped away entirely, so the
+       reader saw three bands where there were four. The printed percentages
+       stay exactly as money-flow reported them; only the geometry is scaled. */
+    const pctSum = rows.reduce((s, r) => s + Math.max(0, r.pct), 0);
+    const pctSpan = Math.max(100, pctSum);
+
     let y = PAD_T;
     const laid = rows.map(r => {
-      const h = allZero ? 0 : Math.max(0, (r.pct / 100) * innerH);
+      let h = allZero ? 0 : Math.max(0, (r.pct / pctSpan) * innerH);
+      /* A real band under ~1.3% of income (3 of this plot's 228 usable units)
+         rounds to under 3px tall and used to fall into the "measured, and it
+         was nothing" hairline below purely on pixel count — R700 of R60,000
+         saved rendered as the exact same zero line as R0 saved, with "R700 ·
+         1%" printed beside it. `r.h < 3` was a rendering threshold standing
+         in for a zero test it never actually performed. A genuinely non-zero
+         band gets a 3-unit floor instead, so it still reads as a sliver
+         rather than vanishing into the hairline meant for a true zero. */
+      if (h > 0 && h < 3) { h = 3; }
       const top = y, bottom = y + h;
       y = allZero ? top + ROW_H : bottom + GAP;
       return { ...r, top, bottom, h };
@@ -768,8 +828,17 @@ module.exports = function registerScore(ctx) {
          implies a rand went somewhere it didn't — the same argument applies
          to any of the four bands reading exactly zero, not only saving. A
          hairline says "measured, and it was nothing" where an absent band
-         would just look like a rendering bug. */
-      if (r.h < 3) {
+         would just look like a rendering bug.
+
+         Gated on the AMOUNT, not on the pixel height `r.h < 3` used to test:
+         that was a rendering threshold wearing a zero test's job, and it
+         fired for any band under ~1.3% of income — a real R700 of R60,000
+         saved drew the exact same hairline as R0 saved, tagged `.is-zero`
+         beside it. `buildFlowMobile` already gates its own zero row this
+         way; this brings the desktop tree into line with it. A genuinely
+         small but non-zero band still gets its 3-unit floor from the `laid`
+         mapping above, so it renders as a sliver rather than a hairline. */
+      if (Math.abs(r.amount) < 0.005) {
         const midY = (r.top + r.bottom) / 2;
         add('line', { x1: RIB_X0, x2: DEST_X + DEST_W, y1: midY, y2: midY, class: 'score-flow-zero' });
         add('text', { x: LABEL_X, y: midY + 4, class: 'score-flow-name' }).textContent = r.name;
@@ -794,6 +863,11 @@ module.exports = function registerScore(ctx) {
      about a band's figure is re-derived for the narrow layout. */
   function buildFlowMobile(rows) {
     const wrap = el('div', { class: 'score-flow-mobile' });
+    /* Same span the Sankey lays out against, for the same reason: a band over
+       100% of income would otherwise be given a width wider than its own
+       track. Scaled, not clamped — clamping would draw two different
+       overspends at an identical full width. */
+    const pctSpan = Math.max(100, rows.reduce((s, r) => s + Math.max(0, r.pct), 0));
     for (const r of rows) {
       const zero = Math.abs(r.amount) < 0.005;
       const row = el('div', { class: `score-flow-m-row${zero ? ' is-zero' : ''}` });
@@ -802,7 +876,7 @@ module.exports = function registerScore(ctx) {
         el('span', { class: 'score-flow-m-amt num' }, money(r.amount, 0))));
       row.append(zero
         ? el('div', { class: 'score-flow-m-bar is-empty' })
-        : el('div', { class: 'score-flow-m-bar' }, el('i', { class: r.cls, style: `width:${r.pct}%` })));
+        : el('div', { class: 'score-flow-m-bar' }, el('i', { class: r.cls, style: `width:${(Math.max(0, r.pct) / pctSpan) * 100}%` })));
       row.append(el('div', { class: 'score-flow-m-sub' }, r.sub));
       wrap.append(row);
     }

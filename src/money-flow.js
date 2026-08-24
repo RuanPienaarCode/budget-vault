@@ -79,14 +79,25 @@ function periodFlow({
   const fixed = fixedCats instanceof Set ? fixedCats : new Set(fixedCats || []);
   const byCat = spendByCat || {};
 
-  let committed = 0, debtRepayments = 0, housing = 0, subscriptions = 0;
+  let committed = 0, debtRepayments = 0, housing = 0, subscriptions = 0, committedSavingsTyped = 0;
+  /* Every savings/investment-typed category's spend, fixed-flagged or not —
+     the same slice health-data.js's own `consumption` excludes for the same
+     reason (see the note there): the outgoing leg of a savings transfer is
+     an ordinary debit inside `spent`, and the incoming leg is what `saving`
+     above already counts. Tracked here rather than folded straight into
+     `living` below because `committedSavingsTyped` (the part ALSO flagged
+     fixed) has to be told apart from the rest first — see the comment on
+     `nonCommittedSavingsTyped`. */
+  let savingsTypedSpend = 0;
   for (const [cat, amt] of Object.entries(byCat)) {
+    const type = catType ? catType(cat) : null;
+    if ((type === 'savings' || type === 'investment') && amt > 0) { savingsTypedSpend += amt; }
     if (!cat || !fixed.has(cat) || !(amt > 0)) { continue; }
     committed += amt;
-    const type = catType ? catType(cat) : null;
     if (type === 'debt') { debtRepayments += amt; }
     else if (HOUSING_TYPES.has(type)) { housing += amt; }
     else if (SUBSCRIPTION_TYPES.has(type)) { subscriptions += amt; }
+    if (type === 'savings' || type === 'investment') { committedSavingsTyped += amt; }
   }
   /* A fixed-flagged category can never claim more than the period actually
      spent — a category that happened to net a refund this period must not
@@ -107,7 +118,19 @@ function periodFlow({
   const interestRaw = activeDebts(debts).reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
   const interest = Math.min(interestRaw, debtRepayments);
 
-  const living = Math.max(0, spent - committed);
+  /* `living` used to be `spent - committed`, and `spent` (periodSummary's own
+     total) INCLUDES savings-typed spend — the outgoing leg of a category
+     categorised `savings`. The same rand's incoming leg is what `saving`
+     above already counts (splitFlows on the RECEIVING account), so a
+     household moving R10,000 into a savings-typed category read as R10,000
+     of extra living AND R10,000 of saving — two of the four bands wrong by
+     the same amount. Subtracted here the way health-data.js's own
+     `consumption` already excludes it, MINUS whatever of it is already
+     flagged fixed: that portion already left `spent` via `committed` above,
+     so subtracting the full `savingsTypedSpend` a second time would pull the
+     same rand out of `living` twice. */
+  const nonCommittedSavingsTyped = Math.max(0, savingsTypedSpend - committedSavingsTyped);
+  const living = Math.max(0, spent - committed - nonCommittedSavingsTyped);
   const notYetSpent = Math.max(0, inc - committed - living - saving);
 
   /* THE TWO LEFTS. Genuinely different questions, both real:
@@ -135,9 +158,21 @@ function periodFlow({
   const allocatedOfIncome = inc > 0 ? bud / inc : null;
   const budgetUsed = bud > 0 ? spent / bud : null;
 
+  /* Percentages OF INCOME — which in a deficit period legitimately come to
+     more than 100: living costs really can be 180% of what came in, and
+     saying so is the point of this card. Largest-remainder only means
+     something while the parts share one whole; past that there is no whole to
+     allocate, `left` in share-percents goes NEGATIVE and its top-up loop
+     silently never runs, so it returns bare floors summing to anything. So
+     the allocation is used only where it applies, and beyond it each band is
+     rounded on its own — still honest, just no longer claiming to partition
+     100. Anything laying these out as proportions must scale by their own sum
+     rather than by a hard 100; views/score.js does, and used to not. */
   const bandAmounts = [committed, living, saving, notYetSpent];
+  const rawPercents = bandAmounts.map(a => (a / inc) * 100);
+  const rawSum = rawPercents.reduce((s, v) => s + v, 0);
   const bandPercents = inc > 0
-    ? largestRemainder(bandAmounts.map(a => (a / inc) * 100), 100)
+    ? (rawSum <= 100 ? largestRemainder(rawPercents, 100) : rawPercents.map(v => Math.round(v)))
     : bandAmounts.map(() => 0);
 
   return {

@@ -425,6 +425,18 @@ class OnboardingWizard extends Modal {
          alongside the wizard while answering. */
       await this.adoptFolder(this.data.folder);
     }
+    /* Zero categories scaffolds a folder the app cannot then recognise as its
+       own: connectVault gates on `!S.categories.length && !txFiles`, so the
+       reader got "Budget folder created — welcome!" and, one second later, an
+       error card reading "Looked in Finances/Budget but found no Categories/
+       or Transactions/ inside it" — which is not even true. The folder WAS
+       found and Categories/ does exist; it is merely empty. Adding an account
+       does not rescue it either, because its transactions folder is created
+       empty too. Caught here, the way firstBudget catches five blank lines,
+       and naming the way out rather than only the problem. */
+    if (step === 'categories' && !this.data.cats.size) {
+      this.fail(i18n.t('wiz.err.catsEmpty')); return;
+    }
     if (step === 'firstBudget') {
       if (this.firstBudgetInvalid()) { this.fail(i18n.t('wiz.err.amount')); return; }
       /* Five blank lines is not a first budget, and the celebration that
@@ -1359,6 +1371,20 @@ class OnboardingWizard extends Modal {
       this.close();
       new Notice(i18n.t(this.mode === 'connect' ? 'wiz.done.connected' : 'wiz.done.created'));
       p.reloadViews();
+      /* Land a freshly-created CSV vault on Budgets, not the Dashboard. The
+         manual path already ends somewhere with something on it — it wrote
+         real budget rows and gets a celebration screen — but the CSV path is
+         the DEFAULT, and it finished on a hero reading R0,00, three zero tiles
+         and three empty states, thirty seconds after being told to "give your
+         categories an amount on the Budgets page". Budgets is already seeded
+         with every category the reader just picked, so it is the one screen
+         where the setup they just did is visible. */
+      /* Guarded, and deliberately not awaited into the failure path: where the
+         reader LANDS is a courtesy, and a courtesy must never be able to
+         report a completed setup as "Setup failed". */
+      if (this.mode === 'create' && !this.isManual() && typeof p.forEachView === 'function') {
+        try { p.forEachView(ctl => ctl.parkView && ctl.parkView('budgets')); } catch (_) { /* land wherever */ }
+      }
       await p.activateView();
     } catch (e) {
       new Notice(i18n.t('wiz.failed', { error: e.message || e }), 8000);

@@ -165,8 +165,20 @@ const rowsIn = (S, key) => S.txFiles[key].rows.length;
   eq(rowsIn(S, 'Cheque/2026-07'), 5,
     'and its rows stay countable: an orphan folder still contributes to period totals');
   const asked = seen.fields[seen.fields.length - 1];
-  ok(/6/.test(asked.fields[0].desc), 'the folder question stated the row count (6 across both months)');
+  /* 4, not 6: the fixture's July file holds 5 RAW rows, but two of them are
+     the `part` halves of the R900 "Big shop" split, and the bank never
+     printed those — it printed the one `parent` line, which stays counted.
+     6 raw rows (5 in July + 1 in August) - 2 split parts = 4 transactions,
+     matching what acct.delete.folderDesc actually says: "transactions", not
+     "rows". Counting parts here is the bug isSplitPart was added to fix — see
+     the comment above the `rows` line in deleteAccount. */
+  ok(/4/.test(asked.fields[0].desc), 'the folder question stated the transaction count (4, not the 6 raw rows)');
   ok(/2/.test(asked.fields[0].desc), 'and the number of monthly files');
+  /* Negative control: pin the exclusion the other way too, so a regression
+     that goes back to counting raw rows (6) fails here even if a future
+     edit to the fixture happened to make 6 match some OTHER substring. */
+  ok(!/\b6\b/.test(asked.fields[0].desc),
+    'and specifically does NOT count the two split parts as separate transactions');
 }
 
 /* ---- 5. an account, folder and all ---- */

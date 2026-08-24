@@ -18,7 +18,7 @@
 */
 
 const assert = require('assert');
-const { symbolOf, isForeign, currenciesIn } = require('../src/currency');
+const { symbolOf, isForeign, currenciesIn, formatAmount } = require('../src/currency');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -80,11 +80,21 @@ const acct = (name, currency) => ({ name, currency });
 
    There is no arithmetic in this module at all — no rate, no filter, no
    "household only" list. That absence is the design, so it is asserted
-   directly: anything added here later has to justify itself against this. ---- */
+   directly: anything added here later has to justify itself against this.
+
+   formatAmount joined the API to fix a real bug, not to grow this module's
+   remit: locale.js's tax-callout formatter (fmtAmt) used to re-derive its own
+   thousands/decimal/sign logic and drift from controller.js's money() on
+   three axes — the country's default symbol instead of the household's, the
+   sign outside the symbol instead of after it, and no guard against
+   non-finite input ("RNaN"). It is still read-only display formatting: given
+   a symbol, an amount and separators, it returns a string — nothing here
+   decides WHAT the amount is or whether an account counts, which is the line
+   this test protects. ---- */
 {
   const api = Object.keys(require('../src/currency')).sort();
-  eq(api, ['currenciesIn', 'isForeign', 'symbolOf'],
-    'three read-only helpers — no convert(), no exclude(), no rate table');
+  eq(api, ['currenciesIn', 'formatAmount', 'isForeign', 'symbolOf'],
+    'four read-only helpers — no convert(), no exclude(), no rate table');
 }
 
 /* ---- 8. degenerate input, because the loader hands this real files ---- */
@@ -92,6 +102,21 @@ const acct = (name, currency) => ({ name, currency });
   eq(currenciesIn(null, 'R'), [], 'no accounts, no symbols');
   eq(currenciesIn([], ''), [], 'and an empty household symbol does not crash');
   eq(symbolOf(null, ''), 'R', 'the last-resort fallback matches the loader default');
+}
+
+/* ---- 9. formatAmount — the shared rules a display formatter must follow.
+   Pinned against controller.js's formatMoney (tests/controller-money.test.cjs
+   covers that one directly): symbol, a space, sign, digits — never sign
+   before symbol, never no space, never a raw NaN/Infinity reaching a reader
+   as if it were a real total. ---- */
+{
+  const loc = { thousands: ' ', decimal: ',' };
+  eq(formatAmount('R', 1234.5, 2, loc), 'R 1 234,50', 'symbol, space, thousands, decimal');
+  eq(formatAmount('R', -1234.5, 2, loc), 'R -1 234,50', 'sign sits AFTER the symbol, not before it');
+  eq(formatAmount('R', NaN, 2, loc), 'R 0,00', 'non-finite input renders as zero, never "RNaN"');
+  eq(formatAmount('R', Infinity, 2, loc), 'R 0,00', 'and never "RInfinity"');
+  eq(formatAmount('$', 40000, 2, { thousands: ',', decimal: '.' }), '$ 40,000.00',
+    'a different locale profile\'s own separators are used, not South Africa\'s');
 }
 
 console.log(`PASS tests/currency.test.cjs (${checks} checks)`);

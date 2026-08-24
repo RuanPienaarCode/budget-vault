@@ -21,7 +21,7 @@ const { ISO_DATE, isoDayNumber } = require('../dates');
 const i18n = require('../i18n');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit, catType, currentPeriod } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -78,9 +78,28 @@ module.exports = function registerBudgets(ctx) {
      records, so it is inferred from the spacing of its siblings and comes back
      null when there is only one. periodRange is NOT asked about a date key —
      under a monthly setting it would read '2026-08-07' as August and answer
-     with a month. */
-  function strandedPeriodDays(key, others) {
-    if (ISO_DATE.test(key)) return inferIntervalFromKeys(others);
+     with a month.
+
+     `allKeys` used to be otherShapeBudgets() — the STRANDED subset alone. That
+     is exactly the wrong set to infer FROM: it holds, by construction, only
+     the keys the current settings cannot address, so on a 7→14 switch its
+     survivors are already 14 days apart, and inferIntervalFromKeys read that
+     back as "the old cycle was 14" — the new length, dressed up as the old
+     one. Every ISO-named key the vault holds (phase-valid ones included) is
+     the honest population to measure spacing over.
+
+     Even over the full population, a gap that lands exactly on `dstDays` is
+     indistinguishable from a real old cycle that coincidentally matches the
+     new one — and on a vault with too few date-named files either side of the
+     switch, the survivors ARE the whole population, so the same collision can
+     still occur. Rather than let that collision silently re-emit a factor of
+     1 flagged `scaled: true`, it comes back null: unknown is the honest
+     answer once the two lengths cannot be told apart. */
+  function strandedPeriodDays(key, allKeys, dstDays) {
+    if (ISO_DATE.test(key)) {
+      const inferred = inferIntervalFromKeys(allKeys);
+      return (inferred !== null && inferred === dstDays) ? null : inferred;
+    }
     const r = periodRange(key);
     return isoDayNumber(r.end) - isoDayNumber(r.start) + 1;
   }
@@ -95,10 +114,14 @@ module.exports = function registerBudgets(ctx) {
     const draft = budgetDraft();
     const existingByCategory = {};
     for (const d of draft) if (d.amount) existingByCategory[d.category] = d.amount;
+    const dstDays = currentPeriodDays();
     const plan = resliceBudget({
       rows: src,
-      oldDays: strandedPeriodDays(key, otherShapeBudgets()),
-      dstDays: currentPeriodDays(),
+      // Every ISO-named key S.budgets holds, not just the stranded subset —
+      // see strandedPeriodDays above for why the stranded-only set could
+      // never tell the old cycle apart from the new one.
+      oldDays: strandedPeriodDays(key, Object.keys(S.budgets), dstDays),
+      dstDays,
       existingByCategory,
     });
     const accepted = await askBudgetReslice(app, plan, { money, sourceLabel: key });
@@ -196,13 +219,48 @@ module.exports = function registerBudgets(ctx) {
   function budgetTotalsStrip() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    let income = 0, budgeted = 0, assumed = 0;
+    let income = 0, budgeted = 0, assumed = 0, namedNetSpend = 0, hasIncomeRow = false;
     for (const d of draft) {
-      if (d.type === 'income') income += d.amount || 0;
-      else if (d.type !== 'transfer') {
-        budgeted += d.amount || 0;
-        if (catAssumeSpent(d.category)) assumed += d.amount || 0;
+      /* The row's own stored Type cell (d.type, the Type column read out of
+         Budgets/<period>.md) versus the category's CURRENT type (catType).
+         There is no re-type UI — editing the category file is the supported
+         correction — so a save writes the stale cell straight back and it is
+         permanently wrong until then. catType is the live answer; d.type is
+         kept only as the fallback for a category with no file to ask, which
+         is exactly what `?? ` (not `||`) buys: catType returns null for that
+         case and the row's own amount for income can legitimately be 0. */
+      const type = catType(d.category) ?? d.type;
+      if (type === 'income') {
+        income += d.amount || 0;
+        // d.inFile, not "this row exists" — budgetDraft() seeds a ZERO row
+        // for every category the vault has, income-typed ones included, so
+        // "exists" is true on nearly every vault regardless of whether income
+        // was ever actually budgeted for THIS period. inFile is true only for
+        // a row that came from the saved file (or was deliberately touched
+        // this session) — an income category that has never been asked about
+        // in this period's file must not silently stand in for one that was.
+        if (d.inFile) hasIncomeRow = true;
+        continue;
       }
+      if (type === 'transfer') continue;
+      budgeted += d.amount || 0;
+      /* Real spend already inside sum.spend for THIS category — periodSummary
+         doesn't know an assume-spent flag exists, but it knows every real
+         transaction, including one in a category the flag was turned on for.
+         The overlay below used to add the WHOLE budgeted amount on top of
+         that, regardless: a category with real spend double-counted its own
+         money (R4 000 budget, R3 000 real spend, flag on -> read R7 000, 175%
+         used, on R3 000 that actually moved). The overlay is only the
+         SHORTFALL beyond what already happened — clamped to zero so a
+         category the assumption undershot never goes negative and pulls the
+         total down. */
+      const raw = sum.byCat[d.category] || 0;
+      const realSpend = -raw;
+      if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - realSpend);
+      // Net per-category spend, refunds folded in — the same figure each row
+      // below reads as its own Actual. Summed here so "Total spent" (gross)
+      // can disclose exactly how it differs from the table under it.
+      namedNetSpend += Math.max(0, realSpend);
     }
     /* Assume-spent rows have no transactions to find, so periodSummary knows
        nothing about them — and "Total spent" read R1 900 low all month while
@@ -212,22 +270,70 @@ module.exports = function registerBudgets(ctx) {
     const spent = sum.spend + assumed;
     const allocPct = income > 0 ? Math.round((budgeted / income) * 100) : null;
     const usedPct = budgeted > 0 ? Math.round((spent / budgeted) * 100) : null;
+
+    /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
+       netted, uncategorised and unknown-name spend counted in full. Every row
+       below is NET per category (refunds folded in) and only exists for a
+       category this vault actually has — namedNetSpend is that same figure,
+       summed. tests/cross-page-consistency.test.cjs allows exactly this split
+       on the Dashboard because its donut's "not shown" note accounts for the
+       WHOLE gap; this tile carried no such disclosure, so it could not be
+       reconciled to the table under it. Measured against sum.spend rather
+       than derived a second way, so the note accounts for the whole
+       difference by construction — same reason renderSplit's own gapNote is
+       built this way (dashboard.js). Reuses the donut's own keys: the words
+       fit a category-netting gap regardless of which page it's disclosed on. */
+    const grossGap = Math.max(0, sum.spend - namedNetSpend);
+    const gapUncat = Math.min((sum.uncatSpend || 0) + (sum.unknown.spend || 0), grossGap);
+    const gapNetted = grossGap - gapUncat;
+    let gapNote = '';
+    if (gapUncat >= 1) gapNote += i18n.t('dash.split.uncatNote', { amount: money(gapUncat) });
+    if (gapNetted >= 1) gapNote += i18n.t('dash.split.nettedNote', { amount: money(gapNetted) });
+
     /* Income minus what's been budgeted — the number that answers "have I given
        every rand a job yet?". Negative means the plan spends more than it earns,
-       which is the one figure here that deserves red. */
-    const unallocated = income - budgeted;
+       which is the one figure here that deserves red.
+
+       Denominator problem, same shape as renderHero's incomeBase (dashboard.js):
+       with no income row at all, `income` is 0 by construction, not because
+       nothing was earned — and "budgeted beyond income" then fires against the
+       WHOLE spend budget, in red, on a vault that never named an income figure
+       to compare against. Five of this vault's eight budget files carry no
+       income row, so this is the normal case, not the corner. While the period
+       is still running there is no honest number to fall back to either — an
+       in-progress period's actual income is a part-period figure — so the tile
+       is simply omitted. Once the period is FINISHED, actual income is a whole,
+       settled figure and stands in, exactly as renderHero's incomeBase does. */
+    const noIncomeInfo = income === 0 && !hasIncomeRow;
+    const periodFinished = S.period !== currentPeriod();
+    let unallocatedTile = null;
+    if (!noIncomeInfo) {
+      const unallocated = income - budgeted;
+      unallocatedTile = {
+        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
+        over: unallocated < 0,
+        note: unallocated < 0 ? i18n.t('bud.total.overNote')
+          : (income > 0 ? i18n.t('bud.total.leftNote') : ''),
+      };
+    } else if (periodFinished) {
+      const fallbackIncome = sum.income;
+      const unallocated = fallbackIncome - budgeted;
+      unallocatedTile = {
+        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
+        over: unallocated < 0,
+        note: unallocated < 0 ? i18n.t('bud.total.overNote')
+          : (fallbackIncome > 0 ? i18n.t('bud.total.leftNote') : ''),
+      };
+    }
     return [
       { label: i18n.t('bud.total.income'), value: money(income), grad: true,
         note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },
       { label: i18n.t('bud.total.budgeted'), value: money(budgeted),
         note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
-      { label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
-        over: unallocated < 0,
-        note: unallocated < 0 ? i18n.t('bud.total.overNote')
-          : (income > 0 ? i18n.t('bud.total.leftNote') : '') },
+      ...(unallocatedTile ? [unallocatedTile] : []),
       { label: i18n.t('bud.total.spent'), value: money(spent), over: budgeted > 0 && spent > budgeted,
-        note: assumed > 0 ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
-          : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '') },
+        note: (assumed > 0 ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
+          : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '')) + gapNote },
     ];
   }
 
@@ -260,82 +366,149 @@ module.exports = function registerBudgets(ctx) {
     const body = el('tbody', {});
     const mark = () => { budDirty = true; $('#budSave').disabled = false; };
     const order = typeOrder(S.settings.groups);
-    const rows = [...draft].sort((a, b) =>
-      typeRank(a.type, order) - typeRank(b.type, order) || a.category.localeCompare(b.category));
-    let lastType = null;
-    for (const d of rows) {
-      if (d.type !== lastType) { lastType = d.type; body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, d.type))); }
-      /* An assume-spent row is its own actual: the money left in an earlier
-         period, so no transaction in THIS one will ever match it. Reading the
-         (always empty) transaction total for it is what made the row sit there
-         claiming the whole amount was still available. */
-      const assumed = catAssumeSpent(d.category);
-      const raw = sum.byCat[d.category] || 0;
-      const actual = assumed ? (d.amount || 0) : (d.type === 'income' ? raw : -raw);
-      // Never "over" while assumed — actual is the amount, so it is exactly on
-      // budget by construction and red would be meaningless.
-      const overActual = !assumed && actual > d.amount && d.amount > 0 && d.type !== 'income';
-      /* Live "remaining" line under the amount input — budget minus actual,
-         red when overspent (never red for income: earning above target is fine). */
-      const remainingEl = el('div', { class: 'bud-remaining' });
-      const updateRemaining = () => {
-        if (!d.amount) { remainingEl.textContent = ''; remainingEl.className = 'bud-remaining'; return; }
-        if (assumed) {
-          remainingEl.textContent = i18n.t('bud.remaining.assumed');
-          remainingEl.className = 'bud-remaining bud-remaining-assumed';
-          return;
-        }
-        const rem = d.amount - actual;
-        const over = rem < 0 && d.type !== 'income';
-        remainingEl.textContent = over
-          ? i18n.t('bud.remaining.over', { amount: money(-rem) })
-          : i18n.t('bud.remaining.left', { amount: money(rem) });
-        remainingEl.className = 'bud-remaining' + (over ? ' over' : '');
-      };
-      updateRemaining();
-      body.append(el('tr', {},
-        el('td', {}, d.category,
-          assumed ? el('div', { class: 'bud-assumed-tag' }, i18n.t('bud.assumed.tag')) : ''),
-        el('td', {}, typeBadge(d.type)),
-        el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
-          el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
-            'aria-label': i18n.t('bud.aria.amount', { category: d.category }), onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); updateRemaining(); renderBudgetTotals(); } }),
-          remainingEl,
-          // Only offered where it means something. On an ordinary row the
-          // figure would be written into a budget that transactions will then
-          // contradict.
-          assumed ? el('button', {
-            class: 'btn-ghost btn-ghost-sm bud-pull', type: 'button',
-            title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag }),
-            onclick: () => pullPreviousOverspend(d),
-          }, i18n.t('bud.pull.label')) : '')),
-        el('td', { class: `num${overActual ? ' text-danger' : assumed ? ' bud-actual-assumed' : ' text-muted'}`, style: 'white-space:nowrap' },
-          money(actual),
-          assumed ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : ''),
-        el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
-          'aria-label': i18n.t('bud.aria.notes', { category: d.category }), onchange: e => { d.notes = e.target.value; mark(); } })),
-        el('td', { style: 'white-space:nowrap' },
-          // Income and transfers are never "already spent" — offering the
-          // toggle there would only invite a state with no meaning.
-          d.type === 'income' || d.type === 'transfer' ? '' : el('button', {
-            class: `btn-ghost btn-ghost-sm${assumed ? ' bud-assume-on' : ''}`, type: 'button',
-            'aria-pressed': assumed ? 'true' : 'false',
-            'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
-            title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
-            onclick: () => toggleAssumeSpent(d.category, !assumed),
-          }, icoEl(['circle-check', 'check-circle', 'check'])),
-          d.inFile
-            ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
-            : '',
-          el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
-            if (await promptDeleteCategory(d.category)) {
-              const draft = budgetDraft();
-              const i = draft.indexOf(d);
-              if (i !== -1 && !d.inFile) draft.splice(i, 1);
-              renderBudgets();
-            }
-          } }, icoEl(['trash-2', 'trash'])))));
+    /* Group FIRST, then order the groups — building a Map<type, rows[]> and
+       sorting its keys by typeRank, the way src/views/services.js already
+       does. Sorting the flat row list by typeRank and emitting a bar on every
+       type change used to do the opposite: typeRank returns order.length for
+       EVERY unrecognised type, so two distinct unknown types tie and sort by
+       category name, interleaving two group bars instead of one — and a
+       blank Type cell rendered its own empty full-width bar for the same
+       reason. Grouping first means every type gets exactly one bar,
+       wherever typeRank puts it. */
+    const groups = new Map();
+    for (const d of draft) {
+      /* The row's own stored Type cell vs the category's CURRENT type — see
+         the comment in budgetTotalsStrip. Computed once per row and reused
+         for the group it lands in, the sign of its Actual, and every other
+         type-driven decision below, so all four can never disagree with each
+         other about which group this row belongs to. */
+      const type = catType(d.category) ?? d.type;
+      if (!groups.has(type)) groups.set(type, []);
+      groups.get(type).push(d);
     }
+    const sortedTypes = [...groups.keys()].sort((a, b) => typeRank(a, order) - typeRank(b, order));
+    for (const type of sortedTypes) {
+      const catRows = groups.get(type).sort((a, b) => a.category.localeCompare(b.category));
+      body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, type)));
+      for (const d of catRows) {
+        /* An assume-spent row is its own actual: the money left in an earlier
+           period, so no transaction in THIS one will ever match it — UNLESS a
+           real transaction landed in the category anyway, which the toggle's
+           own tooltip merely asserts won't happen. periodSummary counts that
+           transaction like any other, inside `raw`/`realSpend` below, so it
+           was already inside sum.spend once — reading it a second time here
+           (the row used to just read d.amount outright) is what doubled a
+           category that both transacted AND carried the flag. `actual` is now
+           whichever is bigger: the assumed amount if nothing (or less than
+           it) really moved, or the real spend if it overran the assumption —
+           the same max() the totals strip's overlay is the complement of, so
+           the two can never disagree about this category's contribution. */
+        const assumed = catAssumeSpent(d.category);
+        const raw = sum.byCat[d.category] || 0;
+        const realSpend = -raw;
+        const actual = assumed ? Math.max(d.amount || 0, realSpend) : (type === 'income' ? raw : -raw);
+        const overActual = actual > d.amount && d.amount > 0 && type !== 'income';
+        /* Live "remaining" line under the amount input — budget minus actual,
+           red when overspent (never red for income: earning above target is
+           fine). An assumed row with nothing (or less than the assumption)
+           really moved still reads the static "already spent" label — that
+           case has no real remaining line to show, by design, the whole
+           budget stands provisioned. One that overran the assumption falls
+           through to the same over/left arithmetic as an ordinary row,
+           because at that point it IS one: real money moved past what was
+           set aside for it. */
+        const remainingEl = el('div', { class: 'bud-remaining' });
+        const updateRemaining = () => {
+          if (!d.amount) {
+            /* Spend in a category nobody budgeted for used to leave this line
+               blank — the one kind of overspend this page said nothing
+               about. Mirrors dashboard.js's renderBudgetTable, which fixed
+               the same "blank reads as nothing to report" gap for the same
+               reason: three such rows on that vault came to R995 with
+               nothing on screen to say so. */
+            if (actual > 0 && type !== 'income' && !assumed) {
+              remainingEl.textContent = i18n.t('bud.remaining.over', { amount: money(actual) });
+              remainingEl.className = 'bud-remaining over';
+            } else {
+              remainingEl.textContent = ''; remainingEl.className = 'bud-remaining';
+            }
+            return;
+          }
+          if (assumed && realSpend <= d.amount) {
+            remainingEl.textContent = i18n.t('bud.remaining.assumed');
+            remainingEl.className = 'bud-remaining bud-remaining-assumed';
+            return;
+          }
+          const rem = d.amount - actual;
+          const over = rem < 0 && type !== 'income';
+          remainingEl.textContent = over
+            ? i18n.t('bud.remaining.over', { amount: money(-rem) })
+            : i18n.t('bud.remaining.left', { amount: money(rem) });
+          remainingEl.className = 'bud-remaining' + (over ? ' over' : '');
+        };
+        updateRemaining();
+        /* Actual cell — kept as element references so an amount edit can
+           update its text and class in place. It used to only refresh
+           updateRemaining() and the totals strip on the amount input's
+           onchange, leaving this cell (which for an assume-spent row IS a
+           function of the amount, via the max() above) showing the FIGURE
+           the row had before the edit while the totals below had already
+           moved on. A full row re-render is simplest and safe here — onchange
+           fires on blur, not per keystroke, so it never fights the user's
+           typing. */
+        const actualTd = el('td', { class: `num${overActual ? ' text-danger' : assumed ? ' bud-actual-assumed' : ' text-muted'}`, style: 'white-space:nowrap' },
+          money(actual),
+          assumed && realSpend <= 0 ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : '');
+        body.append(el('tr', {},
+          el('td', {}, d.category,
+            assumed ? el('div', { class: 'bud-assumed-tag' }, i18n.t('bud.assumed.tag')) : ''),
+          // Deliberately the RAW stored cell, not `type` — this is the one
+          // place on the row that shows what the file actually says, so a
+          // mismatch against the group this row landed in (computed from
+          // catType) is the visible signal that the file's Type cell is
+          // stale and the category file is where to fix it.
+          el('td', {}, typeBadge(d.type)),
+          el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
+            el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
+              'aria-label': i18n.t('bud.aria.amount', { category: d.category }), onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); renderBudgets(); } }),
+            remainingEl,
+            // Only offered where it means something. On an ordinary row the
+            // figure would be written into a budget that transactions will then
+            // contradict.
+            assumed ? el('button', {
+              class: 'btn-ghost btn-ghost-sm bud-pull', type: 'button',
+              title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag }),
+              onclick: () => pullPreviousOverspend(d),
+            }, i18n.t('bud.pull.label')) : '')),
+          actualTd,
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
+            'aria-label': i18n.t('bud.aria.notes', { category: d.category }), onchange: e => { d.notes = e.target.value; mark(); } })),
+          el('td', { style: 'white-space:nowrap' },
+            // Income and transfers are never "already spent" — offering the
+            // toggle there would only invite a state with no meaning.
+            type === 'income' || type === 'transfer' ? '' : el('button', {
+              class: `btn-ghost btn-ghost-sm${assumed ? ' bud-assume-on' : ''}`, type: 'button',
+              'aria-pressed': assumed ? 'true' : 'false',
+              'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
+              title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
+              onclick: () => toggleAssumeSpent(d.category, !assumed),
+            }, icoEl(['circle-check', 'check-circle', 'check'])),
+            d.inFile
+              ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
+              : '',
+            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
+              if (await promptDeleteCategory(d.category)) {
+                const draft = budgetDraft();
+                const i = draft.indexOf(d);
+                if (i !== -1 && !d.inFile) draft.splice(i, 1);
+                renderBudgets();
+              }
+            } }, icoEl(['trash-2', 'trash'])))));
+      }
+    }
+    // Mirrors dashboard.js's renderBudgetTable: a vault with no categories at
+    // all used to leave a header bar sitting over an empty <tbody>.
+    if (!draft.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
     renderBudgetTotals();
   }
@@ -482,5 +655,9 @@ module.exports = function registerBudgets(ctx) {
   }
 
   ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty,
-    otherShapeBudgets, carryStructure });
+    otherShapeBudgets, carryStructure,
+    // Exposed the same way otherShapeBudgets and carryStructure already are —
+    // a pure-ish helper (periodRange aside) worth pinning directly in a bare
+    // node test rather than only reachable through the reslice modal's DOM.
+    strandedPeriodDays });
 };

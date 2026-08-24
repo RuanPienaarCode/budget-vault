@@ -5,7 +5,7 @@
 const { el } = require('./dom');
 const { parseFrontmatter, yamlStr } = require('./markdown');
 const { csvCell } = require('./csv');
-const { learnPattern, prepareRules, autoCategorise } = require('./rules');
+const { learnPattern, prepareRules, autoCategorise, matchRule } = require('./rules');
 const { safeSeg } = require('./vault-path');
 const { typeOrder, typeRank } = require('./groups');
 const { todayIso } = require('./dates');
@@ -230,6 +230,49 @@ module.exports = function registerCategories(ctx) {
     return added;
   }
 
+  /* The rule CURRENTLY governing a description — the same winning rule
+     matchRule would hand autoCategorise, but with the ORIGINAL S.rules entry
+     (case preserved, and the actual object, not a copy) rather than the
+     lowercased one prepareRules builds for matching. Re-deriving that by hand
+     from the lowercased pattern would be a second implementation of
+     matchRule's own tie-break (exact match wins outright, else the longest
+     substring) — this repo's own recurring bug shape is exactly two figures
+     that were supposed to agree and were derived by different rules, so this
+     reuses matchRule and only recovers the original object afterwards.
+
+     Returns null when nothing governs the description yet — a brand new
+     merchant, or a description too short for learnPattern to have kept
+     anything meaningful.
+
+     Exposed so the Transactions page can offer to fix the rule ITSELF when a
+     recategorisation disagrees with it, instead of learning a second rule
+     that could only ever mask the first (learnRules' own have.has guard,
+     just above, is what makes that masking possible — a rule is never
+     silently overwritten by a new one, only by an explicit correction, which
+     is what correctRule below is for). */
+  function governingRule(desc) {
+    const matched = matchRule(desc, prepareRules(S.rules));
+    if (!matched) return null;
+    return S.rules.find(r => r.pattern.trim().toLowerCase() === matched.p) || null;
+  }
+
+  /* Repoint an EXISTING rule at a new category. The one correction path
+     learnRules deliberately has none of — "an established rule is never
+     silently overwritten" is right for AUTOMATIC learning (an import running
+     unattended must never let a later, looser pattern quietly repoint an
+     earlier one), but leaves no way back for a person who has just noticed
+     the rule is wrong, short of hand-editing Data/Categorisation Rules.csv,
+     which the app never even names. This is that way back: it only ever
+     changes a rule the caller already has in hand (governingRule's return),
+     never searches for one and never adds one, so it can't be reached by
+     anything automatic. */
+  async function correctRule(rule, newCat) {
+    if (!rule || !newCat || rule.category === newCat) return false;
+    rule.category = newCat;
+    await writeRulesCsv();
+    return true;
+  }
+
   /* One serializer for the rules file, so learning, tidying and the pre-tidy
      backup can never write it three different ways. Takes the rules rather
      than reading S.rules, so the backup can serialize the set as it was
@@ -296,5 +339,6 @@ module.exports = function registerCategories(ctx) {
     return drop.size;
   }
 
-  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect, learnRules, cleanupRules });
+  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect,
+    learnRules, governingRule, correctRule, cleanupRules });
 };

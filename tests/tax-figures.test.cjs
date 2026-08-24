@@ -105,13 +105,28 @@ const za = PROFILES.za;
 const textOf = msgs => msgs.map(m => m.text).join(' || ');
 const filed = { assessment: 'submit-requested', taxpayer_type: 'standard' };
 
+// figureChecks' 4th argument is the HOUSEHOLD currency symbol (threaded from
+// views/tax.js's `money`, S.settings.currency) — falls back to the profile's
+// own default when omitted, which is what a bare `za.figureChecks(figs, y, t)`
+// call below exercises. See tests/currency.test.cjs #9 and locale.js's fmtAmt
+// for the bug this fixed: fmtAmt used to always print the COUNTRY's default
+// symbol, so a household set to "$" saw these callouts labelled "R", and it
+// put the sign before the symbol with no space where money() puts a space
+// after it — "R18 700,00" here below, "R 18 700,00" everywhere else on the
+// page. Both are now formatAmount, so the strings below carry that space.
 const underLimits = za.figureChecks(original, 2026, filed);
 ok(underLimits.every(m => m.ok), 'everything under threshold reports ok');
 ok(/23 800/.test(textOf(underLimits)), 'names the interest exemption');
 // 4201 total is 5 000 + 100 → headroom 23 800 − 5 100.
-ok(/R18 700,00 of headroom/.test(textOf(underLimits)), 'reports exact interest headroom');
+ok(/R 18 700,00 of headroom/.test(textOf(underLimits)), 'reports exact interest headroom');
 ok(/16 000,00 of headroom/.test(textOf(underLimits)), 'reports TFSA headroom (36 000 - 20 000)');
 ok(/no exemption/.test(textOf(underLimits)), 'flags foreign interest as unexempt');
+
+// Threading the household symbol through must not change the arithmetic —
+// only which symbol and spacing the same figures print in.
+const underLimitsUsd = za.figureChecks(original, 2026, filed, '$');
+ok(/\$ 18 700,00 of headroom/.test(textOf(underLimitsUsd)),
+  'the household symbol ($) replaces the country default (R) when supplied');
 
 const overTfsa = za.figureChecks([{ code: '4219', description: '', source: '', amount: 40000 }], 2026, filed);
 ok(overTfsa.some(m => !m.ok && /40%/.test(m.text)), 'TFSA over the annual limit warns about the penalty');
@@ -201,10 +216,10 @@ ok(Array.isArray(noIncome) && !/[Aa]ssessed taxable income/.test(textOf(noIncome
   ok(/40% inclusion rate/.test(msg.text), 'and the message names the inclusion rate');
   // R100 000 of gains: R60 000 over the exclusion, of which R24 000 is taxable.
   const flat = msg.text.replace(/\s/g, ' ');
-  ok(/exclusion by R60 000/.test(flat), 'the excess is named, as an excess');
-  ok(/R24 000[.,]00 feeds into taxable income/.test(flat),
+  ok(/exclusion by R 60 000/.test(flat), 'the excess is named, as an excess');
+  ok(/R 24 000[.,]00 feeds into taxable income/.test(flat),
     'and the 40%-inclusion figure is the one called taxable income');
-  ok(!/R60 000[.,]00 feeds into taxable income/.test(flat),
+  ok(!/R 60 000[.,]00 feeds into taxable income/.test(flat),
     'never the raw excess - the old wording overstated it two and a half times');
 
   const under = za.figureChecks([{ code: '4250', description: 'Capital gain', source: 'Broker', amount: 30000 }], 2026, {});

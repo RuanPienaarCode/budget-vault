@@ -32,7 +32,7 @@ const TRAILING_MONTHS = 6;
 module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, accountIndex, catType,
-    periodsForMonths, shiftPeriod, periodRange, currentPeriod,
+    periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
   } = ctx;
 
   function healthSnapshot() {
@@ -59,7 +59,21 @@ module.exports = function registerHealthData(ctx) {
       let savings = 0;
       for (const a of savers) {
         const rows = (idx.get(a) || {}).rows || [];
-        savings += splitFlows(rows, catType, { from: start, to: end }).contributions;
+        const flow = splitFlows(rows, catType, { from: start, to: end });
+        /* Contributions ALONE double-counted two real cases: a rand moved
+           from one savings account to another read as fresh saving in the
+           receiving account with nothing netted off the sending one, and a
+           deposit reversed the same month (or an ordinary withdrawal) still
+           added its gross inflow with the money that then left never taken
+           back off. `withdrawals` is the same field splitFlows already
+           reports for the account's own story on the Savings page, so
+           netting it here is not a new judgement about what counts as a
+           withdrawal — it is applying one that already exists. Growth
+           (interest, dividends) is deliberately NOT added in alongside
+           contributions: the rate answers what the household itself put
+           aside, not what the market did for it, the same distinction
+           accountFlows' own 'basis' field draws for the Savings page. */
+        savings += flow.contributions - flow.withdrawals;
       }
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency
@@ -73,12 +87,57 @@ module.exports = function registerHealthData(ctx) {
         if (type !== 'savings' && type !== 'investment') { consumption += amt; }
         if (fixedCats.has(cat)) { fixed += amt; }
       }
+      /* The emergency fund's DIVISOR, built from every account rather than
+         periodSpend's budget-scoped map. `essential` answers "what must the
+         HOUSEHOLD keep paying with no income", and periodSpend deliberately
+         drops `excluded` rows and `budget: false` accounts — the right rule
+         for a BUDGET total, the wrong one here: rent paid from a joint
+         account the household marked out of the budget is still a bill the
+         fund has to cover the month income stops. The numerator already
+         reads every account (resolveEarmarks walks S.accounts unfiltered),
+         so a divisor built from the narrower budget-only set is the exact
+         "two figures derived by different rules" shape this app keeps
+         tripping on — proven on a real vault as R48,000 of real essential
+         spend measured against an R8,000 divisor, "6 months covered" where
+         the truth was 2.
+
+         The net-then-flip transform below is periodSpend's own `spendOf`
+         (trend-math.js), reproduced rather than reused: periodSpend cannot be
+         called without ALSO pulling in the excluded/budget-scoped row filter
+         this fix exists to bypass, so the two shapes have to be built
+         separately even though the arithmetic is identical. Net first, THEN
+         drop income-typed and net-positive categories (a refund month nets a
+         category positive and it must not invert into essential spend) and
+         flip the negative remainder to a positive rand figure — essentialTotal
+         expects spend as positive amounts, the same shape periodSpend's
+         `whole` already handed it. Transfers drop out before the net is
+         built, the one exclusion periodSpend itself applies before anything
+         else can. */
+      const householdNet = Object.create(null);
+      for (const t of txInPeriod(p)) {
+        if (catType(t.cat) === 'transfer') { continue; }
+        const k = t.cat || '';
+        householdNet[k] = (householdNet[k] || 0) + t.amount;
+      }
+      const householdSpend = Object.create(null);
+      for (const [cat, amt] of Object.entries(householdNet)) {
+        const type = catType(cat);
+        if (!cat || type === 'income' || type === 'transfer' || amt >= 0) { continue; }
+        householdSpend[cat] = -amt;
+      }
       periods.push({
         income: periodSummary(p).income,
-        essential: essentialTotal(spend.whole, catType, S.settings.nonessential_groups),
+        essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
         savings, consumption, fixed,
         budgeted: budgetTotals(p).spend,
-        counted: spend.count > 0,
+        /* Household coverage, not budget coverage: a period whose only real
+           activity sat in an excluded or non-budget account is still a period
+           that happened, and dropping it from the trailing average would
+           silently understate the very essential figure this fix exists to
+           correct. Read off `householdNet` (before the income/transfer drop
+           and the sign flip) rather than `householdSpend`, since a period
+           that held only income transactions is still a real period too. */
+        counted: spend.count > 0 || Object.keys(householdNet).length > 0,
       });
     }
 

@@ -17,12 +17,20 @@
 /* Format an amount with a profile's own separators. figureChecks methods use
    method shorthand so `this` is the profile they were read off. */
 const { fact, limitsFor: zaLimitsForFact } = require('./facts');
+const { formatAmount } = require('./currency');
 
-const fmtAmt = (p, v) => {
-  const parts = Math.abs(v).toFixed(2).split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, p.thousands);
-  return (v < 0 ? '-' : '') + p.currency + parts.join(p.decimal);
-};
+/* `currency` is the HOUSEHOLD symbol (S.settings.currency), threaded in from
+   views/tax.js's `money`, and takes priority over the profile's own default —
+   a household set to "$" under country za must see its own symbol on these
+   callouts, not South Africa's "R". Falls back to the profile's default only
+   when no household symbol is supplied (the locale-profiles guard test calls
+   figureChecks() directly, with no household in scope, and every OTHER
+   profile's callouts are unaffected since only za's figureChecks prints
+   money at all). Delegates the actual formatting to currency.js's
+   formatAmount so this is not a second implementation of money()'s rules —
+   see that function for what was disagreeing (symbol source, sign placement,
+   the space, and the missing non-finite guard). */
+const fmtAmt = (p, v, currency) => formatAmount(currency || p.currency, v, 2, p);
 
 /* Sum the figure rows carrying any of the given codes. */
 const sumCodes = (figures, ...codes) => (figures || [])
@@ -73,10 +81,10 @@ const ZA_INCOME_CODES = [
    It asks rather than accuses, because "exempt" is the common answer and only
    the filer knows which. `employmentCodes` empty (generic profiles) → no
    checks, since "which codes are income" is jurisdictional. */
-const reconcileAssessed = (p, figures, t, employmentCodes) => {
+const reconcileAssessed = (p, figures, t, employmentCodes, currency) => {
   if (!t || t.assessment !== 'assessed' || typeof t.assessment_income !== 'number') return [];
   if (!employmentCodes || !employmentCodes.length) return [];
-  const fmt = v => fmtAmt(p, v);
+  const fmt = v => fmtAmt(p, v, currency);
   const rows = (figures || []).filter(f => (f.amount || 0) > 0);
   if (!rows.length) return [];
 
@@ -191,8 +199,8 @@ const PROFILES = {
        page labels them as defaults to verify. The under-65 interest exemption
        is hard-coded because the plugin holds no date of birth; over-65s get a
        higher one and the message says so. */
-    figureChecks(figures, year, t) {
-      const fmt = v => fmtAmt(this, v);
+    figureChecks(figures, year, t, currency) {
+      const fmt = v => fmtAmt(this, v, currency);
       const msgs = [];
 
       const localInterest = sumCodes(figures, '4201');
@@ -232,7 +240,7 @@ const PROFILES = {
         msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(lim.cgt)} annual exclusion.` });
       }
 
-      return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES));
+      return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES, currency));
     },
     seasonMsgs(t) {
       const msgs = [];

@@ -342,9 +342,18 @@ module.exports = function registerLoans(ctx) {
 
     /* A balloon is a percentage of the VEHICLE PRICE, which is how dealers
        quote it — so it is not automatically smaller than the financed amount.
-       recalcCar() clamps it; see the note there. */
+       recalcCar() clamps it to the finance amount; see the note there.
+
+       The label used to print `car.price * pct / 100` UNCLAMPED — the raw
+       percentage of price — while the result card below used the clamped
+       figure recalcCar() actually finances. At price R350 000, deposit 70%,
+       balloon 40% that read "40% (R140 000)" on the slider directly above a
+       result card reading "Balloon due at the end R105 000", with the
+       instalment quietly gone interest-only because the whole loan WAS the
+       balloon. Calling the same clamped expression fixes the label rather
+       than the arithmetic, which was already correct. */
     const bal = rangeField(
-      pct => `Balloon / residual — ${pct}% (${money(car.price * pct / 100, 0)})`,
+      pct => `Balloon / residual — ${pct}% (${money(carBalloon(pct), 0)})`,
       { min: '0', max: '40', step: '5' }, car.balloonPct,
       pct => { car.balloonPct = pct; recalcCar(); });
     carBalloonSync = bal.sync;
@@ -358,15 +367,23 @@ module.exports = function registerLoans(ctx) {
     carBuilt = true;
   }
 
+  /* The financed amount, from the same two inputs recalcCar() reads — pulled
+     out so the balloon slider's own label (above) can clamp against exactly
+     the figure the result card finances, rather than a second computation of
+     "what's financed" that can drift from the first one. */
+  const carFinance = () => Math.max(0, car.price - Math.min(car.deposit, car.price));
+
+  /* The balloon is a percentage of the PRICE, so a large deposit can leave
+     less financed than the balloon asks for. It used to be impossible when
+     the deposit stopped at 50%; now that it reaches 100% the clamp has to be
+     real, or the page would promise a residual bigger than the loan. */
+  const carBalloon = pct => Math.min(car.price * pct / 100, carFinance());
+
   function recalcCar() {
     const p = P();
     const deposit = Math.min(car.deposit, car.price);
-    const finance = Math.max(0, car.price - deposit);
-    // The balloon is a percentage of the PRICE, so a large deposit can leave
-    // less financed than the balloon asks for. It used to be impossible when
-    // the deposit stopped at 50%; now that it reaches 100% the clamp has to
-    // be real, or the page would promise a residual bigger than the loan.
-    const balloon = Math.min(car.price * car.balloonPct / 100, finance);
+    const finance = carFinance();
+    const balloon = carBalloon(car.balloonPct);
     const rate = car.rate ?? p.defaultRate;
     const t = totalsFor(finance, rate, car.months, balloon);
 

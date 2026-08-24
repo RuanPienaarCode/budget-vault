@@ -86,8 +86,21 @@ function resolveEarmarks(accounts) {
    nothing" figure the Debts view leads with, summed across the book. Paid-off
    rows are skipped by the same activeDebts filter that view uses, so the two
    pages cannot disagree about which debts still cost anything. */
+/* Null — not zero — when debts ARE listed but not one of them states a rate.
+   This is the same null-vs-zero rule health-data.js already applies to
+   `payment`, and it was missing here for exactly as long: table-schema's
+   money() reader turns a blank `Rate` cell into 0, monthlyRate(0) is 0, and a
+   *measured* zero scored full marks on the debt pillar for a household
+   carrying R250 000. Some rates known and others blank still totals what IS
+   known, for the reason the payment rule gives: understating a burden is the
+   safe direction, and a partial figure moves the score toward the truth where
+   null leaves it untouched. An empty book stays 0 — no debts really is no
+   interest, and that is a claim about the household, not a gap in it. */
 function debtInterestMonthly(debts) {
-  return activeDebts(debts).reduce((sum, d) => sum + monthlyInterest(d.balance, d.rate), 0);
+  const active = activeDebts(debts);
+  const stated = active.filter(d => (Number(d.rate) || 0) > 0);
+  if (active.length && !stated.length) { return null; }
+  return active.reduce((sum, d) => sum + monthlyInterest(d.balance, d.rate), 0);
 }
 
 /* Average a trailing window of per-period figures and restate them monthly.
@@ -103,16 +116,41 @@ function debtInterestMonthly(debts) {
    spends nothing", which is a claim the data never made. */
 function monthlyAverages(periods, monthsPerPeriod) {
   const mpp = monthsPerPeriod > 0 ? monthsPerPeriod : 1;
-  const KEYS = ['income', 'essential', 'savings', 'consumption', 'fixed', 'budgeted'];
+  const KEYS = ['income', 'essential', 'savings', 'consumption', 'fixed'];
   const sums = {}; for (const k of KEYS) { sums[k] = 0; }
   let counted = 0;
+  /* `budgeted` — and the consumption figure PAIRED against it for budgetUsed —
+     average over a narrower, different denominator: periods that actually
+     carried a plan, not every counted period. Averaging budgeted spend the
+     same way as income or essential punished a household that only started
+     budgeting partway through the six-period window: six periods with a real
+     R22,000 plan in the last two divided that total by six instead of two,
+     "budget used" read 273% for a household that was 9% UNDER budget, and the
+     figure moved further from the truth the longer its budgeting history ran.
+     A period with no budget at all is not a period budgeted zero, for exactly
+     the reason an uncovered period above is not a month spent nothing — this
+     completes that same rule rather than inventing a new one. */
+  let planned = 0, plannedBudgeted = 0, plannedConsumption = 0;
   for (const p of periods || []) {
     if (!p || !p.counted) { continue; }
     counted++;
     for (const k of KEYS) { sums[k] += p[k] || 0; }
+    if (p.budgeted > 0) {
+      planned++;
+      plannedBudgeted += p.budgeted;
+      plannedConsumption += p.consumption || 0;
+    }
   }
-  const out = { counted };
+  const out = { counted, planned };
   for (const k of KEYS) { out[k] = counted ? sums[k] / counted / mpp : null; }
+  out.budgeted = planned ? plannedBudgeted / planned / mpp : null;
+  /* NOT the same figure as `out.consumption` above — that one is the
+     six-period trailing average the consumption PILLAR scores against income.
+     This one is paired to the same narrower window as `budgeted` so
+     budgetUsed compares consumption and its own plan over identical periods,
+     the way monthlyAverages already promises for every other pair it hands
+     back. */
+  out.consumptionForBudget = planned ? plannedConsumption / planned / mpp : null;
   return out;
 }
 
@@ -323,8 +361,16 @@ function healthMetrics({
     /* Budget adherence is the one ratio NOT taken against income — it is spend
        against the household's own plan. Null when nothing was budgeted, because
        dividing by an absent plan measures the absence, not the household. */
-    budgetUsed: (avg.budgeted > 0 && avg.consumption !== null)
-      ? avg.consumption / avg.budgeted
+    /* Gated on hasIncome like every sibling measure, and NOT because the
+       ratio needs income — it does not, it is spend against the household's
+       own plan. It is because this was the one measure that survived a vault
+       with no recognised income, and the outer renormalisation then handed it
+       the whole 100: a household with a typo'd income category, R20 000
+       overdrawn and no savings scored 100 and was told it was "Strong", off a
+       single 5-point measure. A score built on one surviving part is not a
+       summary of anything, and this was the part that let it happen. */
+    budgetUsed: (hasIncome && avg.budgeted > 0 && avg.consumptionForBudget !== null)
+      ? avg.consumptionForBudget / avg.budgeted
       : null,
     netWorth: netWorth ?? null,
     netWorthMultiple: (hasIncome && netWorth !== null && netWorth !== undefined)
@@ -360,8 +406,19 @@ function scoreBreakdown(m, targetMonths) {
       const need = targetMonths * (m.monthlyEssential || 0) - ((m.months || 0) * (m.monthlyEssential || 0));
       return need > 0 ? { kind: 'fund', amount: need } : null;
     }
+    /* `trim`, `monthly` and `build` all name a rand figure AS A SHARE OF
+       INCOME, so each starts by refusing to answer without one — belt and
+       suspenders alongside the pillars' own hasIncome gates upstream (every
+       measure behind saving/spending/wealth already comes back null without
+       income, which is what keeps this branch unreached today), rather than
+       trusting that chain to hold forever. Without it, `m.monthlyIncome || 0`
+       quietly turned "no income" into a target of R0 and reported the
+       household's entire living cost as the amount to trim off nothing —
+       "reserves" is deliberately exempt: it is earmarks over ESSENTIAL SPEND,
+       which has never been an income-relative question. */
     if (key === 'saving') {
-      const need = FULL_MARKS.savingsRate * (m.monthlyIncome || 0) - (m.monthlySavings || 0);
+      if (!m.monthlyIncome) { return null; }
+      const need = FULL_MARKS.savingsRate * m.monthlyIncome - (m.monthlySavings || 0);
       return need > 0 ? { kind: 'monthly', amount: need } : null;
     }
     if (key === 'debt') {
@@ -370,44 +427,70 @@ function scoreBreakdown(m, targetMonths) {
         : null;
     }
     if (key === 'spending') {
+      if (!m.monthlyIncome) { return null; }
       /* The cheapest of the three to move is whichever is furthest from its
          floor, but the honest single figure is what living costs would have to
          come down by to clear the consumption ceiling — the one a reader can
          act on this month without renegotiating a contract. */
-      const target = FULL_MARKS.consumptionFloor * (m.monthlyIncome || 0);
+      const target = FULL_MARKS.consumptionFloor * m.monthlyIncome;
       const need = (m.monthlyConsumption || 0) - target;
       return need > 0 ? { kind: 'trim', amount: need } : null;
     }
-    const want = FULL_MARKS.netWorthMultiple * (m.monthlyIncome || 0) * 12;
+    if (!m.monthlyIncome) { return null; }
+    const want = FULL_MARKS.netWorthMultiple * m.monthlyIncome * 12;
     const need = want - (m.netWorth || 0);
     return need > 0 ? { kind: 'build', amount: need } : null;
   };
 
+  /* score.pillars is already in PILLARS' own declaration order (financialScore
+     built it by walking PILLARS), and the two allocations below run over THAT
+     order rather than the shortfall order the popup displays in — see the
+     comment above the sort a few lines down for why the order an allocation
+     runs in is not merely cosmetic. */
   const pillars = score.pillars.map(p => ({
     key: p.key, max: p.max, points: p.max * p.at, lost: p.max * (1 - p.at), at: p.at,
     gap: gapFor(p.key),
     parts: p.parts,
   }));
-  /* Biggest shortfall first — the popup leads with what is costing the most,
-     not with whichever pillar happens to be declared first. Ties break on the
-     heavier pillar, so closing the one with more weight behind it comes first:
-     it moves the score further per rand. */
-  pillars.sort((a, b) => b.lost - a.lost || b.max - a.max);
 
   /* The INTEGERS the popup prints, allocated so they add up to what is on
      screen above them — the exact figures already sum correctly, but rounding
      each one alone does not: an earlier build printed 0 + 26 + 17 beside a
      headline of 42. Largest-remainder is the same allocation the donut's
      percentage column uses, shared from share-percents.js rather than
-     reimplemented. `shownLost` is derived from the two rounded figures rather
-     than rounded itself, so "26 of 40" and "costing you 14" cannot disagree. */
-  const shownPoints = largestRemainder(pillars.map(p => p.points), score.value);
+     reimplemented.
+
+     shownMax is allocated FIRST, and shownPoints is then allocated over
+     `at * shownMax` — the pillar's own fraction of its OWN rounded ceiling —
+     rather than over the continuous `points` independently rounded against
+     100. Two independent largest-remainder allocations could round one
+     pillar's ceiling down while rounding that SAME pillar's points up, and
+     did: an ordinary vault with no `emergency_fund` set anywhere printed
+     "saving 27 of 26, lost -1" — a pillar earning more than its own maximum.
+     `at * shownMax[i]` can never exceed shownMax[i] (at is capped at 1), so
+     its floor is at most shownMax[i] and largestRemainder's own +1 step can
+     bring it to shownMax[i] exactly but never past it. `shownLost` is derived
+     from the two rounded figures rather than rounded itself, so "26 of 40"
+     and "costing you 14" cannot disagree. */
   const shownMax = largestRemainder(pillars.map(p => p.max), 100);
+  const shownPoints = largestRemainder(pillars.map((p, i) => p.at * shownMax[i]), score.value);
   pillars.forEach((p, i) => {
     p.shownPoints = shownPoints[i];
     p.shownMax = shownMax[i];
     p.shownLost = shownMax[i] - shownPoints[i];
   });
+
+  /* NOW sort for display, biggest shortfall first — the popup leads with what
+     is costing the most, not with whichever pillar happens to be declared
+     first, and not with whichever pillar happens to be worst today either:
+     largestRemainder breaks a tied remainder by ORIGINAL INDEX (deliberately,
+     per share-percents.js), so allocating AFTER this sort let the rounding
+     point land on whichever pillar the shortfall order put first that day —
+     the same four live pillars allocated {saving 27, debt 27, spending 26} in
+     one order and {saving 26, debt 27, spending 27} in the reverse. Ties break
+     on the heavier pillar, so closing the one with more weight behind it comes
+     first: it moves the score further per rand. */
+  pillars.sort((a, b) => b.lost - a.lost || b.max - a.max);
 
   return {
     total: score.value,

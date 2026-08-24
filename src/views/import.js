@@ -16,7 +16,7 @@ const { el } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
   statementAccountNumber, sameAccountNumber } = require('../statement');
-const { prepareRules, autoCategorise } = require('../rules');
+const { prepareRules, autoCategorise, matchRule } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { isCreditCard } = require('../committed');
@@ -60,7 +60,32 @@ module.exports = function registerImport(ctx) {
     return '';
   }
 
+  // Mirrors what #fileInput already advertises (src/shell.js:
+  // accept=".csv,.tsv,.txt,…") so the two entry points never disagree about
+  // what this importer accepts.
+  const STATEMENT_EXT = /\.(csv|tsv|txt)$/i;
+
   async function handleStatementFile(file) {
+    /* The native file picker's `accept` only SUGGESTS a filter (and a user
+       can pick "All Files" through it anyway); a drag-drop has no filter at
+       all — src/controller.js's wireDropZone hands `e.dataTransfer.files[0]`
+       straight to this function. Checked again here, the ONE place both
+       paths funnel through, because the single most likely wrong file to
+       drop is a bank statement PDF sitting right next to the CSV in
+       Downloads. Without this, decodeStatement below turns it into binary
+       garbage, column detection fails, and showColumnMapper then tells the
+       user "this export isn't one the importer recognises. Point it at the
+       right columns and it will import like any other" over a preview of
+       mojibake — confidently wrong about what actually happened. Extension
+       only, not MIME: a dropped file's `file.type` is frequently empty or
+       wrong, where the name is what the user actually sees and chose. */
+    if (!STATEMENT_EXT.test(file.name || '')) {
+      return toast(
+        `"${file.name}" doesn't look like a bank statement export — this importer reads CSV, TSV or TXT files. ` +
+        'If your bank only gives you a PDF, export or save it as CSV first.',
+        true,
+      );
+    }
     // Bytes, not file.text() — the encoding is read off the bytes rather than
     // assumed to be UTF-8, and the delimiter off the decoded text rather than
     // assumed to be a comma. See decodeStatement in statement.js / sniffDelimiter in csv.js.
@@ -161,7 +186,17 @@ module.exports = function registerImport(ctx) {
         /* excluded/transferTo are filled in by applyCounterparties below, once
            for the whole file, because the account this statement is believed to
            belong to is not settled yet — see the note on that function. */
-        items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: autoCategorise(desc, rules),
+        /* matchRule, not autoCategorise, so the WINNING rule survives onto the
+           item and not just the category it resolved to — autoCategorise
+           (still used elsewhere: rule-cleanup.js, categories.js) throws that
+           away. Without it there was no way to tell the reader WHICH rule
+           categorised a row, so a wrong rule could only be found by opening
+           Data/Categorisation Rules.csv, which the review screen never even
+           names. See renderImportReview's category cell, which renders
+           matchedPattern as a muted hint under the select. */
+        const matched = matchRule(desc, rules);
+        items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: matched ? matched.category : '',
+          matchedPattern: matched ? matched.p : '',
           include: true, excluded: false, transferTo: '' });
       } else if (date || amount != null) {
         // Looked like a transaction and wasn't usable — worth reporting.
@@ -454,7 +489,16 @@ module.exports = function registerImport(ctx) {
       (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
       (pendings ? ` · ${pendings} still pending (unticked)` : '') +
       ` · ${auto} auto-categorised` +
-      (p.skipped ? ` · ${p.skipped} unparseable` : '');
+      (p.skipped ? ` · ${p.skipped} unparseable` : '') +
+      /* An exact duplicate is the one decision on this screen the reader
+         cannot override — it renders a "dup" badge instead of a checkbox,
+         with no explanation. The dedupe itself is sound and this is
+         deliberately not an offer to import them anyway (see flagItems in
+         src/dedupe.js for what "exact" means here) — but a bare count with
+         nothing said about WHY reads as "these rows vanished", which for a
+         statement the reader chose on purpose looks like data loss rather
+         than the plugin correctly recognising rows it already has. */
+      (dupes ? ' · already in the vault — check the Transactions page if you expected to see them' : '');
     $('#impLegend').empty();
     $('#impLegend').append(
       el('span', { class: 'imp-legend-swatch' }),
@@ -546,7 +590,15 @@ module.exports = function registerImport(ctx) {
           'transfer'),
         ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
-        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`)),
+        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`),
+          // Named, not silent: a rule that fires wrong is only fixable if the
+          // reader can tell WHICH rule fired — otherwise the only way to find
+          // it is opening Data/Categorisation Rules.csv, which this screen
+          // never mentions. Dropped once the reader has typed their own
+          // category over it (it.manual): the hint would then describe a rule
+          // that no longer explains what's in the cell.
+          ...(it.matchedPattern && !it.manual ? [el('div', { class: 'text-muted', style: 'font-size:0.8em' },
+            `matched "${it.matchedPattern}"`)] : [])),
         // `checked` reflects the model: after a partial-failure re-render the
         // ticks used to vanish while the rows stayed excluded.
         el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
@@ -830,5 +882,9 @@ module.exports = function registerImport(ctx) {
     toast('Import cancelled — nothing was saved');
   }
 
-  ctx.provide({ handleStatementFile, commitImport, renderImport, remapImport, cancelImport, undoImport });
+  // renderImportReview, published for the same reason filteredRows is on
+  // transactions.js's ctx: so a test can re-render the REAL review screen
+  // (e.g. after the reader edits a category) instead of asserting only on
+  // the state runImport's own first call already produced.
+  ctx.provide({ handleStatementFile, commitImport, renderImport, renderImportReview, remapImport, cancelImport, undoImport });
 };

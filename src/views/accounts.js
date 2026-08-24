@@ -3,7 +3,7 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
-const { el, icoEl } = require('../dom');
+const { el, icoEl, keepScroll } = require('../dom');
 /* The ring reuses the Dashboard's own chart primitives rather than a second
    donut implementation — same arc maths, same tooltip, same theme lookup, so
    the two rings on this app cannot drift apart visually. */
@@ -12,6 +12,12 @@ const { normalizeAmount } = require('../amount');
 /* A display symbol per account, and the disclosure when a total spans more
    than one of them. It converts nothing — see the module header. */
 const { symbolOf, currenciesIn } = require('../currency');
+/* What an account is worth against what was put into it, derived from its own
+   transactions rather than a stale hand-typed total_invested. Shared with
+   views/savings.js — see savings-math.js's own header for why
+   `balance - total_invested` was retired: measured against four real accounts
+   it was wrong on all four. */
+const { totalReturn } = require('../savings-math');
 const { yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
@@ -30,13 +36,19 @@ const { isCreditCard } = require('../committed');
 /* The state machine behind the decision queue — which accounts land in it, in
    what order, and why. Pure, and tested without a DOM. */
 const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } = require('../acct-status');
-const { supersededBySplit } = require('../tx-role');
+/* isSplitPart, alongside supersededBySplit: the delete dialog counts what the
+   BANK actually printed, and a split's parts are rows this app created, not
+   statement lines — see tx-role.js's own header. */
+const { supersededBySplit, isSplitPart } = require('../tx-role');
 /* Who an account belongs to. The vocabulary lives in its own module because
    three bands on this page ask the same question of it — the hero's split, the
    filter chips and both dialogs — and a household with one person must get the
    same page it had before the key existed. */
 const { ownerKey, ownerLabel, ownerOptions, netByOwner } = require('../owners');
-const { ISO_DATE, todayIso } = require('../dates');
+/* isRealIsoDate, not ISO_DATE, for the as-at date: ISO_DATE is shape-only and
+   accepts "2026-13-45", which would stamp a confirmation on a month that does
+   not exist and place a window nothing can fall into. */
+const { ISO_DATE, todayIso, isRealIsoDate } = require('../dates');
 /* worth.js owns the by-sign asset/liability split and the -0 collapse a
    break-even household's float remainder needs — see worth.js for why a raw
    `net < 0` there once rendered a solvent household as "-R0.00". Called here
@@ -53,7 +65,7 @@ const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
-    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
+    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName, catType } = ctx;
 
   /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: this page writes
      on every edit (each dialog saves on submit), so there is never an unsaved
@@ -69,6 +81,20 @@ module.exports = function registerAccounts(ctx) {
      says so rather than converting. */
   const acctMoney = (a, v, decimals = 2) =>
     ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
+
+  /* Is this account's balance a cell the loader could not read AT ALL — as
+     opposed to one merely written in a non-canonical format (a decimal comma,
+     grouped thousands) that normalizeAmount reads correctly and load.js still
+     preserves in balanceRaw for lossless write-back?
+
+     `a.balanceRaw != null` alone answers the wrong question: it is set on
+     "1 234,56" too, and that balance is genuinely 1234.56 — reading it back as
+     "unreadable" would un-fix a value this app already gets right. Only when
+     normalizeAmount ALSO fails on the raw cell has parseNum's fallback
+     (`normalizeAmount(t) ?? 0`) forced a.balance to a fabricated zero — see
+     amount.js's own warning that a fallback "must not be a plausible wrong
+     number". That is the one case this page must not render as real money. */
+  const unreadableBalance = a => a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null;
 
   // Every type the loader can produce must appear in exactly one group, or an
   // account renders nowhere on this page — including `other`, which is what a
@@ -268,19 +294,51 @@ module.exports = function registerAccounts(ctx) {
   }
 
   async function editBalance(a) {
+    /* The implied figure, worked out BEFORE the dialog opens, so the reader is
+       comparing against it while they type rather than after they commit.
+
+       This is the one screen where a real bank balance enters the vault, and
+       until now it took the number, stamped today, and compared nothing — then
+       reconcile(), finding its whole window behind the fresh stamp, reported
+       "clean" and the drawer printed "This figure matches your transactions".
+       That sentence was false by construction on every entry that disagreed:
+       a statement imported into the wrong account, a missing row, a duplicate,
+       all silently absorbed, because the confirmed baseline moved with the
+       error. CONTEXT.md defines reconciliation as measuring the stated balance
+       against the implied one and SHOWING THE READER THE DISAGREEMENT — so it
+       is shown, and the reader may still save whatever they typed. The app
+       argues; it does not correct. */
+    const before = reconcile(a, (accountIndex().get(a) || {}).rows || [], todayIso());
+    const impliedNow = before && before.implied !== undefined ? before.implied : a.balance;
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
       { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: a.balance.toFixed(2),
         // Which currency the figure being typed is IN. Nothing converts it, so
         // the symbol is the only thing telling the reader what they are
         // entering — and on a euro account that is the whole question.
-        desc: i18n.t('acct.balance.inCurrency', { symbol: symbolOf(a, S.settings.currency) }) },
+        desc: `${i18n.t('acct.balance.inCurrency', { symbol: symbolOf(a, S.settings.currency) })}${
+          before && before.state === 'drift'
+            ? ` · ${i18n.t('acct.balance.impliedHint', { amount: acctMoney(a, impliedNow), count: before.count })}`
+            : ''}` },
+      /* Reading Monday's statement on Wednesday is the ORDINARY way a
+         household knows its balance, and without this field those two days of
+         real transactions fell behind the stamp and became unreachable for
+         ever. `balance_updated` is not in FM_WRITERS either, so there was no
+         way to correct it from anywhere in the app — only by hand-editing
+         frontmatter the app never mentions. */
+      { key: 'as_at', label: i18n.t('acct.balance.asAt'), type: 'date', value: todayIso(),
+        desc: i18n.t('acct.balance.asAtDesc') },
     ]);
     if (!r) return;
     const num = parseAmount(r.balance);
     if (num === null || isNaN(num)) return toast(i18n.t('acct.err.nan'), true);
+    const now = todayIso();
+    /* A confirmation cannot be dated in the future — reconcile() reads such a
+       date as unplaceable, which would silence the account rather than
+       confirm it. Blank falls back to today, the old behaviour. */
+    const asAt = isRealIsoDate(r.as_at) && r.as_at <= now ? r.as_at : now;
     a.balance = num;
     a.balanceRaw = null;   // the user just gave us a clean figure
-    a.balance_updated = todayIso();
+    a.balance_updated = asAt;
     // saveAccount already toasted the failure — stop here rather than telling
     // the reader it updated when the file never changed.
     if (!(await saveAccount(a))) return;
@@ -289,6 +347,21 @@ module.exports = function registerAccounts(ctx) {
        reader is NOT looking at — leaving the figure they just typed absent from
        the one they are. render() draws whichever view is current. */
     ctx.render();
+    /* Say the disagreement OUT LOUD at the moment it is created. Re-read after
+       the write rather than reusing `before`, because the figure and the date
+       the reader just supplied are both inputs to it — this is the reconcile
+       the old code never performed. A clean result still gets the plain
+       confirmation, so the extra sentence only ever appears when there is
+       genuinely something to argue about. */
+    const after = reconcile(a, (accountIndex().get(a) || {}).rows || [], todayIso());
+    if (after && after.state === 'drift') {
+      toast(i18n.t('acct.balance.updatedDrift', {
+        name: a.name,
+        amount: acctMoney(a, Math.abs(after.delta)),
+        count: after.count,
+      }), true);
+      return;
+    }
     toast(i18n.t('acct.balance.updated', { name: a.name }));
   }
 
@@ -305,11 +378,29 @@ module.exports = function registerAccounts(ctx) {
      ctx.render, not renderAccounts — same reasoning as editBalance above:
      this is reachable from the Savings page too, and renderAccounts() would
      rebuild the page the reader is NOT looking at. */
-  async function acceptImplied(a, implied) {
+  async function acceptImplied(a, implied, rec) {
     const priorBalance = a.balance, priorBalanceRaw = a.balanceRaw, priorUpdated = a.balance_updated;
     a.balance = implied;
     a.balanceRaw = null;
-    a.balance_updated = todayIso();
+    /* Stamped to the LAST ROW THIS FIGURE ABSORBED, not to the clock. Dates
+       carry no time, and reconcile() skips everything dated on or before the
+       stamp — so stamping today buried every row dated between the last
+       transaction and now. Accept a drift on the 24th whose newest row was the
+       20th, and the four days in between became unreachable for ever: a
+       statement imported later carrying rows dated the 21st through 24th was
+       silently never folded in, the pill stayed green, and the account
+       under-reported permanently.
+
+       Narrowing the stamp to the data closes all of that except rows sharing
+       the boundary date itself, which day-granularity dates cannot distinguish
+       from the ones already counted. Capped at today so a future-dated row
+       cannot stamp a confirmation the vault has not reached — reconcile() now
+       reads such a date as unplaceable anyway. */
+    const lastCounted = rec && rec.since && rec.since.length
+      ? rec.since.reduce((m, r) => (r.date > m ? r.date : m), '')
+      : null;
+    const now = todayIso();
+    a.balance_updated = (lastCounted && lastCounted <= now) ? lastCounted : now;
     if (!(await saveAccount(a))) {
       // Back the mutation out. Without this, a failed write left the model
       // stamped with the implied balance and today's date even though the
@@ -546,7 +637,13 @@ module.exports = function registerAccounts(ctx) {
       const labels = entry ? entry.labels : new Set();
       const st = statusOf(a, rows, null, folders.has(a));
       const act = periodActivity(labels);
-      return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a) }, st);
+      /* Computed once here rather than separately in the goal cell and the
+         drawer, same reasoning as reconcile() above it — two call sites
+         deriving "what this account earned" independently is exactly how the
+         retired `balance - total_invested` formula and views/savings.js's
+         totalReturn() came to disagree by R60 000 on the same account. */
+      const tr = totalReturn(a, rows, catType, { today: todayIso() });
+      return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a), tr }, st);
     });
   }
 
@@ -562,8 +659,15 @@ module.exports = function registerAccounts(ctx) {
        credit is not a liability, and an overdrawn cheque account is one. No
        debts/assets pages passed in — this hero is the accounts-only figure,
        and the `elsewhere` caveat below is what tells the reader when those
-       pages hold more. */
-    const w = worth(S.accounts, null, null);
+       pages hold more.
+
+       An account whose balance cell could not be read at all is left OUT of
+       this sum rather than folded in as the fabricated zero load.js falls
+       back to — see unreadableBalance() above. It still appears in the table,
+       flagged, so the reader can fix it; it just does not silently count as
+       R0,00 toward what the household is worth. */
+    const unreadable = S.accounts.filter(unreadableBalance);
+    const w = worth(S.accounts.filter(a => !unreadableBalance(a)), null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     const attention = rows.filter(wantsALook).length;
     const oldest = rows.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
@@ -594,7 +698,10 @@ module.exports = function registerAccounts(ctx) {
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
-        + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')));
+        + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')
+        // TODO(i18n): acct.hero.unreadable — "{count} account balance could
+        // not be read and is left out of this total." (plural: "balances").
+        + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')));
 
     const facts = el('div', { class: 'acct-hero-facts' });
     const fact = (label, value, cls) => facts.append(el('div', { class: 'acct-fact' },
@@ -639,13 +746,19 @@ module.exports = function registerAccounts(ctx) {
     const widest = rows.reduce((m, r) => Math.max(m, Math.abs(r.net)), 0) || 1;
     for (const r of rows) {
       const pct = (Math.abs(r.net) / widest) * 100;
+      /* Same disclosure the hero and the table's group rows already carry: an
+         owner whose accounts span more than one currency gets this row's total
+         quietly adding unlike figures, exactly as the household total does —
+         so it gets the same asterisk, not a silent sum. */
+      const mixed = currenciesIn(S.accounts.filter(a => ownerKey(a.owner) === r.key), S.settings.currency).length > 1;
       const line = el('button', { type: 'button',
         class: `acct-owner-row${view().owner === r.key ? ' is-on' : ''}`,
         'aria-pressed': String(view().owner === r.key),
         'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) }) },
       el('div', { class: 'acct-owner-top' },
         el('span', { class: 'acct-owner-name' }, r.label),
-        el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}` }, money(r.net))),
+        el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}` }, money(r.net),
+          ...(mixed ? [el('span', { class: 'acct-mixed', title: i18n.t('acct.mixedTitle') }, '*')] : []))),
       el('span', { class: 'acct-mbar' },
         el('i', { class: r.net < 0 ? 'bg-danger' : '', style: `width:${pct.toFixed(1)}%` })),
       el('div', { class: 'acct-owner-sub' }, i18n.t('acct.group.count', { count: r.count })));
@@ -664,24 +777,59 @@ module.exports = function registerAccounts(ctx) {
      Rather than drop it silently (which would leave the ring and the hero
      quietly disagreeing), such a group is NAMED under the legend. */
   function whereItSits() {
-    const groups = ACCT_GROUPS.map(([key]) => ({
-      key,
-      colour: GROUP_COLOUR[key] || 'var(--color-accent)',
-      total: S.accounts.filter(a => groupOf(a) === key).reduce((s, a) => s + a.balance, 0),
-    })).filter(g => g.total !== 0);
+    const groups = ACCT_GROUPS.map(([key]) => {
+      const accts = S.accounts.filter(a => groupOf(a) === key);
+      return {
+        key,
+        colour: GROUP_COLOUR[key] || 'var(--color-accent)',
+        total: accts.reduce((s, a) => s + a.balance, 0),
+        /* Same disclosure the hero and the table's group rows carry — see
+           currency.js's own header for why this is never a conversion. */
+        mixed: currenciesIn(accts, S.settings.currency).length > 1,
+      };
+    }).filter(g => g.total !== 0);
 
     const drawn = groups.filter(g => g.total > 0).sort((x, y) => y.total - x.total);
     const negative = groups.filter(g => g.total < 0);
     const sum = drawn.reduce((s, g) => s + g.total, 0);
+    // The true net — what the hero states — for comparison against `sum`
+    // below, which is only the positive half of it.
+    const excluded = -negative.reduce((s, g) => s + g.total, 0);
+
+    /* Whole-card disclosure: the household spans more than one currency, the
+       same fact the hero states under its own number. Per-group marks (below,
+       on the legend and each wedge's tooltip) are the finer-grained version of
+       the same fact, for a group whose OWN total mixes symbols. */
+    const symbols = currenciesIn(S.accounts, S.settings.currency);
 
     const card = el('div', { class: 'card acct-ring' });
     card.append(el('div', { class: 'card-h' },
       el('div', {},
         el('h2', {}, i18n.t('acct.where.title')),
-        el('div', { class: 'sub' }, i18n.t('acct.where.sub')))));
+        el('div', { class: 'sub' },
+          i18n.t('acct.where.sub')
+          + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')))));
 
     const body = el('div', { class: 'body-pad acct-ring-body' });
-    if (!sum) { card.append(body); return card; }
+    if (!sum) {
+      /* The negative note used to sit BEHIND this early return — a vault
+         where every group nets negative got a titled card with an empty body
+         and no explanation, because `sum` is Σ of positive totals only and a
+         household that owes more than it holds has none. Said now, either
+         way, so the card never renders blank. */
+      if (negative.length) {
+        body.append(el('div', { class: 'acct-ring-note' },
+          i18n.t('acct.where.negative', {
+            count: negative.length,
+            names: negative.map(g => i18n.t(g.key)).join(', '),
+          })));
+      } else {
+        // TODO(i18n): acct.where.empty — "Nothing to show yet."
+        body.append(el('div', { class: 'acct-ring-note' }, i18n.t('acct.where.empty')));
+      }
+      card.append(body);
+      return card;
+    }
 
     /* Computed ONCE and indexed everywhere below — the aria-label, each
        wedge's tooltip and the legend's % column all read the same array, so
@@ -694,7 +842,7 @@ module.exports = function registerAccounts(ctx) {
       label: i18n.t('acct.where.aria', {
         parts: drawn.map((g, i) => i18n.t('acct.where.part',
           { group: i18n.t(g.key), pct: shares[i] })).join(', '),
-      }),
+      }) + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : ''),
     });
 
     let a0 = -Math.PI / 2;                  // 12 o'clock, so the largest slice starts at the top
@@ -704,7 +852,8 @@ module.exports = function registerAccounts(ctx) {
         d: arcPath(cx, cy, rOut, rIn, a0, a0 + sweep),
         fill: g.colour, stroke: themeColors(root).hole, 'stroke-width': '2',
       });
-      tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${shares[i]}%`);
+      tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${shares[i]}%`
+        + (g.mixed ? ` — ${i18n.t('acct.mixedTitle')}` : ''));
       a0 += sweep;
     });
     add('text', {
@@ -717,16 +866,24 @@ module.exports = function registerAccounts(ctx) {
       legend.append(el('li', {},
         el('i', { style: `background:${g.colour}` }),
         el('span', { class: 'dl-name' }, i18n.t(g.key)),
-        el('span', { class: 'dl-val num' }, money(g.total, 0)),
+        el('span', { class: 'dl-val num' }, money(g.total, 0),
+          ...(g.mixed ? [el('span', { class: 'acct-mixed', title: i18n.t('acct.mixedTitle') }, '*')] : [])),
         el('span', { class: 'dl-pct' }, `${shares[i]}%`)));
     });
     body.append(svg, legend);
     if (negative.length) {
+      /* Named rather than just counted: the centre figure above is the sum of
+         the POSITIVE groups only, and on its own reads as the household total
+         — which it is not whenever this note fires. The hero, two lines up on
+         the same page, states the real net; this says by how much the two
+         figures differ and why. */
       body.append(el('div', { class: 'acct-ring-note' },
         i18n.t('acct.where.negative', {
           count: negative.length,
           names: negative.map(g => i18n.t(g.key)).join(', '),
-        })));
+        }),
+        // TODO(i18n): acct.where.excluded — "{amount} excluded from the total above."
+        ' ', i18n.t('acct.where.excluded', { amount: money(excluded) })));
     }
     card.append(body);
     return card;
@@ -744,8 +901,10 @@ module.exports = function registerAccounts(ctx) {
 
   function deckWhy(r) {
     if (r.state === 'drift') {
+      // acctMoney, not money: both figures are THIS account's own, in its own
+      // symbol — see acctMoney's header.
       return i18n.t('acct.deck.why.drift',
-        { count: r.rec.count, implied: money(r.rec.implied), stated: money(r.a.balance) });
+        { count: r.rec.count, implied: acctMoney(r.a, r.rec.implied), stated: acctMoney(r.a, r.a.balance) });
     }
     if (r.state === 'stale') {
       return i18n.t('acct.deck.why.stale', { count: r.days, date: r.a.balance_updated });
@@ -759,8 +918,8 @@ module.exports = function registerAccounts(ctx) {
      two competing copies of the same controls. */
   function deckAction(r) {
     if (r.state === 'drift') {
-      return { label: i18n.t('acct.deck.do.drift', { amount: money(r.rec.implied) }),
-        run: () => acceptImplied(r.a, r.rec.implied) };
+      return { label: i18n.t('acct.deck.do.drift', { amount: acctMoney(r.a, r.rec.implied) }),
+        run: () => acceptImplied(r.a, r.rec.implied, r.rec) };
     }
     if (r.state === 'stale' || r.state === 'nodate') {
       return { label: i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'),
@@ -997,12 +1156,31 @@ module.exports = function registerAccounts(ctx) {
     }
     if (a.goal_amount > 0) {
       const pct = (a.balance / a.goal_amount) * 100;
-      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(pct), amount: acctMoney(a, a.goal_amount, 0) }));
+      /* Clamped to match the BAR, which is clamped in the same [0,100] range
+         two lines up in `bar()` — an overdrawn account with a savings goal
+         used to print "−340% of R10 000" beside a bar that could only ever
+         show zero width, two figures making two different claims about the
+         same account. */
+      const shown = Math.min(100, Math.max(0, pct));
+      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(shown), amount: acctMoney(a, a.goal_amount, 0) }));
     }
     if (a.total_invested > 0) {
-      const pct = ((a.balance - a.total_invested) / a.total_invested) * 100;
+      /* totalReturn(), not `balance - total_invested` — see savings-math.js's
+         own header for why that formula was retired: measured against real
+         accounts it was wrong on all four, most starkly wherever a debit
+         order kept moving the balance without total_invested keeping pace.
+         `r.tr` is computed once in model() and shared with the drawer below,
+         so the two cannot disagree with each other the way the goal cell and
+         views/savings.js's own tile used to. */
+      const tr = r.tr;
+      /* `basis === 'none'` is the case totalReturn cannot measure at all — real
+         transactions exist for this account with no starting_amount to split
+         them against, so ANY number here would be a guess wearing the
+         confidence of a percentage. Nothing is better than a wrong number. */
+      if (tr.basis === 'none') return el('span', { class: 'acct-dash' }, '—');
+      const pct = tr.capitalIn > 0 ? (tr.growth / tr.capitalIn) * 100 : 0;
       return bar(100, pct < 0 ? 'bg-warning' : '',
-        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: acctMoney(a, a.total_invested, 0) }));
+        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: acctMoney(a, tr.capitalIn, 0) }));
     }
     return el('span', { class: 'acct-dash' }, '—');
   }
@@ -1045,10 +1223,18 @@ module.exports = function registerAccounts(ctx) {
       nameEl.addEventListener('click', e => { e.stopPropagation(); openTransactions(primary); });
     }
 
+    /* A cell load.js could not parse at all reads as what it is — a figure
+       the app cannot show, not R0,00 — see unreadableBalance() above. The
+       button still opens editBalance(), which is the one place that fixes it. */
+    const unreadable = unreadableBalance(a);
+    const balLabel = unreadable
+      // TODO(i18n): acct.balance.unreadable — 'Can't read "{raw}" — click to fix'
+      ? i18n.t('acct.balance.unreadable', { raw: a.balanceRaw })
+      : acctMoney(a, a.balance);
     const balBtn = el('button', { type: 'button',
-      class: `acct-bal num${a.balance < 0 ? ' text-danger' : ''}`,
-      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: acctMoney(a, a.balance) }) },
-      acctMoney(a, a.balance));
+      class: `acct-bal num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}`,
+      'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: balLabel }) },
+      balLabel);
     balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
 
     const flowCell = r.act.count
@@ -1105,9 +1291,15 @@ module.exports = function registerAccounts(ctx) {
     const a = r.a;
     const box = el('div', { class: 'acct-drawer' });
 
+    /* Same unreadable-cell treatment as the row's own balance button — see
+       unreadableBalance() above and the row's own comment. */
+    const unreadable = unreadableBalance(a);
+    const drawerBal = unreadable
+      ? i18n.t('acct.balance.unreadable', { raw: a.balanceRaw })
+      : acctMoney(a, a.balance);
     box.append(el('div', { class: 'acct-drawer-h' },
       el('h3', {}, a.name),
-      el('div', { class: `acct-drawer-v num${a.balance < 0 ? ' text-danger' : ''}` }, acctMoney(a, a.balance))));
+      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}` }, drawerBal)));
 
     const grid = el('div', { class: 'acct-drawer-grid' });
     const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },
@@ -1125,7 +1317,10 @@ module.exports = function registerAccounts(ctx) {
     }
     if (a.total_invested > 0) {
       f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
-      f(i18n.t('acct.drawer.growth'), acctMoney(a, a.balance - a.total_invested));
+      /* r.tr, not `balance - total_invested` — same fix and same reasoning as
+         goalCell() above, sharing the one totalReturn() call model() already
+         made for this account. */
+      f(i18n.t('acct.drawer.growth'), r.tr.basis === 'none' ? '—' : acctMoney(a, r.tr.growth));
     }
     if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), acctMoney(a, a.monthly_contribution));
     if (r.act.count) {
@@ -1162,7 +1357,7 @@ module.exports = function registerAccounts(ctx) {
       acts.append(b);
     };
     act(i18n.t('acct.btn.editBalance'),
-      i18n.t('acct.aria.balance', { name: a.name, amount: money(a.balance) }), () => editBalance(a));
+      i18n.t('acct.aria.balance', { name: a.name, amount: drawerBal }), () => editBalance(a));
     const primary = [...r.labels][0];
     if (primary) {
       act(i18n.t('acct.btn.seeTx'), i18n.t('acct.aria.showTx', { name: a.name }),
@@ -1197,14 +1392,14 @@ module.exports = function registerAccounts(ctx) {
         i18n.t('acct.drawer.drift', {
           count: rec.count,
           date: a.balance_updated,
-          implied: money(rec.implied),
-          diff: money(Math.abs(diff), 0),
+          implied: acctMoney(a, rec.implied),
+          diff: acctMoney(a, Math.abs(diff), 0),
           dir: i18n.t(diff < 0 ? 'acct.drawer.lower' : 'acct.drawer.higher'),
         }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '')));
       const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: money(rec.implied) }) },
+        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: acctMoney(a, rec.implied) }) },
         icoEl(['check']), i18n.t('acct.recon.useThis'));
-      btn.addEventListener('click', () => acceptImplied(a, rec.implied));
+      btn.addEventListener('click', () => acceptImplied(a, rec.implied, rec));
       line.append(btn);
       return line;
     }
@@ -1329,64 +1524,72 @@ module.exports = function registerAccounts(ctx) {
   function renderTable(rows) {
     const table = $('#acctTable');
     if (!table) return;
-    table.empty();
     const v = view();
     const shown = visibleRows(rows);
 
-    const head = el('tr', {},
-      sortHeader('name', i18n.t('acct.col.account')),
-      sortHeader('balance', i18n.t('acct.col.balance')),
-      sortHeader('flow', periodMonthName(S.period)),
-      colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')), 'month'),
-      colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')), 'goal'),
-      sortHeader('stale', i18n.t('acct.col.confirmed')),
-      colHeader(el('th', { scope: 'col' }, i18n.t('acct.col.state')), 'state'),
-      /* The label is for a screen reader, not for the eye. Spelling "Notes"
-         out visibly made the column 76px wide to hold a 26px chip, which
-         pushed the whole table 24px past its card at 1280 — and the column it
-         clipped was this one. A column of icons needs no word over it; a `th`
-         with no accessible name at all would leave every chip in it announced
-         without the one word that says what the column is. */
-      el('th', { class: 'acct-col-notes', scope: 'col' },
-        el('span', { class: 'sr-only' }, i18n.t('acct.col.notes'))));
-    head.children[2].classList.add('acct-col-drop', 'num');
-    head.children[5].classList.add('acct-col-drop');
-    /* See the note on COL_MIN above: fixed layout is what makes a stored width
-       real, and it is switched on only for a table that has one. */
-    table.classList.toggle('is-sized', resizingOn() && Object.keys(widths()).length > 0);
-    table.append(el('thead', {}, head));
+    /* keepScroll: this is the widest table in the plugin, and every wide
+       table in it (Assets, Debts) already rebuilds inside this wrapper — see
+       dom.js's own note on why. Without it, every render (a filter click, a
+       drawer opening, even the file watcher firing from an import running in
+       another window) snapped a reader mid-scroll on a phone back to the
+       leftmost column. */
+    keepScroll(table, () => {
+      table.empty();
+      const head = el('tr', {},
+        sortHeader('name', i18n.t('acct.col.account')),
+        sortHeader('balance', i18n.t('acct.col.balance')),
+        sortHeader('flow', periodMonthName(S.period)),
+        colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')), 'month'),
+        colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')), 'goal'),
+        sortHeader('stale', i18n.t('acct.col.confirmed')),
+        colHeader(el('th', { scope: 'col' }, i18n.t('acct.col.state')), 'state'),
+        /* The label is for a screen reader, not for the eye. Spelling "Notes"
+           out visibly made the column 76px wide to hold a 26px chip, which
+           pushed the whole table 24px past its card at 1280 — and the column it
+           clipped was this one. A column of icons needs no word over it; a `th`
+           with no accessible name at all would leave every chip in it announced
+           without the one word that says what the column is. */
+        el('th', { class: 'acct-col-notes', scope: 'col' },
+          el('span', { class: 'sr-only' }, i18n.t('acct.col.notes'))));
+      head.children[2].classList.add('acct-col-drop', 'num');
+      head.children[5].classList.add('acct-col-drop');
+      /* See the note on COL_MIN above: fixed layout is what makes a stored width
+         real, and it is switched on only for a table that has one. */
+      table.classList.toggle('is-sized', resizingOn() && Object.keys(widths()).length > 0);
+      table.append(el('thead', {}, head));
 
-    const body = el('tbody', {});
-    const emit = r => {
-      body.append(accountRow(r));
-      if (v.open === r.a.name) body.append(drawerRow(r));
-    };
+      const body = el('tbody', {});
+      const emit = r => {
+        body.append(accountRow(r));
+        if (v.open === r.a.name) body.append(drawerRow(r));
+      };
 
-    if (!shown.length) {
-      body.append(el('tr', { class: 'acct-empty' },
-        el('td', { colspan: '8' },
-          S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
-    } else if (v.grouped) {
-      for (const [key] of ACCT_GROUPS) {
-        const inGroup = shown.filter(r => r.group === key);
-        if (!inGroup.length) continue;
-        const total = inGroup.reduce((s, r) => s + r.a.balance, 0);
-        /* Same disclosure as the hero, at group scale: a Bank total that has
-           quietly added euros to rands is marked where the total is, not in a
-           legend somewhere else on the page. */
-        const mixed = currenciesIn(inGroup.map(r => r.a), S.settings.currency).length > 1;
-        body.append(el('tr', { class: 'type-row' },
+      if (!shown.length) {
+        body.append(el('tr', { class: 'acct-empty' },
           el('td', { colspan: '8' },
-            i18n.t(key),
-            el('span', { class: 'acct-group-total num' }, money(total),
-              ...(mixed ? [el('span', { class: 'acct-mixed',
-                title: i18n.t('acct.mixedTitle') }, '*')] : [])))));
-        for (const r of inGroup) emit(r);
+            S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
+      } else if (v.grouped) {
+        for (const [key] of ACCT_GROUPS) {
+          const inGroup = shown.filter(r => r.group === key);
+          if (!inGroup.length) continue;
+          const total = inGroup.reduce((s, r) => s + r.a.balance, 0);
+          /* Same disclosure as the hero, at group scale: a Bank total that has
+             quietly added euros to rands is marked where the total is, not in a
+             legend somewhere else on the page. */
+          const mixed = currenciesIn(inGroup.map(r => r.a), S.settings.currency).length > 1;
+          body.append(el('tr', { class: 'type-row' },
+            el('td', { colspan: '8' },
+              i18n.t(key),
+              el('span', { class: 'acct-group-total num' }, money(total),
+                ...(mixed ? [el('span', { class: 'acct-mixed',
+                  title: i18n.t('acct.mixedTitle') }, '*')] : [])))));
+          for (const r of inGroup) emit(r);
+        }
+      } else {
+        for (const r of shown) emit(r);
       }
-    } else {
-      for (const r of shown) emit(r);
-    }
-    table.append(body);
+      table.append(body);
+    });
 
     const sub = $('#acctTblSub');
     if (sub) {
@@ -1677,7 +1880,11 @@ module.exports = function registerAccounts(ctx) {
     const labels = (S.txFolders || []).filter(n => accountForLabel(n) === a);
     const folders = labels.map(n => ctx.folderAt(`Transactions/${n}`)).filter(Boolean);
     const files = Object.values(S.txFiles).filter(f => labels.includes(f.label));
-    const rows = files.reduce((n, f) => n + f.rows.length, 0);
+    /* !isSplitPart, like every other raw-row consumer on this page — a split's
+       parts are rows THIS APP created out of one statement line, not lines the
+       bank printed, so counting them here offered to delete "130 transactions"
+       for an account whose statements held 100. */
+    const rows = files.reduce((n, f) => n + f.rows.filter(row => !isSplitPart(row)).length, 0);
 
     let dropFolder = false;
     if (folders.length) {

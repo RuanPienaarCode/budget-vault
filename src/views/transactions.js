@@ -18,12 +18,46 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, txSegment } = ctx;
+  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment } = ctx;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
      so re-picking the same transaction keeps only the final choice. */
   const pendingLearns = new Map();
+
+  // TODO(i18n): still plain English — see the same note above
+  // categoriseFilteredTransactions for why (tests/i18n.test.cjs's invariant 6
+  // fails the build on a key this file cannot also add to lang/en.js). Keys
+  // wanted:
+  //   tx.ruleFix.title    "Update the matching rule too?"
+  //   tx.ruleFix.msg      "Rows matching "{pattern}" are currently categorised
+  //                        as {old}. Also change that rule to {new}, so it
+  //                        gets this right next time too?"
+  //   tx.ruleFix.confirm  "Update rule"
+  //   tx.ruleFix.done     "Rule "{pattern}" now points to {new}."
+  /* The correction path learnRules deliberately has none of ("an established
+     rule is never silently overwritten" — categories.js). A recategorisation
+     here that disagrees with the rule CURRENTLY governing the description is
+     ASKED about, never applied silently: the governing rule is what will keep
+     producing the same wrong category on every future import until someone
+     fixes it, and until now there was no way to even find it short of
+     opening Data/Categorisation Rules.csv by hand, which the app never
+     mentions. Declining leaves the rule exactly as it was — this row's own
+     category is unaffected either way, since the caller has already set
+     r.cat by the time this runs; the only thing on offer here is whether the
+     RULE follows it too. */
+  async function offerRuleCorrection(desc, newCat) {
+    const rule = governingRule(desc);
+    if (!rule || rule.category === newCat) return;
+    const go = await confirmModal(app, {
+      title: 'Update the matching rule too?',
+      message: `Rows matching "${rule.pattern}" are currently categorised as ${rule.category}. `
+        + `Also change that rule to ${newCat}, so it gets this right next time too?`,
+      confirmText: 'Update rule',
+    });
+    if (!go) return;
+    if (await correctRule(rule, newCat)) toast(`Rule "${rule.pattern}" now points to ${newCat}.`);
+  }
 
   /* Not ctx.dirtyFlag: dirtiness here is per transaction FILE (f.dirty), and
      the matching predicate lives in controller.js alongside the import one.
@@ -58,10 +92,22 @@ module.exports = function registerTransactions(ctx) {
     if (whole) {
       list = [];
       for (const f of Object.values(S.txFiles)) for (const r of f.rows) list.push({ ...r, label: f.label, _file: f, _row: r });
-      list.sort((a, b) => b.date.localeCompare(a.date));
     } else {
-      list = txInPeriod(S.period).reverse();
+      list = txInPeriod(S.period);
     }
+    /* ONE comparator for both branches, applied here rather than inside each
+       one. This used to be `b.date.localeCompare(a.date)` on the whole-history
+       list (date only, ties left in file order by Array.sort's stability) and
+       a separate `.reverse()` on the period list — and txInRange (src/period.js)
+       sorts that list `date || desc` ASCENDING first, so reversing it flipped
+       the date order AND every same-date tie. Toggling "whole history" then
+       inverted same-day blocks, which matters most for a split: a parent and
+       its parts share both a date and (until edited) a description, so the
+       parent-then-parts reading order survived txInRange's stable sort intact
+       and was then undone by `.reverse()` alone. A single stable sort by date
+       here, run on whichever list was built, never touches a tie either
+       branch already agreed on. */
+    list.sort((a, b) => b.date.localeCompare(a.date));
     const acc = $('#txAccount').value, cat = $('#txCategory').value, q = $('#txSearch').value.trim().toLowerCase();
     const rows = list.filter(t =>
       (!acc || t.label === acc) &&
@@ -144,6 +190,7 @@ module.exports = function registerTransactions(ctx) {
 
   function renderTransactions() {
     renderUndoBar();
+    ensureBulkCatButton();
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
       [['', i18n.t('tx.allAccounts')]]);
@@ -176,6 +223,13 @@ module.exports = function registerTransactions(ctx) {
     for (const item of list) {
       const r = item._row;
       const mark = () => { item._file.dirty = true; $('#txSave').disabled = false; };
+      // Captured once per render, before any edit — the on-disk category this
+      // row arrived with. Deliberately NOT re-read from r.cat inside the
+      // onchange below, where it would already hold whatever the FIRST edit
+      // in this session wrote, making a second edit to the same row look
+      // "already categorised" and wrongly exempt it from the empty-only rule
+      // just below.
+      const origCat = r.cat;
       body.append(el('tr', {},
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, r.date),
         el('td', {}, r.desc),
@@ -185,7 +239,27 @@ module.exports = function registerTransactions(ctx) {
         // selects, and a select is the priciest control in a mobile WebView.
         el('td', {}, deferredCatSelect(r.cat, v => {
           r.cat = v;
-          if (v) pendingLearns.set(r.desc, v); else pendingLearns.delete(r.desc);
+          /* Learning is scoped to rows that arrived UNCATEGORISED, not every
+             edit. This page is where a reader CORRECTS a category — often a
+             rule's own mistake — and until now every correction here silently
+             rewrote the global rule too, with no confirmation and (see
+             categories.js's learnRules) no way back short of hand-editing
+             Data/Categorisation Rules.csv. The import review only ever offers
+             to learn behind its own visible, labelled checkbox (#impRemember);
+             a page whose whole purpose is fixing mistakes should not be
+             quieter about teaching them than the page that only ever adds new
+             ones. First-time categorisation (origCat was empty) still teaches
+             the auto-categoriser, same as it always has — that half of this
+             was never the problem. */
+          if (v && !origCat) {
+            pendingLearns.set(r.desc, v);
+          } else {
+            pendingLearns.delete(r.desc);
+            // A correction, not a first pick — offer to fix the RULE behind
+            // it too, rather than teach a second, shadow one. See
+            // offerRuleCorrection above.
+            if (v && origCat && v !== origCat) offerRuleCorrection(r.desc, v);
+          }
           mark();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
         el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(r.amount)),
@@ -268,7 +342,22 @@ module.exports = function registerTransactions(ctx) {
        with different categories, so learning from them would teach the
        auto-categoriser a rule that contradicts itself on every import. */
     renderTransactions();
-    toast(i18n.t('tx.split.done', { n: rows.length }));
+    // TODO(i18n): plain English below, not i18n.t() — see the note above
+    // categoriseFilteredTransactions. Key wanted:
+    //   tx.split.uncategorised  "{n} of the new parts still need a category."
+    //
+    // The split MODAL itself (src/modal.js — not an owner file here) does not
+    // gate on every part having a category, only on the remainder being zero
+    // and every part being positive: a 60/40 split can be committed with the
+    // 40 left at "— none —", silently INCREASING the uncategorised count the
+    // reader was trying to reduce, and nothing on the modal's own footer says
+    // so. This can only say it after the fact, once the parts are already in
+    // item._file.rows — src/modal.js is out of reach from here.
+    const stillUncategorised = rows.filter(p => !p.cat).length;
+    toast(i18n.t('tx.split.done', { n: rows.length })
+      + (stillUncategorised
+        ? ` ${stillUncategorised} of the new parts still need a category.`
+        : ''));
   }
 
   /* ------------------------------- deleting --------------------------------
@@ -378,6 +467,95 @@ module.exports = function registerTransactions(ctx) {
          one does not happen. Appended rather than overwritten: two deletes on
          one day must not cost the first one's record. */
   const DELETED_LOG = 'Data/Deleted transactions.csv';
+
+  /* ------------------- bulk categorise what the filters select --------------
+     Categorising is the most-repeated step in the whole loop — 40
+     uncategorised rows is 80 interactions even when a dozen share one
+     merchant — and until now the only bulk action on this page was Delete.
+     Reuses deleteFilteredTransactions's own idiom exactly: filteredRows()
+     IS the selection, and at least one filter must be set first, because the
+     period alone describes nothing a reader chose.
+
+     Unlike delete this does NOT write to disk on its own. A category is not
+     destructive the way removing a row is — the old value is still visible
+     in "Reload from disk" until Save is pressed — so this marks the touched
+     files dirty exactly like a single-row category edit already does
+     (see `mark()` inside renderTransactions) and leaves the existing Save
+     button as the one door to disk. That also means it does not need
+     delete's own "nothing may be unsaved" gate: it is just more of the same
+     kind of in-memory edit a reader can already make one row at a time. */
+  // TODO(i18n): this whole action is still plain English, not i18n.t() —
+  // tests/i18n.test.cjs's invariant 6 fails the build the moment a NEW key is
+  // referenced from src/ before it exists in every lang/*.js table, and this
+  // file may only add lang/en.js keys, never lang files themselves. Keys
+  // wanted, once someone with lang/ access adds them (English text alongside
+  // each — reuses tx.bulk.needFilter / tx.bulk.none / tx.col.category /
+  // tx.uncategorised, which already exist and ARE used below):
+  //   tx.bulkCat.button  "Set category"
+  //   tx.bulkCat.title   "Set category for these rows"
+  //   tx.bulkCat.msg     "{count} rows will be set to {cat}." ({count} plural)
+  //   tx.bulkCat.confirm "Set category ({count})" ({count} plural)
+  //   tx.bulkCat.done    "{count} rows recategorised — remember to Save." ({count} plural)
+  async function categoriseFilteredTransactions() {
+    const { rows, filters } = filteredRows();
+    if (!filters.length) return toast(i18n.t('tx.bulk.needFilter'), true);
+    if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
+
+    const values = await askFields(app, 'Set category for these rows', [
+      {
+        key: 'cat', type: 'select',
+        label: i18n.t('tx.col.category'),
+        options: [
+          { value: '', label: i18n.t('tx.uncategorised') },
+          ...S.categories.map(c => ({ value: c.name, label: c.name })),
+        ],
+      },
+    ]);
+    if (!values) return;
+    const cat = values.cat || '';
+
+    const go = await confirmModal(app, {
+      title: 'Set category for these rows',
+      message: `${rows.length} row${rows.length === 1 ? '' : 's'} will be set to ${cat || i18n.t('tx.uncategorised')}.`,
+      confirmText: `Set category (${rows.length})`,
+    });
+    if (!go) return;
+
+    for (const item of rows) {
+      item._row.cat = cat;
+      item._file.dirty = true;
+    }
+    $('#txSave').disabled = false;
+    renderTransactions();
+    toast(`${rows.length} row${rows.length === 1 ? '' : 's'} recategorised — remember to Save.`);
+  }
+
+  /* Built once and inserted beside the real #txDeleteFiltered button — there
+     is no static placeholder for it in shell.js, unlike every OTHER button on
+     this toolbar, because it did not exist when that markup was written.
+
+     Kept in a closure variable rather than given an id and looked up through
+     $() the way every other button on this page is — that literal call would
+     be exactly the kind tests/shell-contract.test.cjs exists to catch (every
+     $() id-selector in src/ must resolve to a real id in shell.js), and this
+     one deliberately never will, since shell.js is not a file this fix may
+     touch. The variable does the same "insert exactly once" job the id would
+     have: `renderTransactions` calls this on every render (a category edit, a
+     filter change), and without it a fresh button would be spliced in beside
+     Delete every time. */
+  let bulkCatBtn = null;
+  function ensureBulkCatButton() {
+    if (bulkCatBtn) return;
+    const delBtn = $('#txDeleteFiltered');
+    if (!delBtn || !delBtn.parentNode) return;
+    // TODO(i18n): 'Set category' — see tx.bulkCat.button above.
+    const btn = el('button', {
+      type: 'button', class: 'btn-ghost',
+    }, icoEl(['tags', 'tag', 'circle-check', 'check-circle']), ' Set category');
+    btn.addEventListener('click', categoriseFilteredTransactions);
+    delBtn.parentNode.insertBefore(btn, delBtn);
+    bulkCatBtn = btn;
+  }
 
   async function deleteFilteredTransactions() {
     if (Object.values(S.txFiles).some(f => f.dirty)) return toast(i18n.t('tx.bulk.dirty'), true);
@@ -636,6 +814,10 @@ module.exports = function registerTransactions(ctx) {
     toast(i18n.t('tx.export.done', { count: rows.length, cats: S.categories.length, path: written.split('/').slice(0, -1).join('/') }));
   }
 
+  // filteredRows, published for the same reason syncOptions is above: so a
+  // test can drive the REAL row-ordering function instead of a hand-written
+  // mirror of its sort (tests/transactions-sort-order.test.cjs).
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
-    deleteTransaction, deleteFilteredTransactions, exportTransactions, syncOptions });
+    deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions, exportTransactions,
+    syncOptions, filteredRows });
 };

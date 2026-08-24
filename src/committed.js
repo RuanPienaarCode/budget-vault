@@ -492,6 +492,16 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
        cycle; inside one, cash - committedOther = free directly). */
     committedOther,
     incoming,
+    /* What `free` becomes once `incoming` lands — computed HERE, once, because
+       the view cannot safely do it. `incoming` and `cycle.settling` are the
+       SAME credit: inside a settlement cycle `free` already excludes cardDue
+       on the grounds that the card is handled by its own band below, and that
+       band is funded by exactly this salary. So `free + incoming.amount` spent
+       the same money twice and overstated the one figure on this card that
+       answers "what is safe to spend" — by the whole card balance. Null when
+       nothing is arriving, so the view renders no sentence rather than a
+       sentence about zero. */
+    afterIncoming: incoming ? free + incoming.amount - (cycle ? cardDue : 0) : null,
     cardSpend,
     cycle,
     /* Reported beside the figures, deliberately absent from every one of them:

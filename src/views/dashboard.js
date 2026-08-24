@@ -12,6 +12,7 @@ const { scoreBand, SCORE_BANDS, FULL_MARKS } = require('../health-math');
 const { todayIso } = require('../dates');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
+const { currenciesIn } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
@@ -22,10 +23,10 @@ const {
    percentage column is allocated by largest remainder, never rounded per
    slice. Re-exported at the bottom of this file so the donut test keeps
    reading each view's own door. */
-const { sharePercents } = require('../share-percents');
+const { sharePercents, largestRemainder } = require('../share-percents');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -159,8 +160,17 @@ module.exports = function registerDashboard(ctx) {
       ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
         /* A REAL space, not only the margin below it: the tile's accessible
            name is its text content, and "3.9months" is what a screen reader
-           would have said. */
-        [H.months.toFixed(1), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
+           would have said.
+
+           The separator between the whole and fractional digit comes from
+           the country profile (locale().decimal), not from toFixed()'s own
+           output — toFixed(1) always writes a literal '.', which is correct
+           for en-US but wrong for the default za profile (","), and every
+           OTHER number on this card is money, run through money() which
+           already makes this same substitution. Left as toFixed()'s raw
+           string, this was the one figure on the card reading "3.9" beside
+           "R 1 234,50" and "13%". */
+        [H.months.toFixed(1).replace('.', locale().decimal), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
         i18n.t('dash.health.months'),
         i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }))
       : fig('', '—', i18n.t('dash.health.months'),
@@ -214,9 +224,14 @@ module.exports = function registerDashboard(ctx) {
     /* "Debt-free" is a claim about the household; "none recorded" is a claim
        about the vault. Saying the first when only the second is known is the
        one place this tile could mislead, and it costs a word to be right. */
+    /* A THIRD state sits between those two: debts are recorded but not one of
+       them states a rate, so what they cost is unknown rather than nothing.
+       Without this branch a null interest fell straight through to "debt-free"
+       and the tile congratulated a household carrying R250 000. */
     const debtMeta = debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) })
-      : snap.debtsRecorded ? i18n.t('dash.health.debtFree')
-        : i18n.t('dash.health.debtNone');
+      : debtInterest === null ? i18n.t('dash.health.debtNoRate')
+        : snap.debtsRecorded ? i18n.t('dash.health.debtFree')
+          : i18n.t('dash.health.debtNone');
     const debtTile = H.interestShare !== null
       ? fig(H.interestShare <= 0 ? 'is-good' : H.interestShare < 0.05 ? 'is-fair' : 'is-poor',
         pct(H.interestShare),
@@ -376,6 +391,16 @@ module.exports = function registerDashboard(ctx) {
     cashParts.push(i18n.t('dash.left.counted', { count: L.countedAccounts }));
     if (staleCount) cashParts.push(i18n.t('dash.left.unconfirmed', { count: staleCount }));
     if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
+    /* Same disclosure as the position tiles above and views/accounts.js's own
+       hero: cashOnHand (committed.js) adds every in-budget account's implied
+       balance with no conversion, so a euro account folded straight into a
+       rand cash figure with nothing on screen saying so. `.trim()` because
+       acct.hero.mixed carries its own leading space for sentence-appending;
+       this card joins fragments with ' · ' instead. */
+    const cashCurrencies = currenciesIn(S.accounts.filter(a => a.in_budget !== false), S.settings.currency);
+    if (cashCurrencies.length > 1) {
+      cashParts.push(i18n.t('acct.hero.mixed', { symbols: cashCurrencies.join(' · ') }).trim());
+    }
 
     const comParts = [];
     if (L.counts.service) comParts.push(i18n.t('dash.left.orders', { count: L.counts.service }));
@@ -399,28 +424,49 @@ module.exports = function registerDashboard(ctx) {
        claim, and `cycle` is null for it. So the fourth term appears exactly when
        the subtraction is true. */
     const showCardTerm = L.cardDue > 0 && !L.cycle;
+    /* The strip prints a literal equation with a rendered '−' and '=' between
+       the terms, so it has to actually BALANCE at whatever precision it is
+       printed at. Each of the four money(…, 0) calls used to round its own
+       term independently — cash, committed and card do not generally round
+       to whole rand in a way that keeps summing once each is truncated on
+       its own, so "R 12 000 − R 1 501 = R 10 500" printed beside terms whose
+       displayed values actually summed to R 10 499. Rounded ONCE here and
+       the result term DERIVED from the same rounded integers — committed.js's
+       own identity (cash − committedOther − cardDue = free outside a cycle,
+       cash − committedOther = free inside one; see the comment on
+       `committedOther` there) — so the printed equation is exact by
+       construction rather than four independent roundings that usually, but
+       not always, happen to agree. */
+    const dCash = L.cashKnown ? Math.round(L.cash) : null;
+    const dCommitted = Math.round(L.committedOther);
+    const dCard = showCardTerm ? Math.round(L.cardDue) : 0;
+    const dFree = dCash === null ? null : dCash - dCommitted - dCard;
     const op = () => el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−');
     const grid = el('div', { class: `left-grid${showCardTerm ? ' left-grid--card' : ''}` },
-      fig('is-cash', L.cashKnown ? money(L.cash, 0) : '—',
+      fig('is-cash', dCash !== null ? money(dCash, 0) : '—',
         i18n.t('dash.left.cash'), cashParts.join(' · ')),
       op(),
-      fig('is-committed', money(L.committedOther, 0),
+      fig('is-committed', money(dCommitted, 0),
         i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')));
     if (showCardTerm) {
-      grid.append(op(), fig('is-card', money(L.cardDue, 0),
+      grid.append(op(), fig('is-card', money(dCard, 0),
         i18n.t('dash.left.cardDue'),
         L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })));
     }
     /* With the settled card out of the chain, `free` comes out of it too —
        committed.js already accounts for that (see the settlement-cycle
-       comment there), so this reads straight off L.free/L.short rather than
-       recomputing a second figure the view could drift out of step with. The
-       per-day rate, the "short/covered" sentence below and the bar's
-       aria-label all read the SAME L.free for exactly that reason. */
+       comment there). L.short still decides the WORD and the colour: it is
+       committed.js's own cent-precise verdict, immune to the float quirk its
+       own comment documents (freeCents) — a rand-rounded dFree of exactly 0
+       cannot be trusted to say which side of zero a near-exact break-even
+       actually sits on. Only the printed NUMBER now comes from dFree, so the
+       equation above it holds; the per-day rate and the bar below still read
+       L.free, for the same reason they always have — this strip is the one
+       place the printed arithmetic has to survive being re-added by eye. */
     grid.append(el('div', { class: 'left-op', 'aria-hidden': 'true' }, '='),
       /* "Short", never a negative amount of free money — a minus sign in front
          of a figure labelled "actually free" is a sentence that means nothing. */
-      fig(L.short ? 'is-short' : 'is-free', money(Math.abs(L.free), 0),
+      fig(L.short ? 'is-short' : 'is-free', money(Math.abs(dFree ?? L.free), 0),
         i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
     body.append(grid);
 
@@ -453,7 +499,10 @@ module.exports = function registerDashboard(ctx) {
        With it, the card answers the question actually being asked: not "am I
        short" but "am I short until payday". */
     if (L.incoming) {
-      const after = L.free + L.incoming.amount;
+      /* Read, never recomputed: inside a settlement cycle this credit is
+         already spoken for by the card band, and adding it to `free` here
+         counted it twice. whatsLeft owns that netting — see afterIncoming. */
+      const after = L.afterIncoming;
       body.append(el('div', { class: 'left-incoming' },
         icoEl(['arrow-down-circle', 'circle-arrow-down', 'arrow-down']),
         el('div', {},
@@ -582,8 +631,17 @@ module.exports = function registerDashboard(ctx) {
      worth() for the balance-sheet halves and owedSummary() for the lending
      ledger, the same functions the Savings, Debt and Owed pages call. A tile
      that disagrees with the page it links to is worse than no tile. */
-  const balanceOf = type => S.accounts.filter(a => a.type === type)
-    .reduce((t, a) => t + (a.balance || 0), 0);
+  /* Case-folded and trimmed against the account's own type, not compared raw.
+     `load.js` only defaults `type` when the key is ABSENT, so `type: Savings`,
+     `type: TFSA` or `type: ' savings '` all reach here exactly as written in
+     the file — and worth() beside this tile splits every account by SIGN, not
+     by type, so it counts that same balance while this filter silently
+     dropped it. worth.js:122-141 documents the identical trap costing the
+     Savings composition chart R80 000 in an account of an unrecognised type;
+     it was never applied here, so a household holding R85 000 saw this tile
+     read R5 000 while net worth beside it counted the full amount. */
+  const accountsOfType = type => S.accounts.filter(a => String(a.type || '').trim().toLowerCase() === type);
+  const balanceOf = type => accountsOfType(type).reduce((t, a) => t + (a.balance || 0), 0);
 
   /* A tile whose value is a button into the page that owns it. kpiTiles() is
      not used here because its tiles are inert by design — these are summaries
@@ -609,6 +667,13 @@ module.exports = function registerDashboard(ctx) {
     const owed = owedSummary(S.owed);
     const savings = balanceOf('savings');
     const invest = balanceOf('investment');
+    /* currency.js is explicit that a total spanning more than one currency is
+       "still added up — and SAYS SO, via currenciesIn()". views/accounts.js
+       already discloses this under its own hero; these two tiles add every
+       balance the same unconverted way and said nothing. */
+    const netWorthCurrencies = currenciesIn(S.accounts, S.settings.currency);
+    const savingsCurrencies = currenciesIn(
+      [...accountsOfType('savings'), ...accountsOfType('investment')], S.settings.currency);
 
     /* A vault that has none of this yet gets no band at all. Four tiles reading
        R0.00 is not an empty state, it is a balance sheet asserting that the
@@ -629,7 +694,8 @@ module.exports = function registerDashboard(ctx) {
     posTile(grid, {
       label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0),
       cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
-      sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) }),
+      sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) })
+        + (netWorthCurrencies.length > 1 ? i18n.t('acct.hero.mixed', { symbols: netWorthCurrencies.join(' · ') }) : ''),
       view: 'savings',
       say: i18n.t('dash.pos.netWorthSay', { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) }),
     });
@@ -692,7 +758,8 @@ module.exports = function registerDashboard(ctx) {
        and the eye stops being able to tell which of the four is the headline. */
     posTile(grid, {
       label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0),
-      sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) }),
+      sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
+        + (savingsCurrencies.length > 1 ? i18n.t('acct.hero.mixed', { symbols: savingsCurrencies.join(' · ') }) : ''),
       view: 'savings',
       say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) }),
     });
@@ -840,8 +907,25 @@ module.exports = function registerDashboard(ctx) {
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
         el('div', {}, el('div', { class: 'sv' }, money(sum.spend)),
           usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
+    /* A real <button>, not a plain <div> — this is the app's clearest
+       statement of outstanding work and, until now, the one figure on the
+       whole hero a reader could not act on or even reach from a keyboard.
+       class="stat" rather than a new component: the global button reset in
+       styles.css (".budget-app-root button") already neutralises Obsidian's
+       and the browser's native chrome, and .stat's own rules (cascade order
+       puts them after the reset) still decide the flex row, the baseline
+       alignment and the border — so a <button class="stat"> lays out exactly
+       like the <div> it replaces. openUncategorised() below is the same
+       drill-through openCategory() already does, pointed at the '__none__'
+       sentinel shell.js's static "Uncategorised" option and transactions.js's
+       own filter both already understand.
+
+       No new aria-label, and no new i18n key for one: the button's own text
+       — "Uncategorised", the count, "Review" — already reads as the thing
+       being activated, the same call the health card's fig() makes just
+       above in this file for exactly the same reason. */
     if (sum.uncategorised > 0) statCol.append(
-      el('div', { class: 'stat' },
+      el('button', { type: 'button', class: 'stat', onclick: openUncategorised },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.uncategorised'))),
         el('div', {}, el('div', { class: 'sv text-warning' }, String(sum.uncategorised)),
           el('div', { class: 'st' }, i18n.t('dash.stat.review')))));
@@ -914,8 +998,36 @@ module.exports = function registerDashboard(ctx) {
       if (!cat) continue;
       const type = catType(cat);
       if (type === 'transfer') continue;
-      const r = rows.get(cat) || rows.set(cat, { budget: 0, type: type || 'expense', actual: 0, notes: '' }).get(cat);
-      r.actual += type === 'income' ? amt : -amt;
+      /* An assume-spent row was already seeded above with its actual equal to
+         the budgeted amount — it IS its own actual, not a running total that
+         this period's transactions add to. Skipping it here is what the Budget
+         page already does (views/budgets.js: `assumed ? d.amount : …` REPLACES
+         rather than accumulates); without this a payment categorised to the
+         same category the row assumed spent piled its amount on top of the
+         seed, doubling both Spent and the red "over budget" it produced —
+         while the Budget page, reading the same category, stayed on budget. */
+      const existing = rows.get(cat);
+      if (existing && existing.assumed) continue;
+      /* An ORPHANED category — catType(cat) === null, either a name no
+         category file has ever answered to, or one whose file has since
+         been deleted (catKnown/catType in period.js draw that line) — has no
+         reliable sign to guess. `type || 'expense'` used to fall straight to
+         the else branch and sign-flip a positive DEPOSIT into a negative
+         "Spent" figure, the same wrong-bucket trap period.js's own comment on
+         `net` warns about, just re-introduced one file downstream of the fix.
+
+         A row that already carries a budget entry (this category is still
+         IN the budget file, only its category note is gone) keeps signing by
+         its OWN recorded type — read off the budget row itself, not off the
+         missing category file — so a still-budgeted category is unaffected.
+         A row with no budget entry at all has no type from anywhere and is
+         left out of this table entirely, same as periodSummary's own
+         `unknown` bucket and what renderHero already discloses by name
+         instead of guessing a sign for it. */
+      if (type === null && !existing) continue;
+      const r = existing || rows.set(cat, { budget: 0, type: type || 'expense', actual: 0, notes: '' }).get(cat);
+      const signType = type === null ? r.type : type;
+      r.actual += signType === 'income' ? amt : -amt;
     }
     const order = typeOrder(S.settings.groups);
     const sorted = [...rows.entries()].sort((a, b) =>
@@ -982,7 +1094,23 @@ module.exports = function registerDashboard(ctx) {
     const periods = trendPeriods(want);
     const data = periods.map(p => {
       const sum = periodSummary(p);
-      return { p, spent: sum.spend, income: sum.income, budget: budgetTotals(p).spend, label: periodShortLabel(p) };
+      return {
+        p, spent: sum.spend, income: sum.income, budget: budgetTotals(p).spend, label: periodShortLabel(p),
+        /* Whether the vault covers this period AT ALL — periodSpend's own
+           count, uncapped, the same test compareTotals already relies on to
+           keep a never-imported month out of its own baseline. A period that
+           fails this is not "spent nothing", it is a gap nothing was ever
+           imported into, and drawing it as a real zero is the spend/income
+           lines doing exactly what the budget line's comment below (see
+           flushBudgetRun) already refuses to do for the budget line. */
+        covered: periodSpend(p, null).count > 0,
+        /* The period on screen right now, mid-cycle. Always the LAST point —
+           trendPeriods builds backwards from S.period and reverses — and
+           whatever days of it have posted so far are real, but the point
+           reads as a complete period same as every other, which on day 3 of
+           a month reads as a collapse in spending nobody caused. */
+        running: p === currentPeriod(),
+      };
     });
 
     /* The pills live in the header, but they are rebuilt here so the active
@@ -1040,8 +1168,22 @@ module.exports = function registerDashboard(ctx) {
     const fill = areaGradient(add, 'trendSpentArea', c.success);
     gridlines(add, s, W);
 
-    const spentPts = data.map((d, i) => [s.x(i), s.y(d.spent)]);
-    add('path', { d: areaPath(spentPts, s.baseline), fill });
+    /* One area fill per unbroken run of COVERED periods, never one continuous
+       shape across the whole width — the same reasoning as flushBudgetRun
+       just below, applied to the fill under the spend line rather than the
+       budget line drawn on top of it. A gap the vault never imported has no
+       real zero to fill down to, and a single areaPath spanning the whole
+       chart drew exactly that V across it. */
+    let spentAreaRun = [];
+    const flushSpentArea = () => {
+      if (spentAreaRun.length > 1) add('path', { d: areaPath(spentAreaRun, s.baseline), fill });
+      spentAreaRun = [];
+    };
+    data.forEach((d, i) => {
+      if (d.covered) spentAreaRun.push([s.x(i), s.y(d.spent)]);
+      else flushSpentArea();
+    });
+    flushSpentArea();
 
     /* One dashed run per unbroken stretch of BUDGETED periods, never a single
        line across the lot.
@@ -1079,36 +1221,76 @@ module.exports = function registerDashboard(ctx) {
 
     /* Income sits above spend in a healthy period, so it is drawn before the
        spend line and thinner — it is context for the spend line, not a rival
-       to it. */
-    add('path', {
-      d: linePath(data.map((d, i) => [s.x(i), s.y(d.income)])),
-      fill: 'none', stroke: c.info, 'stroke-opacity': '0.85',
-      'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+       to it.
+
+       Broken into runs of COVERED periods for the same reason as the spend
+       area above it: one continuous path across a never-imported gap draws
+       income falling to zero for a month nobody's statement ever reached. */
+    let incomeRun = [];
+    const flushIncome = () => {
+      if (incomeRun.length > 1) {
+        add('path', {
+          d: linePath(incomeRun),
+          fill: 'none', stroke: c.info, 'stroke-opacity': '0.85',
+          'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+        });
+      } else if (incomeRun.length === 1) {
+        add('circle', { cx: incomeRun[0][0], cy: incomeRun[0][1], r: '2', fill: c.info, 'fill-opacity': '0.85' });
+      }
+      incomeRun = [];
+    };
+    data.forEach((d, i) => {
+      if (d.covered) incomeRun.push([s.x(i), s.y(d.income)]);
+      else flushIncome();
     });
+    flushIncome();
 
     /* Segment by segment rather than one polyline, so a period that broke its
        budget colours only the legs touching it. Kept in a list so the two legs
        touching a focused point can thicken without the rest of the line
-       moving — see focusAt below. */
+       moving — see focusAt below.
+
+       Still ONE entry pushed per pair, covered or not — focusAt indexes this
+       array by data index (k === i - 1 || k === i), so dropping an entry for
+       a gap pair would shift every later index out from under that lookup.
+       A gap leg is drawn at opacity 0 instead: present for the indexing,
+       invisible on screen, and .is-on only ever changes stroke-width (see
+       styles.css), so a focused gap leg cannot be highlighted back into view. */
     const segs = [];
     for (let i = 1; i < data.length; i++) {
+      const gap = !data[i - 1].covered || !data[i].covered;
+      /* The leg leading INTO the running period is real data, drawn with a
+         dash rather than hidden — that period is not a gap, it is simply not
+         finished yet, and the dash is the disclosure (see the note appended
+         below the chart). */
+      const dashed = !gap && data[i].running;
       segs.push(add('line', {
         class: 'trend-seg',
         x1: s.x(i - 1), y1: s.y(data[i - 1].spent), x2: s.x(i), y2: s.y(data[i].spent),
         stroke: over(data[i - 1]) || over(data[i]) ? c.danger : c.success,
         'stroke-width': '2.5', 'stroke-linecap': 'round',
+        opacity: gap ? '0' : '1',
+        ...(dashed ? { 'stroke-dasharray': '5 5' } : {}),
       }));
     }
 
     /* Past a dozen points the dots merge into a bead chain and stop being
        readable — a year of weekly periods is 52 of them. The line carries the
        shape on its own from there, and the focus marks below still land on
-       every period whether or not it wears a dot. */
+       every period whether or not it wears a dot.
+
+       Nothing drawn at all for an uncovered period — there is no real figure
+       under it to mark. The running period keeps its dot but draws it
+       hollow (no fill) so it reads as still-open rather than a settled
+       reading like every other point on the line. */
     if (data.length <= 12) {
-      data.forEach((d, i) => add('circle', {
-        cx: s.x(i), cy: s.y(d.spent), r: '5',
-        fill: c.hole, stroke: over(d) ? c.danger : c.success, 'stroke-width': '2.5',
-      }));
+      data.forEach((d, i) => {
+        if (!d.covered) return;
+        add('circle', {
+          cx: s.x(i), cy: s.y(d.spent), r: '5',
+          fill: d.running ? 'none' : c.hole, stroke: over(d) ? c.danger : c.success, 'stroke-width': '2.5',
+        });
+      });
     }
 
     /* ------------------------- the focused period -------------------------
@@ -1159,9 +1341,16 @@ module.exports = function registerDashboard(ctx) {
 
       cross.setAttribute('x1', x); cross.setAttribute('x2', x);
       halo.setAttribute('cx', x); halo.setAttribute('cy', y); halo.setAttribute('fill', key);
+      /* No mark and no rows for a period the vault never covers — see
+         `covered` above the run-breaking logic. Hidden by opacity, the same
+         device budgetMark already uses just below, so the node stays in
+         place and only the drawing of it turns off. */
+      halo.setAttribute('opacity', d.covered ? '1' : '0');
       spentMark.setAttribute('cx', x); spentMark.setAttribute('cy', y);
       spentMark.setAttribute('stroke', key);
+      spentMark.setAttribute('opacity', d.covered ? '1' : '0');
       incomeMark.setAttribute('cx', x); incomeMark.setAttribute('cy', s.y(d.income));
+      incomeMark.setAttribute('opacity', d.covered ? '1' : '0');
       /* A period with no budget set has no budget point to mark — s.y(0) would
          park a dot on the baseline that reads as "budgeted nothing" rather than
          "nothing budgeted". */
@@ -1174,16 +1363,30 @@ module.exports = function registerDashboard(ctx) {
       segs.forEach((n, k) => n.classList.toggle('is-on', k === i - 1 || k === i));
 
       tipHead.textContent = d.label;
+      /* Spent and income are hidden together, never shown half-true: a gap
+         period has neither figure, so a reader focusing it gets the period
+         label and nothing under it rather than two zeroes that look like a
+         reading. TODO(i18n): dash.trend.tip.noImport — "Not imported — no
+         transactions land in this period." */
+      rSpent.node.classList.toggle('hidden', !d.covered);
+      rIncome.node.classList.toggle('hidden', !d.covered);
       rSpent.val.textContent = money(d.spent);
       rSpent.swatch.classList.toggle('is-over', bad);
       rIncome.val.textContent = money(d.income);
       rBudget.val.textContent = money(d.budget);
       rBudget.node.classList.toggle('hidden', !(d.budget > 0));
       const gap = d.budget - d.spent;
-      tipDelta.textContent = d.budget > 0
-        ? i18n.t(bad ? 'dash.trend.tip.over' : 'dash.trend.tip.under', { amount: money(Math.abs(gap)) })
-        : '';
-      tipDelta.classList.toggle('is-over', bad);
+      /* The running period's figures are not final, so a claim like "R400
+         under budget" would be read as the month's result rather than a
+         moving target — the same trap compareBaseline's own note exists to
+         close for the comparison column. TODO(i18n):
+         dash.trend.tip.inProgress — "Still in progress — not the final
+         figure for this period." */
+      tipDelta.textContent = !d.covered ? ''
+        : d.running ? i18n.t('dash.trend.tip.inProgress')
+          : d.budget > 0 ? i18n.t(bad ? 'dash.trend.tip.over' : 'dash.trend.tip.under', { amount: money(Math.abs(gap)) })
+            : '';
+      tipDelta.classList.toggle('is-over', bad && d.covered && !d.running);
 
       /* Placed in PERCENT of the wrap rather than in pixels, which is what lets
          this skip a second measurement: the svg is width:100% height:auto over
@@ -1226,15 +1429,37 @@ module.exports = function registerDashboard(ctx) {
           x: s.x(i) - s.innerW / (data.length * 2), y: s.padT,
           width: s.innerW / data.length, height: s.innerH, fill: 'transparent',
         });
-        tip(add, hit, `${d.label} — `
-          + `${i18n.t('shell.legend.spent')} ${money(d.spent)}`
-          + ` · ${i18n.t('shell.legend.budget')} ${money(d.budget)}`
-          + ` · ${i18n.t('shell.legend.income')} ${money(d.income)}`);
+        /* Same gap the HTML readout hides: nothing to report for a period the
+           vault never covers, and a native title carrying two zeroes is as
+           misleading as the dot it stands in for. */
+        tip(add, hit, d.covered
+          ? `${d.label} — `
+            + `${i18n.t('shell.legend.spent')} ${money(d.spent)}`
+            + ` · ${i18n.t('shell.legend.budget')} ${money(d.budget)}`
+            + ` · ${i18n.t('shell.legend.income')} ${money(d.income)}`
+          : d.label);
       });
     }
 
     axisLabels(add, s, data.map(d => d.label), H);
     wrap.append(svg, tipBox);
+
+    /* Said once, out loud, rather than only on hover — a phone user swiping
+       through this card may never focus the last point at all, and the shape
+       of the line (see the dashed leg and hollow dot above) is not itself
+       readable as "not final" to someone who has not been told the code. The
+       tooltip's own shorter version (dash.trend.tip.inProgress) covers the
+       reader who does focus it; this covers everyone else.
+       TODO(i18n): dash.trend.inProgress — "The current period is still in
+       progress — its point on the chart will keep moving until it ends." */
+    if (data.length && data[data.length - 1].running) {
+      /* Not `donut-note` — that class's `flex: 1 1 100%` assumes the donut's
+         own flex wrap (.donut-wrap), which #trendChart is not. Same look,
+         written locally rather than borrowing a rule tied to a layout this
+         card does not have. */
+      wrap.append(el('p', { class: 'text-muted', style: 'margin:10px 0 0;font-size:11.5px;line-height:1.5' },
+        i18n.t('dash.trend.inProgress')));
+    }
   }
 
   /* --------------------------- category split ---------------------------
@@ -1258,19 +1483,30 @@ module.exports = function registerDashboard(ctx) {
      learns only that the control does nothing. So All appears past a year of
      history and 5Y only past five.
 
-     `periods` really is periods here, not months. This card averages PAY
-     CYCLES — on a weekly cycle "3M" has always meant the three cycles before
-     this one — so the fixed entries stay literal counts and only All, which
-     means "as far back as the vault goes", is converted from the span. */
+     `periods` really is periods here, not months — this card averages PAY
+     CYCLES, and the count that goes into compareTotals() has to be a count of
+     THOSE, never a count of calendar months. That is not the same as the
+     fixed entries staying LITERAL counts, which they used to: "3M" read as 3
+     periods flat, so on a fortnightly vault it averaged the three fortnights
+     before this one — six weeks — under a pill that also sits, unqualified,
+     beside the trend chart's own "3M", which genuinely means three months
+     there (periodsForMonths() converts it). One label, two spans, on one
+     screen. So the fixed entries are converted through periodsForMonths()
+     exactly as the trend's are: "3M" now means the periods a fortnightly
+     vault would actually see across three calendar months (six or seven of
+     them), same as it always meant on a monthly vault, where a month is a
+     period and the conversion is a no-op. Only "Last month" stays a literal
+     1 — it names the single period immediately before this one, not a span
+     of months to convert. */
   const splitRanges = () => {
     const span = historySpan();
     const out = [
       { key: '1m', label: i18n.t('dash.split.r1m'), periods: 1 },
-      { key: '3m', label: '3M', periods: 3 },
-      { key: '6m', label: '6M', periods: 6 },
-      { key: '1y', label: '1Y', periods: 12 },
+      { key: '3m', label: '3M', periods: periodsForMonths(3) },
+      { key: '6m', label: '6M', periods: periodsForMonths(6) },
+      { key: '1y', label: '1Y', periods: periodsForMonths(12) },
     ];
-    if (span > 60) out.push({ key: '5y', label: '5Y', periods: 60 });
+    if (span > 60) out.push({ key: '5y', label: '5Y', periods: periodsForMonths(60) });
     if (span > 12) out.push({ key: 'all', label: i18n.t('dash.range.all'), periods: periodsForMonths(span) + 2 });
     return out;
   };
@@ -1457,6 +1693,18 @@ module.exports = function registerDashboard(ctx) {
        the three can never disagree with each other the way three independent
        Math.round() calls on the same slice occasionally did. */
     const shares = sharePercents(shown.map(x => x.amount));
+    /* The legend's money column, allocated the same way as its percentage
+       column just above rather than left to `money(x.amount, 0)` rounding
+       each row alone. Independent rounding is exactly the trap sharePercents
+       exists to close for the % column — six equal sixths, three equal
+       thirds, [50,25,12.5,12.5] — and it is just as real in rand: four rows
+       rounding up by 50c apiece is R2 sitting in the legend that the centre
+       total (money(total, 0), a single rounding of the true sum) does not
+       carry. `shown` amounts already sum to `total` exactly (the trailing
+       "Other" bucket is `rest`'s own sum), so floor(each) can never exceed
+       Math.round(total) — the contract largestRemainder's other two callers
+       (money-flow.js, health-math.js) already rely on. */
+    const rowMoney = largestRemainder(shown.map(x => x.amount), Math.round(total));
 
     const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
     const { svg, add } = createChart({
@@ -1503,6 +1751,23 @@ module.exports = function registerDashboard(ctx) {
        reassuring, wrong, and wrong in the direction that stops people looking. */
     const base = compareBaseline();
 
+    /* The figure the compare column reads for THIS period, windowed to match
+       the baseline exactly — the baseline (compareTotals, in trend-math.js)
+       already caps each earlier period at `elapsedDays()` of itself, but this
+       side was still reading `x.amount`, the WHOLE period's spend including
+       rows dated ahead of today. reconcile.js documents statements routinely
+       carrying such rows. Two windows on one comparison is not like-for-like
+       even though the column is labelled that way (see dash.split.likeForLike
+       below): an Insurance debit dated the 28th, viewed on the 24th, was
+       counted on the "now" side and excluded from every earlier period it was
+       measured against, so the legend reported a swing that had not happened
+       in either period.
+
+       Only while the period is running (`base.days !== null`) — a finished
+       period has no "ahead of today" rows left to over-count, and periodSpend
+       with a null cap is exactly x.amount again, so nothing changes there. */
+    const nowByCat = base && base.days !== null ? periodSpend(S.period, base.days).part : null;
+
     const legend = el('ul', { class: 'donut-legend donut-legend--linked' });
     if (base) legend.append(el('li', { class: 'donut-legend-head' },
       el('i', { style: 'background:transparent' }),
@@ -1519,11 +1784,13 @@ module.exports = function registerDashboard(ctx) {
          between periods, so its average measures a different set of categories
          each time. A change figure there would be arithmetic without meaning —
          the same reason the row has no drill-through. */
-      const cmp = base && !x.other ? compareCell(x.cat, x.amount, base) : null;
+      const cmp = base && !x.other
+        ? compareCell(x.cat, nowByCat ? (nowByCat[x.cat] || 0) : x.amount, base)
+        : null;
       const face = () => [
         el('i', { style: `background:${x.color}` }),
         el('span', { class: 'dl-name' }, x.cat),
-        el('span', { class: 'dl-val num' }, money(x.amount, 0)),
+        el('span', { class: 'dl-val num' }, money(rowMoney[i], 0)),
         el('span', { class: 'dl-pct num' }, `${pct}%`),
         ...(base ? [
           el('span', { class: 'dl-base num' }, cmp ? cmp.baseText : '—'),
@@ -1580,6 +1847,23 @@ module.exports = function registerDashboard(ctx) {
     ctx.switchView('transactions');
     const sel = $('#txCategory');
     if ([...sel.options].some(o => o.value === cat)) sel.value = cat;
+    $('#txAccount').value = '';
+    $('#txSearch').value = '';
+    $('#txWholeHistory').checked = false;
+    ctx.renderTransactions();
+  }
+
+  /* The hero's uncategorised-count drill-through — same shape as
+     openCategory() just above, with the '__none__' sentinel value
+     shell.js's static "Uncategorised" <option> and transactions.js's own
+     filter (`cat === '__none__' ? !t.cat : t.cat === cat`) already both
+     understand, so no new filter vocabulary is introduced here. Unlike
+     openCategory this option always exists — it ships in the shell's static
+     markup rather than being rebuilt per category — so there is no list to
+     check membership against first. */
+  function openUncategorised() {
+    ctx.switchView('transactions');
+    $('#txCategory').value = '__none__';
     $('#txAccount').value = '';
     $('#txSearch').value = '';
     $('#txWholeHistory').checked = false;

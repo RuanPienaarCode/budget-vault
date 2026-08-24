@@ -27,9 +27,17 @@ function outstandingOf(o) {
 
    The explicit status is still honoured, because money comes back in ways the
    vault never sees — cash, a favour, a debt forgiven — and a reader who says
-   it is settled is right. */
+   it is settled is right.
+
+   Settles on an epsilon, not exact equality — the same EPS debt-math.js
+   already uses for the identical reason. A repayment box defaults to
+   `left.toFixed(2)`, and a THREE-decimal cell (a hand-typed `amount 1000.564`
+   survives normalizeAmount intact) rounds DOWN there: a "full" repayment of
+   1000.56 against 1000.564 leaves an outstanding of 0.004, `=== 0` is false,
+   and the entry stays open forever reading "R 0 left" — a label rounded to
+   whole rand disagreeing with a status the maths never actually reached. */
 function isSettled(o) {
-  return o.status === 'paid' || outstandingOf(o) === 0;
+  return o.status === 'paid' || outstandingOf(o) <= 0.005;
 }
 
 /* Everything a summary needs, in one pass.
@@ -50,15 +58,23 @@ function owedSummary(owed, today) {
   let outstanding = 0, recovered = 0, open = 0, oldestDays = null;
   for (const o of list) {
     const settled = isSettled(o);
+    // A negative `amount` (a typo, or a stray minus sign the amount input
+    // never blocked) makes outstandingOf clamp to 0 — which marks the row
+    // settled — and the settled branch below used to add that negative
+    // amount straight into a total of money that came BACK: a -500 entry on
+    // a book with R500 already recovered dropped Recovered from R500 to R0.
+    // outstandingOf already floors `amount` at zero for the very same reason;
+    // this total has to agree with it rather than read `o.amount` raw.
+    const amt = Math.max(0, o.amount || 0);
     if (settled) {
       // A hand-flagged entry with no repayment recorded: the whole amount came
       // back by some route the vault never saw.
-      recovered += o.repaid > 0 ? Math.min(o.repaid, o.amount || 0) : (o.amount || 0);
+      recovered += o.repaid > 0 ? Math.min(o.repaid, amt) : amt;
       continue;
     }
     open++;
     outstanding += outstandingOf(o);
-    recovered += Math.min(o.repaid || 0, o.amount || 0);
+    recovered += Math.min(o.repaid || 0, amt);
     const age = daysSince(o.lent, today);
     if (age !== null && (oldestDays === null || age > oldestDays)) oldestDays = age;
   }

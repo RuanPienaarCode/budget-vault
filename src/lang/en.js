@@ -169,6 +169,7 @@ module.exports = {
   'wiz.err.currency': 'Enter a currency symbol, or pick one from the list above.',
   'wiz.err.amount': 'Every amount must be a number, and none of them can be negative. Leave a line blank if it does not apply.',
   'wiz.err.firstBudgetEmpty': 'Enter at least one amount — even just your income — or go back and choose CSV import.',
+  'wiz.err.catsEmpty': 'Pick at least one category — the budget needs something to sort your spending into. Untick the ones you do not want, or choose "Type it in myself" to start with the full set.',
 
   /* ---- welcome ---- */
   'wiz.welcome.title': 'Welcome to Budget Vault!',
@@ -552,6 +553,11 @@ module.exports = {
   'acct.balance.field': 'New balance',
   'acct.balance.inCurrency': 'Entered in {symbol}.',
   'acct.balance.updated': '{name} balance updated',
+  'acct.balance.impliedHint': 'Your transactions imply {amount} after {count} row(s) since you last confirmed.',
+  'acct.balance.asAt': 'As at which date?',
+  'acct.balance.asAtDesc': 'The date this figure was true — the date on the statement, not necessarily today. Anything dated after it still counts toward the balance.',
+  'acct.balance.updatedDrift': '{name} balance saved — but {count} row(s) since that date differ by {amount}. Open the account to see them.',
+  'acct.balance.unreadable': 'Could not read "{raw}" — click to fix',
   'acct.reconciled': '{name} reconciled to {amount}',
   'acct.err.nan': 'Not a number',
   'acct.err.type': 'Invalid type',
@@ -695,13 +701,16 @@ module.exports = {
   'acct.hero.oldest': 'Oldest figure',
   'acct.hero.oldestDays': { one: '{count} day', other: '{count} days' },
   'acct.hero.oldestNone': 'none',
+  'acct.hero.unreadable': { one: '{count} account balance could not be read and is left out of this total.', other: '{count} account balances could not be read and are left out of this total.' },
   'acct.where.title': 'Where it sits',
   'acct.where.sub': 'Share of what these accounts hold',
   'acct.where.aria': 'Share of what these accounts hold: {parts}',
   'acct.where.part': '{group} {pct}%',
+  'acct.where.empty': 'Nothing to show yet.',
   /* A group whose card debt exceeds its cash cannot be drawn as a wedge. Said
      out loud rather than dropped, so the ring and the total still agree. */
   'acct.where.negative': { one: '{count} group is net negative and is not drawn: {names}', other: '{count} groups are net negative and are not drawn: {names}' },
+  'acct.where.excluded': '{amount} excluded from the total above.',
 
   /* ---- the queue: the accounts that actually want a decision ---- */
   'acct.deck.title': { one: 'One account wants a decision', other: '{count} accounts want a decision' },
@@ -907,9 +916,12 @@ module.exports = {
     one: 'Spent, budgeted and income over the last {count} period',
     other: 'Spent, budgeted and income over the last {count} periods',
   },
+  'dash.trend.inProgress': 'The current period is still in progress — its point on the chart will keep moving until it ends.',
   /* The trend chart is history: every point but the last is a closed period, so
      these read as a verdict on it rather than as the Budgets page's "left",
-     which is about a period still being spent. */
+     which is about a period still being spent. The running period is the one
+     exception, and gets its own shorter note here. */
+  'dash.trend.tip.inProgress': 'Still in progress — not the final figure for this period.',
   'dash.trend.tip.over': '{amount} over budget',
   'dash.trend.tip.under': '{amount} under budget',
 
@@ -957,6 +969,7 @@ module.exports = {
   'dash.health.debt': 'of income to debt interest',
   'dash.health.debtNone': 'no debts recorded',
   'dash.health.debtFree': 'debt-free',
+  'dash.health.debtNoRate': 'no rate recorded on your debts',
   'dash.health.score': 'financial score',
   'dash.health.strong': 'strong',
   'dash.health.steady': 'steady',
@@ -1003,6 +1016,7 @@ module.exports = {
   'score.win.saving': 'You put real money aside every month, not just what happens to be left over.',
   'score.win.debtNone': 'Nothing is going to interest — though no debts are recorded, so this reflects what your files say rather than a check of them.',
   'score.win.debt': 'Nothing is lost to interest. Every rand you earn is still yours to use.',
+  'score.win.debtNoRate': 'Your repayments sit comfortably against your income — though none of your debts records an interest rate, so what they cost you to carry is not counted here.',
   'score.win.spending': 'Your outgoings leave room to breathe — you are not living at the edge of what comes in.',
   'score.win.wealth': 'What you own has grown well past what you owe. That is the part that compounds quietly.',
   'score.now.reserves': 'Now: {months} months covered · {amount} set aside · goal {target} months',

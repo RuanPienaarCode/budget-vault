@@ -195,7 +195,10 @@ module.exports = function registerTax(ctx) {
   function renderChecks(t) {
     if (!checksBox) return;
     checksBox.empty();
-    for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t) || []) {
+    // The household symbol (S.settings.currency), not the country profile's
+    // default — see locale.js's fmtAmt for the bug this closes: a household
+    // set to "$" under country za used to see these callouts labelled "R".
+    for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t, S.settings.currency) || []) {
       checksBox.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
         icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
     }

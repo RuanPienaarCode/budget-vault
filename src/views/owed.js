@@ -30,11 +30,19 @@ module.exports = function registerOwed(ctx) {
     tile('Entries', String(s.entries));
   }
 
-  /* focusPerson: after a rebuild, put focus back on that row's status pill.
-     Rebuilding the table drops focus to <body>, and cycling status is the main
-     interaction here — a keyboard or screen-reader user was being ejected to
-     the top of the page on every single click. */
-  function renderOwed(focusPerson) {
+  /* focusRow: index into S.owed whose status pill should get focus back after
+     a rebuild. Rebuilding the table drops focus to <body>, and cycling status
+     is the main interaction here — a keyboard or screen-reader user was being
+     ejected to the top of the page on every single click.
+
+     An INDEX rather than a name — two rows can share a person's name (Sam
+     twice is the normal case for two separate loans to the same person), and
+     the previous version looked the row up with S.owed.findIndex(person ===
+     focusPerson), which returns the FIRST match: clicking the second Sam's
+     pill returned focus to the first one. views/debts.js carries the same
+     comment for the identical bug, fixed there by index — this ripples that
+     fix over here. */
+  function renderOwed(focusRow) {
     renderOwedKpis();
     const t = $('#owedTable');
     keepScroll(t, () => {
@@ -51,7 +59,7 @@ module.exports = function registerOwed(ctx) {
           title: o.repaid > 0 ? `${money(o.amount)} lent · ${money(o.repaid)} back · ${money(left)} outstanding` : '',
           'aria-label': `${o.person}: ${label} — click to change` },
           icoEl(settled ? ['circle-check', 'check-circle'] : ['hourglass']), label);
-        pill.addEventListener('click', () => { o.status = settled ? 'outstanding' : 'paid'; mark(); renderOwed(o.person); });
+        pill.addEventListener('click', () => { const row = S.owed.indexOf(o); o.status = settled ? 'outstanding' : 'paid'; mark(); renderOwed(row); });
         /* Age, not the due date. The due-date column was empty on every row of
            the vault this was built against — it asks for something you do not
            have when you lend to family. How long the money has been gone is
@@ -67,9 +75,15 @@ module.exports = function registerOwed(ctx) {
           // Only the KPI tiles read the amount — refresh those, never this table,
           // or the rebuild lands between the tap that leaves this field and the
           // tap that arrives at the next one.
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: o.amount || '',
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0', class: 'form-control form-control-sm', value: o.amount || '',
             'aria-label': `Amount for ${o.person}`,
-            onchange: e => { o.amount = parseFloat(e.target.value) || 0; mark(); renderOwedKpis(); } })),
+            // Floored at zero, not just advised against: a negative amount
+            // made outstandingOf clamp to 0 (settled), and owedSummary's
+            // recovered branch then added it straight into money that came
+            // BACK — a -500 row on a book with R500 recovered dropped
+            // Recovered to R0. `min` alone doesn't stop a typed value or a
+            // spinner nudge from an existing negative, so this clamps too.
+            onchange: e => { o.amount = Math.max(0, parseFloat(e.target.value) || 0); mark(); renderOwedKpis(); } })),
           el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
           el('td', {}, pill),
@@ -82,9 +96,8 @@ module.exports = function registerOwed(ctx) {
       if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No entries yet.')));
       t.append(body);
     });
-    if (focusPerson) {
-      const i = S.owed.findIndex(o => o.person === focusPerson);
-      const pill = t.querySelectorAll('.status-pill')[i];
+    if (focusRow !== undefined && focusRow >= 0) {
+      const pill = t.querySelectorAll('.status-pill')[focusRow];
       if (pill) pill.focus();
     }
   }
@@ -104,9 +117,12 @@ module.exports = function registerOwed(ctx) {
     if (amount === null || amount <= 0) return toast('Not a number', true);
     o.repaid = (o.repaid || 0) + amount;
     // Settling the last of it closes the entry, so "paid" stays something the
-    // arithmetic concludes rather than a second thing to remember.
-    if (outstandingOf(o) === 0) o.status = 'paid';
-    mark(); renderOwed(o.person);
+    // arithmetic concludes rather than a second thing to remember. Through
+    // isSettled(), not `outstandingOf(o) === 0` — the repayment box defaults
+    // to `left.toFixed(2)`, which rounds DOWN a three-decimal cell and can
+    // leave a sub-cent residue that exact equality never clears.
+    if (isSettled(o)) o.status = 'paid';
+    mark(); renderOwed(S.owed.indexOf(o));
     toast(`${money(amount)} back from ${o.person}`);
   }
 
@@ -150,7 +166,10 @@ module.exports = function registerOwed(ctx) {
     if (!r || !r.person.trim()) return;
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
-    S.owed.push({ person: r.person.trim(), amount, description: '', due: '', status: 'outstanding', repaid: 0, lent: '' });
+    // Same clamp as the in-table amount field: a negative amount here makes
+    // outstandingOf clamp to 0 (settled) while owedSummary's recovered
+    // branch adds the negative straight into money that came back.
+    S.owed.push({ person: r.person.trim(), amount: Math.max(0, amount), description: '', due: '', status: 'outstanding', repaid: 0, lent: '' });
     mark(); renderOwed();
   }
 

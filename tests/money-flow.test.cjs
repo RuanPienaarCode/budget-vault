@@ -138,7 +138,17 @@ const base = {
   for (const seg of rail) {
     ok(typeof seg.at === 'number' && seg.at >= 0 && seg.at <= 1, `${seg.key}'s at is a real fraction in [0,1]`);
     if (seg.width > 0) {
-      close(seg.at * seg.width, seg.fill, `${seg.key}'s at matches its own rounded fill/width pair`, 1.01);
+      /* Tightened from 1.01 to 1 (health-math.js fix, see scoreBreakdown):
+         shownPoints is now derived by largestRemainder OVER `at * shownMax`,
+         which floors at most one whole point below that raw value and never
+         rounds past it — so the true slack is strictly UNDER 1, never at or
+         past it. The old 1.01 tolerance was wide enough to admit the bug this
+         guards: two INDEPENDENT largest-remainder allocations (one for
+         shownMax, one for shownPoints) could round a pillar's ceiling down
+         while rounding that same pillar's points up by more than a point,
+         printing "27 of 26" — a slack of just over 1, which 1.01 let through
+         uncaught. */
+      close(seg.at * seg.width, seg.fill, `${seg.key}'s at matches its own rounded fill/width pair`, 1);
     }
   }
   const wealth = rail.find(s => s.key === 'wealth');

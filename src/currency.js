@@ -60,4 +60,31 @@ function currenciesIn(accounts, household) {
   return seen.includes(home) ? [home, ...seen.filter(s => s !== home)] : seen;
 }
 
-module.exports = { symbolOf, isForeign, currenciesIn };
+/* The one money-formatting routine, so a figure printed by a callout and one
+   printed by money() on the same page never disagree.
+
+   Byte-for-byte the same rules as controller.js's formatMoney: symbol, a
+   space, then sign-and-digits (so "-100" reads "R -100,00", not "-R100,00"),
+   thousands grouped per `loc.thousands`, decimals joined with `loc.decimal`,
+   and non-finite input rendered as 0 rather than "RNaN" or "RInfinity".
+
+   Duplicated here rather than imported from controller.js: controller.js
+   pulls in `obsidian` and mounts the live app, so nothing pure can require it
+   without dragging that in, and controller.js is out of scope for this
+   change to touch (it must keep working unchanged). `loc` only needs
+   `{thousands, decimal}`, which both a locale.js country profile and a bare
+   `{thousands, decimal}` object satisfy — so views/tax.js's second formatter
+   (locale.js's fmtAmt) can delegate here instead of re-deriving the same
+   separator logic and drifting from it, which is the bug this closes: fmtAmt
+   used to take no currency argument at all and print the COUNTRY's default
+   symbol instead of the household's, so a household set to "$" saw its own
+   tax callouts labelled "R". */
+function formatAmount(symbol, v, decimals, loc) {
+  if (!Number.isFinite(v)) v = 0;
+  const sign = v < 0 ? '-' : '';
+  const parts = Math.abs(v).toFixed(decimals).split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
+  return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
+}
+
+module.exports = { symbolOf, isForeign, currenciesIn, formatAmount };

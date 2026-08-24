@@ -193,4 +193,26 @@ const asset = (type, value) => ({ type, value });
   ok(!Object.is(w.net, -0), 'and must never be the literal -0 that renders as "-R0.00" either');
 }
 
+/* ---- 13. worth() names the currencies it summed over ---------------------
+   Net worth adds account balances regardless of what currency an account
+   states (currency.js converts nothing) — currenciesIn() already discloses
+   this on the Accounts page (views/accounts.js:589), and worth() is the other
+   place that sums across it, on the two surfaces that headline the total
+   (Dashboard, Savings). This pins that worth() hands a caller the same
+   disclosure rather than silently adding "$" into an "R" total with nothing
+   to say so. Walks ACCOUNTS only — assets carry no currency field. */
+{
+  const single = worth([acct('savings', 1000)], [], []);
+  eq(single.currencies, ['R'], 'one currency, default household symbol, nothing to disclose');
+
+  const named = worth([acct('savings', 1000)], [], [], '$');
+  eq(named.currencies, ['$'], 'the household symbol is threaded through when supplied');
+
+  const mixed = worth([acct('cheque', 50000), { type: 'savings', balance: 20000, currency: '€' }], [], [], 'R');
+  eq(mixed.currencies, ['R', '€'], 'a foreign-currency account is named, household first');
+  eq(mixed.net, 70000, 'and the arithmetic is unchanged — still added, just now disclosed');
+
+  eq(worth([], [], []).currencies, [], 'no accounts, nothing to disclose');
+}
+
 console.log(`worth.test.cjs — ${checks} checks OK`);

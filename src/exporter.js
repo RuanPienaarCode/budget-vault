@@ -52,6 +52,55 @@ const { csvCell } = require('./csv');
    (transfer, still real money) and cannot be reused to mean "phantom row,
    described elsewhere" too. */
 const { splitRole } = require('./tx-role');
+/* SCHEMAS.transactions is the ONE declaration of the transaction columns
+   (docs/adr/0003-columns-are-declared-once.md) — append-only, guarded by a
+   tripwire and a byte-golden gate over in src/table-schema.js, which this
+   module does not touch. TX_HEAD reads that declaration instead of holding a
+   fourth hand-written copy of the column order (the vault file, the loader
+   and the byte-golden test are the other three): a column appended there
+   used to reach the vault, the loader and the golden gate while silently
+   never reaching either export, with nothing going red to say so. `Account`
+   is spliced in at index 2 because it is a real column on screen but not one
+   the schema models — a transaction's account is which file it lives in, not
+   a cell in it. */
+const { SCHEMAS } = require('./table-schema');
+const TX_HEAD = (() => {
+  const h = SCHEMAS.transactions.columns.map(c => c.header);
+  h.splice(2, 0, 'Account');
+  return h;
+})();
+const TX_ALIGN = (() => {
+  const a = SCHEMAS.transactions.columns.map(c => c.align);
+  a.splice(2, 0, 'left');
+  return a;
+})();
+/* Same derivation as table-schema.js's own headerLines — dash count equals
+   the header cell's width, a right-aligned column trades its last dash for
+   the colon — kept as its own small copy rather than a call into that module
+   because headerLines takes a `schema` (columns carry their own read/write),
+   and TX_HEAD/TX_ALIGN describe a row shape table-schema.js was never asked
+   to model (Account is on-screen, not a transaction-file column). */
+function txHeaderLines() {
+  const header = `| ${TX_HEAD.join(' | ')} |`;
+  const sep = '|' + TX_HEAD.map((h, i) => {
+    const width = h.length + 2;
+    return TX_ALIGN[i] === 'right' ? '-'.repeat(width - 1) + ':' : '-'.repeat(width);
+  }).join('|') + '|';
+  return [header, sep];
+}
+/* escMd is markdown.js's, not a local copy. This USED to be its own
+   pipes-only escaper, and that was the bug: markdown.js's escMd also turns a
+   real newline into `<br>`, because a wrapped Description/Note/Category cell
+   is a normal thing for a hand-typed vault file to hold and unescMd turns it
+   back into `\n` on load (src/load.js). A row that reaches this module with a
+   raw `\n` inside a cell and gets only the pipe-escape is written as a SECOND
+   line that doesn't start with `|` — which doesn't just mangle that row, it
+   ends the markdown table, so every transaction after it renders as plain
+   paragraph text instead of a row. See tests/exporter.test.cjs's "wrapped
+   cell" case, proven against the same fixture value
+   tests/vault-roundtrip.test.cjs uses ("multi<br>line" on disk, "multi\nline"
+   in state). */
+const { escMd } = require('./markdown');
 
 /* Where exports land. A folder of its own so an export is never mistaken for
    one of the vault's own data files, and so deleting the lot is one action. */
@@ -104,7 +153,7 @@ function amountCell(row) {
 }
 
 function transactionsCsv(rows) {
-  const head = ['Date', 'Description', 'Account', 'Category', 'Amount', 'Excluded', 'Note', 'Split'];
+  const head = TX_HEAD;
   const body = rows.map(r => [
     csvCell(r.date),
     csvCell(r.desc),
@@ -125,12 +174,6 @@ function categoriesCsv(categories) {
 }
 
 /* ----------------------------- Markdown -------------------------------- */
-
-/* A pipe inside a cell ends the cell. Escaped rather than stripped so a
-   description reads the way the bank sent it. */
-function escMd(s) {
-  return String(s ?? '').replace(/\|/g, '\\|');
-}
 
 /* `money` is the view's own formatter, injected because the export must read in
    the household's currency and separators — and that is a runtime setting off
@@ -161,8 +204,7 @@ function transactionsMarkdown(rows, meta, money) {
     ...(rows.length !== included.length
       ? [`Totals cover ${included.length} of ${rows.length} rows — excluded rows are listed but not counted.`, '']
       : []),
-    '| Date | Description | Account | Category | Amount | Excluded | Note | Split |',
-    '|------|-------------|---------|----------|-------:|----------|------|-------|',
+    ...txHeaderLines(),
   );
   for (const r of rows) {
     // splitRole, not r.split raw: same reason serializeTxFile reads it this
@@ -224,6 +266,6 @@ function exportPaths(range, folder) {
 }
 
 module.exports = {
-  EXPORT_DIR, safeName, escMd,
+  EXPORT_DIR, safeName,
   transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths,
 };

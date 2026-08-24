@@ -64,6 +64,24 @@ module.exports = function registerDebts(ctx) {
      rebuild lands between the tap leaving a field and the one arriving at the
      next, and the arriving tap hits whatever now occupies those pixels. */
   function renderDebtKpis() {
+    /* A household tracking zero debts is the one this page should be
+       congratulating, and until now it got four zeros ("Total debt R0,00 · 0
+       active · 0 tracked", "Paying per month R0,00", "Interest this month
+       R0,00") plus a "Debt-free —" tile captioned "no debt tracked" — the
+       page's own worst-case wording, aimed at its best-case reader. One
+       positive panel instead of four hollow ones; the "New debt" button
+       already sits below the table for the reader who does have one to add. */
+    if (!S.debts.length) {
+      // Reuses the plain-paragraph shape renderDebtPlan already falls back to
+      // below (no debt to plan for), rather than inventing a styled "card"
+      // this file owns no CSS for — an unstyled custom class would render
+      // with no layout at all rather than fail loudly.
+      const box = $('#debtKpis'); box.empty();
+      box.append(el('p', { style: 'margin:0;font-weight:600' }, 'No debt tracked — nothing owing here.'),
+        el('p', { class: 'text-muted', style: 'margin:4px 0 0' },
+          'Add a debt below if that changes, and this page will track the balance, the interest and a payoff plan for it.'));
+      return;
+    }
     const list = active();
     const total = list.reduce((s, d) => s + d.balance, 0);
     const perMonth = list.reduce((s, d) => s + committed(d), 0);
@@ -349,14 +367,24 @@ module.exports = function registerDebts(ctx) {
     const t = $('#debtTable');
     keepScroll(t, () => {
       t.empty();
+      // A debt whose `original` still equals its `balance` never had a real
+      // original amount entered — it's either brand new or was seeded from
+      // the balance at creation because the field was left blank — so the
+      // percentage under it is counting from today, not from the true start
+      // of the loan. When that's true of every tracked debt, the header says
+      // so; a mixed book keeps the plain label rather than mislabel the rows
+      // that DO have a real original.
+      const tracked = S.debts.filter(d => d.original > 0);
+      const paidOffHeader = tracked.length && tracked.every(d => d.original === d.balance)
+        ? 'Paid off (since tracked)' : 'Paid off';
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Debt'),
         el('th', { scope: 'col', class: 'num' }, 'Balance'),
         el('th', { scope: 'col', class: 'num' }, 'Rate %'),
         el('th', { scope: 'col', class: 'num' }, 'Payment'),
-        el('th', { scope: 'col', class: 'num' }, 'Extra'),
+        el('th', { scope: 'col', class: 'num' }, 'Extra / month'),
         el('th', { scope: 'col' }, 'Category'),
-        el('th', { scope: 'col' }, 'Paid off'),
+        el('th', { scope: 'col' }, paidOffHeader),
         el('th', { scope: 'col' }, 'Clear by'),
         el('th', { scope: 'col', class: 'num' }, 'Interest left'),
         el('th', { scope: 'col' }, 'Status'),
@@ -534,6 +562,16 @@ module.exports = function registerDebts(ctx) {
       { key: 'lender', label: 'Lender', type: 'text' },
       { key: 'type', label: 'Kind of debt', type: 'select', value: 'credit card', options: DEBT_TYPES },
       { key: 'balance', label: 'Balance still owed', type: 'number', value: '0' },
+      /* Optional, and asked for up front rather than left to a hand-edit of
+         Debts.md — which is what the ONLY previous route to a real "Paid off"
+         figure required, with no field anywhere on the page to reach it. A
+         household that had paid R300 000 down to R80 000 saw "0%" forever and
+         had every reason to conclude the bar itself was broken. Left blank,
+         `original` falls back to today's balance below, same as before: the
+         bar still draws, it just starts counting from today rather than from
+         the true original loan. */
+      { key: 'original', label: 'What did you originally borrow?', type: 'number', value: '',
+        desc: 'Optional — leave blank to start the "Paid off" progress bar from today\'s balance instead.' },
       { key: 'rate', label: 'Interest rate (% a year)', type: 'number', value: '0' },
       { key: 'payment', label: 'Monthly payment', type: 'number', value: '0' },
       { key: 'category', label: 'Budget category (links its transactions)', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
@@ -546,12 +584,18 @@ module.exports = function registerDebts(ctx) {
     const name = r.name.trim();
     const balance = normalizeAmount(r.balance), rate = normalizeAmount(r.rate), payment = normalizeAmount(r.payment);
     if ([balance, rate, payment].some(v => v === null)) return toast('Balance, rate and payment must be numbers', true);
+    // Blank is the expected case (see the field's `desc` above) — only a
+    // typed, unparseable value is an error, not an empty box.
+    const originalRaw = (r.original || '').toString().trim();
+    const originalTyped = originalRaw ? normalizeAmount(originalRaw) : null;
+    if (originalRaw && originalTyped === null) return toast('Original amount must be a number', true);
     S.debts.push({
       name, lender: (r.lender || '').trim(), type: r.type || 'other',
       balance: Math.max(0, balance),
-      // Seeded from the balance so the "paid off" bar has a baseline from day
-      // one; edit it in Debts.md to the real original amount for a true figure.
-      original: Math.max(0, balance),
+      // The real original loan when given; otherwise seeded from the balance
+      // so the "paid off" bar still has a baseline from day one — see
+      // refreshRow(), which now also names that baseline on screen.
+      original: originalTyped !== null ? Math.max(0, originalTyped) : Math.max(0, balance),
       rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
       start: todayIso(),
       category: (r.category || '').trim(), status: 'active', notes: '',

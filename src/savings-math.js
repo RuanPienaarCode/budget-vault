@@ -58,7 +58,7 @@
    Pure — no DOM, no obsidian import. `typeOf` is injected so this module never
    has to know how categories are stored. */
 
-const { ISO_DATE, todayIso } = require('./dates');
+const { ISO_DATE, todayIso, isRealIsoDate } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
 
 /* THE classification rule, in one place.
@@ -218,7 +218,19 @@ function daysBetween(fromIso, toIso) {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
 
-const monthOf = iso => (ISO_DATE.test(iso || '') ? String(iso).slice(0, 7) : '');
+/* isRealIsoDate, not ISO_DATE — ISO_DATE is SHAPE-only ("2026-13-45 passes",
+   per its own comment in dates.js) and this key feeds a month WALK below that
+   rolls 12 to the next year's 01 and stops at the last real month reached. A
+   row dated '2025-13-05' — the ordinary day/month-swap typo, the real date
+   meant being 2025-05-13 — used to slip past this test, get bucketed under
+   the unwalkable key '2025-13' by monthlyFlows, and then never be visited by
+   any point on the chart: not in a band, not in `undated`, just gone, and
+   `capital + posted + undated = closing` broke under fuzzing on exactly this
+   input class (64/4000 vaults) and no other. Falling back to '' here routes
+   the row into the existing UNDATABLE/pending path instead, which already
+   folds an unplaceable row into the first point — the fix is entirely this
+   one gate. */
+const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : '');
 
 function nextMonth(m) {
   let y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1;
@@ -264,7 +276,14 @@ function totalReturn(account, rows, typeOf, opts) {
      deliberate `starting_amount: 0` — an account opened empty and funded by
      transfer — is a real baseline and must not fall through to 'none'. */
   const hasBaseline = typeof a.starting_amount === 'number';
-  const stated = !hasBaseline && !f.count && typeof a.total_invested === 'number' && a.total_invested;
+  /* typeof, not a trailing truthiness test — the exact bug the comment above
+     `baseline` in accountFlows() forbids for `starting_amount`, reached here
+     via `total_invested` instead: a written `total_invested: 0` is a real
+     baseline (an account funded entirely by transfer, nothing invested up
+     front by any other name), and the truthy test used to read it as absent.
+     accountFlows() already got this right with the bare `typeof` test; this
+     one had drifted from it. */
+  const stated = !hasBaseline && !f.count && typeof a.total_invested === 'number';
 
   let basis, baseline, capitalIn, postedGrowth;
   if (hasBaseline) {
@@ -333,8 +352,16 @@ function totalReturn(account, rows, typeOf, opts) {
        the stated opening date, so either the date is wrong or the baseline is
        not the balance at it — and both mean the split between capital and
        growth is a guess. Named rather than swallowed; the figure is still
-       shown, because it is the best one available. */
-    else if (g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
+       shown, because it is the best one available.
+
+       Gated on `all.first` being real: the `|| today` fallback above exists so
+       an account with NO transactions at all still gets the history-gap flag
+       when its inception is old (see the comment on that branch). But this
+       branch reads a NEGATIVE gap as "records begin before opening", and with
+       no records `g` is manufactured from `today` rather than from a row — a
+       future `inception_date` on an account with zero transactions measured
+       the distance to today and asserted records exist that do not. */
+    else if (all.first !== null && g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
   }
 
   return {
@@ -402,6 +429,23 @@ function monthlyFlows(rows, typeOf, opts) {
    the exclusion below: an account whose growth cannot be measured would put its
    contributions in the bar and its growth nowhere, and the identity would fail
    quietly. It is left out and COUNTED, never silently dropped. */
+/* Whether growthSeries below would actually draw this account into the
+   chart's totals: 'measured' basis (starting_amount set — 'stated' accounts
+   have no transactions at all and would draw a flat step from a date nobody
+   wrote down) AND a month it can be placed at, from inception_date or the
+   first row totalReturn counted.
+
+   Exported so the Growth tile (views/savings.js) counts the SAME set the
+   chart draws. It used to count anything `basis !== 'none'`, which included
+   'stated' accounts the chart has always excluded — a vault could read
+   "measured 2, unmeasured 0" in the tile and "1 of 2 accounts measurable" in
+   the chart's own subtitle, on the same screen, about the same two
+   accounts. */
+function chartable(account, r) {
+  const at = monthOf((account || {}).inception_date) || monthOf(r.since);
+  return r.basis === 'measured' && !!at;
+}
+
 function growthSeries(entries, typeOf, opts) {
   const today = (opts && opts.today) || todayIso();
   const maxMonths = (opts && opts.maxMonths) || 60;
@@ -443,8 +487,19 @@ function growthSeries(entries, typeOf, opts) {
        topped out at R35 000 and called the difference "growth carrying no
        date". Exactly the market-linked holding this whole feature exists for:
        `inception_date` is optional and nothing cross-validates it against
-       `starting_amount`, so filling one and not the other is one keystroke. */
-    if (r.basis !== 'measured' || (r.baseline && !at)) { excluded++; continue; }
+       `starting_amount`, so filling one and not the other is one keystroke.
+
+       The guard used to read `r.baseline && !at` — testing the BASELINE for
+       truthiness rather than testing `at` alone. A 'measured' account always
+       has `r.baseline !== null` (that is what 'measured' means), but a
+       deliberate `starting_amount: 0` — the same real baseline
+       accountFlows() defends a few screens up — made `r.baseline` falsy, so
+       an unplaceable zero-baseline account skipped this exclusion and was
+       counted INCLUDED while contributing nothing to `closing` or `undated`:
+       `closing = Σ balances of included` broke for exactly this account. A
+       'measured' account's baseline is never null, so testing `at` alone is
+       both simpler and correct. */
+    if (!chartable(a, r)) { excluded++; continue; }
     included++;
     closing += r.balance;
     bump(at, 'capital', r.baseline);
@@ -505,4 +560,4 @@ function growthSeries(entries, typeOf, opts) {
   return { points, undated, closing, included, excluded, truncatedFrom };
 }
 
-module.exports = { splitFlows, accountFlows, totalReturn, growthSeries, classifyRow };
+module.exports = { splitFlows, accountFlows, totalReturn, growthSeries, classifyRow, chartable };

@@ -99,8 +99,18 @@ function reconcile(a, rows, today) {
      'no-date' is the more fundamental answer of the two — without a date there
      is no window to place, whether or not there are rows to place in it. */
   if (!ISO_DATE.test(a.balance_updated || '')) return { state: 'no-date' };
-  if (!rows || !rows.length) return { state: 'no-tx' };
   const now = ISO_DATE.test(today || '') ? today : todayIso();
+  /* A confirmation dated in the FUTURE is a typo, not a confirmation — and it
+     used to be the most effective way to silence an account completely. A year
+     slip (2027 for 2026) put every real row before the window, so `since` came
+     back empty, the pill went green on "matches your transactions", and the
+     account dropped out of the decision queue and the attention count while
+     R2 100 of spending sat unaccounted for. Folded into no-date rather than
+     given a state of its own: a date that cannot be true places no window,
+     which is exactly what no-date already means, and every surface already
+     handles it. */
+  if (a.balance_updated > now) return { state: 'no-date' };
+  if (!rows || !rows.length) return { state: 'no-tx' };
   const since = [], ahead = [];
   for (const r of rows) {
     if (supersededBySplit(r)) continue;   // its parts are in this same list
@@ -111,7 +121,20 @@ function reconcile(a, rows, today) {
   if (!since.length) {
     return ahead.length ? { state: 'pending', ahead: ahead.length } : { state: 'clean' };
   }
-  return { state: 'drift', count: since.length, ahead: ahead.length, delta, implied: a.balance + delta };
+  /* Rows that NET TO NOTHING have not moved the balance, so there is nothing
+     to disagree about. Read as a drift, R2 000 out to savings and R2 000
+     straight back printed "2 transactions imply R1 000,00, NOT R1 000,00" and
+     "— R0 higher than the figure on file", then sorted itself above genuinely
+     stale accounts in the queue. The row count survives so the view can still
+     offer to move the confirmation date forward. Cent precision, because the
+     rows are money and float noise is not a disagreement either. */
+  if (Math.round(delta * 100) === 0) {
+    return { state: 'clean', count: since.length, ahead: ahead.length, since };
+  }
+  /* `since` travels with the verdict so the view can show WHICH rows moved the
+     figure. Reporting a delta and then making the reader hunt for its cause is
+     most of the work of reconciling left undone. */
+  return { state: 'drift', count: since.length, ahead: ahead.length, delta, implied: a.balance + delta, since };
 }
 
 /* How many of a set of accounts are carrying an unconfirmed balance, and the
@@ -121,9 +144,14 @@ function reconcile(a, rows, today) {
 function stalenessSummary(accounts, today) {
   let stale = 0, oldest = null, dated = 0;
   for (const a of accounts || []) {
-    const d = daysSince(a.balance_updated, today);
+    const raw = daysSince(a.balance_updated, today);
+    /* A future-dated confirmation is no age at all — counted with the undated
+       rather than as a NEGATIVE number of days, which is what let one typo
+       drag `oldest` to -1 and print "oldest none" for a vault where every
+       balance carried a date. Same reading reconcile() takes of it. */
+    const d = raw === null || raw < 0 ? null : raw;
     if (d !== null) dated++;
-    if (isStale(a.balance_updated, today)) stale++;
+    if (d === null || d > STALE_DAYS) stale++;
     if (d !== null && (oldest === null || d > oldest)) oldest = d;
   }
   return { total: (accounts || []).length, stale, dated, oldestDays: oldest };

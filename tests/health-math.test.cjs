@@ -291,4 +291,85 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   eq(emergencyTarget(' 12 '), 12, 'surrounding whitespace is not a parse failure');
 }
 
+/* ---- 10. budgetUsed's denominator is periods that carried a PLAN, not
+   every counted period — a household that only started budgeting partway
+   through the trailing window must not have its plan diluted by the months
+   before it existed ---- */
+{
+  const noPlan = { income: 20000, essential: 10000, savings: 0, consumption: 20000, fixed: 0, budgeted: 0, counted: true };
+  const planned = { ...noPlan, budgeted: 22000 };
+  const H = healthMetrics({
+    periods: [noPlan, noPlan, noPlan, noPlan, planned, planned], monthsPerPeriod: 1,
+    earmarks: { any: false, total: 0, over: [] }, targetMonths: 6,
+    debtInterest: 0, debtInstalments: null, netWorth: 0, hasFixed: false,
+  });
+  near(H.budgetUsed, 20000 / 22000, 0.0001,
+    'budgetUsed averages consumption/budgeted over the PLANNED periods only (2 of 6), not diluted by the 4 with no plan');
+  ok(H.budgetUsed < 1, 'a household 9% UNDER budget must read as under, not as 273% over it');
+}
+
+/* ---- 11. gapFor refuses an income-relative gap without an income, even
+   for a pillar whose fraction somehow survived without one — belt and
+   suspenders alongside the pillars' own hasIncome gates upstream. `reserves`
+   is deliberately exempt: it is earmarks over ESSENTIAL SPEND, never an
+   income-relative question. ---- */
+{
+  const f = {};
+  for (const p of PILLARS) { for (const q of p.parts) { f[q.key] = 0.3; } }
+  const m = {
+    score: financialScore(f), monthlyIncome: 0, monthlySavings: 0,
+    monthlyConsumption: 50000, netWorth: -10000, monthlyEssential: 5000,
+  };
+  const bd = scoreBreakdown(m, 6);
+  const byKey = k => bd.pillars.find(p => p.key === k);
+  eq(byKey('saving').gap, null, 'no income means no monthly-saving gap, not "save 20% of R0"');
+  eq(byKey('spending').gap, null, 'no income means no trim gap, not "trim your entire living cost"');
+  eq(byKey('wealth').gap, null, 'no income means no net-worth-build gap either');
+  ok(byKey('reserves').gap !== null, 'reserves is unaffected — an income-free household can still be told to fund its cover');
+}
+
+/* ---- 12. the popup's INTEGER allocation never prints a pillar above its
+   own rounded ceiling, and is independent of which pillar the shortfall
+   sort puts first ----
+
+   With `reserves` absent (no `emergency_fund` set anywhere), the remaining
+   four live pillars' weights give saving, debt and spending an IDENTICAL
+   26.667-point max apiece (20/75 of 100) — a genuine three-way
+   largest-remainder tie, with two whole points to hand out. Before the fix,
+   shownMax/shownPoints were allocated over the SHORTFALL-sorted array, so
+   which two of the three tied pillars got the spare point depended on which
+   pillar happened to be worst that day. `worstSaving` and `worstSpending`
+   below share every weight and differ only in WHICH pillar is worst — under
+   the old order-dependent allocation these printed different winners
+   (`{saving 27, debt 27, spending 26}` vs `{spending 27, saving 27, debt
+   26}`); allocating over PILLARS' own declaration order instead makes the
+   answer identical either way. */
+{
+  const worstSaving = { rate: 0, interest: 1, instalments: 1, fixed: 1, consumption: 1, budget: 1, networth: 1 };
+  const worstSpending = { rate: 1, interest: 1, instalments: 1, fixed: 0, consumption: 0, budget: 0, networth: 1 };
+  for (const f of [worstSaving, worstSpending]) {
+    const bd = scoreBreakdown({ score: financialScore(f) }, 6);
+    const byKey = k => bd.pillars.find(p => p.key === k);
+    ok(!byKey('reserves'), 'reserves is genuinely absent — no cover fraction supplied');
+    eq(byKey('saving').shownMax, 27, 'saving carries the tie-break point regardless of which pillar is worst');
+    eq(byKey('debt').shownMax, 27, 'debt carries the tie-break point too — declaration order, not shortfall order');
+    eq(byKey('spending').shownMax, 26, 'spending does NOT, in EITHER shortfall order');
+    for (const p of bd.pillars) {
+      ok(p.shownPoints <= p.shownMax, `${p.key}'s shown points never exceed its own shown ceiling`);
+      ok(p.shownLost >= 0, `${p.key}'s shown-lost is never negative`);
+    }
+  }
+  // And a wider sweep: no random score vector should ever print a pillar
+  // above its own ceiling, the shape of the "saving 27 of 26, lost -1" bug.
+  const keys = PILLARS.flatMap(p => p.parts.map(q => q.key));
+  for (let n = 0; n < 500; n++) {
+    const rf = {}; for (const k of keys) { rf[k] = Math.random(); }
+    const bd = scoreBreakdown({ score: financialScore(rf) }, 6);
+    for (const p of bd.pillars) {
+      ok(p.shownPoints <= p.shownMax, `random vector ${n}: ${p.key}'s shown points never exceed its own ceiling`);
+    }
+  }
+  checks++;
+}
+
 console.log(`PASS health-math (${checks} checks)`);
