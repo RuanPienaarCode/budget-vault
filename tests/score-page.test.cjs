@@ -51,6 +51,31 @@ const FILES = {
 };
 for (const m of MONTHS) { FILES[`${B}/Transactions/Cheque/${m}.md`] = TX(m); }
 
+/* A household that has genuinely earned the confetti: score 90, band `strong`.
+   Deliberately NOT a perfect 100 — the wealth pillar is short — because the
+   rule being tested is "the BAND is strong", not "every part is finished". A
+   fixture at 100 would pass a check that only looked at the pillars, which is
+   the check this replaced. */
+const STRONG_TX = m => '---\nkind: transactions\n---\n\n'
+  + '| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n'
+  + `| ${m}-01 | Salary | Salary | 45000.00 | | | |\n`
+  + `| ${m}-05 | Groceries | Groceries | -9000.00 | | | |\n`
+  + `| ${m}-06 | To investments | Investing | -10000.00 | | | |\n`;
+const STRONG = { ...FILES,
+  [`${B}/Categories/Investing.md`]: '---\ntype: savings\n---\n',
+  [`${B}/Accounts/Emergency Fund.md`]:
+    '---\ntype: savings\nbalance: 150000.00\nbalance_updated: 2026-08-01\nemergency_fund: true\ntx_label: "Emergency Fund"\n---\n',
+  [`${B}/Accounts/Investments.md`]:
+    '---\ntype: investment\nbalance: 300000.00\nbalance_updated: 2026-08-01\ntx_label: "Investments"\n---\n',
+  [`${B}/Accounts/Cheque.md`]:
+    '---\ntype: checking\nbalance: 60000.00\nbalance_updated: 2026-08-01\ntx_label: "Cheque"\n---\n' };
+for (const m of MONTHS) {
+  STRONG[`${B}/Transactions/Cheque/${m}.md`] = STRONG_TX(m);
+  STRONG[`${B}/Transactions/Investments/${m}.md`] = '---\nkind: transactions\n---\n\n'
+    + '| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n'
+    + `| ${m}-06 | From cheque | Investing | 10000.00 | | | |\n`;
+}
+
 async function mount(files = FILES) {
   const ctx = makeCtx(files, { budgetFolder: B, settings: SETTINGS });
   const S = await loadInto(ctx);
@@ -128,15 +153,32 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
     ok(!/score\.|dash\.health\./.test(textOf(node)), `${name} leaks no i18n key`);
   }
 
-  /* ---- 7. THE CELEBRATION, both directions ----
-     Confetti is punctuation for something real. A page of only gaps must not
-     get it, and a page with a win must. */
-  /* Looked for on the PANE, not in the hero: the burst is appended to #root so
-     it can fall the height of what the reader sees rather than being clipped to
-     the card. Asserting it inside the hero would pass only for the clipped
-     version this replaced. */
-  ok(find(ctxRoot, 'score-confetti-bit').length > 0,
-    'a household with a win gets its confetti, thrown over the whole pane');
+  /* ---- 7. THE CELEBRATION, three directions ----
+     Confetti is punctuation for something real, and what makes it real is the
+     SCORE — not a part of it. Looked for on the PANE, not in the hero: the
+     burst is appended to #root so it can fall the height of what the reader
+     sees rather than being clipped to the card. */
+
+  /* The regression this rule exists for. THE DEFAULT FIXTURE scores 54 —
+     `steady` — while carrying TWO pillars at full marks, because a vault with
+     no Debts.md scores full on interest by default and this one also stays
+     inside its budget. Under the old rule ("any pillar at full marks") that
+     was a shower of confetti over a 54, which is the app congratulating a
+     household it has just told to fix three things. */
+  ok(find(good, 'score-win-name').length > 0,
+    'precondition: the ordinary fixture DOES have parts at full marks');
+  eq(find(ctxRoot, 'score-confetti-bit').length, 0,
+    'a merely steady score is NOT confettied at, however many parts are finished');
+
+  {
+    const { nodes: nStrong } = await mount(STRONG);
+    const bits = find(nStrong.get('#root'), 'score-confetti-bit').length;
+    ok(bits > 0, 'a strong score IS celebrated, thrown over the whole pane');
+    /* Proves the gate is the band and not "everything is finished": this
+       fixture still has an unfinished pillar. */
+    ok(find(nStrong.get('#scoreWork'), 'score-gap-name').length > 0,
+      'and it is a real band check — the celebrated fixture still has a gap to work on');
+  }
 
   {
     /* Nothing at full marks anywhere. Note what this fixture NEEDS to be bleak:
@@ -171,7 +213,10 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
     const real = global.matchMedia;
     global.matchMedia = q => ({ matches: /prefers-reduced-motion/.test(q), addEventListener() {}, removeEventListener() {} });
     if (global.window) { global.window.matchMedia = global.matchMedia; }
-    const { nodes: n3 } = await mount();
+    /* STRONG, not the default fixture: since a steady score no longer
+       celebrates at all, mounting the ordinary one here would pass whether or
+       not reduced motion was honoured — a test green for the wrong reason. */
+    const { nodes: n3 } = await mount(STRONG);
     eq(find(n3.get('#root'), 'score-confetti-bit').length, 0,
       'and reduced motion means no confetti at all, not merely a shorter one');
     global.matchMedia = real;

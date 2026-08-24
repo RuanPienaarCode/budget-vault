@@ -985,6 +985,21 @@ module.exports = function registerScore(ctx) {
      no pillar at full marks gets the page without the shower, because confetti
      over a page listing five gaps reads as mockery. */
   function celebrate(hero, breakdown) {
+    /* THE SCORE decides whether there is anything to celebrate, not the parts.
+
+       This used to fire whenever ANY pillar reached full marks, which is a much
+       lower bar than it sounds: a household with no Debts.md scores full marks
+       on interest by default (health-math's documented "debt-free" reading), so
+       a page that was otherwise all gaps still got a shower. Confetti over a
+       58 tells a reader the app is not really looking — and a celebration that
+       fires for everyone is one nobody believes when it finally means
+       something.
+
+       Read off `breakdown.band`, which is the same word the ring's own centre
+       prints, rather than comparing against SCORE_BANDS.strong here: one
+       threshold, one place, so the confetti cannot disagree with the label
+       sitting inside it about whether this is a strong month. */
+    if (breakdown.band !== 'strong') { return; }
     const wins = breakdown.pillars.filter(p => p.at >= GOOD_ENOUGH).length;
     if (!wins) { return; }
     /* Asked live rather than cached: a reader who turns the system setting on
