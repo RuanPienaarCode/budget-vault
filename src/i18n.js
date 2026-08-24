@@ -27,11 +27,13 @@ const es = require('./lang/es');
 const fr = require('./lang/fr');
 const ja = require('./lang/ja');
 const zh = require('./lang/zh');
+const xh = require('./lang/xh');
+const zu = require('./lang/zu');
 
 /* The tables that actually ship. Adding a language is: write src/lang/xx.js,
    add it here, add its name below. tests/i18n.test.cjs fails the build if a
    table is missing keys English has, or carries keys English doesn't. */
-const TABLES = { en, af, de, es, fr, ja, zh };
+const TABLES = { en, af, de, es, fr, ja, zh, xh, zu };
 
 /* Every language's name written the way its own speakers write it — never
    translated into the current interface language, because someone who has
@@ -45,12 +47,14 @@ const LANGUAGE_NAMES = {
   fr: 'Français',
   ja: '日本語',
   zh: '中文',
+  xh: 'isiXhosa',
+  zu: 'isiZulu',
 };
 
 /* Dropdown order — English first (the pre-language default), then the rest in
    the order they were added. Derived from TABLES rather than hand-listed so the
    dropdown can never offer a language that has no table behind it. */
-const LANGUAGE_ORDER = ['en', 'af', 'de', 'es', 'fr', 'ja', 'zh'].filter(id => TABLES[id]);
+const LANGUAGE_ORDER = ['en', 'af', 'de', 'es', 'fr', 'ja', 'zh', 'xh', 'zu'].filter(id => TABLES[id]);
 
 /* --------------------------- plural categories ---------------------------- */
 
@@ -65,9 +69,17 @@ const ONE_FORM = new Set(['zh', 'ja']);
 const ZERO_IS_SINGULAR = new Set(['fr']);
 
 /* Which form of a plural entry a count selects. Kept deliberately small: these
-   seven languages need exactly two categories between them, and Intl.PluralRules
+   nine languages need exactly two categories between them, and Intl.PluralRules
    — which would be the general answer — is not something to depend on for
-   correctness across the WebKit floor when the rule set is this shallow. */
+   correctness across the WebKit floor when the rule set is this shallow.
+
+   isiXhosa and isiZulu take the plain n === 1 rule. Their plurals are a changed
+   noun-class prefix rather than a suffix, which the whole-sentence-per-form
+   contract already handles — the rule that picks the form is the shallow part,
+   and it is the same one English uses. CLDR files isiZulu with French on the
+   zero case; this table does not follow it there, because a count of 0 reaches
+   these strings almost never (an empty state renders instead) and the `other`
+   form reads correctly at 0 in every sentence lang/zu.js carries. */
 function pluralCategory(lang, n) {
   const count = Math.abs(Number(n) || 0);
   if (ONE_FORM.has(lang)) return 'other';
@@ -101,6 +113,16 @@ const ORDINAL_DAY = {
   fr: n => n + (n === 1 ? 'er' : ''),     // "le 1er", then "le 25"
   ja: n => n + '日',
   zh: n => n + ' 日',
+  /* Nguni languages build the day of the month as a possessive concord
+     rather than a suffix on the numeral: "umhla we-25", read "the 25th
+     day". So the formatter renders the CONCORD AND THE NUMBER, and every
+     sentence in lang/xh.js and lang/zu.js that names a day is written to
+     sit around it — "ngomhla {day}" reads "ngomhla we-25". Building an
+     ordinal word out of the numeral instead (eyesi-2, eyesi-5) would need
+     the noun class of whatever the sentence is about, which the formatter
+     cannot see from a bare number. */
+  xh: n => 'we-' + n,
+  zu: n => 'we-' + n,
 };
 
 function ordinalDay(lang, n) {

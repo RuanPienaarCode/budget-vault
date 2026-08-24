@@ -67,7 +67,7 @@ rows must go through `src/tx-role.js`.**
   whole bundle, not one function. No `innerHTML`. No Node/Electron APIs in `src/`.
 - The palette is **sealed** — edit `scripts/presets.cjs` seeds, never derive
   colours from Obsidian's own variables.
-- i18n lives in `src/lang/*.js`, 7 languages, `en.js` is the key source of truth.
+- i18n lives in `src/lang/*.js`, 9 languages, `en.js` is the key source of truth.
   Imported as a namespace (`const i18n = require('./i18n')`) because `t` is
   already a local in several files.
 - Never commit real statement data. `dev-docs/` is gitignored.
