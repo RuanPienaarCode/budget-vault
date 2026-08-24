@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.23.0 — 2026-08-24
 
 A wide correctness pass. Every figure on the Dashboard, Budget, Score, Debt,
 Assets, Savings and Accounts pages was re-derived and checked against the
