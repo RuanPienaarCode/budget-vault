@@ -3,6 +3,18 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Changed
+
+- **The dashboard tiles say they are averages too.** "26% of income saved" and
+  "4% of income to debt interest" leaned on the small "averaged over your last
+  periods" line above them; the tiles now carry it themselves — "of income
+  saved on average" — and the Score page's debt line drops its "Now:" for the
+  same averaging language the saving line already uses. All nine languages.
+- **The plugin description says nine languages**, which has been true since
+  isiXhosa and isiZulu landed, instead of seven.
+
 ## 1.26.2 — 2026-08-25
 
 ### Changed
