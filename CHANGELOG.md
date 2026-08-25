@@ -26,6 +26,53 @@ All notable changes to Budget Vault. Versions match the plugin version in
   vocabulary is the part most worth a native reader's eye. Corrections are
   welcome through Settings → Send feedback.
 
+- **You can mark a category as a fixed bill.** Rent, medical aid, the debit
+  orders — the things you cannot stop paying this month. There is a toggle on
+  each Budget row and a field when you create a category. Until now this could
+  only be set by hand-editing the category file, which is why the "Committed &
+  fixed bills" band read R0 for households that plainly had fixed bills — and
+  why a third of the Spending part of your score had nothing to work with.
+
+  Creating a category and immediately toggling it also works now. It did not
+  before: a newly created category was missing the link to its own file, which
+  silently broke the "assume spent" toggle in the same way.
+
+### Fixed
+
+- **Your savings rate, your living costs and your fixed-bill share were being
+  measured against a different set of transactions than each other.** Your
+  vault supports two honest readings of the same money: one that counts only
+  what your budget covers, and one that counts everything that moved through
+  the household. They can differ by a lot — on the vault this was checked
+  against, about R16 000 a month.
+
+  Each reading is fine on its own. The problem was mixing them inside a single
+  percentage: the savings rate was dividing household saving by budget income,
+  which made it read 11.3% when every consistent way of working it out gives
+  about 9%. The giveaway had been on screen for a while — "essential spending"
+  was coming out HIGHER than total living costs, which cannot happen, since
+  essential is a subset of it.
+
+  Every share of income is now worked out from the same set of transactions,
+  with one deliberate exception: **"budget used" still compares your spending
+  to your plan**, and a plan only ever covered what was in the budget.
+
+- **Spending a fund you built on purpose is no longer counted against your
+  savings rate**, and money moving between your own accounts is no longer
+  counted as new saving. Both were wrong in opposite directions, and both are
+  now decided by whether a matching leg exists somewhere else in your vault
+  rather than by guessing from a label.
+
+### Internal
+
+- A new guard suite asks the blunt questions the others never did: can
+  essential spending exceed total spending, can a share of income come out
+  negative, does a fund spending itself read as a failure to save. Three
+  releases in a row shipped a figure that was internally consistent and simply
+  wrong, each time past a fully green test suite — because every existing test
+  checks that a number is worked out the same way in two places, and none
+  checked whether the definition was right. 107 suites in total.
+
 ## 1.23.3 — 2026-08-25
 
 ### Fixed
