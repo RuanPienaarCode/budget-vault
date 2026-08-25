@@ -10,6 +10,7 @@ const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand, SCORE_BANDS, FULL_MARKS } = require('../health-math');
 const { todayIso } = require('../dates');
+const { allocatedShare } = require('../money-flow');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn } = require('../currency');
@@ -868,27 +869,19 @@ module.exports = function registerDashboard(ctx) {
     const meterMax = Math.max(sum.spend, bud.spend, 1);
     const fillPct = Math.min(100, (sum.spend / meterMax) * 100).toFixed(2);
     const markPct = bud.spend > 0 ? ((bud.spend / meterMax) * 100).toFixed(2) : null;
-    /* Against the income the BUDGET states, not the income that happens to have
-       landed so far.
+    /* Against the income the BUDGET states, not the income that happens to
+       have landed so far — see incomeBaseFor() in money-flow.js, which now
+       owns this rule for both cards that ask it. It lived here alone until the
+       Score page's "Allocated of income" was found answering the same question
+       off actual income and printing 102% where this line printed 100%.
 
-       A running period's actual income is a part-month figure, so dividing a
-       whole period's budget by it says nothing about the budget and everything
-       about today's date. On this vault a R255 invoice arriving before the
-       salary would have printed "19252% allocated" — and it read as a settled
-       fact, because nothing in the line says which day it was measured on. The
-       budgeted figure is the same on day 1 as on day 31, which is what a
-       percentage of an intention should be.
-
-       Actual income stands in only where the budget names none AND the period
-       is FINISHED, where it is a whole figure and no longer moves. A running
-       period with no income budgeted has no honest denominator at all, so it
-       gets no percentage — the same choice perDay makes on the last day of a
-       period, and budgetMark makes for a period nobody budgeted for. Five of
-       this vault's eight budget files carry no income row, so this branch is
-       the normal one, not the corner. */
-    const incomeBase = bud.income > 0 ? bud.income
-      : (S.period === currentPeriod() ? 0 : sum.income);
-    const budgetedPct = incomeBase > 0 ? Math.round((bud.spend / incomeBase) * 100) : null;
+       Five of this vault's eight budget files carry no income row, so the
+       no-percentage branch is the normal one here, not the corner. */
+    const allocated = allocatedShare({
+      budgeted: bud.spend, budgetIncome: bud.income, actualIncome: sum.income,
+      periodFinished: S.period !== currentPeriod(),
+    });
+    const budgetedPct = allocated === null ? null : Math.round(allocated * 100);
     const usedPct = bud.spend > 0 ? Math.round((sum.spend / bud.spend) * 100) : null;
 
     const hero = $('#heroCard'); hero.empty();

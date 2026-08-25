@@ -21,7 +21,7 @@ const {
   scoreBreakdown, DAYS_PER_MONTH,
 } = require('./health-math');
 const { activeDebts } = require('./worth');
-const { splitFlows } = require('./savings-math');
+const { splitFlows, savedFromOutside } = require('./savings-math');
 /* The same split-parent guard splitFlows applies, from the same module, so the
    saving-rate walk below and the Savings page's own flows cannot disagree
    about which rows are real. */
@@ -39,7 +39,6 @@ const POOL_TYPES = new Set(['savings', 'investment']);
    and a reader typing both sides from a statement can be a day out either way;
    three days is generous enough for a weekend and far too short to pair a
    deposit with an unrelated withdrawal a fortnight later. */
-const TRANSFER_DAYS = 3;
 
 /* Which row is which, for pairing. `label` is the transactions folder the row
    was read from, so it identifies the ACCOUNT without needing the account
@@ -70,6 +69,24 @@ const rowKey = r => `${r.label}|${r.date}|${(r.amount || 0).toFixed(2)}|${r.desc
    two different events — the purchase is real spending and must survive. Its
    partner is the R11 514.00 leaving the savings account, which is where the
    money actually came from. */
+/* WITHIN THE PERIOD, not within three days. The window used to be three days
+   and the number decided real figures: a household whose bank settled a card
+   in four days counted the same rand twice in its spending, and read a lower
+   emergency cover than the identical household on an instant transfer. Two
+   people doing the same thing got different answers because of their bank.
+
+   Every caller already hands this one period's rows, so the period IS the
+   window and nothing here needs a calendar. Checked against a real vault
+   before widening: it finds one more genuine pair (a plumber paid on a card on
+   the 21st, reimbursed from the transaction account on the 29th — 22 days, and
+   invisible to a three-day rule) and no false ones.
+
+   Description agreement was tried as a stricter test and rejected on the same
+   data: it threw away four real pairs, because the two sides of one movement
+   are written by two different banks — "Discovery Bank account...6397" against
+   "Notice savings account payout", "VITALITY TRAVEL" against "CAPITEC D
+   COLENBRANDER". Equal and opposite, in two different accounts, once each, is
+   the signal that actually holds. */
 function passthroughPairs(rows) {
   const drop = new Set();
   const ex = (rows || []).filter(r => r && r.excluded
@@ -82,7 +99,6 @@ function passthroughPairs(rows) {
       const a = ex[i], b = ex[j];
       if (a.label === b.label) { continue; }
       if (Math.abs(a.amount + b.amount) > 0.005) { continue; }
-      if (Math.abs(daysBetween(a.date, b.date)) > TRANSFER_DAYS) { continue; }
       used[i] = true; used[j] = true;
       drop.add(rowKey(a)); drop.add(rowKey(b));
       break;
@@ -141,7 +157,6 @@ module.exports = function registerHealthData(ctx) {
          the R40 000 UIF landed in a savings account but its matching leg left
          a cheque account, so a pool-only search would never have seen it. */
       const householdRows = txInPeriod(p);
-      const passthrough = passthroughPairs(householdRows);
       /* Gathered across the WHOLE pool before anything is counted, because an
          internal transfer is only recognisable from both of its legs at once —
          see the matching step below. */
@@ -155,108 +170,7 @@ module.exports = function registerHealthData(ctx) {
       for (const a of savers) {
         for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
       }
-      const inflows = [], outflows = [];
-      {
-        for (const r of householdRows) {
-          if (!r || typeof r.amount !== 'number' || !r.amount) { continue; }
-          if (supersededBySplit(r)) { continue; }   // its parts are in this same list
-          const a = saverLabels.get(r.label);
-          if (!a) { continue; }                     // not a savings or investment account
-          /* A leg of a pass-through the reader already marked as one. On a
-             real vault a R40 000 UIF payment arrived in the transaction
-             account, moved out of it, and landed in a savings account — three
-             rows, all excluded, one movement. `income` honours that marking,
-             so counting the savings leg as fresh saving while the same rand
-             is not counted as income put the rate on a base the household
-             never earned. The pool-internal match further down cannot catch
-             it: the other leg sits in a cheque account, outside the pool it
-             searches, which is why the pairing is computed household-wide.
-
-             An excluded row with NO partner still counts — money genuinely
-             saved that happens to sit outside the budget is still saved. */
-          if (passthrough.has(rowKey(r))) { continue; }
-          (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
-        }
-      }
-      const spent = new Set();
-      for (const { acct, row } of inflows) {
-        /* MONEY THAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT. Not gross
-           inflow, and not net-of-everything — both of those shipped, and both
-           were wrong in opposite directions.
-
-           Gross contributions (to 1.23.0) counted a rand moved from one
-           savings account to another as fresh saving in the receiving account,
-           with nothing taken off the sending one. On a real vault that
-           overstated the rate by R1 250 a month.
-
-           Netting ALL outflows (1.23.1) fixed that and broke something worse:
-           it treated a sinking fund doing its job as dis-saving. A household
-           that had been paying into a Baby Fund and a Car Fund for months, and
-           then bought the pram and serviced the car, was told it was saving
-           NOTHING — R12 022 a month of "Subaru maintenance", "Private room &
-           pram" and "Baby carrier" came straight off a real R12 224 a month of
-           saving and drove the whole pillar to zero. Spending a fund you built
-           on purpose is the fund working, not a failure to save; the STOCK
-           going down is a different statement from the RATE going negative,
-           and the Savings page already tells that first story properly.
-
-           So: count what arrives from outside the pool, and ignore movement
-           WITHIN it in both directions. The vault distinguishes them cleanly
-           without guessing — an internal transfer carries a savings- or
-           investment-typed category (the receiving vehicle's own name), while
-           spending a fund carries a real expense category. Both legs of an
-           internal move are skipped, so a transfer can neither inflate the
-           rate on the way in nor deflate it on the way out.
-
-           Read off the rows directly rather than through splitFlows' buckets:
-           classifyRow sorts a positive row into `growth` purely because its
-           category is income-typed, which is right for the Savings page's
-           growth chart and wrong here — a salary or a UIF reimbursement paid
-           into a savings account is exactly the household putting money aside.
-           supersededBySplit is the same split-parent guard splitFlows applies,
-           imported from the same module so the two cannot drift.
-
-           KNOWN LIMIT, stated rather than hidden: money paid in and spent
-           straight back out within the window still counts in full, because
-           nothing in the data separates "spending what I just put in" from
-           "drawing on a fund I built last year" — both are an expense-typed
-           row leaving a savings account. This is the conventional reading of a
-           savings RATE (what share of income was set aside) and it is the one
-           that does not punish a sinking fund, which is the shape real
-           households actually use. The other story — the balance itself going
-           down — is not lost: the Savings page's growth chart and its
-           per-account "in / out" lines tell it directly, and tell it better
-           than a single ratio could. */
-        /* THE OTHER LEG is the only honest signal for an internal move, and
-           deliberately the ONLY test applied here.
-
-           A first attempt also skipped any inflow whose CATEGORY was
-           savings-typed, reasoning that such a category names the vehicle the
-           money came out of. On one real vault it did. In general it does not,
-           and a guard fixture caught it: a household moving R10 000 a month
-           from its CHEQUE account into Investments categorises that
-           `Investing` — a savings-typed category naming the DESTINATION, which
-           is the ordinary way people label it. That is new saving from outside
-           the pool, and the category rule silently threw it away, taking a
-           genuinely strong vault out of its band.
-
-           So the pairing does the work instead: an equal and opposite row, in
-           a DIFFERENT savings account, within a few days. Matched legs cancel
-           and neither counts; each outflow can only cancel one inflow, so two
-           genuine deposits are never swallowed by one withdrawal. A
-           sinking-fund purchase has no such counterpart — the money went to a
-           shop, not to another account of yours — so it never matches and
-           never reduces the rate. And money arriving from a cheque account has
-           no counterpart in the pool either, so it counts, whatever it is
-           called. */
-        const j = outflows.findIndex((o, i) => !spent.has(i)
-          && o.acct !== acct
-          && Math.abs(-o.row.amount - row.amount) < 0.005
-          && Math.abs(daysBetween(o.row.date, row.date)) <= TRANSFER_DAYS);
-        if (j !== -1) { spent.add(j); continue; }
-
-        savings += row.amount;
-      }
+      savings = savedFromOutside(householdRows, saverLabels);
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency
          divisor. `consumption` is what living cost: everything except money

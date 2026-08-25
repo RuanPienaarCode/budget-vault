@@ -560,4 +560,143 @@ function growthSeries(entries, typeOf, opts) {
   return { points, undated, closing, included, excluded, truncatedFrom };
 }
 
-module.exports = { splitFlows, accountFlows, totalReturn, growthSeries, classifyRow, chartable };
+
+/* WHAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT, for one period.
+
+   Lives here, and is called from BOTH health-data.js (which averages it over
+   six periods for the score's savings rate) and views/score.js (which shows
+   this period's figure on the "Where the money went" card), because the two
+   used to answer "how much did you save" differently on one screen. The card
+   read splitFlows' gross contributions and reported R4 270 for a period in
+   which R4 270 had simply moved from a baby fund into an emergency fund; the
+   score, applying the rule below, said R0. Same money, same screen, same day.
+
+   `saverLabels` maps a transaction label to the pool account it belongs to,
+   so a caller decides what counts as the pool and this decides what crossed
+   into it.
+*/
+function savedFromOutside(rows, saverLabels) {
+  let savings = 0;
+  const labels = saverLabels instanceof Map ? saverLabels : new Map(saverLabels || []);
+  const householdRows = rows || [];
+const inflows = [], outflows = [];
+{
+  for (const r of householdRows) {
+    if (!r || typeof r.amount !== 'number' || !r.amount) { continue; }
+    if (supersededBySplit(r)) { continue; }   // its parts are in this same list
+    const a = labels.get(r.label);
+    if (!a) { continue; }                     // not a savings or investment account
+    /* NOTHING IS SKIPPED HERE ON THE STRENGTH OF THE ROW'S OWN FLAGS,
+       and the reason is worth writing down because two releases got it
+       wrong in opposite directions.
+
+       The old rule paired the legs of a movement household-wide and
+       dropped both, to stop a R40 000 UIF payment counting as saving
+       "while the same rand is not counted as income". That premise was
+       never true. `income` further down is built from householdNet,
+       which filters transfer-typed rows and paired pass-throughs and
+       NOTHING ELSE — it does not look at `excluded` at all. Measured on
+       the vault the rule was written for, August income reads R91 627
+       against R44 850-R57 984 in every other month: the UIF is in the
+       base, and always was.
+
+       So the honest reading is the plain one. The household received
+       R40 000 and put it in a fund. Income counts it once, saving counts
+       it once, and the rate that month is 100% because that is what
+       happened. Dropping the savings leg while income kept it was the
+       inconsistency, not the cure for one.
+
+       A replacement rule — skip anything income-typed AND excluded —
+       was written, tested and reverted for the same reason: it moved the
+       error from one side of the ratio to the other, and would have
+       taken R1 402 of interest credited into savings accounts out of the
+       numerator while income went on counting it.
+
+       What remains is the pool boundary alone, tested just below: money
+       is saved if it arrived from outside the pool, and merely moved if
+       its matching leg left another account inside it. */
+    (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
+  }
+}
+const spent = new Set();
+for (const { acct, row } of inflows) {
+  /* MONEY THAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT. Not gross
+     inflow, and not net-of-everything — both of those shipped, and both
+     were wrong in opposite directions.
+
+     Gross contributions (to 1.23.0) counted a rand moved from one
+     savings account to another as fresh saving in the receiving account,
+     with nothing taken off the sending one. On a real vault that
+     overstated the rate by R1 250 a month.
+
+     Netting ALL outflows (1.23.1) fixed that and broke something worse:
+     it treated a sinking fund doing its job as dis-saving. A household
+     that had been paying into a Baby Fund and a Car Fund for months, and
+     then bought the pram and serviced the car, was told it was saving
+     NOTHING — R12 022 a month of "Subaru maintenance", "Private room &
+     pram" and "Baby carrier" came straight off a real R12 224 a month of
+     saving and drove the whole pillar to zero. Spending a fund you built
+     on purpose is the fund working, not a failure to save; the STOCK
+     going down is a different statement from the RATE going negative,
+     and the Savings page already tells that first story properly.
+
+     So: count what arrives from outside the pool, and ignore movement
+     WITHIN it in both directions. The vault distinguishes them cleanly
+     without guessing — an internal transfer carries a savings- or
+     investment-typed category (the receiving vehicle's own name), while
+     spending a fund carries a real expense category. Both legs of an
+     internal move are skipped, so a transfer can neither inflate the
+     rate on the way in nor deflate it on the way out.
+
+     Read off the rows directly rather than through splitFlows' buckets:
+     classifyRow sorts a positive row into `growth` purely because its
+     category is income-typed, which is right for the Savings page's
+     growth chart and wrong here — a salary or a UIF reimbursement paid
+     into a savings account is exactly the household putting money aside.
+     supersededBySplit is the same split-parent guard splitFlows applies,
+     imported from the same module so the two cannot drift.
+
+     KNOWN LIMIT, stated rather than hidden: money paid in and spent
+     straight back out within the window still counts in full, because
+     nothing in the data separates "spending what I just put in" from
+     "drawing on a fund I built last year" — both are an expense-typed
+     row leaving a savings account. This is the conventional reading of a
+     savings RATE (what share of income was set aside) and it is the one
+     that does not punish a sinking fund, which is the shape real
+     households actually use. The other story — the balance itself going
+     down — is not lost: the Savings page's growth chart and its
+     per-account "in / out" lines tell it directly, and tell it better
+     than a single ratio could. */
+  /* THE OTHER LEG is the only honest signal for an internal move, and
+     deliberately the ONLY test applied here.
+
+     A first attempt also skipped any inflow whose CATEGORY was
+     savings-typed, reasoning that such a category names the vehicle the
+     money came out of. On one real vault it did. In general it does not,
+     and a guard fixture caught it: a household moving R10 000 a month
+     from its CHEQUE account into Investments categorises that
+     `Investing` — a savings-typed category naming the DESTINATION, which
+     is the ordinary way people label it. That is new saving from outside
+     the pool, and the category rule silently threw it away, taking a
+     genuinely strong vault out of its band.
+
+     So the pairing does the work instead: an equal and opposite row, in
+     a DIFFERENT savings account, within a few days. Matched legs cancel
+     and neither counts; each outflow can only cancel one inflow, so two
+     genuine deposits are never swallowed by one withdrawal. A
+     sinking-fund purchase has no such counterpart — the money went to a
+     shop, not to another account of yours — so it never matches and
+     never reduces the rate. And money arriving from a cheque account has
+     no counterpart in the pool either, so it counts, whatever it is
+     called. */
+  const j = outflows.findIndex((o, i) => !spent.has(i)
+    && o.acct !== acct
+    && Math.abs(-o.row.amount - row.amount) < 0.005);
+  if (j !== -1) { spent.add(j); continue; }
+
+  savings += row.amount;
+}
+  return savings;
+}
+
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthSeries, classifyRow, chartable };

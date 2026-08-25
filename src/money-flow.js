@@ -76,9 +76,59 @@ const SUBSCRIPTION_TYPES = new Set(['insurance', 'services']);
 
    Every argument defaults safely, so a brand-new vault (no income, no budget,
    no debts) returns zeroed bands rather than throwing or dividing by zero. */
+/* THE ONE RULE FOR "WHAT SHARE OF INCOME DID THE PLAN CLAIM", shared by the
+   Dashboard's "N% allocated" and the Score page's "Allocated of income" so the
+   two cannot answer the same question differently. They did: on a real vault,
+   mid-period, the Dashboard read 100% and the Score page read 102% off the
+   same files, because one divided by the income the BUDGET states and the
+   other by the income that happened to have landed by that morning.
+
+   The budget's own income figure is the honest denominator. A running period's
+   actual income is a part-month number, so dividing a whole period's plan by
+   it says nothing about the plan and everything about today's date — on this
+   vault a R255 invoice arriving before the salary would have printed "19252%
+   allocated", and it read as a settled fact because nothing on the line said
+   which day it was measured.
+
+   Actual income stands in only where the budget names none AND the period has
+   FINISHED, where it is a whole figure and no longer moves. A running period
+   with no income budgeted has no honest denominator at all and gets no
+   percentage. */
+function incomeBaseFor({ budgetIncome, actualIncome, periodFinished } = {}) {
+  const planned = Number(budgetIncome) || 0;
+  if (planned > 0) { return planned; }
+  if (!periodFinished) { return 0; }
+  return Math.max(0, Number(actualIncome) || 0);
+}
+
+/* The whole answer, not just its denominator, so the two cards that ask it
+   cannot diverge on the edges either.
+
+   A budget of zero is 0% allocated whatever the income is — the numerator
+   settles it and no denominator is needed. That case is deliberate and pinned
+   by tests/null-vs-zero.test.cjs: "income present, budget genuinely 0: a real
+   0% allocated, not null". Only a REAL budget measured against an income base
+   that does not exist yet has no answer, and that returns null so the line is
+   left off rather than invented. */
+function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished } = {}) {
+  const bud = Math.max(0, Number(budgeted) || 0);
+  const base = incomeBaseFor({ budgetIncome, actualIncome, periodFinished });
+  if (!bud) {
+    /* A budget of zero is 0% allocated whatever the denominator is — the
+       numerator settles it. But only where there is SOME income to speak of:
+       a vault with neither budget nor income is not "0% allocated", it is a
+       vault nobody has filled in yet, and gets nothing rather than a figure
+       that looks like a finding. Both halves are pinned by
+       tests/null-vs-zero.test.cjs, which documents this module's 0-vs-null
+       convention against health-math's. */
+    return (base > 0 || (Number(actualIncome) || 0) > 0) ? 0 : null;
+  }
+  return base > 0 ? bud / base : null;
+}
+
 function periodFlow({
   income, spentTotal, budgeted, spendByCat, fixedCats, catType,
-  savingContribution, debts,
+  savingContribution, debts, budgetIncome, periodFinished,
 } = {}) {
   const inc = Number(income) > 0 ? Number(income) : 0;
   const spent = Math.max(0, Number(spentTotal) || 0);
@@ -163,7 +213,13 @@ function periodFlow({
   const neverBudgeted = inc - bud;
   const together = leftInBudget + neverBudgeted;
 
-  const allocatedOfIncome = inc > 0 ? bud / inc : null;
+  /* Against the income the PLAN states, via the shared rule above — NOT
+     against `inc`, which is what has landed so far. Dividing by `inc` made
+     this line disagree with the Dashboard's "N% allocated" on the same data,
+     and drift a little every day as more income arrived. */
+  const allocatedOfIncome = allocatedShare({
+    budgeted: bud, budgetIncome, actualIncome: inc, periodFinished,
+  });
   /* NOT `spent / bud`. `spent` is periodSummary().spend, which the comment
      on `living` two blocks above already documents as INCLUDING
      savings-typed spend — the outgoing leg of a category categorised
@@ -272,4 +328,7 @@ function railSegments(breakdown) {
   return out;
 }
 
-module.exports = { periodFlow, railSegments, HOUSING_TYPES, SUBSCRIPTION_TYPES };
+module.exports = {
+  periodFlow, railSegments, incomeBaseFor, allocatedShare,
+  HOUSING_TYPES, SUBSCRIPTION_TYPES,
+};

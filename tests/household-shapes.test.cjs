@@ -11,33 +11,41 @@
    So: build households the author does not have, and apply the same invariants.
    Two shipped bugs were found this way and are pinned below.
  
-   NEGATIVE-CONTROLLED: drop MIN_LIVE_WEIGHT from financialScore and "a
-   household with no income gets no score" fires (it scores 100 off one pillar).
+   NEGATIVE-CONTROLLED. Reverting either fix makes this file fail:
+     · drop MIN_LIVE_WEIGHT from financialScore and "a household with no income
+       gets no score" fires (it scores 100 off one live pillar).
+     · restore the day window in health-data.js and "the savings rate must not
+       depend on how fast the bank settles" fires.
 
-   ONE DEFECT HERE IS RECORDED, NOT FIXED, and it is pinned below rather than
-   left for someone to rediscover. The savings rate moves with how many days
-   apart the two legs of a transfer land: 0% at three days, 10% at four, the
-   score stepping 66 -> 76 on nothing the household did. That much is certain.
+   THE SETTLEMENT-LAG DEFECT, and why the obvious fixes were wrong.
 
-   What is NOT certain is the right rule, and two plausible fixes were tried
-   and rejected against real data:
-     · skipping transfer-TYPED rows in the savings walk. Rejected: on a real
-       vault all four rows it dropped were money moving from the transaction
-       account into a fund — money crossing INTO the pool from outside, which
-       is saving by this app's own definition. It halved a real rate from 8.8%
-       to 4.2%. This is the same trap the savings walk's own comment documents
-       for savings-typed rows, and the category type cannot escape it.
-     · widening or removing passthroughPairs' date window. Rejected: it makes
-       the cliff wider, not absent, and removing it entirely lets two unrelated
-       equal amounts cancel each other.
+   The savings rate used to move with the calendar: R3 000 moved from a cheque
+   account into a pot read as nothing when the two legs landed within three
+   days and R3 000 when they landed four apart, the score stepping 66 -> 76 on
+   nothing the household did. In the other direction a shuffle BETWEEN two
+   savings accounts read as R3 000 of fresh saving once its legs fell outside
+   the same window. One number, two cliffs, both set by a bank.
 
-   The honest discriminator is whether the money's ORIGIN was counted as income
-   — a salary moved cheque -> pot is saving, a UIF payment passing through on
-   its way to the same pot is not, and the two are identical in shape. That
-   needs provenance the rows do not currently carry, so it is a design decision
-   rather than a patch. Until then this file records the behaviour exactly, so
-   that any change to it is deliberate and visible in the diff.
- 
+   Two fixes were tried and rejected against real data before the one below:
+     · skipping transfer-TYPED rows in the savings walk. All four rows it
+       dropped on a real vault were money moving from a transaction account
+       into a fund — money crossing INTO the pool from outside, which is saving
+       by this app's own definition. It halved a real rate, 8.8% -> 4.2%.
+     · requiring the two legs to share a description. It threw away four real
+       pairs, because two banks write one movement two ways: "Discovery Bank
+       account...6397" against "Notice savings account payout".
+
+   What actually holds is two rules that never consult a calendar:
+     · a pool inflow whose matching outflow sits in ANOTHER POOL account is an
+       internal move, at any distance inside the period.
+     · nothing else. In particular a row is NOT skipped for being `excluded`,
+       nor for being income-typed, because income does not skip those either —
+       it is built from householdNet, which never consults `excluded`. A rule
+       that dropped income-typed excluded inflows was written and reverted for
+       exactly that reason: it moved the inconsistency to the other side of the
+       ratio, taking R1 402 of interest out of the numerator while the
+       denominator went on counting it.
+
      node tests/household-shapes.test.cjs      # non-zero exit on failure
 */
 
@@ -73,26 +81,12 @@ const snapOf = async (files, period = '2026-08') => {
 };
 
 /* ---------------------------------------------------------------------------
-   1. CHARACTERISATION ONLY — THE SETTLEMENT-LAG DEFECT, PINNED AS IT STANDS.
+   1. THE SAVINGS RATE MUST NOT DEPEND ON HOW FAST THE BANK SETTLES.
 
-   Read the header before changing anything here. The assertions below record
-   WRONG behaviour on purpose; they are not an endorsement of it.
-
-   One household, one R3 000 transfer from cheque into a savings pot, both legs
-   categorised `Move` (transfer-typed) — the user has DECLARED this internal.
-   The only thing that varies is how many days apart the legs land.
-
-   Before the fix, `passthroughPairs`' TRANSFER_DAYS = 3 window did all the
-   work: inside it both legs cancelled, outside it the pot inflow survived and
-   was counted as fresh saving. Same behaviour, different bank, 0% vs 10%.
-
-   Note this does NOT reintroduce the bug the savings walk's own comment warns
-   about. That one was about SAVINGS-typed inflows, which are genuinely
-   ambiguous — `Investing` can name the destination (real saving from a cheque
-   account) or the source. A TRANSFER-typed row carries no such ambiguity: the
-   user has said it is money moving between their own accounts. health-data.js
-   already skips transfer-typed rows in the household-spend loop; this makes
-   the savings walk agree with it.
+   Six households that differ only in where the money came from, whether the
+   reader marked the legs excluded, and what category it carries. Each is run
+   at every settlement lag from same-day to seventeen days. Every one must give
+   the same answer at every lag, and it must be the RIGHT answer.
 --------------------------------------------------------------------------- */
 function lagVault(lagDays) {
   const f = Object.assign({ [`${B}/Settings.md`]: settings() }, CATS, {
@@ -108,6 +102,46 @@ function lagVault(lagDays) {
     f[`${B}/Transactions/Pot/${m}.md`] = tbl([
       `| ${m}-${String(10 + lagDays).padStart(2, '0')} | From cheque | Move | 3000.00 | yes | | |`,
     ]);
+  }
+  return f;
+}
+
+/* Same movement, but BOTH legs inside the pool: never new saving. */
+function internalVault(lagDays) {
+  const f = Object.assign({ [`${B}/Settings.md`]: settings() }, CATS, {
+    [`${B}/Accounts/Cheque.md`]: acct('checking', 20000, 'tx_label: "Cheque"\n'),
+    [`${B}/Accounts/Pot.md`]: acct('savings', 60000, 'emergency_fund: true\ntx_label: "Pot"\n'),
+    [`${B}/Accounts/Pot2.md`]: acct('savings', 90000, 'tx_label: "Pot2"\n'),
+  });
+  for (const m of MONTHS) {
+    f[`${B}/Transactions/Cheque/${m}.md`] = tbl([
+      `| ${m}-01 | Pay | Salary | 30000.00 | | | |`,
+      `| ${m}-03 | Rent | Rent | -9000.00 | | | |`,
+    ]);
+    f[`${B}/Transactions/Pot2/${m}.md`] = tbl([`| ${m}-10 | To pot | Move | -3000.00 | | | |`]);
+    f[`${B}/Transactions/Pot/${m}.md`] = tbl([
+      `| ${m}-${String(10 + lagDays).padStart(2, '0')} | From pot2 | Move | 3000.00 | | | |`]);
+  }
+  return f;
+}
+
+/* The R40 000 UIF shape: an income-typed category the reader marked excluded,
+   passing through a non-pool account into a pot. */
+function uifVault(lagDays) {
+  const f = Object.assign({ [`${B}/Settings.md`]: settings() }, CATS, {
+    [`${B}/Categories/Reimbursements.md`]: '---\ntype: income\n---\n',
+    [`${B}/Accounts/Cheque.md`]: acct('checking', 20000, 'tx_label: "Cheque"\n'),
+    [`${B}/Accounts/Pot.md`]: acct('savings', 60000, 'emergency_fund: true\ntx_label: "Pot"\n'),
+  });
+  for (const m of MONTHS) {
+    f[`${B}/Transactions/Cheque/${m}.md`] = tbl([
+      `| ${m}-01 | Pay | Salary | 30000.00 | | | |`,
+      `| ${m}-03 | Rent | Rent | -9000.00 | | | |`,
+      `| ${m}-08 | UIF in | Reimbursements | 3000.00 | yes | | |`,
+      `| ${m}-09 | UIF out | Reimbursements | -3000.00 | yes | | |`,
+    ]);
+    f[`${B}/Transactions/Pot/${m}.md`] = tbl([
+      `| ${m}-${String(9 + lagDays).padStart(2, '0')} | UIF | Reimbursements | 3000.00 | yes | | |`]);
   }
   return f;
 }
@@ -202,26 +236,60 @@ function invariants(label, snap) {
 (async () => {
   /* ---- 1. settlement lag ---- */
   const byLag = [];
-  for (const lag of [0, 1, 2, 3, 4, 5, 6, 7]) {
+  for (const lag of [0, 1, 2, 3, 4, 5, 6, 7, 11, 17]) {
     const s = await snapOf(lagVault(lag));
     byLag.push({ lag, savings: s.metrics.monthlySavings, rate: s.metrics.savingsRate, score: s.breakdown.total });
     invariants(`transfer lag ${lag}d`, s);
   }
-  /* KNOWN DEFECT, pinned exactly. If this block starts failing, someone has
-     changed how transfers are counted — read the header, then decide whether
-     the new behaviour is the fix or a fresh regression, and update this on
-     purpose. The desired end state is one rate at every lag. */
-  const near3 = byLag.filter(r => r.lag <= 3);
-  const past3 = byLag.filter(r => r.lag > 3);
-  ok(near3.every(r => Math.abs(r.savings) < 0.01),
-    'DEFECT: legs settling within TRANSFER_DAYS cancel, and R3 000 a month of real '
-    + `saving reads as nothing (got ${near3.map(r => r.savings).join(', ')})`);
-  ok(past3.every(r => Math.abs(r.savings - 3000) < 0.01),
-    'DEFECT: the same R3 000 counts in full once the legs land further apart '
-    + `(got ${past3.map(r => r.savings).join(', ')})`);
-  ok(near3[0].score !== past3[0].score,
-    'DEFECT: and the headline score moves with the bank rather than the household '
-    + `(${near3[0].score} vs ${past3[0].score})`);
+  ok(new Set(byLag.map(r => Math.round((r.rate || 0) * 1000))).size === 1,
+    'the savings rate must not depend on how many days apart the two legs of a transfer land — '
+    + byLag.map(r => `${r.lag}d:${((r.rate || 0) * 100).toFixed(1)}%`).join(' '));
+  ok(byLag.every(r => Math.abs(r.savings - 3000) < 0.01),
+    'and R3 000 moved from a cheque account into a pot is R3 000 saved at every lag, '
+    + `because a cheque account is outside the pool (got ${byLag.map(r => r.savings).join(', ')})`);
+  ok(new Set(byLag.map(r => r.score)).size === 1,
+    `the score must not move with settlement lag either (got ${byLag.map(r => r.score).join(', ')})`);
+
+  /* The other direction, and the one that OVERSTATED: a shuffle between two
+     savings accounts is never new saving, however far apart its legs land. */
+  const internal = [];
+  for (const lag of [0, 3, 4, 7, 11, 17]) {
+    const s2 = await snapOf(internalVault(lag));
+    internal.push({ lag, savings: s2.metrics.monthlySavings });
+    invariants(`internal shuffle ${lag}d`, s2);
+  }
+  ok(internal.every(r => Math.abs(r.savings) < 0.01),
+    'money moved from one savings account to another is never fresh saving, at any lag — '
+    + `it is the same rand in a different pot (got ${internal.map(r => r.savings).join(', ')})`);
+
+  /* The R40 000 UIF shape: income-typed, excluded, arriving in a non-pool
+     account and moving on into a pot.
+
+     It COUNTS, on both sides. The rule that used to drop it was justified by
+     "the same rand is not counted as income", and that was never true — income
+     is built from householdNet, which filters transfer-typed rows and paired
+     pass-throughs and does not look at `excluded` at all. So the household
+     received the money and put it away, income sees it once, saving sees it
+     once, and the two sides of the ratio agree.
+
+     Asserted here on BOTH sides rather than on savings alone, because the
+     whole defect was the two disagreeing: a savings figure is only meaningful
+     next to the income it is a share of. */
+  const uif = [];
+  for (const lag of [0, 3, 4, 11]) {
+    const s3 = await snapOf(uifVault(lag));
+    uif.push({ lag, savings: s3.metrics.monthlySavings, income: s3.metrics.monthlyIncome });
+    invariants(`uif passthrough ${lag}d`, s3);
+  }
+  ok(uif.every(r => Math.abs(r.savings - 3000) < 0.01),
+    'money that arrived and was put away is saved, at every lag — the pass-through legs '
+    + `cancel and the arrival does not (got ${uif.map(r => r.savings).join(', ')})`);
+  ok(uif.every(r => Math.abs(r.income - 33000) < 0.01),
+    'and the SAME rand is in the income base, which is why counting it as saving is '
+    + `consistent rather than inflationary (got ${uif.map(r => r.income).join(', ')})`);
+  ok(new Set(uif.map(r => Math.round(r.savings))).size === 1
+     && new Set(uif.map(r => Math.round(r.income))).size === 1,
+    'neither side moves with settlement lag');
 
   /* ---- 2. unmeasurable households ---- */
   const noIncome = await snapOf(incomeVault(0, 500000));
@@ -251,6 +319,85 @@ function invariants(label, snap) {
   };
   for (const [name, files] of Object.entries(SHAPES)) {
     invariants(name, await snapOf(files));
+  }
+
+  /* ---- 4. ONE QUESTION, ONE ANSWER, ON EVERY CARD THAT ASKS IT ----
+     "What share of income has the plan claimed?" is asked twice — the
+     Dashboard's "N% allocated" and the Score page's "Allocated of income" —
+     and on a real vault, mid-period, they answered 100% and 102% off the same
+     files. One divided by the income the BUDGET states, the other by the
+     income that happened to have landed by that morning, so the second drifted
+     every day and the two never agreed except by coincidence.
+
+     Both now call money-flow.js's allocatedShare(). This pins the behaviour
+     AND the arrangement: a future reader who reintroduces a second, local
+     calculation makes the last assertion here fail. */
+  const { allocatedShare, periodFlow } = require('../src/money-flow');
+  const CASES = [
+    { budgeted: 40893, budgetIncome: 40795.2, actualIncome: 40240.21, periodFinished: false },
+    { budgeted: 40893, budgetIncome: 0, actualIncome: 40240.21, periodFinished: false },
+    { budgeted: 40893, budgetIncome: 0, actualIncome: 40240.21, periodFinished: true },
+    { budgeted: 0, budgetIncome: 0, actualIncome: 40000, periodFinished: false },
+    { budgeted: 0, budgetIncome: 0, actualIncome: 0, periodFinished: false },
+  ];
+  for (const c of CASES) {
+    const direct = allocatedShare(c);
+    const viaFlow = periodFlow({
+      income: c.actualIncome, spentTotal: 0, budgeted: c.budgeted,
+      budgetIncome: c.budgetIncome, periodFinished: c.periodFinished,
+    }).budget.allocatedOfIncome;
+    ok(direct === viaFlow || (direct !== null && viaFlow !== null && Math.abs(direct - viaFlow) < 1e-9),
+      `the flow card and the shared rule agree on "allocated" for ${JSON.stringify(c)} `
+      + `(${direct} vs ${viaFlow})`);
+  }
+  ok(allocatedShare({ budgeted: 40893, budgetIncome: 40795.2, actualIncome: 1, periodFinished: false })
+     === allocatedShare({ budgeted: 40893, budgetIncome: 40795.2, actualIncome: 40240, periodFinished: false }),
+    'and it does not move as the month\'s income lands — that drift is what made the '
+    + 'two cards disagree in the first place');
+
+  const fsMod = require('fs');
+  for (const view of ['dashboard', 'score']) {
+    const src = fsMod.readFileSync(`${__dirname}/../src/views/${view}.js`, 'utf8');
+    ok(/allocatedShare|periodFlow/.test(src),
+      `views/${view}.js reads the shared rule rather than computing "allocated" itself`);
+  }
+
+  /* ---- 5. "SAVED" MEANS ONE THING, ON BOTH CARDS THAT SAY IT ----
+     The Score page's ring and the "Where the money went" card beside it used
+     to measure saving two ways: the card read splitFlows' GROSS contributions
+     and the ring counted only what crossed into the pool from outside. On a
+     real vault the card reported R4 270 saved in a period whose only movement
+     was R4 270 travelling from a baby fund into an emergency fund. The windows
+     differ on purpose — one period against six — but the measure must not.
+
+     Both now call savings-math.js's savedFromOutside(). */
+  {
+    const { savedFromOutside } = require('../src/savings-math');
+    const { splitFlows } = require('../src/savings-math');
+    const ctx2 = makeCtx(internalVault(0), { budgetFolder: B });
+    await loadInto(ctx2);
+    ctx2.S.period = '2026-08';
+    const per = '2026-07';
+    const idx2 = ctx2.accountIndex();
+    const pool = ctx2.S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
+    const labels = new Map();
+    let gross = 0;
+    for (const a of pool) {
+      for (const L of ((idx2.get(a) || {}).labels || [])) { labels.set(L, a); }
+      gross += splitFlows((idx2.get(a) || {}).rows || [], ctx2.catType,
+        ctx2.periodRange(per)).contributions;
+    }
+    const shared = savedFromOutside(ctx2.txInPeriod(per), labels);
+    ok(Math.abs(shared) < 0.01,
+      'a move between two of your own savings accounts is R0 saved by the shared rule, '
+      + `whatever the gross figure says (got ${shared})`);
+    ok(gross > 0,
+      'and the gross reading really does differ, so this is a live guard rather than '
+      + `two names for the same number (gross ${gross})`);
+    const src = require('fs').readFileSync(`${__dirname}/../src/views/score.js`, 'utf8');
+    ok(/savedFromOutside/.test(src) && !/splitFlows\(/.test(src),
+      'views/score.js feeds the flow card from savedFromOutside, not from a gross reading '
+      + 'of its own');
   }
 
   console.log(`PASS — the maths holds for households that are not the author's (${checks} checks).`);

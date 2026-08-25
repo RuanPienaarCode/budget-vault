@@ -3,6 +3,63 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.26.0 — 2026-08-25
+
+### Fixed
+
+- **Your savings rate could change because of how fast your bank settles a
+  transfer.** Money moved between your own accounts shows up as two rows, and
+  the two do not always land on the same day. Whether they counted as one
+  movement or two was decided by a three-day window, and that window set real
+  figures: R3 000 moved from a cheque account into a pot read as nothing when
+  the legs landed within three days and as R3 000 when they landed four apart.
+  Two households doing exactly the same thing got different scores because of
+  their banks.
+
+  It ran both ways. Money shuffled between two of your own savings accounts was
+  counted as brand-new saving as soon as its legs fell outside the window — the
+  same rand, in a different pot, reading as money set aside. The same window
+  decided spending too, so a card settled slowly could put one rand into your
+  living costs twice and quietly lower the months of cover you were shown.
+
+  One rule replaces it, and it never looks at a calendar: money arriving in a
+  savings account is a move if the matching amount left another of your savings
+  accounts, and saving if it came from anywhere else.
+
+- **A R40 000 payment that was received and put away was not counted as
+  saving.** The old rule dropped it to stop the rate sitting on "a base the
+  household never earned" — but that base always did include it. Income is
+  built without reference to the excluded flag, so the money was in the
+  denominator the whole time and only the numerator was missing it. It now
+  counts on both sides, which is what actually happened: the money came in and
+  it was put away.
+
+  On the vault this was found on, saving read R5 008 a month and now reads
+  R13 474.
+
+- **Two pages disagreed about how much of your income the budget had claimed.**
+  The Dashboard said 100% allocated and the Score page said 102%, from the same
+  files on the same day. One measured the budget against the income the budget
+  states; the other against the income that had landed so far, which part-way
+  through a period is a part-month figure that drifts daily.
+
+- **Two cards on the Score page disagreed about what "saved" means.** "Where
+  the money went" reported R4 270 saved in a period whose only movement was
+  R4 270 travelling from a baby fund into an emergency fund, while the ring
+  directly above it counted that as nothing. The card showed money arriving in
+  a savings account; the ring showed money arriving from OUTSIDE your savings.
+  Both now read the same rule. They still cover different windows — one period
+  against six — and each says so.
+
+### Known
+
+- **Money refunded into a savings account counts as saving.** If a fund pays
+  for something and the money comes back, the return reads as money set aside.
+  This is the cost of counting what arrives and ignoring what leaves — the same
+  choice that stops a sinking fund doing its job from looking like a failure to
+  save. Every rule tried against real data that caught refunds also threw away
+  genuine saving, so it is left visible rather than half-fixed.
+
 ## 1.25.0 — 2026-08-25
 
 ### Fixed

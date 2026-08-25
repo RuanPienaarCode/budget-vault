@@ -18,7 +18,7 @@ const { el, icoEl } = require('../dom');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
-const { splitFlows } = require('../savings-math');
+const { savedFromOutside } = require('../savings-math');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -28,7 +28,8 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodRange, periodSpend, periodSummary, budgetTotals, catType, accountIndex,
+    periodSpend, periodSummary, budgetTotals, catType, accountIndex,
+    txInPeriod,
   } = ctx;
 
   function renderScore() {
@@ -678,7 +679,6 @@ module.exports = function registerScore(ctx) {
      the header comment in money-flow.js for why that matters. */
   function buildFlow() {
     const cur = currentPeriod();
-    const { start, end } = periodRange(cur);
     const summary = periodSummary(cur);
     const spend = periodSpend(cur, null);
     const budget = budgetTotals(cur);
@@ -687,17 +687,31 @@ module.exports = function registerScore(ctx) {
     /* Contributions into savings/investment accounts THIS period — the same
        signal health-data.js averages over six periods for the score's own
        saving pillar, read here for one. */
+    /* THE SAME "saved" THE SCORE MEANS, from the same function.
+
+       This used to read splitFlows' gross contributions, which counts every
+       arrival in a pool account including one that came from another pool
+       account. On a real vault it reported R4 270 saved in a period whose only
+       movement was R4 270 travelling from a baby fund into an emergency fund,
+       while the score's ring on the very same screen counted that as nothing.
+       The window differs on purpose — this card is one period, the ring is six
+       — but the MEASURE must not, or the two are not comparable at all. */
     const idx = accountIndex();
     const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
-    let savingContribution = 0;
+    const saverLabels = new Map();
     for (const a of savers) {
-      const rows = (idx.get(a) || {}).rows || [];
-      savingContribution += splitFlows(rows, catType, { from: start, to: end }).contributions;
+      for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
+    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels);
 
     return periodFlow({
       income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
+      /* "Allocated of income" is a question about the PLAN, so it is measured
+         against the income the plan states — the same rule, from the same
+         helper, the Dashboard's "N% allocated" uses. This card always draws
+         the running period, so it is never a finished one. */
+      budgetIncome: budget.income, periodFinished: false,
     });
   }
 
