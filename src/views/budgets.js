@@ -16,12 +16,13 @@ const { typeOrder, typeRank } = require('../groups');
 const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
+const { sharePercentLabel } = require('../share-percents');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit, catType, currentPeriod } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit, catType, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -319,8 +320,12 @@ module.exports = function registerBudgets(ctx) {
        rather than the saved file, so the tile moves as the amount is typed,
        like every other figure on this strip. */
     const spent = sum.spend + assumed;
-    const allocPct = income > 0 ? Math.round((budgeted / income) * 100) : null;
-    const usedPct = budgeted > 0 ? Math.round((spent / budgeted) * 100) : null;
+    /* sharePercentLabel, not a bare Math.round: "100% of budgeted income" sat
+       on this very strip beside a red "over-budgeted R 97,80" tile — 100.24%
+       rounded onto the boundary the red tile says the plan has crossed. Same
+       rule for "used": 100% is the same kind of boundary there. */
+    const allocPct = income > 0 ? sharePercentLabel(budgeted / income, locale().decimal) : null;
+    const usedPct = budgeted > 0 ? sharePercentLabel(spent / budgeted, locale().decimal) : null;
 
     /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
        netted, uncategorised and unknown-name spend counted in full. Every row

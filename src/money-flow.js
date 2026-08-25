@@ -290,10 +290,46 @@ function periodFlow({
     ? (rawSum <= 100.0001 ? largestRemainder(rawPercents, 100) : rawPercents.map(v => Math.round(v)))
     : bandAmounts.map(() => 0);
 
+  /* The same partition again, in RANDS — the figures the card PRINTS beside
+     those percents. money(x, 0) rounds each band alone, and independent
+     rounding is the same defect the percent column above just closed: on a
+     real vault the printed bands came to R 40 241 under a "money in" headline
+     of R 40 240 — one rand the reader can find nowhere. Allocated the way the
+     Dashboard donut's legend money column already is (dashboard.js's
+     rowMoney): floors plus largest remainder against the headline's own
+     single rounding. Only on the same branch as the percents — in a deficit
+     period there is no whole to partition, and each band rounds alone exactly
+     as its percentage does. `roundRand` mirrors formatMoney's sign-then-abs
+     order so a negative figure pre-rounded here prints the same rand
+     money(v, 0) would have printed for the raw value. */
+  const roundRand = v => (v < 0 ? -1 : 1) * Math.round(Math.abs(v));
+  const displayBands = inc > 0 && rawSum <= 100.0001
+    ? largestRemainder(bandAmounts, roundRand(inc))
+    : bandAmounts.map(roundRand);
+
+  /* The lefts' printed figures. leftInBudget is the Dashboard hero's own
+     headline (budgeted minus spent) and neverBudgeted is its own fact against
+     the same files, so each keeps its plain single rounding — but `together`
+     exists ONLY as their sum, and rounding it separately printed
+     "38 730 − 653 = 38 078" on the one chip whose whole claim is that the two
+     rows combine into the third. Derived from the two printed parts instead,
+     so the row survives the mental arithmetic it invites. The raw identity
+     (together === income − spentTotal, unconditionally — see THE TWO LEFTS
+     above) is untouched; this is display only. */
+  const displayLefts = {
+    leftInBudget: roundRand(leftInBudget),
+    neverBudgeted: roundRand(neverBudgeted),
+  };
+  displayLefts.together = displayLefts.leftInBudget + displayLefts.neverBudgeted;
+
   return {
     income: inc,
     bands: {
       committed, living, saving, notYetSpent,
+      display: {
+        committed: displayBands[0], living: displayBands[1],
+        saving: displayBands[2], notYetSpent: displayBands[3],
+      },
       percents: {
         committed: bandPercents[0], living: bandPercents[1],
         saving: bandPercents[2], notYetSpent: bandPercents[3],
@@ -301,7 +337,7 @@ function periodFlow({
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
     budget: { budgeted: bud, spentTotal: spent, allocatedOfIncome, budgetUsed },
-    lefts: { leftInBudget, neverBudgeted, together },
+    lefts: { leftInBudget, neverBudgeted, together, display: displayLefts },
   };
 }
 

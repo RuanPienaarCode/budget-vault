@@ -18,6 +18,7 @@ const { el, icoEl } = require('../dom');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
+const { sharePercentLabel } = require('../share-percents');
 const { savedFromOutside } = require('../savings-math');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
@@ -29,7 +30,7 @@ module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
     periodSpend, periodSummary, budgetTotals, catType, accountIndex,
-    txInPeriod,
+    txInPeriod, locale,
   } = ctx;
 
   function renderScore() {
@@ -746,31 +747,37 @@ module.exports = function registerScore(ctx) {
   function buildFlowRows(flow) {
     const b = flow.bands, d = flow.committedDetail, lefts = flow.lefts;
     const pct = v => `${v}%`;
+    /* `amount` stays the raw band (zero tests and geometry read it); `display`
+       is money-flow's reconciled rand figure and is what every printed label
+       uses, so the four rows sum to the headline the way their percents
+       already do — see the note on displayBands in money-flow.js. Same split
+       for the sub-line's two lefts, whose printed pair must add up to the
+       "Together" row on the chip below. */
     return [
       {
         key: 'committed', cls: 'is-committed',
-        name: i18n.t('score.flow.committed'), amount: b.committed, pct: b.percents.committed,
+        name: i18n.t('score.flow.committed'), amount: b.committed, display: b.display.committed, pct: b.percents.committed,
         sub: d.debtRepayments > 0
           ? i18n.t('score.flow.sub.committedDebt', { pct: pct(b.percents.committed), amount: money(d.debtRepayments, 0) })
           : i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.committed) }),
       },
       {
         key: 'living', cls: 'is-living',
-        name: i18n.t('score.flow.living'), amount: b.living, pct: b.percents.living,
+        name: i18n.t('score.flow.living'), amount: b.living, display: b.display.living, pct: b.percents.living,
         sub: i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.living) }),
       },
       {
         key: 'saving', cls: 'is-saving',
-        name: i18n.t('score.flow.saving'), amount: b.saving, pct: b.percents.saving,
+        name: i18n.t('score.flow.saving'), amount: b.saving, display: b.display.saving, pct: b.percents.saving,
         sub: b.saving > 0
           ? i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.saving) })
           : i18n.t('score.flow.sub.savingZero'),
       },
       {
         key: 'notYetSpent', cls: 'is-notYetSpent',
-        name: i18n.t('score.flow.notYetSpent'), amount: b.notYetSpent, pct: b.percents.notYetSpent,
+        name: i18n.t('score.flow.notYetSpent'), amount: b.notYetSpent, display: b.display.notYetSpent, pct: b.percents.notYetSpent,
         sub: i18n.t('score.flow.sub.notYetSpent', {
-          inBudget: money(lefts.leftInBudget, 0), neverBudgeted: money(lefts.neverBudgeted, 0),
+          inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
         }),
       },
     ];
@@ -880,12 +887,16 @@ module.exports = function registerScore(ctx) {
     });
     const plotTop = laid[0].top, plotBottom = laid[laid.length - 1].bottom;
 
+    /* The reconciled display figures, not the raw bands — the aria-label is
+       the whole chart for a screen-reader user, and four figures that sum one
+       rand past the income they follow is the donut aria-label defect
+       (share-percents.js's header) in rand instead of percent. */
     const label = i18n.t('score.flow.ariaLabel', {
       income: money(flow.income, 0),
-      committed: money(flow.bands.committed, 0),
-      living: money(flow.bands.living, 0),
-      saving: money(flow.bands.saving, 0),
-      notYetSpent: money(flow.bands.notYetSpent, 0),
+      committed: money(flow.bands.display.committed, 0),
+      living: money(flow.bands.display.living, 0),
+      saving: money(flow.bands.display.saving, 0),
+      notYetSpent: money(flow.bands.display.notYetSpent, 0),
     });
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -922,13 +933,13 @@ module.exports = function registerScore(ctx) {
         add('line', { x1: RIB_X0, x2: DEST_X + DEST_W, y1: midY, y2: midY, class: 'score-flow-zero' });
         add('text', { x: LABEL_X, y: midY + 4, class: 'score-flow-name' }).textContent = r.name;
         add('text', { x: W - 8, y: midY + 4, 'text-anchor': 'end', class: 'score-flow-amt is-zero' }).textContent =
-          i18n.t('score.flow.amountPct', { amount: money(r.amount, 0), pct: `${r.pct}%` });
+          i18n.t('score.flow.amountPct', { amount: money(r.display, 0), pct: `${r.pct}%` });
         continue;
       }
       add('rect', { x: RIB_X0, y: r.top, width: DEST_X + DEST_W - RIB_X0, height: r.h, rx: 4, class: `score-flow-rib ${r.cls}` });
       add('text', { x: LABEL_X, y: r.top + 18, class: 'score-flow-name' }).textContent = r.name;
       add('text', { x: W - 8, y: r.top + 18, 'text-anchor': 'end', class: 'score-flow-amt' }).textContent =
-        i18n.t('score.flow.amountPct', { amount: money(r.amount, 0), pct: `${r.pct}%` });
+        i18n.t('score.flow.amountPct', { amount: money(r.display, 0), pct: `${r.pct}%` });
       if (r.h >= 34) {
         add('text', { x: LABEL_X, y: r.top + 34, class: 'score-flow-caption' }).textContent = r.sub;
       }
@@ -952,7 +963,7 @@ module.exports = function registerScore(ctx) {
       const row = el('div', { class: `score-flow-m-row${zero ? ' is-zero' : ''}` });
       row.append(el('div', { class: 'score-flow-m-head' },
         el('span', { class: 'score-flow-m-name' }, r.name),
-        el('span', { class: 'score-flow-m-amt num' }, money(r.amount, 0))));
+        el('span', { class: 'score-flow-m-amt num' }, money(r.display, 0))));
       row.append(zero
         ? el('div', { class: 'score-flow-m-bar is-empty' })
         : el('div', { class: 'score-flow-m-bar' }, el('i', { class: r.cls, style: `width:${(Math.max(0, r.pct) / pctSpan) * 100}%` })));
@@ -1023,11 +1034,11 @@ module.exports = function registerScore(ctx) {
        reader opening the page early in a period wants to see. */
     const budgetRows = [[i18n.t('score.flow.chip.budgeted'), money(bud.budgeted, 0)]];
     if (bud.allocatedOfIncome !== null) {
-      budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${Math.round(bud.allocatedOfIncome * 100)}%`]);
+      budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${sharePercentLabel(bud.allocatedOfIncome, locale().decimal)}%`]);
     }
     budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spentTotal, 0)]);
     if (bud.budgetUsed !== null) {
-      budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${Math.round(bud.budgetUsed * 100)}%`]);
+      budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${sharePercentLabel(bud.budgetUsed, locale().decimal)}%`]);
     }
     /* The DISCLOSURE half of "declared" (tests/vocabulary.test.cjs's
        GAP A — "Budget used", twice, on one page). This chip's own
@@ -1052,10 +1063,13 @@ module.exports = function registerScore(ctx) {
     const leftsAllZero = Math.abs(lefts.leftInBudget) < 0.005
       && Math.abs(lefts.neverBudgeted) < 0.005 && Math.abs(lefts.together) < 0.005;
     if (!leftsAllZero) {
+      /* Display figures, not raw — "Together" must be the visible sum of the
+         two rows above it, which independent money(v, 0) rounding broke by a
+         rand. money-flow.js's displayLefts note has the arithmetic. */
       wrap.append(buildChip(i18n.t('score.flow.chip.lefts'), [
-        [i18n.t('score.flow.chip.leftInBudget'), money(lefts.leftInBudget, 0)],
-        [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.neverBudgeted, 0)],
-        [i18n.t('score.flow.chip.together'), money(lefts.together, 0)],
+        [i18n.t('score.flow.chip.leftInBudget'), money(lefts.display.leftInBudget, 0)],
+        [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.display.neverBudgeted, 0)],
+        [i18n.t('score.flow.chip.together'), money(lefts.display.together, 0)],
       ]));
     }
 

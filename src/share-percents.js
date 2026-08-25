@@ -46,4 +46,30 @@ function sharePercents(amounts) {
   return largestRemainder(amounts.map(v => (v / total) * 100), 100);
 }
 
-module.exports = { sharePercents, largestRemainder };
+/* One share, printed as a percentage label — whole percents, except that a
+   share genuinely past (or short of) 100% must never round back ONTO the
+   boundary. "100% allocated" printed beside a red "over-budgeted R 97,80" was
+   the trap this closes: 100.24% rounds to 100, and the one thing that pair of
+   tiles exists to say — which SIDE of the line the plan is on — was exactly
+   what the rounding ate. The same masking runs the other way (99.7% printing
+   "100%" over a real amount still unallocated), so the guard is symmetric.
+
+   Decimals appear only at that boundary and only as many as it takes (at most
+   two — a share within half a hundredth of a percent of 100 IS 100 at any
+   precision this app can render); everywhere else the label is the same whole
+   percent every caller printed before. `decimalSep` is the locale's own
+   separator, the one formatMoney already prints, so "100,2%" and "R 97,80"
+   agree on what a decimal looks like. */
+function sharePercentLabel(share, decimalSep) {
+  const pct = share * 100;
+  if (!Number.isFinite(pct)) { return '0'; }
+  const whole = Math.round(pct);
+  if (whole !== 100 || Math.abs(pct - 100) < 0.005) { return String(whole); }
+  for (let d = 1; d <= 2; d++) {
+    const s = pct.toFixed(d);
+    if (Number(s) !== 100) { return s.replace('.', decimalSep || '.'); }
+  }
+  return '100';
+}
+
+module.exports = { sharePercents, largestRemainder, sharePercentLabel };

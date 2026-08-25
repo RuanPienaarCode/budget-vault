@@ -349,7 +349,10 @@ function provenFalse(desc, exactShape, mangled) {
 
   ok(live.score.includes("if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }"),
     'Budget used (Score ring): the ring renders health-math\'s 6-period, savings-excluded figure under "budget used {pct}"');
-  ok(live.score.includes("budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${Math.round(bud.budgetUsed * 100)}%`]);"),
+  /* The literal pins the figure AND its label rule: sharePercentLabel, not a
+     bare Math.round — a share genuinely past (or short of) 100% must never
+     round back onto exactly "100%" (share-percents.js, its own guard test). */
+  ok(live.score.includes("budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${sharePercentLabel(bud.budgetUsed, locale().decimal)}%`]);"),
     'Budget used (Flow chip): the SAME page also renders money-flow\'s this-period figure under the literal label "Budget used"');
   ok(live.score.includes("bud.budgetUsed !== null ? i18n.t('score.flow.chip.budgetUsedNote') : null));"),
     'Budget used: the declared half — the chip discloses the one difference it still has left (the WINDOW, not the numerator) right under the figure, the same disclosure policy Terms 3-4 pin for the Budget page\'s income/spend tiles');

@@ -2,7 +2,7 @@
 /* Guard tests for src/money-flow.js — the arithmetic behind the Score page's
    "Where the money went" card and its segmented rail.
 
-   Five invariants, each one a way the flow card could quietly start lying:
+   Six invariants, each one a way the flow card could quietly start lying:
 
      1. the four bands sum to income
      2. committed is at least as large as its own named sub-parts, nested
@@ -13,6 +13,9 @@
         income-not-spent (income - spentTotal), unconditionally
      4. zero-income and no-budget inputs do not throw or divide by zero
      5. rail segment widths sum to 100 and fills sum to the score
+     6. the PRINTED figures (bands.display / lefts.display) reconcile the way
+        the raw ones do — whole rand, bands summing to the rounded headline,
+        "together" the exact sum of its two printed parts
 
      node tests/money-flow.test.cjs
 */
@@ -155,6 +158,42 @@ const base = {
   close(wealth.at, 1, 'a full-marks pillar (wealth, net worth well past 3x income) reads at = 1');
 
   ok(railSegments(null).length === 0, 'a null breakdown yields no segments, not a throw');
+  checks++;
+}
+
+/* ---- 6. the printed figures reconcile the way the raw ones do ---- */
+{
+  /* The real vault this shipped from: money(x, 0) rounding each figure alone
+     printed bands of R 2 163 + R 38 078 under a "money in" headline of
+     R 40 240, and a "Together" row (R 38 078) one rand off the sum of the two
+     rows printed above it (R 38 730 − R 653 = R 38 077). */
+  const f = periodFlow({
+    income: 40240.21, spentTotal: 2162.69, budgeted: 40893,
+    spendByCat: { Groceries: 2162.69 }, fixedCats: new Set(), catType: () => null,
+    savingContribution: 0, debts: [], budgetIncome: 40795.2, periodFinished: false,
+  });
+  const disp = f.bands.display;
+  for (const k of ['committed', 'living', 'saving', 'notYetSpent']) {
+    ok(Number.isInteger(disp[k]), `display ${k} is a whole rand`);
+    ok(Math.abs(disp[k] - f.bands[k]) <= 1, `display ${k} stays within a rand of the raw band`);
+  }
+  ok(disp.committed + disp.living + disp.saving + disp.notYetSpent === Math.round(f.income),
+    'the printed bands sum to the printed income, exactly');
+
+  const L = f.lefts.display;
+  ok(L.leftInBudget + L.neverBudgeted === L.together, 'the printed lefts add up, exactly');
+  ok(L.leftInBudget === 38730 && L.neverBudgeted === -653 && L.together === 38077,
+    'the reference vault prints 38 730 − 653 = 38 077, not the 38 078 a separate rounding gave');
+  ok(Math.abs(L.together - f.lefts.together) <= 1, 'printed together stays within a rand of the raw identity');
+
+  /* Deficit period: the bands no longer partition the income, so there is no
+     whole to allocate and each printed band rounds alone — same branch, same
+     reasoning, as the percent column above it. */
+  const d = periodFlow({
+    income: 1000, spentTotal: 1800.4, budgeted: 500,
+    spendByCat: {}, fixedCats: new Set(), debts: [],
+  });
+  ok(d.bands.display.living === 1800, 'a deficit period rounds each printed band alone — no whole to partition');
   checks++;
 }
 

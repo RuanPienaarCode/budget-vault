@@ -24,7 +24,7 @@ const {
    percentage column is allocated by largest remainder, never rounded per
    slice. Re-exported at the bottom of this file so the donut test keeps
    reading each view's own door. */
-const { sharePercents, largestRemainder } = require('../share-percents');
+const { sharePercents, largestRemainder, sharePercentLabel } = require('../share-percents');
 
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
@@ -893,8 +893,13 @@ module.exports = function registerDashboard(ctx) {
       budgeted: bud.spend, budgetIncome: bud.income, actualIncome: sum.income,
       periodFinished: S.period !== currentPeriod(),
     });
-    const budgetedPct = allocated === null ? null : Math.round(allocated * 100);
-    const usedPct = bud.spend > 0 ? Math.round((sum.spend / bud.spend) * 100) : null;
+    /* sharePercentLabel, not a bare Math.round: 100.24% allocated rounding to
+       "100%" sat beside the Budget page's red "over-budgeted R 97,80" tile,
+       and the rounding ate the only fact the two figures disagreed on — which
+       side of the line the plan is on. Same rule for "used", where 100% is
+       the same kind of boundary. */
+    const budgetedPct = allocated === null ? null : sharePercentLabel(allocated, locale().decimal);
+    const usedPct = bud.spend > 0 ? sharePercentLabel(sum.spend / bud.spend, locale().decimal) : null;
 
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
