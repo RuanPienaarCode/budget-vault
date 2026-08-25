@@ -152,10 +152,37 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
 {
   const base = {};
   for (const p of PILLARS) { for (const q of p.parts) { base[q.key] = null; } }
-  const only = (key, val) => financialScore({ ...base, [key]: val }).value;
-  eq(only('cover', 1), 100, 'a lone measure at full marks scores the whole 100');
-  eq(only('cover', 0), 0, 'and at nothing, zero');
-  eq(only('cover', 0.5), 50, 'linear in between');
+  /* Linearity, checked with every measure live so the scorer actually reports.
+     A LONE measure no longer scores at all — `cover` by itself is the reserves
+     pillar's 25 of 100, under the half-the-weight bar MIN_LIVE_WEIGHT sets, and
+     a score resting on a quarter of the household is not a summary of it. That
+     is the fix for a real defect: with no income four of the five pillars go
+     null, and the same household with the same pot and the same rent scored 70
+     while earning R40 000 a month and 100 while earning nothing. */
+  const every = val => {
+    const f = { ...base };
+    for (const p of PILLARS) { for (const q of p.parts) { f[q.key] = val; } }
+    return financialScore(f).value;
+  };
+  eq(every(1), 100, 'every measure at full marks scores the whole 100');
+  eq(every(0), 0, 'and at nothing, zero');
+  eq(every(0.5), 50, 'linear in between');
+  eq(financialScore({ ...base, cover: 1 }), null,
+    'but one pillar out of five is too little to score at all, however good it is');
+  {
+    /* The bar itself, from both sides. Reserves alone is 25; reserves + saving
+       + debt is 65, comfortably over, and reserves + saving is 45, under. */
+    const some = keys => {
+      const f = { ...base };
+      for (const p of PILLARS) {
+        if (!keys.includes(p.key)) { continue; }
+        for (const q of p.parts) { f[q.key] = 1; }
+      }
+      return financialScore(f);
+    };
+    eq(some(['reserves', 'saving']), null, '45 of 100 live is under the bar');
+    ok(some(['reserves', 'saving', 'debt']) !== null, 'and 65 of 100 is over it');
+  }
 }
 {
   const m = {

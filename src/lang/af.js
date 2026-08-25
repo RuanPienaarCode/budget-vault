@@ -1008,6 +1008,8 @@ module.exports = {
   'score.empty.title': 'Nog nie genoeg geskiedenis nie',
   'score.empty.body': 'Die telling gemiddel jou laaste ses voltooide tydperke, so dit verskyn sodra daar transaksies is om te gemiddel. Voer ’n staat in, of voeg ’n paar tydperke by, en dit vul vanself in.',
   'score.empty.body.manual': 'Die telling gemiddel jou laaste ses voltooide tydperke, so dit verskyn sodra daar transaksies is om te gemiddel. Voeg \'n paar transaksies by, of \'n paar tydperke, en dit vul vanself in.',
+  'score.empty.unmeasured.title': 'Nog nie genoeg om te tel nie',
+  'score.empty.unmeasured.body': 'Die meeste van die telling word gemeet teen wat jy verdien — spaar, besteding, skuld en netto waarde is almal aandele van inkomste. Sonder inkomste wat aangeteken is, is daar te min om eerlik te tel. Gee die transaksies wat jou betaal ’n inkomste-tipe kategorie en die telling verskyn.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Waarheen die geld gegaan het',

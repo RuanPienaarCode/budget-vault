@@ -202,6 +202,21 @@ const scoreBand = value => (value >= SCORE_BANDS.strong ? 'strong'
    so they can be argued with rather than hunted for. Reserves leads because
    running out of money is the failure that ends households; wealth trails
    because it is the slowest to move and the least actionable this month. */
+/* A score is only a summary if enough of the household is actually in it.
+   Renormalising over the live pillars is right when one genuinely does not
+   apply — a vault with no debts should not carry a silent zero for debt. It is
+   wrong when the pillar is dark because something is MISSING, and the two look
+   identical from inside financialScore.
+
+   The case that forced this: four of the five pillars are income-gated, so a
+   household with no income has only `reserves` left, and a big pot against a
+   small essential spend is full marks on it. The same household with the same
+   R500 000 pot and the same R14 000 rent scored 70 while earning R40 000 a
+   month and 100 while earning nothing. Losing your income raised your score.
+
+   Rather than special-case income, require the live pillars to carry half the
+   weight before any score is reported. No income leaves 25 of 100 live and
+   returns null; no debt leaves 80 and scores exactly as it did. */
 const PILLARS = [
   { key: 'reserves', weight: 25, parts: [{ key: 'cover', weight: 25 }] },
   { key: 'saving', weight: 20, parts: [{ key: 'rate', weight: 20 }] },
@@ -209,6 +224,9 @@ const PILLARS = [
   { key: 'spending', weight: 20, parts: [{ key: 'fixed', weight: 8 }, { key: 'consumption', weight: 7 }, { key: 'budget', weight: 5 }] },
   { key: 'wealth', weight: 15, parts: [{ key: 'networth', weight: 15 }] },
 ];
+const TOTAL_WEIGHT = PILLARS.reduce((t, p) => t + p.weight, 0);
+/* Derived, not typed, so re-weighting the pillars cannot silently move the bar. */
+const MIN_LIVE_WEIGHT = TOTAL_WEIGHT / 2;
 
 /* Where each measure earns full marks, and where it earns nothing. Every one is
    a documented convention rather than a derivation, so they live together where
@@ -287,8 +305,9 @@ function scoreFractions(m, targetMonths) {
    the four pillars it can answer, rather than carrying a silent zero for the
    one it cannot — absence of a claim has never been a claim of nothing.
 
-   Returns null only when NOTHING is measurable, where a score would be a
-   fabrication rather than a summary. */
+   Returns null when too little is measurable for a score to be a summary
+   rather than a fabrication — see MIN_LIVE_WEIGHT. A score resting on one
+   pillar out of five is as much an invention as one resting on none. */
 function financialScore(fractions) {
   const live = [];
   for (const pillar of PILLARS) {
@@ -300,6 +319,7 @@ function financialScore(fractions) {
   }
   if (!live.length) { return null; }
   const outer = live.reduce((t, p) => t + p.weight, 0);
+  if (outer < MIN_LIVE_WEIGHT) { return null; }
   const total = live.reduce((t, p) => t + (p.weight / outer) * p.at, 0);
   return {
     value: Math.round(total * 100),

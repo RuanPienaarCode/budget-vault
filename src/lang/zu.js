@@ -1035,6 +1035,8 @@ module.exports = {
   'score.empty.title': 'Awanele umlando okwamanje',
   'score.empty.body': 'Amaphuzu abala isilinganiso sezikhathi zakho eziyisithupha zokugcina eziqediwe, ngakho avela uma sekukhona imisebenzi yemali yokubala. Ngenisa isitatimende, noma wengeze izikhathi ezimbalwa, bese azigcwalisa ngokwawo.',
   'score.empty.body.manual': 'Amaphuzu abala isilinganiso sezikhathi zakho eziyisithupha zokugcina eziqediwe, ngakho avela uma sekukhona imisebenzi yemali yokubala. Engeza imisebenzi yemali embalwa, noma izikhathi ezimbalwa, bese azigcwalisa ngokwawo.',
+  'score.empty.unmeasured.title': 'Akukwanele ukunikeza amaphuzu okwamanje',
+  'score.empty.unmeasured.body': 'Iningi lamaphuzu likalwa ngokumelene nalokho okutholayo — ukonga, ukusetshenziswa kwemali, izikweletu nengcebo konke kuyizingxenye zemali engenayo. Ngaphandle kwemali engenayo ebhalisiwe akukho okwanele ukunikeza amaphuzu ngokwethembeka. Nikeza ukuthengiselana okukukhokhelayo isigaba sohlobo lwemali engenayo bese amaphuzu ayavela.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Lapho imali iye khona',

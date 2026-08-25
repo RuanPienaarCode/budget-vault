@@ -1010,6 +1010,8 @@ module.exports = {
   'score.empty.title': 'Aún no hay bastante historial',
   'score.empty.body': 'La puntuación promedia tus últimos seis períodos completados, así que aparece en cuanto haya transacciones que promediar. Importa un extracto o añade algunos períodos y se completará sola.',
   'score.empty.body.manual': 'La puntuación promedia tus últimos seis períodos completados, así que aparece en cuanto haya transacciones que promediar. Añade algunas transacciones, o algunos períodos, y se completará sola.',
+  'score.empty.unmeasured.title': 'Aún no hay suficiente para puntuar',
+  'score.empty.unmeasured.body': 'La mayor parte de la puntuación se mide en relación con lo que ganas: el ahorro, el gasto, la deuda y el patrimonio son todos proporciones de tus ingresos. Sin ingresos registrados hay muy poco para puntuar con honestidad. Asigna una categoría de tipo ingreso a las transacciones que te pagan y la puntuación aparecerá.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Adónde fue el dinero',

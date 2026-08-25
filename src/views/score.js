@@ -54,19 +54,31 @@ module.exports = function registerScore(ctx) {
        would be a claim about a figure nobody supplied. */
     const debtRateUnknown = debtsRecorded && snap.debtInterest === null;
 
-    /* No score at all: a vault too new to average anything. It gets an
-       explanation of what the page will show once there is history, not an
+    /* No score at all. It gets an explanation of what the page needs, not an
        empty page and not a zero — a zero would be a verdict the data has not
-       earned. */
+       earned.
+
+       TWO DIFFERENT REASONS, and telling a household the wrong one is worse
+       than saying nothing. A vault too new to average anything needs history.
+       A vault with six months of history and no recognised income needs the
+       income, and "not enough history yet" would send it looking for periods
+       it already has. The second case exists because most of the score is
+       measured AGAINST income — saving, spending, debt and wealth are all
+       shares of it — so financialScore refuses to report at all when too
+       little of the household is live (see MIN_LIVE_WEIGHT). */
     if (!breakdown) {
+      const noHistory = !M || !M.countedPeriods;
       hero.append(el('div', { class: 'score-empty' },
-        el('div', { class: 'score-empty-h' }, i18n.t('score.empty.title')),
+        el('div', { class: 'score-empty-h' },
+          i18n.t(noHistory ? 'score.empty.title' : 'score.empty.unmeasured.title')),
         /* Same reason as the trend card's empty state on the Dashboard: a
            manual household has no Import page in front of them, so "import a
            statement" names a move they cannot make. Read at render time off
            the loaded setting, so flipping it is enough. */
         el('p', { class: 'score-empty-p' },
-          i18n.t(S.settings.input_mode === 'manual' ? 'score.empty.body.manual' : 'score.empty.body'))));
+          i18n.t(noHistory
+            ? (S.settings.input_mode === 'manual' ? 'score.empty.body.manual' : 'score.empty.body')
+            : 'score.empty.unmeasured.body'))));
       $('#scoreGoodCard').classList.add('hidden');
       $('#scoreWorkCard').classList.add('hidden');
       return;

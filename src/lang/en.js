@@ -1072,6 +1072,8 @@ module.exports = {
   'score.empty.title': 'Not enough history yet',
   'score.empty.body': 'The score averages your last six completed periods, so it appears once there are transactions to average. Import a statement, or add a few periods, and it fills in on its own.',
   'score.empty.body.manual': 'The score averages your last six completed periods, so it appears once there are transactions to average. Add a few transactions, or a few periods, and it fills in on its own.',
+  'score.empty.unmeasured.title': 'Not enough to score yet',
+  'score.empty.unmeasured.body': 'Most of the score is measured against what you earn — saving, spending, debt and net worth are all shares of income. Without income recorded there is too little here to score honestly. Give the transactions that pay you an income-type category and the score appears.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Where the money went',

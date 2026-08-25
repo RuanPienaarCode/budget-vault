@@ -1030,6 +1030,8 @@ module.exports = {
   'score.empty.title': 'Ayanele imbali okwangoku',
   'score.empty.body': 'Inqaku libala umndilili wamaxesha akho amathandathu okugqibela agqityiweyo, ngoko livela xa sele kukho iintengiselwano zokubalwa. Ngenisa isitheyitmenti, okanye wongeze amaxesha ambalwa, kwaye lizizalisa ngokwalo.',
   'score.empty.body.manual': 'Inqaku libala umndilili wamaxesha akho amathandathu okugqibela agqityiweyo, ngoko livela xa sele kukho iintengiselwano zokubalwa. Yongeza iintengiselwano ezimbalwa, okanye amaxesha ambalwa, kwaye lizizalisa ngokwalo.',
+  'score.empty.unmeasured.title': 'Akukho nto yaneleyo yokwenza amanqaku okwangoku',
+  'score.empty.unmeasured.body': 'Uninzi lwamanqaku lulinganiswa ngokuchasene noko ukufumanayo — ukonga, inkcitho, ityala kunye nobutyebi bonke ziinxalenye zengeniso. Ngaphandle kwengeniso ebhalisiweyo akukho nto yaneleyo yokwenza amanqaku ngokunyanisekileyo. Nika iintengiselwano ezikuhlawulayo udidi lohlobo lwengeniso ukuze amanqaku abonakale.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Apho imali iye khona',

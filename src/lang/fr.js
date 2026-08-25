@@ -1022,6 +1022,8 @@ module.exports = {
   'score.empty.title': 'Pas encore assez d’historique',
   'score.empty.body': 'Le score fait la moyenne de vos six dernières périodes terminées ; il apparaît dès qu’il y a des opérations à moyenner. Importez un relevé ou ajoutez quelques périodes et il se remplira tout seul.',
   'score.empty.body.manual': 'Le score fait la moyenne de vos six dernières périodes terminées ; il apparaît dès qu\'il y a des opérations à moyenner. Ajoutez quelques opérations ou quelques périodes et il se remplira tout seul.',
+  'score.empty.unmeasured.title': 'Pas encore assez pour un score',
+  'score.empty.unmeasured.body': 'L’essentiel du score se mesure par rapport à ce que vous gagnez : l’épargne, les dépenses, les dettes et le patrimoine sont tous des parts du revenu. Sans revenu enregistré, il y a trop peu d’éléments pour établir un score honnête. Attribuez une catégorie de type revenu aux transactions qui vous rémunèrent et le score apparaîtra.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Où est parti l’argent',

@@ -493,8 +493,15 @@ async function runDeepDives() {
 
     ctx.renderScore();
     const hero = nodes.get('#scoreHero');
-    ok(hero.textContent.includes(i18n.t('score.empty.title')),
-      'the Score page explains there is not enough to average yet, rather than printing any number');
+    /* The UNMEASURED copy, not the too-new one. This vault has six completed
+       periods of groceries — it is not short of history, it is short of
+       income, and "not enough history yet" would send it hunting for periods
+       it already has. The Score page picks between the two on countedPeriods
+       for exactly this reason. */
+    ok(hero.textContent.includes(i18n.t('score.empty.unmeasured.title')),
+      'the Score page names the real reason — no income to measure against — rather than printing any number');
+    ok(!hero.textContent.includes(i18n.t('score.empty.title')),
+      'and does not tell a household with six months of history that it has too little history');
     ok(!/\b100\b/.test(hero.textContent) && !hero.querySelector('.score-ring'),
       'no score value and no ring are drawn — the exact shape of the "100/100 Strong off one surviving measure" bug');
 

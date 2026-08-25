@@ -192,10 +192,32 @@ const moneyFlow = require('../src/money-flow');
      reimplementation of the score, only of the one input the fix touches. */
   const buggyM = { ...base, budgetUsed: 1.0 };   // "spent exactly its budget" — full marks on that one measure
   const buggyScore = healthMath.financialScore(healthMath.scoreFractions(buggyM, targetMonths));
-  ok(buggyScore !== null, 'RED: the ungated input produces a real score out of NOTHING else measurable');
-  eq(buggyScore.value, 100, 'RED: …specifically 100');
-  eq(healthMath.scoreBand(buggyScore.value), 'strong',
-    'RED: …and the household with no recognised income is told its finances are "Strong"');
+  /* THIS NEGATIVE CONTROL NO LONGER GOES RED, AND THAT IS THE POINT.
+
+     When it was written, the hasIncome gate on budgetUsed was the only thing
+     standing between this vault and a score of 100 off a single 5-point
+     measure, so feeding the ungated input straight to financialScore
+     reproduced the historic bug exactly.
+
+     financialScore now refuses it on its own. MIN_LIVE_WEIGHT requires the
+     live pillars to carry half the total weight before any score is reported,
+     and `spending` alone is 20 of 100 — so the same input that once produced
+     "Strong" now produces nothing at all, whatever budgetUsed says. That guard
+     was added for a different defect (four of five pillars are income-gated,
+     so a household with no income scored 100 off its emergency cover while the
+     same household WITH income scored 70), and it happens to close this one
+     from the other side.
+
+     So the historic shape now has two independent guards and neither alone is
+     load-bearing any more. That is worth stating rather than quietly deleting:
+     a reader who removes the hasIncome gate will not see this file go red, and
+     should not conclude the gate is therefore dead code. Section 4's own
+     healthMetrics assertions above still pin the gate directly, which is where
+     its negative control now lives. */
+  eq(buggyScore, null,
+    'the ungated input is refused by MIN_LIVE_WEIGHT alone — one pillar out of five '
+    + 'cannot score, so the historic "no income, scores 100, told Strong" shape is now '
+    + 'unreachable by two separate routes');
 
   const fixedM = { ...base, budgetUsed: null };   // what healthMetrics actually hands over when hasIncome is false
   eq(healthMath.financialScore(healthMath.scoreFractions(fixedM, targetMonths)), null,

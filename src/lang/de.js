@@ -1009,6 +1009,8 @@ module.exports = {
   'score.empty.title': 'Noch zu wenig Historie',
   'score.empty.body': 'Der Score mittelt deine letzten sechs abgeschlossenen Zeiträume und erscheint, sobald es etwas zu mitteln gibt. Importiere einen Auszug oder ergänze ein paar Zeiträume, dann füllt er sich von selbst.',
   'score.empty.body.manual': 'Der Score mittelt deine letzten sechs abgeschlossenen Zeiträume und erscheint, sobald es etwas zu mitteln gibt. Ergänze ein paar Transaktionen oder ein paar Zeiträume, dann füllt er sich von selbst.',
+  'score.empty.unmeasured.title': 'Noch zu wenig für eine Bewertung',
+  'score.empty.unmeasured.body': 'Der größte Teil der Bewertung wird an deinem Einkommen gemessen — Sparen, Ausgaben, Schulden und Vermögen sind alle Anteile davon. Ohne erfasstes Einkommen ist zu wenig vorhanden, um ehrlich zu bewerten. Gib den Transaktionen, die dich bezahlen, eine Kategorie vom Typ Einkommen, und die Bewertung erscheint.',
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Wohin das Geld ging',

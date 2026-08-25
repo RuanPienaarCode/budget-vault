@@ -3,6 +3,50 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.25.0 — 2026-08-25
+
+### Fixed
+
+- **A household with no recorded income was told its finances were perfect.**
+  Four of the five things the score measures — saving, spending, debt and net
+  worth — are shares of what you earn, so with no income recorded they all go
+  unmeasurable at once. The score then quietly rescaled itself over the one
+  survivor, your emergency cover, and a healthy fund against a modest rent is
+  full marks on that one measure. The result was a score of 100 out of 100 for
+  a household living off its capital with nothing coming in.
+
+  Worse, it ran the wrong way round: the same household, same R500 000 put by
+  and same R14 000 rent, scored 70 while earning R40 000 a month and 100 while
+  earning nothing. Losing your income raised your score.
+
+  Rescaling is right when a measure genuinely does not apply — a household with
+  no debts should not be marked down for debt it does not have. It is wrong
+  when the measure is missing because something is. The score now reports only
+  when the measures it can take cover at least half of what it weighs: no
+  income leaves a quarter and reports nothing, no debts leaves four fifths and
+  scores exactly as before.
+
+- **The Score page no longer tells you to add history you already have.** When
+  there was no score it said "Not enough history yet" whatever the reason. A
+  household with six months of statements and no categorised income was sent
+  looking for periods it already had. The page now names the real reason and
+  what to do about it, in all nine languages.
+
+### Known
+
+- **Your savings rate can move with how quickly your bank settles a transfer.**
+  Where the two sides of a transfer between your own accounts land more than a
+  few days apart, the money can be counted as fresh saving rather than
+  recognised as a move. The same household saving the same amount reads one way
+  on an instant transfer and another on a slow one.
+
+  It is not fixed in this release, and deliberately so. Telling a genuine
+  deposit apart from a payment merely passing through needs to know where the
+  money came from, which your files do not currently record — and the two
+  obvious shortcuts both throw away real saving. Two of them were written,
+  tested against real data, and reverted rather than shipped. The behaviour is
+  now pinned by a test so it cannot drift while the proper fix is designed.
+
 ## 1.24.0 — 2026-08-25
 
 ### Added
