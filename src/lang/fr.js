@@ -315,6 +315,12 @@ module.exports = {
   'wiz.failed': 'Échec de la configuration : {error}',
 
   /* ============================== Budget page ============================= */
+  'bud.fresh.title': 'Nouvelle période — rien de budgété pour l\'instant',
+  'bud.fresh.body': {
+    one: '{period} comptait {count} catégorie budgétée — reprenez-la, ou repartez de zéro.',
+    other: '{period} comptait {count} catégories budgétées — reprenez-les, ou repartez de zéro.',
+  },
+
   'bud.shape.title': 'Vos autres budgets sont toujours là',
   'bud.shape.body': {
     one: '{count} fichier de budget est enregistré sous une autre durée de période — il s\'agit de Budgets/{newest}.md. Il reste dans votre coffre et revient dès que vous rétablissez la durée. Les montants partent vides ici parce que cette période n\'a pas la même durée que celle-là.',
@@ -362,7 +368,7 @@ module.exports = {
   'bud.assumed.missing': 'Aucune catégorie nommée {category}',
   'bud.assumed.noFile': 'Impossible de lire la note de {category}',
 
-  'bud.pull.label': 'Reprendre le dépassement',
+  'bud.pull.label': 'Remplir depuis le dépassement',
   'bud.pull.title': { one: 'Remplir à partir du dépassement d\'il y a {lag} période', other: 'Remplir à partir du dépassement d\'il y a {lag} périodes' },
   'bud.pull.none': '{period} n\'a pas dépassé — la période s\'est terminée avec {amount} de plus',
   'bud.pull.confirmTitle': 'Reprendre le dépassement précédent',
@@ -407,13 +413,14 @@ module.exports = {
   'tx.col.account': 'Compte',
   'tx.col.category': 'Catégorie',
   'tx.col.amount': 'Montant',
-  'tx.col.excl': 'Excl.',
+  'tx.col.excl': 'Excl. budget',
   'tx.col.note': 'Note',
   'tx.col.split': 'Répartir',
   'tx.col.actions': 'Actions de ligne',
 
   'tx.aria.category': 'Catégorie pour {date} {desc}',
   'tx.aria.exclude': 'Exclure {desc} des totaux du budget',
+  'tx.title.excl': 'Uniquement hors des totaux du budget — l\'argent a quand même bougé, et tout ce qui mesure ce compte le compte toujours.',
   'tx.aria.note': 'Note pour {date} {desc}',
   'tx.aria.split': 'Répartir {date} {desc} en catégories',
   'tx.title.split': 'Répartir en catégories',
@@ -551,12 +558,12 @@ module.exports = {
   'acct.balance.updatedDrift': { one: 'Solde de {name} enregistré — mais {count} ligne depuis cette date diffère de {amount}. Ouvrez le compte pour la voir.', other: 'Solde de {name} enregistré — mais {count} lignes depuis cette date diffèrent de {amount}. Ouvrez le compte pour les voir.' },
   'acct.balance.unreadable': 'Impossible de lire « {raw} » — touchez pour corriger',
   'acct.reconciled': '{name} rapproché à {amount}',
-  'acct.err.nan': 'Pas un nombre',
-  'acct.err.type': 'Type invalide',
+  'acct.err.nan': '{field} n\'est pas un nombre — essayez un chiffre simple comme {example}.',
+  'acct.err.type': '{field} n\'est pas valide — choisissez-en un dans la liste, par ex. {example}.',
   'acct.err.notNumber': '{field} n\'est pas un nombre',
   'acct.err.nameRequired': 'Le nom du compte est obligatoire',
   'acct.err.exists': 'Ce compte existe déjà',
-  'acct.err.save': 'Impossible d\'enregistrer {name} ({error})',
+  'acct.err.save': 'Impossible d\'enregistrer {name} ({error}) — rien n\'a été écrit dans le fichier ; réessayez la même action.',
 
   'acct.edit.title': 'Modifier le compte — {name}',
   'acct.new.title': 'Nouveau compte',
@@ -597,6 +604,7 @@ module.exports = {
   'acct.field.investedOpt': 'Total investi (facultatif)',
   'acct.field.investedDesc': 'Ce que vous avez versé, pour situer la croissance par rapport à cela.',
   'acct.field.starting': 'Montant de départ',
+  'acct.field.startingDesc': 'Ce que le compte détenait à sa date de départ, pour que la page Épargne puisse distinguer ce que vous avez versé de ce qu\'il a gagné en croissance. Laissez-le vide et la vignette Croissance là-bas n\'a rien pour mesurer et affiche un tiret.',
   'acct.field.opened': 'Ouvert le',
 
   'acct.budget.on': '{name} compte de nouveau dans le budget',
@@ -740,8 +748,8 @@ module.exports = {
   'acct.table.sortedBy': ' · triés par {column}',
   'acct.col.account': 'Compte',
   'acct.col.balance': 'Solde',
-  'acct.col.month': 'Mois',
-  'acct.col.goal': 'Objectif / plafond',
+  'acct.col.month': 'Période',
+  'acct.col.goal': 'Progression',
   'acct.col.confirmed': 'Confirmé',
   'acct.col.state': 'État',
   'acct.col.notes': 'Notes',
@@ -816,8 +824,8 @@ module.exports = {
   'dash.greet.afternoon': 'Bon après-midi',
   'dash.greet.evening': 'Bonsoir',
   'dash.greet.line': '{greeting}, {name}',
-  'dash.hero.remaining': 'Reste sur cette période',
-  'dash.hero.overspent': 'Dépassement sur cette période',
+  'dash.hero.remaining': 'Budget restant sur cette période',
+  'dash.hero.overspent': 'Dépassement de budget sur cette période',
   'dash.hero.sub': '{spent} dépensé sur {budgeted} budgété',
   'dash.stat.income': 'Revenus totaux',
   'dash.stat.budgeted': 'Budgété',
@@ -983,6 +991,7 @@ module.exports = {
   'score.win.spending': 'Vos sorties laissent de l’air — vous ne vivez pas au bord de ce qui rentre.',
   'score.win.wealth': 'Ce que vous possédez a dépassé de loin ce que vous devez. C’est la part qui compose en silence.',
   'score.now.reserves': 'Aujourd’hui : {months} mois couverts · {amount} de côté · objectif {target} mois',
+  'score.now.reserves.essentials': 'L’essentiel coûte en moyenne {amount} par mois.',
   'score.now.saving': 'Aujourd’hui : {pct} des revenus épargnés · {amount} par mois',
   'score.now.savingDown': 'Actuellement : {amount} par mois sont retirés de l\'épargne au lieu d\'y être ajoutés',
   'score.now.debt': 'Aujourd’hui : {pct} des revenus en intérêts',
@@ -991,6 +1000,7 @@ module.exports = {
   'score.now.budget': 'budget utilisé {pct}',
   'score.now.wealth': 'Aujourd’hui : {amount} de patrimoine net · {times}× une année de revenus',
   'score.how.reserves': 'L’argent mis de côté qui porterait le foyer sans revenus, compté en mois de dépenses essentielles.',
+  'score.how.reserves.essentialDef': '« Essentiel » exclut les loisirs, les dons, l’épargne, les placements, les revenus et les virements, plus tout ce qui est ajouté dans Paramètres → Groupes non essentiels.',
   'score.how.saving': 'Ce qui atteint chaque mois votre épargne et vos placements, en part de ce que vous gagnez.',
   'score.how.debt': 'Ce que la dette vous coûte — intérêts et mensualités engagées.',
   'score.how.spending': 'La part de vos revenus déjà promise avant toute décision, le coût de la vie, et si vous restez dans votre budget.',
@@ -1024,6 +1034,7 @@ module.exports = {
   'score.flow.ariaLabel': 'Les revenus de {income} se répartissent en {committed} d’engagé et charges fixes, {living} de coût de la vie, {saving} d’épargne, et {notYetSpent} pas encore dépensé.',
   'score.flow.chip.committed': 'Dans l’engagé',
   'score.flow.committed.empty': 'Aucune catégorie n’est encore marquée comme fixe — mettez fixed: true en haut du fichier de la catégorie (loyer, mensualités de dette, assurances) et cela se remplira.',
+  'score.flow.committed.empty.scoreNote': 'Cela alimente aussi un tiers de la partie Dépenses de votre Score — tant que rien n’est marqué comme fixe, cette partie se lit comme si vous n’aviez aucune charge fixe.',
   'score.flow.chip.debtRepayments': 'Mensualités de dette',
   'score.flow.chip.ofWhichInterest': '…dont intérêts',
   'score.flow.chip.housing': 'Logement et charges',
@@ -1046,7 +1057,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': 'Ce qu’il reste cette période',
+  'shell.dash.left': 'Argent restant cette période',
   'dash.left.sub': 'Avant la fin de cette période, le {date}',
   'dash.left.nowSub': 'L\'argent dont vous disposez maintenant',
   'dash.left.notNow': 'Cette carte mesure l\'argent dont vous disposez maintenant : elle n\'est donc juste que pour la période en cours. Passez à {period} pour la voir.',

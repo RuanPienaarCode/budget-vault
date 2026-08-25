@@ -276,8 +276,11 @@ async function mount(files) {
     eq(walk(bare.nodes.get('savingsGrowth'), e => e.tagName === 'SVG').length, 0,
       'and draws no chart');
     const t = byCls(bare.nodes.get('savingsKpis'), 'mini').map(flat).find(x => x.startsWith('Growth'));
-    ok(/no account records what it started at/.test(t),
-      `the tile explains the gap rather than vanishing — got "${t}"`);
+    // Names the actual field AND the on-page fix ("Add starting amount"),
+    // not just the fact that nothing is measurable — see savings.js's own
+    // comment on growthTile for why (comprehension-audit finding 3).
+    ok(/no account has a Starting amount set/.test(t) && /Add starting amount/.test(t),
+      `the tile explains the gap AND names the fix, rather than vanishing — got "${t}"`);
   }
 
   console.log(`PASS — growth is found where no transaction records it, `

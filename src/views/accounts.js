@@ -55,7 +55,12 @@ const { ISO_DATE, todayIso, isRealIsoDate } = require('../dates');
    with no debts/assets so it reduces to the accounts-only split this hero
    wants, the same call dashboard.js and savings.js make for the vault-wide
    figure. */
-const { worth } = require('../worth');
+/* cardOverlap alongside worth: the Dashboard and the Savings worth chart both
+   disclose a credit card tracked as BOTH an account and a Debt-page row (net
+   worth counting it twice) — this page and the Debt page were the two that
+   invited the duplicate in the first place and said nothing about it. See
+   worth.js's own header for why this is a disclosure, not a dedupe. */
+const { worth, cardOverlap } = require('../worth');
 
 /* Shared with views/dashboard.js — see share-percents.js for why a ring's
    percentage column is allocated by largest remainder, never rounded per
@@ -330,7 +335,14 @@ module.exports = function registerAccounts(ctx) {
     ]);
     if (!r) return;
     const num = parseAmount(r.balance);
-    if (num === null || isNaN(num)) return toast(i18n.t('acct.err.nan'), true);
+    /* TODO(i18n): reword acct.err.nan from "Not a number" to "{field} isn't a
+       number — try a plain figure like {example}." Both params are passed at
+       every call site now (here and in addAccount below) — the old text said
+       neither which field was wrong nor what a valid answer looks like, so a
+       reader who mistyped "R 1 500" learned only that SOMETHING failed. */
+    if (num === null || isNaN(num)) {
+      return toast(i18n.t('acct.err.nan', { field: i18n.t('acct.balance.field'), example: '1500.00' }), true);
+    }
     const now = todayIso();
     /* A confirmation cannot be dated in the future — reconcile() reads such a
        date as unplaceable, which would silence the account rather than
@@ -455,8 +467,16 @@ module.exports = function registerAccounts(ctx) {
       total_invested: { key: 'total_invested', label: i18n.t('acct.field.invested'), type: 'number',
         value: a.total_invested != null ? String(a.total_invested) : '',
         desc: i18n.t('acct.field.investedDesc') },
+      // Every neighbouring optional field on this dialog (invested, currency,
+      // limit) already carries a `desc` explaining what it feeds — this is
+      // the one field that is the WHOLE basis for savings-math.js's
+      // totalReturn() and had none, which is why an account with a balance
+      // but no starting_amount silently shows "—" for Growth on the Savings
+      // page with no clue why. i18n wave: acct.field.startingDesc added to
+      // lang/en.js and all six sibling tables.
       starting_amount: { key: 'starting_amount', label: i18n.t('acct.field.starting'), type: 'number',
-        value: a.starting_amount != null ? String(a.starting_amount) : '' },
+        value: a.starting_amount != null ? String(a.starting_amount) : '',
+        desc: i18n.t('acct.field.startingDesc') },
       inception_date: { key: 'inception_date', label: i18n.t('acct.field.opened'), type: 'date', value: a.inception_date },
     };
     const shown = fieldsForType(a.type, a);
@@ -484,7 +504,14 @@ module.exports = function registerAccounts(ctx) {
     ]);
     if (!r) return;
 
-    if (!ACCT_TYPES.includes(r.type)) return toast(i18n.t('acct.err.type'), true);
+    /* TODO(i18n): reword acct.err.type from "Invalid type" to "{field} isn't
+       valid — pick one from the list, e.g. {example}." — the type control is
+       a closed <select>, so this fires only when something OTHER than a
+       reader's own click supplied the value; naming the field and showing a
+       real option still beats a bare "Invalid type" for whoever hits it. */
+    if (!ACCT_TYPES.includes(r.type)) {
+      return toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
+    }
     /* Only the fields this dialog actually SHOWED are read back. A field the
        type hid was never on screen, so treating its absent result as "the user
        cleared it" would write a decision nobody made — and saveAccount patches
@@ -655,6 +682,15 @@ module.exports = function registerAccounts(ctx) {
     if (!wrap) return;
     wrap.empty();
 
+    /* A brand-new vault gets NOTHING here, not a zero hero over an empty
+       framed ring — renderDeck (just below) already bails the same way for
+       the same reason. The table's own empty state (`acct.empty`) is where
+       "you have no accounts yet" is actually said; a hero reading "Net across
+       your accounts R 0,00" beside a bordered ring with nothing in it repeats
+       that fact twice, badly, before the reader reaches the sentence that
+       explains it. */
+    if (!S.accounts.length) return;
+
     /* By the SIGN of the balance rather than by account type: a credit card in
        credit is not a liability, and an overdrawn cheque account is one. No
        debts/assets pages passed in — this hero is the accounts-only figure,
@@ -719,7 +755,29 @@ module.exports = function registerAccounts(ctx) {
     hero.append(facts);
 
     const split = whoseItIs();
-    wrap.append(hero, ...(split ? [split] : []), whereItSits());
+    const overlap = overlapNote();
+    wrap.append(hero, ...(split ? [split] : []), whereItSits(), ...(overlap ? [overlap] : []));
+  }
+
+  /* Same disclosure the Dashboard and the Savings worth chart already carry —
+     see worth.js's cardOverlap() header. Accounts and Debt are the two pages
+     that actually invite a reader to add the same Visa twice (one as an
+     account, one as a debt row), and until now they were the only two pages
+     that said nothing about it: the net figure at the top of this very page
+     is exactly the one that double-counts. Reuses dash.overlap's wording
+     rather than a page-local copy, so the sentence cannot drift between the
+     three places it now appears. */
+  function overlapNote() {
+    const o = cardOverlap(S.accounts, S.debts);
+    if (!o) return null;
+    const note = el('div', { class: 'kpi-caveat' },
+      el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+        i18n.t('dash.overlap', { accounts: o.cardAccounts, debts: o.cardDebts })));
+    const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+      'aria-label': i18n.t('dash.overlap.aria') }, i18n.t('dash.overlap.btn'));
+    btn.addEventListener('click', () => ctx.switchView('debts'));
+    note.append(btn);
+    return note;
   }
 
   /* Whose it is — the same net figure as the hero, cut by owner.
@@ -1546,7 +1604,40 @@ module.exports = function registerAccounts(ctx) {
         sortHeader('name', i18n.t('acct.col.account')),
         sortHeader('balance', i18n.t('acct.col.balance')),
         sortHeader('flow', periodMonthName(S.period)),
+        /* TODO(i18n): reword acct.col.month from "Month" to "Period" — this
+           header sits over the SPARKLINE column, which is drawn from
+           txInPeriod(S.period) (see sparkline() below), the same window as
+           every other figure on this page. "Month" is wrong whenever the
+           household's period is not a calendar month (a fortnightly household
+           gets a column headed "Month" showing 14 days of shape). The column
+           it sits beside (idx2, just above) already gets this right — its
+           header is periodMonthName(S.period), which is interval-aware — so
+           this is the one surface still hard-coding the word. Matches the
+           vocabulary acct.sort.flow ("this period") and acct.drawer.flow
+           ("This period") already use for the same figure elsewhere on this
+           page — three names for one concept is the bug the audit named;
+           "Period" is the fourth surface converging on the two that already
+           got it right, not a fifth new word. */
         colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')), 'month'),
+        /* TODO(i18n): reword acct.col.goal from "Goal / limit" to "Progress"
+           — goalCell() (below) puts THREE different figures under this one
+           header depending on account type: a credit card's utilisation
+           against its limit, a savings pot's balance against its goal, and —
+           since totalReturn() replaced the retired balance-minus-invested
+           formula — an INVESTMENT'S GROWTH, which is neither a goal nor a
+           limit. "Goal / limit" was accurate for two of three and silently
+           wrong for the third. Renaming beats splitting the figure into its
+           own column: every neighbouring column here is `acct-col-drop`
+           (hidden under 760px) and this table already switches to a fixed
+           layout the moment any column is resized (see COL_MIN's own note
+           above) — adding a column means updating every hard-coded colspan='8'
+           in this file (the empty-table row, the type-row group total, the
+           drawer row) and the phone breakpoint CSS, for a number the Savings
+           page already owns and states in full. "Progress" reads honestly for
+           all three: a limit bar, a goal bar and a growth bar are each "how
+           this account is doing against a benchmark", and a one-word header
+           survives a dragged-narrow column the way "Goal / limit / growth"
+           would not. */
         colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')), 'goal'),
         sortHeader('stale', i18n.t('acct.col.confirmed')),
         colHeader(el('th', { scope: 'col' }, i18n.t('acct.col.state')), 'state'),
@@ -1677,6 +1768,16 @@ module.exports = function registerAccounts(ctx) {
      places that could forget one). addAccount goes further still on a false
      return — it must not push the account it just failed to write into
      S.accounts, or the app would show an account with no file behind it. */
+  // TODO(i18n): reword acct.err.save from "Could not save {name} ({error})"
+  // to "Could not save {name} ({error}) — nothing was written to the file;
+  // try the same action again." This page has no dirty flag and no Save
+  // button of its own (see this function's own header above) — every dialog
+  // here writes through immediately, and neither branch below reverts the
+  // in-memory model on a failed write (acceptImplied does; editBalance and
+  // editAccount do not), so what actually happened on a failure is: the file
+  // is untouched, and reopening the same dialog and saving again is a real,
+  // working retry. The old text said what failed and stopped there — it
+  // never told the reader the retry exists at all.
   async function saveAccount(a, keys = []) {
     // Everything NOT patched — block-style tags, aliases, any hand-added key —
     // is left byte for byte. The body was already preserved via a.body.
@@ -1806,12 +1907,29 @@ module.exports = function registerAccounts(ctx) {
     const name = safeSeg(r.name);
     if (!name) { toast(i18n.t('acct.err.nameRequired'), true); return null; }
     if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { toast(i18n.t('acct.err.exists'), true); return null; }
-    if (!ACCT_TYPES.includes(r.type)) { toast(i18n.t('acct.err.type'), true); return null; }
+    if (!ACCT_TYPES.includes(r.type)) {
+      toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
+      return null;
+    }
 
     const balance = parseAmount(r.balance) ?? 0;
     const goal = parseAmount(r.goal_amount);
     const invested = parseAmount(r.total_invested);
-    if ([balance, goal, invested].some(n => n !== null && isNaN(n))) { toast(i18n.t('acct.err.nan'), true); return null; }
+    /* Which of the three failed, not just that one did — same fix as
+       editBalance's single-field check above, extended to a form that offers
+       three amounts at once. `find`, not `some`: the toast can only carry one
+       field, so the first bad one found is the one named. A reader who fixes
+       it and resubmits gets told about the next one if there is one, rather
+       than three unnamed failures in a row. */
+    const badAmount = [
+      ['balance', balance, i18n.t('acct.field.balance'), '1500.00'],
+      ['goal_amount', goal, i18n.t('acct.field.goalOpt'), '50000.00'],
+      ['total_invested', invested, i18n.t('acct.field.investedOpt'), '20000.00'],
+    ].find(([, n]) => n !== null && isNaN(n));
+    if (badAmount) {
+      toast(i18n.t('acct.err.nan', { field: badAmount[2], example: badAmount[3] }), true);
+      return null;
+    }
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),

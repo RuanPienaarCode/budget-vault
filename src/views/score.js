@@ -175,7 +175,16 @@ module.exports = function registerScore(ctx) {
            strings the removed "How the score is built" card printed, so the
            explanation did not get rewritten on the way here — it just moved
            to where the part itself is. */
-        how: i18n.t(`score.how.${s.key}`),
+        how: i18n.t(`score.how.${s.key}`)
+          /* Audit finding #1: "months of essential spending" names a divisor
+             that is defined nowhere on screen — NON_ESSENTIAL_TYPES plus
+             whatever the vault's own Non-essential groups setting adds
+             (health-math.js's own comment on essentialTotal). A reader
+             cannot tell whether 3.9 months means 3.9 months of their real
+             life without knowing what was left OUT of it. i18n wave:
+             score.how.reserves.essentialDef added to lang/en.js and all six
+             sibling tables. */
+          + (s.key === 'reserves' ? ' ' + i18n.t('score.how.reserves.essentialDef') : ''),
       };
     });
 
@@ -582,9 +591,19 @@ module.exports = function registerScore(ctx) {
   function whereYouAre(key, M, target, earmarks) {
     const pct = v => `${Math.round(v * 100)}%`;
     if (key === 'reserves') {
-      return M.months === null ? null : i18n.t('score.now.reserves', {
+      if (M.months === null) { return null; }
+      const base = i18n.t('score.now.reserves', {
         months: M.months.toFixed(1), target, amount: money(earmarks.total, 0),
       });
+      /* Audit finding #1's second half: the reader is told they have "3.9
+         months covered" but never told what a month of "essential" spending
+         actually costs — the number they are being measured against stays
+         invisible. M.months !== null already guarantees M.monthlyEssential
+         is a real figure (health-math's `months` is only ever set alongside
+         it), so no extra null-guard is needed here. i18n wave:
+         score.now.reserves.essentials added to lang/en.js and all six
+         sibling tables. */
+      return `${base} ${i18n.t('score.now.reserves.essentials', { amount: money(M.monthlyEssential, 0) })}`;
     }
     if (key === 'saving') {
       if (M.savingsRate === null) { return null; }
@@ -918,7 +937,18 @@ module.exports = function registerScore(ctx) {
        what the rows themselves would have shown. */
     const committedAllZero = flow.bands.committed <= 0.005;
     if (!hasFixedCats) {
-      wrap.append(buildChipEmpty(i18n.t('score.flow.chip.committed'), i18n.t('score.flow.committed.empty')));
+      /* Audit finding #2: nothing in the app SETS `fixed: true` — the empty
+         state already told the reader to edit the category file, but said
+         nothing about the SCORE. `fixedShare` (health-math.js) is a third of
+         the Spending pillar's own weight, so a household that never finds
+         this setting is quietly losing points on a page they have never
+         seen, with nothing here or on the Score ring saying so. i18n wave:
+         score.flow.committed.empty.scoreNote added to lang/en.js and all six
+         sibling tables, appended rather than folded into the existing
+         score.flow.committed.empty key so that key's own callers elsewhere
+         are unaffected. */
+      wrap.append(buildChipEmpty(i18n.t('score.flow.chip.committed'),
+        `${i18n.t('score.flow.committed.empty')} ${i18n.t('score.flow.committed.empty.scoreNote')}`));
     } else if (!committedAllZero) {
       const committedRows = [[i18n.t('score.flow.chip.debtRepayments'), money(d.debtRepayments, 0)]];
       if (d.interest > 0) { committedRows.push([i18n.t('score.flow.chip.ofWhichInterest'), money(d.interest, 0), true]); }

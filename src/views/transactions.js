@@ -213,7 +213,23 @@ module.exports = function registerTransactions(ctx) {
     const t = $('#txTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, i18n.t('tx.col.date')), el('th', { scope: 'col' }, i18n.t('tx.col.desc')), el('th', { scope: 'col' }, i18n.t('tx.col.account')),
-      el('th', { scope: 'col' }, i18n.t('tx.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('tx.col.amount')), el('th', { scope: 'col' }, i18n.t('tx.col.excl')), el('th', { scope: 'col' }, i18n.t('tx.col.note')),
+      el('th', { scope: 'col' }, i18n.t('tx.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('tx.col.amount')),
+      /* "Excl." on its own reads as "ignore this row" — audit finding 5, and
+         exactly the trap CLAUDE.md names: `excluded` means "out of the BUDGET
+         totals", the money still moved, and everything measuring the ACCOUNT
+         (reconcile(), periodActivity(), splitFlows(), chargeIndex()...)
+         deliberately does NOT filter on it. The checkbox's own aria-label
+         (tx.aria.exclude, below) already says "from budget totals" correctly
+         — this header did not, and a screen reader in table-navigation mode
+         announces the COLUMN header, not a row's aria-label, on landing in
+         any cell of it. `title` is a stopgap for a sighted desktop hover;
+         phones get nothing from it, which is exactly why the visible header
+         text itself is the thing worth changing too.
+         i18n wave: tx.title.excl added to lang/en.js (and all six sibling
+         tables) for the hover title, and tx.col.excl reworded to
+         'Excl. budget' so the phone gets the fix as well. */
+      el('th', { scope: 'col', title: i18n.t('tx.title.excl') }, i18n.t('tx.col.excl')),
+      el('th', { scope: 'col' }, i18n.t('tx.col.note')),
       /* One header for the whole action cell rather than one per button. Split
          and Delete share that cell deliberately: a ninth column costs width the
          phone does not have, and both colspans on this page — the empty state

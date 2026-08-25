@@ -80,10 +80,18 @@ async function mount(files) {
      keeps showing the raw stored cell (see the comment at that column in
      budgets.js) as the staleness signal, so "expense" legitimately still
      appears in Bonus's own row. What must NOT happen is a SECOND group bar
-     for it — Bonus has to land inside the one 'income' bar alongside Salary. */
+     for it — Bonus has to land inside the one 'income' bar alongside Salary.
+
+     The bar's own TEXT is 'Income', not the raw 'income' — a later audit pass
+     (finding 4) caught the group heading printing the stored enum verbatim,
+     never routed through i18n, unlike the Type badge column right next to it.
+     typeGroupLabel() fixed that with the same wiz.type.* + raw-fallback
+     lookup typeBadge already used; this assertion is pinned to its output,
+     not to the enum, so a translation table swap can never re-break it
+     silently the way a bare 'income' string here once could have. */
   const groupBars = $('#budTable').querySelectorAll('.type-row').map(r => r.textContent);
-  ok(groupBars.length === 1 && groupBars[0] === 'income',
-    `exactly one group bar, labelled income — got ${JSON.stringify(groupBars)}`);
+  ok(groupBars.length === 1 && groupBars[0] === 'Income',
+    `exactly one group bar, labelled Income — got ${JSON.stringify(groupBars)}`);
 
   console.log(`PASS — a budget row's sign and grouping follow the category's CURRENT type, not the stale stored cell (${checks} checks).`);
 })().catch(e => { console.error(e); process.exit(1); });

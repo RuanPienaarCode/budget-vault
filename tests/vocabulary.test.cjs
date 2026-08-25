@@ -394,9 +394,19 @@ function provenFalse(desc, exactShape, mangled) {
   ok(!/S\.accounts\.filter\(a => a\.type === 'savings'\)/.test(live.savings),
     'Account type (Savings page): confirmed — the raw, unfolded `a.type === \'savings\'` filter is gone');
 
-  const HEALTH_LINE = "return t === 'savings' || t === 'investment';";
-  ok(live.healthData.includes(HEALTH_LINE) && live.healthData.includes("const t = String((a && a.type) || '').trim().toLowerCase();"),
-    'Account type (Score\'s saving rate): health-data.js\'s savers filter folds case/whitespace the same way before comparing');
+  /* The two literal comparisons became one shared POOL_TYPES set when the
+     saving RATE was rewritten — the same set now answers both "is this account
+     part of the savings pool" and "does this category name a vehicle inside
+     it", because they are one idea seen from two sides. What this term
+     actually guards is unchanged and is asserted the same way: the field is
+     folded and trimmed BEFORE it is compared, so `type: Savings` cannot count
+     toward net worth while showing as nothing on the tile beside it. */
+  ok(/POOL_TYPES\.has\(String\(\(a && a\.type\) \|\| ''\)\.trim\(\)\.toLowerCase\(\)\)/.test(live.healthData),
+    'Account type (Score\'s saving rate): health-data.js\'s savers filter folds case/whitespace before comparing');
+  ok(/const POOL_TYPES = new Set\(\['savings', 'investment'\]\)/.test(live.healthData),
+    'Account type (Score\'s saving rate): and the pool is one declared set, not a pair of inline literals');
+  ok(!/a\.type === 'savings'/.test(live.healthData),
+    'Account type (Score\'s saving rate): confirmed — no raw, unfolded comparison survives in health-data.js');
   ok(!/a\.type === 'savings' \|\| a\.type === 'investment'/.test(live.healthData),
     'Account type (Score\'s saving rate): confirmed — the raw, unfolded OR-chain is gone');
 

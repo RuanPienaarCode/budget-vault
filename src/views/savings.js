@@ -136,8 +136,14 @@ module.exports = function registerSavings(ctx) {
     const g = growthTotals(entries);
     if (!g.total) return;
     if (!g.measured) {
+      /* Names the field AND where to set it — "no account records what it
+         started at" told the reader a fact with no way to act on it. The field
+         is `starting_amount`, entered as "Starting amount" in an account's
+         edit dialog; the same fix is offered per-card below via the "Add
+         starting amount" action (see renderActions), so this points at the
+         same control rather than inventing a second description of it. */
       return tile('Growth', '—', '',
-        'no account records what it started at, so none can be measured');
+        'no account has a Starting amount set — use "Add starting amount" on an account below');
     }
     const sub = [
       g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
@@ -249,8 +255,21 @@ module.exports = function registerSavings(ctx) {
     const withGoals = S.accounts.filter(a => a.goal_amount > 0);
     const goalsWrap = $('#savingsGoals'); goalsWrap.empty();
     if (!withGoals.length) {
-      goalsWrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
-        'No goals set yet. Add a goal_amount (and optional target_date) to any account file to track progress here.'));
+      /* Names the CONTROL, not the frontmatter key it writes — the key is
+         still hand-editable, but sending a reader to YAML when a real dialog
+         field exists (en.js's own acct.field.goalOpt, "Savings goal
+         (optional)") reads as the app admitting it has no UI for its own
+         feature. Same reasoning as dash.health.setup's own comment. A button
+         is offered too, the same way the staleness caveat below routes to
+         Accounts, because "on the Accounts page" is not a real next step
+         without one. */
+      goalsWrap.append(el('p', { class: 'text-muted', style: 'margin:0 0 10px' },
+        'No goals set yet. Open a savings or investment account on the Accounts page and set its ' +
+        'Savings goal field to track progress here.'));
+      const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+        'aria-label': 'Go to the Accounts page to set a savings goal' }, 'Go to Accounts');
+      btn.addEventListener('click', () => ctx.switchView('accounts'));
+      goalsWrap.append(btn);
     } else {
       const g = el('div', { class: 'goals' });
       for (const a of withGoals) {
@@ -282,6 +301,26 @@ module.exports = function registerSavings(ctx) {
 
   function renderSections(savings, investments, idx) {
     const wrap = $('#savingsSections'); wrap.empty();
+    /* The loop below `continue`s past whichever of the two lists is empty —
+       right when exactly one of them has accounts, so the page doesn't print
+       an empty "Investments" section header for a household with none. But
+       nothing covered the case where BOTH are empty: the loop then runs zero
+       iterations and this whole page section — the page's own subject —
+       renders nothing at all, no explanation and no next step, right below a
+       Goals card that already handles its own empty case. Caught here,
+       before the loop, rather than folded into it. */
+    if (!savings.length && !investments.length) {
+      const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+        'aria-label': 'Go to the Accounts page to add a savings or investment account' }, 'Go to Accounts');
+      btn.addEventListener('click', () => ctx.switchView('accounts'));
+      wrap.append(el('div', { class: 'card mb-4' },
+        el('div', { class: 'body-pad' },
+          el('p', { class: 'text-muted', style: 'margin:0 0 10px' },
+            'No savings or investment accounts yet. Add one on the Accounts page and its balance, ' +
+            'goal and growth will appear here.'),
+          btn)));
+      return;
+    }
     for (const [title, list] of [['Savings', savings], ['Investments', investments]]) {
       if (!list.length) continue;
       const grid = el('div', { class: 'mini-grid' });
@@ -729,11 +768,26 @@ module.exports = function registerSavings(ctx) {
       }, band);
       tip(add, node, `${money(undated)} of growth that no transaction dated — `
         + 'it is inside the balances you typed, so it can be totalled but not placed in time');
-      add('text', {
-        x: x0 + blockW / 2, y: Math.min(yTop, yBot) - 7, 'text-anchor': 'middle',
-        'font-size': '11', 'font-weight': '600', fill: 'currentColor', 'fill-opacity': '0.6',
-        'font-family': 'inherit',
-      }, band).textContent = 'undated';
+      /* Was a bare "undated" here — its only explanation lived in the <title>
+         above, which touch-and-hold reaches and a screen reader never does
+         (createChart marks the svg role="img", which collapses every child
+         including this text) and a desktop pointer never sees either (the
+         HTML tooltip takes over hover, dropping the native title). The
+         legend right beside this chart already says it correctly — "Growth
+         with no date" — so this now says the same thing rather than a
+         second, cryptic phrase for the same block. Two lines, and a smaller
+         size, because the full phrase does not fit one line over a 78-unit
+         column without running past the chart's right edge: the 1.08
+         headroom factor in `span` above reserves enough vertical room for
+         the second line, on every series, not just this one. */
+      const labelX = x0 + blockW / 2;
+      const labelY = Math.min(yTop, yBot) - 7;
+      const labelAttrs = {
+        x: labelX, 'text-anchor': 'middle', 'font-size': '9.5', 'font-weight': '600',
+        fill: 'currentColor', 'fill-opacity': '0.6', 'font-family': 'inherit',
+      };
+      add('text', { ...labelAttrs, y: labelY - 10 }, band).textContent = 'Growth with';
+      add('text', { ...labelAttrs, y: labelY }, band).textContent = 'no date';
     }
 
     // First and last month, at the two ends. Nothing between them: the shape is

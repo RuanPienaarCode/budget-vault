@@ -311,6 +311,12 @@ module.exports = {
   'wiz.failed': 'La configuración falló: {error}',
 
   /* ============================== Budget page ============================= */
+  'bud.fresh.title': 'Nuevo periodo — aún nada presupuestado',
+  'bud.fresh.body': {
+    one: '{period} tenía {count} categoría presupuestada — cópiala, o empieza de cero.',
+    other: '{period} tenía {count} categorías presupuestadas — cópialas, o empieza de cero.',
+  },
+
   'bud.shape.title': 'Tus otros presupuestos siguen aquí',
   'bud.shape.body': {
     one: '{count} archivo de presupuesto está guardado con otra duración de periodo — es Budgets/{newest}.md. Permanece en tu bóveda y vuelve en cuanto restablezcas la duración. Los importes empiezan en blanco aquí porque este periodo no tiene la misma duración que aquel.',
@@ -358,7 +364,7 @@ module.exports = {
   'bud.assumed.missing': 'No hay ninguna categoría llamada {category}',
   'bud.assumed.noFile': 'No se pudo leer la nota de {category}',
 
-  'bud.pull.label': 'Traer el exceso',
+  'bud.pull.label': 'Rellenar con el exceso',
   'bud.pull.title': { one: 'Rellenar con el exceso de gasto de hace {lag} periodo', other: 'Rellenar con el exceso de gasto de hace {lag} periodos' },
   'bud.pull.none': '{period} no gastó de más — terminó {amount} a favor',
   'bud.pull.confirmTitle': 'Traer el exceso anterior',
@@ -403,13 +409,14 @@ module.exports = {
   'tx.col.account': 'Cuenta',
   'tx.col.category': 'Categoría',
   'tx.col.amount': 'Importe',
-  'tx.col.excl': 'Excl.',
+  'tx.col.excl': 'Excl. presup.',
   'tx.col.note': 'Nota',
   'tx.col.split': 'Dividir',
   'tx.col.actions': 'Acciones de fila',
 
   'tx.aria.category': 'Categoría de {date} {desc}',
   'tx.aria.exclude': 'Excluir {desc} de los totales del presupuesto',
+  'tx.title.excl': 'Solo fuera de los totales del presupuesto — el dinero se movió igual, y todo lo que mide esta cuenta lo sigue contando.',
   'tx.aria.note': 'Nota de {date} {desc}',
   'tx.aria.split': 'Dividir {date} {desc} en categorías',
   'tx.title.split': 'Dividir en categorías',
@@ -539,12 +546,12 @@ module.exports = {
   'acct.balance.updatedDrift': { one: 'Saldo de {name} guardado, pero {count} fila desde esa fecha difiere en {amount}. Abre la cuenta para verla.', other: 'Saldo de {name} guardado, pero {count} filas desde esa fecha difieren en {amount}. Abre la cuenta para verlas.' },
   'acct.balance.unreadable': 'No se pudo leer «{raw}» — toca para corregirlo',
   'acct.reconciled': '{name} conciliada a {amount}',
-  'acct.err.nan': 'No es un número',
-  'acct.err.type': 'Tipo no válido',
+  'acct.err.nan': '{field} no es un número — prueba una cifra sencilla como {example}.',
+  'acct.err.type': '{field} no es válido — elige uno de la lista, p. ej. {example}.',
   'acct.err.notNumber': '{field} no es un número',
   'acct.err.nameRequired': 'El nombre de la cuenta es obligatorio',
   'acct.err.exists': 'La cuenta ya existe',
-  'acct.err.save': 'No se pudo guardar {name} ({error})',
+  'acct.err.save': 'No se pudo guardar {name} ({error}) — no se escribió nada en el archivo; inténtalo de nuevo.',
 
   'acct.edit.title': 'Editar cuenta — {name}',
   'acct.new.title': 'Nueva cuenta',
@@ -585,6 +592,7 @@ module.exports = {
   'acct.field.investedOpt': 'Total invertido (opcional)',
   'acct.field.investedDesc': 'Lo que has puesto, para poder mostrar el crecimiento frente a ello.',
   'acct.field.starting': 'Importe inicial',
+  'acct.field.startingDesc': 'Lo que tenía la cuenta en su fecha de inicio, para que la página Ahorros pueda distinguir lo que aportaste de lo que ha crecido. Déjalo en blanco y la ficha de Crecimiento no tendrá nada con que medir, y se mostrará como un guion.',
   'acct.field.opened': 'Abierta el',
 
   'acct.budget.on': '{name} vuelve a contar para el presupuesto',
@@ -728,8 +736,8 @@ module.exports = {
   'acct.table.sortedBy': ' · ordenadas por {column}',
   'acct.col.account': 'Cuenta',
   'acct.col.balance': 'Saldo',
-  'acct.col.month': 'Mes',
-  'acct.col.goal': 'Meta / límite',
+  'acct.col.month': 'Periodo',
+  'acct.col.goal': 'Progreso',
   'acct.col.confirmed': 'Confirmado',
   'acct.col.state': 'Estado',
   'acct.col.notes': 'Notas',
@@ -804,8 +812,8 @@ module.exports = {
   'dash.greet.afternoon': 'Buenas tardes',
   'dash.greet.evening': 'Buenas noches',
   'dash.greet.line': '{greeting}, {name}',
-  'dash.hero.remaining': 'Queda en este periodo',
-  'dash.hero.overspent': 'Gastado de más en este periodo',
+  'dash.hero.remaining': 'Presupuesto restante este periodo',
+  'dash.hero.overspent': 'Por encima del presupuesto este periodo',
   'dash.hero.sub': '{spent} gastado de {budgeted} presupuestado',
   'dash.stat.income': 'Ingresos totales',
   'dash.stat.budgeted': 'Presupuestado',
@@ -971,6 +979,7 @@ module.exports = {
   'score.win.spending': 'Tus salidas dejan aire — no vives al borde de lo que entra.',
   'score.win.wealth': 'Lo que posees ha crecido muy por encima de lo que debes. Esa es la parte que compone en silencio.',
   'score.now.reserves': 'Ahora: {months} meses cubiertos · {amount} apartado · meta {target} meses',
+  'score.now.reserves.essentials': 'Lo esencial cuesta de media {amount} al mes.',
   'score.now.saving': 'Ahora: {pct} de los ingresos ahorrado · {amount} al mes',
   'score.now.savingDown': 'Ahora: se retiran {amount} al mes del ahorro, en lugar de aportar',
   'score.now.debt': 'Ahora: {pct} de los ingresos a intereses',
@@ -979,6 +988,7 @@ module.exports = {
   'score.now.budget': 'presupuesto usado {pct}',
   'score.now.wealth': 'Ahora: {amount} de patrimonio neto · {times}× un año de ingresos',
   'score.how.reserves': 'Dinero apartado que sostendría el hogar sin ingresos, contado en meses de gastos esenciales.',
+  'score.how.reserves.essentialDef': '«Esencial» excluye caprichos, donaciones, ahorro, inversión, ingresos y transferencias, más todo lo que añadas en Ajustes → Grupos no esenciales.',
   'score.how.saving': 'Lo que llega cada mes a tus ahorros e inversiones, como porción de lo que ganas.',
   'score.how.debt': 'Lo que te cuesta la deuda: intereses y las cuotas a las que te has comprometido.',
   'score.how.spending': 'Cuánto de tus ingresos está comprometido antes de decidir, cuánto cuesta vivir y si te mantienes dentro de tu presupuesto.',
@@ -1012,6 +1022,7 @@ module.exports = {
   'score.flow.ariaLabel': 'Los ingresos de {income} se dividen en {committed} de comprometido y gastos fijos, {living} de gastos de vida, {saving} de ahorro, y {notYetSpent} aún sin gastar.',
   'score.flow.chip.committed': 'Dentro de lo comprometido',
   'score.flow.committed.empty': 'Todavía ninguna categoría está marcada como fija — pon fixed: true al principio del archivo de la categoría (alquiler, cuotas de deuda, pólizas) y esto se completará.',
+  'score.flow.committed.empty.scoreNote': 'Esto también alimenta un tercio de la parte de Gasto de tu Puntuación — hasta que algo se marque como fijo, esa parte se lee como si no tuvieras ningún gasto fijo.',
   'score.flow.chip.debtRepayments': 'Cuotas de deuda',
   'score.flow.chip.ofWhichInterest': '…de las cuales intereses',
   'score.flow.chip.housing': 'Vivienda y servicios',
@@ -1034,7 +1045,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': 'Lo que queda este período',
+  'shell.dash.left': 'Dinero que queda este período',
   'dash.left.sub': 'Antes de que este período termine el {date}',
   'dash.left.nowSub': 'El dinero que tienes ahora',
   'dash.left.notNow': 'Esta tarjeta mide el dinero que tienes ahora, así que solo es cierta para el período en el que estás. Cambia a {period} para verla.',

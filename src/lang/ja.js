@@ -309,6 +309,11 @@ module.exports = {
   'wiz.failed': 'セットアップに失敗しました: {error}',
 
   /* ============================== Budget page ============================= */
+  'bud.fresh.title': '新しい期間 — まだ予算を組んでいません',
+  'bud.fresh.body': {
+    other: '{period} には {count} 件のカテゴリに予算がありました — そのままコピーするか、新しく始めてください。',
+  },
+
   'bud.shape.title': '他の予算はそのまま残っています',
   'bud.shape.body': {
     other: '別の期間の長さで保存された予算ファイルが {count} 件あります — 最新のものは Budgets/{newest}.md です。保管庫にはそのまま残っており、期間の長さを元に戻せばまた表示されます。この期間はそれらとは長さが違うため、金額は空の状態から始まります。',
@@ -353,7 +358,7 @@ module.exports = {
   'bud.assumed.missing': '{category} というカテゴリはありません',
   'bud.assumed.noFile': '{category} のノートを読めませんでした',
 
-  'bud.pull.label': '超過分を取り込む',
+  'bud.pull.label': '超過分から入力',
   /* One form only — see the header. No plural distinction in Japanese. */
   'bud.pull.title': { other: '{lag} 期間前の超過支出から入力します' },
   'bud.pull.none': '{period} に超過はありません — {amount} 残して終わりました',
@@ -395,13 +400,14 @@ module.exports = {
   'tx.col.account': '口座',
   'tx.col.category': 'カテゴリ',
   'tx.col.amount': '金額',
-  'tx.col.excl': '除外',
+  'tx.col.excl': '予算除外',
   'tx.col.note': 'メモ',
   'tx.col.split': '分割',
   'tx.col.actions': '行の操作',
 
   'tx.aria.category': '{date} {desc} のカテゴリ',
   'tx.aria.exclude': '{desc} を予算の合計から除外',
+  'tx.title.excl': '予算の合計からだけ除外されます — お金は実際に動いており、この口座を測るものはすべて引き続き計上します。',
   'tx.aria.note': '{date} {desc} のメモ',
   'tx.aria.split': '{date} {desc} をカテゴリに分割',
   'tx.title.split': 'カテゴリに分割',
@@ -517,12 +523,12 @@ module.exports = {
   'acct.balance.updatedDrift': { other: '{name}の残高を保存しました。ただしその日付以降の{count}件が{amount}ずれています。口座を開いて確認してください。' },
   'acct.balance.unreadable': '「{raw}」を読み取れませんでした — タップして修正',
   'acct.reconciled': '{name} を {amount} に照合しました',
-  'acct.err.nan': '数値ではありません',
-  'acct.err.type': '種類が正しくありません',
+  'acct.err.nan': '{field} が数値ではありません — {example} のような単純な数字にしてください。',
+  'acct.err.type': '{field} が正しくありません — 一覧から選んでください（例: {example}）。',
   'acct.err.notNumber': '{field} が数値ではありません',
   'acct.err.nameRequired': '口座名は必須です',
   'acct.err.exists': 'その口座はすでに存在します',
-  'acct.err.save': '{name} を保存できませんでした（{error}）',
+  'acct.err.save': '{name} を保存できませんでした（{error}）— ファイルには何も書き込まれていません。もう一度お試しください。',
 
   'acct.edit.title': '口座を編集 — {name}',
   'acct.new.title': '新しい口座',
@@ -563,6 +569,7 @@ module.exports = {
   'acct.field.investedOpt': '投資額の合計（任意）',
   'acct.field.investedDesc': '投入した金額です。これを基準に増減を表示します。',
   'acct.field.starting': '開始時の金額',
+  'acct.field.startingDesc': '口座の開始日にあった金額です。これがあると、貯蓄ページで入金した分と増えた分を分けて示せます。空欄のままだと、そこにある増減タイルには測る基準がなく、ダッシュ表示になります。',
   'acct.field.opened': '開設日',
 
   'acct.budget.on': '{name} を再び予算に含めます',
@@ -699,8 +706,8 @@ module.exports = {
   'acct.table.sortedBy': ' · {column} 順',
   'acct.col.account': '口座',
   'acct.col.balance': '残高',
-  'acct.col.month': '月',
-  'acct.col.goal': '目標 / 限度額',
+  'acct.col.month': '期間',
+  'acct.col.goal': '進捗',
   'acct.col.confirmed': '確認日',
   'acct.col.state': '状態',
   'acct.col.notes': 'メモ',
@@ -775,8 +782,8 @@ module.exports = {
   'dash.greet.afternoon': 'こんにちは',
   'dash.greet.evening': 'こんばんは',
   'dash.greet.line': '{name}さん、{greeting}',
-  'dash.hero.remaining': '今期の残り',
-  'dash.hero.overspent': '今期の超過額',
+  'dash.hero.remaining': '今期の予算残り',
+  'dash.hero.overspent': '今期の予算超過額',
   'dash.hero.sub': '予算 {budgeted} のうち {spent} を支出',
   'dash.stat.income': '収入合計',
   'dash.stat.budgeted': '予算',
@@ -924,6 +931,7 @@ module.exports = {
   'score.win.spending': '支出に余裕があります。入ってくる額のぎりぎりで暮らしていません。',
   'score.win.wealth': '保有資産が負債を大きく上回っています。静かに積み上がる部分です。',
   'score.now.reserves': '現在: {months} か月分 · {amount} を確保 · 目標 {target} か月',
+  'score.now.reserves.essentials': '必需品には平均で月 {amount} かかります。',
   'score.now.saving': '現在: 収入の {pct} を貯蓄 · 月 {amount}',
   'score.now.savingDown': '現在: 貯蓄に積み増すのではなく、毎月{amount}を取り崩しています',
   'score.now.debt': '現在: 収入の {pct} が利息へ',
@@ -932,6 +940,7 @@ module.exports = {
   'score.now.budget': '予算消化 {pct}',
   'score.now.wealth': '現在: 純資産 {amount} · 年収の {times} 倍',
   'score.how.reserves': '収入がなくても家計を支えられる蓄え。必要支出の何か月分かで数えます。',
+  'score.how.reserves.essentialDef': '「必需品」には、ぜいたく品・寄付・貯蓄・投資・収入・振替は含まれません。加えて 設定 → 非必需グループ で追加したものも含まれません。',
   'score.how.saving': '毎月、貯蓄と投資に届く額。収入に対する割合で見ます。',
   'score.how.debt': '負債にかかる費用 — 利息と、約束した返済です。',
   'score.how.spending': '決める前にすでに約束されている割合、生活にかかる額、そして予算内に収まっているか。',
@@ -965,6 +974,7 @@ module.exports = {
   'score.flow.ariaLabel': '収入 {income} の内訳: 固定費・約束済みの支払い {committed}、生活費 {living}、貯蓄 {saving}、まだ使っていない分 {notYetSpent}。',
   'score.flow.chip.committed': '固定費の内訳',
   'score.flow.committed.empty': 'まだ固定に設定されたカテゴリがありません — カテゴリのファイルの先頭に fixed: true を設定すると（家賃・返済・保険など）ここに表示されます。',
+  'score.flow.committed.empty.scoreNote': 'これはスコアの「支出」部分の3分の1にも影響します — 固定に設定されるまでは、固定費がまったくないものとして扱われます。',
   'score.flow.chip.debtRepayments': '返済',
   'score.flow.chip.ofWhichInterest': '…うち利息',
   'score.flow.chip.housing': '住居・光熱費',
@@ -987,7 +997,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': 'この期間の残り',
+  'shell.dash.left': 'この期間に残っているお金',
   'dash.left.sub': 'この期間が {date} に終わるまで',
   'dash.left.nowSub': '今ある現金',
   'dash.left.notNow': 'このカードは今ある現金を測るため、現在の期間でしか正しくありません。{period} に切り替えると表示されます。',

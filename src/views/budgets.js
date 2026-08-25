@@ -34,6 +34,28 @@ module.exports = function registerBudgets(ctx) {
       .filter(k => !periodKeyValid(k) && (S.budgets[k] || []).length)
       .sort();
   }
+  /* A fresh period with nothing saved yet renders IDENTICALLY to a genuinely
+     all-zero budget: currentPeriod() flips on the clock alone, nothing on
+     screen announces it, and budgetDraft() seeds a zero row for every
+     category regardless of whether the period was ever opened before (audit
+     finding 2). "Copy previous period" already exists for exactly this moment
+     (copyPreviousBudget, below) but sat as a permanently-visible ghost button
+     among three, with nothing to say THIS is when to press it.
+
+     Pure and separate from the render, same reason otherShapeBudgets is just
+     above: a bare-node test can pin the decision without touching the DOM.
+     This checks the immediately previous SAME-shape period (shiftPeriod(-1))
+     — the ordinary roll — a different case from otherShapeBudgets() (a
+     DIFFERENT period-length shape, reachable only after a settings change). A
+     vault can be in both states at once; renderShapeNote checks this one
+     FIRST because it is the common case (every period roll), where the other
+     only fires on a length switch. */
+  function freshPeriodNote() {
+    const prevKey = shiftPeriod(S.period, -1);
+    const prev = S.budgets[prevKey] || [];
+    return prev.length ? { prevKey, count: prev.length } : null;
+  }
+
   /* The note only earns its place when this period is genuinely unbudgeted AND
      there is something on the other side to explain. Shown otherwise it would
      be noise on every fresh period, and people stop reading a banner that is
@@ -41,9 +63,30 @@ module.exports = function registerBudgets(ctx) {
   function renderShapeNote() {
     const box = $('#budShapeNote');
     box.empty();
-    const others = otherShapeBudgets();
     const thisOne = S.budgets[S.period] || [];
-    if (thisOne.length || !others.length) { box.classList.add('hidden'); return; }
+    if (thisOne.length) { box.classList.add('hidden'); return; }
+
+    const fresh = freshPeriodNote();
+    if (fresh) {
+      box.classList.remove('hidden');
+      const label = `${periodMonthName(fresh.prevKey)} · ${periodTitle(fresh.prevKey)}`;
+      /* i18n wave: bud.fresh.title / bud.fresh.body added to lang/en.js (and
+         all six sibling tables) — see src/lang/en.js for the plural shape.
+         The CTA button below reuses the EXISTING shell.bud.copyPrev key
+         ('Copy previous period') rather than inventing a new one — it does
+         the exact same thing the ghost button above the table already does,
+         just with a reason attached to it. */
+      box.append(el('div', { class: 'bud-shape-note-t' }, i18n.t('bud.fresh.title')));
+      box.append(el('p', {}, i18n.t('bud.fresh.body', { count: fresh.count, period: label })));
+      box.append(el('button', {
+        class: 'btn btn-ghost', type: 'button',
+        onclick: copyPreviousBudget,
+      }, i18n.t('shell.bud.copyPrev')));
+      return;
+    }
+
+    const others = otherShapeBudgets();
+    if (!others.length) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     const newest = others[others.length - 1];
     const n = others.length;
@@ -362,6 +405,23 @@ module.exports = function registerBudgets(ctx) {
     }
   }
 
+  /* The group heading used to print the raw stored `type` string verbatim —
+     'income', 'luxuries', 'transfer' — straight onto the page, never routed
+     through i18n (audit finding 4). controller.js's typeBadge was already
+     fixed for the SAME text on the row's own Type column; this is the same
+     wiz.type.* lookup with the same raw fallback, reused rather than
+     re-derived, because two things translating one enum by different rules is
+     exactly this repo's recurring bug shape. i18n.t() returns the key itself
+     when nothing matches (its documented worst case), and rendering THAT
+     ('wiz.type.mygroup') for a household's own custom group would read worse
+     than the raw word it replaced — so the fallback compares against the key
+     it asked for, not against `undefined`, same as typeBadge does. */
+  function typeGroupLabel(type) {
+    const key = 'wiz.type.' + type;
+    const label = i18n.t(key);
+    return label === key ? type : label;
+  }
+
   function renderBudgets() {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     renderShapeNote();
@@ -370,7 +430,18 @@ module.exports = function registerBudgets(ctx) {
     const t = $('#budTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, i18n.t('bud.col.category')), el('th', { scope: 'col' }, i18n.t('bud.col.type')),
-      el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.amount')), el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.actual')), el('th', { scope: 'col' }, i18n.t('bud.col.notes')), el('th', { scope: 'col' }, ''))));
+      el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.amount')), el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.actual')), el('th', { scope: 'col' }, i18n.t('bud.col.notes')),
+      // Was `el('th', { scope: 'col' }, '')` — completely unlabelled. This is
+      // the "assume spent" / clear / delete cell, and one of its two icon-only
+      // buttons deletes a category EVERYWHERE while the other only clears it
+      // from this period's file (audit finding 1). A screen reader in
+      // table-navigation mode announces the COLUMN header on landing in any
+      // cell of it, ahead of a row's own per-button aria-label, so an empty
+      // header left that first announcement blank. tx.col.actions (already
+      // shipped, same sr-only pattern) is the precedent reused here rather than
+      // inventing a new bud.col.actions key this round cannot add to lang/*.js
+      // — "row actions" reads correctly on this table too.
+      el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.actions'))))));
     const body = el('tbody', {});
     const mark = () => { budDirty = true; $('#budSave').disabled = false; };
     const order = typeOrder(S.settings.groups);
@@ -397,7 +468,7 @@ module.exports = function registerBudgets(ctx) {
     const sortedTypes = [...groups.keys()].sort((a, b) => typeRank(a, order) - typeRank(b, order));
     for (const type of sortedTypes) {
       const catRows = groups.get(type).sort((a, b) => a.category.localeCompare(b.category));
-      body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, type)));
+      body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, typeGroupLabel(type))));
       for (const d of catRows) {
         /* An assume-spent row is its own actual: the money left in an earlier
            period, so no transaction in THIS one will ever match it — UNLESS a
@@ -505,8 +576,32 @@ module.exports = function registerBudgets(ctx) {
               title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
               onclick: () => toggleAssumeSpent(d.category, !assumed),
             }, icoEl(['circle-check', 'check-circle', 'check'])),
+            /* Clear (this period only) vs Delete (everywhere) sat side by side
+               with the distinction living only in `title` — invisible on touch,
+               which is most of where this app runs (audit finding 1). Both
+               already carry a correct, DIFFERENT aria-label (bud.aria.clear /
+               bud.aria.delete) for a screen reader, but a sighted phone user
+               gets neither title nor aria-label, only the glyph — and a bare
+               '✕' reads as "remove/close", the same idea a trash can right next
+               to it already signals, so the two buttons collided on meaning
+               even though they never collided on pixels. Swapped for an
+               undo/reset icon (semantically "put this back", not "take this
+               away") so the two buttons disagree on WHAT they do, not just on
+               shape. Names checked against Obsidian's actually-bundled lucide
+               set (app.js, not lucide.dev, which lags it) — 'eraser' is NOT in
+               it, 'rotate-ccw' is.
+
+               Not moved into a category-edit dialog, despite the finding's
+               "seriously consider" — there is no such dialog anywhere in this
+               app (grepped for one; categories are create-only, never edited),
+               so that would be new UI surface crossing modal.js, which no one
+               owns this round, for a destructive action that already sits
+               behind its own confirmModal with the used-transaction count and
+               vault-trash explanation spelled out (see promptDeleteCategory in
+               categories.js). The confirm dialog is the real safety net here;
+               the row button is only ever the entry point to it. */
             d.inFile
-              ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, '✕')
+              ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
               : '',
             el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
               if (await promptDeleteCategory(d.category)) {
@@ -671,5 +766,10 @@ module.exports = function registerBudgets(ctx) {
     // Exposed the same way otherShapeBudgets and carryStructure already are —
     // a pure-ish helper (periodRange aside) worth pinning directly in a bare
     // node test rather than only reachable through the reslice modal's DOM.
-    strandedPeriodDays });
+    strandedPeriodDays,
+    // Same reason: freshPeriodNote decides whether the silent-period-roll note
+    // (audit finding 2) shows at all, and typeGroupLabel decides what the
+    // group heading prints (finding 4) — both worth pinning directly rather
+    // than only reachable through renderBudgets' full DOM render.
+    freshPeriodNote, typeGroupLabel });
 };

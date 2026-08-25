@@ -158,7 +158,20 @@ module.exports = function registerCategories(ctx) {
   /* Delete a category after confirmation: the file goes to the vault's trash
      (recoverable), the in-memory list drops it. Existing transactions and past
      budget files are deliberately untouched — selects already render a stored
-     name with no category file as "(missing)". Returns true if deleted. */
+     name with no category file as "(missing)". Returns true if deleted.
+
+     This confirmModal — with the used-transaction count and the vault-trash
+     explanation spelled out below — IS this app's safety net for a delete
+     that reaches every period, not the row button that opens it. An audit
+     ("13-agent" comprehension pass, Aug 2026) suggested moving the delete
+     entirely out of the Budget row and into a category-edit dialog. There is
+     no such dialog anywhere in this app — categories are create-only today,
+     never edited — so that would be new UI surface crossing modal.js (owned
+     by no one this round) to build a whole screen around one already-guarded
+     action. Kept in place; the row button's ICON was made to disagree with
+     the neighbouring clear-this-period button instead, so the two no longer
+     read as two flavours of the same "remove" gesture (see the Delete/Clear
+     buttons in views/budgets.js). */
   async function promptDeleteCategory(name) {
     if (!S.categories.some(c => c.name === name)) return false;
     let used = 0;

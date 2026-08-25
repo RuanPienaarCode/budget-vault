@@ -156,6 +156,15 @@ module.exports = function registerDashboard(ctx) {
        reader meeting the card for the first time had to look down a line to
        learn what 3.9 counted. Set smaller and lighter, the way the hero already
        carries its currency symbol. */
+    /* Audit finding #4: with debt and score both routing and emergency/saving
+       not, a grid of four tiles read as two buttons and two dead ends —
+       inconsistent enough to look broken rather than intentional. Emergency
+       cover is set and tracked on the Accounts page (`emergency_fund:` on an
+       account's frontmatter, health-math.js's own comment on resolveEarmarks);
+       the saving rate is read off contributions into savings/investment
+       accounts, which is also where a household actually goes to act on it —
+       see score.js's own GAP_DESTS, which sends its `saving` gap to the same
+       page for the same reason. */
     const emergency = H.months !== null
       ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
         /* A REAL space, not only the margin below it: the tile's accessible
@@ -172,9 +181,9 @@ module.exports = function registerDashboard(ctx) {
            "R 1 234,50" and "13%". */
         [H.months.toFixed(1).replace('.', locale().decimal), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
         i18n.t('dash.health.months'),
-        i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }))
+        i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }), 'accounts')
       : fig('', '—', i18n.t('dash.health.months'),
-        earmarks.any ? i18n.t('dash.health.needHistory') : i18n.t('dash.health.setup'));
+        earmarks.any ? i18n.t('dash.health.needHistory') : i18n.t('dash.health.setup'), 'accounts');
     if (H.months !== null) {
       const fill = Math.min(100, (H.months / target) * 100);
       /* The same bar component the budget table fills, and the same three
@@ -222,8 +231,8 @@ module.exports = function registerDashboard(ctx) {
       i18n.t('dash.health.savings'),
       drawingDown
         ? i18n.t('dash.health.savingDown', { amount: money(Math.abs(H.monthlySavings), 0) })
-        : i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }))
-      : fig('', '—', i18n.t('dash.health.savings'), i18n.t('dash.health.needHistory'));
+        : i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }), 'savings')
+      : fig('', '—', i18n.t('dash.health.savings'), i18n.t('dash.health.needHistory'), 'savings');
 
     /* Zero interest with an income to measure against is a fact worth its own
        word — "debt-free" reads as an achievement where "0%" reads as a rounding
@@ -965,8 +974,28 @@ module.exports = function registerDashboard(ctx) {
       const namesLine = restCount > 0
         ? i18n.t('dash.stat.missingNames', { names: shown, count: restCount })
         : shown;
+      /* Audit finding #5: dash.stat.missingSub says "{count} transactions —
+         recategorise" as plain text on a tile that did nothing when tapped —
+         copy naming an action the element could not perform, right beside the
+         Uncategorised tile a few lines above that already IS a button
+         (openUncategorised). A real <button>, same "stat" pattern as that
+         sibling — the global button reset plus .stat's own rules already lay
+         it out identically to the <div> it replaces (see the comment on the
+         uncategorised button below for why no new CSS is needed).
+         Reuses openCategory(), the SAME drill-through the donut and the
+         budget table already use, rather than a bespoke handler — it is
+         already guarded for a category the #txCategory select has no option
+         for (`.some(o => o.value === cat)`), which an ORPHANED name always
+         is (transactions.js:197 builds the select only from S.categories).
+         So this cannot pre-filter to just the offending rows — there is no
+         filter vocabulary for "category name matches no known category" on
+         the Transactions page (that page is a teammate's file, not touched
+         here) — but it still clears the other filters and lands the reader
+         on Transactions with every orphaned name visible right there on
+         this tile to search for by eye, which is a real step forward from a
+         tap that did nothing at all. */
       statCol.append(
-        el('div', { class: 'stat' },
+        el('button', { type: 'button', class: 'stat', onclick: () => openCategory(names[0]) },
           el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.missing'))),
           el('div', {}, el('div', { class: 'sv text-warning' }, String(names.length)),
             el('div', { class: 'st' }, i18n.t('dash.stat.missingSub', { count: sum.unknown.count })),

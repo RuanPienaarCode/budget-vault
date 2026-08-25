@@ -309,6 +309,11 @@ module.exports = {
   'wiz.failed': '设置失败：{error}',
 
   /* ============================== Budget page ============================= */
+  'bud.fresh.title': '新周期 — 还没有预算',
+  'bud.fresh.body': {
+    other: '{period} 有 {count} 个分类做过预算 — 复制过来，或者重新开始。',
+  },
+
   'bud.shape.title': '你的其他预算都还在',
   'bud.shape.body': {
     other: '有 {count} 个预算文件保存在另一种周期长度下 — 最新的是 Budgets/{newest}.md。它们仍保留在你的仓库中，只要把周期长度改回去就会重新出现。这里的金额从空白开始，因为本周期与那些周期的长度不同。',
@@ -353,7 +358,7 @@ module.exports = {
   'bud.assumed.missing': '没有名为 {category} 的分类',
   'bud.assumed.noFile': '无法读取 {category} 的笔记',
 
-  'bud.pull.label': '取回超支',
+  'bud.pull.label': '用超支填入',
   /* One form only — see the header. No plural distinction in Chinese. */
   'bud.pull.title': { other: '用 {lag} 个周期前的超支金额填入' },
   'bud.pull.none': '{period} 没有超支 — 结余 {amount}',
@@ -395,13 +400,14 @@ module.exports = {
   'tx.col.account': '账户',
   'tx.col.category': '分类',
   'tx.col.amount': '金额',
-  'tx.col.excl': '排除',
+  'tx.col.excl': '预算外',
   'tx.col.note': '备注',
   'tx.col.split': '拆分',
   'tx.col.actions': '行操作',
 
   'tx.aria.category': '{date} {desc} 的分类',
   'tx.aria.exclude': '把 {desc} 从预算合计中排除',
+  'tx.title.excl': '只是排除在预算合计之外 — 这笔钱仍然实际发生了，衡量这个账户的一切仍会计入它。',
   'tx.aria.note': '{date} {desc} 的备注',
   'tx.aria.split': '把 {date} {desc} 拆分到多个分类',
   'tx.title.split': '拆分到多个分类',
@@ -517,12 +523,12 @@ module.exports = {
   'acct.balance.updatedDrift': { other: '已保存 {name} 的余额，但该日期之后的 {count} 笔记录相差 {amount}。打开账户查看。' },
   'acct.balance.unreadable': '无法读取“{raw}” — 点按修正',
   'acct.reconciled': '已把 {name} 对账为 {amount}',
-  'acct.err.nan': '不是数字',
-  'acct.err.type': '类型无效',
+  'acct.err.nan': '{field} 不是数字 — 试试像 {example} 这样的普通数字。',
+  'acct.err.type': '{field} 无效 — 请从列表中选择，例如 {example}。',
   'acct.err.notNumber': '{field} 不是数字',
   'acct.err.nameRequired': '账户名称为必填项',
   'acct.err.exists': '该账户已存在',
-  'acct.err.save': '无法保存 {name}（{error}）',
+  'acct.err.save': '无法保存 {name}（{error}）— 文件未写入任何内容；请重试同一操作。',
 
   'acct.edit.title': '编辑账户 — {name}',
   'acct.new.title': '新建账户',
@@ -563,6 +569,7 @@ module.exports = {
   'acct.field.investedOpt': '累计投入（选填）',
   'acct.field.investedDesc': '你投入的金额，以便据此显示增长。',
   'acct.field.starting': '起始金额',
+  'acct.field.startingDesc': '该账户在起始日期时的金额，以便“储蓄”页面能把你投入的钱和它增长出来的部分分开。留空的话，那里的增长卡片就没有可衡量的基准，只会显示一个短横线。',
   'acct.field.opened': '开户日期',
 
   'acct.budget.on': '{name} 重新计入预算',
@@ -699,8 +706,8 @@ module.exports = {
   'acct.table.sortedBy': ' · 按{column}排序',
   'acct.col.account': '账户',
   'acct.col.balance': '余额',
-  'acct.col.month': '月度',
-  'acct.col.goal': '目标 / 额度',
+  'acct.col.month': '周期',
+  'acct.col.goal': '进度',
   'acct.col.confirmed': '确认日期',
   'acct.col.state': '状态',
   'acct.col.notes': '笔记',
@@ -775,8 +782,8 @@ module.exports = {
   'dash.greet.afternoon': '下午好',
   'dash.greet.evening': '晚上好',
   'dash.greet.line': '{greeting}，{name}',
-  'dash.hero.remaining': '本周期剩余',
-  'dash.hero.overspent': '本周期超支',
+  'dash.hero.remaining': '本周期预算剩余',
+  'dash.hero.overspent': '本周期超出预算',
   'dash.hero.sub': '预算 {budgeted}，已花 {spent}',
   'dash.stat.income': '收入合计',
   'dash.stat.budgeted': '预算',
@@ -924,6 +931,7 @@ module.exports = {
   'score.win.spending': '你的支出留有余地 — 没有卡在收入的边缘生活。',
   'score.win.wealth': '你拥有的已远超所欠的。这是会安静复利的部分。',
   'score.now.reserves': '现在：可支撑 {months} 个月 · 已存 {amount} · 目标 {target} 个月',
+  'score.now.reserves.essentials': '必要开支平均每月 {amount}。',
   'score.now.saving': '现在：收入的 {pct} 已储蓄 · 每月 {amount}',
   'score.now.savingDown': '目前：每月从储蓄中支取 {amount}，而不是存入',
   'score.now.debt': '现在：收入的 {pct} 用于利息',
@@ -932,6 +940,7 @@ module.exports = {
   'score.now.budget': '预算已用 {pct}',
   'score.now.wealth': '现在：净资产 {amount} · 一年收入的 {times} 倍',
   'score.how.reserves': '在没有收入时仍能支撑家庭的存款，以必要支出的月数计算。',
+  'score.how.reserves.essentialDef': '「必要」不包括奢侈消费、捐赠、储蓄、投资、收入和转账，也不包括「设置 → 非必要分组」中添加的任何内容。',
   'score.how.saving': '每月进入储蓄和投资的钱，占收入的比例。',
   'score.how.debt': '债务的成本 — 利息，以及你已承诺的还款。',
   'score.how.spending': '在你做任何决定之前已被占用的收入比例、生活的花费，以及是否守住自己的预算。',
@@ -965,6 +974,7 @@ module.exports = {
   'score.flow.ariaLabel': '收入 {income} 分为：固定支出与承诺账单 {committed}、生活成本 {living}、储蓄 {saving}、尚未花掉 {notYetSpent}。',
   'score.flow.chip.committed': '固定支出明细',
   'score.flow.committed.empty': '目前没有分类被标记为固定 — 在该分类文件开头设置 fixed: true（如房租、债务还款、保单），这里就会显示出来。',
+  'score.flow.committed.empty.scoreNote': '这也会影响你评分中「支出」部分的三分之一 — 在标记为固定之前，这部分会显示为你完全没有固定账单。',
   'score.flow.chip.debtRepayments': '债务还款',
   'score.flow.chip.ofWhichInterest': '……其中利息',
   'score.flow.chip.housing': '住房与水电',
@@ -987,7 +997,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': '本期还剩多少',
+  'shell.dash.left': '本期还剩多少钱',
   'dash.left.sub': '在本期于 {date} 结束之前',
   'dash.left.nowSub': '你现在拥有的钱',
   'dash.left.notNow': '这张卡衡量的是你现在拥有的钱，因此只有在当前周期才准确。切换到 {period} 即可查看。',

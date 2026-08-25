@@ -326,6 +326,12 @@ module.exports = {
   /* NOT here: the markdown Budgets/<period>.md is written with. That is vault
      file content, not interface copy — same rule the wizard follows. */
 
+  'bud.fresh.title': 'New period — nothing budgeted yet',
+  'bud.fresh.body': {
+    one: '{period} had {count} category budgeted — copy it across, or start fresh.',
+    other: '{period} had {count} categories budgeted — copy them across, or start fresh.',
+  },
+
   'bud.shape.title': 'Your other budgets are still here',
   'bud.shape.body': {
     one: '{count} budget file is saved under a different period length — it is Budgets/{newest}.md. It stays in your vault, and it comes back as soon as you set the period length back. Amounts start blank here because this period isn\'t the same length as that one was.',
@@ -375,7 +381,7 @@ module.exports = {
   'bud.assumed.missing': 'No category called {category}',
   'bud.assumed.noFile': 'Could not read the note for {category}',
 
-  'bud.pull.label': 'Pull overspend',
+  'bud.pull.label': 'Fill from overspend',
   /* Object form, not the '(s)' string this key carried before — but the
      call site (views/budgets.js:480, a teammate-owned file) passes `lag`
      only, no `count`, so pluralCategory() never sees the real value and
@@ -426,13 +432,14 @@ module.exports = {
   'tx.col.account': 'Account',
   'tx.col.category': 'Category',
   'tx.col.amount': 'Amount',
-  'tx.col.excl': 'Excl.',
+  'tx.col.excl': 'Excl. budget',
   'tx.col.note': 'Note',
   'tx.col.split': 'Split',
   'tx.col.actions': 'Row actions',
 
   'tx.aria.category': 'Category for {date} {desc}',
   'tx.aria.exclude': 'Exclude {desc} from budget totals',
+  'tx.title.excl': 'Out of the budget totals only — the money still moved, and everything measuring this account still counts it.',
   'tx.aria.note': 'Note for {date} {desc}',
   'tx.aria.split': 'Split {date} {desc} into categories',
   'tx.title.split': 'Split into categories',
@@ -566,12 +573,12 @@ module.exports = {
   'acct.balance.updatedDrift': { one: '{name} balance saved — but {count} row since that date differs by {amount}. Open the account to see it.', other: '{name} balance saved — but {count} rows since that date differ by {amount}. Open the account to see them.' },
   'acct.balance.unreadable': 'Could not read "{raw}" — click to fix',
   'acct.reconciled': '{name} reconciled to {amount}',
-  'acct.err.nan': 'Not a number',
-  'acct.err.type': 'Invalid type',
+  'acct.err.nan': '{field} isn\'t a number — try a plain figure like {example}.',
+  'acct.err.type': '{field} isn\'t valid — pick one from the list, e.g. {example}.',
   'acct.err.notNumber': '{field} is not a number',
   'acct.err.nameRequired': 'Account name required',
   'acct.err.exists': 'Account already exists',
-  'acct.err.save': 'Could not save {name} ({error})',
+  'acct.err.save': 'Could not save {name} ({error}) — nothing was written to the file; try the same action again.',
 
   'acct.edit.title': 'Edit account — {name}',
   'acct.new.title': 'New account',
@@ -612,6 +619,7 @@ module.exports = {
   'acct.field.investedOpt': 'Total invested (optional)',
   'acct.field.investedDesc': 'What you have put in, so growth can be shown against it.',
   'acct.field.starting': 'Starting amount',
+  'acct.field.startingDesc': 'What the account held on its start date, so the Savings page can split what you put in from what it grew. Leave it blank and the Growth tile there has nothing to measure from and reads as a dash.',
   'acct.field.opened': 'Opened on',
 
   'acct.budget.on': '{name} counts toward the budget again',
@@ -761,8 +769,8 @@ module.exports = {
   'acct.table.sortedBy': ' · sorted by {column}',
   'acct.col.account': 'Account',
   'acct.col.balance': 'Balance',
-  'acct.col.month': 'Month',
-  'acct.col.goal': 'Goal / limit',
+  'acct.col.month': 'Period',
+  'acct.col.goal': 'Progress',
   'acct.col.confirmed': 'Confirmed',
   'acct.col.state': 'State',
   'acct.col.notes': 'Notes',
@@ -837,8 +845,8 @@ module.exports = {
   'dash.greet.afternoon': 'Good afternoon',
   'dash.greet.evening': 'Good evening',
   'dash.greet.line': '{greeting}, {name}',
-  'dash.hero.remaining': 'Remaining this period',
-  'dash.hero.overspent': 'Overspent this period',
+  'dash.hero.remaining': 'Budget remaining this period',
+  'dash.hero.overspent': 'Over budget this period',
   'dash.hero.sub': '{spent} spent of {budgeted} budgeted',
   'dash.stat.income': 'Total Income',
   'dash.stat.budgeted': 'Budgeted',
@@ -1029,6 +1037,7 @@ module.exports = {
   'score.win.spending': 'Your outgoings leave room to breathe — you are not living at the edge of what comes in.',
   'score.win.wealth': 'What you own has grown well past what you owe. That is the part that compounds quietly.',
   'score.now.reserves': 'Now: {months} months covered · {amount} set aside · goal {target} months',
+  'score.now.reserves.essentials': 'Essentials average {amount} a month.',
   'score.now.saving': 'Now: {pct} of income saved · {amount} a month',
   'score.now.savingDown': 'Now: drawing {amount} a month out of savings, not adding to it',
   'score.now.debt': 'Now: {pct} of income going to interest',
@@ -1037,6 +1046,7 @@ module.exports = {
   'score.now.budget': 'budget used {pct}',
   'score.now.wealth': 'Now: {amount} net worth · {times}× a year of income',
   'score.how.reserves': 'Money set aside that could carry the household with no income, counted in months of essential spending.',
+  'score.how.reserves.essentialDef': '"Essential" excludes luxuries, giving, savings, investment, income and transfers, plus anything added under Settings → Non-essential groups.',
   'score.how.saving': 'What reaches your savings and investments each month, as a share of what you earn.',
   'score.how.debt': 'What debt costs you — interest, and the repayments you are committed to.',
   'score.how.spending': 'How much of your income is promised before you decide anything, what living costs, and whether you stay inside your own budget.',
@@ -1070,6 +1080,7 @@ module.exports = {
   'score.flow.ariaLabel': 'Income of {income} splits into {committed} committed and fixed bills, {living} living costs, {saving} saving, and {notYetSpent} not yet spent.',
   'score.flow.chip.committed': 'Inside committed',
   'score.flow.committed.empty': 'No categories are marked fixed yet — set fixed: true at the top of the category file (rent, debt repayments, policies) and this will fill in.',
+  'score.flow.committed.empty.scoreNote': 'This also feeds a third of the Spending part of your Score — until something is flagged fixed, that part reads as if you have no fixed bills at all.',
   'score.flow.chip.debtRepayments': 'Debt repayments',
   'score.flow.chip.ofWhichInterest': '…of which interest',
   'score.flow.chip.housing': 'Housing & utilities',
@@ -1092,7 +1103,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': 'What\'s left this period',
+  'shell.dash.left': 'Money left this period',
   'dash.left.sub': 'Before this period ends on {date}',
   'dash.left.nowSub': 'Money you have right now',
   'dash.left.notNow': 'This card measures the money you have right now, so it only reads true for the period you are in. Switch to {period} to see it.',

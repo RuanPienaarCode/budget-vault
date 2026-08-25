@@ -309,6 +309,12 @@ module.exports = {
   'wiz.failed': 'Opstelling het misluk: {error}',
 
   /* ============================== Budget page ============================= */
+  'bud.fresh.title': 'Nuwe tydperk — nog niks begroot nie',
+  'bud.fresh.body': {
+    one: '{period} het {count} kategorie begroot gehad — kopieer dit oor, of begin vars.',
+    other: '{period} het {count} kategorieë begroot gehad — kopieer hulle oor, of begin vars.',
+  },
+
   'bud.shape.title': 'Jou ander begrotings is steeds hier',
   'bud.shape.body': {
     one: '{count} begrotingslêer is onder \'n ander tydperklengte gestoor — dit is Budgets/{newest}.md. Dit bly in jou kluis, en dit kom terug sodra jy die tydperklengte terugstel. Bedrae begin hier leeg omdat hierdie tydperk nie dieselfde lengte is as daardie een nie.',
@@ -356,7 +362,7 @@ module.exports = {
   'bud.assumed.missing': 'Geen kategorie genaamd {category} nie',
   'bud.assumed.noFile': 'Kon nie die notas vir {category} lees nie',
 
-  'bud.pull.label': 'Haal oorbesteding',
+  'bud.pull.label': 'Vul uit oorbesteding',
   'bud.pull.title': { one: 'Vul dit in uit die oorbesteding {lag} tydperk terug', other: 'Vul dit in uit die oorbesteding {lag} tydperke terug' },
   'bud.pull.none': '{period} het nie oorbestee nie — dit het {amount} oor geëindig',
   'bud.pull.confirmTitle': 'Haal vorige oorbesteding',
@@ -401,13 +407,14 @@ module.exports = {
   'tx.col.account': 'Rekening',
   'tx.col.category': 'Kategorie',
   'tx.col.amount': 'Bedrag',
-  'tx.col.excl': 'Uitgesl.',
+  'tx.col.excl': 'Uitgesl. begr.',
   'tx.col.note': 'Nota',
   'tx.col.split': 'Verdeel',
   'tx.col.actions': 'Ryaksies',
 
   'tx.aria.category': 'Kategorie vir {date} {desc}',
   'tx.aria.exclude': 'Sluit {desc} uit begrotingstotale uit',
+  'tx.title.excl': 'Net uit die begrotingstotale — die geld het steeds beweeg, en alles wat hierdie rekening meet, tel dit steeds.',
   'tx.aria.note': 'Nota vir {date} {desc}',
   'tx.aria.split': 'Verdeel {date} {desc} in kategorieë',
   'tx.title.split': 'Verdeel in kategorieë',
@@ -537,12 +544,12 @@ module.exports = {
   'acct.balance.updatedDrift': { one: 'Saldo van {name} is gestoor — maar {count} ry sedert daardie datum verskil met {amount}. Maak die rekening oop om dit te sien.', other: 'Saldo van {name} is gestoor — maar {count} rye sedert daardie datum verskil met {amount}. Maak die rekening oop om hulle te sien.' },
   'acct.balance.unreadable': 'Kon nie "{raw}" lees nie — tik om reg te maak',
   'acct.reconciled': '{name} is na {amount} gerekonsilieer',
-  'acct.err.nan': 'Nie \'n getal nie',
-  'acct.err.type': 'Ongeldige tipe',
+  'acct.err.nan': '{field} is nie \'n getal nie — probeer \'n gewone syfer soos {example}.',
+  'acct.err.type': '{field} is nie geldig nie — kies een uit die lys, bv. {example}.',
   'acct.err.notNumber': '{field} is nie \'n getal nie',
   'acct.err.nameRequired': 'Rekeningnaam is verpligtend',
   'acct.err.exists': 'Rekening bestaan reeds',
-  'acct.err.save': 'Kon nie {name} stoor nie ({error})',
+  'acct.err.save': 'Kon nie {name} stoor nie ({error}) — niks is na die lêer geskryf nie; probeer weer.',
 
   'acct.edit.title': 'Wysig rekening — {name}',
   'acct.new.title': 'Nuwe rekening',
@@ -583,6 +590,7 @@ module.exports = {
   'acct.field.investedOpt': 'Totaal belê (opsioneel)',
   'acct.field.investedDesc': 'Wat jy ingesit het, sodat groei daarteen gewys kan word.',
   'acct.field.starting': 'Beginbedrag',
+  'acct.field.startingDesc': 'Wat die rekening op sy begindatum gehou het, sodat die Spaargeld-bladsy kan onderskei wat jy ingesit het van wat dit gegroei het. Los dit leeg en die Groei-teël daar het niks om van te meet nie en lees as \'n streep.',
   'acct.field.opened': 'Geopen op',
 
   'acct.budget.on': '{name} tel weer by die begroting',
@@ -726,8 +734,8 @@ module.exports = {
   'acct.table.sortedBy': ' · gesorteer volgens {column}',
   'acct.col.account': 'Rekening',
   'acct.col.balance': 'Saldo',
-  'acct.col.month': 'Maand',
-  'acct.col.goal': 'Doel / limiet',
+  'acct.col.month': 'Tydperk',
+  'acct.col.goal': 'Vordering',
   'acct.col.confirmed': 'Bevestig',
   'acct.col.state': 'Stand',
   'acct.col.notes': 'Notas',
@@ -802,8 +810,8 @@ module.exports = {
   'dash.greet.afternoon': 'Goeie middag',
   'dash.greet.evening': 'Goeie aand',
   'dash.greet.line': '{greeting}, {name}',
-  'dash.hero.remaining': 'Nog oor hierdie tydperk',
-  'dash.hero.overspent': 'Oorbestee hierdie tydperk',
+  'dash.hero.remaining': 'Begroting nog oor hierdie tydperk',
+  'dash.hero.overspent': 'Oor begroting hierdie tydperk',
   'dash.hero.sub': '{spent} bestee van {budgeted} begroot',
   'dash.stat.income': 'Totale inkomste',
   'dash.stat.budgeted': 'Begroot',
@@ -969,6 +977,7 @@ module.exports = {
   'score.win.spending': 'Jou uitgawes laat ruimte om asem te haal — jy leef nie op die rand van wat inkom nie.',
   'score.win.wealth': 'Wat jy besit het ver verby wat jy skuld gegroei. Dit is die deel wat stilweg saamgestel word.',
   'score.now.reserves': 'Nou: {months} maande gedek · {amount} eenkant · doel {target} maande',
+  'score.now.reserves.essentials': 'Noodsaaklikhede beloop gemiddeld {amount} per maand.',
   'score.now.saving': 'Nou: {pct} van inkomste gespaar · {amount} per maand',
   'score.now.savingDown': 'Nou: {amount} per maand word uit spaargeld onttrek, nie bygevoeg nie',
   'score.now.debt': 'Nou: {pct} van inkomste gaan na rente',
@@ -977,6 +986,7 @@ module.exports = {
   'score.now.budget': 'begroting gebruik {pct}',
   'score.now.wealth': 'Nou: {amount} netowaarde · {times}× een jaar se inkomste',
   'score.how.reserves': 'Geld eenkant gesit wat die huishouding sonder inkomste kan dra, getel in maande se noodsaaklike uitgawes.',
+  'score.how.reserves.essentialDef': '"Noodsaaklik" sluit weelde-items, gawes, spaargeld, beleggings, inkomste en oorplasings uit, plus enigiets wat onder Instellings → Nie-noodsaaklike groepe bygevoeg is.',
   'score.how.saving': 'Wat elke maand jou spaargeld en beleggings bereik, as aandeel van wat jy verdien.',
   'score.how.debt': 'Wat skuld jou kos — rente, en die paaiemente waartoe jy verbind is.',
   'score.how.spending': 'Hoeveel van jou inkomste reeds belowe is voordat jy besluit, wat lewe kos, en of jy binne jou eie begroting bly.',
@@ -1010,6 +1020,7 @@ module.exports = {
   'score.flow.ariaLabel': 'Inkomste van {income} verdeel in {committed} vasgelegde en vaste rekeninge, {living} lewenskoste, {saving} spaar, en {notYetSpent} nog nie bestee nie.',
   'score.flow.chip.committed': 'Binne die vasgelegde bedrag',
   'score.flow.committed.empty': 'Geen kategorie is nog as vas gemerk nie — stel fixed: true boaan die kategorielêer (huur, skuldpaaiemente, polisse) en dit sal invul.',
+  'score.flow.committed.empty.scoreNote': 'Dit voed ook \'n derde van die Besteding-deel van jou Telling — totdat iets as vas gemerk is, lees daardie deel asof jy glad geen vaste rekeninge het nie.',
   'score.flow.chip.debtRepayments': 'Skuldpaaiemente',
   'score.flow.chip.ofWhichInterest': '…waarvan rente',
   'score.flow.chip.housing': 'Behuising en nutsdienste',
@@ -1032,7 +1043,7 @@ module.exports = {
 
 
   /* --------------------- what's left + comparison ------------------- */
-  'shell.dash.left': 'Wat oor is hierdie tydperk',
+  'shell.dash.left': 'Geld oor hierdie tydperk',
   'dash.left.sub': 'Voor hierdie tydperk op {date} eindig',
   'dash.left.nowSub': 'Geld wat jy nou het',
   'dash.left.notNow': 'Hierdie kaart meet die geld wat jy nou het, dus lees dit net waar vir die tydperk waarin jy is. Skakel oor na {period} om dit te sien.',

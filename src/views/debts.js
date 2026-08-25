@@ -11,7 +11,7 @@ const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
-const { activeDebts } = require('../worth');
+const { activeDebts, cardOverlap } = require('../worth');
 const { todayIso } = require('../dates');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
@@ -374,6 +374,41 @@ module.exports = function registerDebts(ctx) {
     wrap.append(note);
   }
 
+  /* worth.js's cardOverlap() — a credit card honestly tracked as BOTH an
+     account and a debt-page row, which double-counts it in net worth — was
+     already surfaced on the Dashboard and on the Savings worth chart, but not
+     here, on one of the two pages that actively invites the double-entry: add
+     a debt below and nothing stops it being the same Visa already sitting in
+     Accounts. Read fresh on every render rather than cached, same as the
+     other two call sites, since either ledger can change under it.
+
+     No dedicated container exists in shell.js for this page (unlike the
+     Dashboard's #dashPositionNote), so the note manages its own insertion
+     point — found by its class and replaced whole on every render, the same
+     idempotent redraw every other section of this file uses via `.empty()`
+     on an id it owns. */
+  function renderDebtOverlap() {
+    const t = $('#debtTable');
+    const tableWrap = t.closest('.table-responsive');
+    const container = tableWrap && tableWrap.parentNode;
+    if (!container) return;                        // shell without this card mounted
+    const existing = container.querySelector('.debt-card-overlap');
+    if (existing) existing.remove();
+
+    const overlap = cardOverlap(S.accounts, S.debts);
+    if (!overlap) return;
+
+    const note = el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+      `Credit-card accounts tracked: ${overlap.cardAccounts} · card debts tracked: ${overlap.cardDebts} — ` +
+      'if the same card is on both, it is counted twice in net worth.');
+    const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
+      'aria-label': 'Review credit-card accounts on the Accounts page' }, 'Review accounts');
+    btn.addEventListener('click', () => ctx.switchView('accounts'));
+
+    container.insertBefore(
+      el('div', { class: 'debt-card-overlap', style: 'margin-bottom:12px' }, note, btn), tableWrap);
+  }
+
   /* ------------------------------ the table ------------------------------
      focusRow: index into S.debts whose status pill should get focus back after
      the rebuild. An index rather than a name — two debts can share one, and
@@ -382,6 +417,7 @@ module.exports = function registerDebts(ctx) {
     renderDebtKpis();
     renderDebtPlan();
     renderDebtPayments();
+    renderDebtOverlap();
 
     const t = $('#debtTable');
     keepScroll(t, () => {
@@ -405,7 +441,16 @@ module.exports = function registerDebts(ctx) {
         el('th', { scope: 'col' }, 'Category'),
         el('th', { scope: 'col' }, paidOffHeader),
         el('th', { scope: 'col' }, 'Clear by'),
-        el('th', { scope: 'col', class: 'num' }, 'Interest left'),
+        // "Interest left" on its own reads as ambiguous on a table already full
+        // of adjacent money columns (Balance, Payment, Extra) — the title names
+        // what it actually is: interest still to be paid, not interest already
+        // paid or a balance figure. A tooltip rather than a longer visible label
+        // because the header row is already eleven columns wide on a table that
+        // scrolls horizontally on a phone; every other header here stays terse
+        // for the same reason (Payment, Extra / month, Clear by).
+        el('th', { scope: 'col', class: 'num',
+          title: 'Total interest still to be paid before this debt clears, at the balance, rate and payment as entered' },
+        'Interest left'),
         el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
