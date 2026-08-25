@@ -3,6 +3,53 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.26.1 — 2026-08-25
+
+### Fixed
+
+- **Typing 0 into "Total invested" no longer disappears on the next save.**
+  Zero is a real baseline — an account opened empty and funded entirely by
+  transfer — and the maths has honoured it for a while. But saving any other
+  field on that account (a new owner, a renamed institution) silently deleted
+  the key from the file, and the growth figure went from a real number to
+  nothing with no message. This is the same bug `starting_amount` had, fixed
+  the same way, and this time a test stands guard over both save paths.
+
+- **A savings account typed `Savings` instead of `savings` now counts
+  everywhere, not just in some places.** The score's ring folded the case;
+  the "Where the money went" card on the same screen did not — so one capital
+  letter in a note's frontmatter could make the ring count a contribution the
+  card reported as R0. Both now read the type the same way.
+
+- **Growth now shows for accounts measured from a starting amount.** An
+  investment set up the recommended way — a starting amount and an inception
+  date, no running total — had its growth computed and then hidden, because
+  the display only checked for the running total. The gate now asks the right
+  question: is there a real figure to show?
+
+- **"+0% growth" is no longer claimed where no honest percentage exists.**
+  When withdrawals exceed what went in, a percentage against that base is
+  noise, and the maths refuses to state one — but the Accounts page was
+  quietly substituting 0%. It now shows a dash, like everywhere else that
+  declines to guess.
+
+- **Break-even totals no longer show "−R0,00".** A group or owner whose
+  balances cancel to zero could leave a trillionth-of-a-cent float remainder
+  that rendered as negative zero in warning red — on the ring, the table's
+  group totals, and the owner split. All three now round to the cent and
+  collapse the sign, the same rule the net-worth figure has always used.
+
+- **Small edit-form honesty fixes.** A starting amount of 0 stays visible in
+  the edit form instead of vanishing from it; fixing an unreadable balance no
+  longer pre-fills "0.00" (one reflexive Enter used to overwrite the original
+  text the app had carefully preserved).
+
+- **Two messages that only spoke English now speak all nine languages** (the
+  "account updated" and "account created" toasts), and the Dashboard's
+  emergency tile now distinguishes "no spending history yet" from "no
+  essential spending recorded" instead of blaming missing income history for
+  both.
+
 ## 1.26.0 — 2026-08-25
 
 ### Fixed
