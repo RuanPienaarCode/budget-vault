@@ -8,7 +8,7 @@ const { typeOrder, typeRank } = require('../groups');
 const i18n = require('../i18n');
 const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
-const { scoreBand, SCORE_BANDS, FULL_MARKS } = require('../health-math');
+const { scoreBand } = require('../health-math');
 const { todayIso } = require('../dates');
 const { allocatedShare } = require('../money-flow');
 const { worth, cardOverlap } = require('../worth');
@@ -183,8 +183,20 @@ module.exports = function registerDashboard(ctx) {
         [H.months.toFixed(1).replace('.', locale().decimal), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
         i18n.t('dash.health.months'),
         i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }), 'accounts')
+      /* `months` (health-math.js) goes null in two different situations that
+         `needHistory` used to say the same thing about: no counted trailing
+         period at all (H.countedPeriods === 0 — genuinely no income history
+         yet, needHistory is right), OR six real periods counted with essential
+         spend of EXACTLY ZERO in every one of them (H.monthlyEssential === 0 —
+         every category this household spent from is typed something other than
+         essential). The second case is not a history problem; more months would
+         not fix it. Distinguished on H.countedPeriods rather than re-deriving
+         "was every period essential-free" here, because health-math.js already
+         computed and named that condition once (avg.essential === 0). */
       : fig('', '—', i18n.t('dash.health.months'),
-        earmarks.any ? i18n.t('dash.health.needHistory') : i18n.t('dash.health.setup'), 'accounts');
+        !earmarks.any ? i18n.t('dash.health.setup')
+          : H.countedPeriods > 0 && H.monthlyEssential === 0 ? i18n.t('dash.health.noEssential')
+            : i18n.t('dash.health.needHistory'), 'accounts');
     if (H.months !== null) {
       const fill = Math.min(100, (H.months / target) * 100);
       /* The same bar component the budget table fills, and the same three

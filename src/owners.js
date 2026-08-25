@@ -148,7 +148,14 @@ function netByOwner(accounts, declared = []) {
     row.net += a.balance;
     row.count++;
   }
-  return [...rows.values()].sort((x, y) => {
+  const out = [...rows.values()];
+  /* Rounded to the cent, then `|| 0` collapses -0 — the same two-step
+     worth.js:91 applies to net worth, for the same reason: summing signed
+     floats leaves a remainder like -7.1e-15 behind on an owner whose accounts
+     are exactly break-even, and read raw that renders a solvent owner's row as
+     "−R0,00" in danger red on the Accounts page. */
+  for (const row of out) { row.net = (Math.round(row.net * 100) / 100) || 0; }
+  return out.sort((x, y) => {
     // Unassigned last, whatever it is called: it is the absence of an answer,
     // not one of the answers.
     if (!x.key !== !y.key) return x.key ? -1 : 1;

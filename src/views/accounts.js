@@ -87,6 +87,16 @@ module.exports = function registerAccounts(ctx) {
   const acctMoney = (a, v, decimals = 2) =>
     ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
 
+  /* Round to the cent, then collapse -0 — the same two-step worth.js:91 applies
+     to its own net figure, for the same reason: summing signed floats leaves a
+     remainder like -7.1e-15 behind on an exact break-even group, and read raw
+     that renders a group holding nothing net as "−R0,00" in danger red. This
+     page sums account balances in three places (the ring's per-group totals,
+     the table's group-total rows) that worth.js itself never touches — it only
+     ever sees the household-wide figure — so the same rule is repeated here
+     rather than imported. */
+  const roundedSum = accts => (Math.round(accts.reduce((s, a) => s + a.balance, 0) * 100) / 100) || 0;
+
   /* Is this account's balance a cell the loader could not read AT ALL — as
      opposed to one merely written in a non-canonical format (a decimal comma,
      grouped thousands) that normalizeAmount reads correctly and load.js still
@@ -186,7 +196,15 @@ module.exports = function registerAccounts(ctx) {
     if (a) for (const k of ALL_OPTIONAL) if (hasValue(a[k])) set.add(k);
     return ALL_OPTIONAL.filter(k => set.has(k));
   }
-  const hasValue = v => v != null && String(v).trim() !== '' && v !== 0;
+  /* 0 IS a value here, same rule as FM_WRITERS.starting_amount and
+     FM_WRITERS.total_invested above: null, undefined and '' are the only
+     "unset" states this app recognises for a number. Under the old `v !== 0`
+     test, an account holding a deliberately typed `starting_amount: 0` had
+     that field hidden the moment its type left the create form's default set —
+     the very value fieldsForType's own header promises stays visible so the
+     reader can "clear it deliberately if that is what they meant" could not be
+     seen at all, let alone cleared. */
+  const hasValue = v => v != null && String(v).trim() !== '';
 
   /* Frontmatter key → the line to write for this account's current value, or
      null to REMOVE the key. saveAccount only patches the keys it is handed, so
@@ -223,7 +241,14 @@ module.exports = function registerAccounts(ctx) {
     goal_amount: a => (a.goal_amount ? a.goal_amount.toFixed(2) : null),
     target_date: a => a.target_date || null,
     monthly_contribution: a => (a.monthly_contribution ? a.monthly_contribution.toFixed(2) : null),
-    total_invested: a => (a.total_invested ? a.total_invested.toFixed(2) : null),
+    /* `!= null`, not truthy — same fix, same reasoning as `starting_amount`
+       immediately below: savings-math.js:278-286 documents a `total_invested: 0`
+       as a real baseline (basis 'stated'), not an absent figure. Under the old
+       truthy test, saving an account with an explicitly typed 0 REMOVED the key
+       — the next load read no total_invested at all, basis fell back to 'none',
+       and the card that had just shown "Growth on R0" offered "Add invested
+       amount" again. */
+    total_invested: a => (a.total_invested != null ? a.total_invested.toFixed(2) : null),
     /* `!= null`, not truthy, because ZERO IS A REAL BASELINE here and the rest
        of these keys is not the same case. savings-math.js says so outright: an
        account opened empty and funded entirely by transfer has
@@ -315,8 +340,17 @@ module.exports = function registerAccounts(ctx) {
        argues; it does not correct. */
     const before = reconcile(a, (accountIndex().get(a) || {}).rows || [], todayIso());
     const impliedNow = before && before.implied !== undefined ? before.implied : a.balance;
+    /* An unreadable balance (see unreadableBalance() above) is a fabricated
+       zero load.js's parseNum fallback produced, never a real figure — so it
+       must not be offered back as the starting point for this field. Pre-filled
+       with `a.balance.toFixed(2)` it read "0.00", and the ONE Enter keystroke a
+       reader uses to accept every other field on this dialog silently overwrote
+       the raw text the loader had preserved (a.balanceRaw) with that fabricated
+       zero. Blank is the honest starting point: the reader types the real
+       figure, same as they would for a brand-new account. */
+    const balancePrefill = unreadableBalance(a) ? '' : a.balance.toFixed(2);
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
-      { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: a.balance.toFixed(2),
+      { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: balancePrefill,
         // Which currency the figure being typed is IN. Nothing converts it, so
         // the symbol is the only thing telling the reader what they are
         // entering — and on a euro account that is the whole question.
@@ -567,7 +601,7 @@ module.exports = function registerAccounts(ctx) {
     // ctx.render, not renderAccounts: a type change moves the account between
     // groups here AND changes whether Savings & Investments shows it at all.
     ctx.render();
-    toast(`${a.name} updated`);
+    toast(i18n.t('acct.toast.updated', { name: a.name }));
   }
 
   async function toggleBudget(a) {
@@ -840,7 +874,7 @@ module.exports = function registerAccounts(ctx) {
       return {
         key,
         colour: GROUP_COLOUR[key] || 'var(--color-accent)',
-        total: accts.reduce((s, a) => s + a.balance, 0),
+        total: roundedSum(accts),
         /* Same disclosure the hero and the table's group rows carry — see
            currency.js's own header for why this is never a conversion. */
         mixed: currenciesIn(accts, S.settings.currency).length > 1,
@@ -1229,7 +1263,14 @@ module.exports = function registerAccounts(ctx) {
       const shown = Math.min(100, Math.max(0, pct));
       return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(shown), amount: acctMoney(a, a.goal_amount, 0) }));
     }
-    if (a.total_invested > 0) {
+    /* r.tr.basis !== 'none', not `a.total_invested > 0` — the old gate hid this
+       whole branch from an account on basis 'measured' (starting_amount +
+       inception_date, no total_invested at all — the account type this cell's
+       own header calls "measured against real accounts") and from one on basis
+       'stated' at an explicit total_invested of 0, which A1 above made a real,
+       reachable state. Both have a growth figure totalReturn() is willing to
+       state; the old test just never asked it. */
+    if (r.tr && r.tr.basis !== 'none') {
       /* totalReturn(), not `balance - total_invested` — see savings-math.js's
          own header for why that formula was retired: measured against real
          accounts it was wrong on all four, most starkly wherever a debit
@@ -1238,12 +1279,15 @@ module.exports = function registerAccounts(ctx) {
          so the two cannot disagree with each other the way the goal cell and
          views/savings.js's own tile used to. */
       const tr = r.tr;
-      /* `basis === 'none'` is the case totalReturn cannot measure at all — real
-         transactions exist for this account with no starting_amount to split
-         them against, so ANY number here would be a guess wearing the
-         confidence of a percentage. Nothing is better than a wrong number. */
-      if (tr.basis === 'none') return el('span', { class: 'acct-dash' }, '—');
-      const pct = tr.capitalIn > 0 ? (tr.growth / tr.capitalIn) * 100 : 0;
+      /* tr.returnPct, not a local re-derivation — totalReturn() (savings-math.js)
+         deliberately returns null here when capitalIn <= 0, because a percentage
+         with nothing paid in to divide by is not a number this app can defend.
+         This cell used to recompute its own `pct` with a `capitalIn > 0 ? … : 0`
+         fallback, which silently printed "+0%" in exactly the case the maths
+         module refuses to answer at all — the same account showing a real growth
+         bar in the drawer beside a dash-free 0% in the table. */
+      if (tr.returnPct === null) return el('span', { class: 'acct-dash' }, '—');
+      const pct = tr.returnPct;
       return bar(100, pct < 0 ? 'bg-warning' : '',
         i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: acctMoney(a, tr.capitalIn, 0) }));
     }
@@ -1380,12 +1424,19 @@ module.exports = function registerAccounts(ctx) {
       f(i18n.t('acct.drawer.goal'), acctMoney(a, a.goal_amount));
       f(i18n.t('acct.drawer.toGo'), acctMoney(a, Math.max(0, a.goal_amount - a.balance)));
     }
-    if (a.total_invested > 0) {
-      f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
-      /* r.tr, not `balance - total_invested` — same fix and same reasoning as
-         goalCell() above, sharing the one totalReturn() call model() already
-         made for this account. */
-      f(i18n.t('acct.drawer.growth'), r.tr.basis === 'none' ? '—' : acctMoney(a, r.tr.growth));
+    /* r.tr.basis !== 'none', not `a.total_invested > 0` — same fix and same
+       reasoning as goalCell() above: the old gate hid Growth from an account on
+       basis 'measured' (starting_amount, no total_invested at all) and from one
+       on basis 'stated' at an explicit total_invested of 0 (a real baseline
+       since A1). "Total invested" stays keyed to `a.total_invested` itself
+       rather than r.tr.capitalIn — it is naming a specific frontmatter figure,
+       and showing it for a 'measured' account that never had one would put a
+       number under a label the account's own file does not support. */
+    if (r.tr && r.tr.basis !== 'none') {
+      if (a.total_invested != null) {
+        f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
+      }
+      f(i18n.t('acct.drawer.growth'), acctMoney(a, r.tr.growth));
     }
     if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), acctMoney(a, a.monthly_contribution));
     if (r.act.count) {
@@ -1670,7 +1721,7 @@ module.exports = function registerAccounts(ctx) {
         for (const [key] of ACCT_GROUPS) {
           const inGroup = shown.filter(r => r.group === key);
           if (!inGroup.length) continue;
-          const total = inGroup.reduce((s, r) => s + r.a.balance, 0);
+          const total = roundedSum(inGroup.map(r => r.a));
           /* Same disclosure as the hero, at group scale: a Bank total that has
              quietly added euros to rands is marked where the total is, not in a
              legend somewhere else on the page. */
@@ -1831,9 +1882,10 @@ module.exports = function registerAccounts(ctx) {
     if (a.goal_amount) lines.push(`goal_amount: ${a.goal_amount.toFixed(2)}`);
     if (a.target_date) lines.push(`target_date: ${a.target_date}`);
     if (a.monthly_contribution) lines.push(`monthly_contribution: ${a.monthly_contribution.toFixed(2)}`);
-    if (a.total_invested) lines.push(`total_invested: ${a.total_invested.toFixed(2)}`);
-    // != null, for the reason spelled out at FM_WRITERS.starting_amount above:
-    // 0 is a baseline the maths module honours, not an absent key.
+    // != null, for the reason spelled out at FM_WRITERS.total_invested and
+    // FM_WRITERS.starting_amount above: 0 is a baseline the maths module
+    // honours, not an absent key.
+    if (a.total_invested != null) lines.push(`total_invested: ${a.total_invested.toFixed(2)}`);
     if (a.starting_amount != null) lines.push(`starting_amount: ${a.starting_amount.toFixed(2)}`);
     if (a.inception_date) lines.push(`inception_date: ${a.inception_date}`);
     if (a.tx_label) lines.push(`tx_label: ${yamlStr(a.tx_label)}`);
@@ -1963,7 +2015,7 @@ module.exports = function registerAccounts(ctx) {
     S.accounts.push(acct);
     S.accounts.sort((a, b) => a.name.localeCompare(b.name));
     ctx.render();   // not renderAccounts — three other pages have this button too
-    toast(`Created Accounts/${name}.md`);
+    toast(i18n.t('acct.toast.created', { path: `Accounts/${name}.md` }));
     return acct;
   }
 

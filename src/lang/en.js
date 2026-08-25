@@ -585,6 +585,8 @@ module.exports = {
   'acct.balance.updatedDrift': { one: '{name} balance saved — but {count} row since that date differs by {amount}. Open the account to see it.', other: '{name} balance saved — but {count} rows since that date differ by {amount}. Open the account to see them.' },
   'acct.balance.unreadable': 'Could not read "{raw}" — click to fix',
   'acct.reconciled': '{name} reconciled to {amount}',
+  'acct.toast.updated': '{name} updated',
+  'acct.toast.created': 'Created {path}',
   'acct.err.nan': '{field} isn\'t a number — try a plain figure like {example}.',
   'acct.err.type': '{field} isn\'t valid — pick one from the list, e.g. {example}.',
   'acct.err.notNumber': '{field} is not a number',
@@ -991,6 +993,7 @@ module.exports = {
      reads as the app admitting it has no UI for its own feature. */
   'dash.health.setup': 'Mark a savings account as your Emergency fund on the Accounts page to start tracking this',
   'dash.health.needHistory': 'needs income history',
+  'dash.health.noEssential': 'no essential spending recorded to measure this against',
   'dash.health.over': '{name} earmarks more than it holds',
   'dash.health.savings': 'of income saved',
   'dash.health.savingDown': '{amount} a month coming out',

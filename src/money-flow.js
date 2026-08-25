@@ -169,7 +169,21 @@ function periodFlow({
 
   /* This month's interest bill on the active book — the SAME figure
      health-data.js hands the score's debt pillar (debtInterestMonthly). It
-     is a subset of `debtRepayments`, never an addend on top of it: an
+     is recomputed here rather than threaded through from healthSnapshot():
+     score.js's renderScore() calls renderFlowCard() (which reaches this
+     function via buildFlow()) BEFORE it calls healthSnapshot() for the
+     breakdown below it, so the snapshot carrying health-data.js:308's own
+     debtInterest does not exist yet at the point this file needs it. Passing
+     it in would mean either reordering renderScore() around a card that is
+     deliberately independent of the trailing-average snapshot (see buildFlow's
+     own header) or calling healthSnapshot() a second time per render — this
+     is the audit's own "leave a comment, not a refactor" case. debtInterestMonthly
+     is a pure function of S.debts with no other input, so the two calls give
+     the same answer today; if that function ever grows a second argument (a
+     date, a rate override) THIS call site and health-data.js:308 must be
+     updated together or the two figures on this page will drift apart again.
+
+     It is a subset of `debtRepayments`, never an addend on top of it: an
      instalment already covers interest before principal, so "of which
      interest" is capped at the repayment line it sits under rather than
      ever printing larger than its own parent. */

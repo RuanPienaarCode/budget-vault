@@ -627,6 +627,18 @@ module.exports = function registerScore(ctx) {
          the magnitude positive. The pillar scores 0 either way, so nothing
          about the number in the ring moves; this is only about the sentence
          under it not contradicting itself. */
+      /* 2026-08-25: UNREACHABLE as of the 1.23.1 netting revert — M.monthlySavings
+         is health-data.js's six-period average of savedFromOutside(), which sums
+         only positive inflows arriving from OUTSIDE the pool (see that function's
+         own header for why netting every outflow against them was tried and
+         reverted). A sum of non-negative rows divided by a positive period count
+         cannot be negative, so this branch never fires today. Left in place, and
+         the i18n keys with it: this is load-bearing again the moment savedFromOutside
+         goes back to netting outflows, which its own header names as a real
+         temptation ("a sinking fund doing its job" reads as dis-saving under that
+         rule) — deleting the dead branch now would silently reintroduce the bug
+         this file's own comment above already warns "-19% of income saved" is not
+         a sentence that can be true. */
       if (M.monthlySavings < 0) {
         return i18n.t('score.now.savingDown', { amount: money(Math.abs(M.monthlySavings), 0) });
       }
@@ -697,7 +709,19 @@ module.exports = function registerScore(ctx) {
        The window differs on purpose — this card is one period, the ring is six
        — but the MEASURE must not, or the two are not comparable at all. */
     const idx = accountIndex();
-    const savers = S.accounts.filter(a => a.type === 'savings' || a.type === 'investment');
+    /* Case-folded and trimmed against the account's own type, not compared
+       raw — the exact trap health-data.js:147-148 (POOL_TYPES) already names:
+       `load.js` only defaults `type` when the key is ABSENT, so a hand-typed
+       `type: Savings` reached here exactly as written and dropped out of this
+       card's saver pool while the score ring two lines below (buildFlow calls
+       into health-data.js) kept counting the same account — the flow card and
+       the ring disagreeing about the same period on the same screen. Kept as
+       its own copy here rather than a shared helper, same as views/savings.js's
+       own `typeIs` — health-data.js and this file are siblings, not a shared
+       module, and each carries this comment for a reader who lands in only one
+       of them. */
+    const savers = S.accounts.filter(a =>
+      ['savings', 'investment'].includes(String((a && a.type) || '').trim().toLowerCase()));
     const saverLabels = new Map();
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
