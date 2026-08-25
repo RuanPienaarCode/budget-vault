@@ -3,6 +3,58 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+- **Your savings score could read zero while you were saving well.** 1.23.1
+  started subtracting what came out of savings from what went in. That is right
+  for money shuffled between your own accounts and wrong for a sinking fund: if
+  you save into a car fund and then service the car, spending it is the fund
+  working, not a failure to save. On one household it wiped out R12 022 a month
+  of real spending against R13 474 a month of real saving and reported nothing
+  saved at all.
+
+  The rate now counts money arriving in your savings from outside it, and
+  ignores money moving between your own savings accounts in either direction. A
+  transfer is recognised by its matching pair — the same amount leaving another
+  savings account within a few days — so it no longer counts twice, while
+  spending a fund you built on purpose no longer counts against you.
+
+  Money paid in and spent straight back out in the same window does still
+  count, because nothing in your files separates that from drawing on a fund
+  you built last year. The Savings page tells that story properly.
+
+- **Two numbers on the Dashboard were labelled almost identically.** "Remaining
+  this period" is how much BUDGET is left; the card right below it is how much
+  MONEY is left. They can differ enormously — R12 000 against R400 — and the
+  first is the one people act on. They now read "Budget remaining this period"
+  and "Money left this period".
+
+- **"Essential spending" is now explained where it is used.** It decides the
+  largest part of your score and appeared nowhere on screen; the page now says
+  what counts as essential and what yours averages a month.
+
+- **Clearing a budget row and deleting a category everywhere looked the same.**
+  Two icon buttons side by side, told apart only by a hover tooltip — which
+  does not exist on a phone. Different icons now, and the column is labelled.
+
+- **A new period says so.** When a period rolls over, the Budget page now names
+  what the previous one held and offers to copy it, instead of showing a full
+  list of categories at zero that looks exactly like a saved budget.
+
+- **Savings goals and growth no longer tell you to edit a file.** Both pointed
+  at a setting that has had a proper field for a long time; they now point at
+  the field, with a button to get there.
+
+- **A credit card entered as both an account and a debt is now flagged on the
+  two pages that invite it** — Accounts and Debt — not only on the two that
+  merely mention it.
+
+- **A brand-new vault no longer shows an empty ring under a R0,00 heading**, two
+  health tiles that looked like links now are, and several error messages that
+  named a problem now say what to do about it.
+
 ## 1.23.2 — 2026-08-24
 
 Six new kinds of test were added after the 1.23.0 audit, and they immediately
