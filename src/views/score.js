@@ -937,8 +937,8 @@ module.exports = function registerScore(ctx) {
        what the rows themselves would have shown. */
     const committedAllZero = flow.bands.committed <= 0.005;
     if (!hasFixedCats) {
-      /* Audit finding #2: nothing in the app SETS `fixed: true` — the empty
-         state already told the reader to edit the category file, but said
+      /* Audit finding #2: nothing in the app SET `fixed: true` — the empty
+         state told the reader to hand-edit the category file, but said
          nothing about the SCORE. `fixedShare` (health-math.js) is a third of
          the Spending pillar's own weight, so a household that never finds
          this setting is quietly losing points on a page they have never
@@ -946,7 +946,17 @@ module.exports = function registerScore(ctx) {
          score.flow.committed.empty.scoreNote added to lang/en.js and all six
          sibling tables, appended rather than folded into the existing
          score.flow.committed.empty key so that key's own callers elsewhere
-         are unaffected. */
+         are unaffected.
+
+         The YAML-editing half of that finding is now fixed too: the Budget
+         page (views/budgets.js) carries a per-row fixed-bill toggle, and
+         promptCreateCategory (categories.js) offers the same flag up front
+         when a category is created. score.flow.committed.empty's own COPY
+         was updated to point at the toggle instead of at hand-edited
+         frontmatter — this branch's logic (S.categories.some(c => c.fixed),
+         same read buildFlow()'s own fixedCats Set uses) needed no change:
+         it was always correct once something set the flag, it just had no
+         supported way to be set. */
       wrap.append(buildChipEmpty(i18n.t('score.flow.chip.committed'),
         `${i18n.t('score.flow.committed.empty')} ${i18n.t('score.flow.committed.empty.scoreNote')}`));
     } else if (!committedAllZero) {

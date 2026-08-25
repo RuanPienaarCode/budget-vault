@@ -363,6 +363,11 @@ module.exports = {
   'bud.assumed.missing': 'Keine Kategorie namens {category}',
   'bud.assumed.noFile': 'Die Notiz für {category} konnte nicht gelesen werden',
 
+  'bud.fixed.on': '{category} ist jetzt als feste, laufende Rechnung markiert',
+  'bud.fixed.off': '{category} ist nicht mehr als feste Rechnung markiert',
+  'bud.fixed.missing': 'Keine Kategorie namens {category}',
+  'bud.fixed.noFile': 'Die Notiz für {category} konnte nicht gelesen werden',
+
   'bud.pull.label': 'Aus Mehrausgabe füllen',
   'bud.pull.title': { one: 'Aus der Mehrausgabe von vor {lag} Zeitraum ausfüllen', other: 'Aus der Mehrausgabe von vor {lag} Zeiträumen ausfüllen' },
   'bud.pull.none': '{period} hatte keine Mehrausgabe — es endete {amount} im Plus',
@@ -379,6 +384,9 @@ module.exports = {
   'bud.aria.assume': 'Das Budget für {category} als bereits ausgegeben zählen',
   'bud.title.assumeOn': 'Dieses Budget als bereits ausgegeben zählen — dafür kommt keine Buchung',
   'bud.title.assumeOff': 'Diese Kategorie wieder an tatsächlichen Buchungen messen',
+  'bud.aria.fixed': '{category} als feste, laufende Rechnung markieren',
+  'bud.title.fixedOn': 'Als feste Rechnung markieren, die du zahlen musst — Miete, Ratenzahlungen, Policen',
+  'bud.title.fixedOff': 'Die Markierung als feste Rechnung entfernen',
   'bud.aria.delete': 'Kategorie {category} löschen',
   'bud.title.delete': 'Diese Kategorie überall löschen',
 
@@ -1020,7 +1028,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Einkommen von {income} teilt sich auf: {committed} Fixkosten & feste Rechnungen, {living} Lebenshaltung, {saving} Sparen und {notYetSpent} noch nicht ausgegeben.',
   'score.flow.chip.committed': 'Innerhalb der Fixkosten',
-  'score.flow.committed.empty': 'Noch keine Kategorie ist als fix markiert — setze fixed: true oben in der Kategoriendatei (Miete, Ratenzahlungen, Policen), dann füllt sich das.',
+  'score.flow.committed.empty': 'Noch keine Kategorie ist als fix markiert — nutze für jede den Fixkosten-Schalter auf der Budget-Seite (Miete, Ratenzahlungen, Policen), dann füllt sich das.',
   'score.flow.committed.empty.scoreNote': 'Das speist auch ein Drittel des Ausgaben-Teils deines Scores — solange nichts als fix markiert ist, liest sich dieser Teil, als hättest du gar keine Fixkosten.',
   'score.flow.chip.debtRepayments': 'Ratenzahlungen',
   'score.flow.chip.ofWhichInterest': '…davon Zinsen',

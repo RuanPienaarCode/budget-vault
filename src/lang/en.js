@@ -381,6 +381,15 @@ module.exports = {
   'bud.assumed.missing': 'No category called {category}',
   'bud.assumed.noFile': 'Could not read the note for {category}',
 
+  /* Fixed / committed bill: money the household cannot stop paying this
+     month — rent, debt repayments, policies. Its own toggle, mirroring
+     assume-spent's, for the same reason the flag itself is its own field
+     rather than derived from type — see load.js's `fixed` comment. */
+  'bud.fixed.on': '{category} is now marked as a fixed, committed bill',
+  'bud.fixed.off': '{category} is no longer marked as a fixed bill',
+  'bud.fixed.missing': 'No category called {category}',
+  'bud.fixed.noFile': 'Could not read the note for {category}',
+
   'bud.pull.label': 'Fill from overspend',
   /* Object form, not the '(s)' string this key carried before — but the
      call site (views/budgets.js:480, a teammate-owned file) passes `lag`
@@ -404,6 +413,9 @@ module.exports = {
   'bud.aria.assume': 'Count the budget for {category} as already spent',
   'bud.title.assumeOn': 'Count this budget as already spent — no transaction will arrive for it',
   'bud.title.assumeOff': 'Go back to measuring this category against actual transactions',
+  'bud.aria.fixed': 'Mark {category} as a fixed, committed bill',
+  'bud.title.fixedOn': 'Mark this as a fixed bill you are committed to pay — rent, debt repayments, policies',
+  'bud.title.fixedOff': 'Remove the fixed-bill flag',
   'bud.aria.delete': 'Delete category {category}',
   'bud.title.delete': 'Delete this category everywhere',
 
@@ -1079,7 +1091,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Income of {income} splits into {committed} committed and fixed bills, {living} living costs, {saving} saving, and {notYetSpent} not yet spent.',
   'score.flow.chip.committed': 'Inside committed',
-  'score.flow.committed.empty': 'No categories are marked fixed yet — set fixed: true at the top of the category file (rent, debt repayments, policies) and this will fill in.',
+  'score.flow.committed.empty': 'No categories are marked fixed yet — use the fixed-bill toggle on the Budget page for each one (rent, debt repayments, policies) and this will fill in.',
   'score.flow.committed.empty.scoreNote': 'This also feeds a third of the Spending part of your Score — until something is flagged fixed, that part reads as if you have no fixed bills at all.',
   'score.flow.chip.debtRepayments': 'Debt repayments',
   'score.flow.chip.ofWhichInterest': '…of which interest',

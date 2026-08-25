@@ -382,6 +382,11 @@ module.exports = {
   'bud.assumed.missing': 'Asikho isigaba esibizwa ngo-{category}',
   'bud.assumed.noFile': 'Ayikwazanga ukufunda inothi lika-{category}',
 
+  'bud.fixed.on': 'U-{category} manje uphawulwe njengesikweletu esimisiwe, esizibophezelwe',
+  'bud.fixed.off': 'U-{category} akasaphawulwanga njengesikweletu esimisiwe',
+  'bud.fixed.missing': 'Asikho isigaba esibizwa ngo-{category}',
+  'bud.fixed.noFile': 'Ayikwazanga ukufunda inothi lika-{category}',
+
   'bud.pull.label': 'Donsa ukweqisa ukuchitha',
   'bud.pull.title': { one: 'Gcwalisa lokhu ngokweqisa ukuchitha kwesikhathi esingu-{lag} esedlule', other: 'Gcwalisa lokhu ngokweqisa ukuchitha kwezikhathi ezingu-{lag} ezedlule' },
   'bud.pull.none': 'U-{period} akazange eqise ukuchitha — waphela nge-{amount} ngaphezulu',
@@ -398,6 +403,9 @@ module.exports = {
   'bud.aria.assume': 'Bala isabelomali sika-{category} njengesivele sichithiwe',
   'bud.title.assumeOn': 'Bala lesi sabelomali njengesivele sichithiwe — awukho umsebenzi wemali ozofika ngaso',
   'bud.title.assumeOff': 'Buyela ekulinganiseni lesi sigaba ngemisebenzi yemali yangempela',
+  'bud.aria.fixed': 'Phawula u-{category} njengesikweletu esimisiwe, esizibophezelwe',
+  'bud.title.fixedOn': 'Phawula lokhu njengesikweletu esimisiwe okumele usikhokhele — irenti, izinkokhelo zezikweletu, izinqubomgomo',
+  'bud.title.fixedOff': 'Susa uphawu lwesikweletu esimisiwe',
   'bud.aria.delete': 'Susa isigaba {category}',
   'bud.title.delete': 'Susa lesi sigaba yonke indawo',
 
@@ -1046,7 +1054,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Umholo ongu-{income} uhlukaniswa ube izikweletu ezizibophezelwe nezimisiwe ezingu-{committed}, izindleko zokuphila ezingu-{living}, ukonga okungu-{saving}, kanye no-{notYetSpent} ongakachithwa.',
   'score.flow.chip.committed': 'Ngaphakathi kwezizibophezelwe',
-  'score.flow.committed.empty': 'Azikho izigaba eziphawulwe njengezimisiwe okwamanje — misa u-fixed: true phezulu efayeleni lesigaba (irenti, izinkokhelo zezikweletu, izinqubomgomo) bese lokhu kuzigcwalisa.',
+  'score.flow.committed.empty': 'Azikho izigaba eziphawulwe njengezimisiwe okwamanje — sebenzisa isishintshi sesikweletu esimisiwe ekhasini leSabelomali kwesigaba ngasinye (irenti, izinkokhelo zezikweletu, izinqubomgomo) bese lokhu kuzigcwalisa.',
   'score.flow.committed.empty.scoreNote': 'Lokhu kuphinde kondle ingxenye yesithathu yoKuchitha kuMaphuzu akho — kuze kube khona okuphawulwe njengokumisiwe, leyo ngxenye ifundeka sengathi awunazo nhlobo izikweletu ezimisiwe.',
   'score.flow.chip.debtRepayments': 'Izinkokhelo zezikweletu',
   'score.flow.chip.ofWhichInterest': '…lapho inzalo iyi',

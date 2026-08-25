@@ -358,6 +358,11 @@ module.exports = {
   'bud.assumed.missing': '{category} というカテゴリはありません',
   'bud.assumed.noFile': '{category} のノートを読めませんでした',
 
+  'bud.fixed.on': '{category} を固定費・約束済みの支払いとして設定しました',
+  'bud.fixed.off': '{category} の固定費の設定を解除しました',
+  'bud.fixed.missing': '{category} というカテゴリはありません',
+  'bud.fixed.noFile': '{category} のノートを読めませんでした',
+
   'bud.pull.label': '超過分から入力',
   /* One form only — see the header. No plural distinction in Japanese. */
   'bud.pull.title': { other: '{lag} 期間前の超過支出から入力します' },
@@ -375,6 +380,9 @@ module.exports = {
   'bud.aria.assume': '{category} の予算を支出済みとして数える',
   'bud.title.assumeOn': 'この予算を支出済みとして数えます — 対応する取引は届きません',
   'bud.title.assumeOff': 'このカテゴリを実際の取引で測り直します',
+  'bud.aria.fixed': '{category} を固定費・約束済みの支払いとして設定',
+  'bud.title.fixedOn': '支払いが確定している固定費として設定します — 家賃・返済・保険など',
+  'bud.title.fixedOff': '固定費の設定を解除します',
   'bud.aria.delete': 'カテゴリ {category} を削除',
   'bud.title.delete': 'このカテゴリをすべての場所から削除',
 
@@ -973,7 +981,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': '収入 {income} の内訳: 固定費・約束済みの支払い {committed}、生活費 {living}、貯蓄 {saving}、まだ使っていない分 {notYetSpent}。',
   'score.flow.chip.committed': '固定費の内訳',
-  'score.flow.committed.empty': 'まだ固定に設定されたカテゴリがありません — カテゴリのファイルの先頭に fixed: true を設定すると（家賃・返済・保険など）ここに表示されます。',
+  'score.flow.committed.empty': 'まだ固定に設定されたカテゴリがありません — 予算ページの固定費スイッチをそれぞれのカテゴリで使うと（家賃・返済・保険など）ここに表示されます。',
   'score.flow.committed.empty.scoreNote': 'これはスコアの「支出」部分の3分の1にも影響します — 固定に設定されるまでは、固定費がまったくないものとして扱われます。',
   'score.flow.chip.debtRepayments': '返済',
   'score.flow.chip.ofWhichInterest': '…うち利息',

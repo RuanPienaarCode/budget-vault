@@ -42,12 +42,26 @@ module.exports = function registerCategories(ctx) {
     const r = await askFields(app, 'New category', [
       { key: 'name', label: 'Name', type: 'text', placeholder: 'e.g. Coffee budget' },
       { key: 'type', label: 'Type', type: 'select', options: typeOrder(S.settings.groups), value: 'expense' },
+      // `toggles` resolves to an ARRAY of the values switched on — not an
+      // object keyed by them. One entry here, so the array is the whole
+      // answer (same idiom as plan.js's "Remove this item" toggle). Matches
+      // this dialog's own existing fields (Name, Type above) in staying
+      // hardcoded English rather than i18n.t() — see the note at this
+      // function's call site for why that split is deliberate for now.
+      { key: 'fixed', label: 'Fixed / committed bill', type: 'toggles',
+        options: [{ value: 'yes', label: 'Money you are committed to pay every period — rent, debt repayments, insurance' }] },
     ]);
     if (!r || !r.name.trim()) return null;
     const realName = r.name.trim();
     if (S.categories.some(c => c.name.toLowerCase() === realName.toLowerCase())) { toast('Category already exists', true); return null; }
     const type = r.type;
     if (!typeOrder(S.settings.groups).includes(type)) { toast('Invalid type', true); return null; }
+    // Income and a transfer are never a commitment to pay — the same rule
+    // the Budget page's per-row toggle enforces by simply not offering itself
+    // there (views/budgets.js). The form above can't hide the field reactively
+    // as `type` changes, so a stray tick is dropped here rather than written
+    // as a `fixed: true` that would read as nonsense next to those two types.
+    const fixed = (r.fixed || []).includes('yes') && type !== 'income' && type !== 'transfer';
     // safeSeg, not a local copy of it: a name like ".hidden" would otherwise
     // write a dotfile Obsidian never indexes, so the category vanishes on the
     // next load and promptDeleteCategory can never find it again.
@@ -59,9 +73,21 @@ module.exports = function registerCategories(ctx) {
     // the first category file.
     if (fileAt(`Categories/${safe}.md`)) { toast(`Categories/${safe}.md already exists`, true); return null; }
     const nameLine = safe !== realName ? `name: ${yamlStr(realName)}\n` : '';
+    // Absent is `fixed`'s own default (load.js), so the key is only written
+    // at all when it's true — mirrors toggleAssumeSpent's null-removes-the-key
+    // trick, just on the write-once path instead of the patch path.
+    const fixedLine = fixed ? 'fixed: true\n' : '';
     await writeFile(`Categories/${safe}.md`,
-      `---\n${nameLine}type: ${type}\ncolor: "#888888"\ntags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${realName}\n\nBudget category of type **${type}**.\n`);
-    const cat = { name: realName, type, color: '#888888' };
+      `---\n${nameLine}type: ${type}\ncolor: "#888888"\n${fixedLine}tags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${realName}\n\nBudget category of type **${type}**.\n`);
+    /* `rel` is budget-folder-relative, the same shape load.js's own read
+       builds (see its comment there) — without it here, a category created
+       THIS session had no path for toggleAssumeSpent (or the new fixed-bill
+       toggle below) to write to, and both bailed with "no file" until the
+       next full reload. `fixed` is set explicitly too (not left to the
+       object's absence read as falsy) so a category ticked fixed above shows
+       correctly on the Budget page before any reload, matching the boolean
+       load.js always assigns. */
+    const cat = { name: realName, type, color: '#888888', fixed, rel: `Categories/${safe}.md` };
     S.categories.push(cat);
     const order = typeOrder(S.settings.groups);
     S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));

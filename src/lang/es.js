@@ -364,6 +364,11 @@ module.exports = {
   'bud.assumed.missing': 'No hay ninguna categoría llamada {category}',
   'bud.assumed.noFile': 'No se pudo leer la nota de {category}',
 
+  'bud.fixed.on': '{category} ahora está marcada como gasto fijo y comprometido',
+  'bud.fixed.off': '{category} ya no está marcada como gasto fijo',
+  'bud.fixed.missing': 'No hay ninguna categoría llamada {category}',
+  'bud.fixed.noFile': 'No se pudo leer la nota de {category}',
+
   'bud.pull.label': 'Rellenar con el exceso',
   'bud.pull.title': { one: 'Rellenar con el exceso de gasto de hace {lag} periodo', other: 'Rellenar con el exceso de gasto de hace {lag} periodos' },
   'bud.pull.none': '{period} no gastó de más — terminó {amount} a favor',
@@ -380,6 +385,9 @@ module.exports = {
   'bud.aria.assume': 'Contar el presupuesto de {category} como ya gastado',
   'bud.title.assumeOn': 'Contar este presupuesto como ya gastado — no llegará ninguna transacción',
   'bud.title.assumeOff': 'Volver a medir esta categoría con transacciones reales',
+  'bud.aria.fixed': 'Marcar {category} como gasto fijo y comprometido',
+  'bud.title.fixedOn': 'Marcar como un gasto fijo que estás obligado a pagar — alquiler, cuotas de deuda, pólizas',
+  'bud.title.fixedOff': 'Quitar la marca de gasto fijo',
   'bud.aria.delete': 'Eliminar la categoría {category}',
   'bud.title.delete': 'Eliminar esta categoría en todas partes',
 
@@ -1021,7 +1029,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Los ingresos de {income} se dividen en {committed} de comprometido y gastos fijos, {living} de gastos de vida, {saving} de ahorro, y {notYetSpent} aún sin gastar.',
   'score.flow.chip.committed': 'Dentro de lo comprometido',
-  'score.flow.committed.empty': 'Todavía ninguna categoría está marcada como fija — pon fixed: true al principio del archivo de la categoría (alquiler, cuotas de deuda, pólizas) y esto se completará.',
+  'score.flow.committed.empty': 'Todavía ninguna categoría está marcada como fija — usa el interruptor de gasto fijo en la página de Presupuesto para cada una (alquiler, cuotas de deuda, pólizas) y esto se completará.',
   'score.flow.committed.empty.scoreNote': 'Esto también alimenta un tercio de la parte de Gasto de tu Puntuación — hasta que algo se marque como fijo, esa parte se lee como si no tuvieras ningún gasto fijo.',
   'score.flow.chip.debtRepayments': 'Cuotas de deuda',
   'score.flow.chip.ofWhichInterest': '…de las cuales intereses',

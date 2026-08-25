@@ -368,6 +368,11 @@ module.exports = {
   'bud.assumed.missing': 'Aucune catégorie nommée {category}',
   'bud.assumed.noFile': 'Impossible de lire la note de {category}',
 
+  'bud.fixed.on': '{category} est désormais marquée comme charge fixe et engagée',
+  'bud.fixed.off': '{category} n’est plus marquée comme charge fixe',
+  'bud.fixed.missing': 'Aucune catégorie nommée {category}',
+  'bud.fixed.noFile': 'Impossible de lire la note de {category}',
+
   'bud.pull.label': 'Remplir depuis le dépassement',
   'bud.pull.title': { one: 'Remplir à partir du dépassement d\'il y a {lag} période', other: 'Remplir à partir du dépassement d\'il y a {lag} périodes' },
   'bud.pull.none': '{period} n\'a pas dépassé — la période s\'est terminée avec {amount} de plus',
@@ -384,6 +389,9 @@ module.exports = {
   'bud.aria.assume': 'Compter le budget de {category} comme déjà dépensé',
   'bud.title.assumeOn': 'Compter ce budget comme déjà dépensé — aucune transaction n\'arrivera',
   'bud.title.assumeOff': 'Mesurer à nouveau cette catégorie sur les transactions réelles',
+  'bud.aria.fixed': 'Marquer {category} comme charge fixe et engagée',
+  'bud.title.fixedOn': 'Marquer comme une charge fixe que vous êtes engagé à payer — loyer, mensualités de dette, assurances',
+  'bud.title.fixedOff': 'Retirer le marquage de charge fixe',
   'bud.aria.delete': 'Supprimer la catégorie {category}',
   'bud.title.delete': 'Supprimer cette catégorie partout',
 
@@ -1033,7 +1041,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Les revenus de {income} se répartissent en {committed} d’engagé et charges fixes, {living} de coût de la vie, {saving} d’épargne, et {notYetSpent} pas encore dépensé.',
   'score.flow.chip.committed': 'Dans l’engagé',
-  'score.flow.committed.empty': 'Aucune catégorie n’est encore marquée comme fixe — mettez fixed: true en haut du fichier de la catégorie (loyer, mensualités de dette, assurances) et cela se remplira.',
+  'score.flow.committed.empty': 'Aucune catégorie n’est encore marquée comme fixe — utilisez le bouton de charge fixe sur la page Budget pour chacune (loyer, mensualités de dette, assurances) et cela se remplira.',
   'score.flow.committed.empty.scoreNote': 'Cela alimente aussi un tiers de la partie Dépenses de votre Score — tant que rien n’est marqué comme fixe, cette partie se lit comme si vous n’aviez aucune charge fixe.',
   'score.flow.chip.debtRepayments': 'Mensualités de dette',
   'score.flow.chip.ofWhichInterest': '…dont intérêts',

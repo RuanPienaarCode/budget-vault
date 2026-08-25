@@ -1936,6 +1936,13 @@
 .budget-app-root .bud-actual-assumed { color: var(--ink-dim); }
 /* The toggle reads as pressed rather than as another ghost button in the row. */
 .budget-app-root .bud-assume-on { color: var(--color-accent); }
+/* Its sibling, and deliberately a DIFFERENT colour. The two sit next to each
+   other in the same cell and answer different questions — "no transaction will
+   arrive for this" against "this bill cannot be stopped" — so sharing an accent
+   would leave a reader with two identical-looking pressed buttons and no way to
+   tell which state they had just set. `aria-pressed` already distinguishes them
+   for a screen reader; this is the sighted half of the same job. */
+.budget-app-root .bud-fixed-on { color: var(--color-info); }
 .budget-app-root .bud-pull { margin-top: 4px; font-size: 11.5px; white-space: nowrap; }
 
 /* Budget page: period totals strip, repeated above and below the table */

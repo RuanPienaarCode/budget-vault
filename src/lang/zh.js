@@ -358,6 +358,11 @@ module.exports = {
   'bud.assumed.missing': '没有名为 {category} 的分类',
   'bud.assumed.noFile': '无法读取 {category} 的笔记',
 
+  'bud.fixed.on': '{category} 现在被标记为固定的承诺账单',
+  'bud.fixed.off': '{category} 已取消固定账单标记',
+  'bud.fixed.missing': '没有名为 {category} 的分类',
+  'bud.fixed.noFile': '无法读取 {category} 的笔记',
+
   'bud.pull.label': '用超支填入',
   /* One form only — see the header. No plural distinction in Chinese. */
   'bud.pull.title': { other: '用 {lag} 个周期前的超支金额填入' },
@@ -375,6 +380,9 @@ module.exports = {
   'bud.aria.assume': '把 {category} 的预算算作已支出',
   'bud.title.assumeOn': '把这笔预算算作已支出 — 不会有对应交易到来',
   'bud.title.assumeOff': '重新按实际交易衡量这个分类',
+  'bud.aria.fixed': '把 {category} 标记为固定的承诺账单',
+  'bud.title.fixedOn': '标记为你承诺要支付的固定账单 — 如房租、债务还款、保单',
+  'bud.title.fixedOff': '取消固定账单标记',
   'bud.aria.delete': '删除分类 {category}',
   'bud.title.delete': '在所有位置删除这个分类',
 
@@ -973,7 +981,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': '收入 {income} 分为：固定支出与承诺账单 {committed}、生活成本 {living}、储蓄 {saving}、尚未花掉 {notYetSpent}。',
   'score.flow.chip.committed': '固定支出明细',
-  'score.flow.committed.empty': '目前没有分类被标记为固定 — 在该分类文件开头设置 fixed: true（如房租、债务还款、保单），这里就会显示出来。',
+  'score.flow.committed.empty': '目前没有分类被标记为固定 — 在预算页面为每个分类使用固定账单开关（如房租、债务还款、保单），这里就会显示出来。',
   'score.flow.committed.empty.scoreNote': '这也会影响你评分中「支出」部分的三分之一 — 在标记为固定之前，这部分会显示为你完全没有固定账单。',
   'score.flow.chip.debtRepayments': '债务还款',
   'score.flow.chip.ofWhichInterest': '……其中利息',

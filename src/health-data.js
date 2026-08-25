@@ -40,6 +40,56 @@ const POOL_TYPES = new Set(['savings', 'investment']);
    three days is generous enough for a weekend and far too short to pair a
    deposit with an unrelated withdrawal a fortnight later. */
 const TRANSFER_DAYS = 3;
+
+/* Which row is which, for pairing. `label` is the transactions folder the row
+   was read from, so it identifies the ACCOUNT without needing the account
+   object — and two legs of one movement always sit in different ones. */
+const rowKey = r => `${r.label}|${r.date}|${(r.amount || 0).toFixed(2)}|${r.desc || ''}`;
+
+/* EXCLUDED ROWS THAT PAIR OFF AGAINST EACH OTHER — the two legs of one
+   movement, found by their own arithmetic rather than trusted from the flag.
+
+   `excluded` is overloaded, and that is the whole problem this solves. A
+   reader uses it for two different things:
+
+     · the second leg of money already counted once — settling a credit card,
+       moving between own accounts, a reimbursement passing through
+     · a bill that genuinely left the household but sits outside the budget
+       for some unrelated reason
+
+   Treating every excluded row as spending double-counted a real vault by
+   R10 453 a month and told it it had 2.2 months of emergency cover instead of
+   2.7. Treating none of them as spending threw away real reimbursed bills, and
+   a guard test rightly pins that case. Neither blanket answer is right, so
+   neither is used: a row is dropped only when an equal and opposite excluded
+   row sits in a DIFFERENT account within a few days, which is what a transfer
+   actually looks like once both sides are written down.
+
+   Same account never pairs. On a real vault the credit card holds both the
+   R11 514.04 purchase and the R11 514.00 that later settles it, and those are
+   two different events — the purchase is real spending and must survive. Its
+   partner is the R11 514.00 leaving the savings account, which is where the
+   money actually came from. */
+function passthroughPairs(rows) {
+  const drop = new Set();
+  const ex = (rows || []).filter(r => r && r.excluded
+    && typeof r.amount === 'number' && r.amount);
+  const used = new Array(ex.length).fill(false);
+  for (let i = 0; i < ex.length; i++) {
+    if (used[i]) { continue; }
+    for (let j = i + 1; j < ex.length; j++) {
+      if (used[j]) { continue; }
+      const a = ex[i], b = ex[j];
+      if (a.label === b.label) { continue; }
+      if (Math.abs(a.amount + b.amount) > 0.005) { continue; }
+      if (Math.abs(daysBetween(a.date, b.date)) > TRANSFER_DAYS) { continue; }
+      used[i] = true; used[j] = true;
+      drop.add(rowKey(a)); drop.add(rowKey(b));
+      break;
+    }
+  }
+  return drop;
+}
 const { worth } = require('./worth');
 
 /* How far back the averages reach. Six months is long enough to absorb a bonus
@@ -87,15 +137,44 @@ module.exports = function registerHealthData(ctx) {
       const spend = periodSpend(p, null);
       const { start, end } = periodRange(p);
       let savings = 0;
+      /* Pass-throughs are found across the WHOLE HOUSEHOLD, not just the pool:
+         the R40 000 UIF landed in a savings account but its matching leg left
+         a cheque account, so a pool-only search would never have seen it. */
+      const householdRows = txInPeriod(p);
+      const passthrough = passthroughPairs(householdRows);
       /* Gathered across the WHOLE pool before anything is counted, because an
          internal transfer is only recognisable from both of its legs at once —
          see the matching step below. */
-      const inflows = [], outflows = [];
+      /* Walked off the HOUSEHOLD rows, filtered down to the pool by label,
+         rather than off accountIndex's per-account row lists. Those lists hold
+         the raw file rows, which carry no `label` — so a key built from one
+         could never match a key built from a household row, and the
+         pass-through check below silently did nothing at all. Same rows either
+         way; this is the shape that can be compared. */
+      const saverLabels = new Map();
       for (const a of savers) {
-        for (const r of ((idx.get(a) || {}).rows || [])) {
+        for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
+      }
+      const inflows = [], outflows = [];
+      {
+        for (const r of householdRows) {
           if (!r || typeof r.amount !== 'number' || !r.amount) { continue; }
           if (supersededBySplit(r)) { continue; }   // its parts are in this same list
-          if (r.date < start || r.date > end) { continue; }
+          const a = saverLabels.get(r.label);
+          if (!a) { continue; }                     // not a savings or investment account
+          /* A leg of a pass-through the reader already marked as one. On a
+             real vault a R40 000 UIF payment arrived in the transaction
+             account, moved out of it, and landed in a savings account — three
+             rows, all excluded, one movement. `income` honours that marking,
+             so counting the savings leg as fresh saving while the same rand
+             is not counted as income put the rate on a base the household
+             never earned. The pool-internal match further down cannot catch
+             it: the other leg sits in a cheque account, outside the pool it
+             searches, which is why the pairing is computed household-wide.
+
+             An excluded row with NO partner still counts — money genuinely
+             saved that happens to sit outside the budget is still saved. */
+          if (passthrough.has(rowKey(r))) { continue; }
           (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
         }
       }
@@ -184,11 +263,16 @@ module.exports = function registerHealthData(ctx) {
          moved into the household's own funds, without which funding an
          investment reads as overspending. `fixed` is the part that cannot be
          stopped this month. */
-      let consumption = 0, fixed = 0;
+      /* BUDGET-SCOPED, and used for exactly one thing: "budget used". That
+         question compares what was spent against THE PLAN, and a plan is
+         budget-scoped by definition — measuring a household-wide numerator
+         against a budget-only denominator would be the same mixing this whole
+         block exists to end. Every other share below is household-wide, built
+         from householdSpend further down. */
+      let consumptionBudget = 0;
       for (const [cat, amt] of Object.entries(spend.whole)) {
         const type = catType(cat);
-        if (type !== 'savings' && type !== 'investment') { consumption += amt; }
-        if (fixedCats.has(cat)) { fixed += amt; }
+        if (type !== 'savings' && type !== 'investment') { consumptionBudget += amt; }
       }
       /* The emergency fund's DIVISOR, built from every account rather than
          periodSpend's budget-scoped map. `essential` answers "what must the
@@ -217,8 +301,36 @@ module.exports = function registerHealthData(ctx) {
          built, the one exclusion periodSpend itself applies before anything
          else can. */
       const householdNet = Object.create(null);
+      const householdPass = passthroughPairs(txInPeriod(p));
       for (const t of txInPeriod(p)) {
         if (catType(t.cat) === 'transfer') { continue; }
+        /* PAIRED excluded rows drop; lone ones stay. Dropping the `excluded`
+           filter outright was a real bug, and so would restoring it be.
+
+           The fix this block exists for was about ACCOUNTS: periodSpend drops
+           `budget: false` accounts, and a bill paid from a joint account the
+           household marked out of the budget is still a bill the emergency
+           fund must cover. That argument stands. But the same edit also
+           dropped the `excluded` filter, and a reader uses that flag for two
+           different things — the second leg of already-counted money, and a
+           real bill that sits outside the budget for an unrelated reason.
+
+           Caught on a real vault: a R11 514 car service appeared as a card
+           purchase AND as the savings withdrawal that settled the card, five
+           days apart. Counting both put R63 293 a month of already-counted
+           money into the divisor and reported 2.2 months of cover instead of
+           2.7. Credit-card settlements, a UIF reimbursement passing through,
+           and moves into other savings vehicles all landed the same way — and
+           every one of them has a matching opposite leg in another account,
+           which is exactly what passthroughPairs looks for. A genuinely
+           reimbursed rent top-up has no such partner and still counts.
+
+           CLAUDE.md's rule that anything measuring the ACCOUNT must not filter
+           on `excluded` — reconcile, periodActivity, splitFlows — stands, and
+           is a different question: the money did move. This measures SPENDING,
+           and counting a rand twice because it moved twice is the thing the
+           flag exists to prevent. */
+        if (householdPass.has(rowKey(t))) { continue; }
         const k = t.cat || '';
         householdNet[k] = (householdNet[k] || 0) + t.amount;
       }
@@ -228,10 +340,39 @@ module.exports = function registerHealthData(ctx) {
         if (!cat || type === 'income' || type === 'transfer' || amt >= 0) { continue; }
         householdSpend[cat] = -amt;
       }
+
+      /* ONE ROW POPULATION FOR EVERY SHARE OF INCOME.
+
+         A ratio only means something when both halves are counted the same
+         way, and this module had drifted into counting them two ways: income,
+         consumption and fixed came from periodSpend (budget-scoped — excluded
+         rows and non-budget accounts dropped), while essential and the saving
+         rate were built household-wide with pass-throughs paired off. On a
+         real vault those two views differ by about R16 000 a month, so the
+         saving rate was a household numerator over a budget denominator and
+         read 11.3% where the consistent answer either way is nearer 9%.
+
+         Both views are legitimate — one answers "how did I do against my
+         plan", the other "what actually moved through this household" — but a
+         single ratio cannot straddle them. Everything below now lives in the
+         household view, with `passthroughPairs` removing the second leg of
+         money already counted once. `budgeted` and `consumptionBudget` stay
+         budget-scoped on purpose: they answer the plan question. */
+      let consumption = 0, fixed = 0;
+      for (const [cat, amt] of Object.entries(householdSpend)) {
+        const type = catType(cat);
+        if (type !== 'savings' && type !== 'investment') { consumption += amt; }
+        if (fixedCats.has(cat)) { fixed += amt; }
+      }
+      let income = 0;
+      for (const [cat, amt] of Object.entries(householdNet)) {
+        if (catType(cat) === 'income' && amt > 0) { income += amt; }
+      }
+
       periods.push({
-        income: periodSummary(p).income,
+        income,
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
-        savings, consumption, fixed,
+        savings, consumption, fixed, consumptionBudget,
         budgeted: budgetTotals(p).spend,
         /* Household coverage, not budget coverage: a period whose only real
            activity sat in an excluded or non-budget account is still a period

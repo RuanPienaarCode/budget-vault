@@ -377,6 +377,11 @@ module.exports = {
   'bud.assumed.missing': 'Alukho udidi olubizwa ngokuba ngu-{category}',
   'bud.assumed.noFile': 'Ayikwazanga ukufunda inqaku lika-{category}',
 
+  'bud.fixed.on': 'U-{category} ngoku uphawulwe njengetyala elimiselweyo, elizibophelelweyo',
+  'bud.fixed.off': 'U-{category} akasaphawulwanga njengetyala elimiselweyo',
+  'bud.fixed.missing': 'Alukho udidi olubizwa ngokuba ngu-{category}',
+  'bud.fixed.noFile': 'Ayikwazanga ukufunda inqaku lika-{category}',
+
   'bud.pull.label': 'Tsala inkcitho egqithileyo',
   'bud.pull.title': { one: 'Zalisa oku ngenkcitho egqithileyo yexesha elingu-{lag} elidlulileyo', other: 'Zalisa oku ngenkcitho egqithileyo yamaxesha angu-{lag} adlulileyo' },
   'bud.pull.none': 'U-{period} akachithanga ngokugqithisileyo — waphela enge-{amount} ngaphezulu',
@@ -393,6 +398,9 @@ module.exports = {
   'bud.aria.assume': 'Bala ibhajethi ka-{category} njengesele ichithiwe',
   'bud.title.assumeOn': 'Bala le bhajethi njengesele ichithiwe — akukho ntengiselwano iza kufika ngayo',
   'bud.title.assumeOff': 'Buyela ekulinganiseni olu didi ngeentengiselwano zokwenene',
+  'bud.aria.fixed': 'Phawula u-{category} njengetyala elimiselweyo, elizibophelelweyo',
+  'bud.title.fixedOn': 'Phawula oku njengetyala elimiselweyo ekumele ulihlawule — irenti, iintlawulo zamatyala, iipolisi',
+  'bud.title.fixedOff': 'Susa uphawu lwetyala elimiselweyo',
   'bud.aria.delete': 'Cima udidi {category}',
   'bud.title.delete': 'Cima olu didi yonke indawo',
 
@@ -1041,7 +1049,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Ingeniso engu-{income} yahlulwa ibe zizinto ezizibophelelweyo nezimiselweyo ezingu-{committed}, iindleko zokuphila ezingu-{living}, ukonga okungu-{saving}, kunye no-{notYetSpent} ongekachithwa.',
   'score.flow.chip.committed': 'Ngaphakathi kwezizibophelelweyo',
-  'score.flow.committed.empty': 'Akukho ndidi ziphawulwe njengezimiselweyo okwangoku — misela u-fixed: true phezulu kwifayile yodidi (irenti, iintlawulo zamatyala, iipolisi) kwaye oku kuya kuzizalisa.',
+  'score.flow.committed.empty': 'Akukho ndidi ziphawulwe njengezimiselweyo okwangoku — sebenzisa iqhosha lokuphawula okumiselweyo kwiphepha leBhajethi kolo didi ngalunye (irenti, iintlawulo zamatyala, iipolisi) kwaye oku kuya kuzizalisa.',
   'score.flow.committed.empty.scoreNote': 'Oku kukwondla isithathu senxalenye yeNkcitho kwiNqaku lakho — de kubekho into ephawulwe njengemiselweyo, loo nxalenye ifundeka ngathi awunazo kwaphela iityala ezimiselweyo.',
   'score.flow.chip.debtRepayments': 'Iintlawulo zamatyala',
   'score.flow.chip.ofWhichInterest': '…apho inzala iyi',

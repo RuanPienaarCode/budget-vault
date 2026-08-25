@@ -362,6 +362,11 @@ module.exports = {
   'bud.assumed.missing': 'Geen kategorie genaamd {category} nie',
   'bud.assumed.noFile': 'Kon nie die notas vir {category} lees nie',
 
+  'bud.fixed.on': '{category} is nou as \'n vaste, vasgelegde rekening gemerk',
+  'bud.fixed.off': '{category} is nie meer as \'n vaste rekening gemerk nie',
+  'bud.fixed.missing': 'Geen kategorie genaamd {category} nie',
+  'bud.fixed.noFile': 'Kon nie die notas vir {category} lees nie',
+
   'bud.pull.label': 'Vul uit oorbesteding',
   'bud.pull.title': { one: 'Vul dit in uit die oorbesteding {lag} tydperk terug', other: 'Vul dit in uit die oorbesteding {lag} tydperke terug' },
   'bud.pull.none': '{period} het nie oorbestee nie — dit het {amount} oor geëindig',
@@ -378,6 +383,9 @@ module.exports = {
   'bud.aria.assume': 'Tel die begroting vir {category} as reeds bestee',
   'bud.title.assumeOn': 'Tel hierdie begroting as reeds bestee — geen transaksie sal daarvoor kom nie',
   'bud.title.assumeOff': 'Meet hierdie kategorie weer teen werklike transaksies',
+  'bud.aria.fixed': 'Merk {category} as \'n vaste, vasgelegde rekening',
+  'bud.title.fixedOn': 'Merk dit as \'n vaste rekening wat jy verplig is om te betaal — huur, skuldpaaiemente, polisse',
+  'bud.title.fixedOff': 'Verwyder die vaste-rekening-merker',
   'bud.aria.delete': 'Skrap kategorie {category}',
   'bud.title.delete': 'Skrap hierdie kategorie oral',
 
@@ -1019,7 +1027,7 @@ module.exports = {
   'score.flow.amountPct': '{amount} · {pct}',
   'score.flow.ariaLabel': 'Inkomste van {income} verdeel in {committed} vasgelegde en vaste rekeninge, {living} lewenskoste, {saving} spaar, en {notYetSpent} nog nie bestee nie.',
   'score.flow.chip.committed': 'Binne die vasgelegde bedrag',
-  'score.flow.committed.empty': 'Geen kategorie is nog as vas gemerk nie — stel fixed: true boaan die kategorielêer (huur, skuldpaaiemente, polisse) en dit sal invul.',
+  'score.flow.committed.empty': 'Geen kategorie is nog as vas gemerk nie — gebruik die vaste-rekening-skakelaar op die Begroting-bladsy vir elkeen (huur, skuldpaaiemente, polisse) en dit sal invul.',
   'score.flow.committed.empty.scoreNote': 'Dit voed ook \'n derde van die Besteding-deel van jou Telling — totdat iets as vas gemerk is, lees daardie deel asof jy glad geen vaste rekeninge het nie.',
   'score.flow.chip.debtRepayments': 'Skuldpaaiemente',
   'score.flow.chip.ofWhichInterest': '…waarvan rente',

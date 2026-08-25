@@ -138,7 +138,17 @@ function monthlyAverages(periods, monthsPerPeriod) {
     if (p.budgeted > 0) {
       planned++;
       plannedBudgeted += p.budgeted;
-      plannedConsumption += p.consumption || 0;
+      /* `consumptionBudget`, not `consumption` — budget-scoped on both sides.
+         "Budget used" asks how the spending compared to THE PLAN, and the plan
+         only ever covered budget-scoped rows, so measuring a household-wide
+         numerator against it would report a household spending far more of its
+         budget than it agreed to simply because some of that spending was
+         never in the budget. Every other share health-data reports is
+         household-wide; this one figure is deliberately not, and takes its own
+         field so the difference is impossible to miss. Falls back to
+         `consumption` for a caller still passing the old shape. */
+      plannedConsumption += (p.consumptionBudget !== undefined
+        ? p.consumptionBudget : p.consumption) || 0;
     }
   }
   const out = { counted, planned };

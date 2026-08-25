@@ -483,6 +483,13 @@ module.exports = function registerBudgets(ctx) {
            the same max() the totals strip's overlay is the complement of, so
            the two can never disagree about this category's contribution. */
         const assumed = catAssumeSpent(d.category);
+        /* Whether this category is a fixed, committed bill — its own read
+           straight off S.categories rather than a shared ctx helper, because
+           period.js (which owns catType/catAssumeSpent) is not this lane's to
+           edit this round; a local lookup here costs nothing and needs no
+           export. See load.js for why `fixed` is its own flag rather than a
+           guess from `type`. */
+        const fixed = S.categories.find(c => c.name === d.category)?.fixed === true;
         const raw = sum.byCat[d.category] || 0;
         const realSpend = -raw;
         const actual = assumed ? Math.max(d.amount || 0, realSpend) : (type === 'income' ? raw : -raw);
@@ -576,6 +583,27 @@ module.exports = function registerBudgets(ctx) {
               title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
               onclick: () => toggleAssumeSpent(d.category, !assumed),
             }, icoEl(['circle-check', 'check-circle', 'check'])),
+            // Same income/transfer exclusion as the assume-spent button just
+            // above, same reason: a fixed bill is a commitment to pay, and
+            // neither of those is one. `lock` (not `circle-check`) so the two
+            // toggles read as two different questions at a glance, not two
+            // flavours of the same checkmark — verified against Obsidian's
+            // actually-bundled lucide set (obsidian.asar's app.js, not
+            // lucide.dev, which lags it): lock, pin and landmark are all in
+            // it, `lock` chosen as the one that reads as "locked in" rather
+            // than a place or a pin.
+            type === 'income' || type === 'transfer' ? '' : el('button', {
+              // `bud-fixed-on` carries no rule in styles.css yet — that file
+              // is outside this lane's owner list this round, so the "on"
+              // state is unstyled beyond aria-pressed for now. The class is
+              // still applied, mirroring bud-assume-on, so styling it later
+              // is a CSS-only change with nothing to wire up in this file.
+              class: `btn-ghost btn-ghost-sm${fixed ? ' bud-fixed-on' : ''}`, type: 'button',
+              'aria-pressed': fixed ? 'true' : 'false',
+              'aria-label': i18n.t('bud.aria.fixed', { category: d.category }),
+              title: i18n.t(fixed ? 'bud.title.fixedOff' : 'bud.title.fixedOn'),
+              onclick: () => toggleFixed(d.category, !fixed),
+            }, icoEl(['lock', 'pin', 'landmark'])),
             /* Clear (this period only) vs Delete (everywhere) sat side by side
                with the distinction living only in `title` — invisible on touch,
                which is most of where this app runs (audit finding 1). Both
@@ -690,6 +718,33 @@ module.exports = function registerBudgets(ctx) {
     cat.assumeSpent = on;
     renderBudgets();
     toast(i18n.t(on ? 'bud.assumed.on' : 'bud.assumed.off', { category: name }));
+  }
+
+  /* Flip a category's fixed/committed-bill flag and persist it to its own
+     note. This is the ONLY UI for the flag anywhere in the app — load.js's
+     `fixed` comment explains why it has to be its own flag rather than a
+     guess from `type` (rent is an ordinary expense and is most households'
+     biggest fixed cost; deriving from type undercounted a real vault's
+     committed spend by more than half). Before this toggle existed the flag
+     could only be set by hand-editing YAML, which is also why the Score
+     page's empty state used to say exactly that.
+
+     Mirrors toggleAssumeSpent above line for line: same file (the category's
+     own, not the period file — the answer belongs to the category, not to
+     any one month), same in-place S.categories update so an unsaved budget
+     draft survives, same null-removes-the-key trick so turning it off leaves
+     the file as if it had never been on. */
+  async function toggleFixed(name, on) {
+    const cat = S.categories.find(c => c.name === name);
+    if (!cat) return toast(i18n.t('bud.fixed.missing', { category: name }), true);
+    if (!cat.rel) return toast(i18n.t('bud.fixed.noFile', { category: name }), true);
+    const text = await readFile(cat.rel);
+    if (text == null) return toast(i18n.t('bud.fixed.noFile', { category: name }), true);
+    const { raw, body } = parseFrontmatter(text);
+    await ctx.patchFile(cat.rel, raw, body, { fixed: on ? 'true' : null });
+    cat.fixed = on;
+    renderBudgets();
+    toast(i18n.t(on ? 'bud.fixed.on' : 'bud.fixed.off', { category: name }));
   }
 
   /* Write the overspend of an earlier period into this row's amount.
