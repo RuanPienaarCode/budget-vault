@@ -3,6 +3,25 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Changed
+
+- **The saving line owns up to being an average.** "Now: 26% of income saved ·
+  R 13 474 a month" was a six-period trailing average wearing the present
+  tense — a one-off windfall (a UIF payout, an insurance claim) landing in a
+  savings account read as today's saving habit. The rule is deliberate and
+  unchanged; the line now says it averages recent periods and that one-off
+  windfalls count and fade as they age out. All nine languages.
+
+### Fixed
+
+- **The printed figures add up, and 100% never hides which side of the line
+  you are on.** Percentage labels across the Budget page, the Dashboard and
+  the Score page now come from one largest-remainder rule, so a set of parts
+  always sums to what the whole says, and a value a fraction short of (or
+  past) a threshold no longer rounds into looking exactly on it.
+
 ## 1.26.1 — 2026-08-25
 
 ### Fixed
