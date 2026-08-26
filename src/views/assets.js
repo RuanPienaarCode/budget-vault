@@ -168,7 +168,7 @@ module.exports = function registerAssets(ctx) {
         el('th', { scope: 'col' }, 'Item'),
         el('th', { scope: 'col' }, 'Kind'),
         el('th', { scope: 'col', class: 'num' }, 'Value'),
-        el('th', { scope: 'col' }, 'Valued'),
+        el('th', { scope: 'col' }, 'Last valued'),
         el('th', { scope: 'col' }, 'Notes'),
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
@@ -273,7 +273,7 @@ module.exports = function registerAssets(ctx) {
       { key: 'type', label: 'Kind', type: 'select', value: 'property', options: ASSET_TYPES },
       { key: 'value', label: 'What would it sell for?', type: 'number', value: '0' },
       { key: 'valued', label: 'When was that worked out?', type: 'date', value: todayIso(),
-        desc: 'Left as today if you are typing a figure you already know.' },
+        desc: 'If this figure comes from an older valuation, set the date it was true.' },
     ]);
     if (!r || !r.name.trim()) return;
     const value = normalizeAmount(r.value);

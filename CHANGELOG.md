@@ -3,6 +3,23 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Changed
+
+- **The words now say what the numbers mean.** A copy pass over the Dashboard,
+  Score, Debt, Savings & Investments, Assets and Accounts pages for readers
+  without a finance background: "earmarked" is now "set aside", "allocated" is
+  "of income budgeted", balances that "drifted" now simply "don't match", what
+  transactions "imply" they now "add up to", debt "instalments" are
+  "repayments", and the reconciler stops introducing itself by name. The two
+  interest figures on the Debt page stop sharing one label — the lifetime one
+  is "Total interest", and the column is "Interest still to pay" in words
+  rather than a hover note phones cannot see. Nine languages where the old
+  wording had the same problem; a handful of languages already said it plainly
+  and kept their words.
+- **"1 accounts" is now "1 account".**
+
 ## 1.26.3 — 2026-08-25
 
 ### Changed

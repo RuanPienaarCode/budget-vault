@@ -63,7 +63,13 @@ module.exports = function registerSavings(ctx) {
       .map(a => ({ account: a, rows: (idx.get(a) || {}).rows || [] }));
 
     const tile = kpiTiles($('#savingsKpis'));
-    tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger');
+    /* The same wording the Dashboard's own net-worth tile carries — matched by
+       hand rather than routed through i18n.t: this view is still on the
+       English-only backlog (EXPECTED_ENGLISH_ONLY in i18n-render.test.cjs),
+       and one translated call here would make its render disagree with
+       English for a reason nothing on the page explains. */
+    tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
+      'what you own minus what you owe');
     tile('Savings', money(totalSavings));
     tile('Investments', money(totalInvest));
     growthTile(tile, entries);
@@ -147,7 +153,7 @@ module.exports = function registerSavings(ctx) {
     }
     const sub = [
       g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
-      g.unmeasured ? `${g.unmeasured} of ${g.total} not measurable` : null,
+      g.unmeasured ? `${g.unmeasured} of ${g.total} missing a starting amount or date` : null,
       g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
     ].filter(Boolean).join(' · ');
     tile('Growth', `${g.growth >= 0 ? '▲' : '▼'} ${money(Math.abs(g.growth))}`,
@@ -284,7 +290,7 @@ module.exports = function registerSavings(ctx) {
            reached — `Math.round` on 99.6% printed "100%" beside a bar that was
            not full and a `reached` flag that was false, the one combination
            that should never appear together on a progress bar. */
-        const pctLine = reached ? 'Goal reached!'
+        const pctLine = reached ? 'Goal reached'
           : `${Math.min(99, Math.floor(pct))}%${a.target_date ? ' · target ' + a.target_date : ''}`;
         g.append(el('div', {},
           el('div', { class: 'goal-h' },
@@ -365,7 +371,7 @@ module.exports = function registerSavings(ctx) {
           renderReturn(card, a, r);
         } else if (flows.basis === 'derived') {
           const g = flows.growth;
-          const line = el('div', { class: 's2' }, `in ${money(flows.contributions, 0)}`);
+          const line = el('div', { class: 's2' }, `put in ${money(flows.contributions, 0)}`);
           /* A zero growth figure is NOT a measurement of zero growth — it means
              nothing in this account posted a transaction the vault could read as
              growth. A unit trust normally posts none at all: the market moves,
@@ -377,7 +383,7 @@ module.exports = function registerSavings(ctx) {
             line.append(' · ', el('span', { class: `num ${g >= 0 ? 'text-success' : 'text-danger'}` },
               `${g >= 0 ? '▲' : '▼'} ${money(Math.abs(g), 0)}`));
           }
-          if (flows.withdrawals) line.append(` · out ${money(flows.withdrawals, 0)}`);
+          if (flows.withdrawals) line.append(` · taken out ${money(flows.withdrawals, 0)}`);
           card.append(line);
 
           /* And say so outright where the silence is most likely to mislead.
@@ -425,7 +431,7 @@ module.exports = function registerSavings(ctx) {
           card.append(el('div', { class: 's2 s2-caveat',
             title: 'No transactions in the vault for this account, so this is the balance less what the '
               + 'account file records as put in. Import its statements and the split becomes real.' },
-          'from the account file'));
+          'based on the account file, not transactions'));
         } else if (a.inception_date) {
           card.append(el('div', { class: 's2' }, `since ${a.inception_date}`));
         }
@@ -436,7 +442,7 @@ module.exports = function registerSavings(ctx) {
         if (rec.state === 'drift') {
           const line = el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt' },
-              `${rec.count} since · implies `, el('b', { class: 'num' }, money(rec.implied)),
+              `${rec.count} since · they add up to `, el('b', { class: 'num' }, money(rec.implied)),
               rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
           const btn = el('button', { type: 'button', class: 'acct-recon-btn',
             'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` }, icoEl(['check']), 'Use this');
@@ -458,7 +464,7 @@ module.exports = function registerSavings(ctx) {
               title: 'The implied figure adds up recorded movements only. Growth that never posted a '
                 + 'transaction is not in it, so on a market-linked fund this figure is a floor rather '
                 + 'than a correction — take it only if your provider agrees.' },
-            'implied from recorded movements only — growth is not in it'));
+            'added up from recorded movements only — growth is not in it'));
           }
         } else if (rec.state === 'clean') {
           card.append(el('div', { class: 'acct-recon' },
@@ -470,7 +476,7 @@ module.exports = function registerSavings(ctx) {
       }
       wrap.append(el('div', { class: 'card mb-4' },
         el('div', { class: 'card-h' },
-          el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${list.length} accounts`)),
+          el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${list.length} account${list.length === 1 ? '' : 's'}`)),
           el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total))))),
         el('div', { class: 'body-pad' }, grid)));
     }
@@ -485,12 +491,12 @@ module.exports = function registerSavings(ctx) {
        returnBar() already refuses to draw a bar for this case; the line gets
        the same relabelling rather than printing a negative "in" figure. */
     const line = el('div', { class: 's2' }, r.capitalIn > 0
-      ? `in ${money(r.capitalIn, 0)}`
+      ? `put in ${money(r.capitalIn, 0)}`
       : `${money(Math.abs(r.capitalIn), 0)} taken out more than put in`);
     /* Withdrawals are ALREADY netted out of capitalIn, so this names them
-       rather than subtracting them a second time — a card reading "in R150 000
-       · out R20 000" invites exactly that arithmetic. */
-    if (r.capitalIn > 0 && r.withdrawals) line.append(` after ${money(r.withdrawals, 0)} out`);
+       rather than subtracting them a second time — a card reading "put in
+       R150 000 · taken out R20 000" invites exactly that arithmetic. */
+    if (r.capitalIn > 0 && r.withdrawals) line.append(` after ${money(r.withdrawals, 0)} taken out`);
     line.append(' · ', el('span', { class: `num ${up ? 'text-success' : 'text-danger'}` },
       `${up ? '▲' : '▼'} ${money(Math.abs(r.growth), 0)}`));
     card.append(line);
@@ -546,7 +552,7 @@ module.exports = function registerSavings(ctx) {
       card.append(el('div', { class: 's2 s2-caveat',
         title: 'No transactions in the vault for this account, so this is the balance less what the '
           + 'account file records as put in. Import its statements and the split becomes real.' },
-      'from the account file'));
+      'based on the account file, not transactions'));
     } else if (r.undatedGrowth && typeIs(a, 'investment')) {
       /* Named because the chart above cannot draw it. A fund's value moved every
          day for years and the vault holds one number — today's — so this growth
@@ -662,8 +668,8 @@ module.exports = function registerSavings(ctx) {
     if (sub) {
       sub.textContent = [
         s.excluded
-          ? `${s.included} of ${s.included + s.excluded} accounts measurable`
-          : `all ${s.included} account${s.included === 1 ? '' : 's'} measurable`,
+          ? `${s.excluded} of ${s.included + s.excluded} missing a starting amount or date`
+          : `all ${s.included} account${s.included === 1 ? '' : 's'} have a starting amount and date`,
         s.truncatedFrom ? `from ${s.truncatedFrom}` : null,
       ].filter(Boolean).join(' · ');
     }

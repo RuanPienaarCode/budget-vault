@@ -171,7 +171,7 @@ async function mount(files) {
     `the tile totals the growth nobody recorded — got "${growthTile}"`);
   ok(growthTile.includes(`+25.0% on ${money(60000, 0)} put in`),
     `and states what it is a return ON — got "${growthTile}"`);
-  ok(/1 of 2 not measurable/.test(growthTile),
+  ok(/1 of 2 missing a starting amount or date/.test(growthTile),
     `and admits the account it could not measure — got "${growthTile}"`);
 
   /* ---- 2/3/5: what the measured card says ---- */
@@ -228,7 +228,7 @@ async function mount(files) {
   /* ---- 4. the account that cannot be measured ---- */
   const pot = flat(cards['Plain Pot']);
   ok(!/total/.test(pot), `no return is invented for it — got "${pot}"`);
-  ok(/in R5000/.test(pot), 'while the contribution it CAN see is still reported');
+  ok(/put in R5000/.test(pot), 'while the contribution it CAN see is still reported');
   const potActs = byCls(cards['Plain Pot'], 'acct-drawer-act').map(flat);
   eq(potActs[0], 'Add starting amount',
     `the fix leads, rather than hiding behind Edit — got ${JSON.stringify(potActs)}`);
@@ -256,7 +256,7 @@ async function mount(files) {
   /* Only the excluded account is left out, and the page says so twice — in the
      subtitle and under the chart, because a silent omission is the one thing
      that could make this disagree with the tiles above. */
-  ok(/1 of 2 accounts measurable/.test(flat(nodes.get('savingsGrowthSub'))),
+  ok(/1 of 2 missing a starting amount or date/.test(flat(nodes.get('savingsGrowthSub'))),
     `the subtitle counts what it covers — got "${flat(nodes.get('savingsGrowthSub'))}"`);
   ok(/1 account left out/.test(flat(nodes.get('savingsGrowth'))),
     'and the exclusion is named under the chart');

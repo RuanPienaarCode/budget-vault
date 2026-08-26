@@ -324,8 +324,8 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     checks++;
     let lastToast = ctx._toasts[ctx._toasts.length - 1];
     ok(lastToast && lastToast.bad === true, 'Savings: a failed reconcile reports an error toast (from saveAccount)');
-    ok(!ctx._toasts.some(t => /reconciled/.test(t.msg || '')),
-      'Savings: a failed reconcile never reports the "reconciled to" success toast');
+    ok(!ctx._toasts.some(t => /matches your transactions/.test(t.msg || '')),
+      'Savings: a failed reconcile never reports the "matches your transactions" success toast');
     ok($('#savingsSections').querySelectorAll('.v')[0].textContent === beforeText,
       'Savings: a failed reconcile does not re-render — the old balance stays on screen, not the implied one');
     ok(acct.balance === priorBalance, 'Savings: a failed reconcile backs a.balance out to its prior value');
@@ -336,8 +336,8 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
     fail.clear();
     btn.click(); await flush();
     lastToast = ctx._toasts[ctx._toasts.length - 1];
-    ok(lastToast && lastToast.bad !== true && /reconciled/.test(lastToast.msg || ''),
-      'Savings: a retried reconcile that succeeds reports the "reconciled to" toast');
+    ok(lastToast && lastToast.bad !== true && /matches your transactions/.test(lastToast.msg || ''),
+      'Savings: a retried reconcile that succeeds reports the "matches your transactions" toast');
     ok($('#savingsSections').querySelectorAll('.v')[0].textContent !== beforeText,
       'Savings: a retried reconcile that succeeds re-renders the new figure');
     ok(acct.balance !== priorBalance, 'Savings: a retried reconcile that succeeds actually updates a.balance');

@@ -760,9 +760,9 @@ async function mount(files, period = '2026-07') {
        category's own actual. */
     eq(sum.uncatIncome, 900, 'the incoming half of the uncategorised bucket is reported');
     const hero = nodes.get('heroCard').textContent;
-    ok(/R 900\.00 in, not counted/.test(hero),
+    ok(/R 900\.00 came in without a category/.test(hero),
       `the Income tile discloses money that arrived without a category — got: ${hero}`);
-    ok(!/1 100\.00 in, not counted/.test(hero),
+    ok(!/1 100\.00 came in without a category/.test(hero),
       'and does not sweep the refund in with it');
   }
 
@@ -798,7 +798,7 @@ async function mount(files, period = '2026-07') {
     const hero = nodes.get('heroCard').textContent;
     ok(/Missing categories/.test(hero), `the hero names the state out loud — got: ${hero}`);
     ok(/3 transactions — recategorise/.test(hero), `and says how many rows it touches — got: ${hero}`);
-    ok(/R 400\.00 in, not counted/.test(hero), 'the orphaned deposit is disclosed beside Income too');
+    ok(/R 400\.00 came in without a category/.test(hero), 'the orphaned deposit is disclosed beside Income too');
     /* WHICH categories used to ride only on a hover title — unreachable by a
        tap, on the platform this plugin explicitly targets. They must be
        readable TEXT, not merely present as an attribute a touch never fires. */
@@ -988,7 +988,7 @@ async function mount(files, period = '2026-07') {
     };
     const { ctx, nodes } = await mount(DONE, '2026-07');
     ctx.renderDashboard();
-    ok(/50% allocated/.test(nodes.get('heroCard').textContent),
+    ok(/50% of income budgeted/.test(nodes.get('heroCard').textContent),
       'a finished period states its own share: 6 000 budgeted against 12 000 earned');
   });
   await atDate('2026-07-02', async () => {
@@ -1003,7 +1003,7 @@ async function mount(files, period = '2026-07') {
     };
     const { ctx, nodes } = await mount(WITH_INCOME);
     ctx.renderDashboard();
-    ok(/50% allocated/.test(nodes.get('heroCard').textContent),
+    ok(/50% of income budgeted/.test(nodes.get('heroCard').textContent),
       'budgeted income is the denominator, so day 1 reads the same as day 31');
   });
 
@@ -1024,7 +1024,7 @@ async function mount(files, period = '2026-07') {
     const { ctx, nodes } = await mount(DRIFTED);
     ctx.renderDashboard();
     const txt = nodes.get('dashStale').textContent;
-    ok(/imply R 4 ?000 more/.test(txt.replace(/ /g, ' ')),
+    ok(/add up to R 4 ?000 more/.test(txt.replace(/ /g, ' ')),
       `the caveat sizes the drift it is warning about — got: ${txt}`);
   });
   {
@@ -1032,7 +1032,7 @@ async function mount(files, period = '2026-07') {
        is about a difference, and there isn't one. */
     const { ctx, nodes } = await mount(POSITION);
     ctx.renderDashboard();
-    ok(!/imply/.test(nodes.get('dashStale').textContent),
+    ok(!/add up to/.test(nodes.get('dashStale').textContent),
       'no drift, no drift sentence');
   }
 

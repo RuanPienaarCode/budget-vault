@@ -442,7 +442,7 @@ SHAPES.push({ name: 'goal-amount-zero-and-negative', files: files(['Budget/Setti
     const goals = nodes.get('#savingsGoals');
     ok(goals && goals.textContent.includes('No goals set yet'),
       'goal_amount 0 and -1 both fail the > 0 filter, so the goals card shows its real empty state');
-    ok(!goals.textContent.includes('Goal reached!'),
+    ok(!goals.textContent.includes('Goal reached'),
       'no account here has a positive goal, so nothing may claim one is reached — the exact 1.15-era bug (a.balance >= a.goal_amount true for any balance against a negative goal)');
   } } });
 SHAPES.push({ name: 'negative-asset-value', files: files(['Budget/Settings.md', settings()],

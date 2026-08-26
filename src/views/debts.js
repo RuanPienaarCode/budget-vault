@@ -159,7 +159,7 @@ module.exports = function registerDebts(ctx) {
     const chosen = planStrategy();
     const base = simulate(list, { strategy: 'minimum' });
     const runs = [
-      { key: 'minimum', label: 'Minimum only', note: 'Contracted payments, nothing extra', res: base },
+      { key: 'minimum', label: 'Minimum only', note: 'Just the payments you already make, nothing extra', res: base },
       { key: 'snowball', label: 'Snowball', note: 'Smallest balance first', res: simulate(list, { extra, strategy: 'snowball' }) },
       { key: 'avalanche', label: 'Avalanche', note: 'Highest rate first', res: simulate(list, { extra, strategy: 'avalanche' }) },
     ];
@@ -174,7 +174,7 @@ module.exports = function registerDebts(ctx) {
         el('div', { class: 'dp-note' }, r.note),
         el('div', { class: 'dp-date num' }, r.res.settled && r.res.months ? monthLabel(addMonths(r.res.months, todayForMonths())) : 'not at this payment'),
         el('div', { class: 'dp-sub' }, r.res.settled && r.res.months ? humanMonths(r.res.months) : 'does not clear within 50 years'),
-        el('div', { class: 'dp-row' }, el('span', {}, 'Interest'),
+        el('div', { class: 'dp-row' }, el('span', {}, 'Total interest'),
           el('b', { class: 'num' }, r.res.settled ? money(r.res.interest, 0) : '—')));
       if (r.key !== 'minimum' && saved > 1) {
         card.append(el('div', { class: 'dp-save num' },
@@ -431,7 +431,7 @@ module.exports = function registerDebts(ctx) {
       // that DO have a real original.
       const tracked = S.debts.filter(d => d.original > 0);
       const paidOffHeader = tracked.length && tracked.every(d => d.original === d.balance)
-        ? 'Paid off (since tracked)' : 'Paid off';
+        ? 'Paid off (since you added it)' : 'Paid off';
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Debt'),
         el('th', { scope: 'col', class: 'num' }, 'Balance'),
@@ -450,7 +450,7 @@ module.exports = function registerDebts(ctx) {
         // for the same reason (Payment, Extra / month, Clear by).
         el('th', { scope: 'col', class: 'num',
           title: 'Total interest still to be paid before this debt clears, at the balance, rate and payment as entered' },
-        'Interest left'),
+        'Interest still to pay'),
         el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
@@ -493,7 +493,7 @@ module.exports = function registerDebts(ctx) {
                   title: `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
                     + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. `
                     + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.` },
-                `schedule says ${money(exp.expected, 0)} since ${d.start}`));
+                `on this plan it would be ${money(exp.expected, 0)} by now`));
               }
             }
           }

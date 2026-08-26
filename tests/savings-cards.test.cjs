@@ -288,10 +288,10 @@ async function mount(files) {
   ok(!/▲/.test(cards.Market), `no green zero on an unmeasured fund — got "${cards.Market}"`);
   ok(/no growth recorded/.test(cards.Market),
     `and it says the growth is inside the balance — got "${cards.Market}"`);
-  ok(/in R2000/.test(cards.Market), 'while the contribution it CAN see is still reported');
+  ok(/put in R2000/.test(cards.Market), 'while the contribution it CAN see is still reported');
 
   /* The drift offer on that same fund is marked as a floor. */
-  ok(/implies/.test(cards.Market), 'the drift offer is still made');
+  ok(/add up to/.test(cards.Market), 'the drift offer is still made');
   ok(/recorded movements only/.test(cards.Market),
     `and is qualified as a floor, not a correction — got "${cards.Market}"`);
 
