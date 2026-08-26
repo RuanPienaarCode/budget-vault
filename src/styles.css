@@ -1333,6 +1333,24 @@
 }
 .budget-app-root .kpi-caveat-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* Tap-to-expand caveat chip — dom.js's caveatChip(). A real button that
+   reveals its own detail line on tap, so the substance a `title=` used to
+   carry alone still reaches a phone, which has no hover to read a title
+   from. No transition on the reveal (the detail line is just present or
+   not), so there is nothing here that needs a reduced-motion guard. */
+.budget-app-root .caveat-chip { display: inline-block; }
+.budget-app-root .caveat-chip-btn {
+  font: inherit; font-size: 11.5px; line-height: 1.3; cursor: pointer;
+  padding: 2px 9px; border-radius: 999px;
+  border: 1px solid var(--color-primary); background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+.budget-app-root .caveat-chip-btn[aria-expanded="true"] {
+  background: var(--color-primary); color: var(--ink-on-accent);
+}
+.budget-app-root .caveat-chip-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .caveat-chip-detail { margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+
 /* The derived next-billing date, offered under the typed one on Services. */
 .budget-app-root .svc-next-hint {
   display: inline-flex; align-items: center; gap: 4px;
@@ -1646,9 +1664,18 @@
 /* The asterisk beside a group total that has added more than one currency
    together. Deliberately a mark and a title rather than a colour: it is not a
    warning about a wrong figure, it is a note about what the figure is made of,
-   and the same information is spelled out under the hero above. */
+   and the same information is spelled out under the hero above. Still used by
+   the "Whose it is" owner rows and the Ring's per-group marks (ITEM 5 left
+   those two unchanged) — retired from the table's own group-total row, which
+   now names its foreign currencies directly instead (.acct-group-other). */
 .budget-app-root .acct-mixed {
   margin-left: 3px; color: var(--text-muted); font-weight: 700; cursor: help;
+}
+/* ITEM 5: the table row's own version of the hero's "plus €640" side figure —
+   named outright rather than marked with an asterisk, since the group total
+   beside it no longer mixes currencies to begin with. */
+.budget-app-root .acct-group-other {
+  margin-left: 6px; font-weight: 400; font-size: .82rem; color: var(--text-muted);
 }
 .budget-app-root .table tbody tr.acct-empty td { padding: 34px 12px; text-align: center; color: var(--text-muted); font-size: 13px; border-bottom: none; }
 .budget-app-root .acct-pill {
@@ -1666,8 +1693,9 @@
 .budget-app-root .acct-pill.muted {
   color: var(--text-muted); border-style: dashed; background: none; opacity: .85;
 }
-.budget-app-root .acct-pill-mute { margin-left: 5px; font-weight: 500; opacity: .8; }
-.budget-app-root .acct-pill-mute::before { content: '· '; }
+/* ITEM 4: the muted reason moved from a bare `title` into a caveatChip
+   (dom.js) — the pill itself no longer wraps a `.acct-pill-mute` text node,
+   so that rule (and its "· " prefix) is retired with it. */
 
 /* The drawer — everything the tile used to carry, shown for ONE account. */
 .budget-app-root .table tbody tr.acct-drawer-row td.acct-drawer-cell { padding: 0 .25rem .5rem; border-bottom: none; background: none; }
@@ -1793,6 +1821,20 @@
 .budget-app-root .debt-plan .dp-row b { color: var(--text-primary); }
 .budget-app-root .debt-plan .dp-save { font-size: 12px; font-weight: 600; color: var(--color-success); margin-top: 8px; }
 .budget-app-root .debt-plan .dp-src { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+
+/* ITEM 1: the planner's own what-if headline — the page KPI tile stopped
+   carrying #debtExtra/#debtStrategy, so this is where that projection now
+   lives, right above the three-way comparison grid it summarises. Same
+   "prediction callout" treatment as .left-incoming (Owed Money's own reading
+   of a repeating row), not a new pattern. */
+.budget-app-root .debt-plan-projected {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: 0 0 14px; padding: 11px 14px; border-radius: 10px;
+  background: var(--color-primary-light); border: 1px solid var(--line-soft);
+}
+.budget-app-root .debt-plan-projected .dpp-h { font-size: 15px; font-weight: 700; color: var(--color-primary); }
+.budget-app-root .debt-plan-projected .dpp-h.text-danger { color: var(--color-danger-ink); }
+.budget-app-root .debt-plan-projected .dpp-sub { font-size: 12px; color: var(--text-muted); }
 
 .budget-app-root .debt-order { list-style: none; margin: 0; padding: 0; counter-reset: dbt; }
 .budget-app-root .debt-order li {
@@ -2866,6 +2908,7 @@
   .budget-app-root .trend-svg-wrap svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .caveat-chip-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .svc-next-hint:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }

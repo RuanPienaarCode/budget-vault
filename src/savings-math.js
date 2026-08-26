@@ -20,23 +20,48 @@
    hand-maintained ledgers in this app die within three weeks of being created.
    See docs/adr/0003.
 
-   THE CLASSIFICATION RULE, and its one known weakness:
+   THE CLASSIFICATION RULE (ITEM 2, 2026-08-26 — replaces the rule this
+   header used to state, see the note below the table for why):
 
-     outflow                        → withdrawal
-     inflow, category type `income` → growth        (interest, dividends)
-     inflow, anything else          → contribution
+     outflow                                  → withdrawal
+     inflow, category flagged `interest: true` → growth
+     inflow, anything else (real, non-transfer) → contribution
 
-   Growth is recognised by the category TYPE, not by a category name: "Interest
+   Growth is recognised by a category FLAG, not a category name: "Interest
    income" is one vault's English label, and a rule keyed to that string is
    wrong in every other language and in any vault that named it differently.
 
-   The weakness: a salary paid DIRECTLY into a savings account is also an
-   income-type inflow, and would be counted as growth when it is really a
-   contribution. It is not guessable from the data — both are income arriving
-   from outside. Rather than pretend, `growthCategories` names every category
-   that fed the growth figure so a reader can see a salary sitting in there and
-   correct the category. Silent misclassification is the failure this module
-   exists to end, so it must not introduce one of its own.
+   WHY A FLAG AND NOT THE `income` TYPE ANY MORE. The rule used to be simpler
+   — any income-typed inflow was growth — and it had exactly one known
+   weakness, named in this header since the day it shipped: a salary, a
+   client payment or a UIF payment landing DIRECTLY in a savings or
+   investment account is ALSO an income-type inflow, and was counted as
+   growth when it is really a contribution. `type` alone cannot tell the two
+   apart — both are income arriving from outside — so the household now
+   says so itself: a category is growth-worthy only once it carries
+   `interest: true` in its frontmatter (load.js, the same additive,
+   opt-in, defaults-false shape `fixed` already uses — see load.js's own
+   comment on that field). Every other real, non-transfer inflow is a
+   contribution: money the household put in, by hand or by debit order,
+   whatever the category is called or typed, income included.
+
+   `typeOf` here is not the household's raw category type any more — every
+   caller must inject `poolCatType` (this module's own export, built once
+   from `S.categories` and shared by views/savings.js AND views/accounts.js's
+   totalReturn() call) rather than `ctx.catType` directly, or an income-typed
+   Interest category answers 'income' again here and silently stops being
+   growth. poolCatType folds `type === 'income' && category.interest` down to
+   the single string 'interest' this rule checks for; every other type passes
+   through unchanged.
+
+   BACKWARD COMPATIBILITY, stated rather than hidden: an existing "Interest"
+   category (income-typed, `interest` unset) now reads as an ordinary
+   contribution until the household ticks the flag — a visible move (the
+   category simply stops appearing under "growth from…" and starts appearing
+   as money put in), not a silent one, and `growthCategories` below still
+   names whatever DOES feed growth so a miscategorised row is never invisible
+   either way. Silent misclassification is the failure this module exists to
+   end, so it must not introduce one of its own.
 
    Contributions deliberately have no category of their own. They wear the
    budget category they came FROM — in one real vault "Baby fund Jan" is
@@ -61,6 +86,30 @@
 const { ISO_DATE, todayIso, isRealIsoDate } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
 
+/* Builds the `typeOf` classifyRow (and everything downstream of it) actually
+   wants: a category's ordinary type, EXCEPT an income-typed category the
+   household has flagged `interest: true` reports as the single string
+   'interest' instead — the one thing classifyRow now recognises as growth.
+
+   Takes `categories` (S.categories) directly rather than being handed an
+   existing `ctx.catType`-style function, so this can be built ONCE, here, and
+   shared byte-for-byte by every caller. That sharing is load-bearing, not
+   tidiness: views/accounts.js's totalReturn() call feeds the SAME goal-cell
+   and drawer growth figure views/savings.js shows for the same account (see
+   accounts.js's own comment on that totalReturn() call for the exact bug —
+   `balance - total_invested` disagreeing by R60 000 on one real account —
+   this repo has already shipped once from two call sites deriving "what this
+   account earned" independently). A caller that passes `ctx.catType` straight
+   through instead of this wrapper silently reverts to the OLD rule for
+   itself alone: every income-typed category, flagged or not, answers
+   'income' again, and interest keeps registering as growth on THAT screen
+   while the household's own flag is respected everywhere else. */
+function poolCatType(categories, name) {
+  const c = (categories || []).find(x => x.name === name);
+  if (!c) return null;
+  return (c.type === 'income' && c.interest) ? 'interest' : c.type;
+}
+
 /* THE classification rule, in one place.
 
    Extracted so splitFlows() and monthlyFlows() below cannot drift: they answer
@@ -72,12 +121,17 @@ const { supersededBySplit } = require('./tx-role');
    Deliberately does NOT apply the date window: splitFlows filters by date after
    calling this, and the ORDER matters. A split parent excluded here is excluded
    whether or not it falls inside the window, which is what stops a window whose
-   edge lands between a parent and its parts from counting the money twice. */
+   edge lands between a parent and its parts from counting the money twice.
+
+   `typeOf` is expected to already be pool-aware — poolCatType() above, not a
+   bare category-type lookup — so the ONLY thing that reads as growth here is
+   the string 'interest'. Everything else a real, non-transfer inflow answers
+   (income included) is a contribution; see this file's own header for why. */
 function classifyRow(r, typeOf) {
   if (!r || typeof r.amount !== 'number' || !r.amount) return null;
   if (supersededBySplit(r)) return null;   // its parts are in this same list
   if (r.amount < 0) return 'withdrawal';
-  return (typeOf ? typeOf(r.cat) : null) === 'income' ? 'growth' : 'contribution';
+  return (typeOf ? typeOf(r.cat) : null) === 'interest' ? 'growth' : 'contribution';
 }
 
 /* Split one account's rows. `typeOf(categoryName)` returns the category's type
@@ -699,4 +753,4 @@ for (const { acct, row } of inflows) {
   return savings;
 }
 
-module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthSeries, classifyRow, chartable };
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthSeries, classifyRow, chartable, poolCatType };

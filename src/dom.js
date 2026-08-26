@@ -86,6 +86,45 @@ function icoEl(names, cls) {
   return s;
 }
 
+/* A caveat that reads on a phone, not just under a mouse.
+
+   `title=` is a hover tooltip — invisible on iOS/Android, which have no
+   hover — so a caveat that only lived in a `title` attribute (the "Interest
+   still to pay" column header, the Savings page's account-file-not-
+   transactions note, an Accounts drawer reconciliation line) disappeared
+   entirely on the platform this plugin ships to as a first-class target, not
+   a fallback one. This renders the short version as a real, focusable
+   `<button>` that reveals an inline detail line on tap, with `aria-expanded`
+   so a screen reader knows which state it is in. `title` is kept too — a
+   free desktop-hover bonus that costs nothing and some readers still reach
+   for — but it is never the ONLY way to reach the sentence again.
+
+   No CSS transition on the reveal: the detail line is either there or it
+   isn't, so there is nothing here that needs a prefers-reduced-motion guard.
+
+   The 44pt touch target is not this function's job to build: the blanket
+   `button:not(.mod-loading)::after` overlay rule in styles.css (under
+   `@media (pointer: coarse)`) already grows every plain `<button>` on a
+   coarse pointer, for free, via `:where(button:not(.mod-loading))` — which
+   carries zero specificity, so a caller that needs to position ITS OWN
+   button (the way the score ring centres its own) keeps that positioning
+   without a fight.
+
+   Returns the wrapping `<span>`; append it wherever a bare `title=` used to
+   sit — the whole point is that nothing else about the call site changes. */
+function caveatChip(shortText, detailText) {
+  const btn = el('button', {
+    type: 'button', class: 'caveat-chip-btn', title: detailText, 'aria-expanded': 'false',
+  }, shortText);
+  const detail = el('div', { class: 'caveat-chip-detail hidden' }, detailText);
+  btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    detail.classList.toggle('hidden', open);
+  });
+  return el('span', { class: 'caveat-chip' }, btn, detail);
+}
+
 /* The KPI strip every page opens with: a row of `.mini` tiles, each a label,
    a number, and optionally a line of context under it.
 
@@ -150,4 +189,4 @@ function setInert(elm, on) {
   }
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, kpiTiles, setInert };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert };

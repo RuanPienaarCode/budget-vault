@@ -102,16 +102,21 @@ function provenFalse(desc, exactShape, mangled) {
 /* ========================================================================
    TERM 1 — "Growth"  ·  status: unified
    ------------------------------------------------------------------------
-   Rule: growth is savings-math.js's totalReturn(account, rows, catType,
+   Rule: growth is savings-math.js's totalReturn(account, rows, poolType,
    opts).growth, and NOTHING else. Both consumers used to each derive it
    their own way — views/savings.js always went through totalReturn();
    views/accounts.js used to compute `balance - total_invested`, a formula
    that ignores withdrawals, so it disagreed with the Savings page by R60 000
    on the same real account (see accounts.js's own comment, left in place on
-   purpose as the reason there is now exactly one call site). ======================================================================= */
+   purpose as the reason there is now exactly one call site).
+
+   ITEM 2 (2026-08-26): the literal moved from `catType` to `poolType` in both
+   files — the SAME poolCatType(S.categories, name) wrapper, built once per
+   view and never the bare ctx.catType, or an income-typed category flagged
+   `interest: true` on one page silently stops being growth on the other. ======================================================================= */
 {
-  const TR_CALL = 'totalReturn(a, rows, catType, { today: todayIso() })';
-  const TR_CALL_SAV = 'totalReturn(e.account, e.rows, catType, { today: todayIso() })';
+  const TR_CALL = 'totalReturn(a, rows, poolType, { today: todayIso() })';
+  const TR_CALL_SAV = 'totalReturn(e.account, e.rows, poolType, { today: todayIso() })';
   ok(live.accounts.includes(TR_CALL), 'Growth: accounts.js computes each account\'s return through the shared totalReturn(), not a local formula');
   ok(live.accounts.includes('r.tr.growth') || live.accounts.includes('tr.growth'),
     'Growth: accounts.js reads .growth off that same totalReturn() result, not off balance minus total_invested');
@@ -146,15 +151,23 @@ function provenFalse(desc, exactShape, mangled) {
    term on purpose, and it discloses the gap with an `elsewhere` caveat
    whenever Assets or Debts actually hold something this figure left out. A
    different word for a different number is not a collision to guard against
-   — it is the thing this whole file exists to make everyone else do too. ======================================================================= */
+   — it is the thing this whole file exists to make everyone else do too.
+
+   ITEM 5 (2026-08-26): the account list FEEDING worth() narrowed further —
+   `primary` is the readable accounts split by currency (splitByCurrency, this
+   file's own), not the raw filtered list — but the two null arguments (still
+   no debts, no assets) are exactly what this term exists to pin, so the
+   literal moved with the call rather than the term being retired. ======================================================================= */
 {
   const FULL_WORTH = 'worth(S.accounts, S.debts, S.assets)';
   ok(live.dashboard.includes(FULL_WORTH), 'Net worth: dashboard.js computes it via worth(accounts, debts, assets)');
   ok(live.savings.split(FULL_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
   ok(live.healthData.includes('worth(S.accounts, S.debts, S.assets).net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
 
-  ok(live.accounts.includes('worth(S.accounts.filter(a => !unreadableBalance(a)), null, null)'),
+  ok(live.accounts.includes('worth(primary, null, null)'),
     'Net worth: accounts.js\'s hero is the declared exception — worth() called with no debts/assets, on purpose');
+  ok(live.accounts.includes('splitByCurrency(S.accounts.filter(a => !unreadableBalance(a)))'),
+    'Net worth: and `primary` is still built from the same readable-accounts filter this term always pinned, now split by currency first (ITEM 5)');
   ok(!live.accounts.includes("i18n.t('dash.pos.netWorth')") && !live.accounts.includes("'Net worth'"),
     'Net worth: accounts.js never borrows the "Net worth" word for its narrower figure — its own label key is distinct');
   ok(live.accounts.includes("i18n.t('acct.hero.elsewhere')"),

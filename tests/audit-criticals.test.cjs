@@ -241,24 +241,48 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
    account under an income-typed "Reimbursements" category was classified as
    growth and excluded, while every rand that later left counted in full. The
    household was told it had saved -19% of its income. The rows below are that
-   month, unchanged. */
+   month, unchanged.
+
+   ITEM 2 (2026-08-26) update: at the time, "the reimbursement is classified
+   as growth" was accepted as the TRAP savings-math.js's header openly named
+   — not the bug 1.23.1 was fixing, which was the asymmetric NETTING beneath
+   it (an inflow could be dropped from `contributions` while every outflow
+   still counted). The trap itself is now closed: an income-typed category
+   only reads as growth once the household flags it `interest: true`
+   (poolCatType(), savings-math.js), and "Reimbursements" — an ordinary
+   income category, unflagged — never would be. So this fixture's own R40 000
+   now lands in `contributions`, not `growth`, from the first line, and the
+   dramatic "contributions-minus-withdrawals reports a LOSS on a month that
+   gained R23 316" no longer reproduces on THIS fixture — the classification
+   bug that caused it is gone. What survives, and is still worth pinning, is
+   the deeper invariant 1.23.1 actually protects: `net` is symmetric
+   regardless of which bucket a real inflow lands in — proved here by adding
+   one row that IS flagged interest, so growth is not simply zero throughout. */
 {
-  const { splitFlows } = require('../src/savings-math');
+  const { splitFlows, poolCatType } = require('../src/savings-math');
   const rows = [
     { date: '2026-08-07', desc: 'UIF', cat: 'Reimbursements', amount: 40000 },
+    { date: '2026-08-09', desc: 'Interest', cat: 'Interest income', amount: 300 },
     { date: '2026-08-11', desc: 'demand savings', cat: 'Discovery 32 Day', amount: 4300 },
     { date: '2026-08-11', desc: 'Subaru maintenance', cat: 'Car maintenance', amount: -11514 },
     { date: '2026-08-23', desc: 'Emergency savings', cat: 'Discovery 32 Day', amount: -4270 },
     { date: '2026-08-23', desc: 'settling up', cat: 'Settle Credit Card', amount: -5200 },
   ];
-  const catType = c => (c === 'Reimbursements' || c === 'Interest income' ? 'income' : 'expense');
+  // 'Reimbursements' is income-typed but UNFLAGGED — ITEM 2's whole point.
+  // 'Interest income' IS flagged, so growth is not simply zero here either.
+  const categories = [
+    { name: 'Reimbursements', type: 'income' },
+    { name: 'Interest income', type: 'income', interest: true },
+  ];
+  const catType = c => poolCatType(categories, c);
   const f = splitFlows(rows, catType, {});
 
-  eq(f.growth, 40000, 'the reimbursement is classified as growth — that is the trap, not the bug');
-  eq(f.withdrawals, 20984, 'and every outflow counts in full');
-  ok(f.contributions - f.withdrawals < 0,
-    'so contributions-minus-withdrawals reports a LOSS on a month that gained R23 316');
-  eq(f.net, 23316, 'net is the symmetric figure: everything in, less everything out');
+  eq(f.growth, 300, 'ITEM 2: only the FLAGGED category is growth now — the R40 000 reimbursement no longer rides in on its income type alone');
+  eq(f.contributions, 44300, 'the reimbursement (unflagged, income-typed) correctly joins contributions instead');
+  eq(f.withdrawals, 20984, 'and every outflow counts in full, unchanged');
+  eq(f.net, 23616, 'net is the symmetric figure: everything in, less everything out');
+  eq(f.net, f.contributions + f.growth - f.withdrawals,
+    'net accounts for every classified row in both directions, whichever bucket each one landed in');
   ok(f.net > 0, 'and it gets the direction right, which is the whole point');
 
   /* The asymmetry itself, stated as an invariant rather than as one example:

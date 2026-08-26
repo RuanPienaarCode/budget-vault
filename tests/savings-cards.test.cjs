@@ -193,14 +193,23 @@ const acctFile = fm => `---\n${fm}\n---\n`;
    recognisable rather than plausible. */
 const FILES = {
   [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
-  [`${B}/Categories/Interest.md`]: '---\ntype: income\ncolor: "#27ae60"\n---\n',
+  // interest: true (ITEM 2, 2026-08-26) — Pot's own "Interest" row (below) must
+  // still read as growth now that income-typed no longer means growth on its
+  // own; Fund's "Salary" row deliberately carries NO such flag — see the
+  // updated comment on it below, the whole reason this category exists in
+  // this fixture flipped with this change.
+  [`${B}/Categories/Interest.md`]: '---\ntype: income\ninterest: true\ncolor: "#27ae60"\n---\n',
   [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#27ae60"\n---\n',
   [`${B}/Categories/Savings.md`]: '---\ntype: expense\ncolor: "#2980b9"\n---\n',
 
   [`${B}/Accounts/Cheque.md`]: acctFile('type: checking\ntx_label: "Cheque"\nbalance: 10000\nbalance_updated: 2026-08-01'),
   [`${B}/Accounts/Pot.md`]: acctFile('type: savings\ntx_label: "Pot"\nbalance: 50000\nbalance_updated: 2026-08-01'),
-  /* One growth category, and it is a consulting fee — the case that used to go
-     unqualified. */
+  /* ITEM 2: was "one growth category, and it is a consulting fee — the case
+     that used to go unqualified" — a client payment landing DIRECTLY in an
+     investment account, income-typed, exactly the shape savings-math.js's
+     classifyRow used to misread as growth. It is now the fixture for the
+     OPPOSITE case: no `interest` flag on Salary, so the consulting fee joins
+     "put in", not "growth from…" — see test 3 below. */
   [`${B}/Accounts/Fund.md`]: acctFile('type: investment\ntx_label: "Fund"\nbalance: 200000\nbalance_updated: 2026-08-01'),
   /* A market-linked fund: contributions recorded, growth never posted, and the
      balance confirmed BEFORE those contributions so it also drifts. */
@@ -277,9 +286,18 @@ async function mount(files) {
     cards[String(c.children[0].textContent)] = flat(c);
   }
 
-  /* A single growth category is named. */
-  ok(/growth from Salary/.test(cards.Fund),
-    `one growth category is still named — got "${cards.Fund}"`);
+  /* ITEM 2 (2026-08-26): was "a single growth category is named" — Fund's
+     Salary-categorised consulting fee used to read as growth on the strength
+     of its income TYPE alone, which is exactly the misclassification this
+     fixture now pins the FIX for instead: no `interest` flag on Salary, so
+     the fee is a contribution, and with no flagged category posting anything
+     the card honestly has no growth to report at all. */
+  ok(/put in R11000/.test(cards.Fund),
+    `the consulting fee joins "put in", not growth — got "${cards.Fund}"`);
+  ok(!/growth from/.test(cards.Fund),
+    `and with nothing flagged \`interest: true\`, no growth is fabricated from it — got "${cards.Fund}"`);
+  ok(/no growth recorded/.test(cards.Fund),
+    `so the card says plainly that none is recorded, same as an unmeasured fund would — got "${cards.Fund}"`);
   /* And more than one still is. */
   ok(/growth from .*Interest/.test(cards.Pot),
     `several growth categories are named — got "${cards.Pot}"`);

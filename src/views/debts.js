@@ -5,7 +5,7 @@
    The arithmetic lives in ../debt-math (pure, separately tested); this file is
    presentation and editing only. */
 
-const { el, kpiTiles, keepScroll, icoEl } = require('../dom');
+const { el, kpiTiles, keepScroll, icoEl, caveatChip } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -105,16 +105,6 @@ module.exports = function registerDebts(ctx) {
     const total = list.reduce((s, d) => s + d.balance, 0);
     const perMonth = list.reduce((s, d) => s + committed(d), 0);
     const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
-    /* Read ONCE and named here. The caption below used to reach for a bare
-       `extra`, which is declared in renderDebtPlan — a different function — so
-       this threw ReferenceError the moment the page drew its tiles, and took
-       the whole Debts view down with it. It shipped in 1.13.0 because this file
-       has no render test: every guard suite was green while the page was dead.
-       Same value the simulation runs on, so the caption cannot describe a
-       different plan from the one above it. */
-    const extra = planExtra();
-    const plan = simulate(list, { extra, strategy: planStrategy() });
-
     const tile = kpiTiles($('#debtKpis'));
     // Neutral: owing money is an ordinary financial position, not a red state.
     tile('Total debt', money(total), '',
@@ -124,18 +114,29 @@ module.exports = function registerDebts(ctx) {
     // cent of principal moves.
     tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
       perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
-    /* The tile silently folded in BOTH the what-if extra typed into the planner
-       below it and the rollover of each cleared payment into the next — so
-       typing 3000 into a box moved the page's headline promise 34 months
-       earlier with nothing saying so. The projection is fine; the caption is
-       what was missing. 'never' likewise became a verdict on the reader rather
-       than a statement about the inputs. */
-    const planAssumes = extra > 0
-      ? `assumes ${money(extra, 0)}/mo extra and each cleared payment rolling into the next`
-      : 'assumes each cleared payment rolls into the next';
-    tile('Debt-free', plan.settled && plan.months ? monthLabel(addMonths(plan.months, todayForMonths())) : (total > 0 ? 'not at this payment' : '—'),
-      plan.settled && plan.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
-      plan.settled && plan.months ? `${humanMonths(plan.months)} — ${planAssumes}` : (total > 0 ? 'not within 50 years at the payments entered' : 'no debt tracked'));
+    /* ITEM 1 re-sourcing: this tile used to run the PLANNER's own simulate()
+       call below — whatever `extra` sat in #debtExtra and whichever strategy
+       was selected in #debtStrategy — so typing 3000 into a box moved the
+       page's own headline promise 34 months earlier with nothing saved to
+       Debts.md to show for it, and the number kept moving as the reader
+       experimented. That coupling is now gone: the headline answers a
+       narrower, unmoving question — debt-free on RECORDED reality alone, each
+       debt's own contracted `payment` plus any standing `extra` already saved
+       to the file. That is exactly debt-math's `strategy: 'minimum'` run (see
+       simulate()'s own header): no pooled what-if extra, and no rollover of a
+       cleared payment into the next — rollover is itself a strategy choice a
+       household has to opt into, not a fact any file states. The planner's
+       what-if still exists; it now lives ONLY in renderDebtPlan's own
+       "With this extra/plan" line, which is free to move without dragging
+       this tile with it. Recomputed here rather than shared with
+       renderDebtPlan's own `base` — two cheap simulate() calls over a
+       household's handful of debts costs nothing, and sharing one across two
+       functions is exactly the kind of coupling this fix removes. */
+    const base = simulate(list, { strategy: 'minimum' });
+    tile('Debt-free', base.settled && base.months ? monthLabel(addMonths(base.months, todayForMonths())) : (total > 0 ? 'not at this payment' : '—'),
+      base.settled && base.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
+      base.settled && base.months ? `${humanMonths(base.months)} — at your recorded payments and extras, no what-if`
+        : (total > 0 ? 'not within 50 years at the payments entered' : 'no debt tracked'));
   }
 
   /* ------------------------------ the plan -------------------------------
@@ -163,6 +164,26 @@ module.exports = function registerDebts(ctx) {
       { key: 'snowball', label: 'Snowball', note: 'Smallest balance first', res: simulate(list, { extra, strategy: 'snowball' }) },
       { key: 'avalanche', label: 'Avalanche', note: 'Highest rate first', res: simulate(list, { extra, strategy: 'avalanche' }) },
     ];
+    // The chosen run, reused below both for this card's own headline and for
+    // the attack-order list further down — planStrategy() only ever returns
+    // one of the two non-minimum keys, so a second simulate() call would just
+    // recompute a result already sitting in `runs`.
+    const plan = runs.find(r => r.key === chosen).res;
+
+    /* ITEM 1: the page KPI (renderDebtKpis) no longer carries this what-if —
+       it now answers "recorded reality only". This line is where the what-if
+       still lives: the SELECTED run's own projected debt-free date, following
+       whatever sits in the two controls above (extra + strategy) right now.
+       Typing into "Extra per month" or switching Snowball/Avalanche moves
+       THIS line, and only this line — never the page's own headline tile. */
+    const projLabel = extra > 0 ? 'With this extra' : 'With this plan';
+    wrap.append(el('div', { class: 'debt-plan-projected' },
+      plan.settled && plan.months
+        ? el('div', { class: 'dpp-h' }, `${projLabel}: debt-free ${monthLabel(addMonths(plan.months, todayForMonths()))}`)
+        : el('div', { class: 'dpp-h text-danger' }, `${projLabel}: not within 50 years`),
+      el('div', { class: 'dpp-sub' },
+        plan.settled && plan.months ? `${humanMonths(plan.months)} on ${chosen}` : `at this payment, on ${chosen}`,
+        extra > 0 ? ` with ${money(extra, 0)}/mo extra` : '')));
 
     const grid = el('div', { class: 'debt-plans' });
     for (const r of runs) {
@@ -221,12 +242,9 @@ module.exports = function registerDebts(ctx) {
     }
 
     /* Attack order for the selected method. Snowball and avalanche only differ
-       in this list, so showing it is what makes the choice concrete.
-
-       The chosen run is reused from `runs` above rather than simulated again —
-       planStrategy() only ever returns one of those two keys, so the extra run
-       was computing a result already sitting in the array. */
-    const plan = runs.find(r => r.key === chosen).res;
+       in this list, so showing it is what makes the choice concrete. `plan` is
+       the same chosen-run reference hoisted above, for this card's own
+       headline. */
     const seq = priorityOrder(list.map(d => ({ ...d })), chosen);
     /* "Put every spare rand at these in order" until now — an instruction, and
        the most advice-shaped sentence in the app. The order is arithmetic and
@@ -442,15 +460,16 @@ module.exports = function registerDebts(ctx) {
         el('th', { scope: 'col' }, paidOffHeader),
         el('th', { scope: 'col' }, 'Clear by'),
         // "Interest left" on its own reads as ambiguous on a table already full
-        // of adjacent money columns (Balance, Payment, Extra) — the title names
-        // what it actually is: interest still to be paid, not interest already
-        // paid or a balance figure. A tooltip rather than a longer visible label
-        // because the header row is already eleven columns wide on a table that
-        // scrolls horizontally on a phone; every other header here stays terse
-        // for the same reason (Payment, Extra / month, Clear by).
-        el('th', { scope: 'col', class: 'num',
-          title: 'Total interest still to be paid before this debt clears, at the balance, rate and payment as entered' },
-        'Interest still to pay'),
+        // of adjacent money columns (Balance, Payment, Extra) — the caveat chip
+        // names what it actually is: interest still to be paid, not interest
+        // already paid or a balance figure. A tappable chip rather than a longer
+        // visible label because the header row is already eleven columns wide on
+        // a table that scrolls horizontally on a phone; every other header here
+        // stays terse for the same reason (Payment, Extra / month, Clear by). A
+        // bare `title` here used to be invisible on the phone this table scrolls
+        // on in the first place — caveatChip (dom.js) is the fix.
+        el('th', { scope: 'col', class: 'num' }, caveatChip('Interest still to pay',
+          'Total interest still to be paid before this debt clears, at the balance, rate and payment as entered')),
         el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
@@ -486,14 +505,17 @@ module.exports = function registerDebts(ctx) {
               const gap = d.balance - exp.expected;
               const material = Math.abs(gap) > Math.max(50, d.original * 0.02);
               if (material) {
-                // The date it projects from is in the visible text, not only the
-                // title — a hover tooltip is invisible on a phone, which is half
-                // of where this table is read.
-                payoffCell.append(el('div', { class: 'debt-implied',
-                  title: `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
+                // The short line stays visible on its own — no tooltip needed to
+                // read THAT the schedule disagrees. The full derivation (the
+                // inputs it ran from, and what could explain the gap) used to
+                // live only in a `title`, invisible on a phone, which is half of
+                // where this table is read — caveatChip (dom.js) makes it
+                // reachable by tap there too.
+                payoffCell.append(el('div', { class: 'debt-implied' }, caveatChip(
+                  `on this plan it would be ${money(exp.expected, 0)} by now`,
+                  `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
                     + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. `
-                    + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.` },
-                `on this plan it would be ${money(exp.expected, 0)} by now`));
+                    + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.`)));
               }
             }
           }

@@ -213,7 +213,11 @@ const acct = { balance: 5000, balance_updated: '2026-08-01' };
 
 /* ---- 4. splitFlows: contributions counted once ---- */
 {
-  const typeOf = (c) => (c === 'Interest income' ? 'income' : 'savings');
+  // 'interest', not 'income' (ITEM 2, 2026-08-26) — this fixture stands in for
+  // a category flagged `interest: true`; savings-math.js's classifyRow only
+  // reads growth off that exact string now, via poolCatType(). This block's
+  // own point (a split contribution counted once) is unaffected either way.
+  const typeOf = (c) => (c === 'Interest income' ? 'interest' : 'savings');
   // R2,000 moved into a fund, split across two categories, plus real interest.
   const rows = [
     { date: '2026-08-03', desc: 'TRANSFER IN', cat: '', amount: 2000, excluded: true, note: '', split: SPLIT_PARENT },

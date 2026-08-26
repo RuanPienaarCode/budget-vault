@@ -116,7 +116,11 @@ const txFile = rows =>
    at all — the case that must be excluded, counted, and offered the fix. */
 const FILES = {
   [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
-  [`${B}/Categories/Interest.md`]: '---\ntype: income\ncolor: "#27ae60"\n---\n',
+  // interest: true (ITEM 2, 2026-08-26) — this fixture's whole point (the
+  // R1 000 posted growth in the comment above) is a credited interest row
+  // that must stay growth now that income-typed no longer means growth on
+  // its own; see savings-math.js's own header for the flag this reads.
+  [`${B}/Categories/Interest.md`]: '---\ntype: income\ninterest: true\ncolor: "#27ae60"\n---\n',
   [`${B}/Categories/Savings.md`]: '---\ntype: expense\ncolor: "#2980b9"\n---\n',
 
   [`${B}/Accounts/Growth Fund.md`]: acctFile(

@@ -72,16 +72,48 @@ async function mount(files = FILES, extra = '') {
     ok(nodes.get('#debtTable').children.length > 0, 'the debt table is drawn');
   }
 
-  /* ---- 2. the exact escape: a what-if extra reaches the caption ----
-     `extra` was out of scope in renderDebtKpis, so ANY render threw — but this
-     pins the branch that actually reads it, which is the one a reader reaches
-     by typing into the planner box. */
+  /* ---- 2. the original escape: renderDebtKpis must not throw on a what-if ----
+     `extra` used to be out of scope in renderDebtKpis (a bare reference into a
+     DIFFERENT function's binding), so ANY render threw. renderDebtKpis no
+     longer reads the planner's `extra` or `strategy` at all (ITEM 1 —
+     re-sourced to recorded reality only), but this still exercises the same
+     render path with a non-zero what-if sitting in the box, so a regression
+     that reintroduces the coupling (or any other out-of-scope reach) still
+     throws here. */
   {
     const { ctx, nodes } = await mount(FILES, '3000');
-    noThrow(() => ctx.renderDebts(), 'a what-if extra must not throw on the way into the Debt-free caption');
-    const txt = nodes.get('#debtKpis').textContent;
-    ok(/3\s?000/.test(txt.replace(/ /g, ' ')),
-      'and the caption states the extra it folded in, rather than promising a date that assumes it silently');
+    noThrow(() => ctx.renderDebts(), 'a what-if extra in the planner box must not throw the page');
+    ok(nodes.get('#debtKpis').textContent.includes('Debt-free'), 'the KPI tile still renders');
+  }
+
+  /* ---- 2b. ITEM 1 — the headline stops moving with the what-if ----
+     The Debt-free KPI tile is recorded reality only: each debt's own
+     `payment` + standing `extra`, no pooled what-if and no rollover. Typing
+     into #debtExtra (or switching #debtStrategy) must not move it a single
+     character. The planner card's own line (`.debt-plan-projected`) is where
+     that what-if now lives, and IT must move. */
+  {
+    const { ctx: ctxA, nodes: nodesA } = await mount(FILES, '0');
+    ctxA.renderDebts();
+    const headlineNoExtra = nodesA.get('#debtKpis').textContent;
+    const plannerNoExtra = nodesA.get('#debtPlan').textContent;
+
+    const { ctx: ctxB, nodes: nodesB } = await mount(FILES, '3000');
+    ctxB.renderDebts();
+    const headlineWithExtra = nodesB.get('#debtKpis').textContent;
+    const plannerWithExtra = nodesB.get('#debtPlan').textContent;
+
+    ok(headlineNoExtra === headlineWithExtra,
+      'ITEM 1: the Debt-free headline tile is byte-identical whether the planner what-if is 0 or 3000 — '
+      + 'it no longer reads #debtExtra/#debtStrategy at all');
+    ok(!/3\s?000/.test(headlineWithExtra.replace(/ /g, ' ')),
+      'ITEM 1: the headline never mentions the planner extra');
+    ok(plannerNoExtra !== plannerWithExtra,
+      'ITEM 1: the planner card DOES move with the what-if — it is the only place the extra still lands');
+    ok(/3\s?000/.test(plannerWithExtra.replace(/ /g, ' ')),
+      'ITEM 1: the planner card states the extra it is projecting with');
+    ok(/With this extra/.test(plannerWithExtra),
+      'ITEM 1: the planner card labels its own projected line, distinct from the page headline');
   }
 
   /* ---- 3. replan, the path the planner controls call ---- */

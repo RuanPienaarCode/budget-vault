@@ -3,21 +3,30 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
-const { el, icoEl, keepScroll } = require('../dom');
+const { el, icoEl, keepScroll, caveatChip } = require('../dom');
 /* The ring reuses the Dashboard's own chart primitives rather than a second
    donut implementation — same arc maths, same tooltip, same theme lookup, so
    the two rings on this app cannot drift apart visually. */
 const { createChart, arcPath, tip, themeColors } = require('../chart');
 const { normalizeAmount } = require('../amount');
 /* A display symbol per account, and the disclosure when a total spans more
-   than one of them. It converts nothing — see the module header. */
-const { symbolOf, currenciesIn } = require('../currency');
+   than one of them. It converts nothing — see the module header. isForeign is
+   used only by this view's own splitByCurrency() below — currency.js stays
+   display-only by design (tests/currency.test.cjs's own §7 pins that), so the
+   ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
+   this view's arithmetic, not that module's. */
+const { symbolOf, isForeign, currenciesIn } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
    `balance - total_invested` was retired: measured against four real accounts
-   it was wrong on all four. */
-const { totalReturn } = require('../savings-math');
+   it was wrong on all four. poolCatType alongside it: ITEM 2, the same
+   growth/contribution split savings.js now makes — this file's own
+   totalReturn() call below must feed it the SAME pool-aware type lookup or
+   the goal cell and drawer answer a different growth figure for the same
+   account than the Savings page does (exactly the two-call-sites-drift bug
+   the comment above already names one instance of). */
+const { totalReturn, poolCatType } = require('../savings-math');
 const { yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
@@ -70,7 +79,12 @@ const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
-    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName, catType } = ctx;
+    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
+
+  /* ITEM 2: the SAME wrapper views/savings.js builds for its own totalReturn()
+     calls — see savings-math.js's poolCatType() header for why the raw
+     ctx.catType must never reach totalReturn() directly here. */
+  const poolType = name => poolCatType(S.categories, name);
 
   /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: this page writes
      on every edit (each dialog saves on submit), so there is never an unsaved
@@ -96,6 +110,51 @@ module.exports = function registerAccounts(ctx) {
      ever sees the household-wide figure — so the same rule is repeated here
      rather than imported. */
   const roundedSum = accts => (Math.round(accts.reduce((s, a) => s + a.balance, 0) * 100) / 100) || 0;
+
+  /* ITEM 5: the hero and the table's own group subtotals used to add every
+     balance regardless of currency and disclose the mix with acct.hero.mixed
+     ("adds accounts... without converting them"). That is still an honest
+     sentence for the Ring and the "Whose it is" split, which are UNCHANGED —
+     but a headline that says "R" should not be quietly summing euros into it.
+     This splits a set of accounts into the ones in the household's own
+     currency (safe to add straight up) and a running total per FOREIGN symbol
+     present, so a caller can state the primary sum alone and offer each other
+     currency as its OWN side figure — still never converted, exactly
+     currency.js's own rule, just applied at the point of summing rather than
+     only at the point of disclosing. */
+  const splitByCurrency = accts => {
+    const home = S.settings.currency;
+    const primary = [];
+    const bySymbol = new Map();
+    for (const a of accts) {
+      if (isForeign(a, home)) {
+        const sym = symbolOf(a, home);
+        bySymbol.set(sym, (bySymbol.get(sym) || 0) + (Number(a.balance) || 0));
+      } else {
+        primary.push(a);
+      }
+    }
+    return { primary, others: [...bySymbol] };
+  };
+
+  /* "€ 640,00 · $ 1 200,00" — zero decimals, since this is always a side note
+     beside a headline that already carries its own full precision. Shared by
+     both wrappers below so the hero's sentence and the table row's short tag
+     can never print the list in a different order or a different rounding. */
+  const otherCurrenciesList = others => others.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
+
+  /* The hero's full sentence — " Plus {list} held in other currencies, not
+     converted." Empty string when nothing is foreign, so a caller can always
+     concatenate it onto the sub-line without an `if`. */
+  const otherCurrenciesLine = others => (others.length
+    ? i18n.t('acct.hero.otherCurrencies', { list: otherCurrenciesList(others) }) : '');
+
+  /* The table row's compact tag — "plus {list}" — beside a group total that is
+     already narrow on a table that scrolls horizontally on a phone; the full
+     sentence above would not fit and would repeat "not converted" once per
+     group, which the hero already said once for the whole page. */
+  const otherCurrenciesTag = others => (others.length
+    ? i18n.t('acct.table.otherCurrencies', { list: otherCurrenciesList(others) }) : '');
 
   /* Is this account's balance a cell the loader could not read AT ALL — as
      opposed to one merely written in a non-canonical format (a decimal comma,
@@ -703,7 +762,7 @@ module.exports = function registerAccounts(ctx) {
          deriving "what this account earned" independently is exactly how the
          retired `balance - total_invested` formula and views/savings.js's
          totalReturn() came to disagree by R60 000 on the same account. */
-      const tr = totalReturn(a, rows, catType, { today: todayIso() });
+      const tr = totalReturn(a, rows, poolType, { today: todayIso() });
       return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a), tr }, st);
     });
   }
@@ -737,7 +796,17 @@ module.exports = function registerAccounts(ctx) {
        flagged, so the reader can fix it; it just does not silently count as
        R0,00 toward what the household is worth. */
     const unreadable = S.accounts.filter(unreadableBalance);
-    const w = worth(S.accounts.filter(a => !unreadableBalance(a)), null, null);
+    /* ITEM 5: the headline used to ADD every readable balance and disclose
+       that the result mixed currencies. It now sums only the accounts stated
+       in the household's own currency — the only ones this figure can add
+       without pretending a euro is a rand — and each foreign currency present
+       becomes its own side figure below, in its own symbol, never converted
+       or folded in. Split BEFORE worth(): worth.js's own arithmetic is shared
+       with the Dashboard, Savings and the health score, so this view feeds it
+       a narrower account list rather than teaching it a new rule those pages
+       never asked for. */
+    const { primary, others } = splitByCurrency(S.accounts.filter(a => !unreadableBalance(a)));
+    const w = worth(primary, null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     const attention = rows.filter(wantsALook).length;
     const oldest = rows.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
@@ -749,26 +818,13 @@ module.exports = function registerAccounts(ctx) {
     const elsewhere = (S.assets || []).some(x => x.value > 0)
       || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
 
-    /* This figure ADDS every balance and states the result in the household
-       currency. Where an account is denominated in something else that is not
-       a conversion — no rate is stored, and one would be a fact about a day
-       this vault does not hold — it is a plain sum of unlike figures. So it
-       says so, right under the number.
-
-       Deliberately not an exclusion. `budget: false` is the one mechanism this
-       app has for keeping an account out of a total, and committed.js states
-       why there must not be a second: two overlapping ways to exclude the same
-       account is how a reader ends up unable to explain their own total. A
-       reader who wants the euro account out already knows how to do it. */
-    const symbols = currenciesIn(S.accounts, S.settings.currency);
-
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
       el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
-        + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')
+        + otherCurrenciesLine(others)
         // TODO(i18n): acct.hero.unreadable — "{count} account balance could
         // not be read and is left out of this total." (plural: "balances").
         + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')));
@@ -1302,10 +1358,14 @@ module.exports = function registerAccounts(ctx) {
     /* A muted account still says what it IS — the pill is the fact, and the
        reader asked for the nagging to stop, not for the page to start
        claiming the figure agrees with transactions it has never seen. Muting
-       only drops the alarm colour and adds the reason it is quiet. */
+       only drops the alarm colour and adds the reason it is quiet. The WHY
+       ("Ignored on this account, so it is not listed under 'Needs a look'.")
+       used to live only in a `title`, invisible on the phones this table's
+       reconciliation state is read on just as much as a desktop — caveatChip
+       (dom.js) makes it reachable by tap. */
     if (r.muted) {
-      return el('span', { class: 'acct-pill muted', title: i18n.t('acct.mutedTitle') },
-        label, el('span', { class: 'acct-pill-mute' }, i18n.t('acct.state.muted')));
+      return el('span', { class: 'acct-pill muted' },
+        label, ' ', caveatChip(i18n.t('acct.state.muted'), i18n.t('acct.mutedTitle')));
     }
     return el('span', { class: `acct-pill ${cls}` }, label);
   }
@@ -1721,17 +1781,18 @@ module.exports = function registerAccounts(ctx) {
         for (const [key] of ACCT_GROUPS) {
           const inGroup = shown.filter(r => r.group === key);
           if (!inGroup.length) continue;
-          const total = roundedSum(inGroup.map(r => r.a));
-          /* Same disclosure as the hero, at group scale: a Bank total that has
-             quietly added euros to rands is marked where the total is, not in a
-             legend somewhere else on the page. */
-          const mixed = currenciesIn(inGroup.map(r => r.a), S.settings.currency).length > 1;
+          /* ITEM 5, same rule as the hero above it: this row's own total sums
+             only the group's primary-currency accounts, and any other
+             currency in the group gets its own small side figure rather than
+             being folded in and marked with an asterisk. */
+          const { primary, others } = splitByCurrency(inGroup.map(r => r.a));
+          const total = roundedSum(primary);
           body.append(el('tr', { class: 'type-row' },
             el('td', { colspan: '8' },
               i18n.t(key),
               el('span', { class: 'acct-group-total num' }, money(total),
-                ...(mixed ? [el('span', { class: 'acct-mixed',
-                  title: i18n.t('acct.mixedTitle') }, '*')] : [])))));
+                ...(others.length ? [el('span', { class: 'acct-group-other' },
+                  otherCurrenciesTag(others))] : [])))));
           for (const r of inGroup) emit(r);
         }
       } else {

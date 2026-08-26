@@ -723,7 +723,12 @@ module.exports = {
   'acct.hero.label': 'Net across your accounts',
   'acct.hero.sub': '{assets} in credit against {liabilities} overdrawn.',
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
+  /* ITEM 5: the hero itself no longer does this — its own total now sums only
+     the household's own currency (acct.hero.otherCurrencies, below, is what
+     it says instead). This key stays live for the Ring and the "Whose it is"
+     split, which still add every currency together and are unchanged. */
   'acct.hero.mixed': ' This total adds accounts held in more than one currency ({symbols}) without converting them.',
+  'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   'acct.hero.muted': 'Warnings ignored',
   'acct.mixedTitle': 'Adds accounts held in more than one currency, without converting them.',
   'acct.hero.count': 'Accounts',
@@ -781,6 +786,9 @@ module.exports = {
   'acct.table.grouped': ' · grouped by kind',
   'acct.table.flat': ' · flat',
   'acct.table.sortedBy': ' · sorted by {column}',
+  // ITEM 5: the compact companion to acct.hero.otherCurrencies — a group
+  // subtotal row is narrow, so this is a short tag rather than a sentence.
+  'acct.table.otherCurrencies': 'plus {list}',
   'acct.col.account': 'Account',
   'acct.col.balance': 'Balance',
   'acct.col.month': 'Period',
@@ -1107,7 +1115,7 @@ module.exports = {
   'score.flow.chip.budgeted': 'Budgeted',
   'score.flow.chip.allocatedOfIncome': 'Share of income budgeted',
   'score.flow.chip.spent': 'Spent',
-  'score.flow.chip.budgetUsed': 'Budget used',
+  'score.flow.chip.budgetUsed': 'Budget used this period',
   'score.flow.chip.budgetUsedNote': 'This period only — the score above uses a six-period average.',
   'score.flow.chip.lefts': 'Money left — two kinds',
   'score.flow.chip.leftInBudget': 'Left in the budget',

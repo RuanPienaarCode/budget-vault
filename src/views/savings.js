@@ -1,11 +1,11 @@
 'use strict';
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
-const { el, kpiTiles, icoEl } = require('../dom');
+const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
 const { isStale, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthSeries, chartable } = require('../savings-math');
+const { accountFlows, totalReturn, growthSeries, chartable, poolCatType } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
@@ -28,7 +28,16 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, accountIndex, catType } = ctx;
+  const { S, $, root, money, accountIndex } = ctx;
+
+  /* ITEM 2: every call into savings-math.js that classifies a row (totalReturn,
+     accountFlows, growthSeries) must use THIS, not ctx.catType directly — see
+     savings-math.js's own poolCatType() header for why passing the raw type
+     straight through silently reverts every income-typed category, flagged
+     interest or not, back to the old "any income is growth" rule on this page
+     alone. Built once so it never drifts from the identical wrapper
+     views/accounts.js's own totalReturn() call uses for the same account. */
+  const poolType = name => poolCatType(S.categories, name);
 
   /* Case-folded and trimmed against the account's own type, not compared
      raw — the same trap views/dashboard.js's own accountsOfType documents,
@@ -100,7 +109,7 @@ module.exports = function registerSavings(ctx) {
      The price is a dependency on `starting_amount`, and every figure here is
      shown with what it depends on rather than alone. */
 
-  const ret = e => totalReturn(e.account, e.rows, catType, { today: todayIso() });
+  const ret = e => totalReturn(e.account, e.rows, poolType, { today: todayIso() });
 
   const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
@@ -356,7 +365,7 @@ module.exports = function registerSavings(ctx) {
            since nothing keeps total_invested in step with a debit order, every
            contribution was reported as performance. */
         const rows = (idx.get(a) || {}).rows || [];
-        const flows = accountFlows(a, rows, catType);
+        const flows = accountFlows(a, rows, poolType);
         const r = ret({ account: a, rows });
 
         /* Where the account records what it STARTED at, the total-return block
@@ -391,11 +400,11 @@ module.exports = function registerSavings(ctx) {
              a savings account crediting monthly interest has a real figure
              above and needs no explanation of one it does not have. */
           if (typeIs(a, 'investment') && !g) {
-            card.append(el('div', { class: 's2 s2-caveat',
-              title: 'Growth only appears here when the account posts it as a transaction the vault can read. '
+            card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+              'no growth recorded — it is inside the balance, not measured here',
+              'Growth only appears here when the account posts it as a transaction the vault can read. '
                 + 'A fund whose value moves with the market posts nothing, so its growth is inside the balance '
-                + 'you typed rather than in this line.' },
-            'no growth recorded — it is inside the balance, not measured here'));
+                + 'you typed rather than in this line.')));
           }
           /* Growth is recognised by category TYPE, and income the household
              EARNED and then deposited here is income-type too — counselling
@@ -417,10 +426,10 @@ module.exports = function registerSavings(ctx) {
              redundant "growth from Interest R120" on the honest account is a
              cheap price for closing that. */
           if (flows.growthCategories.length) {
-            card.append(el('div', { class: 's2 s2-caveat',
-              title: 'Anything here that is not interest or dividends is really a contribution. '
-                + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.' },
-            'growth from ' + flows.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', ')));
+            card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+              'growth from ' + flows.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', '),
+              'Anything here that is not interest or dividends is really a contribution. '
+                + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.')));
           }
         } else if (flows.basis === 'stated') {
           /* No transactions for this account, so the hand-typed baseline is the
@@ -428,10 +437,10 @@ module.exports = function registerSavings(ctx) {
           const over = flows.growth;
           card.append(el('div', { class: `s2 num ${over >= 0 ? 'text-success' : 'text-danger'}` },
             `${over >= 0 ? '▲' : '▼'} ${money(Math.abs(over), 0)} vs ${money(flows.opening, 0)} in`));
-          card.append(el('div', { class: 's2 s2-caveat',
-            title: 'No transactions in the vault for this account, so this is the balance less what the '
-              + 'account file records as put in. Import its statements and the split becomes real.' },
-          'based on the account file, not transactions'));
+          card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+            'based on the account file, not transactions',
+            'No transactions in the vault for this account, so this is the balance less what the '
+              + 'account file records as put in. Import its statements and the split becomes real.')));
         } else if (a.inception_date) {
           card.append(el('div', { class: 's2' }, `since ${a.inception_date}`));
         }
@@ -460,11 +469,11 @@ module.exports = function registerSavings(ctx) {
              accounts to protect the others helps nobody. What it gets is the one
              sentence that stops it reading as a correction. */
           if (typeIs(a, 'investment')) {
-            card.append(el('div', { class: 's2 s2-caveat',
-              title: 'The implied figure adds up recorded movements only. Growth that never posted a '
+            card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+              'added up from recorded movements only — growth is not in it',
+              'The implied figure adds up recorded movements only. Growth that never posted a '
                 + 'transaction is not in it, so on a market-linked fund this figure is a floor rather '
-                + 'than a correction — take it only if your provider agrees.' },
-            'added up from recorded movements only — growth is not in it'));
+                + 'than a correction — take it only if your provider agrees.')));
           }
         } else if (rec.state === 'clean') {
           card.append(el('div', { class: 'acct-recon' },
@@ -513,12 +522,15 @@ module.exports = function registerSavings(ctx) {
     if (r.annualisedPct !== null) bits.push(`≈ ${pct(r.annualisedPct)} a year`);
     if (r.since) bits.push(`since ${r.since}`);
     if (bits.length) {
-      card.append(el('div', { class: 's2',
-        title: r.annualisedPct !== null
-          ? 'The yearly rate is approximate: it assumes every contribution was invested from the '
-            + 'start, which a monthly debit order never is. Treat it as a shape, not a quote.'
-          : null },
-      bits.join(' · ')));
+      /* Marked "≈" wherever it appears, and — now — explained on tap as well
+         as on hover: the whole line carried the caveat before, so the whole
+         line is what becomes tappable, same as it was reachable as a whole
+         under a mouse. */
+      card.append(el('div', { class: 's2' }, r.annualisedPct !== null
+        ? caveatChip(bits.join(' · '),
+          'The yearly rate is approximate: it assumes every contribution was invested from the '
+            + 'start, which a monthly debit order never is. Treat it as a shape, not a quote.')
+        : bits.join(' · ')));
     }
 
     /* The disclosure that matters most, first. A history starting after the
@@ -526,11 +538,11 @@ module.exports = function registerSavings(ctx) {
        reported as growth — the error runs in the flattering direction, which is
        the one a reader is least likely to question. */
     if (r.trust === 'history-gap') {
-      card.append(el('div', { class: 's2 s2-caveat',
-        title: 'Contributions made before your records start are not in the figure above, so they are '
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        `records begin ${r.gapDays} days after it opened — growth may be overstated`,
+        'Contributions made before your records start are not in the figure above, so they are '
           + 'counted as growth instead. Import the account\'s earlier statements, or correct its '
-          + 'opening date, and the split corrects itself.' },
-      `records begin ${r.gapDays} days after it opened — growth may be overstated`));
+          + 'opening date, and the split corrects itself.')));
     }
 
     /* The mirror case. Transactions exist BEFORE the stated opening date, so
@@ -541,27 +553,27 @@ module.exports = function registerSavings(ctx) {
        understated. Disclosed for the same reason the flattering direction is:
        the reader is the only one who knows which of the two is true. */
     if (r.trust === 'pre-inception') {
-      card.append(el('div', { class: 's2 s2-caveat',
-        title: 'This account has transactions dated before the opening date you gave it. The starting '
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        `records begin ${Math.abs(r.gapDays)} days before its opening date`,
+        'This account has transactions dated before the opening date you gave it. The starting '
           + 'amount is treated as the balance on that date, so those earlier rows are not counted again. '
-          + 'If the opening date is wrong, correct it and the split corrects itself.' },
-      `records begin ${Math.abs(r.gapDays)} days before its opening date`));
+          + 'If the opening date is wrong, correct it and the split corrects itself.')));
     }
 
     if (r.basis === 'stated') {
-      card.append(el('div', { class: 's2 s2-caveat',
-        title: 'No transactions in the vault for this account, so this is the balance less what the '
-          + 'account file records as put in. Import its statements and the split becomes real.' },
-      'based on the account file, not transactions'));
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        'based on the account file, not transactions',
+        'No transactions in the vault for this account, so this is the balance less what the '
+          + 'account file records as put in. Import its statements and the split becomes real.')));
     } else if (r.undatedGrowth && typeIs(a, 'investment')) {
       /* Named because the chart above cannot draw it. A fund's value moved every
          day for years and the vault holds one number — today's — so this growth
          is real, is in the balance, and has no date anywhere. */
-      card.append(el('div', { class: 's2 s2-caveat',
-        title: 'Your fund never posted this as a transaction — the value moved and the balance was '
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        'includes growth no transaction recorded',
+        'Your fund never posted this as a transaction — the value moved and the balance was '
           + 'retyped. It is real growth, but it carries no date, so the chart above cannot show when '
-          + 'it happened.' },
-      'includes growth no transaction recorded'));
+          + 'it happened.')));
     }
 
     /* Unchanged in force from the derived path: growth is recognised by category
@@ -569,10 +581,10 @@ module.exports = function registerSavings(ctx) {
        and nothing in the data tells the two apart. Named whenever any category
        fed the figure, including a single one. */
     if (r.growthCategories.length) {
-      card.append(el('div', { class: 's2 s2-caveat',
-        title: 'Anything here that is not interest or dividends is really a contribution. '
-          + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.' },
-      'growth from ' + r.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', ')));
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        'growth from ' + r.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', '),
+        'Anything here that is not interest or dividends is really a contribution. '
+          + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.')));
     }
   }
 
@@ -652,7 +664,7 @@ module.exports = function registerSavings(ctx) {
     if (!wrap) return;                     // shell without this card mounted
     wrap.empty();
 
-    const s = growthSeries(entries, catType, { today: todayIso() });
+    const s = growthSeries(entries, poolType, { today: todayIso() });
     /* Hidden outright rather than shown empty. The Growth tile above already
        says why there is nothing to draw, and a framed blank restates it in the
        space a chart would have occupied. */

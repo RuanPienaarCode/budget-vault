@@ -193,6 +193,22 @@ module.exports = function registerLoad(ctx) {
            against, where the real figure including rent is 44.4%. A ratio that
            silently omits the largest term is worse than no ratio. */
         fixed: fmBool(fm.fixed) === true,
+        /* ITEM 2 (2026-08-26): which `income`-typed categories the household
+           has told us are what a savings/investment account itself EARNED —
+           interest, dividends — rather than money the household put in.
+           savings-math.js's classifyRow used to treat EVERY income-typed
+           inflow as growth, which caught a salary, a client payment or a UIF
+           payment landing directly in a pool account exactly as hard as it
+           caught real interest — nothing in `type` alone tells them apart.
+           Same additive-flag shape as `fixed` just above: opt-in, defaults
+           false, so an existing "Interest" category (income-typed, this flag
+           unset) now reads as an ordinary contribution until the household
+           ticks it — a one-time, VISIBLE move (the category simply stops
+           appearing under "growth from…" and starts appearing as money put
+           in), not a silent one. See savings-math.js's own header for the
+           full rule and why it lives on the category rather than being
+           guessed from the category's name. */
+        interest: fmBool(fm.interest) === true,
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */

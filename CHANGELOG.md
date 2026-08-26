@@ -3,6 +3,30 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Changed
+
+- **The Debt-free headline stops moving when you play.** The headline now
+  reads only what is recorded — your payments and standing extras — and the
+  payoff planner's what-if carries its own line inside the planner card
+  ("With this extra: debt-free Jun 2028"), so a sandbox experiment can never
+  rewrite the page's answer.
+- **"Growth" now means only what the money made on its own.** A salary, a
+  client payment or a payout landing straight in a savings account counts as
+  money you put in, not growth. Interest still counts as growth — mark the
+  category with `interest: true` at the top of its file (the Interest income
+  category is the usual one).
+- **Caveats open on tap.** The small notes that only appeared when hovering a
+  mouse — the interest column's explanation, the Savings page's account-file
+  notes, the Accounts reconciliation lines — are now buttons that expand
+  inline, so phones see them too.
+- **Totals stop mixing currencies.** The Accounts page sums only your main
+  currency and shows the rest beside it in their own symbols ("plus € 640
+  held in other currencies, not converted") — never folded into one number.
+- **"Budget used this period" says which window it is**, now that the score
+  above it averages six.
+
 ## 1.26.4 — 2026-08-26
 
 ### Changed

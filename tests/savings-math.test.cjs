@@ -6,23 +6,38 @@
    hand — and nothing updates it. On a tax-free account with a monthly debit
    order that overstated growth by roughly twenty times.
 
+   ITEM 2 (2026-08-26): a SECOND bug in the replacement itself. Growth used to
+   mean "any income-typed inflow" — which caught a salary or a client payment
+   landing DIRECTLY in a savings/investment account exactly as hard as it
+   caught real interest, because nothing in `type` alone told them apart. This
+   file's `typeOf` fixtures below are now POOL-AWARE, the same shape a real
+   caller's poolCatType(S.categories, name) produces (savings-math.js's own
+   export, built from the category's `interest: true` frontmatter flag) — see
+   that function's header for the full rule. Tests 3 and 4 are where that
+   split is pinned directly; every other test kept 'Interest income' mapped to
+   'interest' (flagged) so the rest of this file's arithmetic is unaffected.
+
    src/savings-math.js is pure, so this runs in bare node with no stub.
 
      node tests/savings-math.test.cjs
 */
 
 const assert = require('assert');
-const { splitFlows, accountFlows } = require('../src/savings-math');
+const { splitFlows, accountFlows, poolCatType } = require('../src/savings-math');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${a}, want ${b}±${tol})`); checks++; };
 
-/* The category table from a real vault: interest is income-type, and the
-   categories contributions arrive under are anything but. */
+/* The category table from a real vault, already run through the shape
+   poolCatType() hands classifyRow: 'Interest income' is flagged
+   `interest: true` (so it reports 'interest', the one string that reads as
+   growth now) and 'Alex pay check' — a salary — is an ordinary income
+   category, unflagged, exactly the shape that used to also read as growth on
+   the strength of `type` alone and is the whole reason the flag exists. */
 const TYPES = {
-  'Interest income': 'income',
+  'Interest income': 'interest',
   'Alex pay check': 'income',
   'Sam personal': 'luxuries',
   'Discovery 32 Day notice savings': 'savings',
@@ -59,34 +74,65 @@ const row = (date, amount, cat) => ({ date, amount, cat: cat || '' });
   eq(after.contributions, 5000, 'and shows up as a contribution instead');
 }
 
-/* ---- 3. growth is recognised by TYPE, never by name ---- */
+/* ---- 3. growth is recognised by a FLAG, never by a name (ITEM 2) ----
+   Was "growth is recognised by TYPE, never by name" — the category TYPE
+   ('income') is no longer sufficient on its own (test 4 below is why); the
+   FLAG poolCatType() reads is what has to survive translation now, and this
+   pins that it does. */
 {
   // A vault in another language: the category is called something else
-  // entirely, and is still income-type.
-  const other = c => (c === 'Rente' ? 'income' : null);
+  // entirely, flagged interest — same as an English "Interest" category
+  // would be, proving the signal is the FLAG, not the word.
+  const flaggedElsewhere = [{ name: 'Rente', type: 'income', interest: true }, { name: 'Spaar', type: 'savings' }];
+  const other = c => poolCatType(flaggedElsewhere, c);
   const f = splitFlows([row('2026-01-01', 50, 'Rente'), row('2026-01-02', 900, 'Spaar')], other);
-  eq(f.growth, 50, 'an income-type category in any language is growth');
+  eq(f.growth, 50, 'a flagged category in any language is growth');
   eq(f.contributions, 900, 'and the rest is contribution');
 
-  // And the English name alone proves nothing without the type.
+  // And the English name alone proves nothing without the flag — an
+  // unflagged "Interest income" (income-typed, exactly what a hand-written
+  // category looks like before anyone ticks the box) is not growth either.
+  const unflagged = [{ name: 'Interest income', type: 'income' }];
+  const stillNothing = splitFlows([row('2026-01-01', 50, 'Interest income')], c => poolCatType(unflagged, c));
+  eq(stillNothing.growth, 0, 'without the flag, "Interest income" is not assumed to be growth');
+  eq(stillNothing.contributions, 50, 'it falls to contribution rather than being invented');
+
+  // No type information reachable at all behaves the same way — unknown is
+  // unflagged, same as it always was.
   const noTypes = splitFlows([row('2026-01-01', 50, 'Interest income')], () => null);
-  eq(noTypes.growth, 0, 'without a type, "Interest income" is not assumed to be growth');
+  eq(noTypes.growth, 0, 'with nothing to ask, nothing is assumed to be growth');
   eq(noTypes.contributions, 50, 'it falls to contribution rather than being invented');
 }
 
-/* ---- 4. the known weakness is REPORTED, not hidden ----
-   A salary paid straight into savings is income-type and will land in growth.
-   It cannot be told apart from interest by the data, so the categories that
-   fed growth are named for the reader to check. */
+/* ---- 4. THE FIX: a salary landing directly no longer joins growth ----
+   A salary, a client payment or a UIF payment paid straight into a pool
+   account is income-typed exactly like real interest, and this file's OWN
+   former test 4 used to pin that landing in growth as a "known weakness,
+   reported not hidden". It is now an ordinary contribution: the household's
+   `interest: true` flag is the only thing that says "the account itself
+   earned this", and a salary category never carries one. Contract-first per
+   the ITEM 2 brief: "a fixture where income is paid straight into a savings
+   account must show it as put-in, not growth; an interest row must stay
+   growth; the identity must hold in both" — all three pinned below. */
 {
   const f = splitFlows([
-    row('2026-01-01', 84.41, 'Interest income'),
-    row('2026-01-25', 30000, 'Alex pay check'),
+    row('2026-01-01', 84.41, 'Interest income'),      // flagged: the account's own earnings
+    row('2026-01-25', 30000, 'Alex pay check'),        // income-typed, UNFLAGGED: a salary landing directly
   ], typeOf);
-  near(f.growth, 30084.41, 0.001, 'a salary into savings does land in growth');
-  eq(f.growthCategories.length, 2, 'but both sources are named');
-  eq(f.growthCategories[0], { cat: 'Alex pay check', amount: 30000 }, 'largest first, so the odd one is obvious');
-  eq(f.growthCategories[1].cat, 'Interest income', 'alongside the real interest');
+  near(f.growth, 84.41, 0.001, 'an interest row stays growth');
+  eq(f.contributions, 30000, 'income paid straight into a savings account shows as put-in, not growth');
+  eq(f.growthCategories.length, 1, 'growthCategories now names only what is ACTUALLY flagged growth');
+  eq(f.growthCategories[0], { cat: 'Interest income', amount: 84.41 }, 'the real interest, alone — no salary beside it');
+  near(f.net, f.contributions + f.growth - f.withdrawals, 0.001,
+    'the identity holds: contributions + growth − withdrawals = net');
+  near(f.net, 30084.41, 0.001, 'and lands on the same total the old rule reached — only the SPLIT moved');
+
+  // NEGATIVE CONTROL: the old rule's own number, still reachable by name so a
+  // regression that reverts the flag check is caught even if this file's own
+  // assertions above were somehow satisfied by coincidence.
+  const oldRuleGrowth = 84.41 + 30000;
+  ok(f.growth !== oldRuleGrowth,
+    `negative control: the old "any income is growth" total (${oldRuleGrowth}) is not what is reported`);
 }
 
 /* ---- 5. excluded rows are not filtered here ----

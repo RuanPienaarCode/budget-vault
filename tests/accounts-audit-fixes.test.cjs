@@ -56,7 +56,13 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
   const ctx = makeCtx({
     [`${B}/Settings.md`]: `---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n${settingsFm}---\n`,
     [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\n---\n',
-    [`${B}/Categories/Interest.md`]: '---\ntype: income\ncolor: "#33aa66"\n---\n',
+    // interest: true (ITEM 2, 2026-08-26) — this fixture's whole point (test
+    // 1 below) is an income-typed "Interest" credit that must still read as
+    // growth after savings-math.js stopped treating every income-typed
+    // inflow as growth by default; without the flag it would now read as an
+    // ordinary contribution, which is the OLD wrong attribution this file
+    // never meant to pin.
+    [`${B}/Categories/Interest.md`]: '---\ntype: income\ninterest: true\ncolor: "#33aa66"\n---\n',
     ...files,
   });
   const S = await loadInto(ctx);
@@ -95,8 +101,13 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
     ctx.renderAccounts();
     const fund = S.accounts.find(a => a.name === 'Fund');
     const idx = ctx.accountIndex();
-    const { totalReturn } = require('../src/savings-math');
-    const tr = totalReturn(fund, (idx.get(fund) || {}).rows || [], ctx.catType, { today: '2026-07-20' });
+    // poolCatType, not the bare ctx.catType (ITEM 2) — the real view calls
+    // never pass the raw category-type lookup into totalReturn() any more;
+    // see savings-math.js's own header for why a direct catType would read
+    // the flagged "Interest" category as an ordinary income category again.
+    const { totalReturn, poolCatType } = require('../src/savings-math');
+    const tr = totalReturn(fund, (idx.get(fund) || {}).rows || [],
+      name => poolCatType(S.categories, name), { today: '2026-07-20' });
     eq(tr.basis, 'measured', 'starting_amount is set, so this account is measured, not stated');
     eq(tr.capitalIn, 55000, '50 000 starting + 5 000 contribution, no withdrawals');
     eq(tr.growth, 5000, '60 000 balance - 55 000 capital in');
