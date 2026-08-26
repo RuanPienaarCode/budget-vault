@@ -99,3 +99,17 @@ wrong — never silently overwrite a figure the user typed.
 - Feature work here → the `budget-vault-engineer` agent in `.claude/agents/`
 - iOS/WebKit + host-cascade audit → `obsidian-mobile-safety-reviewer`
 - Runtime browser proof → `obsidian-plugin-verifier`
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `RuanPienaarCode/budget-vault`, operated via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` and `docs/adr/` already exist at the repo root — read them; `/domain-modeling` maintains them. See `docs/agents/domain.md`.
