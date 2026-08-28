@@ -58,8 +58,19 @@ const { REPORT_DIR, reportPaths, mergeCategoryRows, financialReportMarkdown, fin
 const i18n = require('../i18n');
 
 module.exports = function registerReport(ctx) {
+  /* fileAtVaultPath/readVaultFile/folderAtVaultPath — NOT fileAt/readFile/
+     folderAt. Reports/ is a vault-root sibling of the budget folder (see
+     src/report.js's own header), and fileAt/readFile/folderAt all resolve
+     through relPath(), which PREFIXES the budget folder unconditionally.
+     writeVaultFile already writes at vault-root (guardedVaultPath, not
+     relPath); reading the same file back through the budget-relative door
+     is the exact bug that shipped in 1.28.0 — the write landed at the real
+     `Reports/…`, the read looked for `<budget folder>/Reports/…`, found
+     nothing, and silently cleared the `result` the write had just set. Every
+     lookup below stays on the vault-root side of that line. */
   const {
-    S, $, app, plugin, money, toast, fileAt, readFile, writeVaultFile,
+    S, $, app, plugin, money, toast,
+    fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
     currentPeriod, periodRange, periodMonthName, dayLabel,
     periodsForMonths, trendPeriods, periodSummary, budgetTotals,
     accountIndex, healthSnapshot, txInPeriod,
@@ -132,8 +143,8 @@ module.exports = function registerReport(ctx) {
       const prior = result && result[key];
       return (prior && prior.path === path) ? prior : null;
     };
-    const mdFile = fileAt(mdPath);
-    const jsonFile = fileAt(jsonPath);
+    const mdFile = fileAtVaultPath(mdPath);
+    const jsonFile = fileAtVaultPath(jsonPath);
     const md = mdFile ? (keep('md', mdPath) || { path: mdPath, text: null }) : null;
     const json = jsonFile ? (keep('json', jsonPath) || { path: jsonPath, text: null }) : null;
     result = (md || json) ? { md, json, generatedAt: result && result.generatedAt } : null;
@@ -161,8 +172,10 @@ module.exports = function registerReport(ctx) {
     $('#reportDetailLabel').textContent = i18n.t('report.field.detail');
     $('#reportFormatLabel').textContent = i18n.t('report.field.format');
     $('#reportFolderLabel').textContent = i18n.t('report.field.folder');
+    $('#reportCopyNowLabel').textContent = i18n.t('report.copyNow');
     $('#reportResultTitle').textContent = i18n.t('report.result.title');
     $('#reportOpenLabel').textContent = i18n.t('report.open');
+    $('#reportRevealLabel').textContent = i18n.t('report.reveal');
     $('#reportCopyLabel').textContent = i18n.t('report.copy');
     $('#reportCopyJsonLabel').textContent = i18n.t('report.copyJson');
     $('#reportShareHint').textContent = i18n.t('report.shareHint');
@@ -253,6 +266,9 @@ module.exports = function registerReport(ctx) {
         ? i18n.t('report.result.generated', { date: result.generatedAt })
         : i18n.t('report.result.found');
       $('#reportOpen').classList.toggle('hidden', !result.md);
+      // Always available whenever the panel is — reveal falls back to
+      // whichever of md/json exists, or the folder itself, on its own.
+      $('#reportReveal').classList.remove('hidden');
       $('#reportCopy').classList.toggle('hidden', !result.md);
       $('#reportCopyJson').classList.toggle('hidden', !result.json);
     } else {
@@ -358,61 +374,134 @@ module.exports = function registerReport(ctx) {
     };
   }
 
+  /* The WHOLE body is one try/catch. Not the 1.28.0 dead-button's actual
+     cause (that was refreshResult() reading the file back through the wrong
+     root — see fileAtVaultPath's header in src/io.js) — but a real,
+     independent gap all the same: this is an async click listener wired bare
+     (`$('#reportCreate').addEventListener('click', ctx.createReport)`), and
+     nothing in Obsidian or the DOM awaits or catches what it returns. A throw
+     ANYWHERE in an async function becomes a REJECTED PROMISE, and a rejected
+     promise nobody awaits is an unhandled rejection — invisible on iOS,
+     invisible on desktop unless the console happens to be open, and
+     indistinguishable from the button doing nothing at all. The two
+     per-format try/catches below were never the whole story: buildReportData
+     (six math-module calls deep), reportPaths, ensureVaultFolder and even the
+     final renderReport()/toast() pair all ran OUTSIDE them. This one wraps
+     every line, so the worst case is now always the createFailed toast,
+     never silence. */
   async function createReport() {
-    const data = buildReportData();
-    const paths = reportPaths(data.periodLabel, folder ?? (plugin.settings.reportFolder || REPORT_DIR));
+    try {
+      const data = buildReportData();
+      const paths = reportPaths(data.periodLabel, folder ?? (plugin.settings.reportFolder || REPORT_DIR));
+      /* Explicit, not left to writeVaultFile's own internal ensureFolder —
+         both now run (ensureFolder is idempotent: it checks
+         getAbstractFileByPath and returns immediately if the folder is
+         already there, so calling it twice costs nothing). NOT the
+         dead-button's cause — the verifier proved writeVaultFile's own
+         ensureFolder already self-heals a missing Reports/ correctly — but a
+         cheap, correct belt-and-braces step done once up front rather than
+         raced independently by two writeVaultFile calls when both formats
+         are selected. */
+      await ensureVaultFolder(paths.dir);
 
-    const written = { md: null, json: null };
-    const errors = [];
-    /* Each format writes independently and a failure in one does not lose
-       the other — same shape views/transactions.js's exportTransactions()
-       already accepts for its own four sequential writes: the ones that
-       landed are real files, and a single toast at the end must not read as
-       though NOTHING happened when something did. */
-    if (formats.has('md')) {
-      const md = financialReportMarkdown(data, money);
-      try {
-        written.md = { path: await writeVaultFile(paths.mdPath, md), text: md };
-      } catch (e) { errors.push(e.message || String(e)); }
-    }
-    if (formats.has('json')) {
-      const json = financialReportJson(data);
-      try {
-        written.json = { path: await writeVaultFile(paths.jsonPath, json), text: json };
-      } catch (e) { errors.push(e.message || String(e)); }
-    }
-    if (!written.md && !written.json) {
-      return toast(i18n.t('report.createFailed', { error: errors.join('; ') }), true);
-    }
-
-    /* Remembered only after at least one write actually landed — same rule
-       views/transactions.js's exportTransactions() applies to exportFolder,
-       for the same reason: a destination that failed entirely must not
-       become next time's default. */
-    if (plugin.settings.reportFolder !== paths.dir) {
-      plugin.settings.reportFolder = paths.dir;
-      try {
-        await plugin.saveSettings();
-      } catch (e) {
-        toast(i18n.t('settings.err.save', { error: e.message || e }), true);
+      const written = { md: null, json: null };
+      const errors = [];
+      /* Each format writes independently and a failure in one does not lose
+         the other — same shape views/transactions.js's exportTransactions()
+         already accepts for its own four sequential writes: the ones that
+         landed are real files, and a single toast at the end must not read
+         as though NOTHING happened when something did. */
+      if (formats.has('md')) {
+        const md = financialReportMarkdown(data, money);
+        try {
+          written.md = { path: await writeVaultFile(paths.mdPath, md), text: md };
+        } catch (e) { errors.push(e.message || String(e)); }
       }
+      if (formats.has('json')) {
+        const json = financialReportJson(data);
+        try {
+          written.json = { path: await writeVaultFile(paths.jsonPath, json), text: json };
+        } catch (e) { errors.push(e.message || String(e)); }
+      }
+      if (!written.md && !written.json) {
+        return toast(i18n.t('report.createFailed', { error: errors.join('; ') }), true);
+      }
+
+      /* Remembered only after at least one write actually landed — same rule
+         views/transactions.js's exportTransactions() applies to exportFolder,
+         for the same reason: a destination that failed entirely must not
+         become next time's default. */
+      if (plugin.settings.reportFolder !== paths.dir) {
+        plugin.settings.reportFolder = paths.dir;
+        try {
+          await plugin.saveSettings();
+        } catch (e) {
+          toast(i18n.t('settings.err.save', { error: e.message || e }), true);
+        }
+      }
+      result = { md: written.md, json: written.json, generatedAt: data.generated };
+      renderReport();
+      toast(errors.length ? i18n.t('report.createdPartial', { error: errors.join('; ') }) : i18n.t('report.created'));
+    } catch (e) {
+      console.error('Budget: createReport failed', e);
+      toast(i18n.t('report.createFailed', { error: e.message || e }), true);
     }
-    result = { md: written.md, json: written.json, generatedAt: data.generated };
-    renderReport();
-    toast(errors.length ? i18n.t('report.createdPartial', { error: errors.join('; ') }) : i18n.t('report.created'));
   }
 
   /* Markdown only — the format the share sheet / Export to PDF chain reads.
      Falls back to the JSON file when no Markdown was generated for this
      selection, rather than doing nothing: a reader who picked JSON-only
-     still typed a folder and clicked Create expecting SOMETHING to open. */
+     still typed a folder and clicked Create expecting SOMETHING to open.
+     Whole-body try/catch for the same reason createReport()'s own header
+     gives — a bare async listener with no wrapper turns any throw into a
+     silent, unhandled rejection. */
   async function openReport() {
-    if (!result) return;
-    const entry = result.md || result.json;
-    if (!entry) return toast(i18n.t('report.openFailed'), true);
-    const file = fileAt(entry.path);
-    if (!file) return toast(i18n.t('report.openFailed'), true);
-    await app.workspace.getLeaf('tab').openFile(file);
+    try {
+      if (!result) return;
+      const entry = result.md || result.json;
+      if (!entry) return toast(i18n.t('report.openFailed'), true);
+      const file = fileAtVaultPath(entry.path);
+      if (!file) return toast(i18n.t('report.openFailed'), true);
+      await app.workspace.getLeaf('tab').openFile(file);
+    } catch (e) {
+      toast(i18n.t('report.openFailed'), true);
+    }
+  }
+
+  /* Reveals the created report in Obsidian's OWN file-explorer panel — NOT
+     the OS Finder/File Explorer (app.showInFolder / Electron's
+     shell.showItemInFolder), which is desktop-only and would silently do
+     nothing on iOS. `internalPlugins.getEnabledPluginById('file-explorer')
+     .revealInFolder(file)` is the in-app sidebar reveal Obsidian's own
+     bookmarks pane and right-click "Reveal file in navigation" use
+     internally — undocumented in the public API but stable across desktop
+     AND mobile, since it never leaves the app (the sidebar file tree is core
+     to both). Falls back to opening the file directly only if the File
+     Explorer CORE PLUGIN itself has been disabled — a real but rare
+     platform-independent case, not an iOS-specific one. */
+  async function revealReportFolder() {
+    try {
+      const entry = result && (result.md || result.json);
+      const target = entry ? fileAtVaultPath(entry.path) : folderAtVaultPath(currentPaths().dir);
+      if (!target) return toast(i18n.t('report.revealNone'), true);
+
+      const explorer = app.internalPlugins && typeof app.internalPlugins.getEnabledPluginById === 'function'
+        ? app.internalPlugins.getEnabledPluginById('file-explorer') : null;
+      if (explorer && typeof explorer.revealInFolder === 'function') {
+        explorer.revealInFolder(target);
+        return;
+      }
+      // File Explorer disabled — reveal is unavailable on ANY platform, not
+      // only mobile. Falling back to opening the file is still useful; a
+      // folder has nothing to "open" instead, so that case is an honest toast.
+      if (entry) {
+        await app.workspace.getLeaf('tab').openFile(target);
+      } else {
+        toast(i18n.t('report.revealUnavailable'), true);
+      }
+    } catch (e) {
+      toast(i18n.t('report.revealFailed', { error: e.message || e }), true);
+    }
   }
 
   /* navigator.clipboard, not an Electron/Node API — this is the same
@@ -422,18 +511,13 @@ module.exports = function registerReport(ctx) {
      never loaded into memory) rather than one just generated in this
      session. `strip` trims the Markdown down to its copy-ready body (see
      copyBody's own header); the JSON file has no frontmatter to strip, so
-     copyReportJson passes it through untouched. */
+     copyReportJson passes it through untouched. Whole-body try/catch — same
+     reasoning as createReport()/openReport() above. */
   async function copyEntry(entry, strip) {
-    if (!entry) return;
-    let text = entry.text;
-    if (text == null) {
-      try {
-        text = await readFile(entry.path);
-      } catch (e) {
-        return toast(i18n.t('report.copyFailed', { error: e.message || e }), true);
-      }
-    }
     try {
+      if (!entry) return;
+      let text = entry.text;
+      if (text == null) text = await readVaultFile(entry.path);
       await navigator.clipboard.writeText(strip ? copyBody(text) : text);
       toast(i18n.t('report.copied'));
     } catch (e) {
@@ -442,6 +526,23 @@ module.exports = function registerReport(ctx) {
   }
   const copyReport = () => copyEntry(result && result.md, true);
   const copyReportJson = () => copyEntry(result && result.json, false);
+
+  /* "Copy report" up front, from the OPTIONS card — no vault write at all.
+     Ruan's own ask: copy-paste-ready output before committing to a file.
+     Builds the SAME `data` object createReport() would (buildReportData()),
+     runs it through the SAME markdown serialiser, and puts the SAME
+     frontmatter-stripped body on the clipboard copyReport() already does for
+     a saved report — the only difference is nothing ever reaches disk. */
+  async function copyReportNow() {
+    try {
+      const data = buildReportData();
+      const md = financialReportMarkdown(data, money);
+      await navigator.clipboard.writeText(copyBody(md));
+      toast(i18n.t('report.copied'));
+    } catch (e) {
+      toast(i18n.t('report.copyFailed', { error: e.message || e }), true);
+    }
+  }
 
   function setPeriod(v) { period = v; renderReport(); }
   function setDetail(v) { detail = v; renderReport(); }
@@ -459,7 +560,7 @@ module.exports = function registerReport(ctx) {
   }
 
   ctx.provide({
-    renderReport, createReport, openReport, copyReport, copyReportJson,
+    renderReport, createReport, openReport, revealReportFolder, copyReport, copyReportJson, copyReportNow,
     setReportPeriod: setPeriod, setReportDetail: setDetail, setReportFolder: setFolder,
   });
 };

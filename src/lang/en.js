@@ -58,6 +58,8 @@ module.exports = {
   'topbar.nextPeriod': 'Next period',
   'topbar.import': 'Import CSV',
   'topbar.importTitle': 'Import a bank statement CSV',
+  'topbar.report': 'Generate report',
+  'topbar.reportTitle': 'Generate a financial report',
   'topbar.settings': 'Open budget settings',
 
   /* ------------------------------- settings -------------------------------- */
@@ -1233,6 +1235,7 @@ module.exports = {
   'report.exists': 'Already exists for this selection ({formats}) — creating again overwrites it.',
   'report.create': 'Create report',
   'report.recreate': 'Re-create report (overwrite)',
+  'report.copyNow': 'Copy report',
   'report.contains.title': 'This report will include:',
   'report.contains.incomeSpend': 'Income vs spend',
   'report.contains.category': 'Spend by category',
@@ -1250,6 +1253,10 @@ module.exports = {
   'report.result.found': 'Already on disk from an earlier report',
   'report.open': 'Open report',
   'report.openFailed': 'Could not open that report — the file may have moved',
+  'report.reveal': 'Open report folder',
+  'report.revealNone': 'Nothing to reveal yet — create a report first.',
+  'report.revealUnavailable': 'The file explorer is turned off in Obsidian, so this report cannot be revealed there.',
+  'report.revealFailed': 'Could not reveal that report ({error})',
   'report.copy': 'Copy for AI',
   'report.copyJson': 'Copy JSON',
   'report.copied': 'Copied to clipboard',

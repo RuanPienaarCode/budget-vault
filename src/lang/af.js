@@ -1233,4 +1233,13 @@ module.exports = {
     other: '{count} transaksies in hierdie tydperk.',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': 'Genereer verslag',
+  'topbar.reportTitle': 'Genereer \'n finansiële verslag',
+  'report.copyNow': 'Kopieer verslag',
+  'report.reveal': 'Open verslagvouer',
+  'report.revealNone': 'Nog niks om te wys nie — skep eers \'n verslag.',
+  'report.revealUnavailable': 'Die lêerverkenner is afgeskakel in Obsidian, so hierdie verslag kan nie daar gewys word nie.',
+  'report.revealFailed': 'Kon nie daardie verslag wys nie ({error})',
+
 };

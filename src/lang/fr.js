@@ -1247,4 +1247,13 @@ module.exports = {
     other: '{count} transactions sur cette période.',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': 'Générer un rapport',
+  'topbar.reportTitle': 'Générer un rapport financier',
+  'report.copyNow': 'Copier le rapport',
+  'report.reveal': 'Ouvrir le dossier du rapport',
+  'report.revealNone': 'Rien à afficher pour l\'instant — créez d\'abord un rapport.',
+  'report.revealUnavailable': 'L\'explorateur de fichiers est désactivé dans Obsidian, ce rapport ne peut donc pas y être affiché.',
+  'report.revealFailed': 'Impossible d\'afficher ce rapport ({error})',
+
 };

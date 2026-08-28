@@ -1255,4 +1255,13 @@ module.exports = {
     other: 'Iintengiselwano ezi-{count} kweli xesha.',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': 'Yenza ingxelo',
+  'topbar.reportTitle': 'Yenza ingxelo yezemali',
+  'report.copyNow': 'Kopa ingxelo',
+  'report.reveal': 'Vula ifolda yengxelo',
+  'report.revealNone': 'Akukho nto ingabonakalayo okwangoku — qala udale ingxelo.',
+  'report.revealUnavailable': 'Isikhangeli seefayile sicimile kwi-Obsidian, ngoko le ngxelo ayinakuboniswa apho.',
+  'report.revealFailed': 'Ayikwazekanga ukubonisa loo ngxelo ({error})',
+
 };

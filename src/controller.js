@@ -545,6 +545,7 @@ function mountApp(view) {
       $('#view-connect').classList.remove('hidden');
       $('#periodPill').classList.add('hidden');
       $('#topbarImport').classList.add('hidden');
+      $('#topbarReport').classList.add('hidden');
       $('#connectPathNote').empty();
       $('#connectPathNote').append(
         'Looked in ', el('code', {}, ctx.basePath()),
@@ -556,6 +557,7 @@ function mountApp(view) {
     $('#view-connect').classList.add('hidden');
     $('#periodPill').classList.remove('hidden');
     $('#topbarImport').classList.remove('hidden');
+    $('#topbarReport').classList.remove('hidden');
     /* AFTER the unconditional un-hide above, and here rather than at mount,
        because Settings.md is only read once the vault has loaded — and because
        reload() routes through this function, so changing the setting and
@@ -767,6 +769,9 @@ function mountApp(view) {
     switchView('import');
     if (!S.pendingImport) $('#fileInput').click();
   });
+  // Same navigate-only shape as the Transactions-toolbar Report button —
+  // the Report page owns its own options, no dialog here either.
+  $('#topbarReport').addEventListener('click', () => { if (S.loaded) switchView('report'); });
   $('#pluginSettingsLink').addEventListener('click', () => { closeDrawer(); openPluginSettings(); });
   // Switching period rebuilds the budget draft for the new period, discarding
   // any unsaved edits — so confirm first when the Budget view is dirty.
@@ -896,7 +901,9 @@ function mountApp(view) {
     S._noteQ = setTimeout(() => { S.noteFilter.q = q; ctx.renderNotes(); }, 200);
   });
   $('#reportCreate').addEventListener('click', ctx.createReport);
+  $('#reportCopyNow').addEventListener('click', ctx.copyReportNow);
   $('#reportOpen').addEventListener('click', ctx.openReport);
+  $('#reportReveal').addEventListener('click', ctx.revealReportFolder);
   $('#reportCopy').addEventListener('click', ctx.copyReport);
   $('#reportCopyJson').addEventListener('click', ctx.copyReportJson);
   // 'change', not 'input' — fires on blur, same as tax.js's own text fields,

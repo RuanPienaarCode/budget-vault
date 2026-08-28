@@ -178,6 +178,43 @@ function makeIo({ vault, plugin }) {
   function folderAt(rel) {
     return vault.getFolderByPath(relPath(rel));
   }
+  /* fileAt's VAULT-ROOT sibling — the read half of the split writeFile /
+     writeVaultFile already draws for writes. `rel` here is a path from the
+     VAULT root, exactly what writeVaultFile()/exportPaths()/reportPaths()
+     hand back (Exports/, Reports/ — folders that are deliberately siblings
+     of the budget folder, not inside it). fileAt() cannot be reused for
+     these: it resolves through relPath(), which PREFIXES the budget folder
+     unconditionally, so `fileAt('Reports/x.md')` actually looks up
+     `<budget folder>/Reports/x.md` — a path nothing ever writes to. That
+     exact mismatch shipped in 1.28.0: writeVaultFile() wrote the report to
+     the real `Reports/x.md`, refreshResult() immediately looked it up
+     through fileAt() at the wrong root, found nothing, and cleared the
+     result the write had just set — the report existed on disk from the
+     first click, and the button looked dead forever after. Guarded the same
+     way the write side is (guardedVaultPath, not a bare vault.getFileByPath)
+     so a hostile path is refused here too, not just on the way in. */
+  function fileAtVaultPath(rel) {
+    let path;
+    try { path = guardedVaultPath(rel); } catch (e) { return null; }
+    return vault.getFileByPath(path);
+  }
+  /* readFile's vault-root sibling, for the same reason fileAtVaultPath is
+     fileAt's — a report/export note living outside the budget folder needs
+     its content read back (the Copy affordance, for a report found on disk
+     rather than freshly generated) through the SAME root convention it was
+     written under. */
+  async function readVaultFile(rel) {
+    const f = fileAtVaultPath(rel);
+    return f ? await vault.cachedRead(f) : null;
+  }
+  /* folderAt's vault-root sibling — same reasoning as fileAtVaultPath, for a
+     caller that wants the Reports/ folder itself (revealing it in the file
+     explorer when no individual report file is on hand yet to reveal). */
+  function folderAtVaultPath(rel) {
+    let path;
+    try { path = guardedVaultPath(rel); } catch (e) { return null; }
+    return vault.getFolderByPath(path);
+  }
   function mdFilesIn(rel) {
     const f = vault.getFolderByPath(relPath(rel));
     if (!f) return [];
@@ -216,7 +253,7 @@ function makeIo({ vault, plugin }) {
 
   return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
-    createVaultFileIfAbsent, ensureVaultFolder,
+    createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath,
     lastWriteAt: () => plugin._lastWrite || 0,
   };
 }

@@ -1179,4 +1179,13 @@ module.exports = {
     other: 'この期間の取引は {count} 件です。',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': 'レポートを生成',
+  'topbar.reportTitle': '財務レポートを生成します',
+  'report.copyNow': 'レポートをコピー',
+  'report.reveal': 'レポートフォルダを開く',
+  'report.revealNone': 'まだ表示するものがありません — 先にレポートを作成してください。',
+  'report.revealUnavailable': 'Obsidianでファイルエクスプローラーが無効になっているため、このレポートをそこに表示できません。',
+  'report.revealFailed': 'そのレポートを表示できませんでした（{error}）',
+
 };

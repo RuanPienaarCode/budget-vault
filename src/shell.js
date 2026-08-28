@@ -63,9 +63,6 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="notes">
       <span class="di"><span class="ico" data-ico="notebook-pen|sticky-note|file-text"></span></span><span data-i18n="nav.notes">Notes</span>
     </button>
-    <button class="drawer-link" data-view="report">
-      <span class="di"><span class="ico" data-ico="file-text|file"></span></span><span data-i18n="nav.report">Report</span>
-    </button>
 
     <div class="drawer-divider"></div>
 
@@ -91,6 +88,9 @@ const SHELL_HTML = `
     <div class="drawer-section-label" data-i18n="nav.section.tools">Tools</div>
     <button class="drawer-link" data-view="import">
       <span class="di"><span class="ico" data-ico="cloud-upload|upload-cloud"></span></span><span data-i18n="nav.import">Import CSV</span>
+    </button>
+    <button class="drawer-link" data-view="report">
+      <span class="di"><span class="ico" data-ico="file-text|file"></span></span><span data-i18n="nav.report">Report</span>
     </button>
     <button class="drawer-link" data-view="loans">
       <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
@@ -133,6 +133,9 @@ const SHELL_HTML = `
     <div class="ml-auto">
       <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" data-i18n-aria="topbar.import" title="Import a bank statement CSV" data-i18n-title="topbar.importTitle">
         <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
+      </button>
+      <button type="button" class="topbar-icon-btn hidden" id="topbarReport" aria-label="Generate report" data-i18n-aria="topbar.report" title="Generate a financial report" data-i18n-title="topbar.reportTitle">
+        <span class="ico" data-ico="file-text|file"></span>
       </button>
       <button type="button" class="topbar-avatar" id="topbarAvatar" aria-label="Open budget settings" data-i18n-aria="topbar.settings">BV</button>
     </div>
@@ -479,6 +482,9 @@ const SHELL_HTML = `
               <button class="btn-gradient" id="reportCreate" style="padding:0.55rem 1.5rem">
                 <span class="ico" data-ico="file-text|file"></span> <span id="reportCreateLabel"></span>
               </button>
+              <button class="btn-ghost" id="reportCopyNow" style="padding:0.55rem 1.5rem">
+                <span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyNowLabel"></span>
+              </button>
             </p>
           </div>
         </div>
@@ -488,6 +494,7 @@ const SHELL_HTML = `
             <p class="text-muted" id="reportResultNote" style="font-size:12.5px"></p>
             <div class="row">
               <button class="btn-ghost" id="reportOpen"><span class="ico" data-ico="file-text|file"></span> <span id="reportOpenLabel"></span></button>
+              <button class="btn-ghost" id="reportReveal"><span class="ico" data-ico="folder-open|folder"></span> <span id="reportRevealLabel"></span></button>
               <button class="btn-ghost" id="reportCopy"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyLabel"></span></button>
               <button class="btn-ghost" id="reportCopyJson"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyJsonLabel"></span></button>
             </div>

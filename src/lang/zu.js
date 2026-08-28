@@ -1260,4 +1260,13 @@ module.exports = {
     other: 'Izintengiselwano ezingu-{count} kulesi sikhathi.',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': 'Yakha umbiko',
+  'topbar.reportTitle': 'Yakha umbiko wezimali',
+  'report.copyNow': 'Kopisha umbiko',
+  'report.reveal': 'Vula ifolda yombiko',
+  'report.revealNone': 'Akukho okuzobonakaliswa okwamanje — qala wakhe umbiko.',
+  'report.revealUnavailable': 'Isihloli samafayela sicishiwe ku-Obsidian, ngakho lo mbiko awukwazi ukuboniswa lapho.',
+  'report.revealFailed': 'Ayikwazanga ukubonisa lowo mbiko ({error})',
+
 };

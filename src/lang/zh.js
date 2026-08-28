@@ -1179,4 +1179,13 @@ module.exports = {
     other: '本周期共有 {count} 笔交易。',
   },
 
+  /* --- second pass: topbar report button + up-front copy + reveal-in-folder --- */
+  'topbar.report': '生成报告',
+  'topbar.reportTitle': '生成一份财务报告',
+  'report.copyNow': '复制报告',
+  'report.reveal': '打开报告所在文件夹',
+  'report.revealNone': '目前没有可显示的内容 — 请先创建一份报告。',
+  'report.revealUnavailable': 'Obsidian 中的文件浏览器已关闭，因此无法在其中显示此报告。',
+  'report.revealFailed': '无法显示该报告（{error}）',
+
 };
