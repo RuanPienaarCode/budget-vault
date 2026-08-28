@@ -3,6 +3,34 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.28.1 — 2026-08-28
+
+### Fixed
+
+- **Create report looked dead — it wasn't.** Every created report landed
+  correctly on disk, but the page read it back from the wrong folder root
+  (inside the Budget folder instead of the vault root), so the result panel
+  with Open and Copy never appeared and the success toast faded before most
+  people saw it. The read path now uses the same root the write uses, a
+  round-trip test pins the two together, and any failure now shows an error
+  message instead of doing nothing.
+
+### Added
+
+- **Copy report without creating a file.** A Copy report button next to
+  Create builds the report in memory and puts paste-ready Markdown straight
+  on the clipboard — nothing written to the vault.
+- **Open report folder.** The result panel can reveal the Reports folder in
+  Obsidian's file explorer (or open the report itself when the explorer is
+  turned off).
+- **Generate report from the top bar.** A report icon next to Import jumps
+  straight to the Report page, and appears only once the vault is loaded.
+
+### Changed
+
+- **Report moved down the side menu.** It now lives with the tools, next to
+  Import CSV, rather than among the main pages.
+
 ## 1.28.0 — 2026-08-28
 
 ### Added
