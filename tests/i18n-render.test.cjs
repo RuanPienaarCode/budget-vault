@@ -151,7 +151,7 @@ ok(LANGS.includes('en') && LANGS.length >= 7, `at least the 7 shipped languages 
    same name, but declared independently: this file must not import from an
    owner file it isn't allowed to touch, and a divergence between the two
    copies is itself a signal worth seeing rather than silently inheriting. */
-const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets', 'accounts']);
+const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets', 'accounts', 'report']);
 
 /* ---- EXPECTED_ENGLISH_ONLY — the ratchet. Declared here as the definition
    of "not yet translated", so a view that gains real i18n.t() usage without
@@ -341,7 +341,9 @@ async function mountView() {
   };
   ctx.plugin.settings = { ...ctx.plugin.settings, chartTrendRange: '6m' };
   require('../src/categories')(ctx);
-  for (const f of ['dashboard', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
+  // 'report' right after 'dashboard' — see views-render.test.cjs's mountAll
+  // for why the order is load-bearing.
+  for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
     'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
     require(`../src/views/${f}`)(ctx);
   }

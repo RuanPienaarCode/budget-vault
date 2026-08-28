@@ -36,6 +36,7 @@ const registerTax = require('./views/tax');
 const registerLoans = require('./views/loans');
 const registerImport = require('./views/import');
 const registerNotes = require('./views/notes');
+const registerReport = require('./views/report');
 
 /* The pure core of money formatting, pulled out of moneyIn() so it is
    testable without a live mount — see tests/controller-money.test.cjs.
@@ -399,6 +400,9 @@ function mountApp(view) {
      ctx.loadNotes(), which is late-bound for the same reason. */
   registerNotes(ctx);
   registerDashboard(ctx);
+  // After dashboard, whose budgetVsActualRows/categorySpendRows it reads —
+  // the report page's whole reason for existing is never re-deriving those.
+  registerReport(ctx);
   registerScore(ctx);
   registerTransactions(ctx);
   registerBudgets(ctx);
@@ -435,7 +439,7 @@ function mountApp(view) {
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, score: ctx.renderScore,
        transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
-       plan: ctx.renderPlan, notes: ctx.renderNotes,
+       plan: ctx.renderPlan, notes: ctx.renderNotes, report: ctx.renderReport,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
        debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
@@ -828,6 +832,9 @@ function mountApp(view) {
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
   $('#txExport').addEventListener('click', ctx.exportTransactions);
+  // Navigates only — no dialog. The Report page owns its own options; see
+  // views/report.js's header for why the brief moved it off a modal.
+  $('#txReport').addEventListener('click', () => ctx.switchView('report'));
   $('#txDeleteFiltered').addEventListener('click', ctx.deleteFilteredTransactions);
   for (const id of ['txAccount', 'txCategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
   $('#txSearch').addEventListener('input', () => { clearTimeout(S._q); S._q = setTimeout(ctx.renderTransactions, 200); });
@@ -888,6 +895,15 @@ function mountApp(view) {
     clearTimeout(S._noteQ);
     S._noteQ = setTimeout(() => { S.noteFilter.q = q; ctx.renderNotes(); }, 200);
   });
+  $('#reportCreate').addEventListener('click', ctx.createReport);
+  $('#reportOpen').addEventListener('click', ctx.openReport);
+  $('#reportCopy').addEventListener('click', ctx.copyReport);
+  $('#reportCopyJson').addEventListener('click', ctx.copyReportJson);
+  // 'change', not 'input' — fires on blur, same as tax.js's own text fields,
+  // so the report page never rebuilds the field the reader is still typing
+  // into (views/report.js's own header explains why the folder input is the
+  // one static control on that page).
+  $('#reportFolder').addEventListener('change', e => ctx.setReportFolder(e.target.value.trim()));
   $('#planSave').addEventListener('click', ctx.savePlan);
   $('#planNew').addEventListener('click', ctx.newPlan);
   $('#planDelete').addEventListener('click', ctx.deletePlan);

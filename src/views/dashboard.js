@@ -1023,15 +1023,17 @@ module.exports = function registerDashboard(ctx) {
       statCol));
   }
 
-  function renderBudgetTable() {
-    const sum = periodSummary(S.period);
-    const t = $('#dashBudget'); t.empty();
-    $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
-    t.append(el('thead', {}, el('tr', {},
-      el('th', { scope: 'col' }, i18n.t('dash.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.budget')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.spent')),
-      el('th', { scope: 'col', style: 'width:26%' }, ''), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.remaining')))));
-    const body = el('tbody', {});
-    const budget = S.budgets[S.period] || [];
+  /* The category rows behind the Budget-vs-Actual table — and, since ADR
+     "the report reads what the view reads" (see views/report.js), the ONLY
+     place that computes them. Pulled out of renderBudgetTable so the report
+     page can show the exact same Budget/Actual/Remaining figures the
+     Dashboard shows for the same period, rather than a second copy of this
+     assumed-spend/orphaned-category logic drifting from this one the way
+     income and saving-rate already have twice in this codebase. Pure of the
+     DOM: returns data, renderBudgetTable (and now report.js) draw it. */
+  function budgetVsActualRows(p) {
+    const sum = periodSummary(p);
+    const budget = S.budgets[p] || [];
     const rows = new Map();
     /* An assume-spent row IS its own actual — the money left in an earlier
        period, so no transaction here will ever match it. Seeded before the
@@ -1078,10 +1080,22 @@ module.exports = function registerDashboard(ctx) {
       r.actual += signType === 'income' ? amt : -amt;
     }
     const order = typeOrder(S.settings.groups);
-    const sorted = [...rows.entries()].sort((a, b) =>
-      typeRank(a[1].type, order) - typeRank(b[1].type, order) || a[0].localeCompare(b[0]));
+    return [...rows.entries()]
+      .sort((a, b) => typeRank(a[1].type, order) - typeRank(b[1].type, order) || a[0].localeCompare(b[0]))
+      .map(([cat, r]) => ({ cat, ...r }));
+  }
+
+  function renderBudgetTable() {
+    const t = $('#dashBudget'); t.empty();
+    $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
+    t.append(el('thead', {}, el('tr', {},
+      el('th', { scope: 'col' }, i18n.t('dash.col.category')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.budget')), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.spent')),
+      el('th', { scope: 'col', style: 'width:26%' }, ''), el('th', { scope: 'col', class: 'num' }, i18n.t('dash.col.remaining')))));
+    const body = el('tbody', {});
+    const sorted = budgetVsActualRows(S.period);
     let lastType = null;
-    for (const [cat, r] of sorted) {
+    for (const r of sorted) {
+      const cat = r.cat;
       if (r.type !== lastType) {
         lastType = r.type;
         body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '5' }, r.type)));
@@ -1630,6 +1644,25 @@ module.exports = function registerDashboard(ctx) {
     return { baseText: money(avg, 0), text, cls };
   }
 
+  /* The category-spend rows behind the "Where it went" donut — and, since
+     views/report.js reads it too, the ONE place that decides what counts as
+     "spend by category" for a period. Same filter the donut has always used
+     (income and transfer types dropped, a category that netted positive this
+     period is not spending), minus the donut's own colour/slice-collapsing
+     concerns, which are display, not arithmetic. Pure of the DOM. */
+  function categorySpendRows(p) {
+    const sum = periodSummary(p);
+    const spend = [];
+    for (const [cat, amt] of Object.entries(sum.byCat)) {
+      const type = catType(cat);
+      if (!cat || type === 'income' || type === 'transfer') continue;
+      if (amt >= 0) continue;
+      spend.push({ cat, amount: -amt });
+    }
+    spend.sort((a, b) => b.amount - a.amount);
+    return spend;
+  }
+
   function renderSplit() {
     const wrap = $('#dashSplit'); wrap.empty();
     const sum = periodSummary(S.period);
@@ -1658,14 +1691,7 @@ module.exports = function registerDashboard(ctx) {
     /* byCat holds signed amounts and every type. Spending is the negative side
        of the non-income, non-transfer categories — a refund inside a category
        nets off rather than counting as spend, which is what the table does too. */
-    const spend = [];
-    for (const [cat, amt] of Object.entries(sum.byCat)) {
-      const type = catType(cat);
-      if (!cat || type === 'income' || type === 'transfer') continue;
-      if (amt >= 0) continue;
-      spend.push({ cat, amount: -amt, color: catColor(cat) });
-    }
-    spend.sort((a, b) => b.amount - a.amount);
+    const spend = categorySpendRows(S.period).map(x => ({ ...x, color: catColor(x.cat) }));
 
     const total = spend.reduce((t, x) => t + x.amount, 0);
 
@@ -1937,7 +1963,11 @@ module.exports = function registerDashboard(ctx) {
   /* The guarded wrappers, not the raw ones: applyTheme() calls both of these
      directly on a theme flip, and an unguarded throw there freezes the same
      two cards this module just took care to isolate. */
-  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit });
+  /* budgetVsActualRows / categorySpendRows: published so views/report.js can
+     build its Budget-vs-Actual and Where-it-went sections off the exact same
+     per-category arithmetic this page draws — never a second copy of either
+     filter. */
+  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, budgetVsActualRows, categorySpendRows });
 };
 
 /* Exposed for a direct, DOM-free unit test of the rounding algorithm itself —

@@ -117,7 +117,11 @@ async function mountAll(files = FILES, period = '2026-07') {
   ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
   ctx.plugin.settings = { ...ctx.plugin.settings, chartTrendRange: '6m' };
   require('../src/categories')(ctx);
-  for (const f of ['dashboard', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
+  // 'report' right after 'dashboard' — same order controller.js registers
+  // them in, load-bearing here too: views/report.js destructures
+  // budgetVsActualRows/categorySpendRows off ctx at register time, and both
+  // are published by dashboard.js's own ctx.provide().
+  for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
     'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
     require(`../src/views/${f}`)(ctx);
   }

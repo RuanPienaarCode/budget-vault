@@ -63,6 +63,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="notes">
       <span class="di"><span class="ico" data-ico="notebook-pen|sticky-note|file-text"></span></span><span data-i18n="nav.notes">Notes</span>
     </button>
+    <button class="drawer-link" data-view="report">
+      <span class="di"><span class="ico" data-ico="file-text|file"></span></span><span data-i18n="nav.report">Report</span>
+    </button>
 
     <div class="drawer-divider"></div>
 
@@ -294,6 +297,7 @@ const SHELL_HTML = `
             <div class="row tx-actions">
               <span id="txCount" class="count-note"></span>
               <button class="btn-ghost" id="txExport"><span class="ico" data-ico="download|file-down"></span> <span data-i18n="shell.tx.export">Export</span></button>
+              <button class="btn-ghost" id="txReport"><span class="ico" data-ico="file-text|file"></span> <span data-i18n="shell.tx.report">Report</span></button>
               <button class="btn-ghost" id="txDeleteFiltered"><span class="ico" data-ico="trash-2|trash"></span> <span data-i18n="shell.tx.deleteFiltered">Delete these rows</span></button>
               <button class="btn-ghost" id="txNewAccount"><span class="ico" data-ico="plus"></span> <span data-i18n="acct.new.title">New account</span></button>
               <button class="btn-ghost" id="txAdd"><span class="ico" data-ico="plus"></span> <span data-i18n="shell.tx.add">Add transaction</span></button>
@@ -434,6 +438,60 @@ const SHELL_HTML = `
                      autocomplete="off" autocorrect="off" spellcheck="false">
             </div>
             <ul class="notes-list" id="notesList"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-report" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title" data-i18n="nav.report">Report</h1>
+          <div class="sub-note" id="reportSubNote"></div>
+        </div>
+        <div class="card mb-4">
+          <div class="card-h"><div><h2 id="reportOptionsTitle"></h2></div></div>
+          <div class="body-pad">
+            <div class="tax-field">
+              <span class="l" id="reportPeriodLabel"></span>
+              <div id="reportPeriodPills"></div>
+              <p class="text-muted" id="reportPeriodDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+            </div>
+            <div class="tax-field" style="margin-top:14px">
+              <span class="l" id="reportDetailLabel"></span>
+              <div id="reportDetailPills"></div>
+              <p class="text-muted" id="reportDetailDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+            </div>
+            <div class="tax-field" style="margin-top:14px">
+              <span class="l" id="reportFormatLabel"></span>
+              <div id="reportFormatPills"></div>
+              <p class="text-muted" id="reportFormatDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+            </div>
+            <label class="tax-field" style="margin-top:14px">
+              <span class="l" id="reportFolderLabel"></span>
+              <input type="text" id="reportFolder" class="form-control form-control-sm" placeholder="Reports"
+                     autocomplete="off" autocorrect="off" spellcheck="false">
+              <span class="text-muted" id="reportFolderDesc" style="font-size:12.5px"></span>
+            </label>
+            <p class="text-muted" id="reportPreview" style="font-size:12.5px;margin:10px 0 0"></p>
+            <p class="text-muted" id="reportExistsNote" style="font-size:12.5px;margin:4px 0 0"></p>
+            <p class="text-muted" id="reportContainsLabel" style="font-size:12.5px;margin:10px 0 4px;font-weight:600"></p>
+            <ul id="reportContains" style="margin:0 0 4px 18px;padding:0;font-size:12.5px;color:var(--text-muted)"></ul>
+            <p style="margin-top:1rem">
+              <button class="btn-gradient" id="reportCreate" style="padding:0.55rem 1.5rem">
+                <span class="ico" data-ico="file-text|file"></span> <span id="reportCreateLabel"></span>
+              </button>
+            </p>
+          </div>
+        </div>
+        <div class="card hidden" id="reportResultCard">
+          <div class="card-h"><div><h2 id="reportResultTitle"></h2><div class="sub" id="reportResultSub"></div></div></div>
+          <div class="body-pad">
+            <p class="text-muted" id="reportResultNote" style="font-size:12.5px"></p>
+            <div class="row">
+              <button class="btn-ghost" id="reportOpen"><span class="ico" data-ico="file-text|file"></span> <span id="reportOpenLabel"></span></button>
+              <button class="btn-ghost" id="reportCopy"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyLabel"></span></button>
+              <button class="btn-ghost" id="reportCopyJson"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyJsonLabel"></span></button>
+            </div>
+            <p class="text-muted" style="font-size:12.5px;margin-top:8px" id="reportShareHint"></p>
           </div>
         </div>
       </section>

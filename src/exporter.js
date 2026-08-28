@@ -175,6 +175,18 @@ function categoriesCsv(categories) {
 
 /* ----------------------------- Markdown -------------------------------- */
 
+/* One transaction row, rendered as a markdown table cell — the ONE place that
+   decides how a row looks in a table shaped like TX_HEAD. Factored out of
+   transactionsMarkdown's own loop so views/report.js's transaction-detail
+   section (src/report.js) draws every row exactly the way an export does,
+   instead of a second hand-written template drifting from this one the way
+   income and saving-rate already have drifted from each other elsewhere in
+   this codebase. splitRole, not r.split raw — see the loop below, this is
+   the same call, only moved. */
+function transactionRow(r, money) {
+  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
+}
+
 /* `money` is the view's own formatter, injected because the export must read in
    the household's currency and separators — and that is a runtime setting off
    ctx, not something a pure module can know. */
@@ -206,12 +218,10 @@ function transactionsMarkdown(rows, meta, money) {
       : []),
     ...txHeaderLines(),
   );
-  for (const r of rows) {
-    // splitRole, not r.split raw: same reason serializeTxFile reads it this
-    // way — only two strings are ever legal here, so the cell never needs
-    // escMd, and a stray hand-typed word in the source column reads as ''.
-    out.push(`| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`);
-  }
+  // splitRole, not r.split raw: same reason serializeTxFile reads it this
+  // way — only two strings are ever legal here, so the cell never needs
+  // escMd, and a stray hand-typed word in the source column reads as ''.
+  for (const r of rows) out.push(transactionRow(r, money));
   return out.join('\n') + '\n';
 }
 
@@ -268,4 +278,9 @@ function exportPaths(range, folder) {
 module.exports = {
   EXPORT_DIR, safeName,
   transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths,
+  /* txHeaderLines and transactionRow: published so views/report.js's own
+     transaction-detail table (src/report.js) is built from the SAME column
+     order and row template as this file's own export, rather than a fourth
+     hand-written copy of TX_HEAD's shape. */
+  txHeaderLines, transactionRow,
 };

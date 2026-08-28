@@ -71,9 +71,12 @@ const DISPATCH = (() => {
   for (const m of chunk.matchAll(/(\w+):\s*ctx\.(render\w+)/g)) out.push({ view: m[1], fn: m[2] });
   return out;
 })();
-ok(DISPATCH.length === 15, `all 15 dispatched views are still parsed out of controller.js (found ${DISPATCH.length})`);
+ok(DISPATCH.length === 16, `all 16 dispatched views are still parsed out of controller.js (found ${DISPATCH.length})`);
 
-const VIEW_MODULES = ['dashboard', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
+// 'report' right after 'dashboard' — see views-render.test.cjs's mountAll for
+// why the order is load-bearing (views/report.js reads dashboard.js's own
+// ctx.provide()'d budgetVsActualRows/categorySpendRows at register time).
+const VIEW_MODULES = ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
   'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
 
 /* Mounts one vault against one fresh ctx + DOM, the way controller.js does —
