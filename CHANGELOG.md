@@ -3,6 +3,26 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.28.0 — 2026-08-28
+
+### Added
+
+- **A Report page, one tap from Transactions.** A new Report button beside
+  Export opens a page where you pick the period (this month, last 3 or last
+  12 months), choose a summary or full transaction detail, and pick Markdown
+  and/or JSON output — with the file name shown before you create anything.
+  Create report writes the file(s) into your Reports folder.
+- **Share it your way.** After creating, the page offers *Open report* (from
+  the opened note, your device's share menu reaches mail, WhatsApp or a
+  financial advisor, and desktop Obsidian can export it to PDF) and *Copy
+  for AI* / *Copy JSON* — paste-ready output for dropping straight into an
+  AI chat as context.
+- **The report can never disagree with the app.** Every figure — income vs
+  spend, category breakdown, budgets vs actuals, savings growth, debts, net
+  worth, health score — is read from the same functions the Dashboard draws
+  from, and the Markdown and JSON outputs are two renderings of one computed
+  result, pinned together by a test.
+
 ## 1.27.0 — 2026-08-26
 
 ### Changed
