@@ -63,9 +63,14 @@ const row = (date, cat, amount, extra = {}) => ({ date, desc: 'x', cat, amount, 
   } });
   eq(ctx.trendPeriods(6), ['2026-05', '2026-06', '2026-07'],
     'periods before the first import are not drawn as zero-spend months');
+  /* M2, 2026-08-29 audit — this used to assert the BUG: a vault with no
+     imported data at all returned all 4 requested periods, three of them
+     invented zero-spend history. `earliestDataMonth()` is null here, and
+     "no data" is the SAME "before the earliest month there is" this block's
+     first assertion already covers — the current period only. */
   const bare = trendCtx();
-  eq(bare.trendPeriods(4), ['2026-04', '2026-05', '2026-06', '2026-07'],
-    'with no data at all there is no floor — the caller asked for 4 and gets 4');
+  eq(bare.trendPeriods(4), ['2026-07'],
+    'M2: with no data at all there is nothing to reach back into — only the current period, never invented history');
   eq(ctx.trendPeriods(1), ['2026-07'],
     'the current period is always included, even empty — a chart that drops "now" reads as broken');
 }

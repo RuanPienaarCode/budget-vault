@@ -456,34 +456,34 @@ const SHELL_HTML = `
             <div class="tax-field">
               <span class="l" id="reportPeriodLabel"></span>
               <div id="reportPeriodPills"></div>
-              <p class="text-muted" id="reportPeriodDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+              <p class="text-muted report-field-desc" id="reportPeriodDesc"></p>
             </div>
-            <div class="tax-field" style="margin-top:14px">
+            <div class="tax-field report-field-gap">
               <span class="l" id="reportDetailLabel"></span>
               <div id="reportDetailPills"></div>
-              <p class="text-muted" id="reportDetailDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+              <p class="text-muted report-field-desc" id="reportDetailDesc"></p>
             </div>
-            <div class="tax-field" style="margin-top:14px">
+            <div class="tax-field report-field-gap">
               <span class="l" id="reportFormatLabel"></span>
               <div id="reportFormatPills"></div>
-              <p class="text-muted" id="reportFormatDesc" style="font-size:12.5px;margin:4px 0 0"></p>
+              <p class="text-muted report-field-desc" id="reportFormatDesc"></p>
             </div>
-            <label class="tax-field" style="margin-top:14px">
+            <label class="tax-field report-field-gap">
               <span class="l" id="reportFolderLabel"></span>
               <input type="text" id="reportFolder" class="form-control form-control-sm" placeholder="Reports"
                      autocomplete="off" autocorrect="off" spellcheck="false">
-              <span class="text-muted" id="reportFolderDesc" style="font-size:12.5px"></span>
+              <span class="text-muted report-folder-desc" id="reportFolderDesc"></span>
             </label>
-            <p class="text-muted" id="reportPreview" style="font-size:12.5px;margin:10px 0 0"></p>
-            <p class="text-muted" id="reportExistsNote" style="font-size:12.5px;margin:4px 0 0"></p>
-            <p class="text-muted" id="reportContainsLabel" style="font-size:12.5px;margin:10px 0 4px;font-weight:600"></p>
-            <ul id="reportContains" style="margin:0 0 4px 18px;padding:0;font-size:12.5px;color:var(--text-muted)"></ul>
-            <p class="text-muted" id="reportDisclaimer" style="font-size:12.5px;margin:10px 0 0"></p>
-            <p style="margin-top:1rem">
-              <button class="btn-gradient" id="reportCreate" style="padding:0.55rem 1.5rem">
+            <p class="text-muted report-note" id="reportPreview"></p>
+            <p class="text-muted report-field-desc" id="reportExistsNote"></p>
+            <p class="text-muted report-contains-label" id="reportContainsLabel"></p>
+            <ul class="report-contains-list" id="reportContains"></ul>
+            <p class="text-muted report-note" id="reportDisclaimer"></p>
+            <p class="report-actions">
+              <button class="btn-gradient report-btn" id="reportCreate">
                 <span class="ico" data-ico="file-text|file"></span> <span id="reportCreateLabel"></span>
               </button>
-              <button class="btn-ghost" id="reportCopyNow" style="padding:0.55rem 1.5rem">
+              <button class="btn-ghost report-btn" id="reportCopyNow">
                 <span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyNowLabel"></span>
               </button>
             </p>
@@ -492,14 +492,14 @@ const SHELL_HTML = `
         <div class="card hidden" id="reportResultCard">
           <div class="card-h"><div><h2 id="reportResultTitle"></h2><div class="sub" id="reportResultSub"></div></div></div>
           <div class="body-pad">
-            <p class="text-muted" id="reportResultNote" style="font-size:12.5px"></p>
+            <p class="text-muted report-result-note" id="reportResultNote"></p>
             <div class="row">
               <button class="btn-ghost" id="reportOpen"><span class="ico" data-ico="file-text|file"></span> <span id="reportOpenLabel"></span></button>
               <button class="btn-ghost" id="reportReveal"><span class="ico" data-ico="folder-open|folder"></span> <span id="reportRevealLabel"></span></button>
               <button class="btn-ghost" id="reportCopy"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyLabel"></span></button>
               <button class="btn-ghost" id="reportCopyJson"><span class="ico" data-ico="copy|clipboard-copy"></span> <span id="reportCopyJsonLabel"></span></button>
             </div>
-            <p class="text-muted" style="font-size:12.5px;margin-top:8px" id="reportShareHint"></p>
+            <p class="text-muted report-share-hint" id="reportShareHint"></p>
           </div>
         </div>
       </section>

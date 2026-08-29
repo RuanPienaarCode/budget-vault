@@ -30,6 +30,23 @@ function todayIso() {
   return isoOf(new Date());
 }
 
+/* Today, to the minute, in the SAME local calendar this module's own header
+   insists on for a date — extended to a time-of-day for the Report page's
+   "Generated" stamp (M3, 2026-08-29 audit). Before this, that one caller
+   built its own `new Date().toISOString().slice(0, 16).replace('T', ' ')` —
+   UTC, the exact drift this file's header names for a bare date, just never
+   fixed for a timestamp because nothing needed one until the report did. A
+   report generated at 06:18 SAST printed "04:18"; for a reader east of
+   Greenwich it is not just the wrong hour, it is the wrong CALENDAR DAY, in
+   both the frontmatter and the line the reader actually sees. One copy of
+   the local-time rule, not a second one inlined at the call site — the same
+   reason isoOf/todayIso exist instead of eight files each writing their own
+   `${d.getFullYear()}-…`. */
+function nowLocalMinute() {
+  const d = new Date();
+  return `${isoOf(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 /* Whole days since the epoch, in UTC. Local-time date maths drifts by a day
    across a DST boundary, which would silently lengthen or shorten a period
    twice a year. Shared so the settings tab measures an anchor shift with the
@@ -112,5 +129,5 @@ function periodDaysOrZero(v) {
   if (!Number.isFinite(n) || n < MIN_PERIOD_DAYS || n > MAX_PERIOD_DAYS) return 0;
   return n;
 }
-module.exports = { ISO_DATE, isoOf, todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero, daysBetween, daysUntil };
+module.exports = { ISO_DATE, isoOf, todayIso, nowLocalMinute, isoDayNumber, isoFromDayNumber, isRealIsoDate, periodDaysOrZero, daysBetween, daysUntil };
 

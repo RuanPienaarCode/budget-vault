@@ -78,8 +78,76 @@ const i18n = require('./i18n');
    independent reason to be invisible to the loader: io.js's own
    mdFilesIn()/mdFilesUnder() filter on `extension === 'md'` before they ever
    look at which folder a file sits in, so a .json path could not join
-   load.js's managed set even if it were dropped straight into Transactions/. */
+   load.js's managed set even if it were dropped straight into Transactions/.
+
+   That paragraph was only ever true of THIS default — M1, 2026-08-29 audit:
+   the destination is a free-text field views/report.js hands to reportPaths()
+   below, and nothing refused a reader pointing it AT one of those managed
+   folders instead of away from them. managedFolderMatch() further down is
+   the fix; REPORT_DIR here is unaffected, since it is not one of the seven
+   managed names. */
 const REPORT_DIR = 'Reports';
+
+/* M1, 2026-08-29 audit — the folder field above (`folder` in views/report.js)
+   is free text with no relationship to the folders load.js actually parses:
+   Categories/, Accounts/, Budgets/, Plans/, Tax/, Transactions/, Notes/, each
+   read off the SAME budget-relative root basePath() names — see load.js's
+   own mdFilesIn/mdFilesUnder call sites for each. Point the field at
+   `<budget folder>/Categories` and the very next Create writes a note that
+   the next vault load parses back in as an ordinary category: it joins every
+   category picker, the donut and budgetVsActualRows, silently — the exact
+   opposite of this file's own header claim that a report is "kept OUT of
+   load.js's allow-list", which is only true of the DEFAULT folder.
+
+   MANAGED_SUBFOLDERS lists every folder name load.js reads FILES from off
+   basePath() (not Notes/'s own NOTES_DIR constant, deliberately duplicated
+   as a literal — importing note-file.js here for one string would be an odd
+   dependency for a module that otherwise touches nothing else in this app).
+   Deliberately BLUNT rather than precise: mdFilesIn() only reads one level
+   for Categories/Accounts/Plans, and Budgets/Tax additionally filter by
+   filename shape (a period or a year), so a report's own "<label> Financial
+   Report.md" name would in fact miss some of these today — but a
+   filename-shape argument for why THIS particular destination happens to be
+   safe is exactly the kind of reasoning the next load.js edit could quietly
+   invalidate without anyone remembering to revisit this guard. Refusing the
+   whole named folder, at any depth, costs the reader one folder name they
+   are unlikely to want anyway. */
+const MANAGED_SUBFOLDERS = ['Categories', 'Accounts', 'Budgets', 'Plans', 'Tax', 'Transactions', 'Notes'];
+
+/* L1, 2026-08-29 audit (Phase 4b) — a deliberate, small copy of
+   views/dashboard.js's own SPLIT_SLICES, kept here ONLY to decide whether
+   the in-document percent caveat prints (see categoryTable's own header
+   above and financialReportMarkdown's `report.category.percentNote`
+   comment) — never used for anything arithmetic, so a drift between the two
+   constants would at worst mis-time a caveat, not mis-state a figure. Not
+   imported from dashboard.js: that file is a DOM view (requires 'obsidian'
+   transitively through chart.js), and this module's whole contract is
+   running pure in bare node — see the file header. */
+const REPORT_SPLIT_SLICES = 8;
+
+function pathSegs(p) {
+  return String(p || '').split('/').map(s => s.trim()).filter(Boolean);
+}
+
+/* Does `dir` (a report destination, already through reportPaths()'
+   sanitisation) resolve INSIDE `budgetFolder` at one of the managed names
+   above? Returns the matched name ('Categories', …) or null, rather than a
+   bare boolean — the caller needs the name to say WHICH folder it refused,
+   both in the on-page warning shown before the click and in the error
+   createReport() throws if it is reached anyway. Segment-by-segment, the
+   same shape io.js's own guardedPath uses to refuse a write escaping the
+   budget folder the OTHER direction (out, not in) — string prefix comparison
+   alone would wrongly catch "Budget/CategoriesOfSpending" as "Budget/Categories". */
+function managedFolderMatch(dir, budgetFolder) {
+  const dirSegs = pathSegs(dir);
+  const baseSegs = pathSegs(budgetFolder);
+  if (dirSegs.length <= baseSegs.length) return null;
+  for (let i = 0; i < baseSegs.length; i++) {
+    if (dirSegs[i] !== baseSegs[i]) return null;
+  }
+  const name = dirSegs[baseSegs.length];
+  return MANAGED_SUBFOLDERS.includes(name) ? name : null;
+}
 
 /* Named by WHAT SPAN IT COVERS, not by when it was generated — same
    reasoning as exportPaths(): re-generating the same selection overwrites
@@ -170,14 +238,29 @@ function kvTable(rows) {
    opposite of the truth. Missing `!r.assumed` on purpose: an assumed-spend
    row always carries r.budget > 0 (it is seeded FROM the budget amount — see
    budgetVsActualRows), so it can never satisfy `!r.budget` and never needs
-   the exclusion dashboard.js applies for the same reason. */
+   the exclusion dashboard.js applies for the same reason.
+
+   `orphaned` — R5, 2026-08-29 audit. Same signal categoryTable's own
+   `orphaned` already used for "Spend by Category" (a category name no
+   current Categories/ file answers to), now applied here too: this table
+   used to carry no such marker at all, so a category renamed mid-selection
+   (its OLD name still sitting in an earlier period's own budget/transaction
+   rows, unknown to any current Categories/ file) rendered as an ordinary,
+   unmarked row here even though the identical fact was already flagged one
+   section up. Marked the SAME way (`*`), for the SAME reason mergeCategoryRows'
+   own header gives for not attempting a real merge across a rename: a
+   category is its current name, nothing this app writes remembers what it
+   used to be called, and a merge built on a guess would be exactly the kind
+   of silent, plausible-looking wrong number this codebase's house rule
+   refuses. See financialReportMarkdown's own R5 comment for the caveat this
+   marker feeds. */
 function budgetTable(rows, money) {
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
     '|---|---|---:|---:|---:|'];
   for (const r of rows) {
     const remaining = r.budget - r.actual;
     const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
-    out.push(`| ${escMd(r.cat)} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
+    out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
   }
   return out;
 }
@@ -186,10 +269,26 @@ function budgetTable(rows, money) {
    (dashboard.js's categorySpendRows, merged across periods the same way
    budgetTable's rows are). Percentages come from share-percents.js's
    largest-remainder allocation, the SAME function the Dashboard's own donut
-   uses for its legend column, so a reader comparing "32%" here against the
-   donut on screen is comparing the same number, not two independent
-   roundings of it (share-percents.js's own header documents why an
-   independent Math.round() per row does not sum to 100).
+   uses for its legend column — so the ROUNDING is never the reason the two
+   disagree (share-percents.js's own header documents why an independent
+   Math.round() per row does not sum to 100).
+
+   L1, 2026-08-29 audit (Phase 4b) — that is NOT the same claim as "this
+   column always equals the donut's own %", and an earlier version of this
+   comment said so anyway. It only holds up to SPLIT_SLICES (=8,
+   views/dashboard.js) spend categories: past that, the Dashboard collapses
+   the tail into one "Other (N)" wedge and runs sharePercents() over THAT
+   COLLAPSED list, so the largest-remainder allocation runs over a different
+   set of numbers than this table's — a full, uncollapsed list, deliberately
+   (a report is meant to be complete; collapsing it into an "Other" bucket
+   the way a seven-inch donut has to would throw away exactly the detail a
+   report exists to keep). Duplicating SPLIT_SLICES here to gate an
+   in-document caveat is a small, deliberate copy of a magic number rather
+   than importing views/dashboard.js (a DOM view) into this pure module for
+   one constant — the same trade-off periodsFromAnchor() in views/report.js
+   already accepts, and named the same way there. See
+   financialReportMarkdown's own comment on `report.category.percentNote`
+   for where that caveat actually prints.
 
    `orphaned` — C2 in the 2026-08-29 audit. A category name no `Categories/`
    file answers to gets a "Missing categories" tile on the Dashboard
@@ -199,12 +298,17 @@ function budgetTable(rows, money) {
    already carries the flag (views/report.js sets it with the same
    `catKnown()` predicate period.js and dashboard.js both read), so this only
    has to say so — a trailing `*` on the row, and financialReportMarkdown
-   prints the names it belongs to once, below the table. */
+   prints the names it belongs to once, below the table.
+
+   L4, 2026-08-29 audit — `rows` are expected to already carry `pct`
+   (prepareReportData(), below), the SAME largest-remainder share every JSON
+   consumer of `categories[].percent` reads too. This function no longer
+   calls sharePercents() itself — see prepareReportData's own header for why
+   the call moved rather than merely being duplicated a second place. */
 function categoryTable(rows, money) {
-  const shares = sharePercents(rows.map(r => r.amount));
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.amount')} | ${i18n.t('report.col.percent')} |`,
     '|---|---:|---:|'];
-  rows.forEach((r, i) => out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${money(r.amount)} | ${shares[i]}% |`));
+  for (const r of rows) out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${money(r.amount)} | ${r.pct}% |`);
   return out;
 }
 
@@ -213,6 +317,49 @@ function debtTable(rows, money) {
     '|---|---:|---:|---:|'];
   for (const d of rows) out.push(`| ${escMd(d.name)} | ${money(d.balance)} | ${d.rate ? `${d.rate}%` : '—'} | ${money(d.interest)} |`);
   return out;
+}
+
+/* L4, 2026-08-29 audit — the ONE place the "%" column (Spend by Category)
+   and the savings growth rate are computed, so financialReportMarkdown()
+   and financialReportJson() below can never disagree about either: both
+   call this, on the SAME `data` a caller handed them, before doing
+   anything else. Before this fix each figure was computed exactly once,
+   inside financialReportMarkdown() only (categoryTable's own sharePercents()
+   call; an inline `rate` expression in the savings section) — JSON never
+   saw either, so a consumer who wanted them had no choice but to re-derive
+   them, and share-percents.js's own header already documents what plain
+   per-row rounding does to a percentage column (it does not sum to 100).
+   That is "one object, two serialisers" failing for exactly the two figures
+   that were never actually IN the object.
+
+   Pure — reads sharePercents() and a ratio the identical way the code it
+   replaced always did, moved rather than re-derived, so every existing
+   rendered figure in tests/report.test.cjs stays byte-identical. Called
+   from BOTH financialReportMarkdown() and financialReportJson() rather than
+   once by the caller (views/report.js's buildReportData()) so a test that
+   hand-builds a bare `data` fixture (as tests/report.test.cjs's own DATA
+   constant does, never having gone through buildReportData() at all) still
+   gets correct, non-`undefined` figures — a defensive normalisation, the
+   same shape reportPaths() already sanitises ITS caller's free-text input
+   rather than trusting every caller to have done it first. Idempotent and
+   side-effect-free (never mutates `data`, only returns a new one), so
+   calling it twice — once per serialiser — costs a little arithmetic and
+   risks nothing: there is exactly ONE rule here, not two independently
+   written ones, which is what "two figures derived by different rules"
+   actually means (see this file's own top header). MUST STAY PURE — no
+   Date.now(), no randomness, nothing that could make the two calls (one per
+   serialiser) disagree with each other. */
+function prepareReportData(data) {
+  const spendByCategory = data.spendByCategory || [];
+  const pct = sharePercents(spendByCategory.map(r => r.amount));
+  const savings = data.savings
+    ? { ...data.savings, rate: data.savings.rateCapital > 0 ? (data.savings.rateGrowth / data.savings.rateCapital) * 100 : null }
+    : data.savings;
+  return {
+    ...data,
+    spendByCategory: spendByCategory.map((r, i) => ({ ...r, pct: pct[i] })),
+    savings,
+  };
 }
 
 /* `data` — everything this module needs, already computed by the caller
@@ -224,12 +371,19 @@ function debtTable(rows, money) {
      periodLabel: string,              // heading, e.g. "August 2026"
      rangeNote: string,                // exact date span, e.g. "23 Jul – 22 Aug 2026"
      detail: 'summary' | 'detail',
+     periodCount: number,              // R5 — how many periods were merged; the rename
+                                        // caveat below only ever prints when this is > 1
      income, spend, net: number,       // periodSummary(), summed across the selection
      budgetIncome, budgetSpend: number,// budgetTotals(), summed the same way
-     categories: [{ cat, budget, actual, type }],   // budgetVsActualRows(), merged,
-                                                     // typeRank-sorted (see budgetTable)
+     categories: [{ cat, budget, actual, type, orphaned }],  // budgetVsActualRows(),
+                                                     // merged, typeRank-sorted (see
+                                                     // budgetTable); orphaned = !catKnown(cat)
      spendByCategory: [{ cat, amount, orphaned }],  // categorySpendRows(), merged;
-                                                     // orphaned = !catKnown(cat)
+                                                     // orphaned = !catKnown(cat). `pct` is
+                                                     // NOT the caller's to supply — see
+                                                     // prepareReportData() below, which adds
+                                                     // it (L4, 2026-08-29 audit) before either
+                                                     // serialiser reads this object.
      categoryGap: { uncat, netted },   // C2 — the SAME gap views/dashboard.js's own
                                         // donut discloses beside itself (sum.spend
                                         // minus what the category rows account for,
@@ -238,6 +392,8 @@ function debtTable(rows, money) {
                                         // same additive way every other figure above
                                         // is merged across the selection
      savings: null | { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total },
+                                        // `rate` is likewise prepareReportData()'s, not
+                                        // the caller's — see its own header (L4).
      debts: null | { count, active, total, perMonth, interest, rows: [{name,balance,rate,interest}] },
      netWorth: { net, assets, liabilities },
      health: null | { score, band, months, target, savingsRatePct, interestSharePct },
@@ -247,8 +403,9 @@ function debtTable(rows, money) {
    `money` is the household's own formatter, injected for the reason given in
    the file header. */
 function financialReportMarkdown(data, money) {
+  data = prepareReportData(data);
   const {
-    generated, periodLabel, rangeNote, detail,
+    generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
   } = data;
@@ -314,11 +471,40 @@ function financialReportMarkdown(data, money) {
   }
   const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMd(r.cat));
   if (orphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: orphanedNames.join(', ') }));
+  /* L1, 2026-08-29 audit (Phase 4b) — see categoryTable's own header above
+     for the full reasoning: this table is deliberately never collapsed, so
+     past REPORT_SPLIT_SLICES rows its % column and the Dashboard donut's
+     legend run largest-remainder over two different lists and can disagree.
+     Said once, here, rather than left for a reader who trusts this table
+     enough to hand it to an advisor to notice the mismatch on their own. */
+  if (spendByCategory.length > REPORT_SPLIT_SLICES) out.push('', i18n.t('report.category.percentNote', { count: REPORT_SPLIT_SLICES }));
 
   /* -------------------------- budget vs actual --------------------------- */
   out.push('', `## ${i18n.t('report.section.budgetActual')}`);
   if (categories.length) out.push(...budgetTable(categories, money));
   else out.push('', i18n.t('report.budget.empty'));
+  const budgetOrphanedNames = categories.filter(r => r.orphaned).map(r => escMd(r.cat));
+  if (budgetOrphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: budgetOrphanedNames.join(', ') }));
+
+  /* R5, 2026-08-29 audit — mergeCategoryRows (this file, above) keys on the
+     category's DISPLAY STRING, and there is no stable identity behind that
+     string to merge on instead: a category IS its current name (load.js
+     prefers `fm.name`, falling back to the filename, and neither survives a
+     rename as anything but itself — see controller.js's classifyRename), and
+     nothing this app writes remembers what a category used to be called once
+     the rename has happened. So a category renamed partway through a
+     multi-period selection genuinely does split into two rows here — one
+     under the old name, one under the new — and a real MERGE across that
+     split would mean GUESSING two names are the same category from data
+     alone, which is exactly the "silent, plausible-but-wrong" shape CLAUDE.md
+     already names four other bugs after. Disclosed instead of guessed: both
+     tables above already mark a row `*` when its name matches no CURRENT
+     Categories/ file (the same signal a genuinely deleted category would
+     also trigger — this cannot tell the two apart, and says so rather than
+     claiming false precision), so a caveat here is only ever shown when
+     there IS a `*` to explain AND more than one period could have split one. */
+  const anyOrphaned = spendByCategory.some(r => r.orphaned) || categories.some(r => r.orphaned);
+  if (periodCount > 1 && anyOrphaned) out.push('', i18n.t('report.category.renameCaveat'));
 
   /* --------------------- savings & investment growth ---------------------
      NOT scoped to the chosen period — growth is measured from an account's
@@ -332,7 +518,10 @@ function financialReportMarkdown(data, money) {
   } else if (!savings.measured) {
     out.push('', i18n.t('report.savings.unmeasured'));
   } else {
-    const rate = savings.rateCapital > 0 ? (savings.rateGrowth / savings.rateCapital) * 100 : null;
+    /* L4, 2026-08-29 audit — `rate` is prepareReportData()'s figure now, not
+       a second computation of the same ratio. See that function's own
+       header for why financialReportJson() reads the identical value. */
+    const { rate } = savings;
     out.push(...kvTable([
       [i18n.t('report.savings.growth'), money(savings.growth)],
       ...(rate !== null ? [[i18n.t('report.savings.rate'), `${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%`]] : []),
@@ -459,8 +648,9 @@ function jsonTransactionRow(r) {
    read by a person debugging an AI's answer as often as it is parsed by
    the AI itself. */
 function financialReportJson(data) {
+  data = prepareReportData(data);
   const {
-    generated, periodLabel, rangeNote, detail, currency,
+    generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
   } = data;
@@ -470,6 +660,14 @@ function financialReportJson(data) {
     period: periodLabel,
     range: rangeNote,
     detail,
+    /* R5 — a raw fact, not the Markdown sibling's prose caveat (this file's
+       own header explains why only `disclaimer` and `health_score.note` are
+       translated sentences in JSON): a consumer already gets `orphaned` on
+       every row of `categories` and `budgets_vs_actuals` below, so the same
+       "more than one period + an orphaned row" signal the Markdown caveat
+       gates on is fully reconstructable from data already here. This field
+       only saves that consumer from having to also parse `range`. */
+    period_count: periodCount,
     currency: currency || '',
     /* P2, 2026-08-29 audit — the Markdown sibling states this once, above
        every section (see financialReportMarkdown's own comment on the same
@@ -486,20 +684,42 @@ function financialReportJson(data) {
        header in this file, and financialReportMarkdown's identical branch:
        the JSON reader gets the SAME two facts the Markdown prose states, not
        a table that quietly sums to less than income_vs_spend.spend with no
-       field anywhere explaining why. */
-    categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount, orphaned: !!r.orphaned })),
+       field anywhere explaining why.
+
+       `percent` — L4, 2026-08-29 audit. prepareReportData()'s largest-
+       remainder share, the SAME figure the Markdown table's own % column
+       prints — not left for a consumer to re-derive with a plain
+       Math.round() per row, which is exactly the "does not sum to 100" trap
+       share-percents.js's own header documents. Whole percent points,
+       matching the Markdown column exactly rather than a higher-precision
+       float a consumer might reasonably expect but that would no longer sum
+       to 100 either. */
+    categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount, percent: r.pct, orphaned: !!r.orphaned })),
     category_gap: {
       uncategorised: (categoryGap && categoryGap.uncat) || 0,
       netted: (categoryGap && categoryGap.netted) || 0,
     },
+    /* `orphaned` — R5, 2026-08-29 audit. Same raw fact `categories` above
+       already carries, added here too so the two arrays are equally
+       interpretable (H1's own reasoning for carrying `type` in both). */
     budgets_vs_actuals: categories.map(r => ({
       category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: r.budget - r.actual,
+      orphaned: !!r.orphaned,
     })),
     savings: (savings && savings.total)
       ? {
         growth: savings.growth,
         rate_growth: savings.rateGrowth,
         rate_capital: savings.rateCapital,
+        /* L4, 2026-08-29 audit — the SAME ratio the Markdown sibling's rate
+           row prints (`report.savings.rate`, rounded to one decimal there
+           only for display), never a second division of rate_growth by
+           rate_capital that a consumer would otherwise have had to write
+           themselves. `null` exactly when the Markdown row is omitted
+           (rate_capital <= 0 — every measured account drawn down) rather
+           than 0 or NaN, which would read as "no growth" or silently break
+           downstream arithmetic. */
+        rate_pct: savings.rate,
         measured: savings.measured,
         unmeasured: savings.unmeasured,
         /* M4, 2026-08-29 audit — the SAME fact the Markdown prose discloses
@@ -534,4 +754,7 @@ function financialReportJson(data) {
   return JSON.stringify(shape, null, 2) + '\n';
 }
 
-module.exports = { REPORT_DIR, reportPaths, mergeCategoryRows, financialReportMarkdown, financialReportJson, copyBody };
+module.exports = {
+  REPORT_DIR, REPORT_SPLIT_SLICES, reportPaths, mergeCategoryRows, managedFolderMatch,
+  prepareReportData, financialReportMarkdown, financialReportJson, copyBody,
+};

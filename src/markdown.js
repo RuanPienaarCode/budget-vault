@@ -38,7 +38,8 @@ function parseFrontmatter(text) {
    Hand-rolled rather than /(?<!\\)\|/ on purpose: a lookbehind *literal* is a
    parse-time SyntaxError on WebKit before iOS 16.4, which would take down the
    whole bundle — not just this function — on a device Obsidian itself still
-   supports (iOS 14.5+). Same char-by-char shape as parseCsv below. */
+   supports (iOS 15 / WebKit 15.0 is the documented mobile floor — minAppVersion
+   gates the app, not the engine). Same char-by-char shape as parseCsv below. */
 const endsWithBarePipe = s => s.endsWith('|') && s[s.length - 2] !== '\\';
 function splitBarePipes(s) {
   const cells = [];

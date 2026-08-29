@@ -50,9 +50,12 @@ const { rangePills } = require('../chart');
 const { worth } = require('../worth');
 const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
-const { todayIso } = require('../dates');
+const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
-const { REPORT_DIR, reportPaths, mergeCategoryRows, financialReportMarkdown, financialReportJson, copyBody } = require('../report');
+const {
+  REPORT_DIR, reportPaths, mergeCategoryRows, managedFolderMatch,
+  financialReportMarkdown, financialReportJson, copyBody,
+} = require('../report');
 /* Namespace import: see views/dashboard.js's own comment on why every view
    in this app imports i18n the same way regardless of whether `t` happens
    to be a local name in this particular file. */
@@ -130,13 +133,23 @@ module.exports = function registerReport(ctx) {
      actually has rather than inventing zero-filled history) — but anchored
      on the `anchor` the caller passes instead of S.period. See
      selectedPeriods()'s own comment for why this is a deliberate, small
-     duplication rather than a change to trendPeriods()'s contract. */
+     duplication rather than a change to trendPeriods()'s contract.
+
+     M2, 2026-08-29 audit — this had trendPeriods()'s OWN bug, carried over
+     verbatim by the duplication above: `earliest && i > 0` never breaks on a
+     genuinely empty vault (earliestDataMonth() returns null, so the `earliest
+     &&` guard was always false), so every `want` period got pushed — twelve
+     invented zero-months on the very first report a brand-new household
+     generated. Fixed the same way trend-math.js's own copy was: no data at
+     all means no floor to test against, which is the same as "before
+     whatever floor there is" — `!earliest` breaks here exactly where a real
+     earliest date immediately would. */
   function periodsFromAnchor(anchor, want) {
     const earliest = earliestDataMonth();
     const out = [];
     for (let i = 0; i < want; i++) {
       const p = shiftPeriod(anchor, -i);
-      if (earliest && i > 0 && periodRange(p).end.slice(0, 7) < earliest) break;
+      if (i > 0 && (!earliest || periodRange(p).end.slice(0, 7) < earliest)) break;
       out.push(p);
     }
     return out.reverse();
@@ -146,6 +159,37 @@ module.exports = function registerReport(ctx) {
     return periods.length === 1
       ? periodMonthName(periods[0])
       : `${periodMonthName(periods[0])} ${i18n.t('report.to')} ${periodMonthName(periods[periods.length - 1])}`;
+  }
+
+  /* L2, 2026-08-29 audit (Phase 4b) — the ON-DISK PATH, unlike
+     periodLabelFor()'s document heading just above, must stay the SAME no
+     matter what Settings.md's `language` says. Before this fix, BOTH read
+     periodLabelFor(): switching the interface language between two reports
+     of the exact SAME period selection changed reportPaths()' `label`
+     input, which changed the path — silently breaking "regenerating
+     overwrites the earlier file" (reportPaths()'s own comment, src/report.js)
+     and leaving an orphan in Reports/ the "Already exists" note (below,
+     #reportExistsNote) never mentions, because it only ever checks the ONE
+     path the CURRENT language would produce.
+
+     The fix is a literal, untranslated "to" — not i18n.t('report.to'), on
+     purpose, and not a second look at periodMonthName() either: those month
+     names are already English regardless of interface language
+     (src/period.js's own hard-coded MONTH_FULL, an existing, app-wide fact
+     this file did not create and is not the one to fix here — see this
+     comment's own audit note), so a multi-period filename was already not
+     FULLY translated before this change; only the one further word this
+     file itself chose needed to stop moving under a reader's feet.
+
+     Existing reports written before this fix keep their OLD path (with
+     whatever language's word for "to" was active that day) — this is not
+     migrated, on purpose: a report is a point-in-time export, trivially
+     regenerable from the same period selection, and it is exactly the fix
+     the audit says makes it fine to leave alone. */
+  function filenameLabel(periods) {
+    return periods.length === 1
+      ? periodMonthName(periods[0])
+      : `${periodMonthName(periods[0])} to ${periodMonthName(periods[periods.length - 1])}`;
   }
 
   /* Same shape periodTitle() (period.js) builds for a single period — reused
@@ -160,7 +204,7 @@ module.exports = function registerReport(ctx) {
 
   function currentPaths() {
     const periods = selectedPeriods();
-    return reportPaths(periodLabelFor(periods), folder ?? (plugin.settings.reportFolder || REPORT_DIR));
+    return reportPaths(filenameLabel(periods), folder ?? (plugin.settings.reportFolder || REPORT_DIR));
   }
 
   /* A report already sitting on disk for the exact selection on screen is
@@ -258,11 +302,30 @@ module.exports = function registerReport(ctx) {
     $('#reportFormatDesc').textContent = formatOpts.filter(o => formats.has(o.key)).map(o => o.desc).join(' ');
 
     $('#reportFolder').value = folder ?? (plugin.settings.reportFolder || REPORT_DIR);
-    $('#reportFolderDesc').textContent = i18n.t('report.field.folderDesc');
 
-    const { mdPath, jsonPath } = currentPaths();
+    const { mdPath, jsonPath, dir } = currentPaths();
     const previewPaths = [formats.has('md') ? mdPath : null, formats.has('json') ? jsonPath : null].filter(Boolean);
     $('#reportPreview').textContent = i18n.t('report.preview', { path: previewPaths.join(' · ') });
+
+    /* M1, 2026-08-29 audit — the folder field is free text with no relation
+       to load.js's own allow-list (Categories/, Accounts/, Budgets/, Plans/,
+       Tax/, Transactions/, Notes/ — see src/report.js's own header). Point it
+       at one of those and the generated .md is parsed back in as ordinary
+       vault data on the next load — silently, and specifically as the
+       category/account/plan the reader never meant to create. REFUSED, not
+       warned-and-allowed: the failure mode is silent corruption of the
+       household's own category list, not merely an untidy file, and told
+       BEFORE the click via the SAME description line the folder field
+       already carries (`#reportFolderDesc`, populated from here per the
+       existing `#reportExistsNote` pattern on this page) rather than a new
+       static element. createReport() below refuses the write a second time,
+       independently — this line can be bypassed by editing state directly in
+       a test harness; the write-time refusal cannot. */
+    const managedConflict = managedFolderMatch(dir, plugin.settings.budgetFolder);
+    $('#reportFolderDesc').textContent = managedConflict
+      ? i18n.t('report.field.folderManaged', { folder: managedConflict })
+      : i18n.t('report.field.folderDesc');
+    $('#reportFolderDesc').classList.toggle('text-danger', !!managedConflict);
 
     const existing = [
       (result && result.md) ? i18n.t('report.format.md') : null,
@@ -270,6 +333,7 @@ module.exports = function registerReport(ctx) {
     ].filter(Boolean);
     $('#reportExistsNote').textContent = existing.length ? i18n.t('report.exists', { formats: existing.join(', ') }) : '';
     $('#reportCreateLabel').textContent = i18n.t(existing.length ? 'report.recreate' : 'report.create');
+    $('#reportCreate').disabled = !!managedConflict;
 
     /* What the note will actually contain — a straight list of the sections
        src/report.js's financialReportMarkdown()/financialReportJson() write,
@@ -414,8 +478,19 @@ module.exports = function registerReport(ctx) {
        category nothing was spent on — the Type column (src/report.js's
        budgetTable) needs the grouping to actually mean something. */
     const order = typeOrder(S.settings.groups);
+    /* `orphaned` — R5, 2026-08-29 audit, the same catKnown() predicate
+       spendByCategory's own merge already applies below. A category renamed
+       partway through the selection leaves its OLD name answering to no
+       current Categories/ file (the rename moved the file, not the string
+       already written into an earlier period's budget/transaction rows), so
+       it now surfaces here too rather than only in "Spend by Category" —
+       closing an asymmetry where the same fact was disclosed in one table
+       and silently absent from the other. See mergeCategoryRows' own header
+       and this file's buildReportData/financialReportMarkdown for why a real
+       MERGE across the rename is not attempted: see R5's note there. */
     const categories = mergeCategoryRows(periods.map(p => budgetVsActualRows(p)), ['budget', 'actual'])
-      .sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.cat.localeCompare(b.cat));
+      .sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.cat.localeCompare(b.cat))
+      .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
     /* `orphaned` — catKnown() is the SAME predicate period.js's own catType()
        and dashboard.js's `sum.unknown` both key off (see catKnown's own
        header on why "no category" and "a category no file answers to" are
@@ -429,9 +504,23 @@ module.exports = function registerReport(ctx) {
 
     const w = worth(S.accounts, S.debts, S.assets);
     return {
-      generated: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      /* M3, 2026-08-29 audit — this was `new Date().toISOString().slice(0,
+         16).replace('T', ' ')`, UTC, while todayIso() a few lines up (and
+         everywhere else this app stamps "now") reads local calendar parts —
+         see src/dates.js's own header for why that split is the whole
+         reason the module exists. Generated at 06:18 SAST, this line used to
+         print "04:18"; for a reader east of Greenwich it is the wrong
+         CALENDAR DAY, not just the wrong hour, in both the frontmatter and
+         the "Generated" line the reader actually sees. */
+      generated: nowLocalMinute(),
       periodLabel: periodLabelFor(periods),
       rangeNote: rangeNoteFor(periods),
+      /* R5 — how many periods this selection actually merged. A rename
+         mid-selection can only ever SPLIT a category across two rows when
+         there is more than one period to split across; financialReportMarkdown
+         gates its rename caveat on this so a single-period ("Current month")
+         report, which can never exhibit R5, never prints a caveat about it. */
+      periodCount: periods.length,
       detail,
       currency: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
@@ -463,7 +552,24 @@ module.exports = function registerReport(ctx) {
   async function createReport() {
     try {
       const data = buildReportData();
-      const paths = reportPaths(data.periodLabel, folder ?? (plugin.settings.reportFolder || REPORT_DIR));
+      /* L2 — the write path is named off filenameLabel() (language-stable),
+         NOT data.periodLabel (the document's own translated heading — see
+         filenameLabel's own comment above for why the two must differ). A
+         second, cheap selectedPeriods() call: pure, and nothing async runs
+         between it and buildReportData()'s own identical call, so the two
+         can never disagree about which periods this selection means. */
+      const paths = reportPaths(filenameLabel(selectedPeriods()), folder ?? (plugin.settings.reportFolder || REPORT_DIR));
+      /* M1, 2026-08-29 audit — refused a SECOND time, independently of the
+         renderReport()/disabled-button guard above: that one only stops a
+         click through the rendered page, and buildReportData()/reportPaths()
+         run first in this function regardless, so a caller that reached
+         createReport() any other way (a future command-palette entry, a test
+         that calls it directly) would otherwise still write. Thrown, not
+         toasted directly — the whole-body try/catch below is what turns this
+         into the SAME createFailed toast every other failure in this
+         function produces, not a second, differently-shaped error path. */
+      const conflict = managedFolderMatch(paths.dir, plugin.settings.budgetFolder);
+      if (conflict) throw new Error(i18n.t('report.field.folderManaged', { folder: conflict }));
       /* Explicit, not left to writeVaultFile's own internal ensureFolder —
          both now run (ensureFolder is idempotent: it checks
          getAbstractFileByPath and returns immediately if the folder is

@@ -3439,6 +3439,27 @@
 .budget-app-root .note-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
 .budget-app-root .note-empty { padding: 22px 4px; font-size: 13.5px; line-height: 1.55; }
 
+/* ---- Report --------------------------------------------------------------
+   The report options card wrote its own spacing inline instead of naming it —
+   AUDIT-2026-08-29 REL2. Verified that finding's premise first: the section
+   has 16 inline style= attributes against 50 in shell.js as a whole, so 34
+   pre-date this view and are a separate, wider decision for Ruan, not this
+   pass. These nine classes give the report card's own fields, buttons and
+   fine print names, reusing .tax-field (already shared with the Tax view) as
+   the row wrapper rather than inventing a second one. No new colour, no new
+   modern CSS feature — every value here is the value the inline attribute
+   already had. */
+.budget-app-root .report-field-gap { margin-top: 14px; }
+.budget-app-root .report-field-desc { font-size: 12.5px; margin: 4px 0 0; }
+.budget-app-root .report-folder-desc { font-size: 12.5px; }
+.budget-app-root .report-note { font-size: 12.5px; margin: 10px 0 0; }
+.budget-app-root .report-contains-label { font-size: 12.5px; margin: 10px 0 4px; font-weight: 600; }
+.budget-app-root .report-contains-list { margin: 0 0 4px 18px; padding: 0; font-size: 12.5px; color: var(--text-muted); }
+.budget-app-root .report-actions { margin-top: 1rem; }
+.budget-app-root .report-btn { padding: 0.55rem 1.5rem; }
+.budget-app-root .report-result-note { font-size: 12.5px; }
+.budget-app-root .report-share-hint { font-size: 12.5px; margin-top: 8px; }
+
 /* The chip beside an account/debt/service name. Deliberately quiet with no
    notes against it — there it is an invitation, not a figure — and it takes
    the primary colour once there is something to go and read. */

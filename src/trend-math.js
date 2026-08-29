@@ -50,7 +50,19 @@ module.exports = function registerTrendMath(ctx) {
     const out = [];
     for (let i = 0; i < want; i++) {
       const p = shiftPeriod(S.period, -i);
-      if (earliest && i > 0 && periodRange(p).end.slice(0, 7) < earliest) break;
+      /* M2, 2026-08-29 audit — `earliest` is null on a vault that has
+         imported nothing at all (earliestDataMonth's own doc: an imported-
+         but-empty file is not history either), and the old `earliest &&`
+         guard only ever fired when it was truthy — so on a genuinely empty
+         vault the break never ran and all `want` periods got pushed, twelve
+         months of invented zero-spend history on the very first report a
+         brand-new household ever generated, directly contradicting this
+         function's own comment two paragraphs up. No data at all means
+         there is no floor to test a period against, which is the SAME
+         answer as "before the earliest month there is" — so `!earliest`
+         breaks here exactly where a real earliest date immediately would,
+         leaving only the current period (i===0, always pushed first). */
+      if (i > 0 && (!earliest || periodRange(p).end.slice(0, 7) < earliest)) break;
       out.push(p);
     }
     return out.reverse();
