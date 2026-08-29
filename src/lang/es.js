@@ -1145,7 +1145,7 @@ module.exports = {
   'report.period.12m.desc': 'Los últimos 12 meses, o menos si el vault no llega tan atrás.',
   'report.period.pillsAria': 'Periodo del informe',
   'report.detail.summary': 'Solo resumen',
-  'report.detail.summary.desc': 'Solo totales y categorías — seguro para entregar a un asesor.',
+  'report.detail.summary.desc': 'Sin transacciones individuales — pero sigue mostrando los nombres de tus categorías, totales, deudas y patrimonio neto.',
   'report.detail.detail': 'Incluir detalle de transacciones',
   'report.detail.detail.desc': 'Cada transacción del periodo, listada — más útil para un chat de IA, más para compartir.',
   'report.detail.pillsAria': 'Nivel de detalle del informe',
@@ -1184,6 +1184,7 @@ module.exports = {
   'report.title': 'Informe Financiero — {period}',
   'report.generatedLine': 'Generado {date}',
   'report.rule': 'Las cifras siguen las propias reglas de la app — una transacción excluida se deja fuera de los totales de ingresos y gastos, pero sigue apareciendo abajo si este informe incluye el detalle de transacciones.',
+  'report.disclaimer': 'Este informe resume tus propias cifras. No constituye asesoramiento financiero — confirma cualquier decisión importante con un asesor financiero u otro profesional cualificado antes de actuar.',
   'report.section.incomeSpend': 'Ingresos y Gastos',
   'report.col.income': 'Ingresos',
   'report.col.spend': 'Gastos',
@@ -1211,6 +1212,7 @@ module.exports = {
   'report.savings.growth': 'Crecimiento total',
   'report.savings.rate': 'Tasa de crecimiento',
   'report.savings.partial': '{count} de {total} cuentas no tienen importe inicial ni fecha y quedan fuera de las cifras anteriores.',
+  'report.savings.negCapital': '{count} de {total} cuentas han retirado más de lo que se ha aportado, por lo que quedan fuera de la tasa de crecimiento anterior.',
   'report.section.debt': 'Deuda',
   'report.debt.none': 'No hay deuda registrada.',
   'report.debt.free': {
@@ -1233,6 +1235,7 @@ module.exports = {
   'report.health.months': 'Fondo de emergencia',
   'report.health.savingsRate': 'Tasa de ahorro',
   'report.health.interestShare': 'Interés de deuda como parte del ingreso',
+  'report.health.note': 'Una sola cifra que combina meses de fondo de emergencia, tasa de ahorro y proporción de intereses de deuda — una estimación aproximada a partir de las cifras de este vault, no una evaluación profesional.',
   'report.section.transactions': 'Detalle de Transacciones',
   'report.transactions.count': {
     one: '{count} transacción en este periodo.',

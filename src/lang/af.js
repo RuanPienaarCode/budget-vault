@@ -1143,7 +1143,7 @@ module.exports = {
   'report.period.12m.desc': 'Die laaste 12 maande, of minder as die kluis nie so ver terugstrek nie.',
   'report.period.pillsAria': 'Verslagtydperk',
   'report.detail.summary': 'Net opsomming',
-  'report.detail.summary.desc': 'Slegs totale en kategorieë — veilig om aan \'n adviseur te gee.',
+  'report.detail.summary.desc': 'Geen individuele transaksies nie — maar dit wys steeds jou kategorienaamme, totale, skuld en netto waarde.',
   'report.detail.detail': 'Sluit transaksiedetail in',
   'report.detail.detail.desc': 'Elke transaksie in die tydperk, gelys — meer nuttig vir \'n KI-gesprek, meer om te deel.',
   'report.detail.pillsAria': 'Verslagdetailvlak',
@@ -1182,6 +1182,7 @@ module.exports = {
   'report.title': 'Finansiële Verslag — {period}',
   'report.generatedLine': 'Geskep {date}',
   'report.rule': 'Syfers volg die program se eie reëls — \'n uitgesluite transaksie word uit inkomste- en bestedingstotale gelaat, maar steeds hieronder gelys as hierdie verslag transaksiedetail insluit.',
+  'report.disclaimer': 'Hierdie verslag som jou eie syfers op. Dit is nie finansiële advies nie — bevestig enigiets belangriks met \'n finansiële adviseur of ander gekwalifiseerde professionele persoon voordat jy daarop optree.',
   'report.section.incomeSpend': 'Inkomste en Besteding',
   'report.col.income': 'Inkomste',
   'report.col.spend': 'Besteding',
@@ -1209,6 +1210,7 @@ module.exports = {
   'report.savings.growth': 'Totale groei',
   'report.savings.rate': 'Groeikoers',
   'report.savings.partial': '{count} van {total} rekeninge kort \'n beginbedrag of datum en word uit bostaande syfers gelaat.',
+  'report.savings.negCapital': '{count} van {total} rekeninge het meer onttrek as wat ingesit is, en word dus uit die groeikoers hierbo gelaat.',
   'report.section.debt': 'Skuld',
   'report.debt.none': 'Geen skuld aangeteken nie.',
   'report.debt.free': {
@@ -1231,6 +1233,7 @@ module.exports = {
   'report.health.months': 'Noodfonds',
   'report.health.savingsRate': 'Spaarkoers',
   'report.health.interestShare': 'Skuldrente as deel van inkomste',
+  'report.health.note': 'Een enkele syfer wat noodfondsmaande, spaarkoers en skuldrente-aandeel kombineer — \'n ruwe aanduiding uit hierdie kluis se eie syfers, nie \'n professionele assessering nie.',
   'report.section.transactions': 'Transaksiedetail',
   'report.transactions.count': {
     one: '{count} transaksie in hierdie tydperk.',

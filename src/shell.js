@@ -478,6 +478,7 @@ const SHELL_HTML = `
             <p class="text-muted" id="reportExistsNote" style="font-size:12.5px;margin:4px 0 0"></p>
             <p class="text-muted" id="reportContainsLabel" style="font-size:12.5px;margin:10px 0 4px;font-weight:600"></p>
             <ul id="reportContains" style="margin:0 0 4px 18px;padding:0;font-size:12.5px;color:var(--text-muted)"></ul>
+            <p class="text-muted" id="reportDisclaimer" style="font-size:12.5px;margin:10px 0 0"></p>
             <p style="margin-top:1rem">
               <button class="btn-gradient" id="reportCreate" style="padding:0.55rem 1.5rem">
                 <span class="ico" data-ico="file-text|file"></span> <span id="reportCreateLabel"></span>

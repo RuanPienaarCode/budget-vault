@@ -5,7 +5,7 @@ const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
 const { isStale, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthSeries, chartable, poolCatType } = require('../savings-math');
+const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType } = require('../savings-math');
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
@@ -113,42 +113,21 @@ module.exports = function registerSavings(ctx) {
 
   const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
-  /* `measured`/`unmeasured` are counted by `chartable()` — the SAME predicate
-     growthSeries uses to decide what it draws — rather than a looser
-     `basis !== 'none'`, which also counted a 'stated' account (no
-     transactions, balance − total_invested) as measured. The chart has always
-     excluded those, so the tile used to disagree with the chart's own
-     subtitle about how many of the same accounts were measurable.
-
-     `rateCapital`/`rateGrowth` sum only accounts with a POSITIVE `capitalIn` —
-     the same guard totalReturn puts on `returnPct` itself, applied to the
-     aggregate. Without it one drawn-down account (a living annuity mid
-     withdrawal, `capitalIn` negative) shrinks the total capital the rate is
-     measured against and inflates the headline percentage for every other
-     account riding along with it — a fund with R60 000 real growth on
-     R160 000 put in reading "+183.3% on R30 000 put in" once a −R30 000
-     account was folded into the same sum. `growth` itself is unaffected: it
-     is a plain total, not a ratio, and every measured account's growth is
-     real money regardless of which way its capital line went. */
-  function growthTotals(entries) {
-    let growth = 0, rateGrowth = 0, rateCapital = 0, measured = 0, unmeasured = 0, negCapital = 0;
-    for (const e of entries) {
-      const r = ret(e);
-      if (!chartable(e.account, r)) { unmeasured++; continue; }
-      measured++;
-      growth += r.growth;
-      if (r.capitalIn > 0) { rateGrowth += r.growth; rateCapital += r.capitalIn; }
-      else negCapital++;
-    }
-    return { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total: measured + unmeasured };
-  }
+  /* growthTotals itself now lives in savings-math.js (2026-08-29 audit, M4) —
+     see that module's own header on `growthTotals` for the `measured`/
+     `unmeasured`/`negCapital` reasoning this file used to carry alone. Moved
+     out so views/report.js's savingsSummary() calls the SAME function
+     instead of re-deriving it: "two figures derived by different rules" is
+     this codebase's most-repeated bug shape, and a report whose savings
+     section disagreed with this page's own tile would be exactly that shape
+     wearing a new hat. */
 
   /* The tile is drawn even when NOTHING is measurable, saying so. A tile that
      appeared only once a reader had already filled in the field that produces
      it would never tell anyone the field exists — and "—, no account carries a
      starting amount" is a fact about this vault, not an empty state. */
   function growthTile(tile, entries) {
-    const g = growthTotals(entries);
+    const g = growthTotals(entries, poolType, { today: todayIso() });
     if (!g.total) return;
     if (!g.measured) {
       /* Names the field AND where to set it — "no account records what it

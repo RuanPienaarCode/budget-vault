@@ -48,7 +48,7 @@
 const { el } = require('../dom');
 const { rangePills } = require('../chart');
 const { worth } = require('../worth');
-const { totalReturn, poolCatType, chartable } = require('../savings-math');
+const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
 const { todayIso } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
@@ -293,6 +293,12 @@ module.exports = function registerReport(ctx) {
     ];
     for (const b of bullets) containsList.append(el('li', {}, b));
 
+    /* P2, 2026-08-29 audit — the same not-financial-advice line the
+       generated document carries above every section (report.disclaimer,
+       src/report.js), said here too so a reader sees it BEFORE spending a
+       write on the file, not only after opening what came out. */
+    $('#reportDisclaimer').textContent = i18n.t('report.disclaimer');
+
     const card = $('#reportResultCard');
     if (result) {
       card.classList.remove('hidden');
@@ -315,27 +321,22 @@ module.exports = function registerReport(ctx) {
      Every function below reaches into ctx or a math module for its figures;
      none of them sum a transaction or a balance on their own. */
 
-  /* Savings & investment growth, as of today — the exact reasoning
-     views/savings.js's own growthTile()/growthTotals() apply, reproduced
-     here because that pair are DOM-bound closures over the Savings view's
-     own `tile()`/`money()` calls and cannot be called from another page;
-     the CALLS they make (totalReturn, chartable, poolCatType) are the same
-     ones, not a second guess at what they return. */
+  /* Savings & investment growth, as of today — growthTotals() itself now
+     lives in savings-math.js (2026-08-29 audit, M4), called here with the
+     SAME `entries` shape views/savings.js's own growthTile() builds, so this
+     section can never disagree with that page's own tile about what
+     "growth" or "rate of growth" mean — see growthTotals' own header for
+     why `negCapital` (a drawn-down account, excluded from the rate but not
+     from the plain growth total) used to be computed here a SECOND time and
+     silently dropped that field, the exact "two figures derived by
+     different rules" shape this codebase keeps repeating. */
   function savingsSummary() {
     const poolType = name => poolCatType(S.categories, name);
     const typeIs = (a, t) => String((a && a.type) || '').trim().toLowerCase() === t;
     const pool = S.accounts.filter(a => typeIs(a, 'savings') || typeIs(a, 'investment'));
     const idx = accountIndex();
-    let growth = 0, rateGrowth = 0, rateCapital = 0, measured = 0, unmeasured = 0;
-    for (const a of pool) {
-      const rows = (idx.get(a) || {}).rows || [];
-      const r = totalReturn(a, rows, poolType, { today: todayIso() });
-      if (!chartable(a, r)) { unmeasured++; continue; }
-      measured++;
-      growth += r.growth;
-      if (r.capitalIn > 0) { rateGrowth += r.growth; rateCapital += r.capitalIn; }
-    }
-    return { growth, rateGrowth, rateCapital, measured, unmeasured, total: measured + unmeasured };
+    const entries = pool.map(a => ({ account: a, rows: (idx.get(a) || {}).rows || [] }));
+    return growthTotals(entries, poolType, { today: todayIso() });
   }
 
   /* Debt, as of today — worth.js's own activeDebts() (via w.active) is the

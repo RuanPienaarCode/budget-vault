@@ -1091,7 +1091,7 @@ module.exports = {
   'report.period.12m.desc': '過去12か月分。Vaultがそこまで遡れない場合は、あるだけの分。',
   'report.period.pillsAria': 'レポート期間',
   'report.detail.summary': '概要のみ',
-  'report.detail.summary.desc': '合計とカテゴリのみ — アドバイザーに渡しても安全です。',
+  'report.detail.summary.desc': '個別の取引は含まれませんが、カテゴリ名・合計額・負債・純資産は表示されます。',
   'report.detail.detail': '取引明細を含める',
   'report.detail.detail.desc': '期間内のすべての取引を一覧表示 — AIチャットに役立ち、共有する情報も増えます。',
   'report.detail.pillsAria': 'レポートの詳細度',
@@ -1130,6 +1130,7 @@ module.exports = {
   'report.title': '財務レポート — {period}',
   'report.generatedLine': '{date} に生成',
   'report.rule': '数値はアプリ自体のルールに従います — 除外された取引は収入・支出の合計から除かれますが、このレポートに取引明細が含まれる場合は下に一覧表示されます。',
+  'report.disclaimer': 'このレポートはご自身の数値をまとめたものであり、財務アドバイスではありません。重要な判断をする前に、ファイナンシャルアドバイザーなど資格を持つ専門家に確認してください。',
   'report.section.incomeSpend': '収入と支出',
   'report.col.income': '収入',
   'report.col.spend': '支出',
@@ -1157,6 +1158,7 @@ module.exports = {
   'report.savings.growth': '合計増加額',
   'report.savings.rate': '増加率',
   'report.savings.partial': '{total} 件中 {count} 件の口座に開始額または開始日が設定されておらず、上記の数値には含まれていません。',
+  'report.savings.negCapital': '{total} 件中 {count} 件の口座は入金より出金の方が多いため、上記の増加率には含まれていません。',
   'report.section.debt': '負債',
   'report.debt.none': '負債が記録されていません。',
   'report.debt.free': {
@@ -1178,6 +1180,7 @@ module.exports = {
   'report.health.months': '緊急資金',
   'report.health.savingsRate': '貯蓄率',
   'report.health.interestShare': '収入に占める負債利息の割合',
+  'report.health.note': '緊急資金の月数、貯蓄率、負債利息の割合を組み合わせた一つの数値であり、このボールト内の数値からの大まかな目安であって、専門的な評価ではありません。',
   'report.section.transactions': '取引明細',
   'report.transactions.count': {
     other: 'この期間の取引は {count} 件です。',

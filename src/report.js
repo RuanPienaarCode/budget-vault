@@ -45,10 +45,18 @@
    exporter.js's English-only markdown — the brief for this feature asks for
    a report generated in the reader's own language, and src/i18n.js is
    itself pure (no DOM, no obsidian import), so requiring it here costs
-   nothing bare node cannot pay. JSON carries no translated prose at all —
-   its keys are a stable schema for a machine reader, not English sentences
-   for a human one, and translating THOSE would break the one thing a
-   schema promises: the same key name every time. */
+   nothing bare node cannot pay. JSON's KEYS carry no translated prose — they
+   are a stable schema for a machine reader, not English sentences for a
+   human one, and translating THOSE would break the one thing a schema
+   promises: the same key name every time. Two VALUES are a deliberate,
+   narrow exception (P2, 2026-08-29 audit): `disclaimer` and
+   `health_score.note` are translated sentences, not raw data, because the
+   whole reason they exist is to be read by whoever opens this file — a
+   person debugging an AI's answer, or the AI itself reading in the
+   household's own language — the same audience the file header two
+   paragraphs up already names for the two-space formatting choice. A
+   machine parsing `health_score.score` never looks at `.note`; a human or
+   an AI answering one does, and is exactly who these two fields are for. */
 
 const { escMd } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
@@ -229,7 +237,7 @@ function debtTable(rows, money) {
                                         // inside a category"), summed per period the
                                         // same additive way every other figure above
                                         // is merged across the selection
-     savings: null | { growth, rateGrowth, rateCapital, measured, unmeasured, total },
+     savings: null | { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total },
      debts: null | { count, active, total, perMonth, interest, rows: [{name,balance,rate,interest}] },
      netWorth: { net, assets, liabilities },
      health: null | { score, band, months, target, savingsRatePct, interestSharePct },
@@ -262,6 +270,15 @@ function financialReportMarkdown(data, money) {
        no other way to learn that a figure here is not simply "every
        transaction added up". */
     i18n.t('report.rule'),
+    '',
+    /* P2, 2026-08-29 audit — this document's stated purpose is to be read by
+       an advisor or pasted into an AI chat, yet carried no caution at all
+       while views/tax.js's own checklist (nothing this app calls "advice")
+       does. Placed here, ABOVE every section, not only on the page around
+       it — copyBody() only strips the frontmatter (see its own header), so
+       this line rides along with every copy that leaves the app the same
+       way report.rule does. */
+    i18n.t('report.disclaimer'),
   ];
 
   /* --------------------------- income & spend --------------------------- */
@@ -321,6 +338,18 @@ function financialReportMarkdown(data, money) {
       ...(rate !== null ? [[i18n.t('report.savings.rate'), `${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%`]] : []),
     ]));
     if (savings.unmeasured) out.push('', i18n.t('report.savings.partial', { count: savings.unmeasured, total: savings.total }));
+    /* M4, 2026-08-29 audit — the exact disclosure views/savings.js's own
+       growthTile() puts beside itself ("<n> taken out more than put in —
+       left out of the rate"): a drawn-down account (a living annuity mid
+       withdrawal) is still counted in the plain `growth` total above but
+       excluded from `rateGrowth`/`rateCapital`, so the rate needs its own
+       caveat, said plainly rather than left for the reader to notice the
+       two figures don't add up the way they expect. Shown whenever any
+       account is excluded from the rate this way, whether or not a rate
+       row above ended up printing at all (rateCapital could be 0 because
+       EVERY measured account is drawn down) — the same unconditional gate
+       growthTile() itself uses. */
+    if (savings.negCapital) out.push('', i18n.t('report.savings.negCapital', { count: savings.negCapital, total: savings.total }));
   }
 
   /* ------------------------------- debt -----------------------------------
@@ -359,6 +388,13 @@ function financialReportMarkdown(data, money) {
     if (health.savingsRatePct !== null) rows.push([i18n.t('report.health.savingsRate'), `${Math.round(health.savingsRatePct)}%`]);
     if (health.interestSharePct !== null) rows.push([i18n.t('report.health.interestShare'), `${Math.round(health.interestSharePct)}%`]);
     out.push(...kvTable(rows));
+    /* P2, 2026-08-29 audit — a single number that combines emergency-fund
+       months, saving rate and debt interest share ships into this document
+       with no explanation of what it measures or where it stops, for a
+       reader who did not build it and will reason from it confidently
+       (an advisor, an AI chat). Said once, here, rather than assumed known
+       from the score's own name. */
+    out.push('', i18n.t('report.health.note'));
   }
 
   /* --------------------------- transaction detail --------------------------
@@ -435,6 +471,13 @@ function financialReportJson(data) {
     range: rangeNote,
     detail,
     currency: currency || '',
+    /* P2, 2026-08-29 audit — the Markdown sibling states this once, above
+       every section (see financialReportMarkdown's own comment on the same
+       line); a JSON consumer gets the identical sentence as a field rather
+       than nothing, since a tool that "would rather parse than read" (this
+       file's own header) still hands the parsed numbers to a human, or an
+       AI answering one, eventually. */
+    disclaimer: i18n.t('report.disclaimer'),
     income_vs_spend: {
       income, spend, net,
       budget_income: budgetIncome, budget_spend: budgetSpend,
@@ -459,6 +502,11 @@ function financialReportJson(data) {
         rate_capital: savings.rateCapital,
         measured: savings.measured,
         unmeasured: savings.unmeasured,
+        /* M4, 2026-08-29 audit — the SAME fact the Markdown prose discloses
+           (`report.savings.negCapital`), so a JSON reader is never told
+           less than a human reading the note beside it. Always a number
+           (never absent), matching every other count in this object. */
+        neg_capital: savings.negCapital || 0,
         total: savings.total,
       }
       : null,
@@ -474,6 +522,11 @@ function financialReportJson(data) {
       ? {
         score: health.score, months: health.months, target_months: health.target,
         savings_rate_pct: health.savingsRatePct, interest_share_pct: health.interestSharePct,
+        /* P2 — the same gloss the Markdown prints under this section
+           (`report.health.note`), for the same reason `disclaimer` above
+           rides along: a reader who never opens the Markdown still gets
+           told what this number is and is not. */
+        note: i18n.t('report.health.note'),
       }
       : null,
     transactions: (detail === 'detail' && transactions) ? transactions.map(jsonTransactionRow) : null,

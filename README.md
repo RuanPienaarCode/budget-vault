@@ -49,6 +49,8 @@ Finances/Budget/
 
 Ordinary markdown tables and frontmatter. Open them in any editor, diff them in git, keep them forever.
 
+Two folders sit **outside** the budget folder, at the top of your vault, because what they hold isn't household data to load back in — it's something you asked the plugin to write out: `Exports/` (CSV/Markdown transaction exports) and `Reports/` (the one-note financial report, Markdown and/or JSON). Both default to those names but are yours to rename or relocate from the Transactions and Report pages, and both show you the exact path before anything is written.
+
 ### Debts.md
 
 Columns are read by **position**, not by header name, so keep all twelve in this order — a table missing one silently shifts every later value into the wrong field:

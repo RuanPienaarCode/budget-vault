@@ -1144,7 +1144,7 @@ module.exports = {
   'report.period.12m.desc': 'Die letzten 12 Monate, oder weniger, falls der Vault nicht so weit zurückreicht.',
   'report.period.pillsAria': 'Berichtszeitraum',
   'report.detail.summary': 'Nur Zusammenfassung',
-  'report.detail.summary.desc': 'Nur Summen und Kategorien — sicher für eine Beraterin oder einen Berater.',
+  'report.detail.summary.desc': 'Keine einzelnen Transaktionen — zeigt aber weiterhin deine Kategorienamen, Summen, Schulden und dein Nettovermögen.',
   'report.detail.detail': 'Transaktionsdetails einschließen',
   'report.detail.detail.desc': 'Jede Transaktion im Zeitraum, aufgelistet — nützlicher für einen KI-Chat, mehr zum Teilen.',
   'report.detail.pillsAria': 'Detailgrad des Berichts',
@@ -1183,6 +1183,7 @@ module.exports = {
   'report.title': 'Finanzbericht — {period}',
   'report.generatedLine': 'Erstellt {date}',
   'report.rule': 'Die Zahlen folgen den eigenen Regeln der App — eine ausgeschlossene Transaktion fehlt in den Einnahmen- und Ausgabensummen, wird aber unten weiter aufgeführt, falls dieser Bericht Transaktionsdetails enthält.',
+  'report.disclaimer': 'Dieser Bericht fasst deine eigenen Zahlen zusammen. Er ist keine Finanzberatung — kläre Wichtiges vor dem Handeln mit einer Finanzberaterin, einem Finanzberater oder einer anderen qualifizierten Fachperson ab.',
   'report.section.incomeSpend': 'Einnahmen & Ausgaben',
   'report.col.income': 'Einnahmen',
   'report.col.spend': 'Ausgaben',
@@ -1210,6 +1211,7 @@ module.exports = {
   'report.savings.growth': 'Gesamtwachstum',
   'report.savings.rate': 'Wachstumsrate',
   'report.savings.partial': '{count} von {total} Konten fehlt ein Startbetrag oder ein Datum und sind in den obigen Zahlen nicht enthalten.',
+  'report.savings.negCapital': '{count} von {total} Konten haben mehr entnommen als eingezahlt und sind daher nicht in der obigen Wachstumsrate enthalten.',
   'report.section.debt': 'Schulden',
   'report.debt.none': 'Keine Schulden erfasst.',
   'report.debt.free': {
@@ -1232,6 +1234,7 @@ module.exports = {
   'report.health.months': 'Notfallfonds',
   'report.health.savingsRate': 'Sparquote',
   'report.health.interestShare': 'Schuldzinsen als Anteil am Einkommen',
+  'report.health.note': 'Eine einzelne Kennzahl aus Monaten des Notgroschens, Sparquote und Schuldzinsanteil — ein grober Richtwert aus den Zahlen in diesem Vault, keine professionelle Einschätzung.',
   'report.section.transactions': 'Transaktionsdetails',
   'report.transactions.count': {
     one: '{count} Transaktion in diesem Zeitraum.',

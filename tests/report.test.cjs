@@ -139,7 +139,7 @@ const DATA = {
     { cat: 'Extras', amount: 850, orphaned: false },
   ],
   categoryGap: { uncat: 0, netted: 0 },
-  savings: { growth: 1250.5, rateGrowth: 1250.5, rateCapital: 30000, measured: 2, unmeasured: 1, total: 3 },
+  savings: { growth: 1250.5, rateGrowth: 1250.5, rateCapital: 30000, measured: 2, unmeasured: 1, negCapital: 1, total: 3 },
   debts: {
     count: 2, active: 1, total: 8000, perMonth: 550, interest: 150,
     rows: [{ name: 'Card debt', balance: 8000, rate: 22.5, interest: 150 }],
@@ -181,14 +181,30 @@ const DATA = {
     'and the same three figures appear formatted in the Markdown');
 
   eq(json.savings, {
-    growth: 1250.5, rate_growth: 1250.5, rate_capital: 30000, measured: 2, unmeasured: 1, total: 3,
-  }, 'savings section carries the raw figures, snake_cased');
+    growth: 1250.5, rate_growth: 1250.5, rate_capital: 30000, measured: 2, unmeasured: 1, neg_capital: 1, total: 3,
+  }, 'savings section carries the raw figures, snake_cased, including M4\'s neg_capital');
   ok(md.includes(money(1250.5)), 'the same growth figure appears formatted in the Markdown');
+
+  /* P2 (2026-08-29 audit) — the not-financial-advice line rides in both
+     formats, and the health score carries its own honest gloss in both too. */
+  ok(md.includes(i18n.t('report.disclaimer')), 'the Markdown carries the not-financial-advice line');
+  eq(json.disclaimer, i18n.t('report.disclaimer'), 'the JSON carries the identical sentence, not a second wording of it');
+  ok(md.includes(i18n.t('report.health.note')), 'the Markdown glosses what the health score is and is not');
+  eq(json.health_score.note, i18n.t('report.health.note'), 'the JSON health_score carries the same gloss');
+
+  /* M4 (2026-08-29 audit) — a drawn-down savings/investment account is
+     disclosed the same way views/savings.js's own growthTile() already
+     discloses it beside itself, not silently dropped from the report. */
+  ok(md.includes(i18n.t('report.savings.negCapital', { count: 1, total: 3 })),
+    'a drawn-down account excluded from the rate is disclosed in the document itself');
 
   eq(json.debts.total, 8000); eq(json.debts.rows[0].name, 'Card debt'); eq(json.debts.rows[0].interest, 150);
   ok(md.includes('Card debt') && md.includes(money(150)), 'the same debt row appears in the Markdown');
 
-  eq(json.health_score, { score: 72, months: 3.4, target_months: 6, savings_rate_pct: 12.5, interest_share_pct: 2.1 });
+  eq(json.health_score, {
+    score: 72, months: 3.4, target_months: 6, savings_rate_pct: 12.5, interest_share_pct: 2.1,
+    note: i18n.t('report.health.note'),
+  });
   ok(md.includes('72'), 'the score appears in the Markdown too');
 
   eq(json.currency, 'R', 'the currency code rides along in JSON');

@@ -75,6 +75,8 @@ function stripComments(src) {
 
 const files = {
   savings: read('views/savings.js'),
+  savingsMath: read('savings-math.js'),
+  report: read('views/report.js'),
   assets: read('views/assets.js'),
   accounts: read('views/accounts.js'),
   dashboard: read('views/dashboard.js'),
@@ -113,7 +115,16 @@ function provenFalse(desc, exactShape, mangled) {
    ITEM 2 (2026-08-26): the literal moved from `catType` to `poolType` in both
    files — the SAME poolCatType(S.categories, name) wrapper, built once per
    view and never the bare ctx.catType, or an income-typed category flagged
-   `interest: true` on one page silently stops being growth on the other. ======================================================================= */
+   `interest: true` on one page silently stops being growth on the other.
+
+   M4 (2026-08-29 audit): the SUM across a pool of accounts — growthTotals(),
+   `growth += r.growth` — moved OUT of views/savings.js and into
+   savings-math.js, called from there by BOTH views/savings.js's own
+   growthTile() and views/report.js's savingsSummary(), so the Report page's
+   savings section cannot re-derive this a second way. The checks below moved
+   with it: the summation is now pinned in savings-math.js, and the two view
+   files are pinned only on calling growthTotals(...) rather than summing
+   r.growth themselves again. ======================================================================= */
 {
   const TR_CALL = 'totalReturn(a, rows, poolType, { today: todayIso() })';
   const TR_CALL_SAV = 'totalReturn(e.account, e.rows, poolType, { today: todayIso() })';
@@ -121,7 +132,11 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.accounts.includes('r.tr.growth') || live.accounts.includes('tr.growth'),
     'Growth: accounts.js reads .growth off that same totalReturn() result, not off balance minus total_invested');
   ok(live.savings.includes(TR_CALL_SAV), 'Growth: savings.js computes each account\'s return through the shared totalReturn()');
-  ok(live.savings.includes('growth += r.growth'), 'Growth: savings.js sums growth off totalReturn()\'s own .growth field');
+  ok(live.savingsMath.includes('growth += r.growth'), 'Growth: savings-math.js\'s growthTotals() sums growth off totalReturn()\'s own .growth field — the ONE place this sum happens now');
+  ok(!live.savings.includes('growth += r.growth'), 'Growth: savings.js no longer sums growth itself — it calls growthTotals() instead (M4)');
+  ok(live.savings.includes('growthTotals(entries, poolType, { today: todayIso() })'), 'Growth: savings.js\'s own growth tile calls the shared growthTotals()');
+  ok(live.report.includes('growthTotals(entries, poolType, { today: todayIso() })'), 'Growth: views/report.js\'s savings section calls the SAME growthTotals() — not a second guess at what "growth" or "rate of growth" mean (M4)');
+  ok(!live.report.includes('growth += r.growth'), 'Growth: views/report.js never re-derives the sum itself either');
 
   // The retired formula itself, banned from live code in both consumers —
   // it is fine for it to appear in a COMMENT (accounts.js quotes it on

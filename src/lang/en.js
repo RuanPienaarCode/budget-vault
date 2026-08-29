@@ -1221,7 +1221,7 @@ module.exports = {
   'report.period.12m.desc': 'The last 12 months, or fewer if the vault does not go back that far.',
   'report.period.pillsAria': 'Report period',
   'report.detail.summary': 'Summary only',
-  'report.detail.summary.desc': 'Totals and categories only — safe to hand to an advisor.',
+  'report.detail.summary.desc': 'No individual transactions — but it still shows your category names, totals, debts and net worth.',
   'report.detail.detail': 'Include transaction detail',
   'report.detail.detail.desc': 'Every transaction in the period, listed — more useful to an AI chat, more to share.',
   'report.detail.pillsAria': 'Report detail level',
@@ -1270,6 +1270,7 @@ module.exports = {
   'report.title': 'Financial Report — {period}',
   'report.generatedLine': 'Generated {date}',
   'report.rule': 'Figures follow the app\'s own rules — an excluded transaction is left out of income and spend totals but still listed below if this report includes transaction detail.',
+  'report.disclaimer': 'This report summarises your own numbers. It is not financial advice — confirm anything important with a financial advisor or other qualified professional before acting on it.',
   'report.section.incomeSpend': 'Income & Spend',
   'report.col.income': 'Income',
   'report.col.spend': 'Spend',
@@ -1297,6 +1298,7 @@ module.exports = {
   'report.savings.growth': 'Total growth',
   'report.savings.rate': 'Rate of growth',
   'report.savings.partial': '{count} of {total} accounts are missing a starting amount or date and are left out of the figures above.',
+  'report.savings.negCapital': '{count} of {total} accounts have taken out more than they put in, so they are left out of the rate of growth above.',
   'report.section.debt': 'Debt',
   'report.debt.none': 'No debt recorded.',
   'report.debt.free': {
@@ -1319,6 +1321,7 @@ module.exports = {
   'report.health.months': 'Emergency fund',
   'report.health.savingsRate': 'Saving rate',
   'report.health.interestShare': 'Debt interest share of income',
+  'report.health.note': 'A single number combining emergency-fund months, saving rate and debt interest share — a rough gauge from the numbers in this vault, not a professional assessment.',
   'report.section.transactions': 'Transaction Detail',
   'report.transactions.count': {
     one: '{count} transaction in this period.',

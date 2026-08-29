@@ -1091,7 +1091,7 @@ module.exports = {
   'report.period.12m.desc': '最近12个月，若保险库数据不够久远则取现有全部。',
   'report.period.pillsAria': '报告周期',
   'report.detail.summary': '仅摘要',
-  'report.detail.summary.desc': '仅含总额与分类 — 可放心交给理财顾问。',
+  'report.detail.summary.desc': '不含单笔交易 — 但仍会显示您的分类名称、总额、债务和净资产。',
   'report.detail.detail': '包含交易明细',
   'report.detail.detail.desc': '列出该周期内的每一笔交易 — 对 AI 对话更有用，也有更多可分享内容。',
   'report.detail.pillsAria': '报告详细程度',
@@ -1130,6 +1130,7 @@ module.exports = {
   'report.title': '财务报告 — {period}',
   'report.generatedLine': '生成于 {date}',
   'report.rule': '数字遵循本应用自身的规则 — 被排除的交易不计入收支合计，但若本报告包含交易明细，仍会在下方列出。',
+  'report.disclaimer': '本报告汇总您自己的数字，并非财务建议 — 在采取任何重要行动前，请与理财顾问或其他合资格专业人士确认。',
   'report.section.incomeSpend': '收入与支出',
   'report.col.income': '收入',
   'report.col.spend': '支出',
@@ -1157,6 +1158,7 @@ module.exports = {
   'report.savings.growth': '总增长额',
   'report.savings.rate': '增长率',
   'report.savings.partial': '{total} 个账户中有 {count} 个缺少起始金额或日期，未计入上方数字。',
+  'report.savings.negCapital': '{total} 个账户中有 {count} 个取出多于存入，因此未计入上方的增长率。',
   'report.section.debt': '债务',
   'report.debt.none': '没有记录债务。',
   'report.debt.free': {
@@ -1178,6 +1180,7 @@ module.exports = {
   'report.health.months': '应急基金',
   'report.health.savingsRate': '储蓄率',
   'report.health.interestShare': '债务利息占收入比例',
+  'report.health.note': '这是一个综合应急基金月数、储蓄率和债务利息占比的单一数字 — 只是根据此保险库数字得出的粗略参考，并非专业评估。',
   'report.section.transactions': '交易明细',
   'report.transactions.count': {
     other: '本周期共有 {count} 笔交易。',

@@ -1165,7 +1165,7 @@ module.exports = {
   'report.period.12m.desc': 'Iinyanga ezi-12 ezidlulileyo, okanye ngaphantsi ukuba i-vault ayifiki kude kangako.',
   'report.period.pillsAria': 'Ixesha lengxelo',
   'report.detail.summary': 'Isishwankathelo kuphela',
-  'report.detail.summary.desc': 'Amaxabiso apheleleyo needidi kuphela — kukhuselekile ukunika umcebisi wemali.',
+  'report.detail.summary.desc': 'Akukho zintengiselwano zabucala — kodwa isabonisa amagama eendidi zakho, amaxabiso apheleleyo, amatyala kunye nobutyebi obupheleleyo.',
   'report.detail.detail': 'Bandakanya iinkcukacha zentengiselwano',
   'report.detail.detail.desc': 'Yonke intengiselwano kwelo xesha, idweliswe — luncedo ngakumbi kwincoko ye-AI, kwaye luncedo ukwabelana.',
   'report.detail.pillsAria': 'Inqanaba lenkcukacha yengxelo',
@@ -1204,6 +1204,7 @@ module.exports = {
   'report.title': 'Ingxelo Yezemali — {period}',
   'report.generatedLine': 'Yenziwe {date}',
   'report.rule': 'Amanani alandela imithetho yale app — intengiselwano ekhutshiweyo iyashiywa kwiziphumo zengeniso nendleko, kodwa isadweliswe ngezantsi ukuba le ngxelo ibandakanya iinkcukacha zentengiselwano.',
+  'report.disclaimer': 'Le ngxelo ihlanganisela amanani akho. Ayisiyongcebiso yezimali — qinisekisa nantoni na ebalulekileyo nomcebisi wezimali okanye omnye ongcali ofanelekileyo phambi kokwenza isigqibo.',
   'report.section.incomeSpend': 'Ingeniso Nendleko',
   'report.col.income': 'Ingeniso',
   'report.col.spend': 'Indleko',
@@ -1231,6 +1232,7 @@ module.exports = {
   'report.savings.growth': 'Ukukhula okupheleleyo',
   'report.savings.rate': 'Izinga lokukhula',
   'report.savings.partial': '{count} kwi-{total} yeeakhawunti zisilela imali yokuqala okanye umhla, kwaye azibandakanywanga kumanani angentla.',
+  'report.savings.negCapital': '{count} kwi-{total} yeeakhawunti zikhuphe ngaphezulu kunento ezifakwe kuzo, ngoko azibandakanywanga kwizinga lokukhula elingentla.',
   'report.section.debt': 'Ityala',
   'report.debt.none': 'Akukho tyala libhaliweyo.',
   'report.debt.free': {
@@ -1253,6 +1255,7 @@ module.exports = {
   'report.health.months': 'Ingxowa-mali yongxamiseko',
   'report.health.savingsRate': 'Izinga lokonga',
   'report.health.interestShare': 'Isabelo senzala yetyala kwingeniso',
+  'report.health.note': 'Inani elinye elidibanisa iinyanga zemali yongxamiseko, izinga lokonga kunye nesabelo senzala yamatyala — umlinganiselo orhabaxa osuka kumanani ale-vault, hayi uvavanyo longcali.',
   'report.section.transactions': 'Iinkcukacha Zentengiselwano',
   'report.transactions.count': {
     one: 'Intengiselwano ye-{count} kweli xesha.',

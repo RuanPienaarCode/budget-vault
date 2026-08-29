@@ -500,6 +500,39 @@ function chartable(account, r) {
   return r.basis === 'measured' && !!at;
 }
 
+/* Aggregate growth across a POOL of accounts — `entries` is
+   `[{ account, rows }]`, the same shape both callers already build (Savings
+   page's own `entries` and views/report.js's `savingsSummary()`). Extracted
+   out of views/savings.js's own growthTile() (2026-08-29 audit, M4) rather
+   than left as a DOM-bound closure only that view could call: the Report
+   page needs the EXACT same number, not a second guess at what "growth"
+   and "rate of growth" mean, which is this codebase's most-repeated bug
+   shape (see report.js's own header). Any future third caller gets it free.
+
+   `negCapital` — accounts DRAWN DOWN rather than grown (a living annuity
+   mid-withdrawal, `capitalIn <= 0`) are still `measured` and still counted
+   in the plain `growth` total (real money, not a ratio), but excluded from
+   `rateGrowth`/`rateCapital` — the same guard `totalReturn` itself puts on
+   `returnPct`. Without this a single drawn-down account shrinks the capital
+   the rate is measured against and inflates the headline percentage for
+   every other account riding along with it. Counted rather than silently
+   dropped, so a caller can disclose it — see views/savings.js's own
+   growthTile() sub-text and src/report.js's `report.savings.negCapital`
+   for the two places that disclosure has to happen once this number
+   exists to disclose. */
+function growthTotals(entries, typeOf, opts) {
+  let growth = 0, rateGrowth = 0, rateCapital = 0, measured = 0, unmeasured = 0, negCapital = 0;
+  for (const e of entries) {
+    const r = totalReturn(e.account, e.rows, typeOf, opts);
+    if (!chartable(e.account, r)) { unmeasured++; continue; }
+    measured++;
+    growth += r.growth;
+    if (r.capitalIn > 0) { rateGrowth += r.growth; rateCapital += r.capitalIn; }
+    else negCapital++;
+  }
+  return { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total: measured + unmeasured };
+}
+
 function growthSeries(entries, typeOf, opts) {
   const today = (opts && opts.today) || todayIso();
   const maxMonths = (opts && opts.maxMonths) || 60;
@@ -753,4 +786,4 @@ for (const { acct, row } of inflows) {
   return savings;
 }
 
-module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthSeries, classifyRow, chartable, poolCatType };
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType };

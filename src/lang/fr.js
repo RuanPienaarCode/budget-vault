@@ -1157,7 +1157,7 @@ module.exports = {
   'report.period.12m.desc': 'Les 12 derniers mois, ou moins si le vault ne remonte pas aussi loin.',
   'report.period.pillsAria': 'Période du rapport',
   'report.detail.summary': 'Résumé seulement',
-  'report.detail.summary.desc': 'Totaux et catégories seulement — sans risque à remettre à un conseiller.',
+  'report.detail.summary.desc': 'Aucune transaction individuelle — mais indique tout de même vos noms de catégories, totaux, dettes et patrimoine net.',
   'report.detail.detail': 'Inclure le détail des transactions',
   'report.detail.detail.desc': 'Chaque transaction de la période, listée — plus utile pour une IA, plus à partager.',
   'report.detail.pillsAria': 'Niveau de détail du rapport',
@@ -1196,6 +1196,7 @@ module.exports = {
   'report.title': 'Rapport Financier — {period}',
   'report.generatedLine': 'Généré {date}',
   'report.rule': 'Les chiffres suivent les propres règles de l\'appli — une transaction exclue est retirée des totaux de revenus et de dépenses, mais reste listée ci-dessous si ce rapport inclut le détail des transactions.',
+  'report.disclaimer': 'Ce rapport résume vos propres chiffres. Il ne constitue pas un conseil financier — confirmez tout élément important auprès d\'un conseiller financier ou d\'un autre professionnel qualifié avant d\'agir.',
   'report.section.incomeSpend': 'Revenus et Dépenses',
   'report.col.income': 'Revenus',
   'report.col.spend': 'Dépenses',
@@ -1223,6 +1224,7 @@ module.exports = {
   'report.savings.growth': 'Croissance totale',
   'report.savings.rate': 'Taux de croissance',
   'report.savings.partial': '{count} comptes sur {total} n\'ont pas de montant de départ ni de date et sont exclus des chiffres ci-dessus.',
+  'report.savings.negCapital': '{count} comptes sur {total} ont retiré plus qu\'ils n\'ont versé, et sont donc exclus du taux de croissance ci-dessus.',
   'report.section.debt': 'Dette',
   'report.debt.none': 'Aucune dette enregistrée.',
   'report.debt.free': {
@@ -1245,6 +1247,7 @@ module.exports = {
   'report.health.months': 'Fonds d\'urgence',
   'report.health.savingsRate': 'Taux d\'épargne',
   'report.health.interestShare': 'Part des intérêts de dette dans le revenu',
+  'report.health.note': 'Un seul chiffre combinant les mois de fonds d\'urgence, le taux d\'épargne et la part des intérêts de dette — une estimation approximative à partir des chiffres de ce vault, pas une évaluation professionnelle.',
   'report.section.transactions': 'Détail des Transactions',
   'report.transactions.count': {
     one: '{count} transaction sur cette période.',
