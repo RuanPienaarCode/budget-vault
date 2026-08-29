@@ -424,26 +424,48 @@ module.exports = function registerDashboard(ctx) {
        not. Each renders as its own compact band beneath the headline chain,
        in its own symbol, never converted and never summed across. */
     const home = S.settings.currency;
+    const homeish = list => (list || []).filter(x => !isForeign(x, home));
+    const fxOf = (list, sym) => (list || []).filter(x => symbolOf(x, home) === sym);
     const byCurrency = new Map();
     for (const a of accounts) {
       const key = a.currency || home;
       if (!byCurrency.has(key)) byCurrency.set(key, []);
       byCurrency.get(key).push(a);
     }
-    const foreignGroups = [...byCurrency]
-      .filter(([sym]) => sym !== home)
-      .map(([sym, accts]) => ({
+    /* The set of currencies in play is the UNION of what the accounts, the
+       services and the debts state — not just the accounts. A euro
+       subscription in a vault with no euro account still has to land
+       somewhere, and keying the groups off accounts alone would have dropped
+       it out of every figure and every sentence, which is the silent
+       exclusion this whole partition exists to avoid. */
+    const foreignSyms = [...new Set([
+      ...[...byCurrency.keys()],
+      ...S.services.map(x => symbolOf(x, home)),
+      ...S.debts.filter(d => d.status !== 'paid').map(x => symbolOf(x, home)),
+    ])].filter(sym => sym && sym !== home);
+
+    const foreignGroups = foreignSyms
+      .map(sym => ({
         sym,
         L: whatsLeft({
-          accounts: accts, services: [], debts: [], rows, incomeRows, cardRows,
+          accounts: byCurrency.get(sym) || [],
+          services: fxOf(S.services, sym),
+          debts: fxOf(S.debts.filter(d => d.status !== 'paid'), sym),
+          rows, incomeRows, cardRows,
           periodStart: start, periodEnd: end, today: todayIso(),
         }),
       }))
       .filter(g => g.L.cashKnown || g.L.items.length || g.L.owed);
 
+    /* ISSUE 30. Services.md and Debts.md can state a currency now, so
+       "they carry no currency column and are therefore household money" no
+       longer holds unconditionally — it holds for the ones that say nothing,
+       which is still nearly all of them. A euro subscription belongs to the
+       euro band, not the household chain that subtracts it from rand cash. */
     const L = whatsLeft({
       accounts: byCurrency.get(home) || [],
-      services: S.services, debts: S.debts, rows, incomeRows, cardRows,
+      services: homeish(S.services), debts: homeish(S.debts),
+      rows, incomeRows, cardRows,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 
@@ -800,7 +822,7 @@ module.exports = function registerDashboard(ctx) {
        against a fallback household of "R", so an Rp vault got a list naming a
        currency it has never held. */
     const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
-    const owed = owedSummary(S.owed);
+    const owed = owedSummary(S.owed, undefined, S.settings.currency);
     const savingsAccounts = [...accountsOfType('savings'), ...accountsOfType('investment')];
     const { others: savingsOthers } = splitByCurrency(savingsAccounts, S.settings.currency);
     const savings = primaryTotal(accountsOfType('savings'), S.settings.currency);

@@ -266,13 +266,22 @@ module.exports = function registerServices(ctx) {
         { value: 'monthly', label: 'Monthly' }, { value: 'annual', label: 'Annual' }] },
       { key: 'next', label: 'Next billing (optional)', type: 'date' },
       { key: 'category', label: 'Budget category', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
+      /* ISSUE 30 — see views/assets.js for the reasoning. Blank means the
+         household's currency, which is what every row already on disk says
+         by saying nothing, so this is an option and never a question a
+         single-currency household has to answer. */
+      { key: 'currency', label: 'Currency', type: 'text', value: '',
+        placeholder: S.settings.currency || 'R',
+        desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added in.' },
     ]);
     if (!r || !r.name.trim()) return;
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     const next = ISO_DATE.test((r.next || '').trim()) ? r.next.trim() : '';
     S.services.push({ name: r.name.trim(), provider: (r.provider || '').trim(), amount,
-      cycle: r.cycle === 'annual' ? 'annual' : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '' });
+      cycle: r.cycle === 'annual' ? 'annual' : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '',
+      // '' when it merely restates the household symbol — see usedColumns().
+      currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim() });
     mark(); renderServices();
   }
 

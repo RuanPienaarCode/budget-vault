@@ -23,9 +23,15 @@ module.exports = function registerOwed(ctx) {
   function renderOwedKpis() {
     // Outstanding is net of part-payments, so it answers "how much is actually
     // still out there" rather than "what did I originally lend".
-    const s = owedSummary(S.owed);
+    const s = owedSummary(S.owed, undefined, S.settings.currency);
     const tile = kpiTiles($('#owedKpis'));
-    tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning' : '');
+    /* Entries in another currency are stated beside the figure, never added
+       into it — see owedSummary()'s own header. */
+    const owedOthers = (s.otherCurrencies || []);
+    const otherTag = owedOthers.length
+      ? `plus ${owedOthers.map(([sym, v]) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`)).join(' · ')} owed in other currencies`
+      : null;
+    tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning' : '', otherTag);
     tile('Recovered', money(s.recovered), 'text-success');
     tile('Entries', String(s.entries));
   }
@@ -162,6 +168,13 @@ module.exports = function registerOwed(ctx) {
     const r = await askFields(app, 'New owed entry', [
       { key: 'person', label: 'Who owes / is owed?', type: 'text' },
       { key: 'amount', label: 'Amount', type: 'number', value: '0' },
+      /* ISSUE 30 — see views/assets.js. Blank means the household's currency,
+         which is what every row already on disk says by saying nothing, so
+         this is an option and never a question a single-currency household
+         has to answer. */
+      { key: 'currency', label: 'Currency', type: 'text', value: '',
+        placeholder: S.settings.currency || 'R',
+        desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added into your totals.' },
     ]);
     if (!r || !r.person.trim()) return;
     const amount = normalizeAmount(r.amount);
@@ -169,7 +182,9 @@ module.exports = function registerOwed(ctx) {
     // Same clamp as the in-table amount field: a negative amount here makes
     // outstandingOf clamp to 0 (settled) while owedSummary's recovered
     // branch adds the negative straight into money that came back.
-    S.owed.push({ person: r.person.trim(), amount: Math.max(0, amount), description: '', due: '', status: 'outstanding', repaid: 0, lent: '' });
+    S.owed.push({ person: r.person.trim(), amount: Math.max(0, amount), description: '', due: '', status: 'outstanding', repaid: 0, lent: '',
+      // '' when it merely restates the household symbol — see usedColumns().
+      currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim() });
     mark(); renderOwed();
   }
 

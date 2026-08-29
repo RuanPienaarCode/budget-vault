@@ -25,11 +25,20 @@ const { SCHEMAS, rowToObject } = require('../src/table-schema');
    Read docs/adr/0003-columns-are-declared-once.md before editing a frozen
    list; the only legitimate edit is appending to the END of one. */
 
+/* `currency` was APPENDED to four of these on 2026-08-29 (issue #30) — the
+   only edit ADR-0003 permits, and the frozen prefix below is unchanged, which
+   is the property that matters: every file already on disk still parses into
+   exactly the fields it always did, and a blank cell means the household's
+   currency, which is what those files say by saying nothing.
+
+   Transactions is deliberately NOT among them: a transaction's currency is a
+   property of the account whose FOLDER it lives in, so a column here would be
+   a second place to state one fact, and the two could disagree row by row. */
 const FROZEN = {
-  assets: ['name', 'type', 'value', 'valued', 'notes'],
-  owed: ['person', 'amount', 'description', 'due', 'status', 'repaid', 'lent'],
-  services: ['name', 'provider', 'amount', 'cycle', 'next', 'category', 'active', 'notes'],
-  debts: ['name', 'lender', 'type', 'balance', 'original', 'rate', 'payment', 'extra', 'start', 'category', 'status', 'notes'],
+  assets: ['name', 'type', 'value', 'valued', 'notes', 'currency'],
+  owed: ['person', 'amount', 'description', 'due', 'status', 'repaid', 'lent', 'currency'],
+  services: ['name', 'provider', 'amount', 'cycle', 'next', 'category', 'active', 'notes', 'currency'],
+  debts: ['name', 'lender', 'type', 'balance', 'original', 'rate', 'payment', 'extra', 'start', 'category', 'status', 'notes', 'currency'],
   transactions: ['date', 'desc', 'cat', 'amount', 'excluded', 'note', 'split'],
 };
 
@@ -57,26 +66,26 @@ for (const [name, frozen] of Object.entries(FROZEN)) {
    what the shipped loader yields for an absent cell), not recomputed. */
 
 const FULL_CELLS = {
-  assets: ['A \\| a', 'property', '1 500,00', '2026-03-01', 'n \\| n'],
-  owed: ['P \\| p', 'R4000', 'd \\| d', '2026-09-01', 'PAID', '1 000,00', '2026-01-01'],
-  services: ['S \\| s', 'Prov', '199.00', 'ANNUAL', '2026-08-05', 'Cat', 'NO', 'n \\| n'],
-  debts: ['D \\| d', 'L \\| l', 'vehicle', '1 234,56', '12000.00', '22.50', '400.00', '150.00', '2024-03-01', 'Cat', 'PAID', 'n \\| n'],
+  assets: ['A \\| a', 'property', '1 500,00', '2026-03-01', 'n \\| n', '€'],
+  owed: ['P \\| p', 'R4000', 'd \\| d', '2026-09-01', 'PAID', '1 000,00', '2026-01-01', '€'],
+  services: ['S \\| s', 'Prov', '199.00', 'ANNUAL', '2026-08-05', 'Cat', 'NO', 'n \\| n', '€'],
+  debts: ['D \\| d', 'L \\| l', 'vehicle', '1 234,56', '12000.00', '22.50', '400.00', '150.00', '2024-03-01', 'Cat', 'PAID', 'n \\| n', '€'],
   transactions: ['2026-07-04', 'De \\| sc', 'Cat', '1 234,56', 'yes', 'no \\| te', 'parent'],
 };
 
 const FULL_EXPECTED = {
-  assets: { name: 'A | a', type: 'property', value: 1500, valued: '2026-03-01', notes: 'n | n' },
-  owed: { person: 'P | p', amount: 4000, description: 'd | d', due: '2026-09-01', status: 'paid', repaid: 1000, lent: '2026-01-01' },
-  services: { name: 'S | s', provider: 'Prov', amount: 199, cycle: 'annual', next: '2026-08-05', category: 'Cat', active: false, notes: 'n | n' },
-  debts: { name: 'D | d', lender: 'L | l', type: 'vehicle', balance: 1234.56, original: 12000, rate: 22.5, payment: 400, extra: 150, start: '2024-03-01', category: 'Cat', status: 'paid', notes: 'n | n' },
+  assets: { name: 'A | a', type: 'property', value: 1500, valued: '2026-03-01', notes: 'n | n', currency: '€' },
+  owed: { person: 'P | p', amount: 4000, description: 'd | d', due: '2026-09-01', status: 'paid', repaid: 1000, lent: '2026-01-01', currency: '€' },
+  services: { name: 'S | s', provider: 'Prov', amount: 199, cycle: 'annual', next: '2026-08-05', category: 'Cat', active: false, notes: 'n | n', currency: '€' },
+  debts: { name: 'D | d', lender: 'L | l', type: 'vehicle', balance: 1234.56, original: 12000, rate: 22.5, payment: 400, extra: 150, start: '2024-03-01', category: 'Cat', status: 'paid', notes: 'n | n', currency: '€' },
   transactions: { date: '2026-07-04', desc: 'De | sc', cat: 'Cat', amount: 1234.56, amountRaw: '1 234,56', excluded: true, note: 'no | te', split: 'parent' },
 };
 
 const DEFAULTS = {
-  assets: { name: '', type: 'other', value: 0, valued: '', notes: '' },
-  owed: { person: '', amount: 0, description: '', due: '', status: 'outstanding', repaid: 0, lent: '' },
-  services: { name: '', provider: '', amount: 0, cycle: 'monthly', next: '', category: '', active: true, notes: '' },
-  debts: { name: '', lender: '', type: 'other', balance: 0, original: null, rate: 0, payment: 0, extra: 0, start: '', category: '', status: 'active', notes: '' },
+  assets: { name: '', type: 'other', value: 0, valued: '', notes: '', currency: '' },
+  owed: { person: '', amount: 0, description: '', due: '', status: 'outstanding', repaid: 0, lent: '', currency: '' },
+  services: { name: '', provider: '', amount: 0, cycle: 'monthly', next: '', category: '', active: true, notes: '', currency: '' },
+  debts: { name: '', lender: '', type: 'other', balance: 0, original: null, rate: 0, payment: 0, extra: 0, start: '', category: '', status: 'active', notes: '', currency: '' },
   // A zero-length transaction row cannot exist on disk (parseMdTable yields
   // at least one cell), but the sweep proves the floor anyway: date keeps
   // the loader's verbatim read (undefined), amountRaw keeps parseNum's

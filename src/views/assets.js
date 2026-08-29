@@ -17,8 +17,9 @@ const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
+const { symbolOf, isForeign } = require('../currency');
 const { todayIso } = require('../dates');
-const { assetTotal } = require('../worth');
+const { assetTotal, foreignTotals } = require('../worth');
 
 /* Kinds of possession, in the order a household usually meets them. Stored
    verbatim in the Type column; an unknown value from a hand-edited file is
@@ -42,6 +43,16 @@ const VALUED_STALE_DAYS = 365;
 
 module.exports = function registerAssets(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
+
+  /* ISSUE 30. Assets can state a currency now. An asset's OWN figure prints
+     in its OWN symbol — a Lisbon flat shown as "R 250 000" is not a missing
+     label but a claim the household holds rand it does not — and the page
+     total sums the household's currency alone, naming the rest beside it. */
+  const aMoney = (a, v, dp = 2) => (isForeign(a, S.settings.currency) && typeof ctx.moneyIn === 'function'
+    ? ctx.moneyIn(symbolOf(a, S.settings.currency), v, dp)
+    : money(v, dp));
+  const otherList = pairs => pairs.map(([sym, v]) => (typeof ctx.moneyIn === 'function'
+    ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`)).join(' · ');
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('assetsDirty', '#assetSave');
 
@@ -99,7 +110,8 @@ module.exports = function registerAssets(ctx) {
      one field and the tap arriving at the next. Same reasoning as Owed Money
      and Debt. */
   function renderAssetKpis() {
-    const total = assetTotal(S.assets);
+    const total = assetTotal(S.assets, S.settings.currency);
+    const assetOthers = foreignTotals(S.assets, S.settings.currency, 'value');
     /* Seeded from the first row rather than from null. `a.value > (b?.value||0)`
        never advances past null when every value is 0, so a household that has
        listed the house, the car and the ring but priced none of them yet — a
@@ -111,9 +123,10 @@ module.exports = function registerAssets(ctx) {
     const revaluationCount = S.assets.filter(needsRevaluation).length;
 
     const tile = kpiTiles($('#assetKpis'));
-    tile('Total value', money(total), total > 0 ? 'text-success' : '');
+    tile('Total value', money(total), total > 0 ? 'text-success' : '',
+      assetOthers.length ? `plus ${otherList(assetOthers)} held abroad, not converted` : null);
     tile('Items', String(S.assets.length));
-    tile('Largest', biggest ? money(biggest.value, 0) : '—', '', biggest ? biggest.name : null);
+    tile('Largest', biggest ? aMoney(biggest, biggest.value, 0) : '—', '', biggest ? biggest.name : null);
     // Labelled by what it means to do about it, not by the predicate shape —
     // this used to read "Unvalued" while counting rows that plainly HAVE a
     // value (a house priced 400 days ago), which reads as though the app
@@ -176,6 +189,13 @@ module.exports = function registerAssets(ctx) {
         const age = valuedAge(a);
         body.append(el('tr', {},
           el('td', { style: 'font-weight:600' }, a.name, ctx.noteButton('asset', a.name),
+            /* The row's own currency, where it differs. The Value cell is a
+               bare number input with no symbol on it, so without this the
+               only place a foreign asset announced itself was the total's
+               footnote — and a reader scanning the table would have no idea
+               which row it referred to. */
+            ...(isForeign(a, S.settings.currency)
+              ? [el('span', { class: 'acct-group-other' }, ` ${symbolOf(a, S.settings.currency)}`)] : []),
             ...(age ? [el('div', { class: `asset-age${needsRevaluation(a) ? ' asset-age-old' : ''}` }, age)] : [])),
           // A kind that no longer appears in the preset list (a hand-edited
           // Assets.md, or a list trimmed between versions) keeps an option of
@@ -274,6 +294,16 @@ module.exports = function registerAssets(ctx) {
       { key: 'value', label: 'What would it sell for?', type: 'number', value: '0' },
       { key: 'valued', label: 'When was that worked out?', type: 'date', value: todayIso(),
         desc: 'If this figure comes from an older valuation, set the date it was true.' },
+      /* ISSUE 30. Until now only ACCOUNTS could state a currency, so a house
+         in Lisbon had to be typed as though it were in the household's
+         currency and every total built on it was quietly wrong with no way
+         for the reader to say otherwise. Blank means the household's — which
+         is what every asset already on disk says by saying nothing — so the
+         field is an option, never a question a single-currency household has
+         to answer. */
+      { key: 'currency', label: 'Currency', type: 'text', value: '',
+        placeholder: S.settings.currency || 'R',
+        desc: `Leave blank if it is in ${S.settings.currency || 'your own currency'}. Set it for something held abroad — the value is then shown in that currency and left out of totals rather than added to them.` },
     ]);
     if (!r || !r.name.trim()) return;
     const value = normalizeAmount(r.value);
@@ -284,6 +314,10 @@ module.exports = function registerAssets(ctx) {
     S.assets.push({
       name: r.name.trim(), type: r.type || 'other',
       value: Math.max(0, value), valued: (r.valued || '').trim(), notes: '',
+      /* Normalised to '' when it merely restates the household's symbol, so
+         a table only grows the Currency column when a row genuinely differs
+         — see usedColumns() in table-schema.js. */
+      currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim(),
     });
     mark(); renderAssets();
   }

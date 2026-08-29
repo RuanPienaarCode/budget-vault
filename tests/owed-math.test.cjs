@@ -92,8 +92,31 @@ ok(isSettled({ amount: 2000, repaid: 0, status: 'paid' }), 'and a reader may sim
    calls this before it knows whether the vault has an Owed Money.md at all. */
 for (const [label, input] of [['empty', []], ['absent', undefined], ['null', null]]) {
   const s = owedSummary(input, '2026-07-01');
-  eq(s, { outstanding: 0, recovered: 0, open: 0, entries: 0, oldestDays: null },
+  eq(s, { outstanding: 0, recovered: 0, open: 0, entries: 0, oldestDays: null, otherCurrencies: [] },
     `an ${label} ledger summarises to zeroes rather than throwing`);
+}
+
+/* ISSUE 30 — an entry in another currency (Owed Money.md gained a Currency
+   column by ADR-0003 append). It is neither added into the rand total nor
+   dropped: it comes back in `otherCurrencies` for the page to state.
+
+   Without a household symbol the function behaves exactly as it always did
+   and adds everything, which is what every existing caller gets and the right
+   answer for a ledger where nothing states a currency. */
+{
+  const ledger = [
+    { person: 'Sam', amount: 500, repaid: 0, status: 'outstanding' },
+    { person: 'Pierre', amount: 300, repaid: 0, status: 'outstanding', currency: '€' },
+  ];
+  const blind = owedSummary(ledger, '2026-07-01');
+  eq(blind.outstanding, 800, 'with no household symbol, every entry is added — unchanged behaviour');
+  eq(blind.otherCurrencies, [], 'and nothing is reported as held out');
+
+  const split = owedSummary(ledger, '2026-07-01', 'R');
+  eq(split.outstanding, 500, 'told the household symbol, only the rand entry is in the total');
+  eq(split.open, 1, 'and the open count matches the figure beside it');
+  eq(split.otherCurrencies, [['€', 300]],
+    'the euro entry is NAMED in its own currency — not converted, and not silently dropped');
 }
 
 /* Over-repayment across the whole summary: recovered must not count money that

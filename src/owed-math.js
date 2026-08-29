@@ -17,6 +17,8 @@ const { daysSince } = require('./reconcile');
 /* What is still out on this entry. Net of part-payments, and floored at zero:
    a repayment larger than the loan is somebody's typo, and letting it go
    negative would quietly pay off the NEXT person's loan inside a total. */
+const { isForeign, symbolOf } = require('./currency');
+
 function outstandingOf(o) {
   return Math.max(0, (o.amount || 0) - (o.repaid || 0));
 }
@@ -53,10 +55,26 @@ function isSettled(o) {
    something you do not have when you lend to family — and how long the money
    has been gone is both derivable and the figure that actually applies
    pressure. */
-function owedSummary(owed, today) {
+/* `household` is optional. Absent means "add every entry", which is exactly
+   how this function always behaved and what every caller that has not been
+   taught about currencies still gets — and it is the right answer for a
+   vault whose entries state no currency, which is all of them until someone
+   sets one (ISSUE 30; Owed Money.md gained the column by ADR-0003 append).
+
+   Supplied, entries in another currency are held OUT of the totals and
+   returned in `otherCurrencies` for the caller to state. Adding a €500 loan
+   to a relative into a rand "outstanding" figure is a wrong number, and
+   dropping it silently is what currency.js:14 forbids — so it is neither. */
+function owedSummary(owed, today, household) {
   const list = owed || [];
   let outstanding = 0, recovered = 0, open = 0, oldestDays = null;
+  const others = new Map();
   for (const o of list) {
+    if (household && isForeign(o, household)) {
+      const sym = symbolOf(o, household);
+      others.set(sym, (others.get(sym) || 0) + Math.max(0, outstandingOf(o)));
+      continue;
+    }
     const settled = isSettled(o);
     // A negative `amount` (a typo, or a stray minus sign the amount input
     // never blocked) makes outstandingOf clamp to 0 — which marks the row
@@ -78,7 +96,13 @@ function owedSummary(owed, today) {
     const age = daysSince(o.lent, today);
     if (age !== null && (oldestDays === null || age > oldestDays)) oldestDays = age;
   }
-  return { outstanding, recovered, open, entries: list.length, oldestDays };
+  return {
+    outstanding, recovered, open, entries: list.length, oldestDays,
+    /* [symbol, outstanding] pairs, in each entry's own currency and never
+       converted — the caller states them beside the total rather than
+       inside it. Empty on every single-currency vault. */
+    otherCurrencies: [...others].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
+  };
 }
 
 module.exports = { outstandingOf, isSettled, owedSummary };

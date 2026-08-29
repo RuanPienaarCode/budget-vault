@@ -105,17 +105,48 @@ const vocab = (key, header, match, other) => ({
   write: r => r[key],
 });
 
+/* The currency an entity's own amounts are stated in — a DISPLAY symbol, the
+   same thing an account's `currency:` frontmatter is, and governed by the same
+   rules in src/currency.js: it never converts and never excludes.
+
+   APPENDED to four tables (ADR-0003: append is the only cheap operation), and
+   blank means the household's currency, which is what every file already on
+   disk says by saying nothing. So a vault written by any previous version
+   loads unchanged and every existing figure means exactly what it always did.
+
+   Added because the multi-currency audit found the gap was not a wrong number
+   but an unrecordable fact: only ACCOUNTS could state a currency, so a euro
+   mortgage, a house abroad, a loan to a relative overseas and a subscription
+   billed in dollars all had to be typed as though they were in the
+   household's currency — and then every total, ratio and payoff schedule
+   built on them was quietly wrong with no way for the reader to say
+   otherwise. Frontmatter hand-written into those files survived every
+   round-trip and was read by nothing, which looks like it took.
+
+   Deliberately NOT a `currency_code`. The code exists on accounts because
+   exchange-rate lookup needs one; these four tables have no rate lookup
+   behind them yet, and a column nothing reads is the thing this comment
+   just described. It can be appended the day conversion reaches them. */
+const currency = () => ({
+  key: 'currency', header: 'Currency', align: 'left',
+  read: c => ({ currency: (c || '').trim() }),
+  write: r => escMd(r.currency || ''),
+});
+
 const SCHEMAS = {
   /* Assets.md — every column after Item is additive, so a hand-written file
      with nothing but a name and a value loads. */
   assets: {
     file: 'Assets.md',
+    /* `currency` is appended and optional — see usedColumns(). */
+    optionalTail: 1,
     columns: [
       text('name', 'Item'),
       text('type', 'Kind', 'other'),
       money('value', 'Value', { floor: true }),
       verbatim('valued', 'Valued'),
       text('notes', 'Notes'),
+      currency(),
     ],
   },
 
@@ -124,6 +155,8 @@ const SCHEMAS = {
      always meant — nothing repaid, no lending date. */
   owed: {
     file: 'Owed Money.md',
+    /* `currency` is appended and optional — see usedColumns(). */
+    optionalTail: 1,
     columns: [
       text('person', 'Person'),
       money('amount', 'Amount'),
@@ -132,6 +165,7 @@ const SCHEMAS = {
       vocab('status', 'Status', 'paid', 'outstanding'),
       money('repaid', 'Repaid', { guarded: true }),
       verbatim('lent', 'Lent'),
+      currency(),
     ],
   },
 
@@ -140,6 +174,8 @@ const SCHEMAS = {
      it. */
   services: {
     file: 'Services.md',
+    /* `currency` is appended and optional — see usedColumns(). */
+    optionalTail: 1,
     columns: [
       text('name', 'Name'),
       text('provider', 'Provider'),
@@ -156,6 +192,7 @@ const SCHEMAS = {
         write: r => (r.active ? 'yes' : 'no'),
       },
       text('notes', 'Notes'),
+      currency(),
     ],
   },
 
@@ -165,6 +202,8 @@ const SCHEMAS = {
      rather than preserved verbatim. */
   debts: {
     file: 'Debts.md',
+    /* `currency` is appended and optional — see usedColumns(). */
+    optionalTail: 1,
     columns: [
       text('name', 'Name'),
       text('lender', 'Lender'),
@@ -186,6 +225,7 @@ const SCHEMAS = {
       text('category', 'Category'),
       vocab('status', 'Status', 'paid', 'active'),
       text('notes', 'Notes'),
+      currency(),
     ],
   },
 
@@ -237,12 +277,49 @@ const SCHEMAS = {
    with a subtly different fallback would have been invisible until
    someone's frontmatter got eaten. Prose stays with the view: it is
    content, and differs per file for good reason. */
+/* Drop trailing columns no row in this table actually uses.
+
+   The Split column set the precedent (see the transactions schema above):
+   serializeTxFile writes six columns into a file with no split in it, so a
+   file that has never needed the seventh never grows one. `currency` is
+   appended to four tables on exactly the same terms, and the reasoning is
+   the same only more so — these files sit in user vaults under iCloud sync,
+   and rewriting every Debts.md, Assets.md, Owed Money.md and Services.md on
+   the planet to add an empty column would be user-visible churn and a sync
+   hazard, in exchange for nothing at all for the single-currency vaults that
+   are nearly all of them.
+
+   Only TRAILING columns, and only ones every row leaves empty — an empty
+   cell in the middle of a table is a real value (a blank Category means no
+   category) and must keep its position, because the parser is positional.
+   `write` is asked, not the raw field, so "empty" means what actually
+   reaches disk. */
+function usedColumns(schema, rows) {
+  const cols = schema.columns;
+  let last = cols.length;
+  while (last > 0) {
+    const col = cols[last - 1];
+    const used = (rows || []).some(r => {
+      try { return String(col.write(r) ?? '').trim() !== ''; } catch (e) { return true; }
+    });
+    if (used) break;
+    last--;
+  }
+  /* Never below the frozen shape a reader expects: a table is not narrowed
+     past the columns it has always written, only prevented from GROWING one
+     nobody uses. Columns appended after the original set are the optional
+     tail, and OPTIONAL_TAIL names how many there are. */
+  const floor = cols.length - (schema.optionalTail || 0);
+  return cols.slice(0, Math.max(last, floor));
+}
+
 function mdTableFile({ fm, fallback, title, prose, schema, rows }) {
+  const used = { ...schema, columns: usedColumns(schema, rows) };
   const lines = ['---', ...(fm || fallback).split('\n'), '---', '', `# ${title}`, '',
-    ...prose, '', ...headerLines(schema)];
-  for (const r of rows) lines.push(rowLine(schema, r));
+    ...prose, '', ...headerLines(used)];
+  for (const r of rows) lines.push(rowLine(used, r));
   lines.push('');
   return lines.join('\n');
 }
 
-module.exports = { SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile };
+module.exports = { SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns };

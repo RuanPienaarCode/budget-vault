@@ -17,7 +17,7 @@
    hand-typed `Credit_Card` as not-a-card while the committed chain trimmed and
    case-folded — the same account, a card to one page and not the other. */
 const { isCreditCard } = require('./committed');
-const { currenciesIn } = require('./currency');
+const { currenciesIn, isForeign, symbolOf } = require('./currency');
 
 /* Only `active` debts count. A debt marked paid is history; leaving it in
    reports a bond as still owed years after it was settled. */
@@ -30,8 +30,29 @@ function activeDebts(debts) {
    possession cannot be worth less than nothing, so the figure is a typo, and
    quietly netting it off a real total hides the error instead of leaving it
    somewhere the reader can see it. */
-function assetTotal(assets) {
-  return (assets || []).reduce((t, a) => t + Math.max(0, a.value || 0), 0);
+function assetTotal(assets, household) {
+  return (assets || [])
+    /* ISSUE 30. Assets can state a currency now (ADR-0003 append). One that
+       does not is household money, which is what every asset already on disk
+       says by saying nothing — so `household` being absent means "add them
+       all", exactly as this function always behaved, and every caller that
+       has not been taught about currencies is unchanged. */
+    .filter(a => !household || !isForeign(a, household))
+    .reduce((t, a) => t + Math.max(0, a.value || 0), 0);
+}
+
+/* The other half of that filter, so a caller can NAME what was left out
+   rather than quietly dropping it — currency.js:14 is explicit that this app
+   does not exclude. Returns [symbol, total] pairs in the same shape
+   splitByCurrency() uses for accounts, so a view can print both the same way. */
+function foreignTotals(rows, household, valueKey) {
+  const by = new Map();
+  for (const r of rows || []) {
+    if (!isForeign(r, household)) continue;
+    const sym = symbolOf(r, household);
+    by.set(sym, (by.get(sym) || 0) + Math.max(0, Number(r[valueKey]) || 0));
+  }
+  return [...by].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]);
 }
 
 /* Owned is positive account balances PLUS the Assets page; owed is negative
@@ -70,7 +91,7 @@ function assetTotal(assets) {
 function worth(accounts, debts, assets, household) {
   const list = accounts || [];
   const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
-  const ownedAssets = assetTotal(assets);
+  const ownedAssets = assetTotal(assets, household);
   const owned = ownedAccounts + ownedAssets;
   // `|| 0` collapses -0, which negating a sum of zero produces. Left alone it
   // reaches money() and renders a debt-free vault's liabilities as "-R0.00".
@@ -79,7 +100,13 @@ function worth(accounts, debts, assets, household) {
   // A negative balance on the Debt page would mean the lender owes YOU, which
   // is an Owed Money row, not a debt. Ignored rather than credited against the
   // total, where it would quietly reduce a real liability.
-  const fromDebts = active.reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
+  /* Foreign debts held out for the same reason foreign assets are: a euro
+     mortgage added into a rand liability is a wrong number, and there is no
+     rate here to convert it with. Named below via `otherCurrencies` so no
+     caller can drop it silently. */
+  const fromDebts = active
+    .filter(d => !household || !isForeign(d, household))
+    .reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
   const liabilities = fromAccounts + fromDebts;
   // Rounded to the cent, then `|| 0` collapses -0 — the same two-step
   // `fromAccounts` already applies above, extended to the difference itself.
@@ -94,6 +121,13 @@ function worth(accounts, debts, assets, household) {
     liabilities, fromAccounts, fromDebts,
     net, active,
     currencies: currenciesIn(list, household),
+    /* Everything this total could NOT include, per ledger and per symbol.
+       Accounts are already split by the caller (splitByCurrency) before they
+       reach here; these two are the ledgers worth() reads directly. */
+    otherCurrencies: {
+      assets: foreignTotals(assets, household, 'value'),
+      debts: foreignTotals(active, household, 'balance'),
+    },
   };
 }
 
@@ -198,5 +232,5 @@ function assetsByType(assets) {
 }
 
 module.exports = {
-  worth, activeDebts, assetTotal, cardOverlap, accountGroups, debtsByType, assetsByType,
+  worth, activeDebts, assetTotal, foreignTotals, cardOverlap, accountGroups, debtsByType, assetsByType,
 };

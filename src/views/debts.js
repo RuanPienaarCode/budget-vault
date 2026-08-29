@@ -34,7 +34,21 @@ module.exports = function registerDebts(ctx) {
      and debt-math keys its payoff months by `key` for exactly that reason.
      Read-only everywhere it is used, so copying costs nothing and stops a view
      helper from writing through to the model by accident. */
-  const active = () => S.debts.filter(d => d.status !== 'paid').map((d, i) => ({ ...d, key: i }));
+  /* ISSUE 30. Debts.md gained a Currency column (ADR-0003 append), and every
+     figure this page computes across debts — the payoff simulation, the
+     avalanche/snowball ordering, the debt-to-income ratio, the total owed —
+     is arithmetic that only means something inside ONE currency. A euro
+     mortgage ordered against three rand cards by "highest rate first" is a
+     schedule for a household that does not exist.
+
+     So the working list is the household's own currency, and `activeForeign`
+     is what that left out, stated on the page rather than dropped. The `key`
+     is assigned over the FULL active list before filtering, because
+     debt-math keys its payoff months positionally and a key that shifted
+     when a foreign debt was added would silently repoint every projection. */
+  const activeAll = () => S.debts.filter(d => d.status !== 'paid').map((d, i) => ({ ...d, key: i }));
+  const active = () => activeAll().filter(d => !isForeign(d, S.settings.currency));
+  const activeForeign = () => activeAll().filter(d => isForeign(d, S.settings.currency));
   const committed = d => (d.payment || 0) + (d.extra || 0);
 
   /* The planner's two inputs live in the DOM rather than in S: they are a
@@ -108,8 +122,16 @@ module.exports = function registerDebts(ctx) {
     const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
     const tile = kpiTiles($('#debtKpis'));
     // Neutral: owing money is an ordinary financial position, not a red state.
+    /* What the figures on this page do NOT cover, said on the first tile the
+       reader looks at. A foreign debt is still tracked, still listed and
+       still counted in "tracked" — it is only held out of arithmetic that
+       cannot span currencies. */
+    const fx = activeForeign();
+    const fxTag = fx.length
+      ? ` · ${fx.length} in another currency, not in these figures`
+      : '';
     tile('Total debt', money(total), '',
-      `${list.length} active · ${S.debts.length} tracked`);
+      `${list.length} active · ${S.debts.length} tracked${fxTag}`);
     tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
     // The single most actionable number here: what this month costs before a
     // cent of principal moves.
@@ -696,6 +718,13 @@ module.exports = function registerDebts(ctx) {
       { key: 'rate', label: 'Interest rate (% a year)', type: 'number', value: '0' },
       { key: 'payment', label: 'Monthly payment', type: 'number', value: '0' },
       { key: 'category', label: 'Budget category (links its transactions)', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
+      /* ISSUE 30 — see views/assets.js. Blank means the household's currency,
+         which is what every row already on disk says by saying nothing, so
+         this is an option and never a question a single-currency household
+         has to answer. */
+      { key: 'currency', label: 'Currency', type: 'text', value: '',
+        placeholder: S.settings.currency || 'R',
+        desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added into your totals.' },
     ]);
     if (!r || !r.name.trim()) return;
     /* Deliberately NOT unique. Two debts called "Credit card", one per bank, is
@@ -711,6 +740,8 @@ module.exports = function registerDebts(ctx) {
     const originalTyped = originalRaw ? normalizeAmount(originalRaw) : null;
     if (originalRaw && originalTyped === null) return toast('Original amount must be a number', true);
     S.debts.push({
+      // '' when it merely restates the household symbol — see usedColumns().
+      currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim(),
       name, lender: (r.lender || '').trim(), type: r.type || 'other',
       balance: Math.max(0, balance),
       // The real original loan when given; otherwise seeded from the balance
