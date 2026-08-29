@@ -58,7 +58,21 @@ function normalizeAmount(raw) {
     return false;
   };
   sign();
-  const bare = s.replace(/^(zar|usd|gbp|eur|aud|cad|us\$|a\$|c\$|nz\$|r|[$\u00A3\u20AC])\s*/i, '');
+  /* The symbols and codes a statement actually leads with. Widened after an
+     audit found the reporter of issue #28 — an Indonesian household — unable
+     to import at all: "Rp 1.500.000" failed this test, came back null, and
+     views/import.js counted the row into `skipped`. So a Chinese or
+     Indonesian statement imported ZERO rows and reported them as skipped
+     rather than saying "I cannot read your currency", which is the plausible
+     silent failure this whole file exists to refuse.
+
+     Ordered longest-first within the alternation so "R$" (Brazilian real) is
+     consumed whole rather than leaving a stray "$", and so "RMB" is not read
+     as an "R" followed by junk. `r` stays last of the letter forms for the
+     same reason it always was: it is the shortest and would otherwise shadow
+     every code beginning with it. */
+  const bare = s.replace(
+    /^(zar|usd|gbp|eur|aud|cad|cny|rmb|jpy|inr|idr|chf|sek|nok|dkk|pln|brl|try|krw|sgd|nzd|hkd|us\$|a\$|c\$|nz\$|hk\$|r\$|rp|kr|zł|fr|r|[$\u00A3\u20AC\u00A5\u20B9\u20A9\u20BA\u0E3F\u20AA\u20BD\u20AB\u20B1])\s*/i, '');
   if (bare !== s) { s = bare; sign(); }
   s = s.replace(/[\s\u00A0\u202F']/g, '');
   /* A trailing percent is a unit suffix, exactly like the currency prefix
@@ -71,6 +85,16 @@ function normalizeAmount(raw) {
      pillar on a quarter-million rand of debt. */
   s = s.replace(/%$/, '');
   if (/^\d+(\.\d{3})*,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');  // decimal comma
+  /* Dot-grouped thousands with NO decimal part at all — "1.500.000", the way
+     Indonesia, Germany, Brazil and much of Europe write it. Two or more groups
+     is required, and that requirement is the whole reason this is safe to do
+     without knowing the reader's locale: "1.500" on its own is genuinely
+     ambiguous (one and a half, or one thousand five hundred?) and is left
+     exactly as it always parsed, but "1.500.000" cannot be a decimal — no
+     money has two decimal points. Guessing at the ambiguous case is how a
+     confident wrong number gets printed, which this file refuses; declining
+     to read the UNambiguous one was simply a gap. */
+  else if (/^\d{1,3}(\.\d{3}){2,}$/.test(s)) s = s.replace(/\./g, '');
   else s = s.replace(/,/g, '');                                                       // thousands comma
   // A bare ".50" is a real cell (some exports drop the leading zero), and it
   // must parse rather than fall to null and be served as zero by parseNum.

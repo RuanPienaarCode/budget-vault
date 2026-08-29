@@ -382,7 +382,8 @@ function detectStatementColumns(rows, dayFirst = true) {
     const low = r.map(c => c.trim().toLowerCase());
     const has = names => names.some(n => low.includes(n));
     return (has(DATE_COLS) || low.some(c => c.includes('date'))) &&
-           (has(AMOUNT_COLS) || (has(DEBIT_COLS) && has(CREDIT_COLS)));
+           (has(AMOUNT_COLS) || low.some(c => c.includes('amount'))
+             || (has(DEBIT_COLS) && has(CREDIT_COLS)));
   });
   if (headerIdx !== -1) {
     const low = rows[headerIdx].map(c => c.trim().toLowerCase());
@@ -396,7 +397,15 @@ function detectStatementColumns(rows, dayFirst = true) {
     if (iDesc === -1) iDesc = low.findIndex(c => c.includes('desc'));   // e.g. "Transaction Descr."
     let iBalance = col(BALANCE_COLS);
     if (iBalance === -1) iBalance = low.findIndex(c => c.includes('balance'));
-    const iAmount = col(AMOUNT_COLS), iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+    /* The same substring fallback date, description and balance have had all
+       along. AMOUNT_COLS carries the literal "amount (zar)", so a South
+       African statement auto-detected and the identical file headed
+       "Amount (EUR)" — or (IDR), or (CNY) — did not, and was thrown to the
+       manual column mapper for no reason a reader could see. The currency in
+       a column heading is a label, not a different column. */
+    let iAmount = col(AMOUNT_COLS);
+    if (iAmount === -1) iAmount = low.findIndex(c => c.includes('amount'));
+    const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
     /* Only ever an EXTRA column beside a pair or a signed amount, never the
        thing that makes a file importable on its own: a file whose only numeric
        column is headed "Fee" is a fee schedule, not a statement. So iFee is

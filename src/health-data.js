@@ -107,6 +107,7 @@ function passthroughPairs(rows) {
   return drop;
 }
 const { worth } = require('./worth');
+const { splitByCurrency } = require('./currency');
 
 /* How far back the averages reach. Six months is long enough to absorb a bonus
    month or a double rent payment, and short enough that a household still
@@ -299,7 +300,22 @@ module.exports = function registerHealthData(ctx) {
       });
     }
 
-    const earmarks = resolveEarmarks(S.accounts);
+    /* ISSUE 28 (2026-08-29 audit). Every figure this snapshot feeds the score
+       is a RATIO, and a ratio is the one shape where mixing currencies does
+       more than overstate a total — it inverts the verdict. Measured on a
+       two-currency vault: a rand emergency fund over a rupiah-polluted
+       essential-spend average printed "0.0 months" in red where the true
+       reading was 6.7 months in green, and the overall score fell 26 points.
+       A wrong total at least looks like a number; a wrong percentage looks
+       like a measurement.
+
+       So the pool is narrowed to the household's own currency before any of
+       it is divided. What that leaves out is counted and named on the page —
+       currency.js:14 forbids excluding an account silently, and "left out of
+       a score" is an exclusion however good the reason. */
+    const { primary: homeAccounts, others: scoreOthers } =
+      splitByCurrency(S.accounts, S.settings.currency);
+    const earmarks = resolveEarmarks(homeAccounts);
     const target = S.settings.emergency_target_months || 6;
     /* Once, not per consumer: the score, the debt tile's own figure and the
        "this is costing you" line are the same monthly interest bill, and
@@ -336,11 +352,14 @@ module.exports = function registerHealthData(ctx) {
          never listed a debt has not declared it has none, and full marks for
          an unanswered question is the one thing this must not hand out. */
       debtInstalments: instalments,
-      netWorth: worth(S.accounts, S.debts, S.assets).net,
+      netWorth: worth(homeAccounts, S.debts, S.assets, S.settings.currency).net,
       hasFixed: fixedCats.size > 0,
     });
 
     return {
+      /* Handed to the page so the Score can SAY what it left out, rather than
+         quietly scoring a household on part of its money. */
+      otherCurrencies: scoreOthers,
       metrics, earmarks, target, debtInterest,
       hasFixed: fixedCats.size > 0,
       /* Whether the debt score rests on anything the household actually wrote.

@@ -703,6 +703,11 @@ module.exports = {
   'acct.hero.mixed': ' Hierdie totaal tel rekeninge in meer as een geldeenheid ({symbols}) bymekaar sonder om om te skakel.',
   'acct.hero.otherCurrencies': ' Plus {list} gehou in ander geldeenhede, nie omgeskakel nie.',
   'acct.hero.muted': 'Waarskuwings geïgnoreer',
+  'dash.foreignExcluded': {
+    one: '{count} rekening in \'n ander geldeenheid ({symbols}) is nie in hierdie syfers nie.',
+    other: '{count} rekeninge in ander geldeenhede ({symbols}) is nie in hierdie syfers nie.',
+  },
+
   'settings.currencyCode.name': 'Geldeenheidkode',
   'settings.currencyCode.desc': 'Die drieletter-ISO-kode vir jou geldeenheidsimbool — ZAR, USD, EUR, IDR, CNY. Net nodig as jy wisselkoerse hieronder aanskakel; die simbool hierbo is wat werklik gedruk word. Dit word apart gevra omdat geen simbool op sy eie \'n geldeenheid identifiseer nie — "$" word deur die VSA, Australië, Kanada en Singapoer gelyk gebruik.',
   'settings.exchangeRates.name': 'Wisselkoerse',

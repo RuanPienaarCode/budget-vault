@@ -675,6 +675,11 @@ module.exports = {
   'acct.hero.mixed': ' この合計は複数の通貨（{symbols}）で保有する口座を、換算せずに合算しています。',
   'acct.hero.otherCurrencies': ' ほかに他の通貨で{list}を保有しています（換算なし）。',
   'acct.hero.muted': '無視中の警告',
+  'dash.foreignExcluded': {
+    one: '他の通貨の口座 {count} 件（{symbols}）はこれらの数値に含まれていません。',
+    other: '他の通貨の口座 {count} 件（{symbols}）はこれらの数値に含まれていません。',
+  },
+
   'settings.currencyCode.name': '通貨コード',
   'settings.currencyCode.desc': '通貨記号に対応する3文字のISOコード — ZAR、USD、EUR、IDR、CNY。下で為替レートを有効にする場合にのみ必要で、実際に表示されるのは上の記号です。記号だけでは通貨を特定できないため別に尋ねています — 「$」は米国、オーストラリア、カナダ、シンガポールがいずれも使っています。',
   'settings.exchangeRates.name': '為替レート',

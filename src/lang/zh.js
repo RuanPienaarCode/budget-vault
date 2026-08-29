@@ -675,6 +675,11 @@ module.exports = {
   'acct.hero.mixed': ' 此总计将以多种货币（{symbols}）持有的账户相加，未进行换算。',
   'acct.hero.otherCurrencies': ' 另有 {list} 以其他货币持有，未换算。',
   'acct.hero.muted': '已忽略的提醒',
+  'dash.foreignExcluded': {
+    one: '有 {count} 个其他货币的账户（{symbols}）未计入这些数字。',
+    other: '有 {count} 个其他货币的账户（{symbols}）未计入这些数字。',
+  },
+
   'settings.currencyCode.name': '货币代码',
   'settings.currencyCode.desc': '您的货币符号对应的三字母 ISO 代码——ZAR、USD、EUR、IDR、CNY。仅在下方开启汇率时才需要；实际显示的是上方的符号。之所以单独询问，是因为符号本身无法确定货币——美国、澳大利亚、加拿大和新加坡都在使用"$"。',
   'settings.exchangeRates.name': '汇率',

@@ -751,6 +751,16 @@ module.exports = {
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   'acct.hero.muted': 'Warnings ignored',
   /* Settings' half of the same two questions the wizard asks above. */
+  /* The transaction path's own disclosure. Every figure built from
+     periodSummary — hero, budget rows, donut, trend, comparison — leaves out
+     accounts held in another currency, because a total in one currency cannot
+     include another and this app stores no rate to convert with. Said rather
+     than assumed: a silent exclusion is the one thing currency.js rules out. */
+  'dash.foreignExcluded': {
+    one: '{count} account in another currency ({symbols}) is not in these figures.',
+    other: '{count} accounts in other currencies ({symbols}) are not in these figures.',
+  },
+
   'settings.currencyCode.name': 'Currency code',
   'settings.currencyCode.desc': 'The three-letter ISO code for your currency symbol — ZAR, USD, EUR, IDR, CNY. Only needed if you switch exchange rates on below; the symbol above is what actually gets printed. It is asked separately because no symbol identifies a currency on its own — "$" is used by the US, Australia, Canada and Singapore alike.',
   'settings.exchangeRates.name': 'Exchange rates',

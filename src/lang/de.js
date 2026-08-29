@@ -704,6 +704,11 @@ module.exports = {
   'acct.hero.mixed': ' Diese Summe addiert Konten in mehr als einer Währung ({symbols}), ohne sie umzurechnen.',
   'acct.hero.otherCurrencies': ' Plus {list} in anderen Währungen, nicht umgerechnet.',
   'acct.hero.muted': 'Ignorierte Warnungen',
+  'dash.foreignExcluded': {
+    one: '{count} Konto in einer anderen Währung ({symbols}) ist in diesen Zahlen nicht enthalten.',
+    other: '{count} Konten in anderen Währungen ({symbols}) sind in diesen Zahlen nicht enthalten.',
+  },
+
   'settings.currencyCode.name': 'Währungscode',
   'settings.currencyCode.desc': 'Der dreibuchstabige ISO-Code für Ihr Währungssymbol — ZAR, USD, EUR, IDR, CNY. Nur nötig, wenn Sie unten Wechselkurse aktivieren; gedruckt wird das Symbol oben. Er wird getrennt abgefragt, weil kein Symbol für sich allein eine Währung identifiziert — "$" verwenden die USA, Australien, Kanada und Singapur gleichermaßen.',
   'settings.exchangeRates.name': 'Wechselkurse',

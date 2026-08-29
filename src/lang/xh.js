@@ -718,6 +718,11 @@ module.exports = {
   'acct.hero.mixed': ' Le totali idibanisa iiakhawunti ezigcinwe kwiimali ezingaphezu kwenye ({symbols}) ngaphandle kokuziguqula.',
   'acct.hero.otherCurrencies': ' Ukongeza, {list} igcinwe kwezinye iimali, ngaphandle kokuziguqula.',
   'acct.hero.muted': 'Izilumkiso ezingahoywayo',
+  'dash.foreignExcluded': {
+    one: 'Iakhawunti enye ({count}) ekwenye imali yelizwe ({symbols}) ayibandakanywanga kula manani.',
+    other: 'Iiakhawunti ezingu-{count} ezikwezinye iimali zamazwe ({symbols}) azibandakanywanga kula manani.',
+  },
+
   'settings.currencyCode.name': 'Ikhowudi yemali',
   'settings.currencyCode.desc': 'Ikhowudi ye-ISO yeempawu ezintathu yophawu lwakho lwemali — ZAR, USD, EUR, IDR, CNY. Ifuneka kuphela ukuba uvula amaxabiso otshintshiselwano ngezantsi; uphawu olungasentla lulo olushicilelweyo. Ibuzwa yodwa kuba akukho phawu luchaza imali ngokwalo — "$" isetyenziswa yiMelika, iOstreliya, iKhanada neSingapore ngokufanayo.',
   'settings.exchangeRates.name': 'Amaxabiso otshintshiselwano',

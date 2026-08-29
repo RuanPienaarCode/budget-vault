@@ -717,6 +717,11 @@ module.exports = {
   'acct.hero.mixed': ' Ce total additionne des comptes tenus dans plusieurs devises ({symbols}) sans les convertir.',
   'acct.hero.otherCurrencies': ' Plus {list} détenus dans d\'autres devises, non convertis.',
   'acct.hero.muted': 'Avertissements ignorés',
+  'dash.foreignExcluded': {
+    one: '{count} compte dans une autre devise ({symbols}) n\'est pas inclus dans ces chiffres.',
+    other: '{count} comptes dans d\'autres devises ({symbols}) ne sont pas inclus dans ces chiffres.',
+  },
+
   'settings.currencyCode.name': 'Code de devise',
   'settings.currencyCode.desc': 'Le code ISO à trois lettres de votre symbole monétaire — ZAR, USD, EUR, IDR, CNY. Nécessaire uniquement si vous activez les taux de change ci-dessous ; c\'est le symbole ci-dessus qui est affiché. Il est demandé séparément parce qu\'aucun symbole n\'identifie une devise à lui seul — « $ » est utilisé aussi bien par les États-Unis, l\'Australie, le Canada que Singapour.',
   'settings.exchangeRates.name': 'Taux de change',

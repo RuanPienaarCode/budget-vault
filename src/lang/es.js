@@ -705,6 +705,11 @@ module.exports = {
   'acct.hero.mixed': ' Este total suma cuentas mantenidas en más de una moneda ({symbols}) sin convertirlas.',
   'acct.hero.otherCurrencies': ' Más {list} en otras monedas, sin convertir.',
   'acct.hero.muted': 'Avisos ignorados',
+  'dash.foreignExcluded': {
+    one: '{count} cuenta en otra moneda ({symbols}) no está incluida en estas cifras.',
+    other: '{count} cuentas en otras monedas ({symbols}) no están incluidas en estas cifras.',
+  },
+
   'settings.currencyCode.name': 'Código de moneda',
   'settings.currencyCode.desc': 'El código ISO de tres letras de su símbolo de moneda — ZAR, USD, EUR, IDR, CNY. Solo hace falta si activa los tipos de cambio abajo; lo que se imprime es el símbolo de arriba. Se pide por separado porque ningún símbolo identifica una moneda por sí solo — "$" lo usan por igual Estados Unidos, Australia, Canadá y Singapur.',
   'settings.exchangeRates.name': 'Tipos de cambio',

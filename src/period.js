@@ -22,6 +22,7 @@
 const { MONTHS } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { safeSeg } = require('./vault-path');
+const { isForeign, symbolOf } = require('./currency');
 const { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require('./dates');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
@@ -286,6 +287,37 @@ module.exports = function registerPeriod(ctx) {
     }
     return out;
   }
+  /* Transaction folders whose ACCOUNT is stated in another currency.
+
+     ISSUE 28 (2026-08-29 audit). Currency never reached the transaction path
+     at all: txInRange stamps each row with its folder label and nothing else,
+     and summaryInRange then did `income += t.amount` over the lot. So a
+     Rp 1 500 000 lunch and a R 3 000 grocery shop were the same number.
+     Measured, on a two-currency vault: the Dashboard hero read "R 1 499 000
+     over" where R 1 000 was actually left; the Groceries budget row read
+     "Spent R 1 503 000" against a R 4 000 budget; the donut, the trend line
+     and the month-on-month deadband all inherited it. Not one of those
+     figures carried a disclosure, because the account-level ones are the only
+     place this app had ever thought to put one.
+
+     A household-currency total cannot include foreign spend, and there is no
+     rate here to convert it with. So those rows are held OUT of the totals —
+     and named, every time, via the `foreign` field summaryInRange returns.
+     Silence is the thing currency.js:14 actually forbids; a stated exclusion
+     the reader can act on is what `budget: false` already is.
+
+     Deliberately a SECOND set beside nonBudgetLabels() rather than folded
+     into it: they answer different questions ("the reader opted this out" vs
+     "this app cannot add these together"), and the disclosure a consumer
+     writes for one is not the sentence for the other. */
+  function foreignLabels() {
+    const out = new Map();
+    for (const f of Object.values(S.txFiles)) {
+      const a = accountForLabel(f.label);
+      if (a && isForeign(a, S.settings.currency)) out.set(f.label, symbolOf(a, S.settings.currency));
+    }
+    return out;
+  }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
   /* Does a category file actually answer to this name?
 
@@ -385,7 +417,19 @@ module.exports = function registerPeriod(ctx) {
     // per-account one. Both drop out of income/spend here and nowhere else —
     // Transactions still lists every row, so nothing goes invisible.
     const skip = nonBudgetLabels();
-    const tx = txInRange(start, end).filter(t => !t.excluded && !skip.has(t.label));
+    const foreignBy = foreignLabels();
+    const tx = txInRange(start, end).filter(t =>
+      !t.excluded && !skip.has(t.label) && !foreignBy.has(t.label));
+    /* Only the folders that actually CONTRIBUTED rows in this window — a
+       foreign account with nothing in the period is not something to warn
+       about, and a disclosure that fires on every period regardless of the
+       data is one readers learn to stop seeing. */
+    const foreignHere = new Map();
+    for (const t of txInRange(start, end)) {
+      if (!t.excluded && !skip.has(t.label) && foreignBy.has(t.label)) {
+        foreignHere.set(t.label, foreignBy.get(t.label));
+      }
+    }
     let income = 0, spend = 0, net = 0, uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
     /* Consumer map, so no half of this object reads as orphaned on a cold
        read: `count`/`names` drive the Dashboard's "Missing categories" stat,
@@ -470,7 +514,19 @@ module.exports = function registerPeriod(ctx) {
        NOT counted as income (it may be a transfer in from savings, and
        guessing would inflate every ratio built on income), but a figure that
        quietly omits a real deposit has to say so where it is read. */
-    return { income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat, count: tx.length };
+    /* `foreign` travels WITH the figures, not beside them, so a consumer
+       cannot read the totals without having been handed the caveat. Every
+       tile, table, chart and aria-label built from this object is expected to
+       say something when `foreign.count` is non-zero. */
+    return {
+      income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat,
+      count: tx.length,
+      foreign: {
+        count: foreignHere.size,
+        labels: [...foreignHere.keys()],
+        symbols: [...new Set(foreignHere.values())],
+      },
+    };
   }
   /* A monthly income figure, for the one page that has to talk in months no
      matter what the period length is (Debt — an instalment is quoted monthly,

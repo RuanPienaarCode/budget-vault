@@ -13,7 +13,7 @@ const { todayIso } = require('../dates');
 const { allocatedShare } = require('../money-flow');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
-const { currenciesIn } = require('../currency');
+const { currenciesIn, symbolOf, splitByCurrency, primaryTotal } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
@@ -694,17 +694,34 @@ module.exports = function registerDashboard(ctx) {
     const grid = $('#dashPositionKpis'); grid.empty();
     const card = $('#dashPositionCard');
 
-    const w = worth(S.accounts, S.debts, S.assets);
+    /* ISSUE 28 (2026-08-29 audit). These tiles used to ADD every balance
+       whatever its own `currency:` and disclose the mix with a sentence — the
+       very sentence the Accounts page retired when it stopped doing the
+       arithmetic that sentence described. The result was two answers to one
+       question on two screens this tile links to: Dashboard "Net worth"
+       R 2 020 000 against the Accounts hero's R 20 000 + Rp 2 000 000, for
+       the same files in the same session.
+
+       Same rule as the Accounts hero and the Savings page now: split first,
+       sum the household's own currency, name every other symbol beside it. */
+    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(S.accounts, S.settings.currency);
+    /* The same sentence the Accounts hero carries, from the same key — so the
+       two screens cannot word the same fact differently. */
+    const otherLine = others => (others.length
+      ? i18n.t('acct.hero.otherCurrencies', {
+        list: others.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · '),
+      }) : '');
+    /* The household symbol, passed at last. worth() has computed a
+       `currencies` disclosure for its caller since it was written, and every
+       caller dropped it — and, called with three arguments, computed it
+       against a fallback household of "R", so an Rp vault got a list naming a
+       currency it has never held. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     const owed = owedSummary(S.owed);
-    const savings = balanceOf('savings');
-    const invest = balanceOf('investment');
-    /* currency.js is explicit that a total spanning more than one currency is
-       "still added up — and SAYS SO, via currenciesIn()". views/accounts.js
-       already discloses this under its own hero; these two tiles add every
-       balance the same unconverted way and said nothing. */
-    const netWorthCurrencies = currenciesIn(S.accounts, S.settings.currency);
-    const savingsCurrencies = currenciesIn(
-      [...accountsOfType('savings'), ...accountsOfType('investment')], S.settings.currency);
+    const savingsAccounts = [...accountsOfType('savings'), ...accountsOfType('investment')];
+    const { others: savingsOthers } = splitByCurrency(savingsAccounts, S.settings.currency);
+    const savings = primaryTotal(accountsOfType('savings'), S.settings.currency);
+    const invest = primaryTotal(accountsOfType('investment'), S.settings.currency);
 
     /* A vault that has none of this yet gets no band at all. Four tiles reading
        R0.00 is not an empty state, it is a balance sheet asserting that the
@@ -726,9 +743,14 @@ module.exports = function registerDashboard(ctx) {
       label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0),
       cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
       sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) })
-        + (netWorthCurrencies.length > 1 ? i18n.t('acct.hero.mixed', { symbols: netWorthCurrencies.join(' · ') }) : ''),
+        + otherLine(worthOthers),
       view: 'savings',
-      say: i18n.t('dash.pos.netWorthSay', { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) }),
+      /* The disclosure goes into the aria-label too. The sub-line beside it is
+         a sibling and still reachable, but a screen reader following the tile
+         is handed the FIGURE and its caveat together or not at all — the same
+         asymmetry this file already closes deliberately for the bar below. */
+      say: i18n.t('dash.pos.netWorthSay', { net: money(w.net), owned: money(w.assets), owed: money(w.liabilities) })
+        + otherLine(worthOthers),
     });
 
     /* Negated for display — owed money reads as a positive figure, the same
@@ -790,9 +812,10 @@ module.exports = function registerDashboard(ctx) {
     posTile(grid, {
       label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0),
       sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
-        + (savingsCurrencies.length > 1 ? i18n.t('acct.hero.mixed', { symbols: savingsCurrencies.join(' · ') }) : ''),
+        + otherLine(savingsOthers),
       view: 'savings',
-      say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) }),
+      say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) })
+        + otherLine(savingsOthers),
     });
   }
 
@@ -922,6 +945,17 @@ module.exports = function registerDashboard(ctx) {
        them uncounted income would be the noise that stops people reading the
        line at all. Silent under a currency unit, where only rounding lives. */
     const inUncounted = (sum.uncatIncome || 0) + ((sum.unknown && sum.unknown.income) || 0);
+    /* ISSUE 28. Every figure on this hero — available, income, budgeted, spent
+       and the meter — is built from periodSummary, which now holds foreign
+       accounts OUT because a rand total cannot include rupiah. Held out is
+       fine; held out SILENTLY is not, and this is the most-read card in the
+       app, so the sentence goes here rather than only on the page where the
+       accounts live. */
+    const foreignNote = sum.foreign && sum.foreign.count
+      ? i18n.t('dash.foreignExcluded', {
+        count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
+      })
+      : '';
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
@@ -935,6 +969,7 @@ module.exports = function registerDashboard(ctx) {
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
         el('div', {}, el('div', { class: 'sv' }, money(sum.spend)),
           usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
+    if (foreignNote) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
     /* A real <button>, not a plain <div> — this is the app's clearest
        statement of outstanding work and, until now, the one figure on the
        whole hero a reader could not act on or even reach from a keyboard.

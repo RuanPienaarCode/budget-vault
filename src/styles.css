@@ -1675,6 +1675,14 @@
    household-currency total that (correctly) excludes it. Shared by the
    table's group-total rows, the "Whose it is" owner rows and the Ring's
    legend, so one tag cannot be styled three ways. */
+/* The hero's currency disclosure — a full-width note under the three stats
+   rather than a fourth stat, because it is a sentence about all of them and
+   not a figure of its own. */
+.budget-app-root .stat.stat-note {
+  display: block; border-top: 1px solid var(--line-soft); padding-top: 8px; margin-top: 2px;
+}
+.budget-app-root .stat.stat-note .st { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+
 .budget-app-root .acct-group-other {
   margin-left: 6px; font-weight: 400; font-size: .82rem; color: var(--text-muted);
 }

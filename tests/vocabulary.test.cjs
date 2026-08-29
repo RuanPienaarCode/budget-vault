@@ -185,8 +185,18 @@ function provenFalse(desc, exactShape, mangled) {
    no debts, no assets) are exactly what this term exists to pin, so the
    literal moved with the call rather than the term being retired. ======================================================================= */
 {
+  /* ISSUE 28 (2026-08-29 audit): every page that shows net worth now feeds
+     worth() the household-currency accounts and passes the household symbol.
+     The term is unchanged — one definition of net worth, shared — and it is
+     now pinned in the stronger form: the Dashboard and the Savings page must
+     use the SAME expression, because the whole defect was that they did not.
+     FULL_WORTH is kept as a negative control: the old three-argument call
+     summed unlike currencies and derived its own disclosure against a
+     fallback household of "R", naming a currency an Rp vault never held. */
   const FULL_WORTH = 'worth(S.accounts, S.debts, S.assets)';
-  ok(live.dashboard.includes(FULL_WORTH), 'Net worth: dashboard.js computes it via worth(accounts, debts, assets)');
+  const HOME_WORTH = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency)';
+  ok(live.dashboard.includes(HOME_WORTH), 'Net worth: dashboard.js computes it via worth(homeAccounts, debts, assets, household)');
+  ok(!live.dashboard.includes(FULL_WORTH), 'Net worth: and no longer adds unlike currencies to get there');
   /* ISSUE 28 (2026-08-29 audit): savings.js's two call sites narrowed to the
      household-currency accounts and started passing the household symbol —
      `worth(homeAccounts, S.debts, S.assets, S.settings.currency)`. The term
@@ -196,11 +206,10 @@ function provenFalse(desc, exactShape, mangled) {
      Rp 6 200 000) and a page whose tile and chart could drift from each other
      as well would have three answers. The literal moved with the call, the
      way ITEM 5 moved it before. */
-  const SAV_WORTH = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency)';
-  ok(live.savings.split(SAV_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
+  ok(live.savings.split(HOME_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
   ok(!live.savings.includes(FULL_WORTH),
     'Net worth: and neither place adds unlike currencies together any more');
-  ok(live.healthData.includes('worth(S.accounts, S.debts, S.assets).net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
+  ok(live.healthData.includes(HOME_WORTH + '.net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
 
   ok(live.accounts.includes('worth(primary, null, null)'),
     'Net worth: accounts.js\'s hero is the declared exception — worth() called with no debts/assets, on purpose');
@@ -347,8 +356,21 @@ function provenFalse(desc, exactShape, mangled) {
    account vanished from the divisor and a household with 2 months of real
    cover was told it had 6. ======================================================================= */
 {
-  ok(live.healthData.includes('resolveEarmarks(S.accounts)'),
-    'Emergency cover: the numerator reads every account, S.accounts unfiltered');
+  /* ISSUE 28 (2026-08-29 audit): the numerator is now the household-currency
+     accounts. The term this protects is unchanged and is stated as a NEGATIVE
+     control below — what went wrong originally was a BUDGET-SCOPE filter
+     (`in_budget`), which made a bill paid from a "not in budget" joint account
+     vanish from the divisor and told a household with 2 months of cover it had
+     6. A currency partition is a different thing: it is not a filter at all,
+     both halves come back (see tests/currency.test.cjs), and what it holds out
+     is named on the page rather than dropped. */
+  ok(live.healthData.includes('resolveEarmarks(homeAccounts)'),
+    'Emergency cover: the numerator reads the household-currency accounts, unfiltered by budget scope');
+  ok(!/resolveEarmarks\([^)]*in_budget/.test(live.healthData)
+    && !live.healthData.includes('resolveEarmarks(S.accounts.filter'),
+    'Emergency cover: and NO budget-scope filter has crept back into it — that is the bug this term was written for');
+  ok(live.healthData.includes('otherCurrencies: scoreOthers'),
+    'Emergency cover: what the currency partition holds out is handed to the page to state, never silently dropped');
 
   const ESSENTIAL_LINE = 'essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),';
   ok(live.healthData.includes(ESSENTIAL_LINE),
