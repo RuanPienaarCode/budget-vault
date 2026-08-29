@@ -218,6 +218,9 @@ module.exports = {
   'wiz.ccy.dollar': '$ — ドル',
   'wiz.ccy.euro': '€ — ユーロ',
   'wiz.ccy.pound': '£ — ポンド',
+  'wiz.ccy.rupee': '₹ — インドルピー',
+  'wiz.ccy.rupiah': 'Rp — インドネシアルピア',
+  'wiz.ccy.real': 'R$ — ブラジルレアル',
   'wiz.ccy.other': 'その他…',
 
   /* ---- period ---- */

@@ -131,7 +131,16 @@ const accountTypes = () => ACCOUNT_TYPE_KEYS.map(k => [k, i18n.t('acctType.' + k
 /* The stored VALUE is the symbol; only the currency's NAME is translated, so a
    vault written in one language reads back identically in another. Resolved on
    call, like accountTypes() — the language can change mid-wizard. */
-const CURRENCY_KEYS = [['R', 'rand'], ['$', 'dollar'], ['\u20ac', 'euro'], ['\u00a3', 'pound'], ['__custom__', 'other']];
+/* Symbols are written as escapes, not literals: this list is read in a diff
+   far more often than the strings around it, and a bare rupee or rupiah
+   glyph beside a Latin one is the kind of thing a careless editor drops.
+   R$ is a real two-character symbol, and distinct from the bare R above —
+   the stored value is the symbol string, so the two never collide. */
+const CURRENCY_KEYS = [
+  ['R', 'rand'], ['$', 'dollar'], ['\u20ac', 'euro'], ['\u00a3', 'pound'],
+  ['\u20b9', 'rupee'], ['Rp', 'rupiah'], ['R$', 'real'],
+  ['__custom__', 'other'],
+];
 const currencies = () => CURRENCY_KEYS.map(([sym, k]) => [sym, i18n.t('wiz.ccy.' + k)]);
 
 /* Plain-English headings for the category step. The starter pack is grouped

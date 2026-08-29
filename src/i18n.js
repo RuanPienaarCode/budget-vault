@@ -29,11 +29,14 @@ const ja = require('./lang/ja');
 const zh = require('./lang/zh');
 const xh = require('./lang/xh');
 const zu = require('./lang/zu');
+const pt = require('./lang/pt');
+const hi = require('./lang/hi');
+const id = require('./lang/id');
 
 /* The tables that actually ship. Adding a language is: write src/lang/xx.js,
    add it here, add its name below. tests/i18n.test.cjs fails the build if a
    table is missing keys English has, or carries keys English doesn't. */
-const TABLES = { en, af, de, es, fr, ja, zh, xh, zu };
+const TABLES = { en, af, de, es, fr, ja, zh, xh, zu, pt, hi, id };
 
 /* Every language's name written the way its own speakers write it — never
    translated into the current interface language, because someone who has
@@ -49,29 +52,44 @@ const LANGUAGE_NAMES = {
   zh: '中文',
   xh: 'isiXhosa',
   zu: 'isiZulu',
+  pt: 'Português',
+  hi: 'हिन्दी',
+  id: 'Bahasa Indonesia',
 };
 
 /* Dropdown order — English first (the pre-language default), then the rest in
    the order they were added. Derived from TABLES rather than hand-listed so the
    dropdown can never offer a language that has no table behind it. */
-const LANGUAGE_ORDER = ['en', 'af', 'de', 'es', 'fr', 'ja', 'zh', 'xh', 'zu'].filter(id => TABLES[id]);
+const LANGUAGE_ORDER = ['en', 'af', 'de', 'es', 'fr', 'pt', 'ja', 'zh', 'hi', 'id', 'xh', 'zu']
+  .filter(code => TABLES[code]);
 
 /* --------------------------- plural categories ---------------------------- */
 
 /* Languages with a SINGLE noun form — a count never changes the wording, so
    every plural entry resolves to `other`. Writing `1 item / 2 items` logic into
    these produces text a native reader finds wrong, not merely clumsy. */
-const ONE_FORM = new Set(['zh', 'ja']);
+const ONE_FORM = new Set(['zh', 'ja', 'id']);
 
 /* Languages where 0 takes the SINGULAR alongside 1 (French: "0 fichier",
    "1 fichier", "2 fichiers"). English, Afrikaans, German and Spanish all take
    the plural at 0 ("0 files"), so they use the ordinary n === 1 rule. */
-const ZERO_IS_SINGULAR = new Set(['fr']);
+/* Portuguese and Hindi join French here on CLDR's own rule for each — `pt`
+   is `i = 0..1` and `hi` is `i = 0 or n = 1`, which are both exactly this
+   test over the integers a count can be. Their `one` forms are written to
+   read correctly at zero rather than assuming the count is one. */
+const ZERO_IS_SINGULAR = new Set(['fr', 'pt', 'hi']);
 
 /* Which form of a plural entry a count selects. Kept deliberately small: these
    nine languages need exactly two categories between them, and Intl.PluralRules
    — which would be the general answer — is not something to depend on for
    correctness across the WebKit floor when the rule set is this shallow.
+
+   Twelve languages now, and still exactly two categories between them.
+
+   Indonesian joins Chinese and Japanese in ONE_FORM: a count never changes
+   an Indonesian noun, and reduplication (buku-buku) marks plurality on its
+   own, never beside a number — "2 buku-buku" is wrong where "2 buku" is
+   right.
 
    isiXhosa and isiZulu take the plain n === 1 rule. Their plurals are a changed
    noun-class prefix rather than a suffix, which the whole-sentence-per-form
@@ -123,6 +141,16 @@ const ORDINAL_DAY = {
      cannot see from a bare number. */
   xh: n => 'we-' + n,
   zu: n => 'we-' + n,
+  /* Portuguese names the first of the month with an ordinal and every other
+     day with a cardinal — "no dia 1\u00ba", then "no dia 25" — the same
+     shape as French's "le 1er". */
+  pt: n => n + (n === 1 ? '\u00ba' : ''),
+  /* Hindi and Indonesian both name a day of the month with a bare cardinal:
+     "25 \u0924\u093e\u0930\u0940\u0916\u093c", "tanggal 25". The word that makes it a date sits in
+     the sentence rather than on the numeral, so the formatter returns the
+     number alone and lang/hi.js and lang/id.js are written around it. */
+  hi: n => String(n),
+  id: n => String(n),
 };
 
 function ordinalDay(lang, n) {
