@@ -51,6 +51,7 @@ const { worth } = require('../worth');
 const { totalReturn, poolCatType, chartable } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
 const { todayIso } = require('../dates');
+const { typeOrder, typeRank } = require('../groups');
 const { REPORT_DIR, reportPaths, mergeCategoryRows, financialReportMarkdown, financialReportJson, copyBody } = require('../report');
 /* Namespace import: see views/dashboard.js's own comment on why every view
    in this app imports i18n the same way regardless of whether `t` happens
@@ -71,8 +72,8 @@ module.exports = function registerReport(ctx) {
   const {
     S, $, app, plugin, money, toast,
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
-    currentPeriod, periodRange, periodMonthName, dayLabel,
-    periodsForMonths, trendPeriods, periodSummary, budgetTotals,
+    currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
+    periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
     accountIndex, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows,
   } = ctx;
@@ -97,14 +98,48 @@ module.exports = function registerReport(ctx) {
   let folder = null;
   let result = null;   // { md: {path, text|null} | null, json: {path, text|null} | null, generatedAt }
 
+  /* C1 in the 2026-08-29 audit: 'current' used to anchor on currentPeriod()
+     (the wall clock) while '3m'/'12m' anchored on S.period (the header pill
+     the reader can move, and which switchView() below un-hides everywhere
+     EXCEPT the Report page — see controller.js's own comment on that line).
+     On a vault holding May/June/July, today 2026-08-29, with S.period parked
+     on '2026-05': "Current month" produced August, "Last 3 months" produced
+     a SINGLE-month report for May — two pills that don't even describe
+     overlapping windows, and June/July silently dropped off a label that
+     said "last 3 months".
+
+     All three branches now anchor on currentPeriod() — the wall clock, which
+     is what "Current month" / "Last 3 months" / "Last 12 months" actually
+     promise in their own labels (report.period.current/3m/12m.desc). This
+     duplicates trendPeriods()'s own walk (periodsFromAnchor below) rather
+     than reaching into trend-math.js to change what it anchors on:
+     trendPeriods() is the Dashboard trend's own contract, read there off
+     S.period on purpose (chartTrendRange overlays the period ON SCREEN), and
+     a second caller wanting a different anchor is not a reason to loosen
+     that contract for the one that does. */
   function selectedPeriods() {
-    if (period === 'current') return [currentPeriod()];
+    const anchor = currentPeriod();
+    if (period === 'current') return [anchor];
     const months = period === '3m' ? 3 : 12;
-    // trendPeriods always includes the current period even when it is empty
-    // (see trend-math.js) and stops at the earliest real data otherwise, so
-    // a vault younger than the chosen span reports on what it actually has
-    // rather than inventing zero-filled history for months before it existed.
-    return trendPeriods(periodsForMonths(months));
+    return periodsFromAnchor(anchor, periodsForMonths(months));
+  }
+
+  /* Same walk trendPeriods() (trend-math.js) performs — oldest first, `want`
+     of them at most, stopping at the earliest month the vault actually has
+     data for (a vault younger than the chosen span reports on what it
+     actually has rather than inventing zero-filled history) — but anchored
+     on the `anchor` the caller passes instead of S.period. See
+     selectedPeriods()'s own comment for why this is a deliberate, small
+     duplication rather than a change to trendPeriods()'s contract. */
+  function periodsFromAnchor(anchor, want) {
+    const earliest = earliestDataMonth();
+    const out = [];
+    for (let i = 0; i < want; i++) {
+      const p = shiftPeriod(anchor, -i);
+      if (earliest && i > 0 && periodRange(p).end.slice(0, 7) < earliest) break;
+      out.push(p);
+    }
+    return out.reverse();
   }
 
   function periodLabelFor(periods) {
@@ -346,16 +381,50 @@ module.exports = function registerReport(ctx) {
   function buildReportData() {
     const periods = selectedPeriods();
     let income = 0, spend = 0, net = 0, budgetIncome = 0, budgetSpend = 0;
+    /* C2 in the 2026-08-29 audit — the exact three-line gap
+       views/dashboard.js's own donut discloses beside itself
+       (dashboard.js:1717-1719, "what this donut does NOT show"), run once
+       per period and summed the same additive way mergeCategoryRows already
+       sums budget/actual/amount below: the SAME rule per period, never a
+       second guess at what it means. `spendRows` is kept per period so
+       spendByCategory's own merge (below) does not call categorySpendRows()
+       a second time for figures already in hand. */
+    let uncat = 0, netted = 0;
+    const spendRowsByPeriod = [];
     for (const p of periods) {
       const sum = periodSummary(p);
       income += sum.income; spend += sum.spend; net += sum.net;
       const bt = budgetTotals(p);
       budgetIncome += bt.income; budgetSpend += bt.spend;
+
+      const spendRows = categorySpendRows(p);
+      spendRowsByPeriod.push(spendRows);
+      const total = spendRows.reduce((t, r) => t + r.amount, 0);
+      const notShown = Math.max(0, sum.spend - total);
+      const uncatHere = Math.min(sum.uncatSpend || 0, notShown);
+      uncat += uncatHere;
+      netted += notShown - uncatHere;
     }
+    /* H1 in the audit — typeRank order, same as renderBudgetTable's own sort
+       (views/dashboard.js), off the SAME S.settings.groups this vault's
+       Budget page reads; a plain alphabetical re-sort here used to throw
+       that grouping away, which is what let an income row's "Remaining"
+       read exactly like an overspend and a transfer row read like a
+       category nothing was spent on — the Type column (src/report.js's
+       budgetTable) needs the grouping to actually mean something. */
+    const order = typeOrder(S.settings.groups);
     const categories = mergeCategoryRows(periods.map(p => budgetVsActualRows(p)), ['budget', 'actual'])
-      .sort((a, b) => a.cat.localeCompare(b.cat));
-    const spendByCategory = mergeCategoryRows(periods.map(p => categorySpendRows(p)), ['amount'])
-      .sort((a, b) => b.amount - a.amount);
+      .sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.cat.localeCompare(b.cat));
+    /* `orphaned` — catKnown() is the SAME predicate period.js's own catType()
+       and dashboard.js's `sum.unknown` both key off (see catKnown's own
+       header on why "no category" and "a category no file answers to" are
+       deliberately different questions); applying it directly to the merged
+       row is what the row actually shown here, in THIS table, is — not a
+       wider per-period set that could also hold an income-side orphan never
+       drawn as a spend row at all. */
+    const spendByCategory = mergeCategoryRows(spendRowsByPeriod, ['amount'])
+      .sort((a, b) => b.amount - a.amount)
+      .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
 
     const w = worth(S.accounts, S.debts, S.assets);
     return {
@@ -366,6 +435,7 @@ module.exports = function registerReport(ctx) {
       currency: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
       categories, spendByCategory,
+      categoryGap: { uncat, netted },
       savings: savingsSummary(),
       debts: debtsSummary(w),
       netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },

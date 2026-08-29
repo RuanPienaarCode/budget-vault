@@ -141,6 +141,20 @@ function kvTable(rows) {
    periods is safe: it sums two totals under the same rule per period rather
    than re-deriving the rule itself).
 
+   THE TYPE COLUMN — H1 in the 2026-08-29 audit. `renderBudgetTable`
+   (views/dashboard.js) groups income/expense/transfer/custom-group rows
+   under a type header and sorts by typeRank; this table used to throw that
+   away with an alphabetical re-sort and no type at all, so an income row
+   that beat its budget by R5,000 rendered `Remaining: R -5000.00` —
+   indistinguishable from an overspend — and a transfer budget row (whose
+   `actual` is always 0 by design, see budgetVsActualRows's own header on why
+   a transfer never accumulates one) read as a category nothing was spent on.
+   `rows` is now handed over ALREADY sorted by typeRank (views/report.js
+   builds that order the same way dashboard.js does, off the same
+   S.settings.groups), so this only has to print the type it was given — the
+   JSON path already carried `type` per row; this closes the gap between the
+   two formats rather than opening a second copy of the sort rule.
+
    `unbudgeted` mirrors renderBudgetTable's own test (views/dashboard.js) —
    spending in a category nobody budgeted for is over budget by the whole
    amount, and a blank Remaining cell there reads as "nothing to report",
@@ -150,12 +164,12 @@ function kvTable(rows) {
    budgetVsActualRows), so it can never satisfy `!r.budget` and never needs
    the exclusion dashboard.js applies for the same reason. */
 function budgetTable(rows, money) {
-  const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
-    '|---|---:|---:|---:|'];
+  const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
+    '|---|---|---:|---:|---:|'];
   for (const r of rows) {
     const remaining = r.budget - r.actual;
     const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
-    out.push(`| ${escMd(r.cat)} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
+    out.push(`| ${escMd(r.cat)} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
   }
   return out;
 }
@@ -167,12 +181,22 @@ function budgetTable(rows, money) {
    uses for its legend column, so a reader comparing "32%" here against the
    donut on screen is comparing the same number, not two independent
    roundings of it (share-percents.js's own header documents why an
-   independent Math.round() per row does not sum to 100). */
+   independent Math.round() per row does not sum to 100).
+
+   `orphaned` — C2 in the 2026-08-29 audit. A category name no `Categories/`
+   file answers to gets a "Missing categories" tile on the Dashboard
+   (views/dashboard.js's own comment on `sum.unknown` explains why: it is
+   never counted as income and its sign can't be trusted) but used to print
+   here as an ordinary slice with nothing marking it unrecognised. Each row
+   already carries the flag (views/report.js sets it with the same
+   `catKnown()` predicate period.js and dashboard.js both read), so this only
+   has to say so — a trailing `*` on the row, and financialReportMarkdown
+   prints the names it belongs to once, below the table. */
 function categoryTable(rows, money) {
   const shares = sharePercents(rows.map(r => r.amount));
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.amount')} | ${i18n.t('report.col.percent')} |`,
     '|---|---:|---:|'];
-  rows.forEach((r, i) => out.push(`| ${escMd(r.cat)} | ${money(r.amount)} | ${shares[i]}% |`));
+  rows.forEach((r, i) => out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${money(r.amount)} | ${shares[i]}% |`));
   return out;
 }
 
@@ -194,8 +218,17 @@ function debtTable(rows, money) {
      detail: 'summary' | 'detail',
      income, spend, net: number,       // periodSummary(), summed across the selection
      budgetIncome, budgetSpend: number,// budgetTotals(), summed the same way
-     categories: [{ cat, budget, actual, type }],   // budgetVsActualRows(), merged
-     spendByCategory: [{ cat, amount }],             // categorySpendRows(), merged
+     categories: [{ cat, budget, actual, type }],   // budgetVsActualRows(), merged,
+                                                     // typeRank-sorted (see budgetTable)
+     spendByCategory: [{ cat, amount, orphaned }],  // categorySpendRows(), merged;
+                                                     // orphaned = !catKnown(cat)
+     categoryGap: { uncat, netted },   // C2 — the SAME gap views/dashboard.js's own
+                                        // donut discloses beside itself (sum.spend
+                                        // minus what the category rows account for,
+                                        // split into "uncategorised" and "netted off
+                                        // inside a category"), summed per period the
+                                        // same additive way every other figure above
+                                        // is merged across the selection
      savings: null | { growth, rateGrowth, rateCapital, measured, unmeasured, total },
      debts: null | { count, active, total, perMonth, interest, rows: [{name,balance,rate,interest}] },
      netWorth: { net, assets, liabilities },
@@ -209,7 +242,7 @@ function financialReportMarkdown(data, money) {
   const {
     generated, periodLabel, rangeNote, detail,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
   } = data;
 
   const out = [
@@ -241,10 +274,29 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.budgetSpend'), money(budgetSpend)],
     ]));
 
-  /* ------------------------- spend by category --------------------------- */
+  /* ------------------------- spend by category ---------------------------
+     C2 in the 2026-08-29 audit: this section used to run sharePercents() over
+     whatever rows it was handed and call the result "100%", even on a period
+     where R900 of R2,400 spend never appeared in any row — the same gap the
+     Dashboard's own donut has always disclosed beside itself (that comment,
+     views/dashboard.js:1698 on, is the fuller account of why leaving it
+     unsaid reads as a chart that stopped updating). The two sentences below
+     print whenever there is a gap to explain, table or no table — a period
+     that is ENTIRELY uncategorised spend has NO rows here (spendByCategory
+     only ever holds recognised, non-transfer, non-income categories), so
+     "No spending recorded" would be a straight lie about a period that in
+     fact spent every rand; skip that line rather than print it under a
+     figure disclosing the opposite. */
+  const gapStated = categoryGap && (categoryGap.uncat >= 1 || categoryGap.netted >= 1);
   out.push('', `## ${i18n.t('report.section.category')}`);
   if (spendByCategory.length) out.push(...categoryTable(spendByCategory, money));
-  else out.push('', i18n.t('report.category.empty'));
+  else if (!gapStated) out.push('', i18n.t('report.category.empty'));
+  if (gapStated) {
+    if (categoryGap.uncat >= 1) out.push('', i18n.t('report.category.uncat', { amount: money(categoryGap.uncat) }));
+    if (categoryGap.netted >= 1) out.push('', i18n.t('report.category.netted', { amount: money(categoryGap.netted) }));
+  }
+  const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMd(r.cat));
+  if (orphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: orphanedNames.join(', ') }));
 
   /* -------------------------- budget vs actual --------------------------- */
   out.push('', `## ${i18n.t('report.section.budgetActual')}`);
@@ -374,7 +426,7 @@ function financialReportJson(data) {
   const {
     generated, periodLabel, rangeNote, detail, currency,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
   } = data;
 
   const shape = {
@@ -387,7 +439,16 @@ function financialReportJson(data) {
       income, spend, net,
       budget_income: budgetIncome, budget_spend: budgetSpend,
     },
-    categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount })),
+    /* `orphaned` and `category_gap` are C2's fix — see categoryTable's own
+       header in this file, and financialReportMarkdown's identical branch:
+       the JSON reader gets the SAME two facts the Markdown prose states, not
+       a table that quietly sums to less than income_vs_spend.spend with no
+       field anywhere explaining why. */
+    categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount, orphaned: !!r.orphaned })),
+    category_gap: {
+      uncategorised: (categoryGap && categoryGap.uncat) || 0,
+      netted: (categoryGap && categoryGap.netted) || 0,
+    },
     budgets_vs_actuals: categories.map(r => ({
       category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: r.budget - r.actual,
     })),

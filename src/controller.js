@@ -426,6 +426,17 @@ function mountApp(view) {
     }
     for (const sec of $$('main > section')) sec.classList.add('hidden');
     $(`#view-${v}`).classList.remove('hidden');
+    /* C1 in the 2026-08-29 report audit: the Report page has its own period
+       pills (views/report.js), anchored on currentPeriod() — the wall clock,
+       matching what "Current month" / "Last 3 months" / "Last 12 months"
+       actually promise. The header pill lets the reader move S.period
+       independently, which is exactly what the Dashboard trend wants
+       (trend-math.js's trendPeriods reads S.period on purpose) but which the
+       Report page must NOT also answer to — a second, silent period control
+       on the one page that generates a document meant to leave the app. Only
+       this view hides it; connectVault's own hide/show pair above stays in
+       charge of the not-yet-loaded case. */
+    $('#periodPill').classList.toggle('hidden', v === 'report');
     closeDrawer();
     render();
     /* Move focus to the new route's heading. closeDrawer() puts it back on the

@@ -28,6 +28,26 @@
         touching a document that never had one.
      7. The JSON output never invents a "loans" section — views/loans.js has
         no persisted data for one to hold.
+     8. H2 (2026-08-29 audit) — the ROW COUNT of every rendered table is
+        pinned, not just membership. `md.includes(...)` survives a serialiser
+        that drops the LAST row of a table (proven in the audit: mutating
+        budgetTable/categoryTable to iterate `rows.slice(0, -1)` left this
+        file's old assertions green). tableBodyRows() below counts the real
+        `|`-prefixed data lines under a heading, and one block asserts a
+        byte-exact table — the two together are what a slice(0,-1) mutation
+        actually fails on (re-proven at the end of this file's own review by
+        applying the exact mutation and watching it go red).
+     9. C2 (2026-08-29 audit) — the category-spend table used to sum to
+        100% while silently leaving out uncategorised spend and refunds
+        netted off inside their own category, and an ORPHANED category (no
+        matching Categories/ file) printed as an ordinary, unmarked row. The
+        `categoryGap` figures and each row's `orphaned` flag are pinned in
+        BOTH the Markdown prose and the JSON schema.
+    10. H1 (2026-08-29 audit) — Budget vs Actual carries a Type column and
+        preserves whatever order the caller handed it (views/report.js sorts
+        by typeRank before calling in), so an income row beating its budget
+        and a transfer row that never accumulates an actual are both
+        readable instead of indistinguishable from an overspend.
 
    Pure — no DOM, no obsidian, no vault. */
 
@@ -44,6 +64,26 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
 i18n.setLanguage('en');
 const money = v => `R ${v < 0 ? '-' : ''}${Math.abs(v).toFixed(2)}`;
+
+/* The real data-row lines Markdown renders under a `## Heading` — everything
+   between its divider (`|---…`) and the next blank line. Excludes the header
+   row itself (the divider is the marker for "table starts here"), so its
+   length is exactly the number of RECORDS financialReportMarkdown was handed,
+   which is the assertion H2 needed and `md.includes(...)` could never make. */
+function tableBodyRows(md, heading) {
+  const lines = md.split('\n');
+  const hIdx = lines.indexOf(`## ${heading}`);
+  assert.ok(hIdx >= 0, `section "${heading}" not found in the document`);
+  const rest = lines.slice(hIdx + 1);
+  const dividerIdx = rest.findIndex(l => l.startsWith('|---'));
+  if (dividerIdx === -1) return [];   // no table rendered — an empty-state line instead
+  const body = [];
+  for (let i = dividerIdx + 1; i < rest.length; i++) {
+    if (!rest[i].startsWith('|')) break;
+    body.push(rest[i]);
+  }
+  return body;
+}
 
 /* ---- 1. reportPaths ---- */
 {
@@ -94,10 +134,11 @@ const DATA = {
     { cat: 'Extras', type: 'expense', budget: 0, actual: 850 },
   ],
   spendByCategory: [
-    { cat: 'Rent', amount: 9000 },
-    { cat: 'Groceries', amount: 4200 },
-    { cat: 'Extras', amount: 850 },
+    { cat: 'Rent', amount: 9000, orphaned: false },
+    { cat: 'Groceries', amount: 4200, orphaned: false },
+    { cat: 'Extras', amount: 850, orphaned: false },
   ],
+  categoryGap: { uncat: 0, netted: 0 },
   savings: { growth: 1250.5, rateGrowth: 1250.5, rateCapital: 30000, measured: 2, unmeasured: 1, total: 3 },
   debts: {
     count: 2, active: 1, total: 8000, perMonth: 550, interest: 150,
@@ -125,7 +166,7 @@ const DATA = {
   eq(json.income_vs_spend.budget_spend, DATA.budgetSpend);
 
   eq(json.categories.length, DATA.spendByCategory.length, 'same number of category rows');
-  eq(json.categories[0], { category: 'Rent', amount: 9000 }, 'category shape and figure, unchanged from spendByCategory');
+  eq(json.categories[0], { category: 'Rent', amount: 9000, orphaned: false }, 'category shape and figure, unchanged from spendByCategory');
   ok(md.includes(`| Rent | ${money(9000)} |`.replace('||', '|')) || /\|\s*Rent\s*\|/.test(md),
     'the same category appears in the Markdown table');
   ok(md.includes(money(9000)), 'and its amount is the same figure, formatted');
@@ -155,6 +196,114 @@ const DATA = {
   eq(json.transactions, null, 'no transaction detail in summary mode, in JSON too');
 
   ok(!('loans' in json), 'no "loans" section — views/loans.js has no persisted data for one to hold');
+
+  /* H2's actual fix: a ROW COUNT, not membership. This is the assertion the
+     audit's slice(0, -1) mutation on either table function turns red — every
+     `ok(md.includes(...))` above it stays green even with the last row
+     silently dropped, because the row it checks for is never the one that
+     went missing. */
+  eq(tableBodyRows(md, i18n.t('report.section.category')).length, DATA.spendByCategory.length,
+    'every category row is rendered — none silently dropped');
+  eq(tableBodyRows(md, i18n.t('report.section.budgetActual')).length, DATA.categories.length,
+    'every budget row is rendered — none silently dropped');
+}
+
+/* ---- 3b. H2: one byte-exact table block, mutation-proofed ----
+   Row count alone would not catch a REORDERED row (typeRank in H1's own
+   fix), so this pins the literal rendered lines for a small, hand-checked
+   fixture — income, transfer and expense together, plus a two-row category
+   table with one orphaned entry — rather than a larger DATA blob where a
+   single wrong row is easy to miss reading the assertion. */
+{
+  const small = {
+    ...DATA,
+    categories: [
+      { cat: 'Salary', type: 'income', budget: 40000, actual: 45000 },
+      { cat: 'Move to savings', type: 'transfer', budget: 10000, actual: 0 },
+      { cat: 'Groceries', type: 'expense', budget: 5000, actual: 1200 },
+    ],
+    spendByCategory: [
+      { cat: 'Groceries', amount: 1200, orphaned: false },
+      { cat: 'GoneCategory', amount: 300, orphaned: true },
+    ],
+    categoryGap: { uncat: 900, netted: 50 },
+  };
+  const md = financialReportMarkdown(small, money);
+  const json = JSON.parse(financialReportJson(small));
+
+  /* H1 — the Type column, and typeRank order preserved exactly as handed
+     in (an income row over budget and a transfer row with a zero actual are
+     both readable now, not indistinguishable from an overspend). */
+  const expectedBudget = [
+    `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
+    '|---|---|---:|---:|---:|',
+    `| Salary | income | ${money(40000)} | ${money(45000)} | ${money(-5000)} |`,
+    `| Move to savings | transfer | ${money(10000)} | ${money(0)} | ${money(10000)} |`,
+    `| Groceries | expense | ${money(5000)} | ${money(1200)} | ${money(3800)} |`,
+  ].join('\n');
+  ok(md.includes(expectedBudget),
+    'Budget vs Actual is byte-exact: income over budget reads -5000 next to "income" — not a bare, ambiguous overspend — ' +
+    'and the transfer row is visibly a transfer, not a category nothing was spent on');
+
+  /* C2 — the orphaned row is marked, in order, amounts unchanged. */
+  const expectedCategory = [
+    `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.amount')} | ${i18n.t('report.col.percent')} |`,
+    '|---|---:|---:|',
+    `| Groceries | ${money(1200)} | 80% |`,
+    `| GoneCategory * | ${money(300)} | 20% |`,
+  ].join('\n');
+  ok(md.includes(expectedCategory), 'Spend by Category is byte-exact: the orphaned row is marked with *');
+
+  eq(tableBodyRows(md, i18n.t('report.section.budgetActual')).length, 3, 'three budget rows, none dropped, none duplicated');
+  eq(tableBodyRows(md, i18n.t('report.section.category')).length, 2, 'two category rows, none dropped, none duplicated');
+
+  eq(json.budgets_vs_actuals, [
+    { category: 'Salary', type: 'income', budget: 40000, actual: 45000, remaining: -5000 },
+    { category: 'Move to savings', type: 'transfer', budget: 10000, actual: 0, remaining: 10000 },
+    { category: 'Groceries', type: 'expense', budget: 5000, actual: 1200, remaining: 3800 },
+  ], 'JSON carries the same three rows, same order, same type field the Markdown just proved');
+  eq(json.categories, [
+    { category: 'Groceries', amount: 1200, orphaned: false },
+    { category: 'GoneCategory', amount: 300, orphaned: true },
+  ], 'JSON marks the orphaned row too — the two formats are equally interpretable');
+}
+
+/* ---- 3c. C2: the uncategorised / netted gap, and the orphaned-name line ---- */
+{
+  const gapData = {
+    ...DATA,
+    spendByCategory: [
+      { cat: 'Groceries', amount: 1200, orphaned: false },
+      { cat: 'GoneCategory', amount: 300, orphaned: true },
+    ],
+    categoryGap: { uncat: 900, netted: 50 },
+  };
+  const md = financialReportMarkdown(gapData, money);
+  const json = JSON.parse(financialReportJson(gapData));
+
+  ok(md.includes(i18n.t('report.category.uncat', { amount: money(900) })),
+    'the uncategorised gap is stated in the document itself, the same fact the Dashboard donut discloses beside it');
+  ok(md.includes(i18n.t('report.category.netted', { amount: money(50) })),
+    'the netted-refund gap is stated too');
+  ok(md.includes(i18n.t('report.category.orphaned', { names: 'GoneCategory' })),
+    'the orphaned category name is named, not just marked with an unexplained *');
+
+  eq(json.category_gap, { uncategorised: 900, netted: 50 }, 'the same two figures ride in JSON, snake_cased');
+
+  /* A period that is ENTIRELY uncategorised spend has no rows to show at
+     all — spendByCategory only ever holds recognised, non-transfer,
+     non-income categories — so "No spending recorded" would flatly
+     contradict the gap note underneath it. */
+  const allGap = { ...DATA, spendByCategory: [], categoryGap: { uncat: 500, netted: 0 } };
+  const allGapMd = financialReportMarkdown(allGap, money);
+  ok(!allGapMd.includes(i18n.t('report.category.empty')),
+    'a period that spent every rand, all of it uncategorised, must not say "No spending recorded"');
+  ok(allGapMd.includes(i18n.t('report.category.uncat', { amount: money(500) })),
+    'the gap note explains where the spend actually went instead');
+
+  const trulyEmpty = { ...DATA, spendByCategory: [], categoryGap: { uncat: 0, netted: 0 } };
+  ok(financialReportMarkdown(trulyEmpty, money).includes(i18n.t('report.category.empty')),
+    'a genuinely empty period (no spend, no gap) still says so');
 }
 
 /* ---- 4a. "as of today" sections — none / partial / full ---- */
