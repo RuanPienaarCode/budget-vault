@@ -102,6 +102,7 @@ const hasCls = (el, cls) => el.className.split(/\s+/).includes(cls);
     ctx.$ = $;
     ctx.root = $('#root');
     ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
+    ctx.moneyIn = (sym, v, dp = 2) => `${sym} ${Number(v).toFixed(dp)}`;
     require('../src/views/debts')(ctx);
     ctx.renderDebts();
 
@@ -150,6 +151,7 @@ const hasCls = (el, cls) => el.className.split(/\s+/).includes(cls);
     ctx.$ = $;
     ctx.root = $('#root');
     ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
+    ctx.moneyIn = (sym, v, dp = 2) => `${sym} ${Number(v).toFixed(dp)}`;
     require('../src/views/savings')(ctx);
     ctx.renderSavings();
 

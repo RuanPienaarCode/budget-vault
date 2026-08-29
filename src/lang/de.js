@@ -145,6 +145,7 @@ module.exports = {
   'wiz.step.name': 'Wie dürfen wir dich nennen?',
   'wiz.step.period': 'Wann wirst du bezahlt?',
   'wiz.step.how': 'Wie trägst du deine Ausgaben ein?',
+  'wiz.step.rates': 'Geld in einer anderen Währung?',
   'wiz.step.categories': 'Deine Budgetkategorien',
   'wiz.step.account': 'Dein erstes Konto',
   'wiz.step.firstBudget': 'Dein erstes Budget',
@@ -187,6 +188,16 @@ module.exports = {
   'wiz.how.csv.desc': 'Lade eine CSV bei deiner Bank herunter, und die App sortiert sie in Kategorien, während du es ihr beibringst.',
   'wiz.how.manual.title': 'Selbst eintippen',
   'wiz.how.manual.desc': 'Keine Bankdateien — du trägst Einnahmen und Ausgaben von Hand ein, Zeile für Zeile. Der einfachste Anfang.',
+
+  'wiz.rates.name': 'Halten Sie Geld in mehr als einer Währung?',
+  'wiz.rates.desc': 'Antworten Sie nur mit Ja, wenn einige Ihrer Konten in einer anderen Währung als {symbol} geführt werden. Dies ist der einzige Teil des Plugins, der das Internet nutzt.',
+  'wiz.rates.off.title': 'Nein, oder jetzt nicht',
+  'wiz.rates.off.desc': 'Es wird nichts abgerufen und nichts verlässt Ihr Gerät. Konten in einer anderen Währung werden weiterhin aufgeführt — ihre Summen werden nur getrennt angezeigt statt hinzugerechnet. Sie können dies später in den Einstellungen aktivieren.',
+  'wiz.rates.on.title': 'Ja — tägliche Wechselkurse abrufen',
+  'wiz.rates.on.desc': 'Einmal täglich fragt das Plugin einen öffentlichen Wechselkursdienst nach den Kursen des Tages und speichert sie als Notiz in Ihrem Tresor. Es sendet nur einen Währungscode — niemals Ihre Kontostände, Ihre Konten oder sonst etwas. Jede umgerechnete Zahl wird mit dem Datum ihres Kurses angezeigt.',
+  'wiz.rates.code': 'Ihr Währungscode',
+  'wiz.rates.codeDesc': 'Der dreibuchstabige Code für {symbol} — zum Beispiel ZAR, USD, EUR, IDR oder CNY. Ohne ihn können keine Kurse abgerufen werden.',
+  'wiz.err.code': 'Geben Sie einen dreibuchstabigen Währungscode wie ZAR, USD oder EUR ein — kein Symbol.',
   'wiz.locale.group': 'Sprache · Land · Währung',
 
   /* ---- name ---- */
@@ -693,6 +704,13 @@ module.exports = {
   'acct.hero.mixed': ' Diese Summe addiert Konten in mehr als einer Währung ({symbols}), ohne sie umzurechnen.',
   'acct.hero.otherCurrencies': ' Plus {list} in anderen Währungen, nicht umgerechnet.',
   'acct.hero.muted': 'Ignorierte Warnungen',
+  'settings.currencyCode.name': 'Währungscode',
+  'settings.currencyCode.desc': 'Der dreibuchstabige ISO-Code für Ihr Währungssymbol — ZAR, USD, EUR, IDR, CNY. Nur nötig, wenn Sie unten Wechselkurse aktivieren; gedruckt wird das Symbol oben. Er wird getrennt abgefragt, weil kein Symbol für sich allein eine Währung identifiziert — "$" verwenden die USA, Australien, Kanada und Singapur gleichermaßen.',
+  'settings.exchangeRates.name': 'Wechselkurse',
+  'settings.exchangeRates.off': 'Aus — niemals das Internet nutzen',
+  'settings.exchangeRates.on': 'Ein — tägliche Kurse abrufen',
+  'settings.exchangeRates.desc': 'Standardmäßig aus und das Einzige in diesem Plugin, das eine Netzwerkanfrage stellt. Aktiviert fragt es einmal täglich einen öffentlichen Wechselkursdienst nach den Kursen des Tages, speichert sie als lesbare Notiz in Ihrem Budget-Ordner und rechnet Konten in anderen Währungen in Ihre Summen ein. Es sendet nur einen Währungscode — niemals Ihre Kontostände oder Kontonamen. Jede umgerechnete Zahl wird mit dem Datum ihres Kurses gedruckt, und ein Kurs, der älter als eine Woche ist, sagt das.',
+
   'acct.mixedTitle': 'Addiert Konten in mehr als einer Währung, ohne sie umzurechnen.',
   'acct.hero.count': 'Konten',
   'acct.hero.oldest': 'Älteste Bestätigung',

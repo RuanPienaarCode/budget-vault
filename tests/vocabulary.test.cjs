@@ -134,7 +134,18 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.savings.includes(TR_CALL_SAV), 'Growth: savings.js computes each account\'s return through the shared totalReturn()');
   ok(live.savingsMath.includes('growth += r.growth'), 'Growth: savings-math.js\'s growthTotals() sums growth off totalReturn()\'s own .growth field — the ONE place this sum happens now');
   ok(!live.savings.includes('growth += r.growth'), 'Growth: savings.js no longer sums growth itself — it calls growthTotals() instead (M4)');
-  ok(live.savings.includes('growthTotals(entries, poolType, { today: todayIso() })'), 'Growth: savings.js\'s own growth tile calls the shared growthTotals()');
+  /* The POOL is narrowed at this call site — `entries.filter(homeEntry)` —
+     and the gate matches on the shared function plus its shared argument
+     shape rather than on a literal `entries`. The narrowing is the issue-#28
+     fix reaching this page: growthTotals sums `growth` and `capitalIn` and
+     the tile divides one by the other, so a pool spanning two currencies
+     produced "+11,2% on Rp 903 000 put in" — a percentage of a quantity that
+     does not exist. What this gate protects is that savings.js calls the
+     SHARED function rather than re-deriving the sum, and that is unchanged. */
+  ok(/growthTotals\(entries(\.filter\(homeEntry\))?, poolType, \{ today: todayIso\(\) \}\)/.test(live.savings),
+    'Growth: savings.js\'s own growth tile calls the shared growthTotals()');
+  ok(live.savings.includes('entries.filter(homeEntry)'),
+    'Growth: and it pools ONE currency — a rate whose numerator and denominator are in different currencies is not a rate');
   ok(live.report.includes('growthTotals(entries, poolType, { today: todayIso() })'), 'Growth: views/report.js\'s savings section calls the SAME growthTotals() — not a second guess at what "growth" or "rate of growth" mean (M4)');
   ok(!live.report.includes('growth += r.growth'), 'Growth: views/report.js never re-derives the sum itself either');
 
@@ -176,7 +187,19 @@ function provenFalse(desc, exactShape, mangled) {
 {
   const FULL_WORTH = 'worth(S.accounts, S.debts, S.assets)';
   ok(live.dashboard.includes(FULL_WORTH), 'Net worth: dashboard.js computes it via worth(accounts, debts, assets)');
-  ok(live.savings.split(FULL_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
+  /* ISSUE 28 (2026-08-29 audit): savings.js's two call sites narrowed to the
+     household-currency accounts and started passing the household symbol —
+     `worth(homeAccounts, S.debts, S.assets, S.settings.currency)`. The term
+     this gate protects is unchanged and, if anything, sharper: BOTH places on
+     this page must compute net worth by the same expression, because they
+     used to disagree with the Accounts hero (Rp 6 203 956 against
+     Rp 6 200 000) and a page whose tile and chart could drift from each other
+     as well would have three answers. The literal moved with the call, the
+     way ITEM 5 moved it before. */
+  const SAV_WORTH = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency)';
+  ok(live.savings.split(SAV_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
+  ok(!live.savings.includes(FULL_WORTH),
+    'Net worth: and neither place adds unlike currencies together any more');
   ok(live.healthData.includes('worth(S.accounts, S.debts, S.assets).net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
 
   ok(live.accounts.includes('worth(primary, null, null)'),

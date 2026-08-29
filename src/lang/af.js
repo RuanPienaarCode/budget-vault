@@ -144,6 +144,7 @@ module.exports = {
   'wiz.step.name': 'Wat moet ons jou noem?',
   'wiz.step.period': 'Wanneer word jy betaal?',
   'wiz.step.how': 'Hoe gaan jy jou uitgawes byvoeg?',
+  'wiz.step.rates': 'Geld in \'n ander geldeenheid?',
   'wiz.step.categories': 'Jou begrotingskategorieë',
   'wiz.step.account': 'Jou eerste rekening',
   'wiz.step.firstBudget': 'Jou eerste begroting',
@@ -186,6 +187,16 @@ module.exports = {
   'wiz.how.csv.desc': 'Laai \'n CSV by jou bank af en die program sorteer dit in kategorieë soos jy dit leer.',
   'wiz.how.manual.title': 'Tik dit self in',
   'wiz.how.manual.desc': 'Geen banklêers nie — jy voeg jou inkomste en uitgawes met die hand by, een reël op \'n slag. Die eenvoudigste manier om te begin.',
+
+  'wiz.rates.name': 'Hou jy geld in meer as een geldeenheid?',
+  'wiz.rates.desc': 'Antwoord net ja as van jou rekeninge in \'n ander geldeenheid as {symbol} is. Dit is die enigste deel van die inprop wat die internet gebruik.',
+  'wiz.rates.off.title': 'Nee, of nie nou nie',
+  'wiz.rates.off.desc': 'Niks word gehaal nie en niks verlaat jou toestel nie. Rekeninge in \'n ander geldeenheid word steeds gelys — hulle totale word net apart gewys in plaas van bygetel. Jy kan dit later in Instellings aanskakel.',
+  'wiz.rates.on.title': 'Ja — haal daaglikse wisselkoerse',
+  'wiz.rates.on.desc': 'Een keer per dag vra die inprop \'n openbare wisselkoersdiens vir die dag se koerse en stoor dit as \'n notaboek in jou kluis. Dit stuur net \'n geldeenheidkode — nooit jou saldo\'s, jou rekeninge of enigiets anders nie. Elke omgeskakelde syfer word gewys met die datum waarvoor sy koers geld.',
+  'wiz.rates.code': 'Jou geldeenheidkode',
+  'wiz.rates.codeDesc': 'Die drieletterkode vir {symbol} — byvoorbeeld ZAR, USD, EUR, IDR of CNY. Koerse kan nie daarsonder gehaal word nie.',
+  'wiz.err.code': 'Voer \'n drieletter-geldeenheidkode in soos ZAR, USD of EUR — nie \'n simbool nie.',
   'wiz.locale.group': 'Taal · Land · Geldeenheid',
 
   /* ---- name ---- */
@@ -692,6 +703,13 @@ module.exports = {
   'acct.hero.mixed': ' Hierdie totaal tel rekeninge in meer as een geldeenheid ({symbols}) bymekaar sonder om om te skakel.',
   'acct.hero.otherCurrencies': ' Plus {list} gehou in ander geldeenhede, nie omgeskakel nie.',
   'acct.hero.muted': 'Waarskuwings geïgnoreer',
+  'settings.currencyCode.name': 'Geldeenheidkode',
+  'settings.currencyCode.desc': 'Die drieletter-ISO-kode vir jou geldeenheidsimbool — ZAR, USD, EUR, IDR, CNY. Net nodig as jy wisselkoerse hieronder aanskakel; die simbool hierbo is wat werklik gedruk word. Dit word apart gevra omdat geen simbool op sy eie \'n geldeenheid identifiseer nie — "$" word deur die VSA, Australië, Kanada en Singapoer gelyk gebruik.',
+  'settings.exchangeRates.name': 'Wisselkoerse',
+  'settings.exchangeRates.off': 'Af — gebruik nooit die internet nie',
+  'settings.exchangeRates.on': 'Aan — haal daaglikse koerse',
+  'settings.exchangeRates.desc': 'Af by verstek, en die enigste ding in hierdie inprop wat \'n netwerkversoek maak. Aangeskakel vra dit een keer per dag \'n openbare wisselkoersdiens vir die dag se koerse, stoor dit as \'n leesbare nota in jou begrotingsvouer, en tel rekeninge wat in ander geldeenhede gehou word by jou totale. Dit stuur net \'n geldeenheidkode — nooit jou saldo\'s of rekeningname nie. Elke omgeskakelde syfer word gedruk met die datum waarvoor sy koers geld, en \'n koers ouer as \'n week sê so.',
+
   'acct.mixedTitle': 'Tel rekeninge in meer as een geldeenheid bymekaar, sonder om om te skakel.',
   'acct.hero.count': 'Rekeninge',
   'acct.hero.oldest': 'Oudste balansbevestiging',

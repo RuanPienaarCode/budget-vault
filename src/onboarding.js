@@ -42,6 +42,7 @@ const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS, inputMode } = r
 const { serializeBudgetFile, budgetRangeNote, BUDGET_FRONTMATTER } = require('./budget-file');
 const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
+const { normalizeCode, codeForCountry } = require('./fx');
 const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
 const { safeSeg } = require('./vault-path');
 /* yamlStr, not hand-rolled quoting. This file used to write currency and
@@ -224,6 +225,15 @@ class OnboardingWizard extends Modal {
          default, so a wizard closed at the how screen leaves a vault behaving
          exactly as every vault written before this existed. */
       inputMode: 'csv',
+      /* Exchange rates, asked outright on their own screen. 'off' by default
+         and 'off' if the wizard is closed, because this is the single thing
+         in the plugin that makes a network request and the README's promise
+         is that it makes none — quietly turning that on over somebody's
+         financial vault is not a default anyone else gets to pick for them.
+         `currencyCode` is the ISO code the rate lookup needs; it is asked
+         alongside because no symbol identifies a currency on its own. */
+      exchangeRates: 'off',
+      currencyCode: '',
       /* The manual path's first budget, one entry per FIRST_BUDGET_LINES key.
          Amounts are kept as the RAW typed string, not a number: normalizeAmount
          is the reader, and parsing early would throw away "1 234,56" before the
@@ -238,6 +248,15 @@ class OnboardingWizard extends Modal {
      step list and the writer end up disagreeing about which path is running. */
   isManual() { return inputMode(this.data.inputMode) === 'manual'; }
 
+  /* Rates ON *and* usable. Both halves in one place for the same reason
+     isManual() exists: the screen, the validator and the writer must not each
+     decide separately what "on" means. A yes with no code is not a setting
+     this wizard is willing to write — it would be a vault configured to fetch
+     something it can never name. */
+  fxOn() {
+    return this.data.exchangeRates === 'on' && !!normalizeCode(this.data.currencyCode);
+  }
+
   /* The path being walked, recomputed on every render rather than stored.
 
      It has to be recomputed: the folder field on the finish screen can flip
@@ -249,7 +268,12 @@ class OnboardingWizard extends Modal {
        `how` is last of the three because it is the one that decides the rest
        of the list — asking it earlier would leave the reader watching the
        total change while they still had questions in front of them. */
-    const asked = ['welcome', 'name', 'period', 'how'];
+    /* `rates` sits after `how` and before anything path-specific, so it is
+       asked once, on every path, in the same position — including `connect`,
+       where the reader is adopting a vault that may well already hold foreign
+       accounts. It is the last of the questions about the PERSON, before the
+       screens about their files begin. */
+    const asked = ['welcome', 'name', 'period', 'how', 'rates'];
     /* Connecting adopts a folder that already holds a budget: there are no
        categories to pick, no first account to add and no first budget to seed,
        because all three exist already and not touching them is the point. */
@@ -434,6 +458,14 @@ class OnboardingWizard extends Modal {
        does not rescue it either, because its transactions folder is created
        empty too. Caught here, the way firstBudget catches five blank lines,
        and naming the way out rather than only the problem. */
+    /* Only when they said yes. A blank code with rates OFF is the default and
+       needs no complaint; a blank or malformed code with rates ON is a screen
+       that would silently never fetch anything, which is the failure the
+       reader cannot see. */
+    if (step === 'rates' && this.data.exchangeRates === 'on'
+      && !normalizeCode(this.data.currencyCode)) {
+      this.fail(i18n.t('wiz.err.code')); return;
+    }
     if (step === 'categories' && !this.data.cats.size) {
       this.fail(i18n.t('wiz.err.catsEmpty')); return;
     }
@@ -679,6 +711,55 @@ class OnboardingWizard extends Modal {
       body.createDiv({ cls: 'budget-onb-choice-title', text: i18n.t('wiz.how.' + mode + '.title') });
       body.createDiv({ cls: 'budget-onb-choice-desc', text: i18n.t('wiz.how.' + mode + '.desc') });
     }
+  }
+
+  /* The one screen that asks about the network, and the only one that has to
+     earn a "no" as readily as a "yes".
+
+     Two controls rather than one, which breaks this wizard's own one-question
+     rule — deliberately, and only in the branch where the second question
+     exists at all. A reader who answers "yes" has to supply an ISO code
+     before a single rate can be fetched, and asking for it on a screen of its
+     own would mean a whole extra step for the majority who answer "no" and a
+     dead-end screen for anyone who reaches it by mistake. So the code field
+     appears only once "yes" is chosen, which is the one arrangement where
+     nobody is asked something that cannot apply to them. */
+  render_rates(c) {
+    const symbol = this.currencySymbol();
+    c.createEl('p', { text: i18n.t('wiz.rates.desc', { symbol }) });
+    const chosen = this.data.exchangeRates === 'on' ? 'on' : 'off';
+    const cards = c.createDiv({ cls: 'budget-onb-choices' });
+    /* 'off' FIRST. The order of two radio cards is an argument about which
+       one is normal, and for a plugin whose headline claim is that it makes
+       no network requests, the normal answer is the one that keeps that
+       true. */
+    for (const mode of ['off', 'on']) {
+      const label = cards.createEl('label', { cls: 'budget-onb-choice' + (chosen === mode ? ' is-on' : '') });
+      const radio = label.createEl('input', { type: 'radio', attr: { name: 'budget-onb-rates', value: mode } });
+      radio.checked = chosen === mode;
+      radio.addEventListener('change', () => {
+        this.data.exchangeRates = mode;
+        /* Seed the code from the country the reader already chose, so the
+           common case is a field that is already right rather than a blank
+           box and a puzzle. Only ever a SEED: it is theirs to correct, and
+           anything they have typed is left alone. */
+        if (mode === 'on' && !this.data.currencyCode) {
+          this.data.currencyCode = codeForCountry(this.data.country);
+        }
+        this.renderStep();
+      });
+      const body = label.createDiv({ cls: 'budget-onb-choice-body' });
+      body.createDiv({ cls: 'budget-onb-choice-title', text: i18n.t('wiz.rates.' + mode + '.title') });
+      body.createDiv({ cls: 'budget-onb-choice-desc', text: i18n.t('wiz.rates.' + mode + '.desc') });
+    }
+    if (chosen !== 'on') return;
+    new Setting(c)
+      .setName(i18n.t('wiz.rates.code'))
+      .setDesc(i18n.t('wiz.rates.codeDesc', { symbol }))
+      .addText(t => t
+        .setPlaceholder('ZAR')
+        .setValue(this.data.currencyCode)
+        .onChange(v => { this.data.currencyCode = v; }));
   }
 
   /* Language, country and currency, in that order and under one heading.
@@ -1264,6 +1345,15 @@ class OnboardingWizard extends Modal {
            answers "CSV" gets the key stated rather than left absent — same
            value, but now visible to anyone reading Settings.md. */
         await p.updateBudgetSettingsMd('input_mode', inputMode(this.data.inputMode));
+        /* Only when the reader turned it ON. An adopted vault that has been
+           running happily with no `exchange_rates` key must not have one
+           written just because the wizard walked past the screen — an absent
+           key is the off state, and writing "off" into somebody else's
+           Settings.md is a change where none was asked for. */
+        if (this.fxOn()) {
+          await p.updateBudgetSettingsMd('exchange_rates', 'on');
+          await p.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(this.data.currencyCode)));
+        }
         if (name) await p.updateBudgetSettingsMd('household', yamlStr(name));
       } else {
         for (const sub of ['Categories', 'Accounts', 'Budgets', 'Transactions', 'Tax', 'Data']) {
@@ -1275,6 +1365,9 @@ class OnboardingWizard extends Modal {
           `currency: ${yamlStr(cur)}\ncountry: ${this.data.country}\n` +
           `language: ${i18n.resolveLanguage(this.data.language)}\n` +
           `input_mode: ${inputMode(this.data.inputMode)}\n` +
+          (this.fxOn()
+            ? `exchange_rates: on\ncurrency_code: ${yamlStr(normalizeCode(this.data.currencyCode))}\n`
+            : '') +
           (name ? `household: ${yamlStr(name)}\n` : '') +
           `tags: [finance, finance/budget, vault-meta]\n---\n\n# Budget Settings\n\n` +
           `- **month_start_day** — the financial period starts on this day of the month.\n` +
@@ -1286,6 +1379,10 @@ class OnboardingWizard extends Modal {
           `- **country** — drives amount formatting, statement date order and the Tax view (za, us, uk, eu, au, ca, cn, other).\n` +
           `- **language** — the language the app is written in (${LANGUAGE_ORDER.join(', ')}). Separate from country: neither decides the other.\n` +
           `- **input_mode** — how transactions get in: \`csv\` (import bank statements) or \`manual\` (type them in). Manual hides the Import CSV link and the top-bar import button; nothing is deleted either way.\n` +
+          (this.fxOn()
+            ? `- **exchange_rates** — \`on\` lets the plugin fetch daily rates so accounts in other currencies can be added into your totals. It is the only thing here that uses the internet, and it sends nothing but a currency code. Remove the key or set it to \`off\` to stop.\n` +
+              `- **currency_code** — the ISO code the rate lookup asks for. The \`currency\` symbol above is what gets printed; this says which currency that symbol means.\n`
+            : '') +
           `- **household** — name shown in the dashboard greeting.\n` +
           /* Documented although the wizard does not WRITE it: absent means the
              default of 6, and materialising a line that says nothing would

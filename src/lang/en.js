@@ -161,6 +161,7 @@ module.exports = {
   'wiz.step.name': 'What should we call you?',
   'wiz.step.period': 'When are you paid?',
   'wiz.step.how': 'How will you add your spending?',
+  'wiz.step.rates': 'Money in another currency?',
   'wiz.step.categories': 'Your budget categories',
   'wiz.step.account': 'Your first account',
   'wiz.step.firstBudget': 'Your first budget',
@@ -203,6 +204,22 @@ module.exports = {
   'wiz.how.csv.desc': 'Download a CSV from your bank and the app sorts it into categories as you teach it.',
   'wiz.how.manual.title': 'Type it in myself',
   'wiz.how.manual.desc': 'No bank files — you add your income and spending by hand, a line at a time. The simplest way to start.',
+
+  /* The one screen in this wizard that asks about the network. It is asked
+     outright rather than defaulted on, because the plugin's whole claim is
+     that it makes no network requests, and quietly starting to make one on
+     someone's financial vault is not a default anybody gets to choose for
+     them. "Not now" is offered first and is the answer if the wizard is
+     closed. */
+  'wiz.rates.name': 'Do you hold money in more than one currency?',
+  'wiz.rates.desc': 'Only answer yes if some of your accounts are in a different currency from {symbol}. This is the only part of the plugin that uses the internet.',
+  'wiz.rates.off.title': 'No, or not now',
+  'wiz.rates.off.desc': 'Nothing is fetched and nothing leaves your device. Accounts in another currency are still listed — their totals are just shown separately instead of added in. You can turn this on later in Settings.',
+  'wiz.rates.on.title': 'Yes — fetch daily exchange rates',
+  'wiz.rates.on.desc': 'Once a day the plugin asks a public exchange-rate service for the day\'s rates and saves them as a note in your vault. It sends only a currency code — never your balances, your accounts or anything else. Every converted figure is shown with the date its rate is for.',
+  'wiz.rates.code': 'Your currency code',
+  'wiz.rates.codeDesc': 'The three-letter code for {symbol} — for example ZAR, USD, EUR, IDR or CNY. Rates cannot be fetched without it.',
+  'wiz.err.code': 'Enter a three-letter currency code like ZAR, USD or EUR — not a symbol.',
   'wiz.locale.group': 'Language · Country · Currency',
 
   /* ---- name ---- */
@@ -733,6 +750,14 @@ module.exports = {
   'acct.hero.mixed': ' This total adds accounts held in more than one currency ({symbols}) without converting them.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   'acct.hero.muted': 'Warnings ignored',
+  /* Settings' half of the same two questions the wizard asks above. */
+  'settings.currencyCode.name': 'Currency code',
+  'settings.currencyCode.desc': 'The three-letter ISO code for your currency symbol — ZAR, USD, EUR, IDR, CNY. Only needed if you switch exchange rates on below; the symbol above is what actually gets printed. It is asked separately because no symbol identifies a currency on its own — "$" is used by the US, Australia, Canada and Singapore alike.',
+  'settings.exchangeRates.name': 'Exchange rates',
+  'settings.exchangeRates.off': 'Off — never use the internet',
+  'settings.exchangeRates.on': 'On — fetch daily rates',
+  'settings.exchangeRates.desc': 'Off by default, and the only thing in this plugin that makes a network request. Switched on, it asks a public exchange-rate service once a day for the day\'s rates, saves them as a readable note in your budget folder, and adds accounts held in other currencies into your totals. It sends only a currency code — never your balances or account names. Every converted figure is printed with the date its rate is for, and a rate more than a week old says so.',
+
   'acct.mixedTitle': 'Adds accounts held in more than one currency, without converting them.',
   'acct.hero.count': 'Accounts',
   'acct.hero.oldest': 'Oldest balance check',

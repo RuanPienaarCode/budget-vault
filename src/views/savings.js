@@ -9,6 +9,7 @@ const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCa
 const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
+const { symbolOf, splitByCurrency, primaryTotal, currenciesIn } = require('../currency');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -29,6 +30,40 @@ module.exports = function registerSavings(ctx) {
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
   const { S, $, root, money, accountIndex } = ctx;
+
+  /* ---------------------------- currency ----------------------------------
+     This page was the pre-issue-#28 code verbatim, and an audit found every
+     defect that issue described sitting one tab across from the page it was
+     reported against: net worth read Rp 6 203 956 here while the Accounts
+     hero read Rp 6 200 000 for the same three files, and unlike the hero this
+     page said nothing at all. Its growth tile went further and divided one
+     mixed quantity by another — "+11,2% on Rp 903 000 put in", where the
+     903 000 was Rp 900 000 and ¥ 3 000 added together, a percentage of a
+     number that does not exist.
+
+     The two rules below are the same two the Accounts page uses, imported
+     rather than re-derived so this file cannot drift from it again:
+
+       acctMoney  an account's OWN figures print in the account's OWN symbol.
+                  A ¥ balance rendered "Rp 3 956,00" is not a missing label,
+                  it is a wrong figure — it claims the household holds rupiah
+                  it does not have.
+       homeOnly / otherTag
+                  a total ACROSS accounts sums the household's currency and
+                  names every other symbol beside it, never folding them in. */
+  const acctMoney = (a, v, decimals = 2) =>
+    ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
+  const split = accts => splitByCurrency(accts, S.settings.currency);
+  const homeOnly = accts => primaryTotal(accts, S.settings.currency);
+  /* "plus ¥ 3 956 · $ 1 200" — zero decimals, because this is always a side
+     note beside a figure that already carries its own full precision. This
+     page is on the English-only backlog (EXPECTED_ENGLISH_ONLY in
+     tests/i18n-render.test.cjs), so the wording is inline here rather than
+     through i18n.t, matching every other string in this file. */
+  const otherList = others => others.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
+  const otherTag = others => (others.length ? `plus ${otherList(others)}` : '');
+  const otherLine = others => (others.length
+    ? ` Plus ${otherList(others)} held in other currencies, not converted.` : '');
 
   /* ITEM 2: every call into savings-math.js that classifies a row (totalReturn,
      accountFlows, growthSeries) must use THIS, not ctx.catType directly — see
@@ -58,9 +93,21 @@ module.exports = function registerSavings(ctx) {
   function renderSavings() {
     const savings = S.accounts.filter(a => typeIs(a, 'savings'));
     const investments = S.accounts.filter(a => typeIs(a, 'investment'));
-    const totalSavings = savings.reduce((s, a) => s + a.balance, 0);
-    const totalInvest = investments.reduce((s, a) => s + a.balance, 0);
-    const w = worth(S.accounts, S.debts, S.assets);
+    /* Split BEFORE summing, and split BEFORE worth() — the same order
+       views/accounts.js's hero uses. worth()'s arithmetic is shared with the
+       Dashboard, the Report and the health score, so this view narrows the
+       account list it hands over rather than teaching worth() a rule those
+       callers never asked for. */
+    const sPlit = split(savings), iPlit = split(investments);
+    const totalSavings = homeOnly(savings);
+    const totalInvest = homeOnly(investments);
+    const { primary: homeAccounts, others: worthOthers } = split(S.accounts);
+    /* The household symbol, passed at last: worth() has always computed a
+       `currencies` disclosure for its caller and every caller in this app
+       dropped it — and, calling with three arguments, computed it against a
+       fallback household of "R", so on an Rp vault it named a currency the
+       household has never held. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     const netWorth = w.net;
 
     /* Built once and threaded through the tile, the chart and the cards. Each
@@ -78,9 +125,9 @@ module.exports = function registerSavings(ctx) {
        and one translated call here would make its render disagree with
        English for a reason nothing on the page explains. */
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
-      'what you own minus what you owe');
-    tile('Savings', money(totalSavings));
-    tile('Investments', money(totalInvest));
+      'what you own minus what you owe' + otherLine(worthOthers));
+    tile('Savings', money(totalSavings), '', otherTag(sPlit.others));
+    tile('Investments', money(totalInvest), '', otherTag(iPlit.others));
     growthTile(tile, entries);
     /* NO DEBT TILE HERE, deliberately — it was removed rather than lost.
        This page is about what the household is putting away and what that has
@@ -111,6 +158,10 @@ module.exports = function registerSavings(ctx) {
 
   const ret = e => totalReturn(e.account, e.rows, poolType, { today: todayIso() });
 
+  /* Is this entry's account stated in the household's own currency? The one
+     test the pooled figures on this page are allowed to gate on. */
+  const homeEntry = e => !split([e.account]).others.length;
+
   const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
   /* growthTotals itself now lives in savings-math.js (2026-08-29 audit, M4) —
@@ -127,8 +178,24 @@ module.exports = function registerSavings(ctx) {
      it would never tell anyone the field exists — and "—, no account carries a
      starting amount" is a fact about this vault, not an empty state. */
   function growthTile(tile, entries) {
-    const g = growthTotals(entries, poolType, { today: todayIso() });
-    if (!g.total) return;
+    /* HOME-CURRENCY ENTRIES ONLY. growthTotals pools `growth` and `capitalIn`
+       across whatever it is given, and the tile then divides one by the other
+       — so on a mixed pool it printed "+11,2% on Rp 903 000 put in", where the
+       903 000 was Rp 900 000 and ¥ 3 000 added together. That is not an
+       overstated figure, it is a percentage of a quantity that does not
+       exist, and no disclosure can rescue it: the only honest move is to take
+       the ratio inside ONE currency and say how many accounts that left out.
+
+       Deliberately narrowed HERE rather than inside growthTotals: that
+       function is shared with src/report.js's savings section, and it has no
+       business learning about currencies when what it actually needs is a
+       homogeneous pool. Per-account growth is untouched and correct — an
+       account's own return divides its own figures and is currency-neutral by
+       construction, which is why the cards below still show a rate for a
+       foreign account even though this tile cannot include it. */
+    const foreignEntries = entries.filter(e => !homeEntry(e));
+    const g = growthTotals(entries.filter(homeEntry), poolType, { today: todayIso() });
+    if (!g.total && !foreignEntries.length) return;
     if (!g.measured) {
       /* Names the field AND where to set it — "no account records what it
          started at" told the reader a fact with no way to act on it. The field
@@ -136,13 +203,21 @@ module.exports = function registerSavings(ctx) {
          edit dialog; the same fix is offered per-card below via the "Add
          starting amount" action (see renderActions), so this points at the
          same control rather than inventing a second description of it. */
-      return tile('Growth', '—', '',
-        'no account has a Starting amount set — use "Add starting amount" on an account below');
+      return tile('Growth', '—', '', foreignEntries.length
+        ? `${foreignEntries.length} account${foreignEntries.length > 1 ? 's are' : ' is'} in another currency — a combined rate would divide one currency by another, so each is shown on its own card below`
+        : 'no account has a Starting amount set — use "Add starting amount" on an account below');
     }
     const sub = [
       g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
       g.unmeasured ? `${g.unmeasured} of ${g.total} missing a starting amount or date` : null,
       g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
+      /* Named, never silently dropped — currency.js:14 is explicit that this
+         app does not exclude, and an account left out of a rate with nothing
+         said about it is an exclusion however good the reason. Each card
+         below still shows that account's own return in its own currency. */
+      foreignEntries.length
+        ? `${foreignEntries.length} in another currency — each shown on its own card below`
+        : null,
     ].filter(Boolean).join(' · ');
     tile('Growth', `${g.growth >= 0 ? '▲' : '▼'} ${money(Math.abs(g.growth))}`,
       g.growth >= 0 ? 'text-success' : 'text-danger', sub || null);
@@ -283,7 +358,7 @@ module.exports = function registerSavings(ctx) {
         g.append(el('div', {},
           el('div', { class: 'goal-h' },
             el('div', { class: 'gn' }, a.name),
-            el('div', { class: 'gv' }, el('b', {}, money(a.balance)), ' / ', money(a.goal_amount))),
+            el('div', { class: 'gv' }, el('b', {}, acctMoney(a, a.balance)), ' / ', acctMoney(a, a.goal_amount))),
           el('div', { class: `cat-bar${stale ? ' cat-bar-stale' : ''}` },
             el('i', { class: 'cat-bar-fill', style: `width:${pct}%` })),
           el('div', { class: 'goal-pct' }, pctLine,
@@ -318,10 +393,15 @@ module.exports = function registerSavings(ctx) {
     for (const [title, list] of [['Savings', savings], ['Investments', investments]]) {
       if (!list.length) continue;
       const grid = el('div', { class: 'mini-grid' });
-      const total = list.reduce((s, a) => s + a.balance, 0);
+      /* The section header's own subtotal — split like every other total on
+         this page. It used to add every balance in the group, which put
+         "Rp 1 003 956" at the head of a card whose own Accounts-page twin
+         reads "Rp 1 000 000 plus ¥ 3 956". */
+      const { others: listOthers } = split(list);
+      const total = homeOnly(list);
       for (const a of list) {
         const parts = [[a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · ')];
-        if (a.monthly_contribution) parts.push(`${money(a.monthly_contribution, 0)}/m`);
+        if (a.monthly_contribution) parts.push(`${acctMoney(a, a.monthly_contribution, 0)}/m`);
         /* The balance is a BUTTON, opening the same one-field dialog the
            Accounts page uses. `.mini button.v` is that page's own pattern for an
            editable tile value, chosen over a new class so the hover, the focus
@@ -329,8 +409,8 @@ module.exports = function registerSavings(ctx) {
            would have opted out of the fallback silently, and on the engine this
            plugin actually floors at, that means no focus ring at all. */
         const bal = el('button', { type: 'button', class: 'v num',
-          'aria-label': `Update the balance of ${a.name}, currently ${money(a.balance)}` },
-        money(a.balance));
+          'aria-label': `Update the balance of ${a.name}, currently ${acctMoney(a, a.balance)}` },
+        acctMoney(a, a.balance));
         bal.addEventListener('click', () => ctx.editBalance(a));
 
         const card = el('div', { class: 'mini' },
@@ -359,7 +439,7 @@ module.exports = function registerSavings(ctx) {
           renderReturn(card, a, r);
         } else if (flows.basis === 'derived') {
           const g = flows.growth;
-          const line = el('div', { class: 's2' }, `put in ${money(flows.contributions, 0)}`);
+          const line = el('div', { class: 's2' }, `put in ${acctMoney(a, flows.contributions, 0)}`);
           /* A zero growth figure is NOT a measurement of zero growth — it means
              nothing in this account posted a transaction the vault could read as
              growth. A unit trust normally posts none at all: the market moves,
@@ -369,9 +449,9 @@ module.exports = function registerSavings(ctx) {
              chip appears only when there is something to report. */
           if (g) {
             line.append(' · ', el('span', { class: `num ${g >= 0 ? 'text-success' : 'text-danger'}` },
-              `${g >= 0 ? '▲' : '▼'} ${money(Math.abs(g), 0)}`));
+              `${g >= 0 ? '▲' : '▼'} ${acctMoney(a, Math.abs(g), 0)}`));
           }
-          if (flows.withdrawals) line.append(` · taken out ${money(flows.withdrawals, 0)}`);
+          if (flows.withdrawals) line.append(` · taken out ${acctMoney(a, flows.withdrawals, 0)}`);
           card.append(line);
 
           /* And say so outright where the silence is most likely to mislead.
@@ -406,7 +486,7 @@ module.exports = function registerSavings(ctx) {
              cheap price for closing that. */
           if (flows.growthCategories.length) {
             card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
-              'growth from ' + flows.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', '),
+              'growth from ' + flows.growthCategories.map(c => `${c.cat} ${acctMoney(a, c.amount, 0)}`).join(', '),
               'Anything here that is not interest or dividends is really a contribution. '
                 + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.')));
           }
@@ -415,7 +495,7 @@ module.exports = function registerSavings(ctx) {
              only signal there is. Shown, but never called derived. */
           const over = flows.growth;
           card.append(el('div', { class: `s2 num ${over >= 0 ? 'text-success' : 'text-danger'}` },
-            `${over >= 0 ? '▲' : '▼'} ${money(Math.abs(over), 0)} vs ${money(flows.opening, 0)} in`));
+            `${over >= 0 ? '▲' : '▼'} ${acctMoney(a, Math.abs(over), 0)} vs ${acctMoney(a, flows.opening, 0)} in`));
           card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
             'based on the account file, not transactions',
             'No transactions in the vault for this account, so this is the balance less what the '
@@ -430,10 +510,10 @@ module.exports = function registerSavings(ctx) {
         if (rec.state === 'drift') {
           const line = el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt' },
-              `${rec.count} since · they add up to `, el('b', { class: 'num' }, money(rec.implied)),
+              `${rec.count} since · they add up to `, el('b', { class: 'num' }, acctMoney(a, rec.implied)),
               rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
           const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-            'aria-label': `Set ${a.name} balance to ${money(rec.implied)}` }, icoEl(['check']), 'Use this');
+            'aria-label': `Set ${a.name} balance to ${acctMoney(a, rec.implied)}` }, icoEl(['check']), 'Use this');
           btn.addEventListener('click', () => ctx.acceptImplied(a, rec.implied, rec));
           line.append(btn);
           card.append(line);
@@ -465,7 +545,8 @@ module.exports = function registerSavings(ctx) {
       wrap.append(el('div', { class: 'card mb-4' },
         el('div', { class: 'card-h' },
           el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${list.length} account${list.length === 1 ? '' : 's'}`)),
-          el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total))))),
+          el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total)),
+            ...(listOthers.length ? [el('span', { class: 'acct-group-other' }, ` ${otherTag(listOthers)}`)] : [])))),
         el('div', { class: 'body-pad' }, grid)));
     }
   }
@@ -479,17 +560,17 @@ module.exports = function registerSavings(ctx) {
        returnBar() already refuses to draw a bar for this case; the line gets
        the same relabelling rather than printing a negative "in" figure. */
     const line = el('div', { class: 's2' }, r.capitalIn > 0
-      ? `put in ${money(r.capitalIn, 0)}`
-      : `${money(Math.abs(r.capitalIn), 0)} taken out more than put in`);
+      ? `put in ${acctMoney(a, r.capitalIn, 0)}`
+      : `${acctMoney(a, Math.abs(r.capitalIn), 0)} taken out more than put in`);
     /* Withdrawals are ALREADY netted out of capitalIn, so this names them
        rather than subtracting them a second time — a card reading "put in
        R150 000 · taken out R20 000" invites exactly that arithmetic. */
-    if (r.capitalIn > 0 && r.withdrawals) line.append(` after ${money(r.withdrawals, 0)} taken out`);
+    if (r.capitalIn > 0 && r.withdrawals) line.append(` after ${acctMoney(a, r.withdrawals, 0)} taken out`);
     line.append(' · ', el('span', { class: `num ${up ? 'text-success' : 'text-danger'}` },
-      `${up ? '▲' : '▼'} ${money(Math.abs(r.growth), 0)}`));
+      `${up ? '▲' : '▼'} ${acctMoney(a, Math.abs(r.growth), 0)}`));
     card.append(line);
 
-    const bar = returnBar(r);
+    const bar = returnBar(a, r);
     if (bar) card.append(bar);
 
     const bits = [];
@@ -561,7 +642,7 @@ module.exports = function registerSavings(ctx) {
        fed the figure, including a single one. */
     if (r.growthCategories.length) {
       card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
-        'growth from ' + r.growthCategories.map(c => `${c.cat} ${money(c.amount, 0)}`).join(', '),
+        'growth from ' + r.growthCategories.map(c => `${c.cat} ${acctMoney(a, c.amount, 0)}`).join(', '),
         'Anything here that is not interest or dividends is really a contribution. '
           + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.')));
     }
@@ -571,19 +652,19 @@ module.exports = function registerSavings(ctx) {
      survives of the capital rather than as a growth segment of negative width:
      the bar is a quantity read against itself, and there is no honest way to
      draw "minus R1 200" beside "R32 400". */
-  function returnBar(r) {
+  function returnBar(a, r) {
     if (!(r.capitalIn > 0)) return null;
     const bar = el('span', { class: 'acct-mbar acct-mbar--split' });
     if (r.growth >= 0) {
       const inPct = (r.capitalIn / (r.capitalIn + r.growth)) * 100;
       bar.setAttribute('title',
-        `${money(r.capitalIn, 0)} put in · ${money(r.growth, 0)} earned`);
+        `${acctMoney(a, r.capitalIn, 0)} put in · ${acctMoney(a, r.growth, 0)} earned`);
       bar.append(el('i', { class: 'seg-in', style: `width:${inPct.toFixed(1)}%` }),
         el('i', { class: 'seg-growth', style: `width:${(100 - inPct).toFixed(1)}%` }));
     } else {
       const leftPct = Math.max(0, Math.min(100, (r.balance / r.capitalIn) * 100));
       bar.setAttribute('title',
-        `${money(r.balance, 0)} left of ${money(r.capitalIn, 0)} put in`);
+        `${acctMoney(a, r.balance, 0)} left of ${acctMoney(a, r.capitalIn, 0)} put in`);
       bar.append(el('i', { class: 'seg-in', style: `width:${leftPct.toFixed(1)}%` }),
         el('i', { class: 'seg-growth neg', style: `width:${(100 - leftPct).toFixed(1)}%` }));
     }
@@ -643,7 +724,14 @@ module.exports = function registerSavings(ctx) {
     if (!wrap) return;                     // shell without this card mounted
     wrap.empty();
 
-    const s = growthSeries(entries, poolType, { today: todayIso() });
+    /* Home-currency entries only, for the same reason growthTile() above
+       narrows its pool: growthSeries accumulates `closing`, `baseline` and
+       `undated` across whatever it is given, and its stated identity —
+       capital + posted + undated = closing — is an identity only inside one
+       currency. Excluded accounts are counted and named in the sub-line
+       below, never silently dropped. */
+    const foreignEntries = entries.filter(e => !homeEntry(e));
+    const s = growthSeries(entries.filter(homeEntry), poolType, { today: todayIso() });
     /* Hidden outright rather than shown empty. The Growth tile above already
        says why there is nothing to draw, and a framed blank restates it in the
        space a chart would have occupied. */
@@ -662,6 +750,9 @@ module.exports = function registerSavings(ctx) {
           ? `${s.excluded} of ${s.included + s.excluded} missing a starting amount or date`
           : `all ${s.included} account${s.included === 1 ? '' : 's'} have a starting amount and date`,
         s.truncatedFrom ? `from ${s.truncatedFrom}` : null,
+        foreignEntries.length
+          ? `${foreignEntries.length} in another currency, not drawn here`
+          : null,
       ].filter(Boolean).join(' · ');
     }
     const totalBox = $('#savingsGrowthTotal');
@@ -897,9 +988,24 @@ module.exports = function registerSavings(ctx) {
     const segFor = g => (g.known
       ? { label: meta.get(g.type).label, amount: g.amount, color: meta.get(g.type).color, known: true }
       : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: colorFor(g.type), known: false, acctType: g.type });
-    const groups = accountGroups(S.accounts, WORTH_TYPES.map(([type]) => type));
+    /* HOME-CURRENCY ACCOUNTS ONLY. This chart's segments are widths on a
+       shared scale and shares of one denominator — "16% of what you own" is
+       meaningless the moment the numerator and the denominator are in
+       different currencies, and unlike a total there is no way to print a
+       disclosure inside a bar. So the bar is drawn in one currency and the
+       rest is NAMED underneath it (see the note appended at the end of this
+       function), which is the same trade the Accounts ring makes. */
+    const { primary: homeAccounts, others: worthOthers } = split(S.accounts);
+    const groups = accountGroups(homeAccounts, WORTH_TYPES.map(([type]) => type));
     const assets = groups.owned.map(segFor);
     const debts = groups.owed.map(segFor);
+
+    /* The disclosure the bar itself cannot carry. Appended once, at the end
+       of the segment lists below, rather than inside a wedge — see the note
+       on `worthAccounts` above. */
+    const worthNote = worthOthers.length
+      ? `${otherList(worthOthers)} held in other currencies is not drawn here — a share of one currency's total cannot include another's.`
+      : '';
 
     /* Assets-page rows, grouped by their own kind — the house, the car and the
        ring as three named blocks rather than one anonymous slab. Colours walk a
@@ -973,7 +1079,7 @@ module.exports = function registerSavings(ctx) {
        screen. The grouped arrays stay — they still drive the segment
        geometry — but the headline figures now come from the one function
        that is allowed to state them. */
-    const w = worth(S.accounts, S.debts, S.assets);
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     const totalAssets = w.assets;
     const totalDebts = w.liabilities;
     const net = w.net;
@@ -989,9 +1095,12 @@ module.exports = function registerSavings(ctx) {
     const across = ledgers.length > 1
       ? `Across ${ledgers.slice(0, -1).join(', ')} and ${ledgers[ledgers.length - 1]}`
       : 'Across your accounts';
-    $('#savingsWorthSub').textContent = overlap
-      ? `${across} · a credit card appears on two of them, so it may be counted twice`
-      : across;
+    $('#savingsWorthSub').textContent = [
+      overlap
+        ? `${across} · a credit card appears on two of them, so it may be counted twice`
+        : across,
+      worthNote,
+    ].filter(Boolean).join(' · ');
 
     if (!totalAssets && !totalDebts) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },

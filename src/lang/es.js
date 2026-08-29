@@ -146,6 +146,7 @@ module.exports = {
   'wiz.step.name': '¿Cómo te llamamos?',
   'wiz.step.period': '¿Cuándo cobras?',
   'wiz.step.how': '¿Cómo vas a añadir tus gastos?',
+  'wiz.step.rates': '¿Dinero en otra moneda?',
   'wiz.step.categories': 'Tus categorías de presupuesto',
   'wiz.step.account': 'Tu primera cuenta',
   'wiz.step.firstBudget': 'Tu primer presupuesto',
@@ -188,6 +189,16 @@ module.exports = {
   'wiz.how.csv.desc': 'Descarga un CSV de tu banco y la app lo ordena en categorías a medida que le enseñas.',
   'wiz.how.manual.title': 'Escribirlo yo mismo',
   'wiz.how.manual.desc': 'Sin archivos del banco — añades tus ingresos y gastos a mano, línea a línea. La forma más sencilla de empezar.',
+
+  'wiz.rates.name': '¿Tiene dinero en más de una moneda?',
+  'wiz.rates.desc': 'Responda que sí solo si alguna de sus cuentas está en una moneda distinta de {symbol}. Esta es la única parte del complemento que usa internet.',
+  'wiz.rates.off.title': 'No, o ahora no',
+  'wiz.rates.off.desc': 'No se descarga nada y nada sale de su dispositivo. Las cuentas en otra moneda siguen apareciendo — sus totales sencillamente se muestran aparte en lugar de sumarse. Puede activarlo más adelante en Ajustes.',
+  'wiz.rates.on.title': 'Sí — obtener tipos de cambio diarios',
+  'wiz.rates.on.desc': 'Una vez al día el complemento pide los tipos del día a un servicio público de tipos de cambio y los guarda como una nota en su bóveda. Envía únicamente un código de moneda — nunca sus saldos, sus cuentas ni nada más. Cada cifra convertida se muestra con la fecha a la que corresponde su tipo.',
+  'wiz.rates.code': 'Su código de moneda',
+  'wiz.rates.codeDesc': 'El código de tres letras de {symbol} — por ejemplo ZAR, USD, EUR, IDR o CNY. Sin él no se pueden obtener los tipos.',
+  'wiz.err.code': 'Introduzca un código de moneda de tres letras como ZAR, USD o EUR — no un símbolo.',
   'wiz.locale.group': 'Idioma · País · Moneda',
 
   /* ---- name ---- */
@@ -694,6 +705,13 @@ module.exports = {
   'acct.hero.mixed': ' Este total suma cuentas mantenidas en más de una moneda ({symbols}) sin convertirlas.',
   'acct.hero.otherCurrencies': ' Más {list} en otras monedas, sin convertir.',
   'acct.hero.muted': 'Avisos ignorados',
+  'settings.currencyCode.name': 'Código de moneda',
+  'settings.currencyCode.desc': 'El código ISO de tres letras de su símbolo de moneda — ZAR, USD, EUR, IDR, CNY. Solo hace falta si activa los tipos de cambio abajo; lo que se imprime es el símbolo de arriba. Se pide por separado porque ningún símbolo identifica una moneda por sí solo — "$" lo usan por igual Estados Unidos, Australia, Canadá y Singapur.',
+  'settings.exchangeRates.name': 'Tipos de cambio',
+  'settings.exchangeRates.off': 'Desactivado — nunca usar internet',
+  'settings.exchangeRates.on': 'Activado — obtener tipos diarios',
+  'settings.exchangeRates.desc': 'Desactivado de forma predeterminada, y lo único de este complemento que hace una petición de red. Activado, pide una vez al día los tipos del día a un servicio público de tipos de cambio, los guarda como una nota legible en su carpeta de presupuesto y suma a sus totales las cuentas en otras monedas. Envía únicamente un código de moneda — nunca sus saldos ni los nombres de sus cuentas. Cada cifra convertida se imprime con la fecha a la que corresponde su tipo, y un tipo de más de una semana lo indica.',
+
   'acct.mixedTitle': 'Suma cuentas mantenidas en más de una moneda, sin convertirlas.',
   'acct.hero.count': 'Cuentas',
   'acct.hero.oldest': 'Confirmación de saldo más antigua',

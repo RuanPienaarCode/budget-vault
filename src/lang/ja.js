@@ -146,6 +146,7 @@ module.exports = {
   'wiz.step.name': 'お名前は？',
   'wiz.step.period': '給料日はいつですか？',
   'wiz.step.how': '支出はどうやって記録しますか？',
+  'wiz.step.rates': '他の通貨の資産はありますか',
   'wiz.step.categories': '予算のカテゴリ',
   'wiz.step.account': '最初の口座',
   'wiz.step.firstBudget': '最初の予算',
@@ -188,6 +189,16 @@ module.exports = {
   'wiz.how.csv.desc': '銀行から CSV をダウンロードすると、教えるほどアプリが自動でカテゴリに仕分けします。',
   'wiz.how.manual.title': '自分で入力する',
   'wiz.how.manual.desc': '銀行ファイルは不要 — 収入と支出を 1 行ずつ手で追加します。いちばん手軽な始め方です。',
+
+  'wiz.rates.name': '複数の通貨で資産を持っていますか？',
+  'wiz.rates.desc': '口座の一部が {symbol} 以外の通貨である場合にのみ「はい」を選んでください。プラグインでインターネットを使うのはこの機能だけです。',
+  'wiz.rates.off.title': 'いいえ、または今はしない',
+  'wiz.rates.off.desc': '何も取得せず、端末から何も送信されません。他の通貨の口座も引き続き一覧に表示されます — 合計に足し込まず、別に表示するだけです。あとから設定で有効にできます。',
+  'wiz.rates.on.title': 'はい — 毎日の為替レートを取得する',
+  'wiz.rates.on.desc': '1日1回、公開されている為替レートサービスにその日のレートを問い合わせ、保管庫にノートとして保存します。送信するのは通貨コードだけで、残高や口座名などは一切送りません。換算した数値には必ず、そのレートの日付が添えて表示されます。',
+  'wiz.rates.code': '通貨コード',
+  'wiz.rates.codeDesc': '{symbol} の3文字コード — 例えば ZAR、USD、EUR、IDR、CNY です。これがないとレートを取得できません。',
+  'wiz.err.code': 'ZAR、USD、EUR のような3文字の通貨コードを入力してください — 記号ではありません。',
   'wiz.locale.group': '言語・国・通貨',
 
   /* ---- name ---- */
@@ -664,6 +675,13 @@ module.exports = {
   'acct.hero.mixed': ' この合計は複数の通貨（{symbols}）で保有する口座を、換算せずに合算しています。',
   'acct.hero.otherCurrencies': ' ほかに他の通貨で{list}を保有しています（換算なし）。',
   'acct.hero.muted': '無視中の警告',
+  'settings.currencyCode.name': '通貨コード',
+  'settings.currencyCode.desc': '通貨記号に対応する3文字のISOコード — ZAR、USD、EUR、IDR、CNY。下で為替レートを有効にする場合にのみ必要で、実際に表示されるのは上の記号です。記号だけでは通貨を特定できないため別に尋ねています — 「$」は米国、オーストラリア、カナダ、シンガポールがいずれも使っています。',
+  'settings.exchangeRates.name': '為替レート',
+  'settings.exchangeRates.off': 'オフ — インターネットを使わない',
+  'settings.exchangeRates.on': 'オン — 毎日レートを取得する',
+  'settings.exchangeRates.desc': '既定はオフで、このプラグインでネットワーク通信を行う唯一の機能です。オンにすると1日1回、公開されている為替レートサービスにその日のレートを問い合わせ、予算フォルダに読めるノートとして保存し、他の通貨の口座を合計に含めます。送信するのは通貨コードだけで、残高や口座名は送りません。換算した数値にはそのレートの日付が添えられ、1週間より古いレートはその旨を表示します。',
+
   'acct.mixedTitle': '複数の通貨で保有する口座を、換算せずに合算しています。',
   'acct.hero.count': '口座数',
   'acct.hero.oldest': '最も古い残高確認',

@@ -150,6 +150,7 @@ module.exports = {
   'wiz.step.name': 'Comment vous appeler ?',
   'wiz.step.period': 'Quand êtes-vous payé ?',
   'wiz.step.how': 'Comment allez-vous saisir vos dépenses ?',
+  'wiz.step.rates': 'De l\'argent dans une autre devise ?',
   'wiz.step.categories': 'Vos catégories budgétaires',
   'wiz.step.account': 'Votre premier compte',
   'wiz.step.firstBudget': 'Votre premier budget',
@@ -192,6 +193,16 @@ module.exports = {
   'wiz.how.csv.desc': 'Téléchargez un CSV depuis votre banque et l\'application le range en catégories à mesure que vous lui apprenez.',
   'wiz.how.manual.title': 'Les saisir moi-même',
   'wiz.how.manual.desc': 'Aucun fichier bancaire — vous ajoutez vos revenus et vos dépenses à la main, ligne par ligne. La façon la plus simple de commencer.',
+
+  'wiz.rates.name': 'Détenez-vous de l\'argent dans plus d\'une devise ?',
+  'wiz.rates.desc': 'Ne répondez oui que si certains de vos comptes sont dans une devise autre que {symbol}. C\'est la seule partie de l\'extension qui utilise internet.',
+  'wiz.rates.off.title': 'Non, ou pas maintenant',
+  'wiz.rates.off.desc': 'Rien n\'est récupéré et rien ne quitte votre appareil. Les comptes dans une autre devise restent affichés — leurs totaux sont simplement présentés séparément au lieu d\'être additionnés. Vous pourrez l\'activer plus tard dans les Paramètres.',
+  'wiz.rates.on.title': 'Oui — récupérer les taux de change quotidiens',
+  'wiz.rates.on.desc': 'Une fois par jour, l\'extension demande les taux du jour à un service public de taux de change et les enregistre sous forme de note dans votre coffre. Elle n\'envoie qu\'un code de devise — jamais vos soldes, vos comptes ni quoi que ce soit d\'autre. Chaque montant converti est affiché avec la date à laquelle son taux correspond.',
+  'wiz.rates.code': 'Votre code de devise',
+  'wiz.rates.codeDesc': 'Le code à trois lettres de {symbol} — par exemple ZAR, USD, EUR, IDR ou CNY. Sans lui, les taux ne peuvent pas être récupérés.',
+  'wiz.err.code': 'Saisissez un code de devise à trois lettres comme ZAR, USD ou EUR — pas un symbole.',
   'wiz.locale.group': 'Langue · Pays · Devise',
 
   /* ---- name ---- */
@@ -706,6 +717,13 @@ module.exports = {
   'acct.hero.mixed': ' Ce total additionne des comptes tenus dans plusieurs devises ({symbols}) sans les convertir.',
   'acct.hero.otherCurrencies': ' Plus {list} détenus dans d\'autres devises, non convertis.',
   'acct.hero.muted': 'Avertissements ignorés',
+  'settings.currencyCode.name': 'Code de devise',
+  'settings.currencyCode.desc': 'Le code ISO à trois lettres de votre symbole monétaire — ZAR, USD, EUR, IDR, CNY. Nécessaire uniquement si vous activez les taux de change ci-dessous ; c\'est le symbole ci-dessus qui est affiché. Il est demandé séparément parce qu\'aucun symbole n\'identifie une devise à lui seul — « $ » est utilisé aussi bien par les États-Unis, l\'Australie, le Canada que Singapour.',
+  'settings.exchangeRates.name': 'Taux de change',
+  'settings.exchangeRates.off': 'Désactivé — ne jamais utiliser internet',
+  'settings.exchangeRates.on': 'Activé — récupérer les taux quotidiens',
+  'settings.exchangeRates.desc': 'Désactivé par défaut, et la seule chose dans cette extension qui effectue une requête réseau. Activé, il demande une fois par jour les taux du jour à un service public de taux de change, les enregistre sous forme de note lisible dans votre dossier de budget, et intègre à vos totaux les comptes détenus dans d\'autres devises. Il n\'envoie qu\'un code de devise — jamais vos soldes ni les noms de vos comptes. Chaque montant converti est affiché avec la date à laquelle son taux correspond, et un taux de plus d\'une semaine le signale.',
+
   'acct.mixedTitle': 'Additionne des comptes tenus dans plusieurs devises, sans les convertir.',
   'acct.hero.count': 'Comptes',
   'acct.hero.oldest': 'Confirmation de solde la plus ancienne',

@@ -252,6 +252,7 @@ async function mount(files) {
   ctx.$ = sel => nodes.get(sel.slice(1)) || null;
   ctx.root = new FakeEl('div');
   ctx.money = money;
+  ctx.moneyIn = (sym, v, dp = 2) => `${sym}${Number(v).toFixed(dp)}`;
   ctx.saveAccount = async () => {};
   ctx.switchView = () => {};
   require('../src/views/savings')(ctx);

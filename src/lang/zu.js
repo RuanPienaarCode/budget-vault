@@ -163,6 +163,7 @@ module.exports = {
   'wiz.step.name': 'Sikubize ngubani?',
   'wiz.step.period': 'Ukhokhelwa nini?',
   'wiz.step.how': 'Uzokungenisa kanjani ukuchitha kwakho?',
+  'wiz.step.rates': 'Imali kwenye imali yamazwe?',
   'wiz.step.categories': 'Izigaba zesabelomali sakho',
   'wiz.step.account': 'I-akhawunti yakho yokuqala',
   'wiz.step.firstBudget': 'Isabelomali sakho sokuqala',
@@ -205,6 +206,16 @@ module.exports = {
   'wiz.how.csv.desc': 'Landa i-CSV ebhange lakho bese i-app iyihlunga ngezigaba njengoba uyifundisa.',
   'wiz.how.manual.title': 'Ngizithayiphela mina',
   'wiz.how.manual.desc': 'Awekho amafayela ebhange — ungenisa ngesandla umholo nokuchitha kwakho, umugqa ngamunye. Yindlela elula kunazo zonke yokuqala.',
+
+  'wiz.rates.name': 'Ingabe unemali ngaphezu kwemali eyodwa yezwe?',
+  'wiz.rates.desc': 'Phendula ngoyebo kuphela uma amanye ama-akhawunti akho ekwimali yezwe ehlukile ku-{symbol}. Lena ukuphela kwengxenye yepulaginyi esebenzisa i-inthanethi.',
+  'wiz.rates.off.title': 'Cha, noma hhayi manje',
+  'wiz.rates.off.desc': 'Akukho lutho oluletshwayo futhi akukho lutho oluphuma edivayisini yakho. Ama-akhawunti akwenye imali yezwe asaboniswa — izibalo zawo nje ziboniswa ngokwehlukene esikhundleni sokuhlanganiswa. Ungayivula kamuva kuzilungiselelo.',
+  'wiz.rates.on.title': 'Yebo — landa amazinga okushintshanisa ansuku zonke',
+  'wiz.rates.on.desc': 'Kanye ngosuku ipulaginyi icela insizakalo yomphakathi yamazinga okushintshanisa amazinga osuku bese iwagcina njengenothi kunqolobane yakho. Ithumela ikhodi yemali kuphela — ayilokothi ithumele amabhalansi akho, ama-akhawunti akho noma okunye. Zonke izibalo ezishintshiwe ziboniswa nosuku lwezinga lazo.',
+  'wiz.rates.code': 'Ikhodi yemali yakho',
+  'wiz.rates.codeDesc': 'Ikhodi yezinhlamvu ezintathu ye-{symbol} — isibonelo ZAR, USD, EUR, IDR noma CNY. Amazinga awakwazi ukulandwa ngaphandle kwayo.',
+  'wiz.err.code': 'Faka ikhodi yemali yezinhlamvu ezintathu njenge-ZAR, USD noma EUR — hhayi uphawu.',
   'wiz.locale.group': 'Ulimi · Izwe · Imali',
 
   /* ---- name ---- */
@@ -712,6 +723,13 @@ module.exports = {
   'acct.hero.mixed': ' Leli samba lihlanganisa ama-akhawunti agcinwe ezimalini ezingaphezu kweyodwa ({symbols}) ngaphandle kokuwaguqula.',
   'acct.hero.otherCurrencies': ' Ngokwengeza, {list} kugcinwe kwezinye izimali, ngaphandle kokukuguqula.',
   'acct.hero.muted': 'Izexwayiso ezinganakwayo',
+  'settings.currencyCode.name': 'Ikhodi yemali',
+  'settings.currencyCode.desc': 'Ikhodi ye-ISO yezinhlamvu ezintathu yophawu lwakho lwemali — ZAR, USD, EUR, IDR, CNY. Idingeka kuphela uma uvula amazinga okushintshanisa ngezansi; uphawu olungenhla yilo olubhalwayo. Ibuzwa ngokwehlukene ngoba alukho uphawu oluchaza imali lulodwa — "$" lusetshenziswa yi-USA, i-Australia, iCanada neSingapore ngokufanayo.',
+  'settings.exchangeRates.name': 'Amazinga okushintshanisa',
+  'settings.exchangeRates.off': 'Kuvaliwe — ungalokothi usebenzise i-inthanethi',
+  'settings.exchangeRates.on': 'Kuvuliwe — landa amazinga ansuku zonke',
+  'settings.exchangeRates.desc': 'Kuvaliwe ngokuzenzakalelayo, futhi kuwukuphela kwento kule pulaginyi eyenza isicelo senethiwekhi. Uma kuvuliwe, icela insizakalo yomphakathi yamazinga okushintshanisa kanye ngosuku amazinga osuku, iwagcine njengenothi elifundekayo kufolda yakho yesabelomali, futhi ihlanganise ama-akhawunti asezinye izimali ezibalweni zakho. Ithumela ikhodi yemali kuphela — ayilokothi ithumele amabhalansi akho noma amagama ama-akhawunti. Zonke izibalo ezishintshiwe zibhalwa nosuku lwezinga lazo, futhi izinga elidala ngaphezu kwesonto liyakusho lokho.',
+
   'acct.mixedTitle': 'Lihlanganisa ama-akhawunti agcinwe ezimalini ezingaphezu kweyodwa, ngaphandle kokuwaguqula.',
   'acct.hero.count': 'Ama-akhawunti',
   'acct.hero.oldest': 'Ukuqinisekiswa kwebhalansi okudala kunakho konke',

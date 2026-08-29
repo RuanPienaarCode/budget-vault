@@ -267,14 +267,14 @@ function walkPath(w, expected, label) {
     ok(planned <= 4,
       `the plan must not promise more screens than the shortest path walks (promises ${planned})`);
 
-    walkPath(w, ['welcome', 'name', 'period', 'how', 'categories', 'account', 'finish'], 'csv create');
+    walkPath(w, ['welcome', 'name', 'period', 'how', 'rates', 'categories', 'account', 'finish'], 'csv create');
 
     w.data.inputMode = 'manual';
-    walkPath(w, ['welcome', 'name', 'period', 'how', 'firstBudget', 'finish'], 'manual create');
+    walkPath(w, ['welcome', 'name', 'period', 'how', 'rates', 'firstBudget', 'finish'], 'manual create');
 
     w.data.inputMode = 'csv';
     w.mode = 'connect';
-    walkPath(w, ['welcome', 'name', 'period', 'how', 'finish'], 'connect');
+    walkPath(w, ['welcome', 'name', 'period', 'how', 'rates', 'finish'], 'connect');
     w.mode = 'create';
 
     /* One question per screen, counted. The three question screens carry, in
@@ -300,8 +300,8 @@ function walkPath(w, expected, label) {
   {
     const w = open(makeApp(), makePlugin());
     w.stepIdx = w.steps().indexOf('how'); w.renderStep();
-    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 3 of 6',
-      'the CSV path is six steps past the welcome screen');
+    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 3 of 7',
+      'the CSV path is seven steps past the welcome screen');
     const cards = byClass(w.contentEl, 'budget-onb-choice');
     eq(cards.length, 2, 'the input-mode question is two cards, each with room for a sentence');
     ok(textOf(w.contentEl, 'budget-onb-choice-desc').length > 60,
@@ -312,9 +312,9 @@ function walkPath(w, expected, label) {
 
     radios[1].fire('change');
     eq(w.data.inputMode, 'manual', 'choosing the manual card stores the answer');
-    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 3 of 5',
+    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 3 of 6',
       'AND the counter re-renders against the shorter path — a wizard that still ' +
-      'promised "of 6" would be contradicting itself on the screen where trust is cheapest to lose');
+      'promised "of 7" would be contradicting itself on the screen where trust is cheapest to lose');
     ok(byClass(w.contentEl, 'budget-onb-choice')[1].hasClass('is-on'),
       'and the chosen card is the one that looks chosen');
   }
@@ -538,7 +538,7 @@ function walkPath(w, expected, label) {
     const w = open(app, makePlugin());
     w.stepIdx = w.steps().indexOf('finish'); w.renderStep();
     eq(w.mode, 'create', 'a default folder with nothing in it is a create');
-    eq(w.stepIdx, 6, 'the CSV create path ends on step 6');
+    eq(w.stepIdx, 7, 'the CSV create path ends on step 7');
 
     const folderField = inputs(w.contentEl)[0];
     eq(folderField.value, 'Finances/Budget', 'the folder field is first, prefilled with the default');
@@ -547,11 +547,11 @@ function walkPath(w, expected, label) {
 
     await folderField._onChange('Existing/Budget');
     eq(w.mode, 'connect', 'a folder that already holds a budget switches the wizard to connect');
-    eq(w.steps(), ['welcome', 'name', 'period', 'how', 'finish'],
+    eq(w.steps(), ['welcome', 'name', 'period', 'how', 'rates', 'finish'],
       'and drops the two scaffolding screens');
-    eq(w.stepIdx, 4,
+    eq(w.stepIdx, 5,
       'the reader stays on the finish screen — index arithmetic would have dropped them into "categories"');
-    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 4 of 4', 'and the counter re-reads honestly');
+    eq(textOf(w.contentEl, 'budget-onb-step'), 'Step 5 of 5', 'and the counter re-reads honestly');
 
     const callout = textOf(w.contentEl, 'budget-onb-callout');
     ok(callout.includes('Existing/Budget'), 'the callout names the folder that was found');
@@ -599,13 +599,13 @@ function walkPath(w, expected, label) {
 
     // Back must land somewhere that exists on the SHORTER list.
     w.stepIdx--; w.renderStep();
-    eq(w.steps()[w.stepIdx], 'how', 'Back from a connect finish lands on the last question asked');
+    eq(w.steps()[w.stepIdx], 'rates', 'Back from a connect finish lands on the last question asked');
 
     // And pointing it back at an empty folder returns the create path.
     w.stepIdx = w.steps().indexOf('finish'); w.renderStep();
     await inputs(w.contentEl)[0]._onChange('Somewhere/Else');
     eq(w.mode, 'create', 'a folder with no budget in it goes back to create');
-    eq(w.steps().length, 7, 'and the scaffolding screens come back');
+    eq(w.steps().length, 8, 'and the scaffolding screens come back');
     eq(w.steps()[w.stepIdx], 'finish', 'with the reader still on the finish screen');
   }
 

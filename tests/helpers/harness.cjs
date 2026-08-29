@@ -59,6 +59,15 @@ function stubObsidian() {
         normalizePath: p => String(p).replace(/\\/g, '/').replace(/\/+/g, '/')
           .replace(/^\/|\/$/g, '').normalize('NFC'),
         Notice: class {},
+        /* The ONLY network entry point src/ has (src/fx-fetch.js). It throws
+           by default, so a test that accidentally reaches the network fails
+           loudly instead of quietly depending on the internet and on a live
+           exchange-rate provider's uptime. A test that means to exercise the
+           fetch sets global.__requestUrl to its own stub and clears it after. */
+        requestUrl: (...args) => {
+          if (typeof global.__requestUrl === 'function') return global.__requestUrl(...args);
+          throw new Error('requestUrl: no network in tests — set global.__requestUrl to stub it');
+        },
         Modal: class {},
         Setting: class {},
         PluginSettingTab: class {},
@@ -175,6 +184,14 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
     $$: () => [],
     toast: (msg, bad) => toasts.push({ msg, bad }),
     money: v => String(v),
+    /* The per-account formatter, defaulted here rather than in each test.
+       Views print an account's OWN figures in that account's OWN symbol —
+       a ¥ balance rendered "R 3 956" is a wrong figure, not a missing label —
+       so every view that shows an account balance now reaches for this. A
+       test that stubs `money` and not this one used to fail on a missing
+       function rather than on its own subject, which is noise; a test that
+       cares about symbols still overrides it. */
+    moneyIn: (sym, v, dp = 2) => `${sym} ${Number(v).toFixed(dp)}`,
     locale: () => require('../../src/locale').PROFILES.za,
     registerDirty: fn => dirtyChecks.push(fn),
     /* Mirrors controller.js: a view registers the Save button it owns and gets

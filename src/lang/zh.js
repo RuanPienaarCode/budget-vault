@@ -146,6 +146,7 @@ module.exports = {
   'wiz.step.name': '我们该怎么称呼你？',
   'wiz.step.period': '你什么时候发薪？',
   'wiz.step.how': '你打算怎样记录支出？',
+  'wiz.step.rates': '有其他货币的资产吗',
   'wiz.step.categories': '你的预算分类',
   'wiz.step.account': '你的第一个账户',
   'wiz.step.firstBudget': '你的第一份预算',
@@ -188,6 +189,16 @@ module.exports = {
   'wiz.how.csv.desc': '从银行下载 CSV，你教得越多，应用就越会自动把它归入分类。',
   'wiz.how.manual.title': '我自己输入',
   'wiz.how.manual.desc': '不需要银行文件 — 你一行一行手动添加收入和支出。最简单的开始方式。',
+
+  'wiz.rates.name': '您持有一种以上货币的资产吗？',
+  'wiz.rates.desc': '仅当您的部分账户使用 {symbol} 以外的货币时才选择"是"。这是本插件唯一会使用网络的功能。',
+  'wiz.rates.off.title': '否，或暂时不用',
+  'wiz.rates.off.desc': '不会获取任何数据，也不会有任何内容离开您的设备。其他货币的账户仍会列出——只是单独显示它们的合计，而不并入总额。您可以稍后在设置中开启。',
+  'wiz.rates.on.title': '是——获取每日汇率',
+  'wiz.rates.on.desc': '插件每天一次向公开的汇率服务查询当日汇率，并将其保存为库中的一条笔记。它只发送一个货币代码——绝不会发送您的余额、账户或其他任何信息。每个换算后的数字都会标注其汇率对应的日期。',
+  'wiz.rates.code': '您的货币代码',
+  'wiz.rates.codeDesc': '{symbol} 的三字母代码——例如 ZAR、USD、EUR、IDR 或 CNY。没有它就无法获取汇率。',
+  'wiz.err.code': '请输入 ZAR、USD 或 EUR 这样的三字母货币代码——而不是符号。',
   'wiz.locale.group': '语言 · 国家/地区 · 货币',
 
   /* ---- name ---- */
@@ -664,6 +675,13 @@ module.exports = {
   'acct.hero.mixed': ' 此总计将以多种货币（{symbols}）持有的账户相加，未进行换算。',
   'acct.hero.otherCurrencies': ' 另有 {list} 以其他货币持有，未换算。',
   'acct.hero.muted': '已忽略的提醒',
+  'settings.currencyCode.name': '货币代码',
+  'settings.currencyCode.desc': '您的货币符号对应的三字母 ISO 代码——ZAR、USD、EUR、IDR、CNY。仅在下方开启汇率时才需要；实际显示的是上方的符号。之所以单独询问，是因为符号本身无法确定货币——美国、澳大利亚、加拿大和新加坡都在使用"$"。',
+  'settings.exchangeRates.name': '汇率',
+  'settings.exchangeRates.off': '关闭——绝不使用网络',
+  'settings.exchangeRates.on': '开启——获取每日汇率',
+  'settings.exchangeRates.desc': '默认关闭，也是本插件中唯一会发起网络请求的功能。开启后，它每天一次向公开的汇率服务查询当日汇率，将其保存为预算文件夹中一条可读的笔记，并把其他货币的账户计入您的总额。它只发送一个货币代码——绝不发送您的余额或账户名称。每个换算后的数字都会标注其汇率对应的日期，超过一周的汇率会加以说明。',
+
   'acct.mixedTitle': '将以多种货币持有的账户相加，未进行换算。',
   'acct.hero.count': '账户数',
   'acct.hero.oldest': '最旧的余额确认',

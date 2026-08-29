@@ -72,9 +72,9 @@ const mdKeys = new Set(
    deliberate edit here as well as in settings-tab.js — the list is the
    inventory of what syncs with the vault rather than with the device. */
 eq([...mdKeys].sort(),
-  ['country', 'currency', 'emergency_target_months', 'groups', 'household', 'input_mode',
-    'language', 'month_start_day', 'nonessential_groups', 'overspend_lag', 'owners',
-    'period_anchor', 'period_days'],
+  ['country', 'currency', 'currency_code', 'emergency_target_months', 'exchange_rates',
+    'groups', 'household', 'input_mode', 'language', 'month_start_day',
+    'nonessential_groups', 'overspend_lag', 'owners', 'period_anchor', 'period_days'],
   'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');

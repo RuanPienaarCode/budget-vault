@@ -15,7 +15,7 @@ const { normalizeAmount } = require('../amount');
    display-only by design (tests/currency.test.cjs's own §7 pins that), so the
    ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
    this view's arithmetic, not that module's. */
-const { symbolOf, isForeign } = require('../currency');
+const { symbolOf, splitByCurrency: splitAccounts } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -111,31 +111,14 @@ module.exports = function registerAccounts(ctx) {
      rather than imported. */
   const roundedSum = accts => (Math.round(accts.reduce((s, a) => s + a.balance, 0) * 100) / 100) || 0;
 
-  /* ITEM 5: the hero and the table's own group subtotals used to add every
-     balance regardless of currency and disclose the mix with acct.hero.mixed
-     ("adds accounts... without converting them"). That is still an honest
-     sentence for the Ring and the "Whose it is" split, which are UNCHANGED —
-     but a headline that says "R" should not be quietly summing euros into it.
-     This splits a set of accounts into the ones in the household's own
-     currency (safe to add straight up) and a running total per FOREIGN symbol
-     present, so a caller can state the primary sum alone and offer each other
-     currency as its OWN side figure — still never converted, exactly
-     currency.js's own rule, just applied at the point of summing rather than
-     only at the point of disclosing. */
-  const splitByCurrency = accts => {
-    const home = S.settings.currency;
-    const primary = [];
-    const bySymbol = new Map();
-    for (const a of accts) {
-      if (isForeign(a, home)) {
-        const sym = symbolOf(a, home);
-        bySymbol.set(sym, (bySymbol.get(sym) || 0) + (Number(a.balance) || 0));
-      } else {
-        primary.push(a);
-      }
-    }
-    return { primary, others: [...bySymbol] };
-  };
+  /* ITEM 5, now module-level. The rule this page introduced — sum the
+     household's own currency, state every other symbol beside it, convert
+     nothing — lives in src/currency.js as splitByCurrency(), because leaving
+     it here is what let the Savings page, the Dashboard, the Report and the
+     Score each keep summing their own way. See that function's own header for
+     the three rounds of the same defect that moved it. This is now a binding,
+     not a definition: one implementation, applied everywhere. */
+  const splitByCurrency = accts => splitAccounts(accts, S.settings.currency);
 
   /* "€ 640,00 · $ 1 200,00" — zero decimals, since this is always a side note
      beside a headline that already carries its own full precision. Shared by

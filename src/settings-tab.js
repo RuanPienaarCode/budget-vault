@@ -17,6 +17,7 @@ const { periodDaysOrZero } = require('./dates');
 const { yamlStr } = require('./markdown');
 const { parseOwners } = require('./owners');
 const { parseGroups, parseNonEssential } = require('./groups');
+const { normalizeCode } = require('./fx');
 const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
@@ -26,7 +27,19 @@ const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 /* Setting keys backed by Settings.md rather than plugin data. The declarative
    API binds a control to this.plugin.settings[key] by default, so these
    route through the getControlValue/setControlValue overrides instead. */
-const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'groups', 'nonessential_groups']);
+/* Exchange rates are stored as 'off'/'on' rather than a YAML boolean for the
+   same reason input_mode is a string: the value is read back into a dropdown,
+   and a hand-edited `exchange_rates: yes` (which YAML reads as true, while
+   `exchange_rates: maybe` is a string) would otherwise leave the control
+   showing something the app is not running. Absent means off, so every vault
+   written before this key existed keeps making zero network requests. */
+const fxMode = v => (String(v == null ? '' : v).trim().toLowerCase() === 'on' ? 'on' : 'off');
+const FX_OPTIONS = () => ({
+  off: i18n.t('settings.exchangeRates.off'),
+  on: i18n.t('settings.exchangeRates.on'),
+});
+
+const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'currency_code', 'exchange_rates', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'groups', 'nonessential_groups']);
 
 /* Shared by display() and getSettingDefinitions(), same as OWNERS_DESC below.
    It has to say what the setting HIDES as well as what it stores: choosing
@@ -492,6 +505,41 @@ class BudgetSettingTab extends PluginSettingTab {
           }, 800);
         });
       });
+
+    /* The currency CODE, beside the symbol it belongs to. Two fields for one
+       currency is a cost, and it is paid on purpose: the symbol is what gets
+       printed, the code is what an exchange-rate provider understands, and no
+       reliable mapping exists between them — "$" is USD, AUD, CAD or SGD
+       depending on whose vault it is. Guessing is how the wrong number gets
+       printed with total confidence, so the app asks instead. Blank is a
+       perfectly good answer; it just means rates cannot be fetched. */
+    new Setting(containerEl)
+      .setName(i18n.t('settings.currencyCode.name'))
+      .setDesc(i18n.t('settings.currencyCode.desc'))
+      .addText(t => {
+        t.setPlaceholder('ZAR');
+        t.setValue(md.currency_code ?? '');
+        t.onChange(v => {
+          clearTimeout(this._codeTimer);
+          this._codeTimer = setTimeout(async () => {
+            await this.plugin.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(v)));
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
+
+    new Setting(containerEl)
+      .setName(i18n.t('settings.exchangeRates.name'))
+      .setDesc(i18n.t('settings.exchangeRates.desc'))
+      .addDropdown(d => {
+        for (const [v, label] of Object.entries(FX_OPTIONS())) d.addOption(v, label);
+        d.setValue(fxMode(md.exchange_rates));
+        d.onChange(async v => {
+          await this.plugin.updateBudgetSettingsMd('exchange_rates', fxMode(v));
+          this.plugin.reloadViews();
+          this.display();
+        });
+      });
   }
 
   /* ---- Declarative settings (Obsidian 1.13+) -----------------------------
@@ -627,6 +675,14 @@ class BudgetSettingTab extends PluginSettingTab {
     if (key === 'period_days') return String(periodDaysOrZero(md.period_days));
     if (key === 'period_anchor') return (md.period_anchor ?? '').toString().trim();
     if (key === 'currency') return md.currency ?? 'R';
+    // Normalised on the way out, like country and input_mode above: the field
+    // shows the code the app will actually SEND, not whatever was typed. A
+    // symbol pasted in here reads back as blank rather than sitting in the box
+    // looking accepted while no rate is ever fetched for it.
+    if (key === 'currency_code') return normalizeCode(md.currency_code);
+    // Same contract as input_mode: absent means off, and an unknown
+    // hand-edited value reads as the mode the app is running.
+    if (key === 'exchange_rates') return fxMode(md.exchange_rates);
     // Normalised on the way out for the same reason period_days is: absent
     // means 'csv', and an unknown hand-edited value has to READ as the mode
     // the app is running rather than leaving the dropdown on nothing.
@@ -676,6 +732,8 @@ class BudgetSettingTab extends PluginSettingTab {
       : key === 'groups' ? yamlStr(parseGroups(value).join(', '))
       : key === 'nonessential_groups' ? yamlStr(parseNonEssential(value, parseGroups(this.mdSettings().groups)).join(', '))
       : key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
+      : key === 'currency_code' ? yamlStr(normalizeCode(value))
+      : key === 'exchange_rates' ? fxMode(value)
       : key === 'month_start_day' ? String(parseInt(value, 10))
       : key === 'overspend_lag' ? String(overspendLag(value))
       : key === 'emergency_target_months' ? String(emergencyTarget(value))
@@ -869,6 +927,28 @@ class BudgetSettingTab extends PluginSettingTab {
         control: {
           type: 'text', key: 'currency', placeholder: 'R',
           validate: v => (String(v).trim() ? undefined : 'Enter a currency symbol.'),
+        },
+      },
+      {
+        name: i18n.t('settings.currencyCode.name'),
+        desc: i18n.t('settings.currencyCode.desc'),
+        control: {
+          type: 'text', key: 'currency_code', placeholder: 'ZAR',
+          /* Blank is valid — it means "do not fetch rates", which is the
+             default and a complete answer. Only a non-blank value that is not
+             a code is rejected, because that one is a mistake the reader
+             cannot see the consequence of: the field looks filled in and no
+             rate is ever fetched. */
+          validate: v => (!String(v).trim() || normalizeCode(v) ? undefined
+            : 'Use a three-letter code like ZAR, USD or EUR — not a symbol.'),
+        },
+      },
+      {
+        name: i18n.t('settings.exchangeRates.name'),
+        desc: i18n.t('settings.exchangeRates.desc'),
+        control: {
+          type: 'dropdown', key: 'exchange_rates', defaultValue: 'off',
+          options: FX_OPTIONS(),
         },
       },
     ];

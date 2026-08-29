@@ -60,6 +60,65 @@ function currenciesIn(accounts, household) {
   return seen.includes(home) ? [home, ...seen.filter(s => s !== home)] : seen;
 }
 
+/* Split a set of accounts into the ones stated in the household's own currency
+   — safe to add straight up — and a running total per FOREIGN symbol present.
+
+   This is the rule the whole app now sums by, and it lives HERE rather than in
+   a view because of how it got here. It was written inside views/accounts.js,
+   applied to that page's hero and table, and deliberately not applied to the
+   ring or the owner rows. A reporter found the gap from the outside (issue
+   #28): the donut's centre said Rp 5,203,956 while the hero directly above it
+   said Rp 5,200,000. The ring and the owner rows were fixed. An audit then
+   found the Savings page — a different file that never had the rule at all —
+   printing Rp 6,203,956 against the Accounts page's Rp 6,200,000, with no
+   disclosure of any kind.
+
+   That is three rounds of the same defect, and every round had the same cause:
+   the rule existed in ONE view, so every other view was free to sum its own
+   way. This repo's recurring bug shape is "two figures derived by different
+   rules"; a rule that lives in a view is that shape waiting to happen. It is
+   module-level now so there is one implementation to be right, and any view
+   that wants a total has to come here to get it.
+
+   Never converts — see the header above. `others` is a list of [symbol, total]
+   pairs, each in ITS OWN currency, for the caller to state beside the primary
+   figure rather than fold into it. Household first is not needed here (these
+   are only the non-household symbols), but insertion order is stable so two
+   callers listing the same accounts print them in the same order. */
+function splitByCurrency(accounts, household) {
+  const home = String(household || '').trim();
+  const primary = [];
+  const bySymbol = new Map();
+  for (const a of accounts || []) {
+    if (isForeign(a, home)) {
+      const sym = symbolOf(a, home);
+      bySymbol.set(sym, (bySymbol.get(sym) || 0) + (Number(a.balance) || 0));
+    } else {
+      primary.push(a);
+    }
+  }
+  /* Rounded to the cent and -0 collapsed, the same two-step every other total
+     in this app applies — a foreign side figure is a figure like any other,
+     and "¥ -0" beside a headline reads as a debt that does not exist. */
+  return {
+    primary,
+    others: [...bySymbol].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
+  };
+}
+
+/* The same split, reduced to the one number a caller usually wants: the sum of
+   the household-currency accounts, rounded to the cent with -0 collapsed.
+
+   Every page was rounding this by hand — accounts.js's roundedSum, worth.js's
+   own two-step, owners.js's per-row pass — which is three copies of a rule
+   that exists because summing signed floats leaves a remainder like -7.1e-15
+   behind, and read raw that renders a break-even household as "-R0,00" in
+   danger red. */
+function primaryTotal(accounts, household) {
+  const { primary } = splitByCurrency(accounts, household);
+  return (Math.round(primary.reduce((s, a) => s + (Number(a.balance) || 0), 0) * 100) / 100) || 0;
+}
+
 /* The one money-formatting routine, so a figure printed by a callout and one
    printed by money() on the same page never disagree.
 
@@ -87,4 +146,4 @@ function formatAmount(symbol, v, decimals, loc) {
   return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
 }
 
-module.exports = { symbolOf, isForeign, currenciesIn, formatAmount };
+module.exports = { symbolOf, isForeign, currenciesIn, splitByCurrency, primaryTotal, formatAmount };

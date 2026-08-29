@@ -92,9 +92,40 @@ const acct = (name, currency) => ({ name, currency });
    decides WHAT the amount is or whether an account counts, which is the line
    this test protects. ---- */
 {
-  const api = Object.keys(require('../src/currency')).sort();
-  eq(api, ['currenciesIn', 'formatAmount', 'isForeign', 'symbolOf'],
-    'four read-only helpers — no convert(), no exclude(), no rate table');
+  const mod = require('../src/currency');
+  const api = Object.keys(mod).sort();
+  eq(api, ['currenciesIn', 'formatAmount', 'isForeign', 'primaryTotal', 'splitByCurrency', 'symbolOf'],
+    'read-only helpers plus the partition — still no convert(), no rate, no filter');
+
+  /* splitByCurrency and primaryTotal joined the API for the same kind of
+     reason formatAmount did: a real defect, not a widened remit. The "sum the
+     household's currency and name the rest" rule lived inside
+     views/accounts.js, so the Savings page, the Dashboard, the Report and the
+     Score each summed their own way — issue #28 was reported against one page
+     and an audit then found the identical arithmetic on four others. A rule
+     with one home cannot drift; a rule living in a view already has.
+
+     Neither one weakens the two promises this file makes, and BOTH are
+     asserted rather than assumed:
+
+       no CONVERT — the module still holds no rate and no arithmetic across
+                    symbols. (Conversion is opt-in and lives in src/fx.js,
+                    which imports this module and not the other way round.)
+       no EXCLUDE — splitByCurrency PARTITIONS. Every account handed to it
+                    comes back, in one half or the other. It is not a filter,
+                    and the difference is the whole point: a caller gets the
+                    foreign money to state, not permission to forget it. */
+  const accts = [{ balance: 100 }, { currency: '€', balance: 40 }, { currency: '$', balance: 7 }];
+  const { primary, others } = mod.splitByCurrency(accts, 'R');
+  eq(primary.length + others.length, 3,
+    'every account comes back — a partition, never a filter, because currency.js:14 forbids excluding one');
+  eq(others, [['€', 40], ['$', 7]],
+    'and the foreign halves come back in their OWN symbols, unconverted and unsummed');
+  eq(mod.primaryTotal(accts, 'R'), 100, 'the primary total is the household currency alone');
+  eq(mod.primaryTotal([{ balance: 0.1 }, { balance: 0.2 }], 'R'), 0.3,
+    'rounded to the cent, so a float remainder never reaches a screen');
+  eq(Object.is(mod.primaryTotal([{ balance: -0 }], 'R'), 0), true,
+    'and -0 is collapsed, or a break-even household renders "-R0,00" in danger red');
 }
 
 /* ---- 8. degenerate input, because the loader hands this real files ---- */
