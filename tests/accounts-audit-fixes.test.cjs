@@ -150,7 +150,11 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
     void S;
   }
 
-  /* ---- 2. mixed-currency disclosure on the ring, and never a blank card ---- */
+  /* ---- 2. mixed-currency disclosure on the ring, and never a blank card.
+     ISSUE 28 changed WHICH disclosure: the ring used to add the €500 into a
+     rand total and warn that it had ("more than one currency"); it now sums
+     the rand alone and names the euro beside it, the sentence the hero has
+     carried since ITEM 5. ---- */
   {
     const { ctx } = await mount({
       [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\nbalance: 10000.00\nbalance_updated: 2026-07-01\n---\n',
@@ -160,10 +164,16 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
     ctx.renderAccounts();
     const ring = descend(ctx.$('#acctSummary')).find(n => n._cls && n._cls.has('acct-ring'));
     ok(ring, 'the ring renders');
-    ok(textOf(ring).includes('more than one currency'),
-      'the whole-card disclosure fires when the household spans currencies');
-    ok(descend(ring).some(n => n._cls && n._cls.has('acct-mixed')),
-      'and the group that actually mixes symbols carries its own mark');
+    ok(/Plus/.test(textOf(ring)) && /€ 500/.test(textOf(ring)),
+      'the whole-card disclosure names the foreign holding as its own side figure');
+    ok(textOf(ring).includes('not converted'), 'and says plainly that nothing was converted');
+    ok(!textOf(ring).includes('more than one currency'),
+      'it no longer warns that it added them together, because it did not');
+    ok(!descend(ring).some(n => n._cls && n._cls.has('acct-mixed')),
+      'and the retired asterisk mark is gone with the arithmetic it stood for');
+    const centre = descend(ring).find(n => n.tagName === 'TEXT');
+    ok(centre && /10000/.test(centre.textContent) && !/10500/.test(centre.textContent),
+      'the centre figure is the rand total alone — R10 000, never R10 500');
   }
 
   /* ---- 2b. every group net negative: a note, never a blank body ---- */
@@ -192,7 +202,10 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
     ok(note && textOf(note).trim().length > 0, 'a zero-balance vault still gets a sentence, not silence');
   }
 
-  /* ---- 3. the owner split carries the same mixed-currency mark ---- */
+  /* ---- 3. the owner split follows the same rule as the ring above it.
+     ISSUE 28: Alex's row used to read R10 300 — ten thousand rand and three
+     hundred euro added together with an asterisk over the total. It now
+     states the rand and names the euro. ---- */
   {
     const { ctx } = await mount({
       [`${B}/Accounts/His Cheque.md`]:
@@ -205,8 +218,16 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
     ctx.renderAccounts();
     const owners = descend(ctx.$('#acctSummary')).find(n => n._cls && n._cls.has('acct-owners'));
     ok(owners, '"Whose it is" renders for two owners');
-    ok(descend(owners).some(n => n._cls && n._cls.has('acct-mixed')),
-      "Alex's row (rand + euro) carries the mixed mark Sam's row does not need");
+    const rows = descend(owners).filter(n => n._cls && n._cls.has('acct-owner-row'));
+    const alex = rows.find(n => /Alex/.test(n.textContent));
+    ok(alex && /R 10000\.00/.test(alex.textContent) && !/10300/.test(alex.textContent),
+      "Alex's row states the rand alone — never the R10 300 a blind sum gave");
+    ok(/€ 300/.test(alex.textContent), 'and names the euro balance beside it, in euros');
+    const sam = rows.find(n => /Sam/.test(n.textContent));
+    ok(sam && /R 8000\.00/.test(sam.textContent) && !/€/.test(sam.textContent),
+      "Sam's row is pure rand and says nothing about currencies she does not hold");
+    ok(!descend(owners).some(n => n._cls && n._cls.has('acct-mixed')),
+      'the retired asterisk is gone from the owner rows');
   }
 
   /* ---- 4. an unreadable balance is shown, not fabricated as R0,00 ---- */

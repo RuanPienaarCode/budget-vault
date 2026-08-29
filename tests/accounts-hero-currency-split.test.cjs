@@ -12,13 +12,13 @@
    as its own side figure, in its own symbol — never converted, never folded
    in silently.
 
-   The Ring ("Where it sits") and the "Whose it is" owner split are
-   DELIBERATELY left summing every currency together, unchanged — that is a
-   scoped decision (views/accounts.js's own ITEM 5 comments explain why), not
-   an oversight, so this file pins BOTH halves: the hero/table's new
-   behaviour, and the ring's old behaviour still standing. A future change
-   that quietly "fixes" the ring to match, or accidentally narrows the hero
-   back to matching the ring, should be caught either way.
+   ISSUE 28 closes the other half. The Ring ("Where it sits") and the "Whose
+   it is" owner split were originally left summing every currency together —
+   a scoped decision that a reporter found from the outside: the donut's
+   centre read "Rp 5 203 956" while the hero directly above it read
+   "Rp 5 200 000", the same household, two figures, two rules. Both now use
+   the hero's rule, and this file pins all four surfaces so none of them can
+   drift back.
 
    Runs in bare node against the real view, same harness as
    tests/accounts-lane-review.test.cjs.
@@ -115,17 +115,68 @@ const FILES = {
       'the Bank accounts group is pure rand, so its own total is unaffected by the fix');
   }
 
-  /* ---- 3. the Ring: DELIBERATELY unchanged — still sums every currency and
-     still uses the OLD mixed-currency sentence. This is the scoped half of
-     the fix, pinned so a future change cannot silently narrow it (or widen
-     the hero back to match it) without this test noticing. ---- */
+  /* ---- 3. ISSUE 28 — the Ring now follows the SAME rule as the hero ---- */
   {
-    const ring = ctx.$('#acctSummary');
-    const ringSub = descend(ring).find(n => n._cls && n._cls.has('sub') && /adds accounts held in more than one currency/.test(n.textContent));
-    ok(ringSub, 'the Ring card still carries the OLD "adds accounts... without converting them" sentence');
-    ok(descend(ring).some(n => n._cls && n._cls.has('acct-mixed')),
-      'and the Ring/legend still uses the retired .acct-mixed asterisk mark — unchanged, on purpose');
+    const summary = ctx.$('#acctSummary');
+    const ring = descend(summary).find(n => n._cls && n._cls.has('acct-ring'));
+    ok(ring, 'fixture sanity: the Ring card rendered');
+
+    // The centre figure: the rand group alone. A blind sum would print
+    // R6840 here while the hero, two lines up, printed R5000.
+    const centre = descend(ring).find(n => n.tagName === 'TEXT');
+    ok(centre, 'fixture sanity: the donut centre figure rendered');
+    eq(centre.textContent, 'R 5000',
+      'the donut centre is the primary-currency total — it agrees with the hero above it');
+
+    // NEGATIVE CONTROLS: the old sentence and the old asterisk are both gone.
+    ok(!/adds accounts held in more than one currency/.test(textOf(ring)),
+      'the Ring no longer claims to have added mixed currencies together');
+    ok(!descend(ring).some(n => n._cls && n._cls.has('acct-mixed')),
+      'and the retired .acct-mixed asterisk is gone from the Ring and its legend');
+
+    // The disclosure it carries instead is the hero's own sentence.
+    ok(/Plus/.test(textOf(ring)) && /\$ 1200/.test(textOf(ring)) && /€ 640/.test(textOf(ring)),
+      'the Ring names each other currency as its own side figure instead');
+
+    /* The Savings group holds ONLY foreign money. It cannot be a wedge, but
+       it must not vanish either — it is listed at 0% with its symbols. */
+    const legendRows = descend(ring).filter(n => n.tagName === 'LI');
+    const savingsLi = legendRows.find(n => /Savings/.test(n.textContent));
+    ok(savingsLi, 'a group holding only foreign money is still listed in the legend, not dropped');
+    ok(/0%/.test(savingsLi.textContent),
+      'at 0% of the ring, because none of what it holds is in the currency the ring is drawn in');
+    ok(/\$ 1200/.test(savingsLi.textContent) && /€ 640/.test(savingsLi.textContent),
+      'with both of its foreign totals named beside it');
   }
 
-  console.log(`PASS — Accounts hero + table currency split, Ring intentionally unchanged (${checks} checks).`);
+  /* ---- 4. ISSUE 28 — the "Whose it is" owner rows, same rule again.
+     Needs its own vault: the fixture above declares no owners, so the card
+     does not render there at all. Alex holds R5 000; Sam holds nothing but
+     euros. A blind sum gave Sam "R 640"; the row must say R0 and name the
+     €640 beside it — and Sam must still HAVE a row. ---- */
+  {
+    const { ctx: c2 } = await mount({
+      [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nowners: "Alex, Sam"\n---\n',
+      [`${B}/Accounts/His Cheque.md`]: '---\ntype: checking\nowner: Alex\nbalance: 5000.00\nbalance_updated: 2026-07-01\n---\n',
+      [`${B}/Accounts/Her Euro.md`]: '---\ntype: savings\nowner: Sam\ncurrency: "€"\nbalance: 640.00\nbalance_updated: 2026-07-01\n---\n',
+    });
+    c2.renderAccounts();
+
+    const owners = descend(c2.$('#acctSummary')).filter(n => n._cls && n._cls.has('acct-owner-row'));
+    eq(owners.length, 2, 'fixture sanity: both owners have a row');
+
+    const sam = owners.find(n => /Sam/.test(n.textContent));
+    ok(sam, 'the owner holding ONLY foreign money still has a row — not dropped');
+    ok(/R 0\.00/.test(sam.textContent),
+      "Sam's household-currency total is R0 — not the R640 a blind sum gave");
+    ok(/€ 640/.test(sam.textContent), 'and the euro balance is named beside it, in euros');
+    ok(!descend(sam).some(n => n._cls && n._cls.has('acct-mixed')),
+      'the retired asterisk is gone from the owner rows too');
+
+    const alex = owners.find(n => /Alex/.test(n.textContent));
+    ok(/R 5000\.00/.test(alex.textContent),
+      "Alex's row is pure rand, so it is unaffected by the fix");
+  }
+
+  console.log(`PASS — Accounts hero, table, Ring and owner split all sum one currency (${checks} checks).`);
 })().catch(e => { console.error(e); process.exit(1); });

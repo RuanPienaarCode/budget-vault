@@ -3,6 +3,25 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.29.1 — 2026-08-29
+
+### Fixed
+
+- **The Accounts ring stopped adding unlike currencies together.** On a
+  household set to one currency with an account held in another, the "Where
+  it sits" donut summed both into one figure — so its centre read
+  "Rp 5 203 956" while the headline directly above it read "Rp 5 200 000",
+  the same accounts, two different totals. The ring, its legend and the
+  "Whose it is" owner rows now follow the rule the headline and the table
+  have used since 1.28: the household's own currency is added up, and every
+  other currency is stated beside it in its own symbol, never converted and
+  never folded in. A group or an owner holding nothing but foreign money is
+  listed with its own totals named rather than dropped. Reported in
+  [#28](https://github.com/RuanPienaarCode/budget-vault/issues/28).
+
+  The Dashboard's Net worth, Savings and "left to spend" figures still add
+  unlike currencies and say so; they are tracked separately.
+
 ## 1.29.0 — 2026-08-29
 
 An audit of the Report feature — three independent review passes plus a

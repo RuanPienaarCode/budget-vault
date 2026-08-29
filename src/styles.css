@@ -1662,18 +1662,19 @@
   color: var(--text-primary); font-variant-numeric: tabular-nums;
 }
 /* The asterisk beside a group total that has added more than one currency
-   together. Deliberately a mark and a title rather than a colour: it is not a
-   warning about a wrong figure, it is a note about what the figure is made of,
-   and the same information is spelled out under the hero above. Still used by
-   the "Whose it is" owner rows and the Ring's per-group marks (ITEM 5 left
-   those two unchanged) — retired from the table's own group-total row, which
-   now names its foreign currencies directly instead (.acct-group-other). */
+   together. RETIRED (issue 28): no figure in this app mixes currencies any
+   more, so there is nothing left for the mark to warn about — the table's
+   group rows, the "Whose it is" owner rows and the Ring's legend all name
+   their foreign side figures outright instead (.acct-group-other, below).
+   The rule is kept, unreferenced, only so a stale cached view mid-upgrade
+   does not render a bare unstyled asterisk. */
 .budget-app-root .acct-mixed {
   margin-left: 3px; color: var(--text-muted); font-weight: 700; cursor: help;
 }
-/* ITEM 5: the table row's own version of the hero's "plus €640" side figure —
-   named outright rather than marked with an asterisk, since the group total
-   beside it no longer mixes currencies to begin with. */
+/* The "plus €640" side figure — a foreign total named outright beside a
+   household-currency total that (correctly) excludes it. Shared by the
+   table's group-total rows, the "Whose it is" owner rows and the Ring's
+   legend, so one tag cannot be styled three ways. */
 .budget-app-root .acct-group-other {
   margin-left: 6px; font-weight: 400; font-size: .82rem; color: var(--text-muted);
 }

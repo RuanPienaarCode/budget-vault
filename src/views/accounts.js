@@ -15,7 +15,7 @@ const { normalizeAmount } = require('../amount');
    display-only by design (tests/currency.test.cjs's own §7 pins that), so the
    ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
    this view's arithmetic, not that module's. */
-const { symbolOf, isForeign, currenciesIn } = require('../currency');
+const { symbolOf, isForeign } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -881,7 +881,18 @@ module.exports = function registerAccounts(ctx) {
      "Whose it is" with one row under it answers a question nobody asked. */
   function whoseItIs() {
     if (!ownerInPlay()) return null;
-    const rows = netByOwner(S.accounts, declaredOwners());
+    /* ISSUE 28: sourced the same way the hero and the table's group subtotals
+       already are — netByOwner() decides WHICH rows exist and in what order
+       (so an owner holding nothing but yuan still gets a row), and each row's
+       FIGURE is then re-derived from that owner's household-currency accounts
+       alone, with every other symbol restated beside it. The row used to add
+       every balance and hang an asterisk on the result; an asterisk does not
+       make R5 000 + ¥3 956 = 8 956 true. */
+    const rows = netByOwner(S.accounts, declaredOwners()).map(r => {
+      const { primary, others } = splitByCurrency(
+        S.accounts.filter(a => ownerKey(a.owner) === r.key));
+      return { ...r, net: roundedSum(primary), others };
+    });
     if (rows.length < 2) return null;
 
     const card = el('div', { class: 'card acct-owners' });
@@ -894,19 +905,19 @@ module.exports = function registerAccounts(ctx) {
     const widest = rows.reduce((m, r) => Math.max(m, Math.abs(r.net)), 0) || 1;
     for (const r of rows) {
       const pct = (Math.abs(r.net) / widest) * 100;
-      /* Same disclosure the hero and the table's group rows already carry: an
-         owner whose accounts span more than one currency gets this row's total
-         quietly adding unlike figures, exactly as the household total does —
-         so it gets the same asterisk, not a silent sum. */
-      const mixed = currenciesIn(S.accounts.filter(a => ownerKey(a.owner) === r.key), S.settings.currency).length > 1;
+      /* The same compact tag the table's group rows carry — "plus ¥ 3 956" —
+         rather than the asterisk that used to stand in for it. The tag names
+         what is NOT in the figure; the asterisk only warned that the figure
+         was wrong. */
+      const tag = otherCurrenciesTag(r.others);
       const line = el('button', { type: 'button',
         class: `acct-owner-row${view().owner === r.key ? ' is-on' : ''}`,
         'aria-pressed': String(view().owner === r.key),
-        'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) }) },
+        'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) + (tag ? ` ${tag}` : '') }) },
       el('div', { class: 'acct-owner-top' },
         el('span', { class: 'acct-owner-name' }, r.label),
         el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}` }, money(r.net),
-          ...(mixed ? [el('span', { class: 'acct-mixed', title: i18n.t('acct.mixedTitle') }, '*')] : []))),
+          ...(tag ? [el('span', { class: 'acct-group-other' }, ` ${tag}`)] : []))),
       el('span', { class: 'acct-mbar' },
         el('i', { class: r.net < 0 ? 'bg-danger' : '', style: `width:${pct.toFixed(1)}%` })),
       el('div', { class: 'acct-owner-sub' }, i18n.t('acct.group.count', { count: r.count })));
@@ -927,36 +938,48 @@ module.exports = function registerAccounts(ctx) {
   function whereItSits() {
     const groups = ACCT_GROUPS.map(([key]) => {
       const accts = S.accounts.filter(a => groupOf(a) === key);
+      /* ISSUE 28: this used to be roundedSum(accts) — every balance added
+         regardless of its own `currency:`, with an asterisk hung on the
+         result. The ring was the last figure on the page still doing it, so
+         the centre of the donut and the hero two lines above it printed two
+         different numbers for the same household. Sourced now exactly as the
+         hero is: the household's own currency summed, every other symbol
+         stated beside it in its own symbol, nothing converted. */
+      const { primary, others } = splitByCurrency(accts);
       return {
         key,
         colour: GROUP_COLOUR[key] || 'var(--color-accent)',
-        total: roundedSum(accts),
-        /* Same disclosure the hero and the table's group rows carry — see
-           currency.js's own header for why this is never a conversion. */
-        mixed: currenciesIn(accts, S.settings.currency).length > 1,
+        total: roundedSum(primary),
+        others,
       };
-    }).filter(g => g.total !== 0);
+      /* A group holding ONLY foreign money nets zero in the household's
+         currency but is not empty, so it is kept — it cannot be drawn as a
+         wedge, and appears in the legend at 0% with its own symbols beside
+         it, the same shape the table's group row already takes. Dropping it
+         would be the silent exclusion currency.js forbids. */
+    }).filter(g => g.total !== 0 || g.others.length);
 
     const drawn = groups.filter(g => g.total > 0).sort((x, y) => y.total - x.total);
     const negative = groups.filter(g => g.total < 0);
+    const foreignOnly = groups.filter(g => g.total === 0 && g.others.length);
     const sum = drawn.reduce((s, g) => s + g.total, 0);
     // The true net — what the hero states — for comparison against `sum`
     // below, which is only the positive half of it.
     const excluded = -negative.reduce((s, g) => s + g.total, 0);
 
-    /* Whole-card disclosure: the household spans more than one currency, the
-       same fact the hero states under its own number. Per-group marks (below,
-       on the legend and each wedge's tooltip) are the finer-grained version of
-       the same fact, for a group whose OWN total mixes symbols. */
-    const symbols = currenciesIn(S.accounts, S.settings.currency);
+    /* Whole-card disclosure, and now the same SENTENCE the hero carries —
+       "Plus ¥ 3 956 held in other currencies, not converted." — rather than
+       the retired "adds accounts held in more than one currency" line, which
+       described arithmetic this card no longer does. */
+    const { others: cardOthers } = splitByCurrency(S.accounts);
+    const cardOtherLine = otherCurrenciesLine(cardOthers);
 
     const card = el('div', { class: 'card acct-ring' });
     card.append(el('div', { class: 'card-h' },
       el('div', {},
         el('h2', {}, i18n.t('acct.where.title')),
         el('div', { class: 'sub' },
-          i18n.t('acct.where.sub')
-          + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : '')))));
+          i18n.t('acct.where.sub') + cardOtherLine))));
 
     const body = el('div', { class: 'body-pad acct-ring-body' });
     if (!sum) {
@@ -965,7 +988,11 @@ module.exports = function registerAccounts(ctx) {
          and no explanation, because `sum` is Σ of positive totals only and a
          household that owes more than it holds has none. Said now, either
          way, so the card never renders blank. */
-      if (negative.length) {
+      /* Foreign-only vault: nothing to draw, but there IS money — saying
+         "nothing to show yet" here would be flatly untrue. */
+      if (foreignOnly.length) {
+        body.append(el('div', { class: 'acct-ring-note' }, cardOtherLine.trim()));
+      } else if (negative.length) {
         /* States the AMOUNT as well as the names, the way the partial-negative
            path further down already does. Naming which groups were left out
            while withholding how much they came to is half a disclosure: on a
@@ -997,7 +1024,7 @@ module.exports = function registerAccounts(ctx) {
       label: i18n.t('acct.where.aria', {
         parts: drawn.map((g, i) => i18n.t('acct.where.part',
           { group: i18n.t(g.key), pct: shares[i] })).join(', '),
-      }) + (symbols.length > 1 ? i18n.t('acct.hero.mixed', { symbols: symbols.join(' · ') }) : ''),
+      }) + cardOtherLine,
     });
 
     let a0 = -Math.PI / 2;                  // 12 o'clock, so the largest slice starts at the top
@@ -1008,7 +1035,7 @@ module.exports = function registerAccounts(ctx) {
         fill: g.colour, stroke: themeColors(root).hole, 'stroke-width': '2',
       });
       tip(add, seg, `${i18n.t(g.key)}: ${money(g.total)} · ${shares[i]}%`
-        + (g.mixed ? ` — ${i18n.t('acct.mixedTitle')}` : ''));
+        + (g.others.length ? ` ${otherCurrenciesTag(g.others)}` : ''));
       a0 += sweep;
     });
     add('text', {
@@ -1017,14 +1044,19 @@ module.exports = function registerAccounts(ctx) {
     }).textContent = money(sum, 0);
 
     const legend = el('ul', { class: 'donut-legend acct-ring-legend' });
-    drawn.forEach((g, i) => {
-      legend.append(el('li', {},
-        el('i', { style: `background:${g.colour}` }),
-        el('span', { class: 'dl-name' }, i18n.t(g.key)),
-        el('span', { class: 'dl-val num' }, money(g.total, 0),
-          ...(g.mixed ? [el('span', { class: 'acct-mixed', title: i18n.t('acct.mixedTitle') }, '*')] : [])),
-        el('span', { class: 'dl-pct' }, `${shares[i]}%`)));
-    });
+    /* Drawn wedges first, then any group that holds only foreign money — it
+       has no wedge and no share of the ring, but it is listed rather than
+       dropped, so the legend still accounts for every account on the page. */
+    [...drawn.map((g, i) => [g, shares[i]]), ...foreignOnly.map(g => [g, '0'])]
+      .forEach(([g, pct]) => {
+        const tag = otherCurrenciesTag(g.others);
+        legend.append(el('li', {},
+          el('i', { style: `background:${g.colour}` }),
+          el('span', { class: 'dl-name' }, i18n.t(g.key)),
+          el('span', { class: 'dl-val num' }, money(g.total, 0),
+            ...(tag ? [el('span', { class: 'acct-group-other' }, ` ${tag}`)] : [])),
+          el('span', { class: 'dl-pct' }, `${pct}%`)));
+      });
     body.append(svg, legend);
     if (negative.length) {
       /* Named rather than just counted: the centre figure above is the sum of
