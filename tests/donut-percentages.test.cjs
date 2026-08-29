@@ -269,7 +269,9 @@ async function mountDashboard(files, period = '2026-07') {
     // tests/i18n.test.cjs already pins key parity; this pins that the VIEW
     // reads it rather than a hard-coded literal that happens to equal English.
     const i18n = require('../src/i18n');
-    for (const lang of ['af', 'de', 'es', 'fr', 'ja', 'zh']) {
+    /* Derived, not hand-listed: the hand-listed form silently skipped xh, zu
+       (24 Aug 2026) and pt, hi, id (29 Aug 2026). */
+    for (const lang of i18n.LANGUAGE_ORDER.filter(l => l !== 'en')) {
       i18n.setLanguage(lang);
       const label = i18n.t('dash.split.centerLabel');
       ok(label && label !== 'Total spent' && label !== 'dash.split.centerLabel',
@@ -314,5 +316,5 @@ async function mountDashboard(files, period = '2026-07') {
     eq(found.legend, found.aria, 'the ring legend % column matches the aria-label, slice for slice');
   }
 
-  console.log(`PASS — donut percentages: largest-remainder allocation sums to exactly 100 (six equal, three equal, an exact tie, a single slice, a zero slice), the tie-break is deterministic across runs, and the donut's centre figure is no longer mislabelled Total Spent in any of seven languages (${checks} assertions).`);
+  console.log(`PASS — donut percentages: largest-remainder allocation sums to exactly 100 (six equal, three equal, an exact tie, a single slice, a zero slice), the tie-break is deterministic across runs, and the donut's centre figure is no longer mislabelled Total Spent in any of the ${require('../src/i18n').LANGUAGE_ORDER.length} shipped languages (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -86,13 +86,13 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
-    renderHero(hero, breakdown, M, target, earmarks);
+    renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies);
     renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
   }
 
   /* ------------------------------- the hero ------------------------------ */
-  function renderHero(hero, breakdown, M, target, earmarks) {
+  function renderHero(hero, breakdown, M, target, earmarks, otherCurrencies) {
     const band = breakdown.band;
     const wrap = el('div', { class: `score-hero is-${band}` });
 
@@ -110,6 +110,24 @@ module.exports = function registerScore(ctx) {
     const counted = M.countedPeriods;
     wrap.append(el('p', { class: 'score-hero-sub' },
       counted ? i18n.t('score.hero.sub', { count: counted }) : i18n.t('dash.health.subNone')));
+
+    /* ISSUE 30. Every pillar of this score is a RATIO — months of cover,
+       savings rate, instalment share, net-worth multiple — and a ratio built
+       across currencies does not overstate, it inverts: a rand emergency fund
+       over a rupiah-polluted spend average showed "0.0 months" in red where
+       the true reading was 6.7 in green, and the total fell 26 points. Both
+       legs are taken inside one currency now (health-data.js), which means
+       this page is scoring PART of the household's money — and a score that
+       silently ignores an account is exactly the silent exclusion
+       currency.js:14 rules out. Reuses the Dashboard's wording rather than a
+       second sentence for the same fact. */
+    if (otherCurrencies && otherCurrencies.length) {
+      wrap.append(el('p', { class: 'score-hero-sub' },
+        i18n.t('dash.foreignExcluded', {
+          count: otherCurrencies.length,
+          symbols: otherCurrencies.map(([sym]) => sym).join(' · '),
+        })));
+    }
 
     /* The one sentence a reader takes away, pitched at the band they are in
        rather than a single generic line. */

@@ -49,6 +49,25 @@ const CODE_BY_COUNTRY = {
 };
 const codeForCountry = c => CODE_BY_COUNTRY[String(c || '').trim().toLowerCase()] || '';
 
+/* The symbols that identify exactly ONE currency, and only those.
+
+   This is the direction the module header warns about, so the list earns its
+   place by being strictly the unambiguous half. "$" is missing on purpose —
+   the US, Australia, Canada and Singapore all use it — and so is "R", which
+   is rand here and real in Brazil. "R$" IS listed and is a different string
+   from "R"; the wizard stores the symbol verbatim, so the two never collide.
+
+   Used only to SEED the wizard's code field after the country has had its
+   turn, never to decide an account's currency at render time. A seed the
+   reader can see and correct is a different thing from a guess made silently
+   inside an arithmetic path — the second is what codeOf() refuses to do. */
+const CODE_BY_SYMBOL = {
+  '€': 'EUR', '£': 'GBP', '¥': 'CNY', '₹': 'INR', 'Rp': 'IDR', 'R$': 'BRL',
+  '₩': 'KRW', '₺': 'TRY', '฿': 'THB', '₪': 'ILS', '₽': 'RUB', '₫': 'VND',
+  'zł': 'PLN', 'CHF': 'CHF',
+};
+const codeForSymbol = sym => CODE_BY_SYMBOL[String(sym == null ? '' : sym).trim()] || '';
+
 /* A rate this old is still USED — refusing to convert because the network was
    down for a week would be the app deciding it knows better than the reader —
    but it is labelled everywhere it appears. Seven days, because that is one
@@ -232,6 +251,6 @@ function canConvert(settings, table) {
 }
 
 module.exports = {
-  STALE_AFTER_DAYS, CODE_BY_COUNTRY, codeForCountry, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
+  STALE_AFTER_DAYS, CODE_BY_COUNTRY, codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
   rateBetween, convert, stalenessOf, convertAccounts, canConvert,
 };

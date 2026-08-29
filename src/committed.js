@@ -294,6 +294,16 @@ function cardCommitments({ accounts, from, to }) {
       detail: a.institution || '',
       due,
       amount: owed,
+      /* ISSUE 30. A card commitment is denominated in ITS OWN account's
+         currency, and until now the item carried no way to say so — the
+         "What's counted" table printed a Rp 4 500 000 settlement as
+         "R 4 500 000". That table exists precisely so a reader can check a
+         figure, and a line item mislabelled by a factor of the exchange rate
+         fails at the one job it has. Services and debts are not stamped:
+         Services.md and Debts.md carry no currency column at all, so those
+         items ARE in the household's currency by construction (see issue #30
+         on the four ledgers). */
+      currency: a.currency || '',
       basis: 'settled',
     });
   }

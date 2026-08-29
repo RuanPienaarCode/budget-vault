@@ -122,11 +122,30 @@ ok(/R 18 700,00 of headroom/.test(textOf(underLimits)), 'reports exact interest 
 ok(/16 000,00 of headroom/.test(textOf(underLimits)), 'reports TFSA headroom (36 000 - 20 000)');
 ok(/no exemption/.test(textOf(underLimits)), 'flags foreign interest as unexempt');
 
-// Threading the household symbol through must not change the arithmetic —
-// only which symbol and spacing the same figures print in.
+/* ISSUE 30 — this assertion is REVERSED on purpose, and the reversal is the
+   fix rather than a relaxation.
+
+   It used to require that a household symbol passed in replaced the country
+   default, because an earlier bug printed South Africa's "R" on a "$"
+   household's callouts. That fix went one notch too far: it then stamped the
+   household's symbol onto figures that are not the household's. On a vault
+   with `country: za` and `currency: Rp`, the under-65 interest exemption —
+   R23 800, a statutory RAND figure carrying `unit: 'ZAR per tax year'` in
+   src/facts.js — printed as "Rp 23 800,00", and `localInterest <= exempt`
+   compared a rupiah amount against a rand constant and printed the difference
+   between them as one number.
+
+   Every figure this function touches is rand by construction: the reader's own
+   come off an IRP5/IT3, which are South African documents, and the thresholds
+   are SARS statutes. A household that budgets in another currency still files
+   in rand. So the symbol is the PROFILE's, whatever the caller passes, and
+   views/tax.js prints a line above these callouts saying the page is in rand
+   when the two differ. */
 const underLimitsUsd = za.figureChecks(original, 2026, filed, '$');
-ok(/\$ 18 700,00 of headroom/.test(textOf(underLimitsUsd)),
-  'the household symbol ($) replaces the country default (R) when supplied');
+ok(/R 18 700,00 of headroom/.test(textOf(underLimitsUsd)),
+  'a SARS threshold stays in RAND even for a household that budgets in another currency — the figures on an IRP5 are rand whatever the household spends in');
+ok(!/\$/.test(textOf(underLimitsUsd)),
+  'and the household symbol appears nowhere on a page of statutory rand figures');
 
 const overTfsa = za.figureChecks([{ code: '4219', description: '', source: '', amount: 40000 }], 2026, filed);
 ok(overTfsa.some(m => !m.ok && /40%/.test(m.text)), 'TFSA over the annual limit warns about the penalty');

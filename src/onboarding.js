@@ -42,7 +42,7 @@ const { PERIOD_PRESETS, periodLengthOptions, TYPE_ORDER, MONTHS, inputMode } = r
 const { serializeBudgetFile, budgetRangeNote, BUDGET_FRONTMATTER } = require('./budget-file');
 const { periodDaysOrZero } = require('./dates');
 const { normalizeAmount } = require('./amount');
-const { normalizeCode, codeForCountry } = require('./fx');
+const { normalizeCode, codeForCountry, codeForSymbol } = require('./fx');
 const { todayIso, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
 const { safeSeg } = require('./vault-path');
 /* yamlStr, not hand-rolled quoting. This file used to write currency and
@@ -753,7 +753,13 @@ class OnboardingWizard extends Modal {
            box and a puzzle. Only ever a SEED: it is theirs to correct, and
            anything they have typed is left alone. */
         if (mode === 'on' && !this.data.currencyCode) {
-          this.data.currencyCode = codeForCountry(this.data.country);
+          /* Country first, because country -> code is a fact; the SYMBOL is
+             a fallback and covers only the unambiguous ones (see fx.js's
+             CODE_BY_SYMBOL — "$" and "R" are deliberately absent). Either way
+             it is a seed in a field the reader can see and correct, never a
+             value used silently. */
+          this.data.currencyCode = codeForCountry(this.data.country)
+            || codeForSymbol(this.currencySymbol());
         }
         this.renderStep();
       });

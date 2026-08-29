@@ -110,10 +110,40 @@ for (const code of Object.keys(PROFILES)) {
 
 // localeFor falls back to za for unknown/blank input — every pre-country install
 // (no `country:` in Settings.md) relies on this, so it must never return undefined.
-assert.strictEqual(localeFor('zzz'), PROFILES.za, 'localeFor(unknown) must fall back to za');
-assert.strictEqual(localeFor(''), PROFILES.za, 'localeFor(empty) must fall back to za');
-assert.strictEqual(localeFor(undefined), PROFILES.za, 'localeFor(undefined) must fall back to za');
+/* ISSUE 30 — an unknown country and an ABSENT one are deliberately different
+   answers now, and the distinction is the fix.
+
+   Absent still means za: that is the documented default for every vault
+   written before `country` existed, and moving it would swap the tax page
+   under people who never chose one.
+
+   A value that was actually TYPED and is not recognised falls to `other`,
+   which exists for exactly this. It used to fall to za, while loan-math.js's
+   loanProfileFor() — reading the same key — fell to GENERIC. So a hand-edited
+   `country: nl` in Settings.md, a file this app documents as user-editable,
+   put one reader in two countries at once: the full SARS checklist, ITR12 and
+   the R23 800 interest exemption on one page, a generic loan profile on
+   another. Handing South African tax rules to someone who typed "nl" is the
+   more dangerous of the two ways to be wrong, because those rules look
+   authoritative and are not theirs. */
+assert.strictEqual(localeFor('zzz'), PROFILES.other, 'localeFor(unknown) falls back to `other` — no tax law rather than the wrong country\'s');
+assert.strictEqual(localeFor('nl'), PROFILES.other, 'a plausible-looking country this app has no law for gets none');
+assert.strictEqual(localeFor(''), PROFILES.za, 'localeFor(empty) still means za — the documented pre-`country` default');
+assert.strictEqual(localeFor(undefined), PROFILES.za, 'localeFor(undefined) still means za, for the same reason');
 assert.strictEqual(localeFor('ZA '), PROFILES.za, 'localeFor is case/space-insensitive');
+
+/* The two resolvers read the same key and must agree about what it means. */
+{
+  const { loanProfileFor } = require('../src/loan-math');
+  for (const code of [undefined, '', 'za', 'us', 'nl', 'zzz']) {
+    const knownToLocale = localeFor(code) !== PROFILES.other || (code || 'za') === 'other';
+    const knownToLoans = loanProfileFor(code).hasBuyingCosts;
+    // Only za has buying costs, so "loans knows this country" implies za.
+    assert.ok(!knownToLoans || localeFor(code) === PROFILES.za,
+      `localeFor and loanProfileFor must not disagree about ${JSON.stringify(code)}`);
+    void knownToLocale;
+  }
+}
 
 if (failures) { console.error(`\nFAIL — ${failures} profile issue(s) above.`); process.exit(1); }
 console.log(`PASS — all ${Object.keys(PROFILES).length} country profiles carry the full key set the views read.`);

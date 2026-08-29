@@ -88,13 +88,21 @@ const syncOptions = ctx.syncOptions;
 const accountFixed = () => [['', i18n.t('tx.allAccounts')]];
 const categoryFixed = () => [['', i18n.t('tx.allCategories')], ['__none__', i18n.t('tx.uncategorised')]];
 
+/* Every shipped language except English, read off i18n.js rather than
+   hand-listed. The hand-listed form here missed xh and zu (24 Aug 2026) and
+   then pt, hi and id (29 Aug 2026) — five languages whose filter labels this
+   file claimed to cover and never touched. Derived, a new language is
+   covered the moment it lands in LANGUAGE_ORDER. */
+const LANGS = i18n.LANGUAGE_ORDER.filter(l => l !== 'en');
+ok(LANGS.length >= 11, `every non-English shipped language is exercised (found ${LANGS.length})`);
+
 const ACCOUNTS = ['FNB Cheque', 'Ninety One TFSA'];
 const CATEGORIES = ['Freelance', 'Groceries'];
 
 /* ---- 1. the reported bug: language changes, nothing else does ---- */
 /* This is the assertion that fails on the old skip-check. Values are byte-for-byte
    identical across the switch — only the translated fixed labels move. */
-for (const lang of ['af', 'de', 'es', 'fr', 'ja', 'zh']) {
+for (const lang of LANGS) {
   i18n.setLanguage(lang);
   const acct = new FakeSelect();
   const cat = new FakeSelect();
@@ -164,7 +172,7 @@ eq(gone.value, '', 'a selection whose account disappeared falls back to all-acco
 /* ---- 5. every language actually has these three strings ---- */
 /* A missing key falls back to English, which would make check 1 pass for the
    wrong reason — the label would "switch" only because it was English already. */
-for (const lang of ['af', 'de', 'es', 'fr', 'ja', 'zh']) {
+for (const lang of LANGS) {
   i18n.setLanguage(lang);
   for (const key of ['tx.allAccounts', 'tx.allCategories', 'tx.uncategorised']) {
     i18n.setLanguage('en');

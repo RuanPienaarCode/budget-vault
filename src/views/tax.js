@@ -195,10 +195,21 @@ module.exports = function registerTax(ctx) {
   function renderChecks(t) {
     if (!checksBox) return;
     checksBox.empty();
-    // The household symbol (S.settings.currency), not the country profile's
-    // default — see locale.js's fmtAmt for the bug this closes: a household
-    // set to "$" under country za used to see these callouts labelled "R".
-    for (const m of locale().figureChecks(t.figures || [], +S.taxYear, t, S.settings.currency) || []) {
+    /* ISSUE 30. This page is denominated in the TAX AUTHORITY's currency, not
+       the household's: the figures are read off an IRP5/IT3 and the
+       thresholds they are checked against are statutes. When those two differ
+       — a household budgeting in rupiah that still files with SARS — the page
+       has to say so once, at the top, rather than let a reader assume the
+       callouts below are in the currency the rest of the app speaks. See
+       locale.js's fmtAmt header for the two opposite bugs that led here. */
+    const loc = locale();
+    if (loc.currency && S.settings.currency && loc.currency !== S.settings.currency) {
+      checksBox.append(el('p', { class: 'tax-check' },
+        icoEl(['info', 'alert-circle']), ' ',
+        `Every figure below is in ${loc.currency} — tax figures come off your certificates and the thresholds are ${loc.authority || 'the tax authority'}'s, `
+        + `so this page is in ${loc.currency} even though the rest of your budget is in ${S.settings.currency}. Nothing is converted.`));
+    }
+    for (const m of loc.figureChecks(t.figures || [], +S.taxYear, t, S.settings.currency) || []) {
       checksBox.append(el('p', { class: `tax-check ${m.ok ? 'tax-check-ok' : 'tax-check-warn'}` },
         icoEl(m.ok ? ['circle-check', 'check-circle'] : ['alert-triangle', 'triangle-alert']), ' ', m.text));
     }

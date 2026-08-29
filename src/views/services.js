@@ -9,6 +9,7 @@ const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
 const { isSplitPart } = require('../tx-role');
+const { symbolOf, isForeign } = require('../currency');
 
 module.exports = function registerServices(ctx) {
   const { S, $, app, money, toast, writeFile } = ctx;
@@ -28,19 +29,57 @@ module.exports = function registerServices(ctx) {
      per service. */
   function chargeIndex() {
     const rows = [];
-    /* Parts are skipped, parents are kept: this is asking what the MERCHANT
+    /* ISSUE 28/30. Two pools, not one, and the split is the whole fix.
+
+       `Services.md` has no currency column, so `s.amount` is always in the
+       household's currency. The charges it is compared against are raw
+       amounts from whichever account they landed in. Compared blind, a
+       Netflix subscription listed at R199 and really billed $15.99 on a
+       dollar card produced `agrees: false`, `diff: -183.01` and a GREEN
+       "really R 16" pill reading "Your bank is charging R 15.99, not
+       R 199.00" — a 92% price cut, asserted as fact, on a price that never
+       moved. The 4% band below was widened to absorb a currency wobble; it
+       cannot absorb a 12x symbol mismatch.
+
+       So PRICE is compared only against charges in the household's own
+       currency, and LIVENESS still follows every charge whatever its
+       currency — "did this merchant bill me" is a question about events, not
+       amounts, and a subscription paid from a euro card is no less alive. A
+       service with only foreign charges gets no price verdict at all and
+       says so, rather than a confident wrong one.
+
+       Parts are skipped, parents are kept: this is asking what the MERCHANT
        charged, and a split is the reader slicing one charge into categories
        after the fact. Feeding both would show a subscription being billed twice
        a month, and — worse, because it is silent — would drag the median of the
        last three charges that comparePrice() and nextExpected() are built on. */
-    for (const f of Object.values(S.txFiles)) for (const r of f.rows) if (!isSplitPart(r)) rows.push(r);
+    const homeRows = [];
+    for (const f of Object.values(S.txFiles)) {
+      const acct = typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(f.label) : null;
+      const foreign = isForeign(acct, S.settings.currency);
+      for (const r of f.rows) {
+        if (isSplitPart(r)) continue;
+        const stamped = foreign ? { ...r, _symbol: symbolOf(acct, S.settings.currency) } : r;
+        rows.push(stamped);
+        if (!foreign) homeRows.push(stamped);
+      }
+    }
     const today = todayIso();
     const out = new Map();
     for (const s of S.services) {
       const m = matchCharges(s, rows);
-      const stats = chargeStats(m.charges);
+      const home = matchCharges(s, homeRows);
+      const stats = chargeStats(home.charges);
+      /* The symbols this service was actually billed in, other than the
+         household's — named on the row so a reader can see WHY no price
+         verdict is offered rather than just noticing one is missing. */
+      const foreignSymbols = [...new Set(m.charges.map(r => r._symbol).filter(Boolean))];
       out.set(s, {
         stats,
+        foreignSymbols,
+        /* Charges exist, but none of them in a currency this figure can be
+           compared against. */
+        priceUncomparable: !home.charges.length && m.charges.length > 0,
         // Liveness follows the MERCHANT — every description the tokens hit —
         // because a renamed debit order is not a cancellation.
         status: chargeStatus(chargeStats(m.all), s.cycle, today),
@@ -112,6 +151,15 @@ module.exports = function registerServices(ctx) {
       out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`,
         title: `Your bank is charging ${money(c.price.actual)}, not ${money(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.` },
       `really ${money(c.price.actual, 0)}`));
+    } else if (c.priceUncomparable) {
+      /* Neutral, not a warning: nothing is wrong with this service, the app
+         simply cannot check its price. Saying so beats both alternatives —
+         a silent blank reads as "checked and fine", and the old behaviour
+         asserted a price change that never happened. */
+      out.push(el('span', { class: 'category-badge badge-dup',
+        title: `This service is billed in ${c.foreignSymbols.join(' · ')}, and the amount on this page is in ${S.settings.currency}. `
+          + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.' },
+      `billed in ${c.foreignSymbols.join(' · ')}`));
     }
     return out;
   }

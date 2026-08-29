@@ -13,6 +13,7 @@ const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
 const { activeDebts, cardOverlap } = require('../worth');
 const { todayIso } = require('../dates');
+const { symbolOf, isForeign } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
@@ -273,7 +274,32 @@ module.exports = function registerDebts(ctx) {
     const list = active();
     if (!list.length) return;
 
-    const tx = txInPeriod(S.period).filter(t => !t.excluded);
+    /* ISSUE 30. Two currency problems in one line, and the second is the one
+       that has been here longest.
+
+       CURRENCY: `Debts.md` has no currency column, so every debt figure —
+       balance, payment, the `planned` totals below — is in the household's
+       own currency by construction. The transactions matched against them
+       were not: a rand debt paid from a dollar account read as ~94% short
+       forever, and a payment made in another currency inflated the `paid`
+       side of a bar drawn against a household-currency `planned`.
+
+       BUDGET SCOPE: this path uses txInPeriod directly rather than
+       summaryInRange, so unlike every other spend figure in the app it never
+       dropped `budget: false` accounts either — an account explicitly opted
+       OUT of budget totals still fed these payment bars. Both filters applied
+       here, and what they exclude is counted so the note below can say so
+       rather than leaving a bar quietly short. */
+    const allTx = txInPeriod(S.period).filter(t => !t.excluded);
+    const txAccountOf = t => (typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(t.label) : null);
+    const tx = allTx.filter(t => {
+      const a = txAccountOf(t);
+      if (a && a.in_budget === false) return false;
+      return !isForeign(a, S.settings.currency);
+    });
+    const droppedForeign = new Set(allTx
+      .filter(t => isForeign(txAccountOf(t), S.settings.currency))
+      .map(t => symbolOf(txAccountOf(t), S.settings.currency)));
     const linked = list.filter(d => d.category);
     const unlinked = list.filter(d => !d.category);
 
@@ -374,6 +400,15 @@ module.exports = function registerDebts(ctx) {
       note.append(el('span', { class: 'text-muted' },
         `${money(committedAll)} a month across ${list.length} debt${list.length === 1 ? '' : 's'}. ` +
         `No income recorded in ${iv ? avgWindow : 'this period'}, so there is no ratio to show yet.`));
+    }
+    /* What the payment bars above left out, said rather than silently short.
+       currency.js:14 is explicit that this app does not exclude — so where it
+       must (a payment in another currency cannot be counted toward a
+       household-currency plan), it names what it excluded. */
+    if (droppedForeign.size) {
+      note.append(el('div', { class: 'text-muted', style: 'margin-top:6px' },
+        `Payments made from accounts in ${[...droppedForeign].join(' · ')} are not counted above — `
+        + `there is no exchange rate here to measure them against a ${S.settings.currency} plan.`));
     }
     /* The reconciliation line stays scoped to what is actually traceable —
        mixing an all-debts "planned" with a linked-only "paid" is what produced

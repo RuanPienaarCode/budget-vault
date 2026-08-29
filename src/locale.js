@@ -19,17 +19,33 @@
 const { fact, limitsFor: zaLimitsForFact } = require('./facts');
 const { formatAmount } = require('./currency');
 
-/* `currency` is the HOUSEHOLD symbol (S.settings.currency), threaded in from
-   views/tax.js's `money`, and takes priority over the profile's own default —
-   a household set to "$" under country za must see its own symbol on these
-   callouts, not South Africa's "R". Falls back to the profile's default only
-   when no household symbol is supplied (the locale-profiles guard test calls
-   figureChecks() directly, with no household in scope, and every OTHER
-   profile's callouts are unaffected since only za's figureChecks prints
-   money at all). Delegates the actual formatting to currency.js's
-   formatAmount so this is not a second implementation of money()'s rules —
-   see that function for what was disagreeing (symbol source, sign placement,
-   the space, and the missing non-finite guard). */
+/* `currency` is a symbol the CALLER believes these figures are in. Delegates
+   the actual formatting to currency.js's formatAmount so this is not a second
+   implementation of money()'s rules — see that function for what was
+   disagreeing (symbol source, sign placement, the space, and the missing
+   non-finite guard).
+
+   ISSUE 30 — read the argument order carefully, because it was reversed once
+   and both directions were wrong in different ways.
+
+   Originally this printed the PROFILE's symbol, and a household set to "$"
+   saw its own tax callouts labelled "R". That was fixed by preferring the
+   household symbol, and the pendulum went one notch too far: it then stamped
+   the household symbol onto figures that are not the household's. On a vault
+   with `country: za` and `currency: Rp`, the under-65 interest exemption —
+   R23 800, a statutory RAND figure from src/facts.js carrying
+   `unit: 'ZAR per tax year'` — rendered as "Rp 23 800,00", and the comparison
+   `localInterest <= exempt` ran a rupiah amount against a rand constant and
+   printed the DIFFERENCE as a single figure.
+
+   The resolution is that neither symbol is a property of this function: the
+   caller knows which currency the figures it is passing are denominated in,
+   and za's figureChecks passes ZA_CURRENCY explicitly because every figure on
+   a SARS tax page is rand by construction — an IRP5 is a South African
+   document and its source-code amounts are rand whatever currency the
+   household happens to budget in. The fallback to the profile's own symbol
+   remains for the locale-profiles guard test, which calls figureChecks()
+   directly with no currency in scope. */
 const fmtAmt = (p, v, currency) => formatAmount(currency || p.currency, v, 2, p);
 
 /* Sum the figure rows carrying any of the given codes. */
@@ -200,7 +216,16 @@ const PROFILES = {
        is hard-coded because the plugin holds no date of birth; over-65s get a
        higher one and the message says so. */
     figureChecks(figures, year, t, currency) {
-      const fmt = v => fmtAmt(this, v, currency);
+      /* RAND, deliberately, and NOT the household symbol the caller passes.
+         Every figure this function touches is rand: the reader's own numbers
+         come off an IRP5/IT3 (South African documents, denominated in rand),
+         and the thresholds they are compared against are SARS statutes. A
+         household that budgets in another currency still files in rand, and
+         the page says so above these callouts. `currency` is accepted and
+         ignored here so the signature stays uniform across profiles — see
+         fmtAmt's header for the two opposite bugs this settles. */
+      void currency;
+      const fmt = v => fmtAmt(this, v, this.currency);
       const msgs = [];
 
       const localInterest = sumCodes(figures, '4201');
@@ -259,7 +284,12 @@ const PROFILES = {
       return msgs;
     },
     safetyNote: 'Always type sars.gov.za into the browser yourself — SARS never asks for passwords or OTPs by email, SMS or phone.',
-    seedSteps: year => [
+    /* Method shorthand, not an arrow, so `this` is the profile — the TFSA
+       step below reads this.currency/thousands/decimal to format a limit it
+       must not hard-code. Called as loc.seedSteps(year) (views/tax.js), so
+       the binding is always the profile it belongs to. */
+    seedSteps(year) {
+      return [
       { step: 'Confirm taxpayer status on eFiling', notes: 'Maintain Registered Particulars — provisional vs standard' },
       { step: 'Check auto-assessment status on the eFiling dashboard', notes: '' },
       { step: 'Gather documents', notes: 'See the Documents list below' },
@@ -267,7 +297,18 @@ const PROFILES = {
       { step: 'Review pre-populated data', notes: 'IRP5, medical certificate, bank IT3(b)s — check both banks reflect' },
       { step: 'Add freelance income & deductible expenses', notes: 'Invoiced total; home office %, software, equipment, internet/phone portion, accounting fees' },
       { step: 'Declare investment income', notes: 'IT3(b)/IT3(c) from your investment provider: interest, dividends, capital gains on sales' },
-      { step: 'Declare TFSA contributions', notes: 'Contribution certificate; check R36 000/yr & R500 000 lifetime limits' },
+      /* ISSUE 30 — built from facts.js rather than written out, because a
+         literal here outlives the fix that corrected it everywhere else.
+         This step hard-coded "R36 000/yr" while limitsFor(2027) returns
+         46 000 and figureChecks (200 lines up) printed "the R 46 000,00
+         annual limit" — two figures for one statutory limit, one screen
+         apart. Worse, seeded steps are WRITTEN to Tax/<year>.md, so the
+         stale number persisted in the reader's vault long after the code
+         was right. src/facts.js:207-210 exists to end exactly this; the
+         earlier pass fixed figureChecks and missed the seed prose. */
+      { step: 'Declare TFSA contributions',
+        notes: `Contribution certificate; check the ${fmtAmt(this, zaLimitsFor(year).tfsa, this.currency)}/yr `
+          + `& ${fmtAmt(this, fact('za.tfsa.lifetime'), this.currency)} lifetime limits` },
       { step: 'Claim out-of-pocket medical expenses', notes: 'Qualifying expenses not covered by the aid' },
       { step: 'Submit the ITR12', notes: '' },
       { step: 'Check the ITA34 against your own figures', notes: 'Assessed taxable income should account for every income figure you captured — anything missing was either exempt or omitted' },
@@ -275,7 +316,8 @@ const PROFILES = {
       { step: 'Respond to SARS verification requests', notes: 'Within the timeframe SARS gives' },
       { step: `IRP6 provisional return ${year + 1} — period 1`, due: `${year}-08-31`, notes: 'Provisional taxpayers only — mark N/A if standard' },
       { step: `IRP6 provisional return ${year + 1} — period 2`, due: `${year + 1}-02-28`, notes: 'Provisional taxpayers only — mark N/A if standard' },
-    ],
+      ];
+    },
     seedDocs: () => [
       { name: 'IRP5 / IT3(a) employee certificate', source: 'Employer', notes: 'Usually pre-populated' },
       { name: 'IT3(b) interest certificate', source: 'Your bank', notes: 'One per bank you hold accounts with' },
@@ -629,8 +671,29 @@ const COUNTRY_ORDER = ['za', 'us', 'uk', 'eu', 'au', 'ca', 'cn', 'other'];
 
 /* Resolve a Settings.md `country` value to a profile; unknown/missing → za
    (every install before the country setting existed was South African). */
+/* ISSUE 30 — an UNKNOWN country resolves to `other`, not to South Africa.
+
+   This and loan-math.js's loanProfileFor() read the same `country` key and
+   used to disagree about what an unrecognised value meant: this one returned
+   PROFILES.za, that one returned GENERIC. A hand-edited `country: nl` in
+   Settings.md — a plain markdown file this app documents as user-editable —
+   therefore put one reader in two countries at once, handed them the full
+   SARS checklist, ITR12 and the R23 800 interest exemption, and gave them a
+   generic loan profile alongside it.
+
+   `other` is the honest answer, and it exists precisely for this: a country
+   this app has no tax law for gets no tax law. Serving South African rules to
+   someone who typed "nl" is the more dangerous of the two ways to be wrong,
+   because those rules look authoritative and are not theirs.
+
+   A MISSING or blank code still means za — that is the documented default for
+   every vault written before `country` existed, and changing it would move
+   the tax page under people who never chose one. Only a value that was
+   actually typed and is not recognised falls to `other`. */
 function localeFor(code) {
-  return PROFILES[(code || 'za').toString().trim().toLowerCase()] || PROFILES.za;
+  const raw = code == null ? '' : String(code).trim().toLowerCase();
+  if (!raw) return PROFILES.za;
+  return PROFILES[raw] || PROFILES.other;
 }
 
 module.exports = { PROFILES, COUNTRY_ORDER, localeFor };

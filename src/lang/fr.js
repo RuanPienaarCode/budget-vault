@@ -435,7 +435,7 @@ module.exports = {
   'tx.col.account': 'Compte',
   'tx.col.category': 'Catégorie',
   'tx.col.amount': 'Montant',
-  'tx.col.excl': 'Excl. budget',
+  'tx.col.excl': 'Hors budget',
   'tx.col.note': 'Note',
   'tx.col.split': 'Répartir',
   'tx.col.actions': 'Actions de ligne',

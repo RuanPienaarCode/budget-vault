@@ -105,22 +105,48 @@ for (const [lang, table] of Object.entries(TABLES)) {
 }
 
 /* ---- 4. plural categories per language ---- */
-/* English, Afrikaans, German, Spanish: plural at 0. */
-for (const lang of ['en', 'af', 'de', 'es']) {
-  eq(pluralCategory(lang, 1), 'one', `${lang}: 1 is singular`);
-  eq(pluralCategory(lang, 0), 'other', `${lang}: 0 takes the plural`);
-  eq(pluralCategory(lang, 2), 'other', `${lang}: 2 takes the plural`);
-}
-/* French: 0 takes the singular alongside 1. */
-eq(pluralCategory('fr', 0), 'one', 'fr: 0 is singular');
-eq(pluralCategory('fr', 1), 'one', 'fr: 1 is singular');
-eq(pluralCategory('fr', 2), 'other', 'fr: 2 is plural');
-/* Chinese, Japanese: one noun form, always. */
-for (const lang of ['zh', 'ja']) {
-  for (const n of [0, 1, 2, 11]) {
-    eq(pluralCategory(lang, n), 'other', `${lang}: ${n} uses the single form`);
+/* Declared per language rather than looped over a hand-written subset. The
+   subset form shipped here until 29 Aug 2026 and it had gone quietly stale
+   twice: xh and zu (24 Aug) and then pt, hi and id (29 Aug) all landed without
+   anyone adding them, so five of the twelve shipped with their plural rule
+   asserted nowhere. The completeness check at the bottom is the part that
+   stops that happening a third time — a new table with no entry here fails,
+   rather than being silently skipped.
+
+     'plural-at-zero'  — the ordinary n === 1 rule. 0 takes the plural.
+     'singular-at-zero'— 0 joins 1 in the singular (ZERO_IS_SINGULAR).
+     'one-form'        — a count never changes the noun (ONE_FORM). */
+const PLURAL_RULE = {
+  en: 'plural-at-zero',   // 0 files, 1 file, 2 files
+  af: 'plural-at-zero',
+  de: 'plural-at-zero',
+  es: 'plural-at-zero',
+  xh: 'plural-at-zero',   // Nguni plurals change a class prefix, same rule picks it
+  zu: 'plural-at-zero',
+  fr: 'singular-at-zero', // 0 fichier, 1 fichier, 2 fichiers
+  pt: 'singular-at-zero', // CLDR pt: i = 0..1
+  hi: 'singular-at-zero', // CLDR hi: i = 0 or n = 1
+  zh: 'one-form',
+  ja: 'one-form',
+  id: 'one-form',         // plurality is reduplication, never a numeral agreement
+};
+for (const [lang, rule] of Object.entries(PLURAL_RULE)) {
+  ok(TABLES[lang], `PLURAL_RULE names '${lang}', which must actually ship`);
+  if (rule === 'one-form') {
+    for (const n of [0, 1, 2, 11]) {
+      eq(pluralCategory(lang, n), 'other', `${lang}: ${n} uses the single form`);
+    }
+    continue;
   }
+  eq(pluralCategory(lang, 1), 'one', `${lang}: 1 is singular`);
+  eq(pluralCategory(lang, 2), 'other', `${lang}: 2 takes the plural`);
+  eq(pluralCategory(lang, 0), rule === 'singular-at-zero' ? 'one' : 'other',
+    `${lang}: 0 takes the ${rule === 'singular-at-zero' ? 'singular' : 'plural'}`);
 }
+/* The ratchet: every shipped table must be classified above. */
+eq(Object.keys(TABLES).filter(l => !(l in PLURAL_RULE)), [],
+  'a language ships with no plural rule declared in PLURAL_RULE — add it there, ' +
+  'and to ONE_FORM / ZERO_IS_SINGULAR in i18n.js if it is not the ordinary rule');
 
 /* ---- 5. resolution order and interpolation ---- */
 setLanguage('en');

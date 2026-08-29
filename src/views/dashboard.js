@@ -13,7 +13,7 @@ const { todayIso } = require('../dates');
 const { allocatedShare } = require('../money-flow');
 const { worth, cardOverlap } = require('../worth');
 const { owedSummary } = require('../owed-math');
-const { currenciesIn, symbolOf, splitByCurrency, primaryTotal } = require('../currency');
+const { currenciesIn, symbolOf, isForeign, splitByCurrency, primaryTotal } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
@@ -356,6 +356,13 @@ module.exports = function registerDashboard(ctx) {
         settleMonthly: !!a.settle_monthly,
         settleDay: a.settle_day || 0,
         institution: a.institution || '',
+        /* ISSUE 30. One field, added at the one place this list is built.
+           Everything downstream — cashOnHand, cardsOwed, cardCommitments,
+           settlesMonthly — is currency-agnostic arithmetic that is correct
+           the moment its input is homogeneous, so the fix is to give the list
+           the dimension it should always have had and then group on it,
+           rather than to teach committed.js a new rule. */
+        currency: symbolOf(a, S.settings.currency),
       };
     });
 
@@ -388,15 +395,62 @@ module.exports = function registerDashboard(ctx) {
       }
     }
 
+    /* ISSUE 30 — one card per currency, computed by the same code.
+
+       "What's left" was the worst figure on the page: cash, committed, card
+       due and free were four terms of one equation, all four summed across
+       currencies, and only the FIRST carried a disclosure. Measured on a
+       two-currency vault it read "R 5 017 000 − R 0 − R 4 500 000 =
+       R 517 000 actually free · R 24 619 a day" where the truth was R 17 000
+       free and R 809 a day — over by a factor of thirty, on the one number
+       that answers "how much is safe to spend".
+
+       Both obvious repairs are defects. Summing gives the figure above.
+       FILTERING foreign accounts out before cashOnHand() looks right and is
+       worse: the same shaped list feeds cardsOwed(), cardCommitments() and
+       settlesMonthly, so a foreign credit card would vanish from all four at
+       once — and `owedElse`, the disclosure written to catch exactly that
+       state, is derived by subtracting claimed items from the same filtered
+       list, so both sides go to zero together and it cannot fire.
+       committed.js:390-398 names that as "the exact silent state this
+       disclosure exists to end", and currency.js:14 forbids it outright.
+
+       So: partition, and run the UNCHANGED whatsLeft once per currency.
+       Services and debts belong to the household group — Services.md and
+       Debts.md carry no currency column, so their amounts are in the
+       household's currency by construction. Foreign groups get their own
+       accounts and no service/debt commitments, which is exactly right: a
+       euro card's settlement is a euro obligation, and a rand debit order is
+       not. Each renders as its own compact band beneath the headline chain,
+       in its own symbol, never converted and never summed across. */
+    const home = S.settings.currency;
+    const byCurrency = new Map();
+    for (const a of accounts) {
+      const key = a.currency || home;
+      if (!byCurrency.has(key)) byCurrency.set(key, []);
+      byCurrency.get(key).push(a);
+    }
+    const foreignGroups = [...byCurrency]
+      .filter(([sym]) => sym !== home)
+      .map(([sym, accts]) => ({
+        sym,
+        L: whatsLeft({
+          accounts: accts, services: [], debts: [], rows, incomeRows, cardRows,
+          periodStart: start, periodEnd: end, today: todayIso(),
+        }),
+      }))
+      .filter(g => g.L.cashKnown || g.L.items.length || g.L.owed);
+
     const L = whatsLeft({
-      accounts, services: S.services, debts: S.debts, rows, incomeRows, cardRows,
+      accounts: byCurrency.get(home) || [],
+      services: S.services, debts: S.debts, rows, incomeRows, cardRows,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 
     /* Nothing to say: no confirmed cash AND nothing scheduled. classList, not
        Obsidian's addClass/removeClass — those are host extensions to
        HTMLElement, and every other card here toggles the plain way. */
-    const nothing = !L.cashKnown && !L.items.length && !L.owed;
+    const nothing = !L.cashKnown && !L.items.length && !L.owed && !foreignGroups.length;
     if (card) card.classList.toggle('hidden', nothing);
     if (nothing) return;
 
@@ -500,6 +554,26 @@ module.exports = function registerDashboard(ctx) {
       fig(L.short ? 'is-short' : 'is-free', money(Math.abs(dFree ?? L.free), 0),
         i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
     body.append(grid);
+
+    /* One compact band per other currency, under the headline chain. Its own
+       cash, its own commitments, its own free figure — the same three terms,
+       computed by the same function, printed in that currency's own symbol.
+       Never converted, never added to the figures above, and never dropped:
+       a reader holding a euro card can see what it owes without this card
+       pretending a euro is a rand. */
+    for (const g of foreignGroups) {
+      const gm = (v) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(g.sym, v, 0) : `${g.sym} ${Math.round(v)}`);
+      const parts = [
+        g.L.cashKnown ? i18n.t('dash.left.cash') + ' ' + gm(g.L.cash) : null,
+        g.L.committedOther || g.L.cardDue
+          ? i18n.t('dash.left.committed') + ' ' + gm(g.L.committedOther + g.L.cardDue) : null,
+        g.L.cashKnown
+          ? i18n.t(g.L.short ? 'dash.left.short' : 'dash.left.free') + ' ' + gm(Math.abs(g.L.free)) : null,
+      ].filter(Boolean);
+      body.append(el('div', { class: 'left-fx' },
+        el('span', { class: 'left-fx-sym' }, g.sym),
+        el('span', { class: 'left-fx-txt' }, parts.join(' · '))));
+    }
 
     /* The settlement cycle: what went on the card this period against the income
        that clears it. This is the figure that carries a verdict — under 100% the
@@ -638,7 +712,16 @@ module.exports = function registerDashboard(ctx) {
         list.append(el('tr', {},
           el('td', {}, el('div', { class: 'dn' }, it.name),
             el('div', { class: 'dd' }, [it.detail, when, src].filter(Boolean).join(' · '))),
-          el('td', { class: 'da num' }, money(it.amount, 0))));
+          /* ISSUE 30. This table exists because "a card asserting a committed
+             figure with no way to check it is the Services page again" — and
+             it was printing a foreign card's commitment under the household
+             symbol, so the disclosure written to make a figure checkable was
+             itself unreadable. `it.currency` is stamped on the item where it
+             is built (committed.js); absent means household. */
+          el('td', { class: 'da num' }, it.currency && it.currency !== S.settings.currency
+            && typeof ctx.moneyIn === 'function'
+            ? ctx.moneyIn(it.currency, it.amount, 0)
+            : money(it.amount, 0))));
       }
       const det = el('details', { class: 'left-open' },
         el('summary', {}, i18n.t('dash.left.whatsCounted')), list,
@@ -874,18 +957,39 @@ module.exports = function registerDashboard(ctx) {
        is the exact move in NET worth because worth() splits accounts by sign
        and nets them straight back: the owned and owed halves both shift, and
        what survives is the sum of the deltas. */
+    /* ISSUE 30. reconcile() itself is correct — `a.balance + delta` is
+       single-account arithmetic in that account's own currency — but summing
+       the deltas across accounts is not, and the comment above claims this is
+       "the exact move in NET worth". That stops being true the moment two
+       accounts differ in currency: on a two-currency vault this printed
+       "moved them down by R 1 503 000" where the rand move was R 3 000.
+
+       Home-currency accounts only, and the count of what that leaves out
+       travels with it — the sentence below states both. */
     const idx = accountIndex();
-    let drift = 0;
+    let drift = 0, driftForeign = 0;
     for (const a of S.accounts) {
       const rec = reconcile(a, (idx.get(a) || {}).rows || []);
-      if (rec.state === 'drift') drift += rec.delta;
+      if (rec.state !== 'drift') continue;
+      if (isForeign(a, S.settings.currency)) { driftForeign++; continue; }
+      drift += rec.delta;
     }
     /* Below a whole currency unit there is nothing to report but rounding. */
     const driftNote = Math.abs(drift) >= 1
       ? i18n.t(drift > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: money(Math.abs(drift), 0) })
       : '';
+    /* Reuses the hero's own key rather than a second sentence for the same
+       fact — the drift figure above covers the household's currency only, and
+       this is the app's one wording for "these accounts are not in it". */
+    const driftForeignNote = driftForeign
+      ? ' ' + i18n.t('dash.foreignExcluded', {
+        count: driftForeign,
+        symbols: [...new Set(S.accounts.filter(a => isForeign(a, S.settings.currency))
+          .map(a => symbolOf(a, S.settings.currency)))].join(' · '),
+      })
+      : '';
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      i18n.t('dash.stale.line', { line, age }) + driftNote));
+      i18n.t('dash.stale.line', { line, age }) + driftNote + driftForeignNote));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': i18n.t('dash.stale.aria') }, i18n.t('dash.stale.btn'));
     btn.addEventListener('click', () => ctx.switchView('accounts'));

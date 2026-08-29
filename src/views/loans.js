@@ -25,6 +25,36 @@ module.exports = function registerLoans(ctx) {
      render without re-mounting — same contract as ctx.locale(). */
   const P = () => loanProfileFor(S.settings.country);
 
+  /* ISSUE 30. The buying-costs and lender-fee cards print STATUTORY tariffs —
+     transfer duty off the SARS table, the guideline conveyancing tariff, the
+     National Credit Act fee caps — and every one of them is a rand amount
+     fixed by a South African regulation. They were printed through money(),
+     the household's formatter, so a `country: za` household set to "$" read
+     "Transfer duty $ 23 544" directly above costsNote's own literal text
+     quoting "initiation R5 250 + VAT". Two currencies for one fee, six inches
+     apart, on the same card.
+
+     tariffMoney prints them in the profile's own currency; money() still
+     handles the repayment calculator above, which works on figures the READER
+     typed and so is genuinely in their currency. A profile with no tariffs
+     (GENERIC) carries no `currency`, so this falls through to money() and
+     nothing changes for the countries that only get the calculator. */
+  const tariffMoney = (v, dp = 0) => {
+    const cur = P().currency;
+    return cur && cur !== S.settings.currency && typeof ctx.moneyIn === 'function'
+      ? ctx.moneyIn(cur, v, dp)
+      : money(v, dp);
+  };
+
+  /* Said once per card, and only when the two actually differ — a household
+     already budgeting in rand needs no note about a rand fee. */
+  const tariffNote = () => {
+    const cur = P().currency;
+    return cur && cur !== S.settings.currency
+      ? ` These are ${cur} figures set by regulation, not converted into ${S.settings.currency}.`
+      : '';
+  };
+
   /* `rate: null` means "still on the country default". Once the reader types a
      rate it is theirs and the profile stops overwriting it — without that flag
      a rate typed here would be silently reset on the next view switch, and
@@ -295,15 +325,15 @@ module.exports = function registerLoans(ctx) {
 
     $('#loanHomeCostsCard').classList.toggle('hidden', !p.hasBuyingCosts);
     if (p.hasBuyingCosts) {
-      $('#loanHomeCostsSub').textContent = p.costsNote;
+      $('#loanHomeCostsSub').textContent = p.costsNote + tariffNote();
       const costs = $('#loanHomeCosts'); costs.empty();
       costs.append(el('div', { class: 'loan-out' },
-        row('Transfer duty', money(duty, 0)),
-        row('Bond registration (est.)', money(bond, 0)),
-        row('Transfer costs (est.)', money(transfer, 0)),
-        row('Initiation fee', money(init, 0)),
+        row('Transfer duty', tariffMoney(duty)),
+        row('Bond registration (est.)', tariffMoney(bond)),
+        row('Transfer costs (est.)', tariffMoney(transfer)),
+        row('Initiation fee', tariffMoney(init)),
         el('div', { class: 'lo-sep' }),
-        row('Total once-off costs', money(onceOff, 0), 'lo-big')));
+        row('Total once-off costs', tariffMoney(onceOff), 'lo-big')));
     }
 
     amortTable($('#loanHomeAmort'),
@@ -425,13 +455,13 @@ module.exports = function registerLoans(ctx) {
 
     $('#loanCarFeesCard').classList.toggle('hidden', !p.hasBuyingCosts);
     if (p.hasBuyingCosts) {
-      $('#loanCarFeesSub').textContent = p.feesNote;
+      $('#loanCarFeesSub').textContent = p.feesNote + tariffNote();
       const fees = $('#loanCarFees'); fees.empty();
       fees.append(el('div', { class: 'loan-out' },
-        row('Initiation fee (once-off)', money(init, 0)),
-        row('Monthly service fee', money(service, 0)),
+        row('Initiation fee (once-off)', tariffMoney(init)),
+        row('Monthly service fee', tariffMoney(service)),
         el('div', { class: 'lo-sep' }),
-        row('Total service fees over the term', money(serviceTotal, 0), 'lo-big')));
+        row('Total service fees over the term', tariffMoney(serviceTotal), 'lo-big')));
     }
 
     amortTable($('#loanCarAmort'),

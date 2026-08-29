@@ -20,9 +20,17 @@ const { prepareRules, autoCategorise, matchRule } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { isCreditCard } = require('../committed');
+const { symbolOf, isForeign } = require('../currency');
 
 module.exports = function registerImport(ctx) {
   const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
+
+  /* The formatter for a previewed row, rebound whenever the destination
+     account changes (see renderPreview). Defaults to money() so any path that
+     renders before an account is chosen still prints something sane, and so a
+     single-currency vault — nearly all of them — is on the same formatter as
+     the rest of the app. */
+  let previewMoney = v => money(v);
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -525,6 +533,17 @@ module.exports = function registerImport(ctx) {
        but never reaches the Dashboard's income/spend — which looks like a
        broken import to anyone who doesn't know the flag is set. */
     const target = accountForLabel(p.label || '');
+    /* ISSUE 30. The rows on this screen are about to land in `target`, whose
+       currency was resolved right here and then ignored: the preview printed
+       every amount with money(), the household's formatter, so a €900 row
+       heading for a euro account previewed as "R -900.00". The Accounts page
+       has done this correctly since it gained per-account symbols; the one
+       screen where the reader decides whether the import is right was the one
+       still showing the wrong unit. */
+    const home = (S.settings || {}).currency;
+    previewMoney = v => (isForeign(target, home) && typeof ctx.moneyIn === 'function'
+      ? ctx.moneyIn(symbolOf(target, home), v)
+      : money(v));
     const nbEl = $('#impNonBudget');
     const nonBudget = !!target && !target.in_budget;
     nbEl.classList.toggle('hidden', !nonBudget);
@@ -570,7 +589,7 @@ module.exports = function registerImport(ctx) {
         : '';
       body.append(el('tr', { class: cls.trim() },
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${money(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
+          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${previewMoney(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
             // nearAuto stays TRUE once we have auto-unticked: it records that the
             // untick already happened, so a re-render (account switch, "show
             // more") leaves the user's decision — either way — alone.
@@ -589,7 +608,7 @@ module.exports = function registerImport(ctx) {
             title: `The description names your ${it.transferTo} account, so this looks like money moved between your own accounts rather than income or spend. Untick Exclude to count it.` },
           'transfer'),
         ] : [])),
-        el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(it.amount)),
+        el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewMoney(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`),
           // Named, not silent: a rule that fires wrong is only fixable if the
           // reader can tell WHICH rule fired — otherwise the only way to find

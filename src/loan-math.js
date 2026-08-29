@@ -261,6 +261,17 @@ const round50 = v => Math.round(v / 50) * 50;
 const LOAN_PROFILES = {
   za: {
     hasBuyingCosts: true,
+    /* ISSUE 30. The currency these tariffs are DENOMINATED in, which is not
+       necessarily the one the household budgets in. Every figure this profile
+       produces — transfer duty off the SARS table, the guideline conveyancing
+       tariff, the National Credit Act fee caps — is a rand amount fixed by a
+       South African regulation. views/loans.js printed all of them through
+       ctx.money(), i.e. the household's symbol, so a `country: za` household
+       set to "$" saw "Transfer duty $ 23 544" sitting directly above
+       costsNote's own literal text quoting "initiation R5 250 + VAT": two
+       currencies for one fee, six inches apart, which is this repo's
+       recurring shape in its purest form. */
+    currency: 'R',
     defaultRate: fact('za.prime.rate'),
     /* Every figure in these three notes now names WHEN it was checked. A hedge
        with no date cannot be acted on: the reader has no way to tell whether it
@@ -282,6 +293,10 @@ const LOAN_PROFILES = {
 /* Everything the view reads, with the country-specific half switched off. */
 const GENERIC_LOAN_PROFILE = {
   hasBuyingCosts: false,
+  /* No tariffs, so nothing to denominate — the view falls back to the
+     household's own symbol, which is right for the repayment calculator: that
+     one works on figures the READER typed. */
+  currency: '',
   defaultRate: 8,
   rateNote: 'Enter the annual interest rate your lender quoted.',
   costsNote: '',
@@ -294,8 +309,23 @@ const GENERIC_LOAN_PROFILE = {
   vehicleInitiationFee: () => 0,
 };
 
+/* ISSUE 30 — the fallback deliberately matches locale.js's localeFor().
+
+   The two resolvers read the SAME `country` key and used to disagree about
+   what an unknown value meant: localeFor('nl') returned the ZA profile (full
+   SARS checklist, ITR12, the R23 800 exemption) while loanProfileFor('nl')
+   returned GENERIC. A hand-edited `country: nl` in Settings.md — a plain
+   markdown file this app documents as user-editable — therefore put the
+   reader in two countries at once.
+
+   GENERIC is the right answer for both, and locale.js now falls back the same
+   way: an unknown country is one this app has no law for, and quietly serving
+   South African tax rules to someone who typed "nl" is the more dangerous of
+   the two directions to be wrong in. A MISSING code still means za, which is
+   the documented default for a vault that has never set one. */
 function loanProfileFor(code) {
-  return LOAN_PROFILES[(code || 'za').toString().trim().toLowerCase()] || GENERIC_LOAN_PROFILE;
+  const key = (code == null || code === '' ? 'za' : String(code)).trim().toLowerCase();
+  return LOAN_PROFILES[key] || GENERIC_LOAN_PROFILE;
 }
 
 module.exports = {

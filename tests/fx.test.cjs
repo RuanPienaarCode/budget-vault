@@ -134,6 +134,22 @@ eq(fx.rateBetween('CNY', 'XXX', TABLE), null, 'in either direction');
     'an account with no code of its own is household money, exactly as it was before this feature existed');
 }
 
+/* ------------------------- seeding a code for the wizard ------------------ */
+{
+  eq(fx.codeForCountry('za'), 'ZAR', 'a country identifies its currency');
+  eq(fx.codeForCountry('AU'), 'AUD', 'case-folded — and NOT the USD a "$" table would have handed an Australian');
+  eq(fx.codeForCountry('other'), '', '"somewhere else" names no currency');
+  eq(fx.codeForCountry(''), '', 'and neither does nothing');
+
+  eq(fx.codeForSymbol('Rp'), 'IDR', 'an unambiguous symbol can seed a code');
+  eq(fx.codeForSymbol('R$'), 'BRL', 'and R$ is a different string from R, so the two never collide');
+  eq(fx.codeForSymbol('₹'), 'INR', '');
+  eq(fx.codeForSymbol('$'), '',
+    'but "$" is refused — it is USD, AUD, CAD and SGD, and a seed that is wrong is worse than a field left blank');
+  eq(fx.codeForSymbol('R'), '',
+    'and so is "R" — rand here, real in Brazil');
+}
+
 /* -------------------------------- canConvert ----------------------------- */
 {
   const on = { exchange_rates: true, currency_code: 'IDR' };
