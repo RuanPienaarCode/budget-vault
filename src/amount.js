@@ -19,7 +19,52 @@
    decimal-comma "1 234,56" / "1.234,56", parenthesised negatives "(123.45)",
    trailing minus "123.45-", and Cr/Dr markers (Cr → credit/positive,
    Dr → debit/negative). Zero is a valid return — callers decide to skip it. */
-function normalizeAmount(raw) {
+/* ---- what the SEPARATORS mean, decided per FILE rather than per cell ----
+
+   "1.500.000" cannot be a decimal — no money has two decimal points — so a
+   cell like that reads as grouped thousands without needing to know anything
+   about the reader. "250.000" is genuinely ambiguous on its own, and
+   normalizeAmount leaves it alone for exactly that reason.
+
+   The trouble is that a real statement contains both. An Indonesian export
+   reading
+
+     Rp -1.500.000      -> -1500000   (unambiguous, two groups)
+     Rp    -250.000     ->     -250   (ambiguous, one group)
+
+   parsed its own rows by two different rules and put -250 next to -1500000,
+   which is this codebase's recurring bug shape arriving inside a single
+   column. And it is the worst kind: a plausible number, off by a thousand,
+   with nothing on screen to suggest anything happened.
+
+   So the convention is inferred ONCE from the whole column and then applied
+   to every cell in it. Evidence is only ever taken from the unambiguous
+   forms — two-or-more dot groups, or a decimal comma — so a file that offers
+   no evidence gets no guess and every cell parses exactly as it does today.
+   A file offering evidence BOTH ways gets no guess either: that is a column
+   this function has no business resolving on its own.
+
+   Returns 'dot' (1.500.000 / 1.234,56), 'comma' (1,500,000 / 1,234.56), or
+   null for "no evidence — do not assume". */
+function inferGrouping(cells) {
+  let dot = 0, comma = 0;
+  for (const raw of cells || []) {
+    const c = String(raw == null ? '' : raw).replace(/[\s\u00A0\u202F']/g, '');
+    // Two or more dot groups, or a decimal comma: dot groups the thousands.
+    if (/\d{1,3}(\.\d{3}){2,}(?!\d)/.test(c) || /\d(\.\d{3})*,\d{1,2}(?!\d)/.test(c)) dot++;
+    // Two or more comma groups, or a decimal point: commas group the thousands.
+    if (/\d{1,3}(,\d{3}){2,}(?!\d)/.test(c) || /\d(,\d{3})*\.\d{1,2}(?!\d)/.test(c)) comma++;
+  }
+  if (dot && !comma) return 'dot';
+  if (comma && !dot) return 'comma';
+  return null;
+}
+
+/* `opts.grouping` is inferGrouping()'s verdict for the column this cell came
+   from. Optional at every call site: without it this function behaves exactly
+   as it always has, which is what keeps the loader, the modals and the
+   onboarding wizard — none of which have a column to infer from — unchanged. */
+function normalizeAmount(raw, opts) {
   let s = (raw ?? '').toString().trim();
   if (!s) return null;
   let neg = false;
@@ -58,22 +103,67 @@ function normalizeAmount(raw) {
     return false;
   };
   sign();
-  /* The symbols and codes a statement actually leads with. Widened after an
-     audit found the reporter of issue #28 — an Indonesian household — unable
-     to import at all: "Rp 1.500.000" failed this test, came back null, and
-     views/import.js counted the row into `skipped`. So a Chinese or
-     Indonesian statement imported ZERO rows and reported them as skipped
-     rather than saying "I cannot read your currency", which is the plausible
-     silent failure this whole file exists to refuse.
+  /* ---- the currency marker, whichever end of the cell it is on ----
 
-     Ordered longest-first within the alternation so "R$" (Brazilian real) is
-     consumed whole rather than leaving a stray "$", and so "RMB" is not read
-     as an "R" followed by junk. `r` stays last of the letter forms for the
-     same reason it always was: it is the shortest and would otherwise shadow
-     every code beginning with it. */
+     Not an allowlist. An allowlist was the first fix (issue #28: the
+     reporter's "Rp 1.500.000" came back null, so an Indonesian statement
+     imported ZERO rows and reported them all as "skipped"), and an
+     allowlist's failure mode is the same silent nothing for the next
+     currency nobody thought of. So the rule is structural instead: a money
+     cell is a number with an optional UNIT attached, and the unit is either
+     a currency symbol or a short alphabetic code.
+
+     \p{Sc} is the Unicode currency-symbol category — every currency sign
+     there is, present and future, rather than the fourteen somebody
+     remembered. Safe on this plugin's real floor: property escapes have
+     worked in WebKit since Safari 11.1, and src/controller.js already ships
+     \p{L}. LOOKBEHIND is the construct that is fatal before iOS 16.4 (a
+     parse-time SyntaxError that kills the whole bundle) and there is none
+     here — see tests/bundle-smoke.test.cjs, which scans for it.
+
+     Generous stripping is safe because the numeric gate at the bottom of
+     this function is strict: anything left that is not a number still comes
+     back null. "N/A" loses its "N" and fails on "/A"; "three thousand" loses
+     "three" and fails on the rest.
+
+     \p{L}, not [A-Za-z]: "zł", "Kč" and "лв" are currency markers whose
+     letters are not ASCII, and an ASCII-only class read all three as junk and
+     returned null — the same silent nothing, one alphabet over. It also picks
+     up "1,200円" for free.
+
+     The trailing form requires TWO letters if they are ASCII. Nobody writes
+     an amount as "100m" in a statement column, but if a vault does, a single
+     trailing ASCII letter is left alone rather than silently turning 100m
+     into 100 — that cell comes back null, which is the honest answer to
+     something this function cannot read. A single NON-ASCII trailing
+     character has no such ambiguity: "1,200円" and "1,200元" are how those
+     statements write it, and no shorthand competes for the position.
+
+     Both strips are guarded on the result still containing a digit, which is
+     what makes a generous rule safe: "three thousand" loses four letters to
+     the leading strip, the remainder has no digit, and the original string is
+     put back to fail the numeric gate as it always did. */
+  /* Leading: a symbol and/or a code of at most four letters, optionally glued
+     to the number ("R150", "Rp 1.500", "US$1,200"). The LOOKAHEAD is what
+     makes a generous rule safe — the marker is only removed when a number
+     actually follows it. Without it, "about 15 000" lost "abo" to the letter
+     run and came back as 15000: prose read as a confident figure, which is
+     the precise failure this whole module exists to refuse. Lookahead, not
+     lookbehind: the latter is a parse-time SyntaxError before iOS 16.4 that
+     would kill the entire bundle (tests/bundle-smoke.test.cjs scans for it).
+
+     The lookahead admits a SIGN as well as a digit, because "R-100" puts the
+     minus inside the symbol and is a form banks really write — the sign()
+     pass below picks it up once the symbol is gone. */
   const bare = s.replace(
-    /^(zar|usd|gbp|eur|aud|cad|cny|rmb|jpy|inr|idr|chf|sek|nok|dkk|pln|brl|try|krw|sgd|nzd|hkd|us\$|a\$|c\$|nz\$|hk\$|r\$|rp|kr|zł|fr|r|[$\u00A3\u20AC\u00A5\u20B9\u20A9\u20BA\u0E3F\u20AA\u20BD\u20AB\u20B1])\s*/i, '');
+    /^(?:\p{Sc}|\p{L}){1,4}\$?[\s\u00A0]*(?=[\d.,+\-\u2212\uFF0D])/u, '');
   if (bare !== s) { s = bare; sign(); }
+  /* Trailing: "1234.56 ZAR", "1 234,56 €", "50CHF", "1,200円". No lookbehind
+     available, so the guard is explicit instead: only strip when what remains
+     still ENDS in a digit, which "15 000 about" would not survive either. */
+  const tail = s.replace(
+    /[\s\u00A0]*(?:\p{Sc}|\p{L}{2,4}|[^\x00-\x7F])$/u, '');
+  if (tail !== s && /\d$/.test(tail.trim())) s = tail.trim();
   s = s.replace(/[\s\u00A0\u202F']/g, '');
   /* A trailing percent is a unit suffix, exactly like the currency prefix
      stripped above, and it is dropped for the same reason. Debts.md's `Rate`
@@ -95,6 +185,10 @@ function normalizeAmount(raw) {
      confident wrong number gets printed, which this file refuses; declining
      to read the UNambiguous one was simply a gap. */
   else if (/^\d{1,3}(\.\d{3}){2,}$/.test(s)) s = s.replace(/\./g, '');
+  /* The single-group case, resolved only where the FILE said which convention
+     it uses — see inferGrouping above. This is what stops "250.000" reading
+     as 250 in a column whose other rows are plainly dot-grouped. */
+  else if (opts && opts.grouping === 'dot' && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   else s = s.replace(/,/g, '');                                                       // thousands comma
   // A bare ".50" is a real cell (some exports drop the leading zero), and it
   // must parse rather than fall to null and be served as zero by parseNum.
@@ -119,4 +213,4 @@ function parseNum(s) {
   return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
 }
 
-module.exports = { normalizeAmount, parseNum };
+module.exports = { normalizeAmount, inferGrouping, parseNum };

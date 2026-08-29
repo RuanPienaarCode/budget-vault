@@ -13,7 +13,7 @@
    read by parseCsv, which is comma-only. */
 
 const { el } = require('../dom');
-const { normalizeAmount } = require('../amount');
+const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
   statementAccountNumber, sameAccountNumber } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
@@ -136,6 +136,28 @@ module.exports = function registerImport(ctx) {
        never become transactions, because an unbroken run of balances is what
        makes the reconciliation below conclusive. */
     const ledger = [];
+    /* ISSUE 30. What "1.500" means is a property of the FILE, not of the cell,
+       and reading it per cell put two different answers in one column. On a
+       real Indonesian export:
+
+         Rp -1.500.000  ->  -1500000   (two dot groups: unambiguous)
+         Rp   -250.000  ->      -250   (one group: ambiguous, left alone)
+
+       -250 sitting next to -1500000, off by a thousand, with nothing on screen
+       to suggest anything had happened. Inferred once here over every amount
+       column this file actually has — signed, debit, credit, fee and balance —
+       so the evidence is as wide as possible, and applied to every cell below.
+       inferGrouping() only ever takes evidence from the UNAMBIGUOUS forms and
+       returns null when a file offers none or offers both, in which case every
+       cell parses exactly as it did before this existed. */
+    const amountCells = [];
+    for (const r of dataRows) {
+      for (const i of [iAmount, iDebit, iCredit, iFee, iBalance]) {
+        if (i !== -1 && r[i]) amountCells.push(r[i]);
+      }
+    }
+    const numOpts = { grouping: inferGrouping(amountCells) };
+    const num = v => normalizeAmount(v, numOpts);
     const showBar = dataRows.length > 1500;
     if (showBar) importProgress('start', 'Categorising transactions…');
     const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
@@ -156,9 +178,9 @@ module.exports = function registerImport(ctx) {
       if (loc.stripDescSuffix && desc.endsWith(loc.stripDescSuffix)) desc = desc.slice(0, -loc.stripDescSuffix.length);
       /* Amount: a single signed column when present, else credit (positive) /
          debit (negated — statements list debits as positive numbers). */
-      let amount = iAmount !== -1 ? normalizeAmount(r[iAmount]) : null;
+      let amount = iAmount !== -1 ? num(r[iAmount]) : null;
       if (amount == null && iCredit !== -1) {
-        const c = normalizeAmount(r[iCredit]);
+        const c = num(r[iCredit]);
         // Money in is normally written as a plain positive number, but an
         // explicit sign in the cell is the statement telling us something —
         // a reversal-of-a-refund posted as "-30.00" in the Credit column is
@@ -167,7 +189,7 @@ module.exports = function registerImport(ctx) {
         if (c != null && c !== 0) amount = c;
       }
       if (amount == null && iDebit !== -1) {
-        const d = normalizeAmount(r[iDebit]);
+        const d = num(r[iDebit]);
         if (d != null && d !== 0) amount = -Math.abs(d);
       }
       /* The third column — a bank charge, which Capitec writes in `Fee` with
@@ -185,10 +207,10 @@ module.exports = function registerImport(ctx) {
          fees unsigned instead is caught by the balance column: fee rows are in
          the ledger below, so the reconciliation now judges them too. */
       if (amount == null && iFee !== -1) {
-        const f = normalizeAmount(r[iFee]);
+        const f = num(r[iFee]);
         if (f != null && f !== 0) amount = f;
       }
-      if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: normalizeAmount(r[iBalance]) });
+      if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: num(r[iBalance]) });
       const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
       if (date && desc && amount != null && amount !== 0) {
         /* excluded/transferTo are filled in by applyCounterparties below, once

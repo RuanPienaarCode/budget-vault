@@ -339,13 +339,43 @@ function detectHeaderlessColumns(rows, dayFirst = true) {
 // (Capitec): the posting date is the one the balance column follows, and it is
 // the one that keeps a month-end row in the month the statement bills it to —
 // Capitec timestamps February's interest 2026-03-01 00:20.
+/* ISSUE 30 — the header names, in the languages this app now ships.
+
+   A statement's column headings are written in the bank's language, not the
+   app's. Until the interface was English-only that was a fair assumption to
+   leave unexamined; it is not any more, and the currency work made it
+   concrete: an Indonesian household — the one that reported issue #28 —
+   downloads a file headed "Tanggal, Keterangan, Jumlah". Every heading below
+   is unrecognised, detectStatementColumns returns null, and the reader is
+   thrown to the manual column mapper for a file the app could have read.
+
+   The mapper is a real fallback and nobody is stuck, so this is a papercut
+   rather than the silent-data-loss class of defect — but it is a papercut on
+   the very first thing a new reader does with this plugin.
+
+   Only the languages src/i18n.js actually ships are listed. Guessing at
+   headings for a language with no interface behind it would be inventing
+   vocabulary nobody can check, and the substring fallbacks in
+   detectStatementColumns() catch the near-misses anyway. */
 const DATE_COLS = ['value date', 'date', 'posting date', 'post date', 'date posted', 'effective date',
-  'transaction date', 'trans date', 'txn date', 'process date', 'action date'];
+  'transaction date', 'trans date', 'txn date', 'process date', 'action date',
+  // af, de, es/pt, fr, id, zh, ja, hi
+  'datum', 'buchungstag', 'wertstellung', 'fecha', 'data', 'date de valeur',
+  'tanggal', 'tgl', '日期', '交易日期', '日付', 'दिनांक', 'तारीख'];
 const DESC_COLS = ['description', 'title', 'narrative', 'narration', 'details', 'detail', 'particulars',
-  'transaction description', 'statement description', 'transaction detail', 'reference', 'payee', 'memo'];
-const AMOUNT_COLS = ['amount', 'transaction amount', 'amount (zar)', 'signed amount', 'value'];
-const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out', 'withdrawal', 'withdrawals', 'paid out'];
-const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in'];
+  'transaction description', 'statement description', 'transaction detail', 'reference', 'payee', 'memo',
+  'beskrywing', 'buchungstext', 'verwendungszweck', 'descripción', 'concepto', 'descrição',
+  'histórico', 'libellé', 'keterangan', 'uraian', 'deskripsi', '描述', '摘要', '内容', '摘要説明',
+  'विवरण', 'ब्यौरा'];
+const AMOUNT_COLS = ['amount', 'transaction amount', 'amount (zar)', 'signed amount', 'value',
+  'bedrag', 'betrag', 'umsatz', 'importe', 'monto', 'valor', 'montant',
+  'jumlah', 'nominal', '金额', '金額', 'राशि'];
+const DEBIT_COLS = ['debit', 'debits', 'debit amount', 'money out', 'amount out', 'withdrawal', 'withdrawals', 'paid out',
+  'debiet', 'soll', 'lastschrift', 'débito', 'cargo', 'débit', 'retrait',
+  'debet', 'penarikan', 'keluar', '支出', '借方', '出金'];
+const CREDIT_COLS = ['credit', 'credits', 'credit amount', 'money in', 'amount in', 'deposit', 'deposits', 'paid in',
+  'krediet', 'haben', 'gutschrift', 'crédito', 'abono', 'crédit', 'dépôt',
+  'kredit', 'setoran', 'masuk', '收入', '贷方', '入金'];
 /* A THIRD amount column, and the one this importer was blind to.
 
    Capitec's export is Money In / Money Out / Fee, and a bank charge goes in the
@@ -368,7 +398,8 @@ const FEE_COLS = ['fee', 'fees', 'fee amount', 'bank charge', 'bank charges', 's
 /* Not a column the importer needs — a column it CHECKS ITSELF against. See
    reconcileAmounts: the balance is what lets a never-before-seen bank's export
    prove its own sign convention instead of the importer assuming one. */
-const BALANCE_COLS = ['balance', 'running balance', 'closing balance', 'account balance', 'balance (zar)'];
+const BALANCE_COLS = ['balance', 'running balance', 'closing balance', 'account balance', 'balance (zar)',
+  'saldo', 'kontostand', 'solde', 'sisa saldo', '余额', '残高', 'शेष', 'शेष राशि'];
 
 /* Decide which column is which: by header name where the file has one, by the
    shape of the rows where it doesn't. Returns a column map, or null when the
@@ -383,7 +414,8 @@ function detectStatementColumns(rows, dayFirst = true) {
     const has = names => names.some(n => low.includes(n));
     return (has(DATE_COLS) || low.some(c => c.includes('date'))) &&
            (has(AMOUNT_COLS) || low.some(c => c.includes('amount'))
-             || (has(DEBIT_COLS) && has(CREDIT_COLS)));
+             || (has(DEBIT_COLS) && has(CREDIT_COLS))
+             || (low.some(c => c.includes('debit')) && low.some(c => c.includes('credit'))));
   });
   if (headerIdx !== -1) {
     const low = rows[headerIdx].map(c => c.trim().toLowerCase());
@@ -405,7 +437,16 @@ function detectStatementColumns(rows, dayFirst = true) {
        a column heading is a label, not a different column. */
     let iAmount = col(AMOUNT_COLS);
     if (iAmount === -1) iAmount = low.findIndex(c => c.includes('amount'));
-    const iDebit = col(DEBIT_COLS), iCredit = col(CREDIT_COLS);
+    /* ISSUE 30 — the same substring fallback, extended to the debit/credit
+       PAIR. "Amount (ZAR)" was detected and "Amount (EUR)" was not; the
+       identical gap sat one line down, where "Debit (IDR)" / "Credit (IDR)"
+       matched nothing at all and threw a perfectly ordinary two-column
+       statement to the manual mapper. A currency in a heading is a label on
+       the column, not a different column. */
+    let iDebit = col(DEBIT_COLS);
+    if (iDebit === -1) iDebit = low.findIndex(c => c.includes('debit'));
+    let iCredit = col(CREDIT_COLS);
+    if (iCredit === -1) iCredit = low.findIndex(c => c.includes('credit'));
     /* Only ever an EXTRA column beside a pair or a signed amount, never the
        thing that makes a file importable on its own: a file whose only numeric
        column is headed "Fee" is a fee schedule, not a statement. So iFee is

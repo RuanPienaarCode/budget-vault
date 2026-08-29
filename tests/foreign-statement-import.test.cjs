@@ -24,22 +24,73 @@ let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
-/* ---- 1. the symbols and codes real statements lead with ---- */
+/* ---- 1. ANY currency, not a list of remembered ones ----
+
+   The first fix for this was an allowlist of about twenty symbols and codes.
+   An allowlist's failure mode is the same silent nothing for the twenty-first
+   currency, so the rule is structural now: a money cell is a number with an
+   optional unit attached, and the unit is a Unicode currency symbol or a
+   short alphabetic code, at either end. These cases are a sample of that
+   rule, not its definition — the point is that nothing here was enumerated in
+   src/amount.js. ---- */
 {
   const cases = [
-    ['Rp 1.500.000', 1500000, 'Indonesian rupiah, dot-grouped — the reporter\'s own statement'],
+    // The reporter's own statement (issue #28).
+    ['Rp 1.500.000', 1500000, 'Indonesian rupiah, dot-grouped'],
     ['Rp1500000', 1500000, 'and with no space after the symbol'],
+    // Symbols.
     ['¥1,200', 1200, 'yen/yuan'],
-    ['RMB 100', 100, 'and the code some Chinese exports use instead'],
-    ['CNY 100', 100, 'as well as the ISO one'],
     ['₹500', 500, 'rupee'],
-    ['R$ 250,00', 250, 'Brazilian real — consumed WHOLE, not as an R leaving a stray $'],
-    ['kr 100,50', 100.5, 'Nordic krona with a decimal comma'],
-    ['CHF 50', 50, 'Swiss franc'],
-    ['zł 99,00', 99, 'Polish złoty'],
     ['₩50000', 50000, 'won'],
+    ['₪1,234.56', 1234.56, 'shekel'],
+    ['₺1.234,56', 1234.56, 'lira, dot-grouped'],
+    ['฿1,200', 1200, 'baht'],
+    ['₫1.500.000', 1500000, 'dong'],
+    ['₦5,000', 5000, 'naira'],
+    ['₱1,234.56', 1234.56, 'peso'],
+    ['₴ 1 234,56', 1234.56, 'hryvnia'],
+    ['₨ 500', 500, 'the other rupee sign'],
+    ['£99.99', 99.99, 'pound'],
+    ['€900.00', 900, 'euro'],
+    // Non-ASCII LETTERS — an [A-Za-z] class read all of these as junk.
+    ['zł 99,00', 99, 'Polish złoty'],
+    ['Kč 1 234,56', 1234.56, 'Czech koruna'],
+    ['лв 99,00', 99, 'Bulgarian lev, Cyrillic'],
+    // Alphabetic codes and multi-character symbols.
+    ['R$ 250,00', 250, 'Brazilian real — consumed WHOLE, not an R leaving a stray $'],
+    ['US$1,200.00', 1200, 'and the same for US$'],
+    ['RMB 100', 100, 'the code some Chinese exports use'],
+    ['CNY 100', 100, 'as well as the ISO one'],
+    ['CHF 50', 50, 'Swiss franc'],
+    ['kr 100,50', 100.5, 'Nordic krona with a decimal comma'],
+    ['RM 1,234.56', 1234.56, 'ringgit'],
+    ['Rs 1,234.56', 1234.56, 'rupees written as a code'],
+    // TRAILING markers — banks write it both ways round.
+    ['1234.56 ZAR', 1234.56, 'a trailing ISO code'],
+    ['100 EUR', 100, 'with a space'],
+    ['50CHF', 50, 'and without one'],
+    ['1 234,56 €', 1234.56, 'a trailing symbol'],
+    ['1,200円', 1200, 'a single trailing CJK character — no shorthand competes for that position'],
+    ['1,200元', 1200, ''],
   ];
-  for (const [cell, want, why] of cases) eq(normalizeAmount(cell), want, `${JSON.stringify(cell)} — ${why}`);
+  for (const [cell, want, why] of cases) {
+    eq(normalizeAmount(cell), want, `${JSON.stringify(cell)}${why ? ' — ' + why : ''}`);
+  }
+}
+
+/* ---- 1b. and it still refuses everything that is not a number ----
+
+   This is the half that makes the generosity above safe, and it caught a real
+   regression while it was being written: a greedy letter-run turned
+   "about 15 000" into 15000 — prose read as a confident figure, which is the
+   exact failure src/amount.js's own header says it exists to refuse. The
+   marker is only stripped when a number actually follows it. ---- */
+{
+  for (const cell of ['about 15 000', 'roughly 200', 'TBC', 'N/A', 'three thousand',
+    'abc', '-', '--100', '100m', '1e5', 'R', '$', 'ZAR']) {
+    eq(normalizeAmount(cell), null,
+      `${JSON.stringify(cell)} is null — a plausible wrong number is worse than no number`);
+  }
 }
 
 /* ---- 2. what must NOT change: everything that already worked ---- */
@@ -94,4 +145,47 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
     'a file with no amount column is still refused — the fallback widened the match, it did not remove it');
 }
 
-console.log(`PASS — a statement that is not in rand can be read: amounts and headings (${checks} checks).`);
+/* ---- 6. the HEADINGS are in the bank's language, not the app's ----
+
+   A statement's column names come from the bank. While the interface was
+   English-only that assumption went unexamined; the app now ships nine
+   languages plus Português, हिन्दी and Bahasa Indonesia, and the household
+   that reported issue #28 downloads a file headed "Tanggal, Keterangan,
+   Jumlah". Every heading missed, detection returns null, and a file the app
+   could have read goes to the manual column mapper instead.
+
+   The mapper is a real fallback, so this is a papercut rather than data loss
+   — but it is a papercut on the first thing a new reader does. ---- */
+{
+  const detect = csv => detectStatementColumns(csv.trim().split('\n').map(l => l.split(',')), true);
+  const cases = [
+    ['Indonesian', 'Tanggal,Keterangan,Jumlah,Saldo\n01/08/2026,WARUNG,1.500.000,8.500.000'],
+    ['Chinese', '日期,摘要,金额,余额\n2026-08-01,午餐,1200,8000'],
+    ['Japanese', '日付,内容,金額,残高\n2026-08-01,昼食,1200,8000'],
+    ['German', 'Buchungstag,Verwendungszweck,Betrag,Kontostand\n01.08.2026,Miete,-900,1200'],
+    ['Spanish', 'Fecha,Concepto,Importe,Saldo\n01/08/2026,Alquiler,-900,1200'],
+    ['French', 'Date de valeur,Libellé,Montant,Solde\n01/08/2026,Loyer,-900,1200'],
+    ['Portuguese', 'Data,Histórico,Valor,Saldo\n01/08/2026,Aluguel,-900,1200'],
+    ['Afrikaans', 'Datum,Beskrywing,Bedrag,Saldo\n01/08/2026,Huur,-900,1200'],
+    ['Hindi', 'दिनांक,विवरण,राशि,शेष\n01/08/2026,किराया,-900,1200'],
+  ];
+  for (const [lang, csv] of cases) {
+    const got = detect(csv);
+    ok(got, `a ${lang} statement is auto-detected rather than sent to the manual mapper`);
+    eq([got.iDate, got.iDesc, got.iAmount, got.iBalance], [0, 1, 2, 3],
+      `and every ${lang} column lands where it should`);
+  }
+
+  /* The debit/credit PAIR had the identical currency-in-the-heading gap the
+     Amount column had — "Debit (IDR)" matched nothing at all. */
+  const pair = detect('Date,Description,Debit (IDR),Credit (IDR),Balance\n01/08/2026,X,1.500.000,,8.500.000');
+  ok(pair, 'a debit/credit statement with the currency in its headings is detected');
+  eq([pair.iDebit, pair.iCredit], [2, 3], 'and both columns are found');
+
+  // NEGATIVE CONTROL: widening the match must not make everything a statement.
+  eq(detect('Date,Description,Notes\n2026-01-01,x,y'), null,
+    'a file with no amount-ish column is still refused');
+  eq(detect('Name,Type,Colour\na,b,c'), null, 'and so is one with no date');
+}
+
+console.log(`PASS — a statement in any currency, and headed in any language this app speaks (${checks} checks).`);
