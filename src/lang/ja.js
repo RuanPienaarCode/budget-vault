@@ -676,6 +676,8 @@ module.exports = {
   'acct.hero.sub': '残高 {assets} に対し、当座借越 {liabilities}。',
   'acct.hero.elsewhere': ' それぞれのページに記録された資産と負債はここには含まれません。',
   'acct.hero.mixed': ' この合計は複数の通貨（{symbols}）で保有する口座を、換算せずに合算しています。',
+  'acct.hero.converted': ' {date} のレートで換算した {list} を含みます。',
+  'acct.hero.convertedStale': ' {date} のレートで換算した {list} を含みます（{days} 日前のレート）。',
   'acct.hero.otherCurrencies': ' ほかに他の通貨で{list}を保有しています（換算なし）。',
   'acct.hero.muted': '無視中の警告',
   'dash.foreignExcluded': {

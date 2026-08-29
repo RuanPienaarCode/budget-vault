@@ -705,6 +705,8 @@ module.exports = {
   'acct.hero.sub': '{assets} im Haben gegenüber {liabilities} im Soll.',
   'acct.hero.elsewhere': ' Vermögen und Schulden, die auf ihren eigenen Seiten erfasst sind, zählen hier nicht mit.',
   'acct.hero.mixed': ' Diese Summe addiert Konten in mehr als einer Währung ({symbols}), ohne sie umzurechnen.',
+  'acct.hero.converted': ' Enthält {list}, umgerechnet zu Kursen vom {date}.',
+  'acct.hero.convertedStale': ' Enthält {list}, umgerechnet zu Kursen vom {date} — {days} Tage alt.',
   'acct.hero.otherCurrencies': ' Plus {list} in anderen Währungen, nicht umgerechnet.',
   'acct.hero.muted': 'Ignorierte Warnungen',
   'dash.foreignExcluded': {

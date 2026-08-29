@@ -724,6 +724,8 @@ module.exports = {
   'acct.hero.sub': '{assets} enemali ngokumelene ne-{liabilities} edonswe ngokweqile.',
   'acct.hero.elsewhere': ' Amafa nezikweletu ezibhalwe emakhasini awo awabalwa lapha.',
   'acct.hero.mixed': ' Leli samba lihlanganisa ama-akhawunti agcinwe ezimalini ezingaphezu kweyodwa ({symbols}) ngaphandle kokuwaguqula.',
+  'acct.hero.converted': ' Ihlanganisa {list}, eguqulwe ngamazinga osuku lwe-{date}.',
+  'acct.hero.convertedStale': ' Ihlanganisa {list}, eguqulwe ngamazinga osuku lwe-{date} — asenezinsuku ezingu-{days}.',
   'acct.hero.otherCurrencies': ' Ngokwengeza, {list} kugcinwe kwezinye izimali, ngaphandle kokukuguqula.',
   'acct.hero.muted': 'Izexwayiso ezinganakwayo',
   'dash.foreignExcluded': {

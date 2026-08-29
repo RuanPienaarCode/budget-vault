@@ -690,6 +690,8 @@ module.exports = {
   'acct.hero.sub': '{assets} bersaldo positif berbanding {liabilities} bersaldo negatif.',
   'acct.hero.elsewhere': ' Aset dan utang yang dicatat di halamannya masing-masing tidak dihitung di sini.',
   'acct.hero.mixed': ' Total ini menjumlahkan rekening dalam lebih dari satu mata uang ({symbols}) tanpa mengonversinya.',
+  'acct.hero.converted': ' Termasuk {list}, dikonversi dengan kurs {date}.',
+  'acct.hero.convertedStale': ' Termasuk {list}, dikonversi dengan kurs {date} — sudah {days} hari.',
   'acct.hero.otherCurrencies': ' Ditambah {list} dalam mata uang lain, tanpa konversi.',
   'acct.hero.muted': 'Peringatan diabaikan',
   'dash.foreignExcluded': {

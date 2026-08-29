@@ -719,6 +719,8 @@ module.exports = {
   'acct.hero.sub': '{liabilities} ओवरड्रॉन के सामने {assets} जमा में।',
   'acct.hero.elsewhere': ' अपने-अपने पेजों पर दर्ज संपत्ति और कर्ज़ यहाँ नहीं गिने जाते।',
   'acct.hero.mixed': ' यह जोड़ एक से ज़्यादा मुद्राओं ({symbols}) में रखे खातों को बिना बदले जोड़ देता है।',
+  'acct.hero.converted': ' इसमें {list} शामिल है, {date} की दरों पर परिवर्तित।',
+  'acct.hero.convertedStale': ' इसमें {list} शामिल है, {date} की दरों पर परिवर्तित — {days} दिन पुरानी।',
   'acct.hero.otherCurrencies': ' साथ ही दूसरी मुद्राओं में {list}, जो बदले नहीं गए।',
   'acct.hero.muted': 'चेतावनियाँ अनदेखी',
   'dash.foreignExcluded': {

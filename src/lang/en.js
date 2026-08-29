@@ -751,6 +751,12 @@ module.exports = {
      it says instead). This key stays live for the Ring and the "Whose it is"
      split, which still add every currency together and are unchanged. */
   'acct.hero.mixed': ' This total adds accounts held in more than one currency ({symbols}) without converting them.',
+  /* The provenance a converted figure must never appear without. currency.js
+     refused conversion because "a rate is a fact about a day that this vault
+     does not hold" — so the day travels with the number, and a rate old
+     enough to matter says how old. */
+  'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
+  'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   'acct.hero.muted': 'Warnings ignored',
   /* Settings' half of the same two questions the wizard asks above. */

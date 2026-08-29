@@ -676,6 +676,8 @@ module.exports = {
   'acct.hero.sub': '结余 {assets}，透支 {liabilities}。',
   'acct.hero.elsewhere': ' 记录在各自页面上的资产与债务不计入此处。',
   'acct.hero.mixed': ' 此总计将以多种货币（{symbols}）持有的账户相加，未进行换算。',
+  'acct.hero.converted': ' 包含 {list}，按 {date} 的汇率换算。',
+  'acct.hero.convertedStale': ' 包含 {list}，按 {date} 的汇率换算——已是 {days} 天前的汇率。',
   'acct.hero.otherCurrencies': ' 另有 {list} 以其他货币持有，未换算。',
   'acct.hero.muted': '已忽略的提醒',
   'dash.foreignExcluded': {

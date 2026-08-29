@@ -720,6 +720,8 @@ module.exports = {
   'acct.hero.sub': '{assets} positivos contra {liabilities} negativos.',
   'acct.hero.elsewhere': ' Bens e dívidas registrados nas páginas deles não entram nesta conta.',
   'acct.hero.mixed': ' Este total soma contas mantidas em mais de uma moeda ({symbols}) sem convertê-las.',
+  'acct.hero.converted': ' Inclui {list}, convertido às taxas de {date}.',
+  'acct.hero.convertedStale': ' Inclui {list}, convertido às taxas de {date} — com {days} dias.',
   'acct.hero.otherCurrencies': ' Mais {list} em outras moedas, sem conversão.',
   'acct.hero.muted': 'Avisos ignorados',
   'dash.foreignExcluded': {

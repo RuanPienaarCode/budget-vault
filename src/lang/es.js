@@ -706,6 +706,8 @@ module.exports = {
   'acct.hero.sub': '{assets} a favor frente a {liabilities} en descubierto.',
   'acct.hero.elsewhere': ' Los bienes y las deudas registrados en sus propias páginas no se cuentan aquí.',
   'acct.hero.mixed': ' Este total suma cuentas mantenidas en más de una moneda ({symbols}) sin convertirlas.',
+  'acct.hero.converted': ' Incluye {list}, convertido a los tipos del {date}.',
+  'acct.hero.convertedStale': ' Incluye {list}, convertido a los tipos del {date} — {days} días de antigüedad.',
   'acct.hero.otherCurrencies': ' Más {list} en otras monedas, sin convertir.',
   'acct.hero.muted': 'Avisos ignorados',
   'dash.foreignExcluded': {

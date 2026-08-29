@@ -718,6 +718,8 @@ module.exports = {
   'acct.hero.sub': '{assets} au crédit face à {liabilities} à découvert.',
   'acct.hero.elsewhere': ' Les biens et les dettes enregistrés sur leurs propres pages ne sont pas comptés ici.',
   'acct.hero.mixed': ' Ce total additionne des comptes tenus dans plusieurs devises ({symbols}) sans les convertir.',
+  'acct.hero.converted': ' Comprend {list}, converti aux taux du {date}.',
+  'acct.hero.convertedStale': ' Comprend {list}, converti aux taux du {date} — {days} jours d\'ancienneté.',
   'acct.hero.otherCurrencies': ' Plus {list} détenus dans d\'autres devises, non convertis.',
   'acct.hero.muted': 'Avertissements ignorés',
   'dash.foreignExcluded': {

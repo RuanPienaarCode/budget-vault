@@ -5,6 +5,7 @@ const { TFile } = require('obsidian');
 const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
+const { normalizeCode } = require('./fx');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
 const { parseCsv } = require('./csv');
 /* One declaration per flat table drives this loader's reads AND the views'
@@ -120,6 +121,20 @@ module.exports = function registerLoad(ctx) {
       S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
       S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;
+      /* ISSUE 30 — exchange rates, opt-in and off by default. Absent means
+         off, so every vault written before this key existed keeps making
+         ZERO network requests, which is the promise the README makes.
+         Normalised to a real boolean here rather than left as the raw cell:
+         `exchange_rates: yes` reads as YAML true while `exchange_rates: maybe`
+         reads as a string, and fx.js's canConvert() deliberately refuses a
+         truthy string — a hand-edited value must not switch money conversion
+         on by accident. */
+      S.settings.exchange_rates = String(fm.exchange_rates ?? '').trim().toLowerCase() === 'on';
+      /* The ISO code the rate lookup asks for. The `currency` symbol above is
+         what gets PRINTED; this says which currency that symbol means, because
+         "$" is four of them. Blank is a complete answer — it just means rates
+         cannot be fetched. */
+      S.settings.currency_code = normalizeCode(fm.currency_code);
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
       // values, so a hand-edited Settings.md can't break the app.
       S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
@@ -236,6 +251,18 @@ module.exports = function registerLoad(ctx) {
            the household's, so no existing vault renders differently on
            upgrade. It never converts and never excludes — see currency.js. */
         currency: String(fm.currency || '').trim(),
+        /* The ISO code that symbol MEANS, and the one thing an exchange-rate
+           lookup can use — "$" is USD, AUD, CAD and SGD, so the symbol above
+           cannot answer it. Absent is a complete answer: the account is then
+           simply not convertible and is stated in its own symbol instead,
+           which is exactly what every account did before this existed.
+
+           Read here because it was written into Settings.md and the account
+           dialog and read by NOTHING for a whole release — a field the user
+           can fill in that has no effect is the precise failure this issue
+           was opened about (see docs/adr/0004), and it very nearly shipped
+           inside the fix for it. */
+        currency_code: normalizeCode(fm.currency_code),
         /* Warnings this account has been told to stay quiet about — `true`, or
            a list like [no-transactions, unconfirmed]. Kept as the raw string;
            acct-status.js owns what the words mean, so there is one parser

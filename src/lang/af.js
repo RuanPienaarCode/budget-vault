@@ -704,6 +704,8 @@ module.exports = {
   'acct.hero.sub': '{assets} in krediet teenoor {liabilities} oortrokke.',
   'acct.hero.elsewhere': ' Bates en skulde wat op hul eie bladsye aangeteken is, tel nie hier nie.',
   'acct.hero.mixed': ' Hierdie totaal tel rekeninge in meer as een geldeenheid ({symbols}) bymekaar sonder om om te skakel.',
+  'acct.hero.converted': ' Sluit {list} in, omgeskakel teen koerse vir {date}.',
+  'acct.hero.convertedStale': ' Sluit {list} in, omgeskakel teen koerse vir {date} — {days} dae oud.',
   'acct.hero.otherCurrencies': ' Plus {list} gehou in ander geldeenhede, nie omgeskakel nie.',
   'acct.hero.muted': 'Waarskuwings geïgnoreer',
   'dash.foreignExcluded': {

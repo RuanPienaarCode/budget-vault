@@ -789,6 +789,44 @@ module.exports = function registerAccounts(ctx) {
        a narrower account list rather than teaching it a new rule those pages
        never asked for. */
     const { primary, others } = splitByCurrency(S.accounts.filter(a => !unreadableBalance(a)));
+
+    /* ISSUE 30 — the opt-in conversion, finally reaching a screen.
+
+       `conv` is null unless the reader turned exchange rates on AND the app
+       has a usable table, which is the overwhelmingly common case; the
+       un-converted split above is what renders then, exactly as it has since
+       1.29.1. So the no-conversion path is the NORMAL path and stays
+       exercised, rather than becoming a fallback nobody looks at.
+
+       When it is on, the headline becomes one number the reader can actually
+       act on — and it never appears without saying what it is made of and WHEN
+       its rates are from. src/currency.js's objection to conversion was never
+       the arithmetic, it was a figure that has forgotten when it was true, so
+       the date travels with the number and a rate over a week old says so.
+
+       An account the rate table cannot convert is still named, not folded in
+       at par and not dropped: that is `unconvertible`, and it prints as the
+       same "held in other currencies" sentence the un-converted view uses. */
+    const conv = ctx.fxConvert ? ctx.fxConvert(S.accounts.filter(a => !unreadableBalance(a))) : null;
+    const convLine = conv ? (() => {
+      const parts = conv.converted.map(c =>
+        `${ctx.moneyIn(symbolOf({ currency_code: c.code }, S.settings.currency), c.amount, 0)}`);
+      const bits = [];
+      if (conv.converted.length) {
+        bits.push(i18n.t(conv.stale ? 'acct.hero.convertedStale' : 'acct.hero.converted', {
+          list: conv.converted.map((c, i) => `${c.code} ${parts[i].replace(/^\S+\s/, '')}`).join(' · '),
+          date: conv.date,
+          days: conv.age === null ? '?' : String(conv.age),
+        }));
+      }
+      /* Accounts the table could not convert keep the honest sentence — they
+         are not in the figure above and must not look as though they are. */
+      if (conv.unconvertible.length) {
+        const stuck = splitByCurrency(conv.unconvertible.map(u => u.account));
+        bits.push(otherCurrenciesLine(stuck.others));
+      }
+      return bits.join('');
+    })() : '';
     const w = worth(primary, null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     const attention = rows.filter(wantsALook).length;
@@ -803,11 +841,12 @@ module.exports = function registerAccounts(ctx) {
 
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
-      el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
+      el('div', { class: `hero-num${(conv ? conv.total : net) < 0 ? ' hero-num--negative' : ''}` },
+        money(conv ? conv.total : net)),
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
-        + otherCurrenciesLine(others)
+        + (conv ? convLine : otherCurrenciesLine(others))
         // TODO(i18n): acct.hero.unreadable — "{count} account balance could
         // not be read and is left out of this total." (plural: "balances").
         + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')));

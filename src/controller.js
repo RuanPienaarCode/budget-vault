@@ -16,6 +16,7 @@ const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const registerIo = require('./io');
+const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
 const registerLoad = require('./load');
 const registerCategories = require('./categories');
@@ -190,6 +191,30 @@ async function reloadFromDisk(ctx, S, $, disableSaveButtons) {
     await ctx.loadVault();
   } finally {
     disableSaveButtons();
+  }
+  /* ISSUE 30 — exchange rates, refreshed AFTER the vault is on screen and
+     deliberately not awaited into it.
+
+     Two properties this ordering buys, both of which matter more than the
+     half-second it costs:
+
+       - a render never waits on the network. A page that blocked on a rate
+         lookup would be a page that goes blank when the wifi does, and the
+         un-converted split it draws first is a correct, complete view in its
+         own right — the conversion is an improvement on it, not a
+         prerequisite for it.
+       - nothing happens at all while the setting is off, which is the
+         default and the README's promise. refreshRates() returns immediately
+         in that case without reading a file or opening a socket.
+
+     The redraw is conditional on the table actually CHANGING, so a fresh
+     cached rate (the normal case, once a day) repaints nothing. Errors are
+     swallowed by refreshRates itself; the .catch here is belt and braces
+     against a caller that has not been registered yet. */
+  if (typeof ctx.refreshRates === 'function') {
+    ctx.refreshRates()
+      .then(changed => { if (changed) ctx.render(); })
+      .catch(() => {});
   }
 }
 
@@ -389,6 +414,10 @@ function mountApp(view) {
   registerIo(ctx);          // basePath, readFile, writeFile, mdFilesIn, …
   registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
   registerLoad(ctx);        // loadVault, txSegment
+  /* After load (it reads S.settings) and before every view that might print a
+     converted figure. Registering it does NOT touch the network — see its own
+     header; nothing happens at all until exchange_rates is switched on. */
+  registerFxLive(ctx);      // fxTable, fxState, refreshRates, fxConvert
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
   registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
   // After trend-math, whose periodsForMonths it uses, and before the two views

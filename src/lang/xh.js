@@ -719,6 +719,8 @@ module.exports = {
   'acct.hero.sub': '{assets} enemali ngokuchasene ne-{liabilities} etsalwe ngokugqithisileyo.',
   'acct.hero.elsewhere': ' Iiasethi namatyala abhalwe kumaphepha awo awabalwa apha.',
   'acct.hero.mixed': ' Le totali idibanisa iiakhawunti ezigcinwe kwiimali ezingaphezu kwenye ({symbols}) ngaphandle kokuziguqula.',
+  'acct.hero.converted': ' Ibandakanya {list}, eguqulwe ngamaxabiso omhla we-{date}.',
+  'acct.hero.convertedStale': ' Ibandakanya {list}, eguqulwe ngamaxabiso omhla we-{date} — aneentsuku ezingu-{days}.',
   'acct.hero.otherCurrencies': ' Ukongeza, {list} igcinwe kwezinye iimali, ngaphandle kokuziguqula.',
   'acct.hero.muted': 'Izilumkiso ezingahoywayo',
   'dash.foreignExcluded': {
