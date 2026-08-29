@@ -64,14 +64,38 @@ const { splitRole } = require('./tx-role');
    the schema models — a transaction's account is which file it lives in, not
    a cell in it. */
 const { SCHEMAS } = require('./table-schema');
+/* `Currency` is spliced in the same export-only way `Account` is, and
+   immediately BEFORE Amount so the two are read together.
+
+   Without it the exported file was uninterpretable. A euro row and a rand row
+   both wrote a bare number into one Amount column, so a file could read
+
+     2026-08-01,Salary,Cheque,Income,20000.00
+     2026-08-05,Rent Berlin,Euro Savings,Housing,-900.00
+
+   and SUM(Amount) returned 19100 — a figure in no currency that exists. The
+   account name was the only trace, and it is a free-text household label that
+   an outside reader, a spreadsheet or a future version of this app cannot
+   resolve. This is the export rule this repo already wrote down for the
+   Report, applied to the file that outlives the app that made it: a document
+   must carry the caveats its on-screen twin prints beside the number, and
+   here the caveat IS the number's unit.
+
+   Not added to SCHEMAS.transactions: a row's currency is a property of the
+   account whose folder it lives in, exactly as `Account` is, and ADR-0003's
+   append-only tripwire is not something to trip for a column the vault file
+   does not hold. */
+const TX_CURRENCY_AT = 4;
 const TX_HEAD = (() => {
   const h = SCHEMAS.transactions.columns.map(c => c.header);
   h.splice(2, 0, 'Account');
+  h.splice(TX_CURRENCY_AT, 0, 'Currency');
   return h;
 })();
 const TX_ALIGN = (() => {
   const a = SCHEMAS.transactions.columns.map(c => c.align);
   a.splice(2, 0, 'left');
+  a.splice(TX_CURRENCY_AT, 0, 'left');
   return a;
 })();
 /* Same derivation as table-schema.js's own headerLines — dash count equals
@@ -152,13 +176,21 @@ function amountCell(row) {
   return Number(row.amount || 0).toFixed(2);
 }
 
-function transactionsCsv(rows) {
+/* `symbolFor` resolves a row's own currency symbol from its account, injected
+   for the same reason `money` is: the mapping is a runtime lookup over
+   S.accounts, which a pure module cannot do. Optional, and defaulted to the
+   household symbol — an older caller that has not been updated still produces
+   a valid file rather than one with an empty column, and a single-currency
+   vault (nearly all of them) is unaffected either way. */
+function transactionsCsv(rows, symbolFor) {
   const head = TX_HEAD;
+  const sym = symbolFor || (() => '');
   const body = rows.map(r => [
     csvCell(r.date),
     csvCell(r.desc),
     csvCell(r.label),
     csvCell(r.cat || ''),
+    csvCell(sym(r)),
     amountCell(r),
     csvCell(r.excluded ? 'yes' : ''),
     csvCell(r.note || ''),
@@ -183,18 +215,38 @@ function categoriesCsv(categories) {
    income and saving-rate already have drifted from each other elsewhere in
    this codebase. splitRole, not r.split raw — see the loop below, this is
    the same call, only moved. */
+/* `money` here is now a PER-ROW formatter — it is handed the row, not just an
+   amount, so it can print that row's figure in that row's own currency. It
+   used to be the household's formatter applied to every row, which stamped
+   "R -900.00" on a €900 charge. That is not a missing label but a wrong
+   figure: it asserts an amount of rand that was never spent. */
 function transactionRow(r, money) {
-  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
+  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
 }
 
-/* `money` is the view's own formatter, injected because the export must read in
-   the household's currency and separators — and that is a runtime setting off
-   ctx, not something a pure module can know. */
+/* `money(amount, row)` is the view's own formatter, injected because the
+   separators and the account->symbol lookup are runtime settings off ctx, not
+   something a pure module can know. The second argument is optional at every
+   call site, so a caller that only ever formats a household figure passes the
+   amount alone exactly as before.
+
+   `foreignSymbols` names the other currencies present, so the totals line can
+   say what it does NOT cover — see the note built below. */
 function transactionsMarkdown(rows, meta, money) {
   const { range, filters, generated } = meta;
   const included = rows.filter(r => !r.excluded);
-  const inTotal = included.filter(r => r.amount > 0).reduce((t, r) => t + r.amount, 0);
-  const outTotal = included.filter(r => r.amount < 0).reduce((t, r) => t + r.amount, 0);
+  /* Totals over the HOUSEHOLD-currency rows only. They used to add every
+     amount whatever its account's currency and print the result as one
+     figure — R and € summed and labelled R. A total across currencies is not
+     a total, and the file's only caveat covered excluded rows and nothing
+     else. Rows in other currencies are still LISTED, each in its own symbol;
+     they are just not summed into a number that could not mean anything. */
+  const foreignSymbols = [...new Set(rows
+    .map(r => (r._symbol || ''))
+    .filter(sym => sym && sym !== (meta.household || '')))];
+  const counted = included.filter(r => !r._symbol || r._symbol === (meta.household || ''));
+  const inTotal = counted.filter(r => r.amount > 0).reduce((t, r) => t + r.amount, 0);
+  const outTotal = counted.filter(r => r.amount < 0).reduce((t, r) => t + r.amount, 0);
 
   const out = [
     '---',
@@ -215,6 +267,10 @@ function transactionsMarkdown(rows, meta, money) {
        of blanks: a total that ignores some listed rows has to explain itself. */
     ...(rows.length !== included.length
       ? [`Totals cover ${included.length} of ${rows.length} rows — excluded rows are listed but not counted.`, '']
+      : []),
+    ...(foreignSymbols.length
+      ? [`Rows in ${foreignSymbols.join(', ')} are listed in their own currency and are NOT included in the totals above — `
+        + 'there is no exchange rate in this file to combine them with.', '']
       : []),
     ...txHeaderLines(),
   );

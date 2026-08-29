@@ -408,7 +408,21 @@ function financialReportMarkdown(data, money) {
     generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    otherCurrencies, household,
   } = data;
+
+  /* ISSUE 28. This document LEAVES the app: it is saved, shared, and read
+     later by a person or a parser with none of the on-screen context. The
+     house rule is that an exported document carries the caveats its
+     on-screen twin prints beside the number — and that rule had been broken
+     in the one place it mattered most. The Net Worth section printed a total
+     that added unlike currencies, in silence, while BOTH of its screen twins
+     disclosed or split it. */
+  const otherLine = (otherCurrencies || []).length
+    ? i18n.t('acct.hero.otherCurrencies', {
+      list: otherCurrencies.map(([sym, v]) => `${sym} ${Math.round(v)}`).join(' · '),
+    }).trim()
+    : '';
 
   const out = [
     '---',
@@ -598,7 +612,13 @@ function financialReportMarkdown(data, money) {
     out.push('', `## ${i18n.t('report.section.transactions')}`,
       i18n.t('report.transactions.count', { count: transactions.length }),
       ...txHeaderLines());
-    for (const r of transactions) out.push(transactionRow(r, money));
+    /* Per-row currency: transactionRow hands the ROW to the formatter now, so
+       a €900 charge prints in euro instead of being stamped "R -900,00" — an
+       amount of rand that never moved. */
+    for (const r of transactions) {
+      out.push(transactionRow(r, (v, row) => (row && row.currency && row.currency !== household
+        ? `${row.currency} ${Number(v).toFixed(2)}` : money(v))));
+    }
   }
 
   return out.join('\n') + '\n';
@@ -630,6 +650,13 @@ function copyBody(markdown) {
 function jsonTransactionRow(r) {
   return {
     date: r.date, description: r.desc, account: r.label, category: r.cat || '',
+    /* ISSUE 28: `currency` per row, beside the number it qualifies. The
+       document declares a single top-level `currency` and used to carry rows
+       in other currencies underneath it without a word, so a parser — this
+       shape's stated audience — read -900 as rand when it was euro. The
+       account name was the only hint and it is a free-text household label
+       nothing outside this vault can resolve. */
+    currency: r.currency || '',
     amount: Number(r.amount || 0), excluded: !!r.excluded, note: r.note || '',
     split: splitRole(r.split),
   };
@@ -653,6 +680,7 @@ function financialReportJson(data) {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    otherCurrencies,
   } = data;
 
   const shape = {
@@ -738,6 +766,11 @@ function financialReportJson(data) {
       }
       : null,
     net_worth: { net: netWorth.net, assets: netWorth.assets, liabilities: netWorth.liabilities },
+    /* Every other currency the household holds, each in its own symbol and
+       never converted, so a document that spans currencies declares itself
+       rather than claiming to be in one. Empty on the single-currency vaults
+       that are nearly all of them. */
+    other_currencies: (otherCurrencies || []).map(([symbol, amount]) => ({ symbol, amount })),
     health_score: health
       ? {
         score: health.score, months: health.months, target_months: health.target,

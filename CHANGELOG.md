@@ -3,6 +3,81 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.30.0 — 2026-08-29
+
+Issue [#28](https://github.com/RuanPienaarCode/budget-vault/issues/28) reported
+one wrong figure on the Accounts page. Fixing it prompted a full audit of how
+this app handles a household that holds money in more than one currency, and
+the audit found the same defect on almost every other page. This release is
+that repair.
+
+The rule, everywhere now: **your own currency is added up, and money in any
+other currency is shown beside it in its own symbol, never folded in and never
+silently dropped.** Nothing is converted — there is still no exchange rate
+stored anywhere in your vault unless you switch one on (see below).
+
+### Fixed
+
+- **Savings page figures were wrong, and said nothing.** Net worth read
+  "Rp 6 203 956" where the Accounts page read "Rp 6 200 000" for the same
+  accounts. The growth rate was worse: "+11,2% on Rp 903 000 put in", where
+  that 903 000 was Rp 900 000 and ¥ 3 000 added together — a percentage of an
+  amount that does not exist. Every per-account figure was also printed with
+  the household's symbol, so a ¥ balance appeared as "Rp 3 956,00".
+- **The Dashboard was counting foreign spending as your own.** Currency never
+  reached transactions at all, so a Rp 1 500 000 lunch and a R 3 000 grocery
+  shop were the same number. On a two-currency vault the hero read
+  "−R 1 499 000" where R 1 000 was actually left, and the Groceries budget row
+  read "spent R 1 503 000" of R 4 000. The donut, the trend line and the
+  month-on-month comparison were all built on the same figure.
+- **The health tile inverted its own verdict.** Months of cover is a ratio,
+  and a ratio built from two currencies does not merely overstate — it flips.
+  A household with 6.7 months of cover was shown "0.0 months" in red, and the
+  overall score fell 26 points.
+- **A statement that was not in rand could not be imported at all.** "Rp
+  1.500.000" could not be read, so every row was counted as "skipped" — an
+  Indonesian or Chinese statement imported nothing and never said why. ¥, ₹,
+  R$, kr, CHF, zł and ₩ are now read too, and a file headed "Amount (EUR)" is
+  detected the same way "Amount (ZAR)" always was.
+- **Exported files could not be interpreted later.** The CSV put two
+  currencies in one Amount column with nothing to tell them apart, so summing
+  that column gave a figure in no currency at all. There is now a Currency
+  column beside it. The exported Markdown stamped every row with the household
+  symbol — "R -900.00" on a €900 charge — and totalled across currencies; each
+  row now prints in its own currency and the totals say what they leave out.
+- **The Report said nothing about any of it.** It is the one document meant to
+  leave the app and be read by someone else, and it was the only place with no
+  caveat at all. Its JSON declared a single currency and then carried rows in
+  another; every row now carries its own.
+- **The Accounts ring and the "Whose it is" rows** — the original #28 fix,
+  released as 1.29.1 and included here.
+
+### Added
+
+- **Exchange rates, off by default.** If you do hold money in more than one
+  currency, the setup wizard now asks — on its own screen, with "no" offered
+  first — whether you want daily rates fetched so those accounts can be added
+  into your totals. It is also a setting you can change at any time.
+
+  This is the only thing in the plugin that uses the internet. It sends a
+  three-letter currency code and nothing else: no balances, no account names,
+  nothing about your vault. The rates are saved as an ordinary note in your
+  budget folder that you can read, edit or delete, and every converted figure
+  is printed with the date its rate is for — a rate more than a week old says
+  so. Leave it off and the plugin makes no network requests, exactly as before.
+
+- **`currency_code` on an account**, for the same feature. Your `currency:` is
+  still the symbol that gets printed; the code says which currency that symbol
+  means, because "$" alone could be four different ones.
+
+### Still to come
+
+Debts, assets, money owed to you and services cannot record a currency at all,
+so a foreign loan or an overseas property still has to be entered in your own
+currency. The "left to spend" card, the Services price-drift flag and the Tax
+page's SARS thresholds also still assume a single currency. These are tracked
+and are next.
+
 ## 1.29.1 — 2026-08-29
 
 ### Fixed

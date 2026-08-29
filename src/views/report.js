@@ -48,6 +48,7 @@
 const { el } = require('../dom');
 const { rangePills } = require('../chart');
 const { worth } = require('../worth');
+const { symbolOf, splitByCurrency } = require('../currency');
 const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
 const { todayIso, nowLocalMinute } = require('../dates');
@@ -502,7 +503,16 @@ module.exports = function registerReport(ctx) {
       .sort((a, b) => b.amount - a.amount)
       .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
 
-    const w = worth(S.accounts, S.debts, S.assets);
+    /* ISSUE 28 (2026-08-29 audit). The Report's Net Worth section printed a
+       total that added unlike currencies and — alone among the three surfaces
+       that compute it — disclosed nothing. That is the worse half of this
+       repo's recurring shape: the one document meant to LEAVE the app and be
+       handed to somebody else carried no caveat, while both of its on-screen
+       twins did. Same rule as those twins now, and `otherCurrencies` travels
+       into the document so the section can say what it holds. */
+    const { primary: homeAccounts, others: reportOthers } =
+      splitByCurrency(S.accounts, S.settings.currency);
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     return {
       /* M3, 2026-08-29 audit — this was `new Date().toISOString().slice(0,
          16).replace('T', ' ')`, UTC, while todayIso() a few lines up (and
@@ -523,6 +533,14 @@ module.exports = function registerReport(ctx) {
       periodCount: periods.length,
       detail,
       currency: S.settings.currency || '',
+      /* Every other currency this household holds, each in its own symbol and
+         never converted. A document that declares ONE `currency` and then
+         carries figures in another is not merely incomplete, it is wrong
+         about itself — a parser (the stated audience for the JSON) reads
+         -900 as rand when it is euro. So the list is stated, and the
+         per-row currency below closes the same gap for transactions. */
+      otherCurrencies: reportOthers,
+      household: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
       categories, spendByCategory,
       categoryGap: { uncat, netted },
@@ -530,7 +548,14 @@ module.exports = function registerReport(ctx) {
       debts: debtsSummary(w),
       netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },
       health: healthSummary(),
-      transactions: detail === 'detail' ? periods.flatMap(p => txInPeriod(p)) : null,
+      /* Each row stamped with the symbol of the account whose folder it lives
+         in, so neither the markdown table nor the JSON can print a euro
+         charge under the household's symbol. */
+      transactions: detail === 'detail'
+        ? periods.flatMap(p => txInPeriod(p)).map(r => ({
+          ...r, currency: symbolOf(ctx.accountForLabel(r.label), S.settings.currency),
+        }))
+        : null,
     };
   }
 

@@ -80,12 +80,20 @@ const ROWS = [
   ok(!/(^|,)-DEBIT/.test(line), 'and the bare form is not what lands in the cell');
 }
 
-/* ---- 2. CSV amounts are raw numbers a spreadsheet can sum ---- */
+/* ---- 2. CSV amounts are raw numbers a spreadsheet can sum ----
+
+   ISSUE 28 (2026-08-29 audit): a `Currency` column was spliced in immediately
+   BEFORE Amount, so the amount column moved from index 4 to index 5. Without
+   it the file was uninterpretable the moment a household held two currencies
+   — a euro row and a rand row both wrote a bare number into one column, and
+   SUM(Amount) returned a figure in no currency that exists. The amount cell
+   itself is unchanged and must stay a bare number: the unit belongs in its
+   own column precisely so this one stays summable. ---- */
 {
   const csv = transactionsCsv(ROWS);
   const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
-  // amount is column 4 (Date, Description, Account, Category, Amount, …)
-  const amounts = rows.map(r => r[4]);
+  // amount is column 5 (Date, Description, Account, Category, Currency, Amount, …)
+  const amounts = rows.map(r => r[csv.split('\n')[0].split(',').indexOf('Amount')]);
   ok(amounts.every(a => /^-?\d+\.\d{2}$/.test(a)),
     `every amount is a bare number, got ${JSON.stringify(amounts)}`);
   /* Checked on the amount COLUMN, not the whole file — a description may
@@ -107,7 +115,7 @@ const ROWS = [
   // strict on-disk-shape check failed and set amountRaw.
   const row = { ...ROWS[0], amount: 1234.56, amountRaw: '1 234,56 CR' };
   const csv = transactionsCsv([row]);
-  const cell = csv.trim().split('\n')[1].split(',')[4];
+  const cell = csv.trim().split('\n')[1].split(',')[csv.split('\n')[0].split(',').indexOf('Amount')];
   eq(cell, '1234.56', 'the Amount cell is the parsed number, not the raw text');
   ok(!csv.includes('1 234,56 CR'), 'the unparsed original text does not leak into the CSV at all');
 }
@@ -118,7 +126,7 @@ const ROWS = [
   const row = { ...ROWS[0], amount: 0, amountRaw: 'abc' };
   const csv = transactionsCsv([row]);
   const md = transactionsMarkdown([row], { range: 'Aug 2026', filters: [], generated: 'x' }, money);
-  const cell = csv.trim().split('\n')[1].split(',')[4];
+  const cell = csv.trim().split('\n')[1].split(',')[csv.split('\n')[0].split(',').indexOf('Amount')];
   eq(cell, '0.00', 'a cell the loader could not parse at all exports as the same zero the app itself uses');
   ok(md.includes(money(0)), 'and markdown agrees — same row, same figure, in both files');
 }
@@ -128,7 +136,7 @@ const ROWS = [
   const csv = transactionsCsv(ROWS);
   ok(csv.includes('TRANSFER TO SAVINGS'), 'an excluded row still appears in the CSV');
   const line = csv.split('\n').find(l => l.includes('TRANSFER TO SAVINGS'));
-  eq(line.split(',')[5], 'yes', 'and is marked excluded');
+  eq(line.split(',')[csv.split('\n')[0].split(',').indexOf('Excluded')], 'yes', 'and is marked excluded');
   eq(csv.trim().split('\n').length, ROWS.length + 1, 'every row plus a header, nothing dropped');
 }
 
@@ -150,23 +158,39 @@ const SPLIT_ROWS = [
   const head = csv.split('\n')[0];
   ok(/(^|,)Split(,|$)/.test(head), 'the CSV header carries a Split column');
 
+  /* Columns looked up BY NAME rather than by a hardcoded index. Splicing the
+     Currency column in (issue #28) shifted six literals in this file at once,
+     and each failed as a baffling assertion about split roles rather than as
+     "a column moved". The header is right there in the file under test;
+     reading it is both truer to what a consumer of this CSV actually does and
+     immune to the next column anyone adds. */
+  const cols = head.split(',');
+  const at = name => {
+    const i = cols.indexOf(name);
+    ok(i !== -1, `the CSV header carries a ${name} column`);
+    return i;
+  };
+  const AMOUNT = at('Amount'), EXCLUDED = at('Excluded'), SPLIT = at('Split');
+  ok(at('Currency') < AMOUNT,
+    'and Currency sits immediately beside Amount — a unit two columns away from its figure is a unit nobody reads');
+
   const rows = csv.trim().split('\n').slice(1).map(l => l.split(','));
-  eq(rows[0][7], 'parent', 'the split parent is marked, not just excluded');
-  eq(rows[1][7], 'part', 'so are its parts');
-  eq(rows[2][7], 'part', '');
-  eq(rows[3][5], 'yes', 'the transfer is excluded, same as the parent...');
-  eq(rows[3][7], '', '...but its Split cell is empty — Excluded alone could never tell these apart');
+  eq(rows[0][SPLIT], 'parent', 'the split parent is marked, not just excluded');
+  eq(rows[1][SPLIT], 'part', 'so are its parts');
+  eq(rows[2][SPLIT], 'part', '');
+  eq(rows[3][EXCLUDED], 'yes', 'the transfer is excluded, same as the parent...');
+  eq(rows[3][SPLIT], '', '...but its Split cell is empty — Excluded alone could never tell these apart');
 
   /* The correct filter now exists: drop rows where Split is "parent" and sum
      the rest. That is real money only — the parts (already summing back to
      what the parent was) plus the transfer, which still moved. */
-  const realTotal = rows.filter(r => r[7] !== 'parent').reduce((t, r) => t + Number(r[4]), 0);
+  const realTotal = rows.filter(r => r[SPLIT] !== 'parent').reduce((t, r) => t + Number(r[AMOUNT]), 0);
   eq(realTotal, -1500, 'no double count: -600 + -400 + -500, the parent itself excluded from the sum');
 
   /* And the filter the app already uses for its own totals (Excluded != yes)
      still lands on the same figure for the split specifically, because a
      part is never excluded and a parent always is. */
-  const budgetTotal = rows.filter(r => r[5] !== 'yes').reduce((t, r) => t + Number(r[4]), 0);
+  const budgetTotal = rows.filter(r => r[EXCLUDED] !== 'yes').reduce((t, r) => t + Number(r[AMOUNT]), 0);
   eq(budgetTotal, -1000, 'Excluded != yes already avoided the double-count on its own — -600 + -400');
 }
 
@@ -218,16 +242,23 @@ const SPLIT_ROWS = [
 /* ---- 10. the export column order is read from SCHEMAS.transactions, not a
    fourth hand-written copy ---- */
 {
+  /* Two export-only columns now. Both are properties of the FOLDER a row
+     lives in rather than cells the transaction file holds, which is exactly
+     why neither is in SCHEMAS.transactions and why adding them did not trip
+     ADR-0003's append-only tripwire. The point this test protects is
+     unchanged: everything else comes from the schema, in the schema's order,
+     rather than from a fourth hand-written copy. */
   const expectedHead = SCHEMAS.transactions.columns.map(c => c.header);
   expectedHead.splice(2, 0, 'Account');
+  expectedHead.splice(4, 0, 'Currency');
 
   const csvHead = transactionsCsv([]).trim().split('\n')[0].split(',');
-  eq(csvHead, expectedHead, 'the CSV header matches the schema plus Account');
+  eq(csvHead, expectedHead, 'the CSV header matches the schema plus Account and Currency');
 
   const md = transactionsMarkdown([], { range: 'x', filters: [], generated: 'x' }, money);
   const headerLine = md.split('\n').find(l => l.startsWith('| Date'));
   const mdHead = headerLine.split('|').slice(1, -1).map(s => s.trim());
-  eq(mdHead, expectedHead, 'the markdown header matches the schema plus Account');
+  eq(mdHead, expectedHead, 'the markdown header matches the schema plus Account and Currency');
 }
 
 /* ---- 6. filters are disclosed in the document ---- */

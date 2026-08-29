@@ -1,7 +1,7 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.29.1",
+  "version": "1.30.0",
   "minAppVersion": "1.8.0",
   "description": "Track your budget, spending, debt and savings as plain files in your own vault. Import bank statements, see where your money goes, and read the main screens in nine languages. No account, no server — nothing ever leaves your device.",
   "author": "Ruan Pienaar",

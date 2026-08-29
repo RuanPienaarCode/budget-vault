@@ -6,7 +6,9 @@
 
 Most budgeting apps ask you to upload your bank statements and trust someone else's server with them. Budget Vault doesn't.
 
-Every account, budget and transaction is a plain markdown file in your own vault, on your own devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours. The plugin makes zero network requests, so your financial history can't be uploaded, analysed or sold.
+Every account, budget and transaction is a plain markdown file in your own vault, on your own devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours.
+
+Out of the box the plugin makes **zero network requests**, so your financial history can't be uploaded, analysed or sold. There is exactly one thing that can change that, and only if you switch it on: if you hold money in more than one currency, you can ask the plugin to fetch daily exchange rates so those accounts can be added into your totals. It is off by default, the setup wizard asks about it outright, and when it is on it sends a three-letter currency code and nothing else — no balances, no account names, nothing about your vault. The rates are saved as an ordinary note in your budget folder that you can read, edit or delete.
 
 Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your budget follows you to every device — synced by a service you chose, not one we picked.
 

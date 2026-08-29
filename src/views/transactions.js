@@ -10,6 +10,7 @@ const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 const { ISO_DATE, todayIso } = require('../dates');
+const { symbolOf } = require('../currency');
 const { applySplit, splitRole } = require('../tx-role');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
@@ -19,6 +20,32 @@ module.exports = function registerTransactions(ctx) {
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
   const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment } = ctx;
+
+  /* A row's own currency symbol, resolved from the account whose folder it
+     lives in. Every figure this view prints or exports goes through one of
+     these two, never through bare money(): a €900 charge rendered "R -900,00"
+     is not a missing label, it is an assertion that 900 rand left an account
+     it never left. */
+  const rowSymbol = r => {
+    /* Late-bound off ctx, and guarded. accountForLabel is provided by
+       period.js, which registers separately — the same registration-order
+       trap views/savings.js's own header describes for saveAccount. Falling
+       back to the household symbol is exactly what symbolOf(null, …) does
+       anyway, so an unresolvable label is a single-currency vault's normal
+       answer rather than a throw. */
+    const a = typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(r && r.label) : null;
+    return symbolOf(a, (S.settings || {}).currency);
+  };
+  /* money() for a household-currency row — which is every row in nearly every
+     vault — and the per-symbol formatter only where the row is actually in
+     another currency. That ordering is not just an optimisation: it keeps the
+     common path on the one formatter the rest of the app uses, so separators
+     and rounding cannot drift between this table and the page around it. */
+  const rowMoney = (v, r) => {
+    const sym = r ? rowSymbol(r) : '';
+    if (!sym || sym === (S.settings || {}).currency || typeof ctx.moneyIn !== 'function') return money(v);
+    return ctx.moneyIn(sym, v);
+  };
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -278,7 +305,7 @@ module.exports = function registerTransactions(ctx) {
           }
           mark();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
-        el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, money(r.amount)),
+        el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, rowMoney(r.amount, r)),
         el('td', {}, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
           ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
@@ -438,7 +465,7 @@ module.exports = function registerTransactions(ctx) {
     const go = await confirmModal(app, {
       title: i18n.t('tx.delete.title'),
       message: i18n.t('tx.delete.msg', {
-        date: r.date, desc: r.desc, amount: money(r.amount), file: `Transactions/${f.label}/${f.month}.md`,
+        date: r.date, desc: r.desc, amount: rowMoney(r.amount, r), file: `Transactions/${f.label}/${f.month}.md`,
       }) + ' ' + detail,
       confirmText: i18n.t('tx.delete.confirm'),
     });
@@ -597,7 +624,7 @@ module.exports = function registerTransactions(ctx) {
        add today's rows under it. transactionsCsv owns the column shape, so the
        log reads the same as an export and can be imported straight back in. */
     try {
-      const csv = transactionsCsv(rows);
+      const csv = transactionsCsv(rows, rowSymbol);
       const existing = await readFile(DELETED_LOG);
       await writeFile(DELETED_LOG, existing
         ? existing.replace(/\n*$/, '\n') + csv.split('\n').slice(1).join('\n')
@@ -803,8 +830,13 @@ module.exports = function registerTransactions(ctx) {
     const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');
     let written;
     try {
-      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows));
-      await writeVaultFile(paths.txMd, transactionsMarkdown(rows, { range, filters, generated }, money));
+      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, rowSymbol));
+      /* Each row is stamped with its own symbol on the way in, so the
+         markdown writer can both PRINT it correctly and know which rows its
+         totals may add together. */
+      const stamped = rows.map(r => ({ ...r, _symbol: rowSymbol(r) }));
+      await writeVaultFile(paths.txMd, transactionsMarkdown(stamped,
+        { range, filters, generated, household: S.settings.currency }, rowMoney));
       await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {
