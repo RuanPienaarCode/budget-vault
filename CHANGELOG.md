@@ -3,6 +3,80 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.29.0 — 2026-08-29
+
+An audit of the Report feature — three independent review passes plus a
+live click-through — found the report could state things that were not
+true, and could promise more safety than it delivered. This release is
+the fix.
+
+### Fixed
+
+- **"Last 3 months" could report one month.** The period buttons on the
+  Report page and the period arrows in the header were answering to two
+  different clocks, so the range you picked was not always the range you
+  got. All three buttons now mean what they say, and the header arrows
+  are hidden on the Report page so there is only one place to choose a
+  period.
+- **Spend by category no longer hides the gap.** If some of your spending
+  has no category, the table used to show only the categorised part and
+  still call it 100%. It now says how much was left out, and marks a
+  category whose file no longer exists instead of listing it as an
+  ordinary one.
+- **Budget vs actual tells income apart from spending.** Earning more
+  than you planned used to read as a negative "Remaining", exactly like
+  overspending. There is now a Type column, and rows keep the same order
+  the Budget page uses.
+- **Savings growth stops quietly dropping accounts.** An account you have
+  drawn down more than you put in was left out of the growth rate with
+  no mention, while the Savings page said so plainly. Both pages now use
+  one shared calculation, and the report says the same thing the page
+  does.
+
+### Changed
+
+- **The report says what it is.** Every generated report now carries a
+  line saying it is not financial advice and to confirm anything
+  important with a professional — placed so it travels with the file and
+  with anything you copy out of it. The financial health score comes
+  with a short note on what it actually measures.
+- **"Summary only" describes itself honestly.** It used to say it was
+  "safe to hand to an advisor". It now says what it really contains — no
+  individual transactions, but still your category names, totals, debts
+  and net worth — so you can decide that for yourself.
+- **The README says where reports are written.** `Reports/` and
+  `Exports/` sit beside your budget folder rather than inside it, which
+  the "Where your data lives" section had never mentioned.
+- **The report folder refuses to write into your budget data.** Pointing
+  it at a folder the plugin manages — Categories, Accounts, Budgets and
+  the rest — used to write a report there that was then read back as
+  budget data, so a report could turn up as a category in every picker.
+  The page now says so and stops you before you create it.
+- **An empty vault no longer invents a year of history.** A brand-new
+  vault asked for twelve months produced twelve months of zeroes. It now
+  reports only what it has — which also fixes the same behaviour in the
+  Dashboard's trend chart.
+- **The generated time is your time.** It was stamped in UTC while every
+  other date in the app is local, so for some time zones a report made in
+  the morning was stamped the previous evening.
+- **The report file keeps its name in every language.** The filename used
+  a translated word, so switching language produced a second file for the
+  same period instead of replacing the first.
+- **Percentages agree with themselves.** The spend-by-category percentages
+  and the savings growth rate are now worked out once and shared by both
+  the readable and the data version of the report. If you have more than
+  eight spending categories, the report says why its percentages can look
+  different from the Dashboard's donut.
+- **A renamed category is flagged, not silently split.** Over a long
+  window, a category renamed partway through appears as two rows. The
+  report cannot tell a rename from a deletion, so it now marks the row
+  and says so rather than quietly reporting a smaller total.
+
+### Internal
+
+- The Report page's styling moved out of the markup into the stylesheet,
+  so themes and CSS snippets can restyle it.
+
 ## 1.28.1 — 2026-08-28
 
 ### Fixed
