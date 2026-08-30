@@ -3,6 +3,102 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.32.1 — 2026-08-30
+
+### Fixed
+
+- **The description said something that had stopped being true.** It read "no
+  account, no server — nothing ever leaves your device", written before
+  exchange rates existed and not true once you switch them on. It now says
+  what the app actually does: no account, no server, and exchange rates as
+  something you can optionally turn on. It also said the interface was in nine
+  languages; it is in twelve.
+- **Three releases were missing from this file.** 1.31.0, 1.31.1 and 1.32.0
+  shipped without an entry here. They are written up below, from the commits,
+  rather than left as a gap in a file that claims to record every notable
+  change.
+
+No code changed in this release.
+
+## 1.32.0 — 2026-08-30
+
+The rest of the multi-currency work, and the part of it that was not a wrong
+number but a missing field.
+
+### Added
+
+- **A debt, an asset, money owed to you or a service can now say which
+  currency it is in.** Until now only accounts could. A euro mortgage, a flat
+  abroad, a loan to a relative overseas or a dollar-billed subscription had to
+  be typed as though it were in your own currency — and then every total,
+  ratio and payoff schedule built on it was quietly wrong, with no way for you
+  to say otherwise. Each of those four pages now has a Currency field. Leave
+  it blank and nothing changes: blank means your own currency, which is what
+  every file already on your disk says by saying nothing, and the new column
+  is not written into a file until something in it uses one.
+- **Exchange rates now actually do something.** The setting and the wizard
+  question shipped in 1.30.0 with nothing behind them — switching it on
+  changed no figure on any screen. It does now: with rates on, the Accounts
+  headline is a single total in your own currency, and it never appears
+  without saying what was converted and the date the rates are for. A rate
+  more than a week old says so. Off by default, and off means no network
+  requests at all.
+
+### Fixed
+
+- **Importing a statement in any currency.** 1.30.0 widened a list of about
+  twenty currency symbols, which fixes twenty and leaves the twenty-first
+  failing the same silent way. Any currency symbol or code is read now, at
+  either end of the cell — "Rp 1.500.000", "1234.56 ZAR", "1 234,56 €",
+  "zł 99,00", "1,200円".
+- **A statement whose amounts mixed grouped and ungrouped thousands.** On a
+  real Indonesian export, "Rp -1.500.000" read correctly as -1500000 while
+  "Rp -250.000" read as -250 — off by a thousand, in the same column, with
+  nothing on screen to say so. What "1.500" means is now decided once per
+  file rather than once per cell.
+- **Statements headed in your own language.** "Tanggal, Keterangan, Jumlah"
+  matched nothing and went to the manual column mapper. Column names are
+  recognised in every language the app speaks, and debit/credit columns with
+  the currency in their heading ("Debit (IDR)") are found too.
+- **The Services page claimed price changes that never happened.** A
+  subscription listed at R199 and really billed $15.99 on a dollar card showed
+  a green "really R 16" — a 92% price cut, asserted as fact. Price is only
+  compared against charges in your own currency now.
+- **The Tax page put your currency on SARS's figures.** A household budgeting
+  in another currency saw the R23 800 interest exemption printed in that
+  currency and compared against it. Tax figures are in rand; the page says so
+  when your budget is not.
+- **The Loans page contradicted itself** — transfer duty and the fee caps are
+  rand amounts fixed by regulation, printed in the household's symbol directly
+  above a note quoting them in rand.
+- **A hand-edited unknown country gave you two countries at once** — the full
+  SARS checklist on one page and a generic loan profile on another.
+- **A stale figure in the seeded tax checklist** — it said R36 000 where the
+  page above it said R46 000, and it was written into your own vault.
+- **"What's left to spend" is now one card per currency.** It was adding cash
+  in one currency against commitments in another; on a two-currency vault it
+  could read thirty times too high.
+- Smaller: the Debt page's payment bars and debt-to-income ratio, the import
+  preview, the "What's counted" table, the staleness note, and the Score page
+  — which now says which accounts its ratios could not include.
+
+## 1.31.1 — 2026-08-29
+
+### Fixed
+
+- The currency repairs below, released. The Savings page, the Dashboard
+  tiles, the Report and both exported formats stopped stating figures that
+  added unlike currencies together.
+
+## 1.31.0 — 2026-08-29
+
+### Added
+
+- **Português, हिन्दी and Bahasa Indonesia** — the interface now reads in
+  twelve languages.
+- **More currency symbols in the setup wizard** — ₹, Rp and R$ join rand,
+  dollar, euro and pound, so a new vault can pick its own without typing it in.
+
 ## 1.30.0 — 2026-08-29
 
 Issue [#28](https://github.com/RuanPienaarCode/budget-vault/issues/28) reported
