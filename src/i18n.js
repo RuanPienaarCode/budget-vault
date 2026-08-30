@@ -80,11 +80,10 @@ const ONE_FORM = new Set(['zh', 'ja', 'id']);
 const ZERO_IS_SINGULAR = new Set(['fr', 'pt', 'hi']);
 
 /* Which form of a plural entry a count selects. Kept deliberately small: these
-   nine languages need exactly two categories between them, and Intl.PluralRules
-   — which would be the general answer — is not something to depend on for
-   correctness across the WebKit floor when the rule set is this shallow.
-
-   Twelve languages now, and still exactly two categories between them.
+   twelve languages need exactly two categories between them, and
+   Intl.PluralRules — which would be the general answer — is not something to
+   depend on for correctness across the WebKit floor when the rule set is this
+   shallow.
 
    Indonesian joins Chinese and Japanese in ONE_FORM: a count never changes
    an Indonesian noun, and reduplication (buku-buku) marks plurality on its

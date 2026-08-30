@@ -296,7 +296,7 @@ module.exports = function registerScore(ctx) {
        its legend row prints — name, points, and whereYouAre — read off `laid`
        rather than re-derived, so the ring and the list beside it can never
        describe one pillar two ways. No new lang keys either: both halves are
-       strings the legend already renders in all seven languages. */
+       strings the legend already renders in all twelve languages. */
     const tipPts = r => i18n.t('dash.health.why.points', { points: r.fill, max: r.width });
 
     /* Hover is a capability question, not a screen-size one — the rule
