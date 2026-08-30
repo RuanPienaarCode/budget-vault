@@ -37,6 +37,8 @@ module.exports = function registerFxLive(ctx) {
   const enabled = () => !!(S.settings && S.settings.exchange_rates
     && fx.normalizeCode(S.settings.currency_code));
 
+  const cadence = () => fx.normalizeCadence(S.settings && S.settings.rate_refresh);
+
   const household = () => ({
     code: fx.normalizeCode(S.settings && S.settings.currency_code),
     symbol: (S.settings && S.settings.currency) || '',
@@ -63,10 +65,16 @@ module.exports = function registerFxLive(ctx) {
     inFlight = (async () => {
       const before = table && table.date;
       if (!loaded) { table = await readCachedRates(ctx); loaded = true; }
-      const { stale } = fx.stalenessOf(table, todayIso());
-      /* Only when the cache cannot answer. A fresh cached table means no
-         request at all — the promise is one lookup a day, not one a render. */
-      if (stale) {
+      /* Only when the cache cannot answer AT THIS VAULT'S CADENCE. A cached
+         table younger than that means no request at all — the promise is one
+         lookup per interval, not one a render.
+
+         Note this is fx.refreshDue, NOT fx.stalenessOf: the age that earns a
+         "this rate is old" badge and the age that earns a network request are
+         two different questions, and sharing one constant for both is the bug
+         this replaces — the refresh fired at exactly the age the badge would
+         have appeared, so online readers effectively never saw it. */
+      if (fx.refreshDue(table, todayIso(), cadence())) {
         const fetched = await fetchRates(ctx, household().code);
         if (fetched) table = fetched;
       }

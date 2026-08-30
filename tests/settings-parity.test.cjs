@@ -74,7 +74,8 @@ const mdKeys = new Set(
 eq([...mdKeys].sort(),
   ['country', 'currency', 'currency_code', 'emergency_target_months', 'exchange_rates',
     'groups', 'household', 'input_mode', 'language', 'month_start_day',
-    'nonessential_groups', 'overspend_lag', 'owners', 'period_anchor', 'period_days'],
+    'nonessential_groups', 'overspend_lag', 'owners', 'period_anchor', 'period_days',
+    'rate_refresh'],
   'MD_KEYS holds every Settings.md key');
 
 const defaults = fs.readFileSync(path.join(__dirname, '..', 'src', 'constants.js'), 'utf8');

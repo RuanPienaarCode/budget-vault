@@ -5,7 +5,7 @@ const { TFile } = require('obsidian');
 const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
-const { normalizeCode } = require('./fx');
+const { normalizeCode, normalizeCadence } = require('./fx');
 const { parseFrontmatter, parseMdTable, unescMd } = require('./markdown');
 const { parseCsv } = require('./csv');
 /* One declaration per flat table drives this loader's reads AND the views'
@@ -130,6 +130,13 @@ module.exports = function registerLoad(ctx) {
          truthy string — a hand-edited value must not switch money conversion
          on by accident. */
       S.settings.exchange_rates = String(fm.exchange_rates ?? '').trim().toLowerCase() === 'on';
+      /* How often those rates may be re-asked for: daily, weekly or monthly.
+         Absent resolves to daily, which is what the setting and the wizard
+         have always described, so a vault written before this key existed
+         keeps the behaviour its own Settings.md documents. Normalised through
+         fx.normalizeCadence so a hand-edited `rate_refresh: hourly` falls back
+         rather than reaching the refresh gate as an unknown. */
+      S.settings.rate_refresh = normalizeCadence(fm.rate_refresh);
       /* The ISO code the rate lookup asks for. The `currency` symbol above is
          what gets PRINTED; this says which currency that symbol means, because
          "$" is four of them. Blank is a complete answer — it just means rates

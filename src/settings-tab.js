@@ -4,7 +4,7 @@
    to every device with the vault) — the tab edits that file in place. */
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
-const { DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODE_DEFAULT, inputMode } = require('./constants');
+const { DEFAULT_SETTINGS, TYPE_ORDER, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODE_DEFAULT, inputMode } = require('./constants');
 const { OnboardingWizard } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 /* Namespace import, not `const { t }`: this codebase already binds `t` as a
@@ -16,8 +16,9 @@ const { setLanguage, LANGUAGE_NAMES, LANGUAGE_ORDER } = i18n;
 const { periodDaysOrZero } = require('./dates');
 const { yamlStr } = require('./markdown');
 const { parseOwners } = require('./owners');
-const { parseGroups, parseNonEssential } = require('./groups');
-const { normalizeCode } = require('./fx');
+const { parseGroups, parseNonEssential, typeOrder } = require('./groups');
+const { NON_ESSENTIAL_TYPES } = require('./health-math');
+const { normalizeCode, normalizeCadence } = require('./fx');
 const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
@@ -39,7 +40,15 @@ const FX_OPTIONS = () => ({
   on: i18n.t('settings.exchangeRates.on'),
 });
 
-const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'currency_code', 'exchange_rates', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'groups', 'nonessential_groups']);
+/* Resolved on call like FX_OPTIONS above, so the labels follow the interface
+   language rather than the language the tab first rendered in. */
+const CADENCE_OPTIONS = () => ({
+  daily: i18n.t('settings.rateRefresh.daily'),
+  weekly: i18n.t('settings.rateRefresh.weekly'),
+  monthly: i18n.t('settings.rateRefresh.monthly'),
+});
+
+const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'currency_code', 'exchange_rates', 'rate_refresh', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'groups', 'nonessential_groups']);
 
 /* Shared by display() and getSettingDefinitions(), same as OWNERS_DESC below.
    It has to say what the setting HIDES as well as what it stores: choosing
@@ -58,7 +67,17 @@ const INPUT_MODE_OPTIONS = { csv: 'Import bank statements (CSV)', manual: 'Type 
    find it on the page needs to know it sits with the household buckets, just
    before "expense". */
 const GROUPS_DESC = 'Your own category groups, separated by commas — e.g. "property, treats". Each becomes a header on the Budget page (placed just before "expense") and a Type you can give a category. Built-in names are ignored here; leave blank to use only the built-in groups.';
-const NONESSENTIAL_DESC = 'Groups the emergency-fund sums may leave out, separated by commas — what you would stop paying if income stopped, e.g. "treats, personal". Luxuries, giving, savings and investments are always left out; this can only add to that list.';
+/* Tick what the household would stop paying if income stopped. Deliberately
+   NOT a comma box any more: the valid answers are a closed set — the built-in
+   types plus this vault's own groups — so a free-text field made the reader
+   retype a word they had already typed one row above, and silently dropped
+   anything it did not recognise. A typo cost you the setting with nothing on
+   screen to say so.
+
+   The six types health-math.js already treats as non-essential come what may
+   are not offered at all, rather than shown ticked and disabled: a control
+   that cannot be changed is noise in a list of controls that can. */
+const NONESSENTIAL_DESC = 'Tick the groups the emergency-fund sums may leave out — what you would stop paying if income stopped. Income, transfers, luxuries, giving, savings and investments are always left out and are not listed here; this can only add to that.';
 
 const OWNERS_DESC = 'The people this household\'s accounts can belong to, separated by commas — e.g. "Alex, Sam". Each account then gets an Owner dropdown offering these plus Joint, and the Accounts page gains a per-person breakdown and filter. Leave blank if the budget is one person\'s.';
 
@@ -301,24 +320,44 @@ class BudgetSettingTab extends PluginSettingTab {
           this._groupsTimer = setTimeout(async () => {
             await this.plugin.updateBudgetSettingsMd('groups', yamlStr(parseGroups(v).join(', ')));
             this.plugin.reloadViews();
+            /* A new group is a new row below, and a removed one takes its row
+               with it — without this the list underneath describes the groups
+               this tab opened with, not the ones the vault now has. */
+            if (this._redrawNonEssential) await this._redrawNonEssential();
           }, 800);
         });
       });
 
-    new Setting(containerEl)
-      .setName('Non-essential groups')
-      .setDesc(NONESSENTIAL_DESC)
-      .addText(t => {
-        t.setPlaceholder('treats, personal');
-        t.setValue(parseNonEssential(md.nonessential_groups, parseGroups(md.groups)).join(', '));
-        t.onChange(v => {
-          clearTimeout(this._nonEssTimer);
-          this._nonEssTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd('nonessential_groups', yamlStr(parseNonEssential(v, parseGroups(md.groups)).join(', ')));
-            this.plugin.reloadViews();
-          }, 800);
-        });
-      });
+    /* Its own container so the group list can be redrawn on its own when
+       Category groups above changes. Rebuilding the WHOLE tab would be the
+       obvious fix and is the wrong one: the groups field debounces at 800ms,
+       so the tab would rebuild under a reader who is still typing in it and
+       take the focus out of the box mid-word. */
+    const nonEssSection = containerEl.createDiv();
+    /* The snapshot each toggle reads and writes through. Kept in the closure
+       and updated after every write, because `md` was read once when the tab
+       opened: the shipped bug was that adding "treats" above and then naming
+       it here in the same visit validated the second against the group list
+       from BEFORE the first, so the word was silently dropped. */
+    let live = md;
+    const drawNonEssential = () => {
+      nonEssSection.empty();
+      new Setting(nonEssSection).setName('Non-essential groups').setHeading().setDesc(NONESSENTIAL_DESC);
+      for (const row of this.nonEssentialRows(live)) {
+        new Setting(nonEssSection)
+          .setName(row.label)
+          .addToggle(t => t
+            .setValue(row.on)
+            .onChange(async v => {
+              live = { ...live, nonessential_groups: await this.setNonEssential(live, row.key, v) };
+            }));
+      }
+    };
+    drawNonEssential();
+    this._redrawNonEssential = async () => {
+      live = await this.plugin.readBudgetSettingsMd();
+      drawNonEssential();
+    };
 
     new Setting(containerEl)
       .setName('Month start day')
@@ -540,6 +579,25 @@ class BudgetSettingTab extends PluginSettingTab {
           this.display();
         });
       });
+
+    /* Only worth showing when rates are actually on: a cadence for a feature
+       that makes no requests is a control over nothing, and this tab already
+       hides the rest of the currency block the same way. display() re-runs on
+       every exchange_rates change above, so the row appears and disappears
+       with it. */
+    if (fxMode(md.exchange_rates) === 'on') {
+      new Setting(containerEl)
+        .setName(i18n.t('settings.rateRefresh.name'))
+        .setDesc(i18n.t('settings.rateRefresh.desc'))
+        .addDropdown(d => {
+          for (const [v, label] of Object.entries(CADENCE_OPTIONS())) d.addOption(v, label);
+          d.setValue(normalizeCadence(md.rate_refresh));
+          d.onChange(async v => {
+            await this.plugin.updateBudgetSettingsMd('rate_refresh', normalizeCadence(v));
+            this.plugin.reloadViews();
+          });
+        });
+    }
   }
 
   /* ---- Declarative settings (Obsidian 1.13+) -----------------------------
@@ -683,6 +741,10 @@ class BudgetSettingTab extends PluginSettingTab {
     // Same contract as input_mode: absent means off, and an unknown
     // hand-edited value reads as the mode the app is running.
     if (key === 'exchange_rates') return fxMode(md.exchange_rates);
+    /* Same contract as exchange_rates: absent means the default the app is
+       actually running (daily), and a hand-edited `rate_refresh: hourly`
+       reads back as daily rather than leaving the dropdown on nothing. */
+    if (key === 'rate_refresh') return normalizeCadence(md.rate_refresh);
     // Normalised on the way out for the same reason period_days is: absent
     // means 'csv', and an unknown hand-edited value has to READ as the mode
     // the app is running rather than leaving the dropdown on nothing.
@@ -734,6 +796,7 @@ class BudgetSettingTab extends PluginSettingTab {
       : key === 'household' || key === 'currency' ? yamlStr(String(value).trim())
       : key === 'currency_code' ? yamlStr(normalizeCode(value))
       : key === 'exchange_rates' ? fxMode(value)
+      : key === 'rate_refresh' ? normalizeCadence(value)
       : key === 'month_start_day' ? String(parseInt(value, 10))
       : key === 'overspend_lag' ? String(overspendLag(value))
       : key === 'emergency_target_months' ? String(emergencyTarget(value))
@@ -752,6 +815,42 @@ class BudgetSettingTab extends PluginSettingTab {
     // reloadViews() re-reads the vault without re-mounting the shell.
     if (key === 'language') this.plugin.forEachView(ctl => ctl.applyLanguage());
     this.plugin.reloadViews();
+  }
+
+  /* One row per group this household could plausibly stop paying for, in the
+     order the Budget page shows them. Built-in types are labelled with the
+     same words the wizard and the Type column use (wiz.type.*), so the toggle
+     and the header it governs read alike; a custom group is its own key,
+     which is also its label — groups.js has no key=Label syntax on purpose.
+
+     The six in NON_ESSENTIAL_TYPES are filtered out rather than rendered
+     ticked-and-disabled. health-math.js drops them whatever this setting
+     says, so offering a switch would promise a choice that does not exist. */
+  nonEssentialRows(md) {
+    const groups = parseGroups(md && md.groups);
+    const current = new Set(parseNonEssential(md && md.nonessential_groups, groups));
+    const builtin = new Set(TYPE_ORDER);
+    return typeOrder(groups)
+      .filter(k => !NON_ESSENTIAL_TYPES.has(k))
+      .map(k => ({
+        key: k,
+        label: builtin.has(k) ? i18n.t('wiz.type.' + k) : k,
+        on: current.has(k),
+      }));
+  }
+
+  /* Flip one group and write the whole list back, re-ordered to typeOrder so
+     the file reads the way the page does rather than in click order. Returns
+     the value written, so the caller can keep its own snapshot current
+     instead of re-reading the vault after every tap. */
+  async setNonEssential(md, key, on) {
+    const groups = parseGroups(md && md.groups);
+    const next = new Set(parseNonEssential(md && md.nonessential_groups, groups));
+    if (on) next.add(key); else next.delete(key);
+    const ordered = typeOrder(groups).filter(k => next.has(k)).join(', ');
+    await this.plugin.updateBudgetSettingsMd('nonessential_groups', yamlStr(ordered));
+    this.plugin.reloadViews();
+    return ordered;
   }
 
   getSettingDefinitions() {
@@ -839,11 +938,29 @@ class BudgetSettingTab extends PluginSettingTab {
         desc: GROUPS_DESC,
         control: { type: 'text', key: 'groups', placeholder: 'property, treats' },
       },
+      /* The declarative twin of drawNonEssential() above. This method re-runs
+         on every update(), and mdSettings() is a synchronous metadataCache
+         read, so the list here is rebuilt from current state each time — the
+         stale-snapshot bug the imperative side needs its own redraw for
+         cannot arise on this path.
+
+         `render` rather than a bound `control`: a control binds ONE storage
+         key, and these rows are many switches over one comma list. Their
+         names are built from the vault's own groups, so they are deliberately
+         invisible to tests/settings-parity.test.cjs's literal-name scan —
+         absent from both halves, therefore consistent. The heading below is
+         the static name that IS pinned on both sides. */
       {
         name: 'Non-essential groups',
         desc: NONESSENTIAL_DESC,
-        control: { type: 'text', key: 'nonessential_groups', placeholder: 'treats, personal' },
+        render: setting => { setting.setHeading(); },
       },
+      ...this.nonEssentialRows(this.mdSettings()).map(row => ({
+        name: row.label,
+        render: setting => setting.addToggle(t => t
+          .setValue(row.on)
+          .onChange(v => { this.setNonEssential(this.mdSettings(), row.key, v); })),
+      })),
       {
         name: 'Month start day',
         desc: MONTH_START_DESC,
@@ -949,6 +1066,14 @@ class BudgetSettingTab extends PluginSettingTab {
         control: {
           type: 'dropdown', key: 'exchange_rates', defaultValue: 'off',
           options: FX_OPTIONS(),
+        },
+      },
+      {
+        name: i18n.t('settings.rateRefresh.name'),
+        desc: i18n.t('settings.rateRefresh.desc'),
+        control: {
+          type: 'dropdown', key: 'rate_refresh', defaultValue: 'daily',
+          options: CADENCE_OPTIONS(),
         },
       },
     ];

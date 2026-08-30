@@ -77,6 +77,42 @@ const codeForSymbol = sym => CODE_BY_SYMBOL[String(sym == null ? '' : sym).trim(
    an off-by-one here is a day of silently unlabelled figures. */
 const STALE_AFTER_DAYS = 7;
 
+/* How often the app may ASK for new rates. Deliberately a different number
+   from STALE_AFTER_DAYS above, because they answer different questions:
+   STALE_AFTER_DAYS is "how old before the reader is warned", this is "how old
+   before we spend a network request". Tying them to one constant — which is
+   what shipped until now — made the warning almost unreachable online, since
+   the refresh fired at exactly the age the badge would have appeared.
+
+   `monthly` is deliberately allowed to sit past STALE_AFTER_DAYS: a household
+   that asks for monthly rates gets monthly rates, and every figure drawn from
+   one keeps saying how old it is. Choosing to fetch rarely is not the same as
+   being lied to about how fresh the answer is. */
+const REFRESH_AFTER_DAYS = { daily: 1, weekly: 7, monthly: 30 };
+const DEFAULT_CADENCE = 'daily';
+
+/* Any hand-edited or absent value resolves to daily rather than throwing —
+   the same contract resolveLanguage() and localeFor() give. Daily is the
+   default because it is what the setting and the wizard have always promised,
+   and a vault written before this key existed should keep the behaviour its
+   own copy describes. */
+function normalizeCadence(raw) {
+  const k = String(raw ?? '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(REFRESH_AFTER_DAYS, k) ? k : DEFAULT_CADENCE;
+}
+
+function refreshAfterDays(cadence) {
+  return REFRESH_AFTER_DAYS[normalizeCadence(cadence)];
+}
+
+/* Whether a cached table is old enough to be worth re-asking for, at this
+   vault's cadence. Same defensive shape as stalenessOf: no date, or a date in
+   the future, is a reason to refetch rather than to trust it. */
+function refreshDue(table, todayIso, cadence) {
+  const age = table ? daysBetweenIso(table.date, todayIso) : null;
+  return age === null || age < 0 || age >= refreshAfterDays(cadence);
+}
+
 /* Whole days between two ISO dates, or null if either is not a real date.
    UTC throughout, for the same reason the rest of this app is: a rate dated
    "2026-08-29" is not a moment, and pulling it through a local timezone is how
@@ -251,6 +287,7 @@ function canConvert(settings, table) {
 }
 
 module.exports = {
-  STALE_AFTER_DAYS, CODE_BY_COUNTRY, codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
+  STALE_AFTER_DAYS, REFRESH_AFTER_DAYS, DEFAULT_CADENCE, normalizeCadence, refreshAfterDays, refreshDue,
+  CODE_BY_COUNTRY, codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
   rateBetween, convert, stalenessOf, convertAccounts, canConvert,
 };

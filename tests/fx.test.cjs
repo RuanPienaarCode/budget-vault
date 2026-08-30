@@ -163,4 +163,55 @@ eq(fx.rateBetween('CNY', 'XXX', TABLE), null, 'in either direction');
     'the toggle is a boolean — a truthy string from a hand-edited file does not switch money conversion on');
 }
 
+/* ---- refresh cadence: how OFTEN we ask, kept apart from how old is OLD ----
+   These were one constant until now, and that was the bug: refreshRates()
+   gated on stalenessOf(), so online the refresh fired at exactly the age the
+   "this rate is old" badge would have appeared, and the badge was therefore
+   almost unreachable. They are now two questions with two answers. */
+{
+  const dated = d => fx.normalizeTable({ base: 'ZAR', date: d, rates: { USD: 0.055 } });
+
+  eq(fx.normalizeCadence('daily'), 'daily', 'daily reads back as daily');
+  eq(fx.normalizeCadence('WEEKLY'), 'weekly', 'case is normalised');
+  eq(fx.normalizeCadence('  monthly  '), 'monthly', 'surrounding space is trimmed');
+  eq(fx.normalizeCadence('hourly'), 'daily',
+    'an unknown hand-edited cadence falls back to daily rather than reaching the refresh gate as an unknown');
+  eq(fx.normalizeCadence(''), 'daily', 'blank means the default');
+  eq(fx.normalizeCadence(undefined), 'daily',
+    'ABSENT means daily — a vault written before this key existed keeps the behaviour its own Settings.md describes');
+
+  eq(fx.refreshAfterDays('daily'), 1, 'daily asks after a day');
+  eq(fx.refreshAfterDays('weekly'), 7, 'weekly asks after a week');
+  eq(fx.refreshAfterDays('monthly'), 30, 'monthly asks after thirty days');
+
+  /* A rate five days old: due on daily, not yet due on weekly or monthly. */
+  const five = dated('2026-08-25');
+  eq(fx.refreshDue(five, '2026-08-30', 'daily'), true, 'five days old is due at daily');
+  eq(fx.refreshDue(five, '2026-08-30', 'weekly'), false, 'five days old is not yet due at weekly');
+  eq(fx.refreshDue(five, '2026-08-30', 'monthly'), false, 'five days old is not yet due at monthly');
+
+  /* The boundary, on both sides, the way STALE_AFTER_DAYS is pinned above. */
+  eq(fx.refreshDue(dated('2026-08-29'), '2026-08-30', 'daily'), true, 'age 1 IS due at daily');
+  eq(fx.refreshDue(dated('2026-08-30'), '2026-08-30', 'daily'), false, 'age 0 is not');
+  eq(fx.refreshDue(dated('2026-08-23'), '2026-08-30', 'weekly'), true, 'age 7 IS due at weekly');
+  eq(fx.refreshDue(dated('2026-08-24'), '2026-08-30', 'weekly'), false, 'age 6 is not');
+
+  /* An unusable table is always due — an unknown age is not a fresh one, the
+     same defensive reading stalenessOf() takes. */
+  eq(fx.refreshDue(null, '2026-08-30', 'monthly'), true, 'no table at all is always due');
+  eq(fx.refreshDue(dated('not-a-date'), '2026-08-30', 'monthly'), true, 'an unreadable date is always due');
+  eq(fx.refreshDue(dated('2026-09-30'), '2026-08-30', 'monthly'), true,
+    'a rate dated in the FUTURE is refetched rather than trusted');
+
+  /* The decoupling itself, stated as an assertion rather than left implied:
+     at twenty days a monthly vault has not asked again, AND the reader is
+     told the rate is old. Both must be true at once — that is the whole
+     point of splitting the two constants. */
+  const twenty = dated('2026-08-10');
+  eq(fx.refreshDue(twenty, '2026-08-30', 'monthly'), false, 'monthly has not asked again at twenty days');
+  eq(fx.stalenessOf(twenty, '2026-08-30').stale, true, 'and the reader is still told that rate is old');
+  ok(fx.REFRESH_AFTER_DAYS.monthly > fx.STALE_AFTER_DAYS,
+    'monthly deliberately outlives the staleness badge — choosing to fetch rarely is not the same as being lied to about freshness');
+}
+
 console.log(`PASS — fx engine: conversion, provenance, and every refusal to guess (${checks} checks).`);
