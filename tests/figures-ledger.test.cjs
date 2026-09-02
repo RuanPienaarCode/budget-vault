@@ -32,7 +32,8 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { harvestAll } = require('./helpers/figures.cjs');
+const { harvestAll, leaves, ownText, numbersIn } = require('./helpers/figures.cjs');
+const { FakeEl } = require('./helpers/dom-stub.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
 
 const GOLDEN = path.join(__dirname, 'figures', 'ledger.txt');
@@ -53,7 +54,60 @@ function render(results) {
   return out.join('\n');
 }
 
+/* ---- the harness checks itself first ------------------------------------
+   A ledger claiming "every number the app displays" is worth exactly what its
+   collection rule is worth, and that rule shipped wrong: it read an element's
+   own text from `_text` alone, which is what textContent= writes, and missed
+   the #TEXT child that dom.js's el() creates when a view appends a plain
+   string. Any figure written the second way, sitting beside an element
+   sibling, was silently absent — on Accounts that was the savings group total,
+   its donut-legend twin and both deck buttons. The ledger diffed clean the
+   whole time, because a figure that is never collected can never move.
+
+   So the collection rule is tested before the ledger is, on a tree built here
+   by hand. This costs four assertions and is the only thing standing between a
+   green ledger and a green ledger over nothing. */
+function selfCheck() {
+  const span = (cls, text) => { const e = new FakeEl('span'); e.className = cls; e.append(text); return e; };
+
+  /* The exact shape that was being dropped: an element owning text through
+     append(), with an element sibling underneath it. */
+  const total = new FakeEl('span');
+  total.className = 'acct-group-total';
+  total.append('R 15 000,00');
+  total.append(span('acct-group-other', '$ 1 000'));
+
+  const found = leaves(total);
+  assert.ok(found.includes(total),
+    'an element that owns text AND has element children must be collected — this is the defect that hid the savings group total');
+  assert.strictEqual(ownText(total).trim(), 'R 15 000,00',
+    'own text must be the element\'s own, never its descendants\' (that would concatenate two figures into one)');
+
+  /* The other way a view can write text, which always worked and must keep
+     working — the two are interchangeable at the call site. */
+  const viaTextContent = new FakeEl('div');
+  viaTextContent.textContent = 'R 42,00';
+  assert.strictEqual(ownText(viaTextContent).trim(), 'R 42,00',
+    'textContent= and append() are interchangeable in the views, so they must be interchangeable here');
+
+  /* And the rule that stops a figure being counted once per level of nesting:
+     the PARENT of a text-owning element contributes only what it owns itself. */
+  const wrap = new FakeEl('div');
+  wrap.append(total);
+  assert.strictEqual(ownText(wrap).trim(), '',
+    'an ancestor owns none of its descendants\' text — counting it would report every figure twice');
+
+  /* Money is whatever the formatter produced, and nothing else. The first cut
+     matched "a symbol then digits" and read the "ast 3" inside "Last 3 months"
+     as currency. */
+  const kinds = numbersIn('Last 3 months', [{ str: 'R 3,00', raw: 3, ambiguous: false }]).map(n => n.kind);
+  assert.deepStrictEqual(kinds, ['number'],
+    'a bare word before a digit is not a currency symbol — money is recognised by asking the formatter');
+}
+
 (async () => {
+  selfCheck();
+
   const results = await harvestAll(SEED, { period: PERIOD, today: TODAY, budgetFolder: B });
   const ledger = render(results);
 
@@ -93,5 +147,5 @@ function render(results) {
   }
 
   const n = results.reduce((s, r) => s + r.figures.length, 0);
-  console.log(`figures-ledger: ${n} figures across ${results.length} views, ledger unchanged.`);
+  console.log(`figures-ledger: ${n} figures across ${results.length} views, ledger unchanged (collection rule self-checked).`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });

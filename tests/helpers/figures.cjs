@@ -37,7 +37,34 @@ const fs = require('fs');
 const path = require('path');
 const { makeCtx, loadInto } = require('./harness.cjs');
 const { makeDom } = require('./dom-stub.cjs');
-const { formatAmount } = require('../../src/currency');
+
+/* ---- the money recorder -------------------------------------------------
+   Wrapped at src/currency.js's formatAmount, NOT at ctx.money, because
+   ctx.money is only one of its two callers. locale.js's fmtAmt calls
+   formatAmount directly — that is how the Tax page prints the R23 800 interest
+   exemption — so a recorder installed on the ctx wrapper saw none of it, and
+   eight of the Tax page's figures landed in the ledger as bare numbers with no
+   raw value. A ledger that reports a currency figure as a plain number is
+   wrong in the one column it exists to be right about.
+
+   The src cache is purged first so that every module destructuring
+   `formatAmount` at require time picks up the wrapper rather than the original
+   it captured on a previous mount. That also gives each view a clean module
+   state, which is closer to what the app does than sixteen views sharing one. */
+function installMoneyRecorder() {
+  const srcDir = path.join(__dirname, '..', '..', 'src') + path.sep;
+  for (const k of Object.keys(require.cache)) if (k.startsWith(srcDir)) delete require.cache[k];
+  const currency = require('../../src/currency');
+  const real = currency.formatAmount;
+  const seen = new Map();
+  currency.formatAmount = (symbol, v, decimals, loc) => {
+    const text = real(symbol, v, decimals, loc);
+    if (!seen.has(text)) seen.set(text, new Set());
+    seen.get(text).add(Number(v));
+    return text;
+  };
+  return { seen, currency, restore: () => { currency.formatAmount = real; } };
+}
 
 const SRC = path.join(__dirname, '..', '..', 'src');
 
@@ -86,6 +113,7 @@ function pinClock(iso) {
    attribution is the whole point of an addressed ledger, so each view gets its
    own DOM and pays for one more vault load. */
 async function mountFor(files, { period, settings, budgetFolder } = {}) {
+  const recorder = installMoneyRecorder();
   const opts = {};
   if (settings) opts.settings = settings;
   if (budgetFolder) opts.budgetFolder = budgetFolder;
@@ -106,7 +134,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
      re-derive the figure through a second rule, the exact bug shape this
      harness exists to find. */
   const loc = ctx.locale();
-  /* text -> the SET of raw values that formatted to it.
+  /* seen: text -> the SET of raw values that formatted to it.
 
      Keyed by text because that is the only handle the rendered tree gives back:
      a view appends a string, and nothing survives to say which call produced
@@ -120,13 +148,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
      is reported, several is reported as ambiguous. A harness whose subject is
      "two figures derived by different rules" has no business inventing a third
      rule to attribute them by. */
-  const raws = new Map();
-  const remember = (text, v) => {
-    if (!raws.has(text)) raws.set(text, new Set());
-    raws.get(text).add(Number(v));
-    return text;
-  };
-  ctx.moneyIn = (sym, v, dp = 2) => remember(formatAmount(sym, Number(v), dp, loc), v);
+  ctx.moneyIn = (sym, v, dp = 2) => recorder.currency.formatAmount(sym, Number(v), dp, loc);
   ctx.money = (v, dp = 2) => ctx.moneyIn(S.settings.currency, v, dp);
 
   const { el } = require('../../src/dom');
@@ -142,7 +164,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
     'savings', 'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
     require(`../../src/views/${f}`)(ctx);
   }
-  return { ctx, S, nodes, raws };
+  return { ctx, S, nodes, raws: recorder.seen, restore: recorder.restore };
 }
 
 /* ---- what counts as a number -------------------------------------------
@@ -165,7 +187,15 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
    scan a date is three numbers and none of them is a quantity the reader
    reads. */
 const PERCENT = /-?\d[\d  ,.]*\s?%/gu;
-const NUMBER = /-?\d[\d  ,.]*\d|-?\d/gu;
+/* A '-' counts as a sign only where a sign can be: at a boundary, not inside a
+   word. "under-65" is not negative sixty-five — which is exactly what the Tax
+   page's age threshold was being reported as.
+
+   Written with a leading group rather than a lookbehind deliberately. Lookbehind
+   is fine in bare node and this file is never bundled, but it is fatal on the
+   iOS 15 WebKit this plugin still supports, and a pattern sitting in the repo is
+   a pattern someone will copy into src/ one day. Not worth the saving. */
+const NUMBER = /(^|[^\w-])(-?\d[\d  ,.]*\d|-?\d)/gu;
 const ISO_DATE = /\d{4}-\d{2}-\d{2}/g;
 const TRIM = /^[\s,.;:)\]]+|[\s,.;:(\[]+$/gu;
 
@@ -195,7 +225,8 @@ function numbersIn(text, moneyStrings = []) {
     if (free(m.index, m.index + m[0].length)) claim(m.index, m.index + m[0].length, 'percent', null, false);
   }
   for (const m of [...s.matchAll(NUMBER)]) {
-    if (free(m.index, m.index + m[0].length)) claim(m.index, m.index + m[0].length, 'number', null, false);
+    const from = m.index + m[1].length, to = from + m[2].length;
+    if (free(from, to)) claim(from, to, 'number', null, false);
   }
   return out.sort((a, b) => a.at - b.at)
     .map(({ kind, text, raw, ambiguous }) => ({ kind, text, raw, ambiguous: !!ambiguous }));
@@ -222,14 +253,33 @@ function addressOf(node, rootId) {
   return `${rootId}/${parts.join('/')}`;
 }
 
-/* Leaves only. An ancestor's textContent concatenates every descendant's, so
-   harvesting non-leaves would report each figure once per level of nesting and
-   invent numbers that appear nowhere ("R 12" + "340,00" read as one string). */
+/* Text-owning nodes only. An ancestor's textContent concatenates every
+   descendant's, so harvesting every element would report each figure once per
+   level of nesting and invent numbers that appear nowhere ("R 12" + "340,00"
+   read as one string). What is collected instead is each element's OWN text —
+   the part of it no descendant also claims.
+
+   "Own text" means both ways an element can hold it, and the first cut here
+   knew only one. dom.js's el() writes a plain string child through append(),
+   which the DOM stub stores as a #TEXT node; textContent= writes `_text`
+   instead. Checking `_text` alone therefore dropped every figure sitting beside
+   an element sibling — on the Accounts page that was the savings group total
+   (a `span.acct-group-total` whose text is followed by the `.acct-group-other`
+   span naming the foreign balance), its donut legend twin, and both "Use
+   R 17 000,00" buttons on the deck.
+
+   A ledger whose whole claim is "every number the app displays" cannot decide
+   which numbers to look at by which of two equivalent DOM calls a view happened
+   to use. */
+function ownText(el) {
+  return (el._text || '')
+    + el.children.filter(c => c.nodeType === 1 && c.tagName === '#TEXT').map(c => c._text).join('');
+}
+
 function leaves(el, out = []) {
-  const kids = el.children.filter(c => c.nodeType === 1);
-  const elementKids = kids.filter(c => c.tagName !== '#TEXT');
+  const elementKids = el.children.filter(c => c.nodeType === 1 && c.tagName !== '#TEXT');
   if (!elementKids.length) { out.push(el); return out; }
-  if (el._text && el._text.trim()) out.push(el);   // an element with its own text AND children
+  if (ownText(el).trim()) out.push(el);
   for (const c of elementKids) leaves(c, out);
   return out;
 }
@@ -257,7 +307,7 @@ function harvestView(ctx, nodes, raws, { view, fn }) {
     void before;
     const rootId = sel.replace(/^#/, '');
     for (const leaf of leaves(root)) {
-      const text = (leaf._text || '') + leaf.children.filter(c => c.tagName === '#TEXT').map(c => c._text).join('');
+      const text = ownText(leaf);
       for (const num of numbersIn(text, moneyStrings)) {
         figures.push({ view, address: addressOf(leaf, rootId), kind: num.kind,
           text: num.text, raw: num.raw, ambiguous: !!num.ambiguous });
@@ -281,4 +331,4 @@ async function harvestAll(files, { period = '2026-09', today = '2026-09-02', set
   } finally { unpin(); }
 }
 
-module.exports = { dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves };
+module.exports = { dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves, ownText };
