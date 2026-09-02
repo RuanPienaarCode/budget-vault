@@ -69,9 +69,9 @@ const FILES = {
      they must be READ, not truncated — and this file is the one place that can
      prove it, because owed-math's own suite builds its rows from numeric
      literals and never goes through the loader. */
-  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | |\n| Léa | 40.00 | multi<br>line | | paid | |\n| Thabo | 1 500,00 | space-grouped \\| comma decimal | 2026-09-01 | outstanding | |\n| Nadia | R4000 | currency prefix, part repaid | | outstanding | 1 000,00 |\n| Yusuf | 12,500.00 | comma-grouped thousands | | outstanding | |\n| Pieter | ask him | never wrote it down | | outstanding | |\n',
+  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | |\n| Léa | 40.00 | multi<br>line | | paid | |\n| Thabo | 1 500,00 | space-grouped \\| comma decimal | 2026-09-01 | outstanding | |\n| Nadia | R4000 | currency prefix, part repaid | | outstanding | 1 000,00 |\n| Yusuf | 12,500.00 | comma-grouped thousands | | outstanding | |\n| Pieter | ask him | never wrote it down | | disputed | |\n',
 
-  [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n| Store card | Edgars | credit card | 2 400 R | prime + 2 | prime + 2 | 300.00 | 0.00 | 2025-05-01 |  | active | three cells nobody can read |\n',
+  [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n| Store card | Edgars | credit card | 2 400 R | prime + 2 | prime + 2 | 300.00 | 0.00 | 2025-05-01 |  | written off | four cells nobody can read |\n',
 
   /* A hand-written Assets.md: a space-grouped value that parseFloat would read
      as 15, an unescaped pipe in a name, a non-ISO valuation date, a kind that
@@ -80,7 +80,7 @@ const FILES = {
 
   /* Same hazard in the Services amount column, which feeds the committed total
      the Dashboard subtracts from "actually free to spend". */
-  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n| Gym | Virgin Active | about R400 | monthly | 2026-08-20 | | yes | amount typed as prose |\n',
+  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n| Gym | Virgin Active | about R400 | weekly | 2026-08-20 | | yes | amount AND cycle nobody can model |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: assessed\ndeadline_standard: "2026-10-20"\nassessment_ref: "ITA34: 2026/0031"\nassessment_result: -1250.00\nassessment_income: 480000\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | banks \\| investments |\n| File ITR12 | todo |  |  |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | uploaded | irp5.pdf | |\n| IT3(b) | Bank \\| A | needed | | multi<br>line |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n| 4201 | Local interest | Bank B | 12000.00 |\n',
 };
@@ -347,6 +347,39 @@ const FILES = {
     'an unreadable value is still 0 for arithmetic — the text is kept, not believed');
   eq(S.assets.find(a => a.name === 'Ring').valueRaw, '12 000 R',
     'and the raw rides alongside it, the way balanceRaw does on an account');
+
+  /* ---------------- the UNRECOGNISED VOCABULARY cell survives too --------- */
+  /* The same defect one column to the right, and the half the money sweep left
+     behind. table-schema.js's vocab() coerced anything that was not `match` to
+     `other` and kept nothing of what the cell said, so the write put `other`
+     back: a hand-written `weekly` in Services.md became `monthly` on disk, and
+     `written off` / `disputed` became `active` / `outstanding`. Words a
+     lender's own paperwork really uses, destroyed by a save the reader
+     triggered from a different row.
+
+     Asserted on the REWRITTEN BYTES for the same reason the money block above
+     is: a destroyed cell reloads as the coerced default and both passes agree
+     perfectly on the wrong word — self-consistent and silently destructive. */
+  for (const [file, cell, why] of [
+    [`${B}/Services.md`, 'weekly', 'a billing cycle this app does not model (issue #33)'],
+    [`${B}/Debts.md`, 'written off', 'a debt status the lender uses and the column has no room for'],
+    [`${B}/Owed Money.md`, 'disputed', 'a loan the two parties do not agree about'],
+  ]) {
+    ok(rewritten[file].includes(cell),
+      `${why} must come back byte-for-byte, never the coerced default over it`);
+  }
+  ok(!/\| Gym \| Virgin Active \| about R400 \| monthly \|/.test(rewritten[`${B}/Services.md`]),
+    'and specifically NOT as the monthly the reader never typed');
+
+  /* What the app COMPUTES with is still the coerced value — preserving the word
+     is not believing it. Every consumer downstream (recurring.js's
+     nextExpected/chargeStatus, committed.js, monthlyEquiv) branches on the two
+     known values and must not have changed behaviour by one row. */
+  eq(svcOf('Gym').cycle, 'monthly',
+    'an unrecognised cycle still reads as monthly for every consumer — only the file changed');
+  eq(svcOf('Gym').cycleRaw, 'weekly', 'with the reader\'s own word riding alongside it');
+  eq(S.debts.find(d => d.name === 'Store card').status, 'active',
+    'and an unrecognised debt status still reads as active, exactly as it always did');
 
   /* ---------------- txSegment: memory key and write path agree ------------ */
   // The bug this guards: load keyed by the raw folder name while writers keyed

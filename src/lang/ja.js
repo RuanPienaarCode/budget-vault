@@ -485,6 +485,17 @@ module.exports = {
   'tx.split.marker': '{n} 件に分割',
   'tx.split.done': '{n} 件に分割しました — 確認してから変更を保存してください',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': '{count} 件に分割',
+  'tx.split.chipGap': '{amount} が未計上',
+  'tx.aria.splitChip': '{date} の {desc} の分割オプション',
+  'tx.unsplit.action': '分割を解除',
+  'tx.unsplit.title': 'この取引の分割を解除しますか？',
+  'tx.unsplit.msg': {
+    other: '分割された {count} 件の明細を削除し、{desc} を {amount} の 1 件の取引に戻します。',
+  },
+
   'tx.add.noAccount': '先に口座を追加してください — 取引は必ずいずれかの口座に属します',
   'tx.add.title': '取引を追加',
   'tx.field.date': '日付',
@@ -1110,6 +1121,13 @@ module.exports = {
 
   'dash.err.render': '{label} を描画できませんでした — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'いずれかの負債に金利を記録すると表示されます',
+  'debt.interest.partial': {
+    other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'レポート',
@@ -1208,6 +1226,8 @@ module.exports = {
   'report.debt.total': '合計残高',
   'report.debt.perMonth': '月あたりの返済予定額',
   'report.debt.interest': '今月の利息',
+  'report.debt.interestNone': 'どの負債にも金利が記録されていないため、今月の利息は表示していません。',
+  'report.debt.interestPartial': '今月の利息は {total} 件中 {shown} 件の負債を対象としています。{missing} 件には金利が記録されていません。',
   'report.col.debt': '負債',
   'report.col.balance': '残高',
   'report.col.rate': '金利',

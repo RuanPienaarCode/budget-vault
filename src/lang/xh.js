@@ -517,6 +517,18 @@ module.exports = {
   'tx.split.marker': 'Yahlulwe yaba ngu-{n}',
   'tx.split.done': 'Yahlulwe yaba ngu-{n} — hlola, uze uGcine utshintsho',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'yahlulwe yaba ngu-{count}',
+  'tx.split.chipGap': '{amount} engabalwanga',
+  'tx.aria.splitChip': 'Iindlela zokwahlula {desc} ngomhla {date}',
+  'tx.unsplit.action': 'Rhoxisa ukwahlula',
+  'tx.unsplit.title': 'Rhoxisa ukwahlulwa kwale ntengiselwano?',
+  'tx.unsplit.msg': {
+    one: 'Oku kususa inxalenye enye, ize {desc} ibuyele ibe yintengiselwano enye ka-{amount}.',
+    other: 'Oku kususa iinxalenye ezingu-{count}, ize {desc} ibuyele ibe yintengiselwano enye ka-{amount}.',
+  },
+
   'tx.add.noAccount': 'Yongeza iakhawunti kuqala — yonke intengiselwano ineyayo',
   'tx.add.title': 'Yongeza intengiselwano',
   'tx.field.date': 'Umhla',
@@ -1184,6 +1196,14 @@ module.exports = {
 
   'dash.err.render': 'Ayikwazanga ukuzoba u-{label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'yongeza izinga kulo naliphi na ityala ukuze ubone oku',
+  'debt.interest.partial': {
+    one: 'ibandakanya {shown} kumatyala angu-{total} · {missing} alinazinga',
+    other: 'ibandakanya {shown} kumatyala angu-{total} · {missing} awanazinga',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Ingxelo',
@@ -1283,6 +1303,8 @@ module.exports = {
   'report.debt.total': 'Ibhalansi epheleleyo',
   'report.debt.perMonth': 'Okuthenjisiweyo ngenyanga',
   'report.debt.interest': 'Inzala kule nyanga',
+  'report.debt.interestNone': 'Inzala kule nyanga ayiboniswanga, kuba akukho tyala libhala izinga.',
+  'report.debt.interestPartial': 'Inzala kule nyanga ibandakanya {shown} kumatyala angu-{total}; {missing} awabhali zinga.',
   'report.col.debt': 'Ityala',
   'report.col.balance': 'Ibhalansi',
   'report.col.rate': 'Izinga',

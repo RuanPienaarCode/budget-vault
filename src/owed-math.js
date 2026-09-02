@@ -72,6 +72,34 @@ function owedSummary(owed, today, household) {
   const backOthers = new Map();
   for (const o of list) {
     const settled = isSettled(o);
+    /* PRESSURE BEFORE MONEY, and deliberately ABOVE the foreign branch.
+
+       `open` is a count of obligations and `oldestDays` a count of days.
+       Neither is denominated in anything, so currency.js:10 — the rule that
+       keeps a euro out of a rand total because this vault holds no rate to
+       convert with — has nothing to say about either of them. The foreign
+       branch below exists to protect the SUMS, and its `continue` was taking
+       these two with it: a €5 000 loan out for 400 days counted towards
+       neither "N open" nor the oldest-debt age.
+
+       What the reader saw was this repo's recurring shape — two figures
+       derived by different rules — with the two rules disagreeing about
+       whether a loan existed at all. The Owed page's own row already read
+       "out 400 days" (views/owed.js computes daysSince(o.lent) per row, with
+       no currency test in it), while the Dashboard position band, built from
+       this function, said nothing was out on loan and printed no age beside
+       it. One array, one render apart.
+
+       `settled` is still decided FIRST and gates this — the 1.34.0 ordering,
+       pinned by tests/owed-foreign-settlement.test.cjs. An entry the reader
+       marked `paid` is not open and does not age, in any currency, because
+       the pill on its own row says Paid and a count that disagreed with it
+       would be the same defect wearing the opposite sign. */
+    if (!settled) {
+      open++;
+      const age = daysSince(o.lent, today);
+      if (age !== null && (oldestDays === null || age > oldestDays)) oldestDays = age;
+    }
     /* Settled FIRST, then foreign — and that order is the whole of this
        branch's history. The foreign test used to `continue` before
        isSettled() ran, so a euro entry the reader marked `status: paid` was
@@ -121,11 +149,9 @@ function owedSummary(owed, today, household) {
       recovered += o.repaid > 0 ? Math.min(o.repaid, amt) : amt;
       continue;
     }
-    open++;
+    // `open` and the age were counted above, for every currency at once.
     outstanding += outstandingOf(o);
     recovered += Math.min(o.repaid || 0, amt);
-    const age = daysSince(o.lent, today);
-    if (age !== null && (oldestDays === null || age > oldestDays)) oldestDays = age;
   }
   return {
     outstanding, recovered, open, entries: list.length, oldestDays,

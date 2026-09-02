@@ -485,6 +485,17 @@ module.exports = {
   'tx.split.marker': '拆分为 {n} 笔',
   'tx.split.done': '已拆分为 {n} 笔 — 请检查后保存更改',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': '拆分为 {count} 笔',
+  'tx.split.chipGap': '{amount} 未分配',
+  'tx.aria.splitChip': '{date} {desc} 的拆分选项',
+  'tx.unsplit.action': '取消拆分',
+  'tx.unsplit.title': '要取消这笔交易的拆分吗？',
+  'tx.unsplit.msg': {
+    other: '这会删除拆分出的 {count} 行，并把 {desc} 恢复为一笔 {amount} 的交易。',
+  },
+
   'tx.add.noAccount': '请先添加一个账户 — 每笔交易都要归属于某个账户',
   'tx.add.title': '添加交易',
   'tx.field.date': '日期',
@@ -1110,6 +1121,13 @@ module.exports = {
 
   'dash.err.render': '无法绘制{label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': '为任一债务记录利率后才会显示',
+  'debt.interest.partial': {
+    other: '涵盖 {total} 笔债务中的 {shown} 笔 · {missing} 笔没有利率',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': '报告',
@@ -1208,6 +1226,8 @@ module.exports = {
   'report.debt.total': '总余额',
   'report.debt.perMonth': '每月承诺还款',
   'report.debt.interest': '本月利息',
+  'report.debt.interestNone': '本月利息未显示，因为没有任何债务记录了利率。',
+  'report.debt.interestPartial': '本月利息涵盖 {total} 笔债务中的 {shown} 笔；{missing} 笔没有记录利率。',
   'report.col.debt': '债务',
   'report.col.balance': '余额',
   'report.col.rate': '利率',

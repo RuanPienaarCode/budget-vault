@@ -11,7 +11,7 @@ const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
 const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf } = require('../currency');
-const { applySplit, splitRole } = require('../tx-role');
+const { applySplit, splitRole, splitShortfall, SPLIT_PARENT } = require('../tx-role');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
 
@@ -306,8 +306,7 @@ module.exports = function registerTransactions(ctx) {
           mark();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
         el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, rowMoney(r.amount, r)),
-        el('td', {}, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
-          ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } })),
+        el('td', {}, excludedCell(item, mark)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
@@ -401,6 +400,134 @@ module.exports = function registerTransactions(ctx) {
       + (stillUncategorised
         ? ` ${stillUncategorised} of the new parts still need a category.`
         : ''));
+  }
+
+  /* ---------------------- the Excluded cell, which is two controls ----------
+     `excluded` means two unrelated things, src/tx-role.js exists to keep them
+     apart, and this cell was the last place in the app where they still shared
+     one control.
+
+     It rendered a plain checkbox on every row, split parents included:
+
+       onchange: e => { r.excluded = e.target.checked; mark(); }
+
+     supersededBySplit() requires BOTH the `parent` role and the Excluded tick,
+     deliberately — so that the reversal the markdown invites ("untick Excluded,
+     delete the parts") can never leave a row the budget counts and
+     reconciliation skips. Read from the table, that same rule turns one tap
+     into a silent double count: the tick goes while the parts sit untouched in
+     the same file, the parent stops being superseded, and every reader
+     measuring the ACCOUNT rather than the budget — reconcile(),
+     periodActivity(), splitFlows(), chargeIndex() — counts the charge twice
+     from that tap onward. That is the 1.11.9 bug, reached through a control
+     that mentions splits nowhere, with no dialog and no visible change beyond
+     one unticked box.
+
+     Guarding the checkbox — refusing the change, or silently re-ticking it —
+     was the smaller edit and the worse one: the bad state stays reachable and
+     something in the app has to keep noticing it. Making it UNREACHABLE is the
+     call ADR-0001 already took for the stale period anchor; a state the app
+     cannot enter needs no rule about what to do when it does.
+
+     So a parent gets a CHIP where its checkbox was. It says what the row is,
+     says when its parts have stopped adding up, and its one action is the
+     reversal a reader reaching for that checkbox actually wanted. A PART keeps
+     its ordinary checkbox: excluding one slice from the budget is a legitimate
+     preference, nothing about it can describe the same money twice, and taking
+     it away would be a regression dressed as a fix.
+
+     (splitPartsOf lives further down with the delete, which needs the same
+     join. Function declaration, so it is hoisted; kept there rather than moved
+     because that is the header explaining why the match is date + description
+     and deliberately narrow.) */
+  function excludedCell(item, mark) {
+    const r = item._row;
+    if (splitRole(r.split) !== SPLIT_PARENT) {
+      return el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
+        ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } });
+    }
+    const parts = splitPartsOf(item._file, r);
+    const gap = splitShortfall(r, parts);
+    /* The shortfall stated as a MAGNITUDE. It is money the parts stopped
+       describing — what a reader leaves behind by deleting one part, since the
+       parent stays superseded and that slice then falls out of every total
+       rather than back onto the parent (deleteTransaction's own header names
+       this as the one delete that moves a figure). A minus sign here would
+       read as a direction the sentence does not need: the direction is the
+       parent's own and is already printed in the cell immediately to the left.
+
+       Zero is the common case and says nothing at all. A chip that appended
+       "R0.00 unaccounted" to every healthy split would teach the reader to
+       stop reading the clause that matters. */
+    const label = i18n.t('tx.split.chip', { count: parts.length })
+      + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), r) }) : '');
+    /* A real <button>, so it is in the tab order and takes the focus ring for
+       free. caveat-chip-btn rather than a class of its own: it is dom.js's own
+       pill button, already legible in both themes with a :focus-visible
+       outline, and the palette is sealed — a new chip style would mean moving
+       scripts/presets.cjs and src/styles.css together for an affordance that
+       already exists. */
+    const b = el('button', { type: 'button', class: 'caveat-chip-btn',
+      'aria-label': i18n.t('tx.aria.splitChip', { desc: r.desc, date: r.date }) }, label);
+    b.addEventListener('click', () => unsplitTransaction(item));
+    return b;
+  }
+
+  /* Un-split — the reversal src/tx-role.js documents as "untick Excluded,
+     delete the parts", performed as ONE act rather than two hand edits that
+     can be left half done.
+
+     Confirmed, because it removes rows: the parts carry categories a reader
+     chose, and there is no way back to them but typing them again. The dialog
+     is the same shape the delete uses, and for the same reason.
+
+     Works in memory and marks the file dirty rather than writing. Identical
+     rule to deleteTransaction, and the reasoning is that function's, verbatim
+     in substance: serializeTxFile writes the WHOLE file, so an un-split that
+     saved would flush every unsaved category, note and Excluded edit sitting
+     in the same month — a save the reader did not ask for, hidden inside an
+     action they did. The page's Save button is the one door to disk, and until
+     it is pressed "Reload from disk" is a working undo.
+
+     No toast, deliberately. Every string this app shows goes through the
+     twelve language tables, tests/i18n.test.cjs fails the build on a key
+     referenced from src/ before it exists in all of them, and this file may
+     not add one (see the TODO(i18n) notes above categoriseFilteredTransactions
+     for the same constraint met three times already). The row itself is the
+     feedback here in a way it is not after a delete: the chip is replaced by an
+     ordinary unticked checkbox, the parts are visibly gone, and Save lights up. */
+  async function unsplitTransaction(item) {
+    const r = item._row, f = item._file;
+    const parts = splitPartsOf(f, r);
+    const go = await confirmModal(app, {
+      title: i18n.t('tx.unsplit.title'),
+      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowMoney(r.amount, r) }),
+      confirmText: i18n.t('tx.unsplit.action'),
+    });
+    if (!go) return;
+    const doomed = new Set(parts);
+    f.rows = f.rows.filter(x => !doomed.has(x));
+    /* Both columns, together — the same pairing applySplit sets and for the
+       same reason. `excluded` is what the budget totals read and the role is
+       what the account totals read, so clearing one without the other leaves
+       the row ordinary in half the app and superseded in the other half. */
+    r.split = '';
+    /* Unticked unconditionally, with no prior value remembered, and that is
+       SAFE rather than lossy: splitTransaction refuses a row that is already
+       excluded (`if (r.excluded) return toast(i18n.t('tx.split.excluded'), true)`
+       above), so a parent's tick was ALWAYS written by applySplit and can never
+       be a preference a reader set. There is no earlier state to restore —
+       every parent that can exist was unticked before it was split. */
+    r.excluded = false;
+    /* The note is left exactly as it is. applySplit APPENDS its marker to
+       whatever the reader had already written there (`note · Split into 2`),
+       so removing it means guessing where their own text ends — and the note
+       is their column, not the app's. A stale marker beside a row that reads
+       as ordinary everywhere else is a wrong word; editing their sentence to
+       fix it would be a wrong act. */
+    f.dirty = true;
+    $('#txSave').disabled = false;
+    renderTransactions();
   }
 
   /* ------------------------------- deleting --------------------------------
@@ -875,7 +1002,12 @@ module.exports = function registerTransactions(ctx) {
   // filteredRows, published for the same reason syncOptions is above: so a
   // test can drive the REAL row-ordering function instead of a hand-written
   // mirror of its sort (tests/transactions-sort-order.test.cjs).
+  /* unsplitTransaction alongside its sibling: splitTransaction and
+     deleteTransaction are both published so a test can drive the REAL function,
+     and the reversal of a split deserves that no less than the split. Checked
+     against the flat namespace before publishing — ctx.provide throws at mount
+     on a collision, so a name only fails on the device. */
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
-    deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions, exportTransactions,
-    syncOptions, filteredRows });
+    unsplitTransaction, deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
+    exportTransactions, syncOptions, filteredRows });
 };

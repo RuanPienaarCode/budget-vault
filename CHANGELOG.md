@@ -3,6 +3,61 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+The follow-on from 1.34.0's calculation audit. Five things it found and did
+not fix: four figures that were wrong or claims the app could not support,
+and one control that could break its own arithmetic in a single click.
+
+### Changed
+
+- **A split transaction's Excluded box is now a chip that says what it is.**
+  On the original row of a split, that checkbox never meant what it means
+  everywhere else. On an ordinary row it means "leave this out of my budget",
+  which is yours to decide. On a split original it means "the parts have taken
+  this over", which is not a preference at all: untick it and every total
+  counted the charge twice, silently, from that tap onward. The cell now shows
+  how many parts the row was split into, and its only action is to un-split,
+  which removes the parts and puts the row back. Nothing reaches disk until
+  you press Save, so "Reload from disk" undoes it. The parts keep their own
+  ordinary Excluded boxes, because leaving one slice out of your budget is a
+  real choice.
+- **A split whose parts no longer add up says so on the same chip.** Deleting
+  one part of a split leaves its money in no total anywhere, because the
+  original is still standing aside for parts that are no longer all there. The
+  chip names the gap, and un-splitting is the way back.
+
+### Fixed
+
+- **"Interest this month" claimed you paid none when it simply did not know.**
+  A household that listed its debts and left the Rate column empty was told
+  its interest was zero, on the Debt page and in a generated report, while the
+  health score correctly withheld the same figure as unknown. All three now
+  read one rule. With no rate recorded anywhere the figure is withheld and the
+  page says a rate would make it knowable. With some rates recorded it shows
+  the total it can work out and says how much of your debt that covers. A
+  report's per-debt table does the same, so a row with no rate no longer
+  reports a monthly interest of zero beside a dash.
+- **Money lent in another currency applied no pressure.** The amount was
+  shown, but the count of open loans and the age of the oldest one both
+  skipped it, so a loan out for over a year sat on the page contributing to
+  neither. Neither of those figures is an amount, so there was never a reason
+  to leave it out. Both now count every unsettled loan, whatever currency it
+  is in, while the money totals stay separated as before.
+- **"Largest" asset compared numbers, not worth.** With no exchange rate to go
+  on, the tile picked the biggest number, so an item priced in a currency that
+  runs many units to the rand beat a house worth several times more. It now
+  ranks what you own in your own currency, and names the largest in each other
+  currency beside it.
+- **A billing cycle the app did not recognise was overwritten.** Typing
+  anything other than monthly or annual into a service's Cycle column, or an
+  unfamiliar word into a debt's or an owed entry's Status column, was read as
+  the default and then written back over your own word on the next save. Your
+  text now survives, exactly as an unreadable amount has since 1.34.0. Weekly
+  and fortnightly billing still are not calculated, which is
+  [issue #33](https://github.com/RuanPienaarCode/budget-vault/issues/33), but
+  asking for them no longer erases the request.
+
 ## 1.34.0 — 2026-09-02
 
 A calculation audit. Five reviewers each took one slice of the arithmetic —

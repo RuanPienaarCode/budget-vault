@@ -504,6 +504,18 @@ module.exports = {
   'tx.split.marker': 'Aufgeteilt auf {n}',
   'tx.split.done': 'Auf {n} aufgeteilt — prüfen, dann Änderungen speichern',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'auf {count} aufgeteilt',
+  'tx.split.chipGap': '{amount} nicht zugeordnet',
+  'tx.aria.splitChip': 'Aufteilungsoptionen für {desc} vom {date}',
+  'tx.unsplit.action': 'Aufteilung aufheben',
+  'tx.unsplit.title': 'Aufteilung dieser Transaktion aufheben?',
+  'tx.unsplit.msg': {
+    one: 'Das entfernt den 1 Teil und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
+    other: 'Das entfernt die {count} Teile und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
+  },
+
   'tx.add.noAccount': 'Lege zuerst ein Konto an — jede Transaktion gehört zu einem',
   'tx.add.title': 'Transaktion hinzufügen',
   'tx.field.date': 'Datum',
@@ -1163,6 +1175,14 @@ module.exports = {
 
   'dash.err.render': 'Die Karte {label} konnte nicht gezeichnet werden — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'hinterlege bei einer Schuld einen Zinssatz, um das hier zu sehen',
+  'debt.interest.partial': {
+    one: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',
+    other: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Bericht',
@@ -1262,6 +1282,8 @@ module.exports = {
   'report.debt.total': 'Gesamtsaldo',
   'report.debt.perMonth': 'Verpflichtet pro Monat',
   'report.debt.interest': 'Zinsen diesen Monat',
+  'report.debt.interestNone': 'Zinsen diesen Monat werden nicht ausgewiesen, weil keine Schuld einen Zinssatz angibt.',
+  'report.debt.interestPartial': 'Zinsen diesen Monat decken {shown} von {total} Schulden ab; bei {missing} fehlt der Zinssatz.',
   'report.col.debt': 'Schuld',
   'report.col.balance': 'Saldo',
   'report.col.rate': 'Zinssatz',

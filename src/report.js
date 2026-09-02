@@ -341,7 +341,14 @@ function categoryTable(rows, money) {
 function debtTable(rows, money) {
   const out = ['', `| ${i18n.t('report.col.debt')} | ${i18n.t('report.col.balance')} | ${i18n.t('report.col.rate')} | ${i18n.t('report.col.interest')} |`,
     '|---|---:|---:|---:|'];
-  for (const d of rows) out.push(`| ${escMd(d.name)} | ${money(d.balance)} | ${d.rate ? `${d.rate}%` : '—'} | ${money(d.interest)} |`);
+  /* A row stating no rate prints '—' for its interest, not a formatted zero.
+     The section total above this table was taught the difference between "no
+     interest" and "interest unknown" in 1.35.0; this table was the same false
+     claim one layer down, on a per-debt line where the rate cell RIGHT BESIDE
+     IT already prints '—' for the very same missing figure. A reader who sees
+     a dash under Rate and R0.00 under Monthly interest is being told the
+     second was worked out from the first. */
+  for (const d of rows) out.push(`| ${escMd(d.name)} | ${money(d.balance)} | ${d.rate ? `${d.rate}%` : '—'} | ${d.rate ? money(d.interest) : '—'} |`);
   return out;
 }
 
@@ -420,7 +427,12 @@ function prepareReportData(data) {
      savings: null | { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total },
                                         // `rate` is likewise prepareReportData()'s, not
                                         // the caller's — see its own header (L4).
-     debts: null | { count, active, total, perMonth, interest, rows: [{name,balance,rate,interest}] },
+     debts: null | { count, active, total, perMonth, interest, coverage,
+                     rows: [{name,balance,rate,interest}] },
+                                        // `interest` is NULL, not 0, when no active debt
+                                        // states a rate — health-math.js's rule, and
+                                        // `coverage` {shown,total,missing} is how much of
+                                        // the book a stated figure actually covers
      netWorth: { net, assets, liabilities },
      health: null | { score, band, months, target, savingsRatePct, interestSharePct },
      transactions: null | rows[],      // detail mode only, exporter.js row shape
@@ -641,11 +653,34 @@ function financialReportMarkdown(data, money) {
        bond named below IS the whole story in that case. */
     if (!debtForeign) out.push('', i18n.t('report.debt.free', { count: debts.count }));
   } else {
+    /* The interest row is DROPPED, not zeroed, when no active debt states a
+       rate. This document is the one the app writes to be forwarded to an
+       advisor or pasted into a chat, read by somebody who cannot open the
+       app and check — so "Interest this month: R0,00" beside a R900 000
+       bond is the most expensive place in the codebase to make that claim.
+       health-math.js's aggregate returns null for exactly this, and a
+       sentence saying what would make the figure knowable is a smaller,
+       honest answer where a zero is a confident wrong one.
+
+       Partial coverage keeps the row and adds a sentence, for the same
+       reason the tile on the Debt page does: the number is real, and what it
+       covers is a fact the reader cannot recover from the table (a blank
+       Rate cell renders as '—' per row, which says the rate is missing but
+       never says the total below it therefore isn't the whole bill). Nothing
+       is added when the book is fully rated — a household that filled the
+       column in reads exactly the document it read before. */
+    const cov = debts.coverage;
     out.push(...kvTable([
       [i18n.t('report.debt.total'), money(debts.total)],
       [i18n.t('report.debt.perMonth'), money(debts.perMonth)],
-      [i18n.t('report.debt.interest'), money(debts.interest)],
+      ...(debts.interest === null ? [] : [[i18n.t('report.debt.interest'), money(debts.interest)]]),
     ]), ...debtTable(debts.rows, money));
+    if (debts.interest === null) {
+      out.push('', i18n.t('report.debt.interestNone'));
+    } else if (cov && cov.missing > 0) {
+      out.push('', i18n.t('report.debt.interestPartial',
+        { shown: cov.shown, total: cov.total, missing: cov.missing }));
+    }
   }
   if (debtForeign) out.push('', debtForeign);
 
@@ -882,8 +917,23 @@ function financialReportJson(data) {
     debts: (debts && debts.count)
       ? {
         count: debts.count, active: debts.active, total: debts.total,
-        per_month: debts.perMonth, interest: debts.interest,
-        rows: debts.rows.map(d => ({ name: d.name, balance: d.balance, rate: d.rate, interest: d.interest })),
+        per_month: debts.perMonth,
+        /* NULL when no active debt states a rate — the same withholding the
+           Markdown twin does in prose, because a machine reader deserves the
+           distinction between "no interest" and "interest unknown" at least
+           as much as a human one. `rate_coverage` is the same three counts
+           the Markdown's sentence spends words on, as data. */
+        interest: debts.interest,
+        rate_coverage: debts.coverage
+          ? { shown: debts.coverage.shown, total: debts.coverage.total, missing: debts.coverage.missing }
+          : null,
+        /* `interest: null` on a row stating no rate, matching the '—' its
+           Markdown twin prints. Zero would tell a parsing consumer that this
+           debt costs nothing to carry, which is the claim the section total
+           above already refuses to make on the same evidence. */
+        rows: debts.rows.map(d => ({
+          name: d.name, balance: d.balance, rate: d.rate, interest: d.rate ? d.interest : null,
+        })),
         /* ISSUE 30 — the debts every figure above holds out, per symbol.
            `others` rather than `symbols` because a foreign debt's BALANCE is
            the fact a reader of this section wants and cannot reconstruct

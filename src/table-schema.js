@@ -138,14 +138,65 @@ const money = (key, header, { floor = false, guarded = false } = {}) => {
   };
 };
 
-// A closed vocabulary: anything that trims+folds to `match` is `match`,
-// everything else — including an absent cell — is `other`. Written raw:
-// only two strings can ever occupy the cell, so it never needs escaping.
-const vocab = (key, header, match, other) => ({
-  key, header, align: 'left',
-  read: c => ({ [key]: (c || other).trim().toLowerCase() === match ? match : other }),
-  write: r => r[key],
-});
+/* A closed vocabulary: anything that trims+folds to `match` is `match`,
+   everything else — including an absent cell — is `other`.
+
+   A cell matching NEITHER value keeps its verbatim text in `<key>Raw`, and the
+   write prefers it. This is money()'s contract above, copied deliberately
+   rather than re-invented, because it is the same defect one column over: the
+   reader's own text was coerced (there for arithmetic, here for a branch) and
+   the coerced value was then written back over what they typed.
+
+   `| Gym | Virgin Active | 400.00 | weekly | … |` in Services.md loaded as
+   `monthly`, and the next save — triggered by an edit to some entirely
+   different row on the page — put `monthly` on disk. The word was gone, the
+   fact that anything else had been typed there was gone, and nothing on screen
+   said so. Same for a Status of `written off` or `disputed`: two words a
+   lender's own paperwork really uses, which this column has no room for.
+
+   Behaviour DOWNSTREAM is unchanged — every consumer still sees `monthly`, so
+   recurring.js, committed.js and views/services.js branch exactly as before.
+   Only what reaches disk changes. Modelling weekly billing for real is issue
+   #33; this only stops the destruction in the meantime.
+
+   Two boundaries, both money()'s and both load-bearing:
+
+   An absent or BLANK cell keeps no raw. Blank has always meant the default on
+   these tables — it is what makes a column safe to append at all (ADR-0003's
+   truncation sweep) — so there is no reader's text to protect, and writing ''
+   back would leave an empty cell where every other row states a word.
+
+   The write prefers the raw only while the row still HOLDS the value that raw
+   produced. views/services.js's cycle <select> and views/debts.js's status
+   control assign these fields in place and — exactly like views/assets.js with
+   the money columns — have no way to clear a sibling key they have never heard
+   of. Preferring the raw unconditionally would make a deliberate edit vanish
+   on save: the same bug one step to the left. A reader who re-picks the
+   coerced value out of the select sees no change and their own word stands;
+   the app cannot tell that from "never touched", and leaving the reader's text
+   alone is the honest side to be wrong on.
+
+   Still written WITHOUT escMd, and that is load-bearing now rather than
+   incidental: a third string can occupy this cell, and a word can contain a
+   pipe. The cell arrives from parseMdTable still \|-escaped (see this module's
+   header), the raw keeps it escaped, and the write puts those same bytes back
+   — so preserving a cell cannot shear the row, and a second load reads the
+   identical raw. Precisely what money() does with parseNum's raw. */
+const vocab = (key, header, match, other) => {
+  const rawKey = key + 'Raw';
+  return {
+    key, header, align: 'left',
+    read: c => {
+      const raw = (c || '').trim();
+      const folded = raw.toLowerCase();
+      const v = folded === match ? match : other;
+      return !raw || folded === match || folded === other
+        ? { [key]: v }
+        : { [key]: v, [rawKey]: raw };
+    },
+    write: r => (r[rawKey] != null && r[key] === other ? r[rawKey] : r[key]),
+  };
+};
 
 /* The currency an entity's own amounts are stated in — a DISPLAY symbol, the
    same thing an account's `currency:` frontmatter is, and governed by the same

@@ -522,6 +522,18 @@ module.exports = {
   'tx.split.marker': 'Kuhlukaniswe kwaba ngu-{n}',
   'tx.split.done': 'Kuhlukaniswe kwaba ngu-{n} — buyekeza, bese uLondoloza izinguquko',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'kuhlukaniswe kwaba ngu-{count}',
+  'tx.split.chipGap': '{amount} engabalwanga',
+  'tx.aria.splitChip': 'Izinketho zokuhlukanisa {desc} ngomhla {date}',
+  'tx.unsplit.action': 'Khansela ukuhlukanisa',
+  'tx.unsplit.title': 'Khansela ukuhlukaniswa kwalo msebenzi wemali?',
+  'tx.unsplit.msg': {
+    one: 'Lokhu kususa ingxenye eyodwa, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
+    other: 'Lokhu kususa izingxenye ezingu-{count}, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
+  },
+
   'tx.add.noAccount': 'Engeza i-akhawunti kuqala — wonke umsebenzi wemali unewakhe',
   'tx.add.title': 'Engeza umsebenzi wemali',
   'tx.field.date': 'Usuku',
@@ -1189,6 +1201,14 @@ module.exports = {
 
   'dash.err.render': 'Ayikwazanga ukudweba u-{label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'engeza izinga kunoma yisiphi isikweletu ukuze ubone lokhu',
+  'debt.interest.partial': {
+    one: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} asinazinga',
+    other: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} azinazinga',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Umbiko',
@@ -1288,6 +1308,8 @@ module.exports = {
   'report.debt.total': 'Ibhalansi ephelele',
   'report.debt.perMonth': 'Okuzibophezelwe ngenyanga',
   'report.debt.interest': 'Inzalo yalenyanga',
+  'report.debt.interestNone': 'Inzalo yalenyanga ayiboniswa, ngoba asikho isikweletu esibhala izinga.',
+  'report.debt.interestPartial': 'Inzalo yalenyanga ihlanganisa {shown} kwezikweletu ezingu-{total}; {missing} azibhali zinga.',
   'report.col.debt': 'Isikweletu',
   'report.col.balance': 'Ibhalansi',
   'report.col.rate': 'Izinga',

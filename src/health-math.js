@@ -117,11 +117,82 @@ function resolveEarmarks(accounts) {
    Held out BEFORE the all-blank-rates test, so a book of one rand debt with
    no rate and one euro debt with a rate still returns null rather than
    reporting the foreign rate as the household's whole interest bill. */
-function debtInterestMonthly(debts, household) {
+/* THE ONE DERIVATION. debtInterestMonthly() below is a wrapper over this
+   function's `monthly` field, and every other consumer of "what does this
+   month's interest cost" reads one or the other — never its own reduce().
+
+   That mattered: on 2026-09-02 a household with a R900 000 bond and R164 000
+   of car finance, both with a blank Rate cell, got TWO answers off one
+   ledger. This function said null (rates unknown, nothing to report), while
+   views/debts.js's "Interest this month" tile and views/report.js's
+   debtsSummary() each re-spelled the aggregate inline —
+   `list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0)` — and
+   printed R0,00. The two consumers were not slightly wrong; they made the
+   opposite claim to the score, on the two surfaces a person actually reads,
+   and one of them is the document that leaves the app. "Two figures derived
+   by different rules" is this repository's most-repeated bug shape, and
+   "unprovable is not disproved" is its standing rule against exactly this.
+
+   `shown` / `total` / `missing` exist so a caller can DISCLOSE the coverage
+   rather than silently deciding for the reader what a partial figure means.
+   A tile printing the interest on one of three debts with no word about the
+   other two is a smaller version of the same false claim: the number is
+   right and what it covers is not stated. Counted over the same narrowed
+   `active` list the total is summed from — never recomputed by a caller —
+   so a caption and the figure it captions cannot describe different books.
+
+   `shown` counts rates ABOVE zero, matching the `stated` predicate the
+   null-vs-zero rule below has always used. A Rate cell of 0 and a blank one
+   are indistinguishable after table-schema's money() reader, so an
+   interest-free store account counts as uncovered — the conservative
+   direction, and the only one the data supports. */
+/* Which debts this figure is about, and which of them state a rate — the one
+   place either question is answered, so the aggregate below and the coverage
+   counts beside it can never describe different books. Two callers recompute
+   this slice rather than sharing one call; over a household's handful of
+   debts that costs nothing, and the alternative (threading the slice through
+   a second parameter) is the coupling that makes a caller able to pass a
+   list the figure was not derived from. */
+function ratedDebtSlice(debts, household) {
   const active = activeDebts(debts).filter(d => !household || !isForeign(d, household));
-  const stated = active.filter(d => (Number(d.rate) || 0) > 0);
+  return { active, stated: active.filter(d => (Number(d.rate) || 0) > 0) };
+}
+
+function debtInterestMonthly(debts, household) {
+  const { active, stated } = ratedDebtSlice(debts, household);
+  /* KEEP THIS LINE EXACTLY AS IT READS. tests/degenerate-vaults.test.cjs's
+     NC2 negative control deletes it from a COPY of this file by literal text
+     match and asserts the result goes red — the proof that the guard is what
+     produces the null rather than something else in the chain. Re-spelling it
+     (a ternary, an early object return) leaves the guard working and the
+     proof of it silently unrun, which is the one failure mode a negative
+     control exists to rule out. */
   if (active.length && !stated.length) { return null; }
   return active.reduce((sum, d) => sum + monthlyInterest(d.balance, d.rate), 0);
+}
+
+/* The same figure, plus how much of the book it actually covers.
+
+   `shown` / `total` / `missing` exist so a caller can DISCLOSE the coverage
+   rather than silently deciding for the reader what a partial figure means.
+   A tile printing the interest on one of three debts with no word about the
+   other two is a smaller version of the same false claim: the number is
+   right and what it covers is not stated. `monthly` is debtInterestMonthly's
+   own return, never a second reduce, so the caption and the figure it
+   captions cannot come apart.
+
+   `shown` counts rates ABOVE zero, matching the `stated` predicate above. A
+   Rate cell of 0 and a blank one are indistinguishable after table-schema's
+   money() reader, so an interest-free store account counts as uncovered —
+   the conservative direction, and the only one the data supports. */
+function debtInterestCoverage(debts, household) {
+  const { active, stated } = ratedDebtSlice(debts, household);
+  return {
+    monthly: debtInterestMonthly(debts, household),
+    shown: stated.length,
+    total: active.length,
+    missing: active.length - stated.length,
+  };
 }
 
 /* Average a trailing window of per-period figures and restate them monthly.
@@ -555,7 +626,7 @@ function scoreBreakdown(m, targetMonths) {
 }
 
 module.exports = {
-  essentialTotal, resolveEarmarks, debtInterestMonthly, monthlyAverages,
+  essentialTotal, resolveEarmarks, debtInterestMonthly, debtInterestCoverage, monthlyAverages,
   financialScore, scoreFractions, healthMetrics, scoreBand, scoreBreakdown,
   NON_ESSENTIAL_TYPES, DAYS_PER_MONTH, SCORE_BANDS, PILLARS, FULL_MARKS,
 };

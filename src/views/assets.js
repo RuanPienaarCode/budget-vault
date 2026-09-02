@@ -123,21 +123,56 @@ module.exports = function registerAssets(ctx) {
   function renderAssetKpis() {
     const total = assetTotal(S.assets, S.settings.currency);
     const assetOthers = foreignTotals(S.assets, S.settings.currency, 'value');
-    /* Seeded from the first row rather than from null. `a.value > (b?.value||0)`
+    /* Ranked over the HOUSEHOLD'S OWN CURRENCY, the same way the total tile
+       directly above is summed — and for the same reason. `a.value` is stated
+       in whatever symbol its row carries, and this vault holds no rate, so
+       `a.value > b.value` across two currencies is not a comparison; it ranks
+       digit counts. It fails hardest where it looks most plausible: a currency
+       that runs many units to the rand made an Rp 50 000 000 motorbike (about
+       R50 000) beat an R900 000 house, and aMoney then printed the winner in
+       its own symbol — so the tile read "Largest: Rp 50 000 000 · Motorbike",
+       a true figure with a true label naming the wrong item, which is worse
+       than a visibly broken tile because there is nothing to disbelieve.
+
+       Seeded from the first row rather than from null. `a.value > (b?.value||0)`
        never advances past null when every value is 0, so a household that has
        listed the house, the car and the ring but priced none of them yet — a
        state this page explicitly expects, and the one the tile beside this is
        about — read "Largest: —" as though it owned nothing. */
-    const biggest = S.assets.length
-      ? S.assets.reduce((b, a) => (a.value > b.value ? a : b))
+    const ownAssets = S.assets.filter(a => !isForeign(a, S.settings.currency));
+    const biggest = ownAssets.length
+      ? ownAssets.reduce((b, a) => (a.value > b.value ? a : b))
       : null;
+    /* And the ones held out are NAMED, because currency.js:14 forbids dropping
+       them silently just as plainly as currency.js:10 forbids converting them.
+       The [symbol, figure] pair shape is `assetOthers`'s, so otherList prints
+       both footnotes identically — but the figure is the LARGEST in each
+       symbol, not the total: a tile answering "what is the biggest thing here"
+       with a sum in its own caption would be two figures derived by different
+       rules inside one tile, which is the shape this page has already paid for
+       twice. */
+    const biggestOthers = new Map();
+    for (const a of S.assets) {
+      if (!isForeign(a, S.settings.currency)) continue;
+      const sym = symbolOf(a, S.settings.currency);
+      const v = Math.max(0, a.value || 0);
+      if (!biggestOthers.has(sym) || v > biggestOthers.get(sym)) biggestOthers.set(sym, v);
+    }
     const revaluationCount = S.assets.filter(needsRevaluation).length;
 
     const tile = kpiTiles($('#assetKpis'));
     tile('Total value', money(total), total > 0 ? 'text-success' : '',
       assetOthers.length ? `plus ${otherList(assetOthers)} held abroad, not converted` : null);
     tile('Items', String(S.assets.length));
-    tile('Largest', biggest ? aMoney(biggest, biggest.value, 0) : '—', '', biggest ? biggest.name : null);
+    /* Two clauses because they answer two questions, and folding them into one
+       sentence would imply a ranking between them that no rate exists to make.
+       `aMoney` rather than `money` even though `biggest` is a household row by
+       construction: the row's own formatter is what every other figure on this
+       page uses, and a second spelling here is how the two drift apart. */
+    const biggestSub = [biggest ? biggest.name : null,
+      biggestOthers.size ? `largest abroad ${otherList([...biggestOthers])}, not converted` : null]
+      .filter(Boolean).join(' · ') || null;
+    tile('Largest', biggest ? aMoney(biggest, biggest.value, 0) : '—', '', biggestSub);
     // Labelled by what it means to do about it, not by the predicate shape —
     // this used to read "Unvalued" while counting rows that plainly HAVE a
     // value (a house priced 400 days ago), which reads as though the app

@@ -518,6 +518,18 @@ module.exports = {
   'tx.split.marker': '{n} हिस्सों में बँटी',
   'tx.split.done': '{n} हिस्सों में बाँट दी — जाँच लें, फिर "बदलाव सहेजें" दबाएँ',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': '{count} हिस्सों में बँटी',
+  'tx.split.chipGap': '{amount} का हिसाब नहीं',
+  'tx.aria.splitChip': '{date} के {desc} के लिए बँटवारे के विकल्प',
+  'tx.unsplit.action': 'बँटवारा हटाएँ',
+  'tx.unsplit.title': 'इस लेन-देन का बँटवारा हटाएँ?',
+  'tx.unsplit.msg': {
+    one: 'इससे हिस्सा हट जाएगा और {desc} फिर से {amount} का एक ही लेन-देन बन जाएगा।',
+    other: 'इससे {count} हिस्से हट जाएँगे और {desc} फिर से {amount} का एक ही लेन-देन बन जाएगा।',
+  },
+
   'tx.add.noAccount': 'पहले एक खाता जोड़ें — हर लेन-देन किसी न किसी खाते का होता है',
   'tx.add.title': 'लेन-देन जोड़ें',
   'tx.field.date': 'तारीख़',
@@ -1178,6 +1190,14 @@ module.exports = {
 
   'dash.err.render': '{label} नहीं बनाया जा सका — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'यह देखने के लिए किसी कर्ज़ पर दर दर्ज करें',
+  'debt.interest.partial': {
+    one: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
+    other: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
+  },
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'एक Markdown नोट · इसे Obsidian में पढ़ें, साझा करें, या किसी AI चैट में चिपका दें',
   'report.options.title': 'रिपोर्ट के विकल्प',
@@ -1281,6 +1301,8 @@ module.exports = {
   'report.debt.total': 'कुल बकाया',
   'report.debt.perMonth': 'हर महीने बंधी रकम',
   'report.debt.interest': 'इस महीने का ब्याज',
+  'report.debt.interestNone': 'इस महीने का ब्याज नहीं दिखाया गया है, क्योंकि किसी कर्ज़ पर दर दर्ज नहीं है।',
+  'report.debt.interestPartial': 'इस महीने का ब्याज {total} में से {shown} कर्ज़ों को शामिल करता है; {missing} पर कोई दर दर्ज नहीं है।',
   'report.col.debt': 'कर्ज़',
   'report.col.balance': 'बकाया',
   'report.col.rate': 'दर',

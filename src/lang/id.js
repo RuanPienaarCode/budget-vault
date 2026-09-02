@@ -497,6 +497,17 @@ module.exports = {
   'tx.split.marker': 'Dipecah menjadi {n}',
   'tx.split.done': 'Dipecah menjadi {n} — periksa, lalu tekan Simpan perubahan',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'dipecah menjadi {count}',
+  'tx.split.chipGap': '{amount} belum tercatat',
+  'tx.aria.splitChip': 'Opsi pecahan untuk {desc} pada {date}',
+  'tx.unsplit.action': 'Batalkan pecahan',
+  'tx.unsplit.title': 'Batalkan pecahan transaksi ini?',
+  'tx.unsplit.msg': {
+    other: 'Ini menghapus {count} bagian dan mengembalikan {desc} menjadi satu transaksi sebesar {amount}.',
+  },
+
   'tx.add.noAccount': 'Tambahkan rekening dulu — setiap transaksi menempel pada satu rekening',
   'tx.add.title': 'Tambah transaksi',
   'tx.field.date': 'Tanggal',
@@ -1133,6 +1144,13 @@ module.exports = {
 
   'dash.err.render': '{label} tidak bisa digambar — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'tambahkan suku bunga pada salah satu utang untuk melihat ini',
+  'debt.interest.partial': {
+    other: 'mencakup {shown} dari {total} utang · {missing} tanpa suku bunga',
+  },
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Satu catatan Markdown · baca di Obsidian, bagikan, atau tempelkan ke obrolan AI',
   'report.options.title': 'Pilihan laporan',
@@ -1235,6 +1253,8 @@ module.exports = {
   'report.debt.total': 'Total saldo',
   'report.debt.perMonth': 'Terikat per bulan',
   'report.debt.interest': 'Bunga bulan ini',
+  'report.debt.interestNone': 'Bunga bulan ini tidak ditampilkan, karena tidak ada utang yang mencantumkan suku bunga.',
+  'report.debt.interestPartial': 'Bunga bulan ini mencakup {shown} dari {total} utang; {missing} tidak mencantumkan suku bunga.',
   'report.col.debt': 'Utang',
   'report.col.balance': 'Saldo',
   'report.col.rate': 'Suku bunga',

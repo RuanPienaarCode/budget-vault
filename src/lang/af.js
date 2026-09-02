@@ -503,6 +503,18 @@ module.exports = {
   'tx.split.marker': 'Verdeel in {n}',
   'tx.split.done': 'Verdeel in {n} — gaan na, en stoor dan die veranderinge',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'verdeel in {count}',
+  'tx.split.chipGap': '{amount} onverklaar',
+  'tx.aria.splitChip': 'Verdeelopsies vir {desc} op {date}',
+  'tx.unsplit.action': 'Verdeling ongedaan maak',
+  'tx.unsplit.title': 'Maak hierdie transaksie se verdeling ongedaan?',
+  'tx.unsplit.msg': {
+    one: 'Dit verwyder die 1 deel en stel {desc} terug as een enkele transaksie van {amount}.',
+    other: 'Dit verwyder die {count} dele en stel {desc} terug as een enkele transaksie van {amount}.',
+  },
+
   'tx.add.noAccount': 'Voeg eers \'n rekening by — elke transaksie hoort by een',
   'tx.add.title': 'Voeg transaksie by',
   'tx.field.date': 'Datum',
@@ -1162,6 +1174,14 @@ module.exports = {
 
   'dash.err.render': 'Kon nie die {label} teken nie — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'voeg \'n koers by enige skuld om dit te sien',
+  'debt.interest.partial': {
+    one: 'dek {shown} van {total} skulde · {missing} sonder koers',
+    other: 'dek {shown} van {total} skulde · {missing} sonder koers',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Verslag',
@@ -1261,6 +1281,8 @@ module.exports = {
   'report.debt.total': 'Totale balans',
   'report.debt.perMonth': 'Verbind per maand',
   'report.debt.interest': 'Rente hierdie maand',
+  'report.debt.interestNone': 'Rente hierdie maand word nie gewys nie, want geen skuld gee \'n koers aan nie.',
+  'report.debt.interestPartial': 'Rente hierdie maand dek {shown} van {total} skulde; {missing} gee geen koers aan nie.',
   'report.col.debt': 'Skuld',
   'report.col.balance': 'Balans',
   'report.col.rate': 'Koers',

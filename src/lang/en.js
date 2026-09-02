@@ -541,6 +541,25 @@ module.exports = {
   'tx.split.marker': 'Split into {n}',
   'tx.split.done': 'Split into {n} — review, then Save changes',
 
+  /* The split chip, and the un-split it offers. The chip REPLACES the Excluded
+     checkbox on a split parent row, because on that one row the tick meant two
+     things a reader cannot tell apart: "I excluded this line from the budget"
+     and "the app excluded it, because its parts now carry the money". A parent
+     has no honest checkbox state — untick it and the money is counted twice —
+     so the row states the fact instead, and offers the one action that changes
+     it. `chipGap` is appended after ' · ' when the parts no longer sum to the
+     parent: a split that does not add up is a disagreement about the account,
+     and this app argues rather than quietly absorbing the difference. */
+  'tx.split.chip': 'split into {count}',
+  'tx.split.chipGap': '{amount} unaccounted',
+  'tx.aria.splitChip': 'Split options for {desc} on {date}',
+  'tx.unsplit.action': 'Un-split',
+  'tx.unsplit.title': 'Un-split this transaction?',
+  'tx.unsplit.msg': {
+    one: 'This removes the 1 part and puts {desc} back as a single transaction of {amount}.',
+    other: 'This removes the {count} parts and puts {desc} back as a single transaction of {amount}.',
+  },
+
   'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
   'tx.add.title': 'Add transaction',
   'tx.field.date': 'Date',
@@ -1260,6 +1279,28 @@ module.exports = {
 
   'dash.err.render': 'Could not draw the {label} — {error}',
 
+  /* ------------------------------- Debt page ------------------------------
+     "Interest this month" on the Debt page. Both strings exist because a debt
+     with a BLANK rate is unknown, not zero: summing only the debts that state
+     a rate and printing that total unqualified quotes a figure the vault does
+     not support, and reading a blank as 0% understates what the debt costs to
+     carry. So the tile says what it covers instead of picking one of those.
+
+     `partial` pluralises on the number MISSING a rate, but t() only ever reads
+     `count` to choose the form — so the caller passes it twice, the same way
+     'tx.showMore' does:
+
+       i18n.t('debt.interest.partial',
+              { shown, total, missing, count: missing })
+
+     Pass `missing` alone and every language picks its `other` form, which
+     reads "1 have no rate" — wrong in the exact case the tile exists for. */
+  'debt.interest.noRates': 'add a rate to any debt to see this',
+  'debt.interest.partial': {
+    one: 'covers {shown} of {total} debts · {missing} has no rate',
+    other: 'covers {shown} of {total} debts · {missing} have no rate',
+  },
+
   /* --------------------------------- report -------------------------------
      views/report.js (the page) and src/report.js (the generated note's own
      words — headings, table columns, section labels) share this prefix.
@@ -1369,6 +1410,11 @@ module.exports = {
   'report.debt.total': 'Total balance',
   'report.debt.perMonth': 'Committed per month',
   'report.debt.interest': 'Interest this month',
+  /* The report leaves the app, so it states in a full sentence the caveat its
+     on-screen twin compresses into a chip — a reader holding the exported note
+     has no tile to hover. */
+  'report.debt.interestNone': 'Interest this month is not shown, because no debt states a rate.',
+  'report.debt.interestPartial': 'Interest this month covers {shown} of {total} debts; {missing} state no rate.',
   'report.col.debt': 'Debt',
   'report.col.balance': 'Balance',
   'report.col.rate': 'Rate',

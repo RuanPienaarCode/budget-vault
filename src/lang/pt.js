@@ -519,6 +519,18 @@ module.exports = {
   'tx.split.marker': 'Dividida em {n}',
   'tx.split.done': 'Dividida em {n} — confira e use Salvar alterações',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'dividida em {count}',
+  'tx.split.chipGap': '{amount} não atribuído',
+  'tx.aria.splitChip': 'Opções de divisão para {desc} em {date}',
+  'tx.unsplit.action': 'Desfazer divisão',
+  'tx.unsplit.title': 'Desfazer a divisão desta transação?',
+  'tx.unsplit.msg': {
+    one: 'Isto remove a parte e devolve {desc} como uma única transação de {amount}.',
+    other: 'Isto remove as {count} partes e devolve {desc} como uma única transação de {amount}.',
+  },
+
   'tx.add.noAccount': 'Crie uma conta primeiro — toda transação pertence a uma',
   'tx.add.title': 'Adicionar transação',
   'tx.field.date': 'Data',
@@ -1179,6 +1191,14 @@ module.exports = {
 
   'dash.err.render': 'Não foi possível desenhar {label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'adicione uma taxa a alguma dívida para ver isto',
+  'debt.interest.partial': {
+    one: 'cobre {shown} de {total} dívidas · {missing} não tem taxa',
+    other: 'cobre {shown} de {total} dívidas · {missing} não têm taxa',
+  },
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Uma nota em Markdown · leia no Obsidian, compartilhe, ou cole num chat de IA',
   'report.options.title': 'Opções do relatório',
@@ -1282,6 +1302,8 @@ module.exports = {
   'report.debt.total': 'Saldo total',
   'report.debt.perMonth': 'Comprometido por mês',
   'report.debt.interest': 'Juros deste mês',
+  'report.debt.interestNone': 'Os juros deste mês não são mostrados, porque nenhuma dívida informa uma taxa.',
+  'report.debt.interestPartial': 'Os juros deste mês cobrem {shown} de {total} dívidas; {missing} não informam taxa.',
   'report.col.debt': 'Dívida',
   'report.col.balance': 'Saldo',
   'report.col.rate': 'Taxa',

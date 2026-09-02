@@ -505,6 +505,18 @@ module.exports = {
   'tx.split.marker': 'Dividida en {n}',
   'tx.split.done': 'Dividida en {n} — revisa y luego guarda los cambios',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'dividida en {count}',
+  'tx.split.chipGap': '{amount} sin asignar',
+  'tx.aria.splitChip': 'Opciones de división para {desc} del {date}',
+  'tx.unsplit.action': 'Deshacer división',
+  'tx.unsplit.title': '¿Deshacer la división de esta transacción?',
+  'tx.unsplit.msg': {
+    one: 'Esto quita la 1 parte y devuelve {desc} como una sola transacción de {amount}.',
+    other: 'Esto quita las {count} partes y devuelve {desc} como una sola transacción de {amount}.',
+  },
+
   'tx.add.noAccount': 'Añade una cuenta primero — cada transacción pertenece a una',
   'tx.add.title': 'Añadir transacción',
   'tx.field.date': 'Fecha',
@@ -1164,6 +1176,14 @@ module.exports = {
 
   'dash.err.render': 'No se pudo dibujar {label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'añade un tipo de interés a alguna deuda para ver esto',
+  'debt.interest.partial': {
+    one: 'cubre {shown} de {total} deudas · {missing} no tiene tipo de interés',
+    other: 'cubre {shown} de {total} deudas · {missing} no tienen tipo de interés',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Informe',
@@ -1263,6 +1283,8 @@ module.exports = {
   'report.debt.total': 'Saldo total',
   'report.debt.perMonth': 'Comprometido al mes',
   'report.debt.interest': 'Interés de este mes',
+  'report.debt.interestNone': 'El interés de este mes no se muestra porque ninguna deuda indica un tipo de interés.',
+  'report.debt.interestPartial': 'El interés de este mes cubre {shown} de {total} deudas; {missing} no indican ningún tipo de interés.',
   'report.col.debt': 'Deuda',
   'report.col.balance': 'Saldo',
   'report.col.rate': 'Tasa',

@@ -56,6 +56,12 @@ const { worth, otherCurrencyNet } = require('../worth');
 const { symbolOf, splitByCurrency, isForeign } = require('../currency');
 const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
+/* The canonical monthly-interest aggregate. This section used to sum its
+   own rows and printed R0,00 into a document that leaves the app for a
+   household whose Rate column was blank — see health-math.js's own header
+   for the reproduction. monthlyInterest above is still imported for the
+   PER-ROW figure in the table, which is a different question. */
+const { debtInterestCoverage } = require('../health-math');
 const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
 const {
@@ -471,12 +477,24 @@ module.exports = function registerReport(ctx) {
       const sym = symbolOf(d, S.settings.currency);
       others.set(sym, (others.get(sym) || 0) + Math.max(0, d.balance || 0));
     }
+    /* The section total comes from health-math.js's shared rule, NOT from
+       summing `rows` — and those two are not the same figure when a Rate
+       cell is blank. `rows.reduce` reported a measured zero, the same claim
+       the Debt page's tile was making and the opposite of what the score
+       said about the identical ledger. The cover object's own active slice
+       is activeDebts narrowed by isForeign, which is exactly `home` above,
+       so the count in the disclosure and the debts in the table describe one
+       book. `coverage` travels beside the figure the way `foreign` already
+       does: src/report.js states it as prose, the JSON sibling as data, and
+       neither re-derives it. */
+    const cover = debtInterestCoverage(S.debts, S.settings.currency);
     return {
       count: S.debts.length,
       active: home.length,
       total: rows.reduce((t, r) => t + r.balance, 0),
       perMonth: home.reduce((t, d) => t + (d.payment || 0) + (d.extra || 0), 0),
-      interest: rows.reduce((t, r) => t + r.interest, 0),
+      interest: cover.monthly,
+      coverage: { shown: cover.shown, total: cover.total, missing: cover.missing },
       rows,
       foreign: {
         count: away.length,

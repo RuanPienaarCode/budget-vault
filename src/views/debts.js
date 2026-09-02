@@ -12,8 +12,16 @@ const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
 const { activeDebts, cardOverlap } = require('../worth');
+/* The canonical "what does this month's interest cost" rule (see its own
+   header): this file used to re-spell the aggregate inline and printed R0,00
+   on a book where every Rate cell was blank, while the score withheld the
+   same figure as unknown. */
+const { debtInterestCoverage } = require('../health-math');
 const { todayIso } = require('../dates');
 const { symbolOf, isForeign } = require('../currency');
+/* Namespace import, per the house rule — `t` is already taken as a local in
+   several files, so every file in this app imports i18n the same way. */
+const i18n = require('../i18n');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
@@ -119,7 +127,14 @@ module.exports = function registerDebts(ctx) {
     const list = active();
     const total = list.reduce((s, d) => s + d.balance, 0);
     const perMonth = list.reduce((s, d) => s + committed(d), 0);
-    const interest = list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
+    /* Through health-math.js's shared rule rather than a reduce of this
+       file's own, because the two disagreed. `S.debts` plus the household
+       symbol re-derives exactly `list` — activeDebts (status) narrowed by
+       isForeign (currency) is the same pair of filters `activeAll()` and
+       `active()` apply above, proven on a fixture in
+       tests/debt-interest-coverage.test.cjs rather than assumed here. */
+    const cover = debtInterestCoverage(S.debts, S.settings.currency);
+    const interest = cover.monthly;
     const tile = kpiTiles($('#debtKpis'));
     // Neutral: owing money is an ordinary financial position, not a red state.
     /* What the figures on this page do NOT cover, said on the first tile the
@@ -135,8 +150,38 @@ module.exports = function registerDebts(ctx) {
     tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
     // The single most actionable number here: what this month costs before a
     // cent of principal moves.
-    tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
-      perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
+    /* Three states, because a blank Rate column is not a rate of zero. With
+       NO rate stated anywhere the figure is unknown, and this tile withholds
+       it — the same '—' placeholder the Debt-free tile below and the Savings
+       growth tile already use for "no figure to give", captioned with the one
+       thing that would make it knowable. Printing R0,00 instead told a
+       household carrying a R900 000 bond that its debt was free.
+
+       With SOME rates stated the sum is real but partial, so it prints WITH
+       what it covers: a figure covering one debt of three, presented as the
+       household's interest bill, is the same false claim wearing a true
+       number. Fully rated is untouched, caption and all — the disclosure is
+       additive, and a household that filled the column in should see no
+       change at all. */
+    if (interest === null) {
+      tile('Interest this month', '—', '', i18n.t('debt.interest.noRates'));
+    } else if (cover.missing > 0) {
+      /* `count` alongside `missing`, carrying the same value. i18n.t() picks
+         a plural form from `count` and from nothing else, and this sentence
+         pluralises on the debts MISSING a rate — so passing `missing` alone
+         selects every language's `other` form and renders "1 have no rate"
+         in precisely the single-missing case the tile most often meets. Same
+         shape as 'tx.showMore'; the reasoning is recorded above the key in
+         src/lang/en.js, and the one-missing render is pinned in
+         tests/debt-interest-coverage.test.cjs against the other-form render
+         so an assertion that passed either way cannot creep back. */
+      tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
+        i18n.t('debt.interest.partial',
+          { shown: cover.shown, total: cover.total, missing: cover.missing, count: cover.missing }));
+    } else {
+      tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
+        perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
+    }
     /* ITEM 1 re-sourcing: this tile used to run the PLANNER's own simulate()
        call below — whatever `extra` sat in #debtExtra and whichever strategy
        was selected in #debtStrategy — so typing 3000 into a box moved the

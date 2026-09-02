@@ -509,6 +509,18 @@ module.exports = {
   'tx.split.marker': 'Répartie en {n}',
   'tx.split.done': 'Répartie en {n} — vérifiez, puis enregistrez les modifications',
 
+  /* --- the split chip and its un-split, replacing the Excluded tick on a
+     split parent row (the why is in en.js) --- */
+  'tx.split.chip': 'répartie en {count}',
+  'tx.split.chipGap': '{amount} non affecté',
+  'tx.aria.splitChip': 'Options de ventilation pour {desc} du {date}',
+  'tx.unsplit.action': 'Annuler la ventilation',
+  'tx.unsplit.title': 'Annuler la ventilation de cette transaction ?',
+  'tx.unsplit.msg': {
+    one: 'Cela supprime la part et rétablit {desc} comme une seule transaction de {amount}.',
+    other: 'Cela supprime les {count} parts et rétablit {desc} comme une seule transaction de {amount}.',
+  },
+
   'tx.add.noAccount': 'Ajoutez d\'abord un compte — chaque transaction appartient à un compte',
   'tx.add.title': 'Ajouter une transaction',
   'tx.field.date': 'Date',
@@ -1176,6 +1188,14 @@ module.exports = {
 
   'dash.err.render': 'Impossible de dessiner {label} — {error}',
 
+  /* --- Debt page: "Interest this month" says what it covers, because a debt
+     with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'debt.interest.noRates': 'ajoutez un taux à une dette pour voir ce chiffre',
+  'debt.interest.partial': {
+    one: 'couvre {shown} dettes sur {total} · {missing} n\'a pas de taux',
+    other: 'couvre {shown} dettes sur {total} · {missing} n\'ont pas de taux',
+  },
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Rapport',
@@ -1275,6 +1295,8 @@ module.exports = {
   'report.debt.total': 'Solde total',
   'report.debt.perMonth': 'Engagé par mois',
   'report.debt.interest': 'Intérêts ce mois-ci',
+  'report.debt.interestNone': 'Les intérêts de ce mois-ci ne sont pas affichés, car aucune dette n\'indique de taux.',
+  'report.debt.interestPartial': 'Les intérêts de ce mois-ci couvrent {shown} dettes sur {total} ; {missing} n\'indiquent aucun taux.',
   'report.col.debt': 'Dette',
   'report.col.balance': 'Solde',
   'report.col.rate': 'Taux',

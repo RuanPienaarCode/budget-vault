@@ -121,7 +121,14 @@ for (const [label, input] of [['empty', []], ['absent', undefined], ['null', nul
 
   const split = owedSummary(ledger, '2026-07-01', 'R');
   eq(split.outstanding, 500, 'told the household symbol, only the rand entry is in the total');
-  eq(split.open, 1, 'and the open count matches the figure beside it');
+  /* This asserted `1` when the currency split first landed, on the reasoning
+     that `open` should "match the figure beside it". That reasoning was wrong,
+     and pinning it kept the defect alive for two releases: the rand total is
+     denominated and `open` is not — it counts obligations, and Pierre owes one
+     whether or not this vault can price it in rand. The Owed page's own row for
+     him already said "out N days" while this count said he did not exist.
+     See tests/owed-foreign-pressure.test.cjs, which owns the fix. */
+  eq(split.open, 2, 'both loans are open — a count of obligations is not stated in any currency');
   eq(split.otherCurrencies, [['€', 300]],
     'the euro entry is NAMED in its own currency — not converted, and not silently dropped');
 }

@@ -45,7 +45,7 @@ Module._load = function (request) {
 };
 
 const {
-  SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit,
+  SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
 } = require('../src/tx-role');
 const { reconcile } = require('../src/reconcile');
 const { splitFlows, accountFlows } = require('../src/savings-math');
@@ -157,6 +157,52 @@ const THREE_WAY = [
   // Negative control: the refusal must be about the ROLE and nothing else.
   const plain = freshParent();
   ok(applySplit(plain, THREE_WAY, 'Split into 3'), 'an ordinary row still splits');
+}
+
+/* ---- 2c. splitShortfall: the money the parts stopped describing ----
+
+   Sections 3 and 4 below prove a COMPLETE split is counted once. This is the
+   incomplete one, and it is not a hypothetical: deleting a single part leaves
+   the parent excluded and still marked, so it stays superseded — and that
+   slice's money is then in no total at all. Not the budget's, which never
+   counted the parent; not the account's, which skips it. Nothing was corrupted
+   and nothing is missing from the file; a figure simply left the app.
+
+   deleteTransaction's dialog has warned about this in words since it shipped
+   and could never put a number on it. This is the number, and the Excluded
+   cell on a split parent is where it is now said (tests/split-parent-chip.test.cjs).
+   Pinned here because the arithmetic is pure and belongs beside the predicate
+   it qualifies, not in the view that prints it. */
+{
+  const p = freshParent();
+  const rows = applySplit(p, THREE_WAY, 'Split into 3');
+  eq(splitShortfall(p, rows), 0, 'a split straight out of applySplit accounts for all of itself');
+
+  eq(splitShortfall(p, rows.filter(r => r.amount !== -120)), -120,
+    'delete one part and the shortfall is exactly that part, signed like the parent');
+  eq(splitShortfall(p, []), -1000,
+    'delete every part and the whole charge is unaccounted for — the row describes nothing');
+
+  /* In cents, not floats. -1240.85 less -800 less -440.85 is -2.27e-13 in
+     binary floating point, and a chip announcing a shortfall on a split that is
+     exactly right teaches the reader to ignore the one warning it exists to
+     give. */
+  const odd = { amount: -1240.85 };
+  eq(splitShortfall(odd, [{ amount: -800 }, { amount: -440.85 }]), 0,
+    'an amount that does not survive binary floating point still balances exactly');
+  eq(splitShortfall({ amount: -0.30 }, [{ amount: -0.1 }, { amount: -0.2 }]), 0,
+    'and so does the classic 0.1 + 0.2');
+  eq(splitShortfall({ amount: -100 }, [{ amount: -33.33 }, { amount: -33.33 }, { amount: -33.33 }]), -0.01,
+    'a one-cent shortfall is reported rather than absorbed — the modal refuses to write one, '
+    + 'so seeing it here means a row left');
+
+  // A money-in parent reads the same way round, and the sign is the parent's.
+  eq(splitShortfall({ amount: 900 }, [{ amount: 500 }]), 400,
+    'an income split reports its shortfall positive, because the parent is');
+
+  // Nothing to report on, rather than a throw: the caller is a render function.
+  eq(splitShortfall(null, []), 0, 'a missing parent has no shortfall, it has no split');
+  eq(splitShortfall({ amount: -100 }, null), -100, 'and a missing parts list is no parts');
 }
 
 /* ---- 3. reconcile: the split charge moves the balance ONCE ---- */

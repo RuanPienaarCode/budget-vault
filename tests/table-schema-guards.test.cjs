@@ -113,4 +113,57 @@ for (const [name, cells] of Object.entries(FULL_CELLS)) {
   }
 }
 
+/* ---------------- the sweep, again, over a row the vocabulary refuses -----
+
+   The sweep above feeds every vocab column a word it RECOGNISES ('PAID',
+   'ANNUAL'), so it proved absence and canonical write-back and nothing about
+   the third case a real file contains: a word this app does not model. That
+   cell used to be coerced to `other` and written back as `other`, destroying
+   what the reader typed — the money-cell defect of 1.34.0 one column over, and
+   the half that sweep left behind. tests/schema-unreadable-vocab-cells.test.cjs
+   owns the contract; this repeats the TRUNCATION property over it, because a
+   column that keeps a second field has a second way to fail on a short row —
+   the raw must appear only for a cell that is actually present, or a file
+   written before the column existed would grow a key out of nothing.
+
+   The unrecognised word is substituted into each vocab column in turn rather
+   than all at once, so a failure names one column. */
+const UNRECOGNISED = { owed: 'disputed', services: 'weekly', debts: 'written off' };
+
+for (const [name, word] of Object.entries(UNRECOGNISED)) {
+  const schema = SCHEMAS[name];
+  /* Found by asking the column, not by a hand-kept index: a vocab column is
+     one where an absent cell and a nonsense cell land on the same string. */
+  const idxs = schema.columns
+    .map((c, i) => {
+      const other = c.read(undefined)[c.key];
+      return (typeof other === 'string' && other !== '' && c.read(' zzz ')[c.key] === other) ? i : -1;
+    })
+    .filter(i => i >= 0);
+  assert.ok(idxs.length, `${name}: must have a vocab column to guard`); checks++;
+
+  for (const i of idxs) {
+    const col = schema.columns[i];
+    const rawKey = col.key + 'Raw';
+    const cells = [...FULL_CELLS[name]];
+    cells[i] = word;
+
+    eq(rowToObject(schema, cells)[rawKey], word,
+      `${name}.${col.key}: a full row keeps the reader's own word for write-back`);
+
+    for (let len = 0; len < cells.length; len++) {
+      const obj = rowToObject(schema, cells.slice(0, len));
+      /* The same value either way, and that is the point: an unrecognised
+         word coerces to exactly what an ABSENT cell yields, so no consumer
+         downstream can tell the two apart and none of them changed behaviour.
+         Only the raw distinguishes them, and only on the way back to disk. */
+      eq(obj[col.key], DEFAULTS[name][col.key],
+        `${name}.${col.key}: truncated at ${len}, an unrecognised word reads as the documented default`);
+      eq(obj[rawKey], len > i ? word : undefined,
+        `${name}.${col.key}: truncated at ${len}, a raw exists only where a cell actually did — ` +
+        'a file written before this column existed must not grow one out of absence');
+    }
+  }
+}
+
 console.log(`table-schema-guards.test.cjs — ${checks} checks OK (tripwire + truncation sweep)`);

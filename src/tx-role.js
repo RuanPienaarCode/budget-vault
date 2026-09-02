@@ -134,6 +134,44 @@ function applySplit(parent, parts, marker) {
   return rows;
 }
 
+/* What a parent's parts no longer account for.
+
+   Zero on a healthy split, and it has to be: applySplit takes the modal at its
+   word — "already summing to it exactly; this does no arithmetic and
+   deliberately re-checks none, because the modal is the gate" — and that gate
+   weighs the values it is about to WRITE (tests/split-transaction.test.cjs,
+   section 4b). So anything non-zero here means rows have LEFT since.
+
+   That is one specific thing, and it is worth naming. Delete a single part and
+   the parent stays excluded AND marked, so it stays superseded — and the money
+   that part carried then falls into no total whatsoever. Not the budget's,
+   which never counted the parent. Not the account's, which skips it. No row is
+   missing from the file and no file is corrupt; a figure is simply gone from
+   the app, silently, on a delete whose own dialog warns about it in words and
+   could not put a number on it. This is that number.
+
+   Pure, and here rather than in the view for the reason this module exists at
+   all: the sum that decides whether a split still adds up belongs beside the
+   predicate that decides whether it counts — not inside a render function,
+   where no guard test can reach it and a second, subtly different rule grows.
+
+   In CENTS, deliberately. -1200 less -800 less -400 is 0 exactly, but
+   -1240.85 less -800 less -440.85 is -2.27e-13 in binary floating point, and a
+   chip announcing "R0.00 unaccounted" over a split that is exactly right would
+   be worse than no chip: it teaches the reader to ignore the one warning that
+   cell exists to give. Same rounding rule the modal's own remainder() applies,
+   so the two can never disagree about what "balanced" means.
+
+   Signed like the parent, leaving the caller to decide whether a direction is
+   worth printing; 0 when there is nothing to report, so that
+   `if (splitShortfall(...))` reads as the question it is. */
+function splitShortfall(parent, parts) {
+  if (!parent) return 0;
+  const cents = v => Math.round((Number(v) || 0) * 100);
+  const taken = (parts || []).reduce((sum, p) => sum + cents(p && p.amount), 0);
+  return (cents(parent.amount) - taken) / 100;
+}
+
 module.exports = {
-  SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit,
+  SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
 };
