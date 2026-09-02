@@ -6,6 +6,11 @@ const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { daysSince } = require('../reconcile');
+/* A new entry is stamped with the day it was created — see addOwed for why a
+   default beats an empty field here. Read through todayIso() rather than
+   `new Date()` so it is a LOCAL calendar date, the distinction dates.js exists
+   to keep. */
+const { todayIso } = require('../dates');
 /* The definitions of "outstanding" and "settled" now live in owed-math.js,
    because the Dashboard's position band states an outstanding total too. Two
    copies of this arithmetic in one app is exactly the drift worth.js exists to
@@ -67,7 +72,9 @@ module.exports = function registerOwed(ctx) {
       t.empty();
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Person'), el('th', { scope: 'col' }, 'Description'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
-        el('th', { scope: 'col' }, 'Due date'), el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));
+        /* Lent before Due, in the order the money moves. */
+        el('th', { scope: 'col' }, 'Lent'), el('th', { scope: 'col' }, 'Due date'),
+        el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
       for (const o of S.owed) {
         const settled = isSettled(o);
@@ -81,7 +88,17 @@ module.exports = function registerOwed(ctx) {
         /* Age, not the due date. The due-date column was empty on every row of
            the vault this was built against — it asks for something you do not
            have when you lend to family. How long the money has been gone is
-           derivable, and is the figure that actually applies pressure. */
+           derivable, and is the figure that actually applies pressure.
+
+           That argument still holds. What did not, until now, is that `lent`
+           was READ here and by owedSummary's `oldestDays` and written by
+           NOTHING: the table rendered no field for it and addOwed hardcoded it
+           empty, so the one figure this comment calls the real pressure was
+           unreachable for any entry the app itself created. Measured on a real
+           vault: 0 of 6 entries carried a lent date, while the only unsettled
+           one carried a due date already in the past — the exact inverse of the
+           premise above. The column exists in Owed Money.md's schema and always
+           did; only the way in was missing. See issue #34. */
         const age = daysSince(o.lent);
         body.append(el('tr', {},
           el('td', { style: 'font-weight:600' }, o.person, ctx.noteButton('owed', o.person),
@@ -105,6 +122,13 @@ module.exports = function registerOwed(ctx) {
                table-schema.js keeps for a cell it could not read (see money()
                there) — same as views/budgets.js clearing amountRaw on edit. */
             onchange: e => { o.amount = Math.max(0, parseFloat(e.target.value) || 0); o.amountRaw = null; mark(); renderOwedKpis(); } })),
+          /* The age caption under the person's name is derived from this, so
+             editing it re-renders the row rather than only marking dirty —
+             unlike the amount field, whose figure is read by the KPI tiles and
+             not by the row itself. renderOwed(row) restores focus to the
+             status pill, matching what the pill's own handler does. */
+          el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Date lent to ${o.person}` },
+            v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(row); })),
           el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
           el('td', {}, pill),
@@ -114,7 +138,7 @@ module.exports = function registerOwed(ctx) {
             el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${o.person}`,
               onclick: () => { S.owed.splice(S.owed.indexOf(o), 1); mark(); renderOwed(); } }, '✕')))));
       }
-      if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No entries yet.')));
+      if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No entries yet.')));
       t.append(body);
     });
     if (focusRow !== undefined && focusRow >= 0) {
@@ -197,7 +221,13 @@ module.exports = function registerOwed(ctx) {
     // Same clamp as the in-table amount field: a negative amount here makes
     // outstandingOf clamp to 0 (settled) while owedSummary's recovered
     // branch adds the negative straight into money that came back.
-    S.owed.push({ person: r.person.trim(), amount: Math.max(0, amount), description: '', due: '', status: 'outstanding', repaid: 0, lent: '',
+    /* `lent` defaults to TODAY rather than staying empty. You are recording
+       the loan at the moment you make it in the overwhelming case, an empty
+       date makes the age caption and oldestDays unreachable (issue #34), and
+       a wrong-by-a-few-days age is worth far more than no age at all. It is a
+       plain date field in the table, so correcting it is one tap. `due` stays
+       empty on purpose — nothing can guess when it comes back. */
+    S.owed.push({ person: r.person.trim(), amount: Math.max(0, amount), description: '', due: '', status: 'outstanding', repaid: 0, lent: todayIso(),
       // '' when it merely restates the household symbol — see usedColumns().
       currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim() });
     mark(); renderOwed();
