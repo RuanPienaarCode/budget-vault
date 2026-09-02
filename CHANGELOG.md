@@ -3,6 +3,22 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.35.1 — 2026-09-02
+
+### Fixed
+
+- **Money owed can finally record when you lent it.** The Owed page shows how
+  long money has been out under a person's name, and the Dashboard reads the
+  age of your oldest loan, both worked out from a Lent date. That column has
+  always existed in `Owed Money.md`, and the app read it and wrote it back
+  faithfully — but there was no field for it anywhere on the page, and a new
+  entry was created with it empty. So unless you edited the markdown by hand
+  the date stayed blank, the "out N days" line never appeared, and the
+  oldest-loan figure was empty no matter how long someone had owed you. There
+  is now a Lent date field beside the due date, and a new entry is stamped with
+  today's date, which you can correct in one tap. The due date is still left
+  empty, because nothing can guess when money comes back.
+
 ## 1.35.0 — 2026-09-02
 
 The follow-on from 1.34.0's calculation audit. Five things it found and did

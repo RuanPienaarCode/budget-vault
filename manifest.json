@@ -1,7 +1,7 @@
 {
   "id": "budget-app",
   "name": "Budget Vault",
-  "version": "1.35.0",
+  "version": "1.35.1",
   "minAppVersion": "1.8.0",
   "description": "Track your budget, spending, debt and savings as plain files in your own vault. Import bank statements in any currency, in twelve languages. No account, no server. Optionally turn on exchange rates to combine multiple currencies.",
   "author": "Ruan Pienaar",
