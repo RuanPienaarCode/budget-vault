@@ -3,6 +3,151 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+A calculation audit. Five reviewers each took one slice of the arithmetic —
+the foundation (amounts, periods, currency), the budget and spend chain,
+savings and net worth, debt and the score, and every page that restates a
+figure another page already computes — and derived each number by hand
+before reading the code that produced it. Twenty-six of the figures they
+checked were wrong, none caught by the guard suite, and most of them in one
+family: a currency filter applied to the numerator of a figure and not to
+its divisor, or to accounts and not to the other ledgers. Every one below is
+now pinned by a test that was red before the fix.
+
+### Fixed
+
+- **The transaction table in the Markdown export and in the Report was one
+  cell short.** The header declared nine columns — Currency among them — and
+  each row wrote eight, so from Amount onward every value sat under the wrong
+  heading: the amount under Currency, "yes" under Amount, the note under
+  Excluded. The CSV written by the same click was right. Both files now come
+  from one row template, and a test compares a real row against the header.
+- **The Report's Debt section added foreign debts as if they were in your
+  currency**, and its Savings growth was a percentage of a pool spanning two
+  currencies — while the Debt and Savings pages, and the Report's own Net
+  Worth section three headings down, had already held them out. The Report
+  now takes the same one-currency slice its on-screen twins take and says
+  what it left out. Its Net Worth section also prints the disclosure it had
+  been computing and never writing, and its Income & Spend section now
+  carries the same "account in another currency is not in these figures"
+  line the Dashboard hero does. So does the Budget page.
+- **The financial health score divided rand by rupiah.** The 1.32.0 fix
+  narrowed the accounts it reads to your own currency but not the
+  transactions, so every ratio behind the score — months of cover, savings
+  rate, consumption share — had a mixed-currency divisor under a one-currency
+  numerator. Measured: adding one small foreign holiday account took a score
+  from 67 to 22 and "6 months of cover" to 0.04, while the page said the
+  account was not in these figures. The score's debt pillar and the money
+  card's "of which interest" had the same gap for a foreign debt. All of it
+  now filters on the one predicate the period totals already use.
+- **A foreign loan you had marked paid was still counted as owed**, forever,
+  because the currency branch returned before the settled check ran. Settled
+  foreign entries now land in a disclosed "recovered in other currencies"
+  bucket.
+- **Net worth dropped a foreign house or a foreign mortgage with nothing
+  said.** The figure held them out correctly; the disclosure beside it named
+  foreign accounts only, on the Dashboard, the Savings page and the Report
+  alike. All three now name the net of accounts, assets and debts per
+  currency. The Savings composition chart drew those foreign rows as segments
+  against a total that excluded them — the bar ran to 115% of its track — and
+  the "valued over a year ago" caveat summed euros into a rand figure. Fixed,
+  with the Assets page's "share of the total" caveat brought onto the same
+  one-currency basis.
+- **The Services page added a euro subscription into a rand "Per month"**
+  while the Dashboard partitioned the same list. It holds foreign services
+  out and names them now.
+- **"What's left" on the Dashboard mixed currencies in three places the
+  1.32.0 partition missed:** the transactions, income and card rows behind
+  the settlement-cycle band, the incoming-salary line and each foreign band's
+  own committed figure were one household-wide list. A euro card's spend
+  landed in the rand cycle; a euro band's three terms did not add up; a €2 000
+  recurring credit was announced as "R 2 000 lands on…". Each currency now
+  gets its own three lists. The cash figure's "adds more than one currency"
+  caveat, which had kept firing on a figure that no longer mixed anything, is
+  measured over the right set.
+- **The Dashboard, Report and both exports under-reported an assume-spent
+  category that had real spend.** The Budget page took the larger of the
+  budgeted amount and what was actually spent; the Dashboard table discarded
+  the real spend, printing "on budget" over R1 500 of statement-backed
+  overspend. One shared rule now, called by every surface.
+- **The Dashboard hero, the trend line, the score and the Report used a
+  budget row's stored Type, which goes stale the moment you retype the
+  category** — the Budget page had read the live type since 1.28. Retyping
+  Bonus from expense to income made the hero say R 5 000 more remained than
+  the Budget page did. One predicate now.
+- **A transaction whose date was not a real date — the ordinary 2026-13-05
+  day/month swap — made its account read as agreeing with its statement.**
+  As a plain string it sorted after today, so reconciliation filed it as
+  "dated ahead", called the account clean and dropped its money from the
+  implied balance. Those rows are now counted, the account shows a "date
+  unreadable" state that cannot be dismissed, and the Dashboard says how many
+  it left out of the cash figure.
+- **The savings-rate pairing rule could cancel a real deposit against an
+  unrelated purchase of the same size.** A R5 000 emergency-fund deposit on
+  the 1st and a R5 000 pram from the baby fund on the 28th read as one
+  internal move; R4 999 flipped the answer by R5 000. Its own comment had
+  promised a date test for two releases. Money cannot arrive before it
+  leaves: the rule now requires the legs to be in that order, with a short
+  allowance for value-dating.
+- **A money cell the app could not read was rewritten as 0.00 on the next
+  save.** "12 000 R" in Assets.md, "prime + 2" in a debt's rate column — read
+  as zero, and then written back as zero, the reader's own text gone. The
+  transactions table had kept such cells verbatim since 1.11; the other four
+  tables now do the same, and typing a number over one clears it.
+- **A valuation date typed into the future read as current.** "Needs a new
+  valuation: 0, every value is current" beside a row captioned "valued ahead
+  of today". The same hole reconciliation closed in 1.23.1, in a fifth place;
+  one shared rule now.
+- **The trend chart, the comparison column and the score's "budget used"
+  read every account's transactions regardless of currency**, unlike the
+  period totals beside them. One filter now.
+- **The Dashboard Debt tile said "2 active" over a figure built from one.**
+  The caption counted foreign debts the figure had held out.
+- **A loan's headline "Total interest" was an instalment times the full
+  term, while the schedule drawn beneath it cleared two months early.** R669
+  apart on one card for an R11 000, 30-year example. The headline is now read
+  off the schedule.
+- **Any negative that rounded to nothing printed with a minus sign** —
+  "Over by R 0,00" in red on a budget row that was exactly on target.
+- **The Tax page's totals row printed your household symbol on figures the
+  page had just declared were in the tax authority's currency.**
+- **The UK tax year turned over on 1 April, five days early.** It ends on the
+  5th; the check tested the month alone.
+- **The transactions export stamped "generated" in UTC**, the wrong calendar
+  day east of Greenwich, after the Report's stamp was fixed in 1.32.0.
+- **Found by the verification pass on the fixes above:** the Report's Debt
+  section said a foreign bond was "held" in another currency, an asset's verb
+  for money owed — it now says owed, in all twelve languages; the Report's
+  JSON dropped its savings caveat on a household whose savings are entirely
+  in another currency; and the Savings page still said "matches your
+  transactions" over rows it could not date.
+
+## 1.33.0 — 2026-08-30
+
+### Changed
+
+- **Choose how often exchange rates are fetched** — daily, weekly or monthly.
+  There was no honest way to add this without first admitting the old
+  behaviour: the refresh was gated on the staleness constant, so a plugin
+  promising "once a day" asked once a week, and the "this rate is old" badge
+  was nearly unreachable online because the refresh fired at exactly the age
+  that would have shown it. Two questions, two constants now. `rate_refresh`
+  is a new Settings.md key; absent means daily, so nothing changes for a
+  vault written before it existed.
+- **The Non-essential groups setting is a tick-list**, labelled with the same
+  words the Budget page uses, instead of a free-text box that made you retype
+  a group you had declared one row above and silently discarded anything it
+  did not recognise. The six types that are non-essential whatever the
+  setting says are not offered at all.
+
+### Fixed
+
+- **Declaring a group and naming it non-essential in the same visit dropped
+  the word.** The tab read Settings.md once on open, so the second field
+  validated against the group list from before the first. The section
+  redraws when groups change now.
+
 ## 1.32.1 — 2026-08-30
 
 ### Fixed

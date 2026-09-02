@@ -138,10 +138,28 @@ function primaryTotal(accounts, household) {
    used to take no currency argument at all and print the COUNTRY's default
    symbol instead of the household's, so a household set to "$" saw its own
    tax callouts labelled "R". */
+/* The sign is decided from the ROUNDED magnitude, not from `v`. Taking it from
+   the unrounded value while the digits came from the rounded one let the two
+   halves of the string disagree, and the reader got a minus in front of a zero.
+   -0 was safe by accident (`-0 < 0` is false in JS); every other negative that
+   rounds away to nothing was not — and this module is where that bites hardest,
+   because primaryTotal a few lines up exists precisely because summing signed
+   floats leaves a remainder like -7.1e-15 behind. A break-even household
+   therefore printed "R -0,00": a negative figure, in danger red, for a
+   household that owes nothing. At decimals=0 (the compact tiles) every amount
+   between -0,5 and 0 printed "R -0" for the same reason.
+
+   A minus is the strongest claim a money label makes; it must not outlive the
+   rounding that erased the number it belonged to. It survives only while a
+   digit does — -0,005 still rounds to a cent, so it keeps its sign.
+
+   controller.js's formatMoney carries this identical change; the two are held
+   byte-for-byte together by tests/controller-money.test.cjs. */
 function formatAmount(symbol, v, decimals, loc) {
   if (!Number.isFinite(v)) v = 0;
-  const sign = v < 0 ? '-' : '';
-  const parts = Math.abs(v).toFixed(decimals).split('.');
+  const abs = Math.abs(v).toFixed(decimals);
+  const sign = v < 0 && Number(abs) !== 0 ? '-' : '';
+  const parts = abs.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
   return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
 }

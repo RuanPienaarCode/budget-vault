@@ -68,11 +68,13 @@ const moneyFlow = require('../src/money-flow');
      the reader's raw text verbatim; `value` is always a plausible NUMBER
      because every money() column falls back through it into arithmetic, and
      JS has no "unreadable" numeric type to hand back instead. That fallback
-     is 0 for an unreadable cell — table-schema.js's own comment calls this
-     "same as the loader today" — so parseNum does NOT keep "blank", "stated
-     zero" and "unreadable" apart in its `value`; only `ok`+`raw` distinguish
-     "unreadable" from the other two, and only for a serializer, not for a
-     downstream number consumer. Documented here as the seam it is. */
+     is 0 for an unreadable cell, so parseNum does NOT keep "blank", "stated
+     zero" and "unreadable" apart in its `value`; `ok`+`raw` distinguish
+     "not canonical" from "canonical", and `readable` (false only when no
+     number came out at all) is the tell table-schema.js's money() uses to keep
+     the verbatim text in `<key>Raw` so a save cannot overwrite it with 0.00 —
+     a serializer's concern, never a downstream number consumer's. Documented
+     here as the seam it is. */
   eq(amount.parseNum('').value, 0, 'parseNum folds a blank cell into 0 (ok:false)');
   eq(amount.parseNum('').ok, false, '…but says so via ok:false');
   eq(amount.parseNum('0').value, 0, 'parseNum reads a stated zero as 0 too');

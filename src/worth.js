@@ -166,9 +166,28 @@ function groupedByType(rows, valueOf) {
   return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
 }
 
-/* Debt-page rows grouped by their own type. */
-function debtsByType(debts) {
-  return groupedByType(activeDebts(debts), d => d.balance);
+/* Debt-page rows grouped by their own type.
+
+   `household`, if given, holds out the rows stated in another currency —
+   exactly the filter `fromDebts` inside worth() already applies, and for the
+   same reason. Optional, and absent means "add everything", so a caller that
+   has not been taught about currencies is unchanged rather than quietly
+   altered — the same contract assetTotal() carries.
+
+   It has to be on offer because of what these groups ARE. A chart row's
+   widths are shares of ONE scale under a single heading: the Savings
+   composition chart took its heading from worth() (which holds foreign rows
+   out) and its segments from here (which did not), so a two-currency vault
+   drew R2 300 000 of blocks under a R2 100 000 heading on a track scaled to
+   R2 100 000 — 109.5% of the bar's own width, running over its neighbour —
+   and sharePercents then stated each wedge against the SEGMENT sum, a
+   denominator the reader was never shown. Unlike a total, a bar has nowhere
+   to print a disclosure inside itself, so the held-out rows are named
+   underneath instead; see views/savings.js's `worthNote`. */
+function debtsByType(debts, household) {
+  return groupedByType(
+    activeDebts(debts).filter(d => !household || !isForeign(d, household)),
+    d => d.balance);
 }
 
 /* Every account, grouped for the composition chart, split by SIGN — the known
@@ -226,11 +245,46 @@ function accountGroups(accounts, knownTypes) {
 
 /* The same grouping for the owned side, so the house, the car and the ring are
    three named blocks in the chart rather than one anonymous "possessions"
-   slab. */
-function assetsByType(assets) {
-  return groupedByType(assets, a => a.value);
+   slab. `household` behaves exactly as it does on debtsByType above — and
+   matches assetTotal()'s filter, so the segments and the figure worth() states
+   for the same ledger are drawn from one rule. */
+function assetsByType(assets, household) {
+  return groupedByType(
+    (assets || []).filter(a => !household || !isForeign(a, household)),
+    a => a.value);
+}
+
+/* Everything a net-worth figure held out, per symbol, as ONE list a page can
+   print beside it.
+
+   worth() has returned `otherCurrencies` — the foreign assets and the foreign
+   debts it filtered out — since ADR-0004 landed, and no page ever read it.
+   Every surface disclosed the ACCOUNTS half only (splitByCurrency's `others`,
+   computed by the caller before worth() was reached), so a €200 000 flat and
+   a €100 000 bond vanished from the Dashboard, Savings and Report net-worth
+   tiles with nothing said — the silent exclusion currency.js forbids, on the
+   one figure that claims to be the whole picture.
+
+   Merged into a per-symbol NET (accounts + assets − debts), because the figure
+   it sits beside is a net worth and "held" in the disclosure sentence means
+   "in the household's position", not "in a bank". A symbol that nets to
+   nothing is dropped and -0 is collapsed, so a household whose euro flat
+   exactly matches its euro bond does not print "€ 0" beside a rand total.
+   Insertion order is accounts first, then assets, then debts, so two pages
+   listing the same household print the symbols in the same order. */
+function otherCurrencyNet(w, accountOthers) {
+  const by = new Map();
+  const add = (pairs, sign) => {
+    for (const [sym, v] of pairs || []) by.set(sym, (by.get(sym) || 0) + sign * (Number(v) || 0));
+  };
+  add(accountOthers, 1);
+  add(w && w.otherCurrencies && w.otherCurrencies.assets, 1);
+  add(w && w.otherCurrencies && w.otherCurrencies.debts, -1);
+  return [...by]
+    .map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0])
+    .filter(([, v]) => v !== 0);
 }
 
 module.exports = {
-  worth, activeDebts, assetTotal, foreignTotals, cardOverlap, accountGroups, debtsByType, assetsByType,
+  worth, activeDebts, assetTotal, foreignTotals, otherCurrencyNet, cardOverlap, accountGroups, debtsByType, assetsByType,
 };

@@ -27,12 +27,24 @@ module.exports = function registerOwed(ctx) {
     const tile = kpiTiles($('#owedKpis'));
     /* Entries in another currency are stated beside the figure, never added
        into it — see owedSummary()'s own header. */
+    const inOwn = list => list
+      .map(([sym, v]) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`))
+      .join(' · ');
     const owedOthers = (s.otherCurrencies || []);
     const otherTag = owedOthers.length
-      ? `plus ${owedOthers.map(([sym, v]) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`)).join(' · ')} owed in other currencies`
+      ? `plus ${inOwn(owedOthers)} owed in other currencies`
       : null;
     tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning' : '', otherTag);
-    tile('Recovered', money(s.recovered), 'text-success');
+    /* Money that came back in another currency needs saying for the same
+       reason money still out does. It cannot join the rand figure beside it —
+       €200 is not R200 and this app never invents a rate — and until
+       owedSummary grew `recoveredOthers` it had nowhere else to go, so a
+       recovered foreign part-payment was disclosed nowhere on the page while
+       its unrecovered half was disclosed on the tile directly above. One
+       ledger, half of it visible. */
+    const backOthers = (s.recoveredOthers || []);
+    tile('Recovered', money(s.recovered), 'text-success',
+      backOthers.length ? `plus ${inOwn(backOthers)} recovered in other currencies` : null);
     tile('Entries', String(s.entries));
   }
 
@@ -89,7 +101,10 @@ module.exports = function registerOwed(ctx) {
             // BACK — a -500 row on a book with R500 recovered dropped
             // Recovered to R0. `min` alone doesn't stop a typed value or a
             // spinner nudge from an existing negative, so this clamps too.
-            onchange: e => { o.amount = Math.max(0, parseFloat(e.target.value) || 0); mark(); renderOwedKpis(); } })),
+            /* amountRaw = null: a number typed here supersedes the verbatim text
+               table-schema.js keeps for a cell it could not read (see money()
+               there) — same as views/budgets.js clearing amountRaw on edit. */
+            onchange: e => { o.amount = Math.max(0, parseFloat(e.target.value) || 0); o.amountRaw = null; mark(); renderOwedKpis(); } })),
           el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
           el('td', {}, pill),
@@ -121,7 +136,7 @@ module.exports = function registerOwed(ctx) {
     if (!r) return;
     const amount = normalizeAmount(r.amount);
     if (amount === null || amount <= 0) return toast('Not a number', true);
-    o.repaid = (o.repaid || 0) + amount;
+    o.repaid = (o.repaid || 0) + amount; o.repaidRaw = null;
     // Settling the last of it closes the entry, so "paid" stays something the
     // arithmetic concludes rather than a second thing to remember. Through
     // isSettled(), not `outstandingOf(o) === 0` — the repayment box defaults

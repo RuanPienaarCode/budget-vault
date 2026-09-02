@@ -16,7 +16,11 @@ const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
-const { daysSince } = require('../reconcile');
+/* `staleValuationOf` is reconcile.js's shared "is this figure still current"
+   rule, aliased on the way in so the local predicate below keeps the name this
+   file already uses everywhere. See that function's own header for why the
+   RULE moved out and the NUMBER stayed here. */
+const { daysSince, isStaleValuation: staleValuationOf } = require('../reconcile');
 const { symbolOf, isForeign } = require('../currency');
 const { todayIso } = require('../dates');
 const { assetTotal, foreignTotals } = require('../worth');
@@ -73,10 +77,17 @@ module.exports = function registerAssets(ctx) {
      the KPI tile and the caveat under it did not. */
   const dateUnreadable = a => daysSince(a.valued) === null;
   const neverValued = a => !a.valued;
-  const isStaleValuation = a => {
-    const d = daysSince(a.valued);
-    return d !== null && d > VALUED_STALE_DAYS;
-  };
+  /* Delegated to reconcile.js rather than spelled out here a third time. The
+     expression this used to hold — `d !== null && d > VALUED_STALE_DAYS` — is
+     false for a NEGATIVE d, so a Valued date typo'd into the future read as a
+     current valuation and the tile below printed "Needs a new valuation: 0 —
+     every value is current" directly above a row whose own caption
+     (valuedAge, twenty lines down, which has always had the `d < 0` branch)
+     said "valued ahead of today". reconcile.js:63 closed exactly that hole for
+     a bank balance in 1.23.1; this function and views/savings.js's staleAssets
+     were a fourth and fifth answer to the same question and neither was
+     patched. One rule now, in one place, with the threshold handed to it. */
+  const isStaleValuation = a => staleValuationOf(a.valued, null, VALUED_STALE_DAYS);
   /* "Not current" for the KPI tile and the row's age styling: never valued,
      unreadable, or valued so long ago the figure is a memory. Same shape as
      reconcile's isStale, on the longer clock above. Named for what it MEANS
@@ -153,7 +164,16 @@ module.exports = function registerAssets(ctx) {
     const bits = [];
     if (stale.length) {
       const all = stale.length === S.assets.length;
-      const share = assetTotal(stale) / (assetTotal(S.assets) || 1);
+      /* BOTH SIDES in the household's own currency, which the tile directly
+         above already states — `assetTotal(S.assets, S.settings.currency)`.
+         Dropped on both sides, this was a ratio between two mixed-currency
+         sums presented as a share of a figure the page never printed, and the
+         50% gate below made it consequential rather than merely untidy: one
+         stale R1 000 000 house is 100% of a rand household's assets and says
+         so, and the same house beside a €5 000 000 flat computed 17% and
+         suppressed the disclosure entirely. */
+      const share = assetTotal(stale, S.settings.currency)
+        / (assetTotal(S.assets, S.settings.currency) || 1);
       const subject = all
         ? (S.assets.length === 1 ? 'This value is' : 'Every value here is')
         : `${stale.length} of ${S.assets.length} values are`;
@@ -222,7 +242,12 @@ module.exports = function registerAssets(ctx) {
             onchange: e => {
               const value = normalizeAmount(e.target.value);
               if (value === null) { toast('Value must be a number', true); renderAssets(); return; }
-              a.value = Math.max(0, value); mark(); renderAssetKpis();
+              /* valueRaw is the verbatim text of a cell the loader could not
+                 read (table-schema.js's money()); the writer prefers it over a
+                 fabricated 0 so a save cannot erase what the reader typed.
+                 A number typed HERE supersedes that text, so the sibling is
+                 cleared — the same thing views/budgets.js does with amountRaw. */
+              a.value = Math.max(0, value); a.valueRaw = null; mark(); renderAssetKpis();
             } })),
           /* Editing the value does NOT stamp this date. A valuation is a
              separate act from correcting a typo, and stamping today on every

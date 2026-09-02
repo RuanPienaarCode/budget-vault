@@ -10,11 +10,91 @@ const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
 const { isSplitPart } = require('../tx-role');
 const { symbolOf, isForeign } = require('../currency');
+/* Namespace import, this repo's convention wherever a bare `t` could be
+   shadowed — and it is here: renderServices binds `const t = $('#svcTable')`. */
+const i18n = require('../i18n');
 
 module.exports = function registerServices(ctx) {
-  const { S, $, app, money, toast, writeFile } = ctx;
+  const { S, $, app, money, moneyIn, toast, writeFile } = ctx;
 
   function monthlyEquiv(s) { return s.cycle === 'annual' ? s.amount / 12 : s.amount; }
+
+  /* ---------------------- what a total may add up -------------------------
+
+     ISSUE 30. Services.md can state a currency (ADR-0004), and this page
+     learned exactly half of what that means. chargeIndex() below is
+     scrupulous about it — a listed price is compared ONLY against charges in
+     the household's own currency, and a service billed abroad gets a neutral
+     "billed in €" badge and no price verdict at all rather than a confident
+     wrong one. Every TOTAL on the page then added the same services blind:
+     R800 of fibre plus €15 of cloud storage printed "Per month R 815.00 · Per
+     year R 9 780.00" — a euro added to a rand and stamped with a rand symbol,
+     on the page whose own badges say those two figures cannot be compared.
+     The Dashboard already splits these very services by symbol before they
+     reach whatsLeft (views/dashboard.js's homeish/fxOf), so it was also two
+     answers to one question on two screens.
+
+     Same shape and same rounding as currency.js's splitByCurrency — the
+     household figure, then a [symbol, total] list to state BESIDE it, never
+     folded in — but over monthlyEquiv() rather than a balance, which is a
+     quantity only this page has. Never converted, never dropped:
+     currency.js:14. */
+  function monthlySplit(list) {
+    const home = S.settings.currency;
+    let primary = 0;
+    const bySymbol = new Map();
+    for (const s of list || []) {
+      const m = monthlyEquiv(s) || 0;
+      if (isForeign(s, home)) {
+        const sym = symbolOf(s, home);
+        bySymbol.set(sym, (bySymbol.get(sym) || 0) + m);
+      } else primary += m;
+    }
+    // Rounded to the cent with -0 collapsed, the two-step every other total in
+    // this app applies — a foreign side figure is a figure like any other, and
+    // "€ -0" beside a headline reads as a cost that does not exist.
+    return {
+      primary: (Math.round(primary * 100) / 100) || 0,
+      others: [...bySymbol].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
+    };
+  }
+
+  /* The sentence beside a KPI figure. From the Accounts page's own key, so no
+     two screens word one fact differently. `scale` annualises it for the "Per
+     year" tile: what is stated beside a figure has to be stated over the same
+     span as the figure, or the reader is handed a monthly euro next to an
+     annual rand. `.trim()` because acct.hero.otherCurrencies carries a leading
+     space for sentence-appending and a KPI sub-line is not one. */
+  const otherNote = (others, scale = 1) => (others.length
+    ? i18n.t('acct.hero.otherCurrencies', {
+      list: others.map(([sym, v]) => moneyIn(sym, v * scale, 0)).join(' · '),
+    }).trim() : '');
+
+  /* Services grouped by their budget category. Both writers of the subtotal
+     row built this map for themselves; one function so a change to the
+     "Uncategorised" fallback cannot land in only one of them. null-proto: a
+     "__proto__"/"constructor" category must not crash the view. */
+  function serviceGroups() {
+    const groups = Object.create(null);
+    for (const s of S.services) (groups[s.category || 'Uncategorised'] ??= []).push(s);
+    return groups;
+  }
+
+  /* THE category subtotal cell, written by renderServices on a full paint and
+     by renderServiceSubtotals on every amount edit. It was two expressions of
+     one string, which is this repo's recurring defect shape — and both of them
+     added unlike currencies. `acct.table.otherCurrencies` is the compact
+     companion to the sentence above: a subtotal cell is narrow, so the other
+     symbols get a tag rather than a clause. A group billed ENTIRELY abroad
+     still prints its rand subtotal — "R 0/mo · plus € 10/mo" is the truth, and
+     a bare R0 would say the group costs nothing. */
+  function subtotalText(list) {
+    const { primary, others } = monthlySplit((list || []).filter(s => s.active));
+    return `${money(primary, 0)}/mo`
+      + (others.length ? ' · ' + i18n.t('acct.table.otherCurrencies', {
+        list: others.map(([sym, v]) => `${moneyIn(sym, v, 0)}/mo`).join(' · '),
+      }) : '');
+  }
 
   /* ------------------- what the statements actually say -------------------
      The list on this page is what the reader BELIEVES they pay. The vault holds
@@ -103,10 +183,14 @@ module.exports = function registerServices(ctx) {
      the next, and the arriving tap hits whatever now occupies those pixels. */
   function renderServicesKpis() {
     const active = S.services.filter(s => s.active);
-    const perMonth = active.reduce((sum, s) => sum + monthlyEquiv(s), 0);
+    const { primary: perMonth, others } = monthlySplit(active);
     const tile = kpiTiles($('#servicesKpis'));
-    tile('Per month', money(perMonth));
-    tile('Per year', money(perMonth * 12));
+    tile('Per month', money(perMonth), null, otherNote(others));
+    tile('Per year', money(perMonth * 12), null, otherNote(others, 12));
+    /* The two counts are unchanged, deliberately. A euro subscription is still
+       a subscription — the currency decides which total may hold its AMOUNT,
+       not whether the thing exists, and dropping it from the count here would
+       be the silent exclusion the disclosure above exists to replace. */
     tile('Active', String(active.length));
     tile('Total services', String(S.services.length));
   }
@@ -114,13 +198,9 @@ module.exports = function registerServices(ctx) {
   /* The per-category subtotal rows are the other thing an amount feeds. They
      hold no inputs, so they are safe to replace in place. */
   function renderServiceSubtotals() {
-    const groups = Object.create(null);
-    for (const s of S.services) (groups[s.category || 'Uncategorised'] ??= []).push(s);
+    const groups = serviceGroups();
     for (const row of $('#svcTable').querySelectorAll('tr.type-row')) {
-      const cat = row.dataset.cat;
-      const list = groups[cat] || [];
-      const gMonthly = list.filter(s => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
-      row.lastElementChild.textContent = `${money(gMonthly, 0)}/mo`;
+      row.lastElementChild.textContent = subtotalText(groups[row.dataset.cat] || []);
     }
   }
 
@@ -186,13 +266,11 @@ module.exports = function registerServices(ctx) {
         el('th', { scope: 'col' }, 'Service'), el('th', { scope: 'col' }, 'Provider'), el('th', { scope: 'col', class: 'num' }, 'Amount'),
         el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
-      const groups = Object.create(null);   // null-proto: a "__proto__"/"constructor" category can't crash the view
-      for (const s of S.services) (groups[s.category || 'Uncategorised'] ??= []).push(s);
+      const groups = serviceGroups();
       for (const cat of Object.keys(groups).sort()) {
-        const gMonthly = groups[cat].filter(s => s.active).reduce((sum, s) => sum + monthlyEquiv(s), 0);
         body.append(el('tr', { class: 'type-row', 'data-cat': cat },
           el('td', { colspan: '6' }, cat),
-          el('td', { class: 'num' }, `${money(gMonthly, 0)}/mo`)));
+          el('td', { class: 'num' }, subtotalText(groups[cat]))));
         for (const s of groups[cat]) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
@@ -201,7 +279,9 @@ module.exports = function registerServices(ctx) {
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
               'aria-label': `Amount for ${s.name}`,
-              onchange: e => { s.amount = parseFloat(e.target.value) || 0; refresh(); } })),
+              /* amountRaw = null: a number typed here supersedes the verbatim
+                 text table-schema.js keeps for a cell it could not read. */
+              onchange: e => { s.amount = parseFloat(e.target.value) || 0; s.amountRaw = null; refresh(); } })),
             el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
               onchange: e => { s.cycle = e.target.value === 'annual' ? 'annual' : 'monthly'; refresh(); } },
               el('option', { value: 'monthly', ...(s.cycle === 'monthly' ? { selected: '' } : {}) }, 'monthly'),

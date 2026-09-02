@@ -3,13 +3,14 @@
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
-const { isStale, stalenessSummary, reconcile } = require('../reconcile');
+const { isStale, isStaleValuation, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType } = require('../savings-math');
-const { worth, activeDebts, cardOverlap, accountGroups, debtsByType, assetsByType } = require('../worth');
+const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
+  otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
-const { symbolOf, splitByCurrency, primaryTotal, currenciesIn } = require('../currency');
+const { symbolOf, isForeign, splitByCurrency, primaryTotal, currenciesIn } = require('../currency');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -124,8 +125,23 @@ module.exports = function registerSavings(ctx) {
        English-only backlog (EXPECTED_ENGLISH_ONLY in i18n-render.test.cjs),
        and one translated call here would make its render disagree with
        English for a reason nothing on the page explains. */
+    /* THREE LEDGERS, ONE DISCLOSURE. `worthOthers` is the ACCOUNTS half alone
+       — what splitByCurrency held out before worth() was ever called — and it
+       is what this caption used to state on its own. worth() has returned the
+       other two halves (`otherCurrencies.assets` and `.debts`) since ADR-0004
+       landed and no page had ever read them, so a €300 000 flat and a
+       €200 000 mortgage vanished from the headline figure of this page with
+       nothing said: the silent exclusion currency.js's header forbids, on the
+       one number that claims to be the whole picture. otherCurrencyNet merges
+       all three into a per-symbol NET, which is the right shape here because
+       the figure it sits beside is a NET worth — "held" in this sentence means
+       "in the household's position", not "in a bank".
+
+       The Savings and Investments tiles below keep `otherTag(…others)` on
+       purpose: those two figures ARE account sums, so the accounts half is the
+       whole of what they hold out. */
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
-      'what you own minus what you owe' + otherLine(worthOthers));
+      'what you own minus what you owe' + otherLine(otherCurrencyNet(w, worthOthers)));
     tile('Savings', money(totalSavings), '', otherTag(sPlit.others));
     tile('Investments', money(totalInvest), '', otherTag(iPlit.others));
     growthTile(tile, entries);
@@ -269,12 +285,56 @@ module.exports = function registerSavings(ctx) {
      sentence that helps anyone. So a zero-valued stale asset is real and
      visible on the Assets page (where the question is "is the date good")
      and silent here (where the question is "how much money is at stake") —
-     two pages counting different rows on purpose, not by drift. */
+     two pages counting different rows on purpose, not by drift.
+
+     The DATED half of the test is reconcile.js's `isStaleValuation` now, not a
+     third hand-written `d > VALUED_STALE_DAYS`. That expression is false for a
+     NEGATIVE d, so a `valued:` date typed into the future read as a fresh
+     valuation here and on the Assets page both — the exact hole 1.23.1 closed
+     for a bank balance in reconcile() and stalenessSummary(), still open in
+     the two functions that ask the same question about a valuation. One rule,
+     one spelling; the THRESHOLD still comes from assets.js through ctx, so
+     the number stays where its own header says it lives.
+
+     The UNDATED half stays local and stays this page's own: an unreadable or
+     absent Valued date is money resting on a figure nobody has checked, which
+     is exactly what this sentence is counting, whereas the Assets page states
+     it as a separate claim ("has never been valued") because its question is
+     about the date rather than the money. */
   function staleAssets() {
     return (S.assets || []).filter(a => {
+      /* FOREIGN ROWS OUT. The sentence this feeds prints one figure in the
+         household's symbol — "R 2 300 000 of what you own was last valued over
+         a year ago" — and R2 000 000 plus €300 000 is not R2 300 000. The
+         euro rows are named beside it instead (see renderAssetCaveat), the
+         same trade every other total on this page makes. */
+      if (isForeign(a, S.settings.currency)) return false;
+      /* Unreadable date (null) counts as stale HERE — this sentence is about
+         money at stake, and a valuation nobody can date is money at stake;
+         isStaleValuation() itself answers false for null because assets.js
+         names "date unreadable" as its own state. Everything datable goes
+         through the shared rule, so a future-dated typo reads stale on both
+         pages by the same test. */
       const d = daysSince(a.valued);
-      return (d === null || d > ctx.VALUED_STALE_DAYS) && a.value > 0;
+      return (d === null || isStaleValuation(a.valued, null, ctx.VALUED_STALE_DAYS)) && a.value > 0;
     });
+  }
+
+  /* The euro half of the same question, per symbol, so the sentence above can
+     NAME what it left out rather than dropping it — currency.js:10 is explicit
+     that this app does not exclude silently. Same predicate, same clock, same
+     `a.value > 0` rule; only the currency test is inverted. */
+  function staleAssetsOther() {
+    const by = new Map();
+    for (const a of S.assets || []) {
+      if (!isForeign(a, S.settings.currency)) continue;
+      const d = daysSince(a.valued);
+      const stale = d === null || isStaleValuation(a.valued, null, ctx.VALUED_STALE_DAYS);
+      if (!stale || !(a.value > 0)) continue;
+      const sym = symbolOf(a, S.settings.currency);
+      by.set(sym, (by.get(sym) || 0) + a.value);
+    }
+    return [...by].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]);
   }
 
   function renderStaleNote() {
@@ -306,10 +366,28 @@ module.exports = function registerSavings(ctx) {
      figure printed above and the reader should meet it first. */
   function renderAssetCaveat(wrap) {
     const stale = staleAssets();
-    if (!stale.length) return;
+    const otherStale = staleAssetsOther();
+    if (!stale.length && !otherStale.length) return;
     const owned = stale.reduce((t, a) => t + a.value, 0);
+    /* TWO SENTENCES, NEVER ONE SUM — the same shape views/assets.js's own
+       caveat takes, and for the same reason: R2 000 000 plus €300 000 is not
+       R2 300 000, and this line prints ONE figure in the household's symbol.
+       The foreign rows are named after it, unconverted, rather than folded in
+       or dropped. ("Last valued over a year ago" covers a date that is absent,
+       unreadable, past the year or ahead of today — all four mean the same
+       thing to a reader deciding whether to trust the total above, which is
+       what this line is for.) */
+    const bits = [];
+    if (stale.length) {
+      bits.push(`${money(owned, 0)} of what you own was last valued over a year ago.`);
+    }
+    if (otherStale.length) {
+      bits.push(stale.length
+        ? `A further ${otherList(otherStale)} of it is held in other currencies, not converted.`
+        : `${otherList(otherStale)} of what you own, all of it held in other currencies, was last valued over a year ago.`);
+    }
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      `${money(owned, 0)} of what you own was last valued over a year ago.`));
+      bits.join(' ')));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': 'Review asset valuations on the Assets page' }, 'Review valuations');
     btn.addEventListener('click', () => ctx.switchView('assets'));
@@ -534,6 +612,16 @@ module.exports = function registerSavings(ctx) {
                 + 'transaction is not in it, so on a market-linked fund this figure is a floor rather '
                 + 'than a correction — take it only if your provider agrees.')));
           }
+        } else if (rec.state === 'clean' && rec.unreadable) {
+          /* `clean` means "nothing READABLE has moved" (reconcile.js) — it is
+             not agreement while rows the app cannot date exist. The Accounts
+             page refuses to paint green here (acct-status's `unreadable`
+             state); this card must refuse too, or the page where the balance
+             is largest and least often confirmed is the one that says
+             "matches" over money it never checked. */
+          card.append(el('div', { class: 'acct-recon' },
+            el('div', { class: 'acct-recon-txt text-warning' },
+              `${rec.unreadable} transaction${rec.unreadable === 1 ? '' : 's'} carr${rec.unreadable === 1 ? 'ies' : 'y'} a date this app cannot read — not checked against them`)));
         } else if (rec.state === 'clean') {
           card.append(el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt text-success' }, 'Matches your transactions')));
@@ -996,15 +1084,38 @@ module.exports = function registerSavings(ctx) {
        rest is NAMED underneath it (see the note appended at the end of this
        function), which is the same trade the Accounts ring makes. */
     const { primary: homeAccounts, others: worthOthers } = split(S.accounts);
+    /* worth.js is the one place net worth is computed — see its own header —
+       and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
+       the very same grouped arrays instead of reading it, which meant it also
+       skipped the `Math.round(…* 100) / 100 || 0` guard worth() applies to
+       `net`: a household sitting at exactly zero read "R 0,00" in the KPI
+       tile above and "R -0,00" in this chart's own aria-label, on the same
+       screen. The grouped arrays stay — they still drive the segment
+       geometry — but the headline figures come from the one function that is
+       allowed to state them.
+
+       Read HERE rather than three-quarters of the way down the function,
+       where it used to sit, because the disclosure note below is built out of
+       the very ledgers it held out. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     const groups = accountGroups(homeAccounts, WORTH_TYPES.map(([type]) => type));
     const assets = groups.owned.map(segFor);
     const debts = groups.owed.map(segFor);
 
     /* The disclosure the bar itself cannot carry. Appended once, at the end
        of the segment lists below, rather than inside a wedge — see the note
-       on `worthAccounts` above. */
-    const worthNote = worthOthers.length
-      ? `${otherList(worthOthers)} held in other currencies is not drawn here — a share of one currency's total cannot include another's.`
+       on `worthAccounts` above.
+
+       Built from otherCurrencyNet, not from `worthOthers`, for the same reason
+       the Net worth tile above it is: the accounts were only ever one of the
+       three ledgers this chart draws. Once assetsByType and debtsByType stopped
+       drawing foreign rows on a rand scale (below), a note naming the accounts
+       alone would have disclosed a third of what had just been held out — and
+       the figure this chart is headed by is a net worth, so a per-symbol net is
+       the shape that answers "what is missing from it". */
+    const worthOther = otherCurrencyNet(w, worthOthers);
+    const worthNote = worthOther.length
+      ? `${otherList(worthOther)} held in other currencies is not drawn here — a share of one currency's total cannot include another's.`
       : '';
 
     /* Assets-page rows, grouped by their own kind — the house, the car and the
@@ -1015,7 +1126,13 @@ module.exports = function registerSavings(ctx) {
        leads with a house implies you could spend it this week. */
     const ASSET_VARS = ['--color-accent', '--color-investment', '--color-info', '--ink-faint'];
     const ASSET_FALLBACKS = ['#0d9488', '#6f42c1', '#0ea5e9', '#5f6779'];
-    assetsByType(S.assets).forEach((a, i) => {
+    /* HOME CURRENCY, like the accounts above. These two calls used to take no
+       household symbol at all, so every foreign row reached a segment while
+       the heading beside it — worth()'s, which holds them out — did not: a
+       R2 300 000 bar under a R2 100 000 label on a R2 100 000 track. What is
+       held out is named in `worthNote`. */
+    const assetSegs = assetsByType(S.assets, S.settings.currency);
+    assetSegs.forEach((a, i) => {
       const color = (css.getPropertyValue(ASSET_VARS[i % ASSET_VARS.length]) || '').trim()
         || ASSET_FALLBACKS[i % ASSET_FALLBACKS.length];
       assets.push({ label: a.type, amount: a.amount, color, fromAssetPage: true });
@@ -1028,7 +1145,8 @@ module.exports = function registerSavings(ctx) {
        different debt. */
     const DEBT_VARS = ['--color-warning', '--color-danger', '--color-investment', '--ink-faint'];
     const DEBT_FALLBACKS = ['#f5a524', '#f43f5e', '#6f42c1', '#5f6779'];
-    debtsByType(S.debts).forEach((d, i) => {
+    const debtSegs = debtsByType(S.debts, S.settings.currency);
+    debtSegs.forEach((d, i) => {
       const color = (css.getPropertyValue(DEBT_VARS[i % DEBT_VARS.length]) || '').trim()
         || DEBT_FALLBACKS[i % DEBT_FALLBACKS.length];
       debts.push({ label: d.type, amount: d.amount, color, fromDebtPage: true });
@@ -1070,28 +1188,25 @@ module.exports = function registerSavings(ctx) {
     const resolved = distinctColors(ordered.map(g => g.wanted), { reserved: sealedColors });
     ordered.forEach((grp, i) => { for (const m of grp.members) m.color = resolved[i]; });
 
-    /* worth.js is the one place net worth is computed — see its own header —
-       and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
-       the very same grouped arrays instead of reading it, which meant it also
-       skipped the `Math.round(…* 100) / 100 || 0` guard worth() applies to
-       `net`: a household sitting at exactly zero read "R 0,00" in the KPI
-       tile above and "R -0,00" in this chart's own aria-label, on the same
-       screen. The grouped arrays stay — they still drive the segment
-       geometry — but the headline figures now come from the one function
-       that is allowed to state them. */
-    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
     const totalAssets = w.assets;
     const totalDebts = w.liabilities;
     const net = w.net;
 
-    const active = activeDebts(S.debts);
     const overlap = cardOverlap(S.accounts, S.debts);
-    // Name every ledger the bar is drawn from. The subtitle is not a
-    // disclosure — the figures are all actually IN the chart — but a reader
-    // who cannot tell which pages fed it has no way to check it.
+    /* Name every ledger the bar is drawn from. The subtitle is not a
+       disclosure — the figures are all actually IN the chart — but a reader
+       who cannot tell which pages fed it has no way to check it.
+
+       Read off the SEGMENT lists rather than off S.assets/S.debts directly:
+       once the two grouping calls above started holding foreign rows out, a
+       vault whose only assets are a Lisbon flat would have been told the bar
+       was drawn "across your accounts and the Assets page" with not one pixel
+       of the Assets page on it. A caption that names a source contributing
+       nothing is the same failure as a total that omits one silently, pointed
+       the other way. */
     const ledgers = ['your accounts',
-      ...(S.assets && S.assets.some(a => a.value > 0) ? ['the Assets page'] : []),
-      ...(active.length ? ['the Debt page'] : [])];
+      ...(assetSegs.length ? ['the Assets page'] : []),
+      ...(debtSegs.length ? ['the Debt page'] : [])];
     const across = ledgers.length > 1
       ? `Across ${ledgers.slice(0, -1).join(', ')} and ${ledgers[ledgers.length - 1]}`
       : 'Across your accounts';

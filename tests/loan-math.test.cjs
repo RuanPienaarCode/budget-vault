@@ -29,8 +29,14 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 
   const t = L.totalsFor(loan, 11, 240);
   eq(t.payment, 13935, 'monthly repayment on R1 350 000 over 20 years at 11%');
-  eq(t.totalRepaid, 3344400, 'total repaid = rounded instalment x 240');
-  eq(t.totalInterest, 1994400, 'total interest');
+  /* Off the SCHEDULE, not `payment × 240`. These pinned 3 344 400 / 1 994 400
+     — the instalment times the term — for as long as amortise() has been
+     forcing its last row exactly onto zero, which makes the final payment a
+     part payment and the schedule R395 cheaper than the multiplication. The
+     headline and the table under it now share one basis; see
+     tests/loan-schedule-identity.test.cjs and totalsFor's own header. */
+  near(t.totalRepaid, 3344004.66, 0.01, 'total repaid = what the 240-row schedule actually collects');
+  near(t.totalInterest, 1994004.66, 0.01, 'total interest, off the same rows');
 
   const duty = L.zaTransferDuty(price);
   eq(duty, 8700, 'SARS transfer duty on R1 500 000 (3% of the excess over R1 210 000)');
@@ -59,8 +65,12 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   const rows = L.amortise(loan, 11, 240, t.payment);
   eq(rows.length, 240, 'one row per month');
   eq(rows[rows.length - 1].closing, 0, 'the last month lands exactly on zero');
-  near(rows.reduce((s, r) => s + r.interest, 0), t.totalInterest, 500,
-    'schedule interest agrees with the headline total');
+  /* EXACT, not within R500. The tolerance was hiding the drift rather than
+     measuring it: two figures derived two ways can agree to R500 and still be
+     two figures. They are one sum now, so any difference at all means the
+     second derivation has come back. */
+  eq(rows.reduce((s, r) => s + r.interest, 0), t.totalInterest,
+    'schedule interest IS the headline total — the same sum, not a close one');
 
   const years = L.byYear(rows);
   eq(years.length, 20, 'one row per year');
@@ -76,8 +86,9 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 
   const t = L.totalsFor(finance, 11, 60);
   eq(t.payment, 6849, 'monthly repayment on R315 000 over 60 months at 11%');
-  eq(t.totalRepaid, 410940, 'total repaid');
-  eq(t.totalInterest, 95940, 'total interest');
+  // Schedule-derived, as above: was 410 940 / 95 940 off `payment × 60`.
+  near(t.totalRepaid, 410929.13, 0.01, 'total repaid');
+  near(t.totalInterest, 95929.13, 0.01, 'total interest');
 
   const p = L.loanProfileFor('za');
   /* Vehicle finance is an "OTHER CREDIT AGREEMENT" under Regulation 42(2)
@@ -104,7 +115,9 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(Math.round(p.serviceFee * 60), 4140, 'service fees over the term');
 
   // Total cost of ownership INCLUDES the deposit — it is money spent on the car.
-  eq(Math.round(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60), 451288,
+  // R451 288 before the totals moved onto the schedule; the R11 delta is the
+  // vehicle loan's own final part payment, and nothing else in this line moved.
+  eq(Math.round(deposit + t.totalRepaid + p.vehicleInitiationFee(finance) + p.serviceFee * 60), 451277,
     'total cost of ownership');
 }
 

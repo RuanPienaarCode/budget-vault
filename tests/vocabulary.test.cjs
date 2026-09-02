@@ -86,6 +86,8 @@ const files = {
   healthMath: read('health-math.js'),
   healthData: read('health-data.js'),
   worth: read('worth.js'),
+  transactions: read('views/transactions.js'),
+  dates: read('dates.js'),
 };
 const live = {}; // same files, comments stripped, for "must not contain the old shape" checks
 for (const [k, v] of Object.entries(files)) live[k] = stripComments(v);
@@ -146,7 +148,16 @@ function provenFalse(desc, exactShape, mangled) {
     'Growth: savings.js\'s own growth tile calls the shared growthTotals()');
   ok(live.savings.includes('entries.filter(homeEntry)'),
     'Growth: and it pools ONE currency — a rate whose numerator and denominator are in different currencies is not a rate');
-  ok(live.report.includes('growthTotals(entries, poolType, { today: todayIso() })'), 'Growth: views/report.js\'s savings section calls the SAME growthTotals() — not a second guess at what "growth" or "rate of growth" mean (M4)');
+  /* The POOL is narrowed at this call site too, with the SAME predicate name
+     savings.js uses (`homeEntry`), so one grep finds both. This used to pin
+     the UNFILTERED string — and pinning it is how the gap survived: savings.js
+     narrowed, report.js did not, and this line asserted that report.js was
+     right to. On a mixed pool the Report printed "Total growth R 5900.00 /
+     +53.2%" where the Savings page printed "R 1000.00 / +9.1%" — one figure,
+     two rules, which is the exact shape this whole file exists to catch. */
+  ok(live.report.includes('growthTotals(entries.filter(homeEntry), poolType, { today: todayIso() })'), 'Growth: views/report.js\'s savings section calls the SAME growthTotals() over the SAME one-currency pool — not a second guess at what "growth" or "rate of growth" mean (M4)');
+  ok(live.report.includes('const homeEntry = e => !isForeign(e.account, S.settings.currency);'),
+    'Growth: and it names that pool the same way savings.js does — a rate whose numerator and denominator are in different currencies is not a rate');
   ok(!live.report.includes('growth += r.growth'), 'Growth: views/report.js never re-derives the sum itself either');
 
   // The retired formula itself, banned from live code in both consumers —
@@ -295,27 +306,58 @@ function provenFalse(desc, exactShape, mangled) {
    net R700 refund computed R1 700, for a row the table itself showed at
    R1 000). `realSpend` is now clamped at zero before the shortfall is taken,
    matching the row's own Actual cell one function down, which clamps the
-   same quantity the same way. dashboard.js's own comment names budgets.js's
-   rule by name as the one it is matching — about as directly "unified" as
-   two independent files get. ======================================================================= */
-{
-  const SHORTFALL = 'if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - Math.max(0, realSpend));';
-  ok(live.budgets.includes(SHORTFALL),
-    'Assume-spent (Budget): the overlay is the shortfall — budgeted minus real spend clamped at zero FIRST, the whole thing floored at zero again — never the whole amount added on top, and never inflated by a category that netted a refund');
+   same quantity the same way.
 
-  ok(live.dashboard.includes('actual: assumed ? (b.amount || 0) : 0'),
-    'Assume-spent (Dashboard): an assume-spent row is SEEDED with its actual equal to the budgeted amount (REPLACES)');
-  ok(live.dashboard.includes('if (existing && existing.assumed) continue;'),
-    'Assume-spent (Dashboard): a transaction landing in that same category is then SKIPPED rather than added on top — REPLACES, matching the Budget page\'s rule rather than re-deriving a second one');
+   A THIRD round then followed (2026-09-02), and it is the reason this term's
+   checks below no longer pin two hand-matched expressions in two files. The
+   Dashboard's copy of the rule read `assumed ? budgeted : 0` and DISCARDED
+   real spend entirely, so one assume-spent category budgeted R2 500 against
+   a real R4 000 payment was over budget on the Budget page and "on budget"
+   on the Dashboard, the Report and both exports — the same word over two
+   numbers again, in the direction this file was written to catch. The rule
+   is now ONE exported pure function, `assumedActual(budgeted, realSpend)` in
+   views/budgets.js, and every surface reads it: this page's Actual column,
+   the totals strip's overlay (its exact complement), and, through
+   dashboard.js's budgetVsActualRows, the Dashboard table, views/report.js
+   and both exports.
+
+   So what this term pins changed shape with it. Requiring two independent
+   expressions to stay textually in step was always the weaker form of
+   "unified" — it can only ever prove that two files still say the same
+   thing, never that there is one thing to say. Pinning the shared function
+   and each consumer's CALL to it is the stronger form, and is what the
+   earlier terms in this file (Growth, Net worth) already do.
+   ======================================================================= */
+{
+  const RULE = 'function assumedActual(budgeted, realSpend) {';
+  const OVERLAY = 'if (catAssumeSpent(d.category)) assumed += assumedActual(d.amount, realSpend) - Math.max(0, realSpend);';
+  ok(live.budgets.includes(RULE) && live.budgets.includes('module.exports.assumedActual = assumedActual;'),
+    'Assume-spent: views/budgets.js declares the rule ONCE as a pure module-level function and exports it, so there is one implementation to be right rather than two to keep in step');
+  ok(live.budgets.includes(OVERLAY),
+    'Assume-spent (Budget): the totals-strip overlay is DERIVED from that same rule minus what really moved — never a second expression of the same idea, which is how the overlay and the row\'s own Actual cell drifted apart over a refund');
+  ok(live.budgets.includes('assumed ? assumedActual(d.amount, realSpend)'),
+    'Assume-spent (Budget): and the row\'s Actual cell reads the rule directly');
+
+  ok(live.dashboard.includes("const { assumedActual } = require('./budgets');"),
+    'Assume-spent (Dashboard): reads the SAME function rather than re-deriving it — its own copy used to discard real spend, so a category over its budget read "on budget" here and over there');
+  ok(live.dashboard.includes('actual: assumed ? assumedActual(b.amount, 0) : 0'),
+    'Assume-spent (Dashboard): an assume-spent row is SEEDED through the rule, with nothing yet spent against it');
+  ok(live.dashboard.includes('existing.actual = assumedActual(existing.budget, -amt);'),
+    'Assume-spent (Dashboard): and a transaction landing in that category re-reads the rule with the real figure — REPLACES, never PLUS');
 
   // Negative control 1: the pre-1.23.0 Budget-page line added the WHOLE
   // amount unconditionally — the double-count the changelog describes.
-  provenFalse('Assume-spent (Budget)', SHORTFALL, 'if (catAssumeSpent(d.category)) assumed += d.amount || 0;');
+  provenFalse('Assume-spent (Budget)', OVERLAY, 'if (catAssumeSpent(d.category)) assumed += d.amount || 0;');
   // Negative control 2: the shortfall shape WITHOUT the inner clamp — the
-  // narrower refund-inflation defect this fix closed second, on the same
-  // line, without reintroducing the first.
-  provenFalse('Assume-spent (Budget) — refund clamp', SHORTFALL,
+  // narrower refund-inflation defect the second round closed.
+  provenFalse('Assume-spent (Budget) — refund clamp', OVERLAY,
     'if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - realSpend);');
+  // Negative control 3: the Dashboard's own retired copy, which threw real
+  // spend away — the third round's defect, and the one a text-match between
+  // two hand-written expressions could never have caught, because both
+  // expressions were internally consistent and simply meant different things.
+  provenFalse('Assume-spent (Dashboard) — discarded real spend',
+    'assumedActual(existing.budget, -amt)', 'existing.actual = b.amount || 0;');
 }
 
 /* ========================================================================
@@ -520,7 +562,10 @@ function provenFalse(desc, exactShape, mangled) {
    different rows on purpose, disclosed in the number's own framing, not by
    drift. */
 {
-  const THRESHOLD_READ = 'return (d === null || d > ctx.VALUED_STALE_DAYS) && a.value > 0;';
+  /* The live read: an unreadable date counts as stale on this page, and
+     everything datable goes through the SHARED isStaleValuation() rule with
+     the published threshold — one spelling, no second literal 365. */
+  const THRESHOLD_READ = 'return (d === null || isStaleValuation(a.valued, null, ctx.VALUED_STALE_DAYS)) && a.value > 0;';
   ok(live.assets.includes('const VALUED_STALE_DAYS = 365;') && live.assets.includes('VALUED_STALE_DAYS });'),
     'Stale valuation: assets.js declares VALUED_STALE_DAYS as its documented single source and publishes it via ctx.provide');
   ok(live.savings.includes(THRESHOLD_READ),
@@ -546,6 +591,54 @@ function provenFalse(desc, exactShape, mangled) {
 }
 
 /* ========================================================================
+   TERM 11 — "Generated" (the stamp a written document carries)  ·  unified
+   ------------------------------------------------------------------------
+   Rule: the "when this document was made" stamp is dates.js's
+   nowLocalMinute(), and nothing else. There are exactly two files in this
+   app that write one — views/report.js (the report's frontmatter and its
+   "Generated {date}" line) and views/transactions.js (the Transactions
+   markdown export's own `generated:` frontmatter, which exporter.js prints
+   verbatim).
+
+   The two disagreed. views/report.js was moved onto nowLocalMinute() by M3
+   of the 2026-08-29 audit — see dates.js's own header, which records the
+   reproduction: a report generated at 06:18 SAST printed "04:18", and for a
+   reader east of Greenwich that is not the wrong hour but the wrong CALENDAR
+   DAY. views/transactions.js was left on the very expression that audit
+   retired, so one document written by this app said today and the other said
+   yesterday, both under the same word, with nothing on either to say why.
+
+   Same shape as every other term in this file: one rendered English word,
+   two derivations, no disclosure — and here the two are not even a defensible
+   pair, since one of them is simply wrong for most of the world.
+   ======================================================================== */
+{
+  const NOW = 'nowLocalMinute()';
+  ok(live.dates.includes('function nowLocalMinute()'),
+    'Generated: dates.js declares nowLocalMinute() as the one local-calendar "now" stamp');
+  ok(live.report.includes(NOW),
+    'Generated: views/report.js stamps its report through nowLocalMinute()');
+  ok(live.transactions.includes(NOW),
+    'Generated: views/transactions.js stamps its export through the SAME nowLocalMinute() — not a second, UTC-flavoured copy of the rule');
+
+  /* The retired expression itself, banned from LIVE code in both writers.
+     It is fine for it to appear in a comment — views/report.js quotes it on
+     purpose as the thing it stopped doing — which is exactly why this runs
+     over the comment-stripped text. */
+  const RETIRED = /new Date\(\)\.toISOString\(\)\.slice\(0,\s*16\)/;
+  ok(!RETIRED.test(live.report),
+    'Generated: the UTC expression is gone from live views/report.js code (it survives only as the comment explaining why)');
+  ok(!RETIRED.test(live.transactions),
+    'Generated: and gone from live views/transactions.js too — this is the half that was still shipping it');
+
+  // Negative control: the exact line views/transactions.js used to carry.
+  const mangled = "const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');";
+  provenFalse('Generated', NOW, mangled);
+  ok(RETIRED.test(mangled),
+    'Generated: control — the retired-expression regex DOES match the old line, so its absence-check above is a real check rather than a typo matching nothing');
+}
+
+/* ========================================================================
    DELIBERATELY NOT A TERM HERE — "Debt payments"
    ------------------------------------------------------------------------
    The audit's own table names this pairing (Debts page: payment + extra ·
@@ -564,4 +657,4 @@ function provenFalse(desc, exactShape, mangled) {
    here rather than silently dropped, per this file's own rule that a gap
    must be SAID rather than just absent. ======================================================================= */
 
-console.log(`PASS — the vocabulary gate: ${checks} assertions across 10 unified/declared terms (negative-controlled where the file's own pattern calls for it) and 0 known live gaps — the 2026-08-24 audit's original three (GAP A/B/C) are now Terms 8, 9 and 10, fixed and pinned rather than merely characterised.`);
+console.log(`PASS — the vocabulary gate: ${checks} assertions across 11 unified/declared terms (negative-controlled where the file's own pattern calls for it) and 0 known live gaps — the 2026-08-24 audit's original three (GAP A/B/C) are now Terms 8, 9 and 10, fixed and pinned rather than merely characterised.`);

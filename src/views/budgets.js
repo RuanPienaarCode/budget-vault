@@ -21,6 +21,38 @@ const { sharePercentLabel } = require('../share-percents');
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
 
+/* THE Actual an assume-spent category reads, on every surface that shows one.
+
+   `assume_spent` says the money was committed in an earlier period, so this
+   period's transactions will not match it — an assertion the toggle's own
+   tooltip makes and a reader can contradict simply by paying the bill from a
+   tracked account anyway. Whichever is BIGGER is the honest figure: the
+   assumption while nothing (or less) really moved, and the real spend once it
+   overran, because at that point the category IS an ordinary one and real
+   money went past what was set aside for it. Never the sum — adding them is
+   what doubled a category that both transacted and carried the flag (R4 000
+   budget, R3 000 really spent, read as R7 000 and 175% used on R3 000 that
+   actually moved).
+
+   Module-level and exported because FOUR surfaces state this one rule: this
+   page's Actual column, the totals strip's overlay (its exact complement —
+   see budgetTotalsStrip), and, through dashboard.js's budgetVsActualRows, the
+   Dashboard's Budget-vs-Actual table, views/report.js and both exports. It was
+   written twice instead, and the copies drifted: the Dashboard's read
+   `assumed ? budgeted : 0` and then skipped the transaction pass, DISCARDING
+   real spend — so one Carry category budgeted R2 500 against a real R4 000
+   payment was red and over here and "on budget" on the other three surfaces.
+   Two figures for one quantity, derived by two rules: this repo's
+   most-repeated defect, and the reason there is now one function to be right.
+
+   Pure, and takes both figures rather than reading them: no DOM, no ctx, so
+   tests/dash-assumed-actual.test.cjs can drive both callers against it. */
+function assumedActual(budgeted, realSpend) {
+  const b = Number(budgeted) || 0;
+  const r = Number(realSpend) || 0;
+  return Math.max(b, r);
+}
+
 module.exports = function registerBudgets(ctx) {
   const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit, catType, currentPeriod, locale } = ctx;
 
@@ -300,15 +332,22 @@ module.exports = function registerBudgets(ctx) {
          total down. */
       const raw = sum.byCat[d.category] || 0;
       const realSpend = -raw;
-      /* Clamped at zero BEFORE the shortfall is taken, matching the row's own
-         Actual cell (`Math.max(d.amount, realSpend)` further down). A category
-         that nets POSITIVE — a refund larger than the month's spending — gives
-         `realSpend` a negative value, and subtracting a negative inflated the
+      /* Written as the row's own Actual MINUS what really moved, rather than
+         as a second expression of the same idea. The overlay and the Actual
+         cell are the same quantity seen from two sides, and while they were
+         two expressions they COULD disagree — an earlier version of this
+         line subtracted an UNCLAMPED `realSpend`, so a category that nets
+         POSITIVE (a refund larger than the month's spending) inflated the
          overlay by the refund's own excess: budgeted R1 000 against a net
          refund of R700 computed an overlay of R1 700 for a row the table
-         itself showed at R1 000. The two figures are the same quantity and
-         must clamp the same way. */
-      if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - Math.max(0, realSpend));
+         itself showed at R1 000. That clamp was already in place before the
+         2026-09-02 rewrite; what changed is that it is no longer a second
+         expression. Derived from assumedActual() it cannot drift again: whatever
+         that rule says the row reads, this is the part of it no transaction
+         accounts for. Math.max(0, realSpend) is the same clamp namedNetSpend
+         below applies — a refunded category contributes nothing to "how much
+         was spent", never a negative slice of it. */
+      if (catAssumeSpent(d.category)) assumed += assumedActual(d.amount, realSpend) - Math.max(0, realSpend);
       // Net per-category spend, refunds folded in — the same figure each row
       // below reads as its own Actual. Summed here so "Total spent" (gross)
       // can disclose exactly how it differs from the table under it.
@@ -345,6 +384,31 @@ module.exports = function registerBudgets(ctx) {
     let gapNote = '';
     if (gapUncat >= 1) gapNote += i18n.t('dash.split.uncatNote', { amount: money(gapUncat) });
     if (gapNetted >= 1) gapNote += i18n.t('dash.split.nettedNote', { amount: money(gapNetted) });
+    /* ISSUE 30. A SECOND omission, and a different one: the gap note above
+       accounts for what this tile's gross figure holds that the table below it
+       nets away, and this accounts for what periodSummary never counted at
+       all. summaryInRange drops every row from a foreign account, because a
+       rand total cannot include a euro and this vault stores no rate — and
+       period.js:517-520 puts the caveat INSIDE the returned object precisely
+       so no consumer can read the totals without being handed it: "every tile,
+       table, chart and aria-label built from this object is expected to say
+       something when foreign.count is non-zero." This tile read the object and
+       said nothing, so a household with a euro account saw a spend figure here
+       that quietly omitted every euro row while the Dashboard hero one screen
+       away disclosed the same omission. Same key as the hero's, so the two
+       screens cannot word one fact differently; appended rather than
+       substituted, because both omissions can be true at once. */
+    if (sum.foreign && sum.foreign.count) {
+      /* Joined with ' · ' only when something precedes it: the two keys above
+         carry their own leading separator and this one does not (the
+         Dashboard prints it as a line of its own, where a separator would be
+         a stray bullet). On a period with a foreign account and no home
+         spend or budget — gapNote still empty — an unconditional ' · ' opened
+         the tile's note with a bullet. */
+      gapNote += (gapNote ? ' · ' : '') + i18n.t('dash.foreignExcluded', {
+        count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
+      });
+    }
 
     /* Income minus what's been budgeted — the number that answers "have I given
        every rand a job yet?". Negative means the plan spends more than it earns,
@@ -497,7 +561,7 @@ module.exports = function registerBudgets(ctx) {
         const fixed = S.categories.find(c => c.name === d.category)?.fixed === true;
         const raw = sum.byCat[d.category] || 0;
         const realSpend = -raw;
-        const actual = assumed ? Math.max(d.amount || 0, realSpend) : (type === 'income' ? raw : -raw);
+        const actual = assumed ? assumedActual(d.amount, realSpend) : (type === 'income' ? raw : -raw);
         const overActual = actual > d.amount && d.amount > 0 && type !== 'income';
         /* Live "remaining" line under the amount input — budget minus actual,
            red when overspent (never red for income: earning above target is
@@ -833,3 +897,12 @@ module.exports = function registerBudgets(ctx) {
     // than only reachable through renderBudgets' full DOM render.
     freshPeriodNote, typeGroupLabel });
 };
+
+/* Hung off the module the way dashboard.js hangs sharePercents off its own —
+   a pure rule this view OWNS, reachable by the one other view that has to
+   state it identically (views/dashboard.js requires it straight from here) and
+   by a guard test, without either of them going through ctx. ctx would have
+   forced a registration order on two views that are otherwise independent, and
+   a test mounting one without the other would then fail on the wiring rather
+   than on its subject. */
+module.exports.assumedActual = assumedActual;

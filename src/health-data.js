@@ -107,7 +107,7 @@ function passthroughPairs(rows) {
   return drop;
 }
 const { worth } = require('./worth');
-const { splitByCurrency } = require('./currency');
+const { splitByCurrency, isForeign } = require('./currency');
 
 /* How far back the averages reach. Six months is long enough to absorb a bonus
    month or a double rent payment, and short enough that a household still
@@ -118,6 +118,7 @@ module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, accountIndex, catType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
+    foreignLabels,
   } = ctx;
 
   function healthSnapshot() {
@@ -130,6 +131,36 @@ module.exports = function registerHealthData(ctx) {
     const cur = currentPeriod();
     const want = periodsForMonths(TRAILING_MONTHS);
     const idx = accountIndex();
+
+    /* ISSUE 28, second pass. Every household walk below feeds a RATIO, and
+       until this line each of them read `txInPeriod(p)` raw — so a vault with
+       one rupiah holiday account divided rand by rupiah in every one of them
+       while the block at the foot of this function narrowed only the ACCOUNTS
+       and its comment claimed "the pool is narrowed to the household's own
+       currency before any of it is divided". It was not, and the page said so
+       out loud: "1 account in another currency (Rp) is not in these figures",
+       printed beside figures that very much included it. Measured on the
+       fixture in tests/score-currency-isolation.test.cjs: cover 3.5 months →
+       0.003, saving rate 11.1% → 0.02%, the score 69 → 22. A wrong total at
+       least looks like a number; a wrong percentage looks like a measurement.
+
+       `foreignLabels()` (src/period.js) is the SAME predicate summaryInRange
+       already filters by — a Map of transaction-folder label to symbol for
+       every folder whose account states a currency that is not the
+       household's — so the Dashboard's period summary and this snapshot
+       cannot come to different conclusions about which rows are household
+       money. Resolved once per snapshot rather than per period: it is a
+       property of the accounts, and the six periods below cannot disagree
+       about it.
+
+       What is held out is NOT dropped silently. Because the predicate is the
+       account's own `currency:`, the folders excluded here belong to exactly
+       the accounts `splitByCurrency` hands back as `scoreOthers` at the foot
+       of this function — so the disclosure the page already prints now names
+       precisely what these walks left out, which is what it always claimed
+       to be doing. currency.js:14 forbids the alternative. */
+    const foreign = foreignLabels();
+    const homeRows = p => txInPeriod(p).filter(t => !foreign.has(t.label));
     /* Contributions into savings AND investment accounts both count as saving —
        the rate measures money the household kept, not which wrapper it kept it
        in. splitFlows already knows a contribution from growth and from a split
@@ -145,8 +176,16 @@ module.exports = function registerHealthData(ctx) {
        shared helper — health-data.js and views/savings.js are siblings, not
        a shared module, and each carries this comment for a reader who lands
        in only one of them. */
+    /* Household currency only, matching the rows the pairing below is handed
+       (homeRows drops foreign folders). With the pool boundary drawn wider
+       than the row set, a foreign savings account sat in saverLabels while
+       none of its rows were present — so a transfer OUT of a euro savings
+       account INTO a rand one lost its outflow leg and counted as fresh
+       saving from outside the pool. Both sides of the pairing now see the
+       same accounts. */
     const savers = S.accounts.filter(a =>
-      POOL_TYPES.has(String((a && a.type) || '').trim().toLowerCase()));
+      !isForeign(a, S.settings.currency)
+      && POOL_TYPES.has(String((a && a.type) || '').trim().toLowerCase()));
 
     const periods = [];
     for (let i = 1; i <= want; i++) {
@@ -157,7 +196,7 @@ module.exports = function registerHealthData(ctx) {
       /* Pass-throughs are found across the WHOLE HOUSEHOLD, not just the pool:
          the R40 000 UIF landed in a savings account but its matching leg left
          a cheque account, so a pool-only search would never have seen it. */
-      const householdRows = txInPeriod(p);
+      const householdRows = homeRows(p);
       /* Gathered across the WHOLE pool before anything is counted, because an
          internal transfer is only recognisable from both of its legs at once —
          see the matching step below. */
@@ -216,8 +255,12 @@ module.exports = function registerHealthData(ctx) {
          built, the one exclusion periodSpend itself applies before anything
          else can. */
       const householdNet = Object.create(null);
-      const householdPass = passthroughPairs(txInPeriod(p));
-      for (const t of txInPeriod(p)) {
+      /* One filtered row list for both, so the pairing and the walk it feeds
+         can never see different rows. `homeRows`, not `txInPeriod` — see the
+         currency note above healthSnapshot's loop. */
+      const netRows = homeRows(p);
+      const householdPass = passthroughPairs(netRows);
+      for (const t of netRows) {
         if (catType(t.cat) === 'transfer') { continue; }
         /* PAIRED excluded rows drop; lone ones stay. Dropping the `excluded`
            filter outright was a real bug, and so would restoring it be.
@@ -321,7 +364,7 @@ module.exports = function registerHealthData(ctx) {
        "this is costing you" line are the same monthly interest bill, and
        computing it separately is how two of them disagree after someone
        changes the filter in only one place. */
-    const debtInterest = debtInterestMonthly(S.debts);
+    const debtInterest = debtInterestMonthly(S.debts, S.settings.currency);
 
     /* What the household is committed to repaying each month — or null when
        nothing says.
@@ -338,7 +381,17 @@ module.exports = function registerHealthData(ctx) {
        than refusing to answer: understating a burden is the safe direction, and
        a partial figure moves the score toward the truth where null leaves it
        untouched. */
-    const active = activeDebts(S.debts);
+    /* Foreign debts held out, the same way debtInterestMonthly above and
+       worth() below already hold them out — and for the sharper reason. A
+       €900 monthly repayment is not R900 of commitment, and instalmentShare
+       divides this straight by rand income: on a two-currency book the score
+       read a household as spending a quarter more of its income on debt than
+       it does, against a Debt page six inches away still printing the
+       rand-only total. `isForeign` through debtInterestMonthly's own
+       argument would not reach here — this is a second figure off the same
+       ledger, so it takes the same filter rather than trusting that one. */
+    const active = activeDebts(S.debts)
+      .filter(d => !isForeign(d, S.settings.currency));
     const stated = active.filter(d => (d.payment || 0) > 0);
     const instalments = stated.length ? stated.reduce((t, d) => t + d.payment, 0) : null;
 
@@ -365,7 +418,13 @@ module.exports = function registerHealthData(ctx) {
       /* Whether the debt score rests on anything the household actually wrote.
          False means the pillar's full marks are an ASSUMPTION — see the note in
          health-math's PILLARS block — and the surfaces say so rather than
-         letting a reader believe the vault checked. */
+         letting a reader believe the vault checked.
+
+         Off the currency-filtered `active`, deliberately. A household whose
+         only debt is a euro bond has written one down, but not one this score
+         can measure — every figure the pillar reads is now the rand book —
+         so full marks there ARE an assumption, and saying otherwise would be
+         the pillar quietly claiming a check it did not perform. */
       debtsRecorded: active.length > 0,
       breakdown: scoreBreakdown(metrics, target),
       /* Nothing honest to say: no fund to measure and nothing computable from

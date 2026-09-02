@@ -350,10 +350,29 @@ module.exports = function registerPeriod(ctx) {
   function assumedSpend(p) {
     let total = 0;
     for (const b of S.budgets[p] || []) {
-      if (b.type === 'income' || b.type === 'transfer') continue;
+      const type = budgetRowType(b);
+      if (type === 'income' || type === 'transfer') continue;
       if (catAssumeSpent(b.category)) total += b.amount || 0;
     }
     return total;
+  }
+
+  /* THE type of a budget row: the category's live type, and only when no
+     category file answers (catType null — no category named, or the file
+     gone) the cell the row itself stored.
+
+     One function because there were three readers of a budget row's type and
+     the 2026-09-02 audit found them disagreeing: budgetTotals() had just been
+     taught to read the live type, while assumedSpend() above and the
+     Dashboard's budgetVsActualRows still read `b.type` — the cell
+     serializeBudgetFile writes back verbatim, so it never heals after a
+     category is retyped. Measured through the real loader: a category file
+     saying `expense, assume_spent: true` whose July row still said `income`
+     gave budgetTotals {income: 10 000, spend: 1 200} and assumedSpend 0 —
+     two figures on one page from two rules. `??`, not `||`: null is the only
+     value that means "no live answer". */
+  function budgetRowType(b) {
+    return catType(b.category) ?? b.type;
   }
 
   /* How far a period ended in the hole: what actually went out, less what
@@ -636,17 +655,56 @@ module.exports = function registerPeriod(ctx) {
     }
     return { income: w.income / months, months, complete: true };
   }
+  /* What a period's budget FILE adds up to, bucketed by the category's type as
+     it reads TODAY — not by the Type cell the file happens to carry.
+
+     That cell is written on save and never again: there is no re-type UI, so
+     correcting a category means editing Categories/<name>.md, and
+     serializeBudgetFile writes `r.type` back verbatim, so every row saved under
+     the old type stays stale until its own next save. views/budgets.js has read
+     the live answer since the stale-type fix (`catType(d.category) ?? d.type`,
+     in the totals strip and again for the group bars — see
+     tests/budget-stale-type-guard.test.cjs); this function did not, so the two
+     disagreed about the same file with no save in between. And this is the one
+     the rest of the app believes: the Dashboard hero's remaining line, the
+     trend chart's budget line, money-flow's budgetUsed denominator,
+     health-data.js's budget pillar in the score, and the Report.
+
+     Measured on the fixture in tests/period-budget-totals-live-type.test.cjs
+     (Bonus retyped to income in its category file, its July row still saying
+     expense): the Budget page's own tiles read income 15 000 / budgeted 3 000
+     while this returned {income: 10 000, spend: 8 000} — so the Dashboard
+     printed "R 6 800 remaining", R 5 000 too high, on the very period the
+     Budget page had just described correctly.
+
+     `?? `, not `||`, for the reason views/budgets.js gives: catType returns
+     null both for "this row names no category" and for "the category has no
+     file", and only then may the row's own stored cell stand in. One predicate,
+     computed once per row, so income and spend can never bucket the same row
+     two different ways — which a pair of independent filters could. */
   function budgetTotals(p) {
     const budget = S.budgets[p] || [];
-    return {
-      income: budget.filter(b => b.type === 'income').reduce((a, b) => a + b.amount, 0),
-      spend: budget.filter(b => b.type !== 'income' && b.type !== 'transfer').reduce((a, b) => a + b.amount, 0),
-    };
+    let income = 0, spend = 0;
+    for (const b of budget) {
+      const type = budgetRowType(b);
+      if (type === 'income') income += b.amount;
+      else if (type !== 'transfer') spend += b.amount;
+    }
+    return { income, spend };
   }
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
     txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, accountsWithFolder, nonBudgetLabels,
+    /* Published so the score's household walk (health-data.js) narrows rows by
+       the SAME predicate summaryInRange does — a second spelling of "which
+       folders are foreign" is how the ISSUE 28 fix reached the numerators and
+       missed the divisors. */
+    foreignLabels,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, assumedSpend, periodDeficit,
+    /* The one reading of a budget row's type — views/dashboard.js's
+       budgetVsActualRows reads it too, so the table, the hero and the Budget
+       page cannot bucket one row three ways. */
+    budgetRowType,
   });
 };

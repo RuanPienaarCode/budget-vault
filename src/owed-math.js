@@ -69,13 +69,44 @@ function owedSummary(owed, today, household) {
   const list = owed || [];
   let outstanding = 0, recovered = 0, open = 0, oldestDays = null;
   const others = new Map();
+  const backOthers = new Map();
   for (const o of list) {
+    const settled = isSettled(o);
+    /* Settled FIRST, then foreign — and that order is the whole of this
+       branch's history. The foreign test used to `continue` before
+       isSettled() ran, so a euro entry the reader marked `status: paid` was
+       counted in `otherCurrencies` forever: the Owed page printed "plus € 500
+       owed in other currencies" beside a row whose own pill, off the same
+       isSettled(), read "Paid". Nothing the reader could do cleared it, since
+       setting that status is exactly what the app asks of them.
+
+       And a foreign entry's recovered money reached nowhere at all. It cannot
+       reach `recovered` — that total is stated in the household's currency and
+       €200 is not R200, which currency.js:10 forbids inventing a rate for —
+       so it needs a counterpart of its own, or it is money dropped in silence,
+       which currency.js:14 forbids just as plainly. Hence `recoveredOthers`:
+       the same [symbol, total] shape as `otherCurrencies`, so a view states
+       both the same way.
+
+       `amt` is floored for the same reason the household branch floors it: a
+       stray minus sign makes outstandingOf clamp to 0, which marks the row
+       settled, and reading `o.amount` raw would then subtract a typo from a
+       real recovery. The bug was fixed once on the household side; this is the
+       same arithmetic one currency over and gets the same floor rather than a
+       second chance to reintroduce it. */
     if (household && isForeign(o, household)) {
       const sym = symbolOf(o, household);
-      others.set(sym, (others.get(sym) || 0) + Math.max(0, outstandingOf(o)));
+      const amt = Math.max(0, o.amount || 0);
+      if (settled) {
+        backOthers.set(sym, (backOthers.get(sym) || 0)
+          + (o.repaid > 0 ? Math.min(o.repaid, amt) : amt));
+      } else {
+        others.set(sym, (others.get(sym) || 0) + Math.max(0, outstandingOf(o)));
+        const back = Math.min(o.repaid || 0, amt);
+        if (back > 0) { backOthers.set(sym, (backOthers.get(sym) || 0) + back); }
+      }
       continue;
     }
-    const settled = isSettled(o);
     // A negative `amount` (a typo, or a stray minus sign the amount input
     // never blocked) makes outstandingOf clamp to 0 — which marks the row
     // settled — and the settled branch below used to add that negative
@@ -102,6 +133,15 @@ function owedSummary(owed, today, household) {
        converted — the caller states them beside the total rather than
        inside it. Empty on every single-currency vault. */
     otherCurrencies: [...others].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
+    /* The other half of that ledger, in the same shape: what has come BACK in
+       each foreign currency. Separate from `recovered` because that figure is
+       in the household's own currency and adding a euro to it would be a wrong
+       number; separate from `otherCurrencies` because "still out" and "came
+       back" are opposite answers and a reader must not have to work out which
+       one a single list is showing them. Empty on every single-currency
+       vault — and empty, like its sibling, when no household symbol was given
+       at all, because then nothing was held out to report. */
+    recoveredOthers: [...backOthers].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
   };
 }
 

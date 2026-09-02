@@ -20,9 +20,22 @@
    Use isRealIsoDate when the value has to name a day that happened. */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/* A Date → the local calendar date it falls on. */
+/* A Date → the local calendar date it falls on.
+
+   The YEAR is padded to four digits for exactly the reason the month and day
+   are: every date comparison in this app is a STRING comparison on
+   YYYY-MM-DD, so a two- or three-character year sorts in FRONT of every real
+   transaction instead of behind them, and isRealIsoDate refuses it outright.
+
+   Reachable, not theoretical. period.js's MONTH_KEY deliberately admits years
+   0100–9999, and its own comment insists that "a month key it would refuse as
+   a date must not be reachable as a month" — but with month_start_day 23,
+   periodRange('0100-01') came back {start: '99-12-23', end: '100-01-22'},
+   neither of them ISO-shaped, so the two halves of that promise disagreed.
+   Nothing below year 0099 can arrive here: MONTH_KEY floors at 0100 and a
+   period reaches at most 31 days back past its own key. */
 function isoOf(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /* Today as a local calendar date. */
@@ -93,10 +106,15 @@ function daysUntil(iso, today) {
 
 /* The inverse: a UTC day number back to YYYY-MM-DD. UTC getters, to undo
    exactly what isoDayNumber did — reading a day number with local getters
-   would shift the result by a day for anyone west of Greenwich. */
+   would shift the result by a day for anyone west of Greenwich.
+
+   The year is padded for the same reason isoOf's is, and it has to be done in
+   BOTH: periodRange builds its start with one and its end with the other, so
+   padding only one would leave a period whose two boundaries were shaped
+   differently — the harder half of the bug to see. */
 function isoFromDayNumber(n) {
   const d = new Date(n * 86400000);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  return `${String(d.getUTCFullYear()).padStart(4, '0')}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
 /* A real calendar date in YYYY-MM-DD, not merely something date-SHAPED. The

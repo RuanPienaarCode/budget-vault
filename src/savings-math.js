@@ -648,6 +648,37 @@ function growthSeries(entries, typeOf, opts) {
 }
 
 
+/* MONEY CANNOT ARRIVE BEFORE IT LEAVES — the ordering test savedFromOutside()
+   applies to a candidate pair of legs. Used only there; the full reasoning
+   sits beside the predicate it gates.
+
+   Deliberately a DIRECTION and not a window. A symmetric "within N days" rule
+   was written first and rejected: tests/household-shapes.test.cjs pins, with a
+   negative control and a header explaining why, that the savings rate must not
+   move with how fast a bank settles — the shipped defect was a score stepping
+   66 -> 76 because two legs of one transfer landed four days apart instead of
+   three, "one number, two cliffs, both set by a bank". A window puts that
+   cliff straight back at the far end. Direction has no cliff at all in that
+   axis: settlement lag only ever pushes the ARRIVAL later, and later is
+   allowed without limit.
+
+   `backstamp` is the one concession, and it is not a settlement window: two
+   institutions occasionally value-date one movement in the opposite order, so
+   the receiving leg can carry the earlier date. Three days covers that
+   artefact. Beyond it, an outflow dated after the inflow it would cancel is
+   not that inflow's other leg — it is a later, separate decision, which is
+   exactly what a sinking-fund purchase is.
+
+   Null — a leg nothing can date — is NOT a match, the same reading
+   reconcile.js takes of an unplaceable row. `daysBetween` is this module's
+   own, shape-gated and null-safe; a second copy of the counting would be the
+   drift dates.js's header warns about. */
+const BACKSTAMP_DAYS = 3;
+function couldBeSameMovement(outIso, inIso) {
+  const d = daysBetween(outIso, inIso);   // positive when the money left first
+  return d !== null && d >= -BACKSTAMP_DAYS;
+}
+
 /* WHAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT, for one period.
 
    Lives here, and is called from BOTH health-data.js (which averages it over
@@ -775,10 +806,53 @@ for (const { acct, row } of inflows) {
      shop, not to another account of yours — so it never matches and
      never reduces the rate. And money arriving from a cheque account has
      no counterpart in the pool either, so it counts, whatever it is
-     called. */
+     called.
+
+     THE DATE WAS NEVER CONSULTED AT ALL, which made "the money went to a
+     shop" a claim the code could not check. Any outflow of equal
+     magnitude from any other pool account, anywhere in the period,
+     cancelled a deposit — and on a household running sinking funds, the
+     shape this whole rule exists to protect, that is not a rare
+     coincidence but the normal month:
+
+       1 Aug   Emergency fund   +5 000   a real deposit from the cheque account
+       28 Aug  Baby fund        -5 000   the pram, bought from the fund
+
+     Unrelated, twenty-seven days apart, and the period reported R0
+     saved. Price the pram at R4 999 and the same month reports R5 000 —
+     a rounding of a shop's price moving the household's scored savings
+     rate by the whole deposit, which is the signature of a predicate
+     matching on the wrong thing.
+
+     couldBeSameMovement is the smallest test that separates them without
+     re-opening the defect tests/household-shapes.test.cjs pins. MONEY
+     CANNOT ARRIVE BEFORE IT LEAVES: an outflow dated after the inflow it
+     would cancel is a LATER decision, not that inflow's other leg. The
+     pram fails it; a transfer never does, however slowly the bank
+     settles — and "however slowly" is the point, because a symmetric
+     "within N days" window (written first, rejected) would put back the
+     exact cliff that file exists to keep out, a score stepping 66 -> 76
+     because two legs landed four days apart instead of three.
+
+     WHAT THIS STILL CANNOT SEE, stated rather than hidden: the mirror of
+     the pram — a fund purchase EARLY in the month cancelled by an equal
+     deposit later — is still matched, because from the dates alone it is
+     indistinguishable from a slow transfer. The signal that would settle
+     it is the outflow's CATEGORY (a real expense, against the
+     savings-typed category a transfer leg carries), which this function
+     cannot reach: it takes rows and a label map, not the category table,
+     and health-data.js and views/score.js both depend on that signature.
+     Closing it means giving this function a category type lookup, which
+     is a larger decision than this fix.
+
+     A leg nothing can date cannot be ordered against anything, so
+     daysBetween's null does not match — the same reading reconcile.js
+     takes of an unplaceable row. The app does not get to assume the
+     convenient answer about a date it cannot read. */
   const j = outflows.findIndex((o, i) => !spent.has(i)
     && o.acct !== acct
-    && Math.abs(-o.row.amount - row.amount) < 0.005);
+    && Math.abs(-o.row.amount - row.amount) < 0.005
+    && couldBeSameMovement(o.row.date, row.date));
   if (j !== -1) { spent.add(j); continue; }
 
   savings += row.amount;

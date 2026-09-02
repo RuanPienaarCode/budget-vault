@@ -204,6 +204,32 @@ function mergeCategoryRows(periodRows, fields) {
    money string. Kept this small rather than a generic table builder because
    a two-column key/value table and an N-column data table read differently
    in Markdown and gain nothing from sharing one function. */
+/* "Plus € 100 000 held in other currencies, not converted." — the sentence
+   this document uses to name money a figure could not include: the Net Worth
+   total's held-out accounts, assets and debts (merged per symbol by
+   worth.js's otherCurrencyNet), and, under Debt, that section's own foreign
+   balances.
+
+   One function, two KEYS. The first version used acct.hero.otherCurrencies
+   at both sites on the argument that the two caveats should read
+   identically — and under the Debt heading that printed "Plus € 100 000 HELD
+   in other currencies" about money the household OWES. An advisor reading
+   the forwarded report reads "held" as an asset; the figure was right and
+   the verb inverted its sign. So the Debt site passes report.debt.
+   otherCurrencies ("owed in other currencies"), and the Net Worth site keeps
+   the hero's wording, where "held" is what a net position is. Rounded to
+   whole units the way views/accounts.js's hero prints it: this is a "there
+   is also this much, elsewhere, in another unit" figure, and cents would
+   imply a precision the absence of a rate makes meaningless. Empty string
+   for an empty list, so the caller's `if` is the only gate. */
+function currencyLine(pairs, key = 'acct.hero.otherCurrencies') {
+  return (pairs || []).length
+    ? i18n.t(key, {
+      list: pairs.map(([sym, v]) => `${sym} ${Math.round(v)}`).join(' · '),
+    }).trim()
+    : '';
+}
+
 function kvTable(rows) {
   const out = ['', '|  |  |', '|---|---:|'];
   for (const [label, value] of rows) out.push(`| ${escMd(label)} | ${value} |`);
@@ -408,7 +434,7 @@ function financialReportMarkdown(data, money) {
     generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
-    otherCurrencies, household,
+    otherCurrencies, household, foreign,
   } = data;
 
   /* ISSUE 28. This document LEAVES the app: it is saved, shared, and read
@@ -418,11 +444,30 @@ function financialReportMarkdown(data, money) {
      in the one place it mattered most. The Net Worth section printed a total
      that added unlike currencies, in silence, while BOTH of its screen twins
      disclosed or split it. */
-  const otherLine = (otherCurrencies || []).length
-    ? i18n.t('acct.hero.otherCurrencies', {
-      list: otherCurrencies.map(([sym, v]) => `${sym} ${Math.round(v)}`).join(' · '),
-    }).trim()
-    : '';
+  const otherLine = currencyLine(otherCurrencies);
+
+  /* The three sections whose figures are NARROWED to the household's own
+     currency by the same rule their on-screen twins apply, and which said
+     nothing about it here.
+
+     `foreignExcluded` reuses the Dashboard hero's own key rather than
+     inventing a third wording of one sentence — dash.foreignExcluded is
+     already the app's phrase for "N accounts in another currency are not in
+     these figures", it is plural-aware in all twelve language tables, and
+     both places it is used below are genuinely counting ACCOUNTS: the
+     Income & Spend figures come from periodSummary(), which holds foreign
+     transaction FOLDERS out, and the Savings figures come from growthTotals()
+     over a pool of savings/investment accounts.
+
+     The Debt section deliberately does NOT use it. A debt is not an account,
+     and a document that leaves this app to be read by an advisor cannot call
+     one the other; it takes currencyLine() instead — the same sentence the
+     Net Worth section prints two sections down, which names the amount and
+     its symbol rather than a count, and which is true of a liability
+     ("held in euro") exactly as it is of an asset. */
+  const foreignExcluded = f => (f && f.count
+    ? i18n.t('dash.foreignExcluded', { count: f.count, symbols: (f.symbols || []).join(' · ') })
+    : '');
 
   const out = [
     '---',
@@ -461,6 +506,15 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.budgetIncome'), money(budgetIncome)],
       [i18n.t('report.col.budgetSpend'), money(budgetSpend)],
     ]));
+  /* period.js's periodSummary() returns `foreign` WITH the figures rather
+     than beside them, and says in its own comment that every tile, table,
+     chart and aria-label built from this object is expected to say something
+     when foreign.count is non-zero. views/dashboard.js's hero does. This
+     section read the same object and printed the same five figures with
+     nothing — in the one document that gets forwarded to somebody who cannot
+     open the app and check. */
+  const incomeForeign = foreignExcluded(foreign);
+  if (incomeForeign) out.push('', incomeForeign);
 
   /* ------------------------- spend by category ---------------------------
      C2 in the 2026-08-29 audit: this section used to run sharePercents() over
@@ -554,16 +608,38 @@ function financialReportMarkdown(data, money) {
        growthTile() itself uses. */
     if (savings.negCapital) out.push('', i18n.t('report.savings.negCapital', { count: savings.negCapital, total: savings.total }));
   }
+  /* Outside the branches above on purpose: a pool that is ENTIRELY foreign
+     falls into `!savings.total` and prints "No savings or investment accounts
+     recorded", which would be a flat untruth about a household that has
+     them. The caveat has to reach that branch too, and it is the only thing
+     that makes the sentence above it survivable. */
+  const savingsForeign = foreignExcluded(savings && savings.foreign);
+  if (savingsForeign) out.push('', savingsForeign);
 
   /* ------------------------------- debt -----------------------------------
      Also present-tense — see the savings section's own note, same reasoning:
      a debt book is not paged by budget period any more than an account
      balance is. */
   out.push('', `## ${i18n.t('report.section.debt')}`, i18n.t('report.asOf'));
+  /* ISSUE 30's rule, reaching this document at last. Every figure below —
+     the total, the monthly commitment, the interest and each row of the
+     table — is arithmetic that only means something inside ONE currency, and
+     views/debts.js has narrowed its own page to the household's since ADR-0004
+     landed. This section kept reading the UNFILTERED active list, so a
+     €100 000 bond printed as "R 100000.00" and was added to the rand total
+     beside it — and the SAME document's Net Worth section, three sections
+     down, was already excluding that bond from `Owed`. One report,
+     disagreeing with itself about one debt. */
+  const debtForeign = currencyLine(debts && debts.foreign && debts.foreign.others, 'report.debt.otherCurrencies');
   if (!debts || !debts.count) {
     out.push('', i18n.t('report.debt.none'));
   } else if (!debts.active) {
-    out.push('', i18n.t('report.debt.free', { count: debts.count }));
+    /* "Debt-free — N debts tracked, all paid off" is suppressed when a
+       foreign debt is still live. The count-based sentence would be a claim
+       about the household, not about this section's arithmetic, and the
+       caveat underneath cannot take back a word like debt-free. The euro
+       bond named below IS the whole story in that case. */
+    if (!debtForeign) out.push('', i18n.t('report.debt.free', { count: debts.count }));
   } else {
     out.push(...kvTable([
       [i18n.t('report.debt.total'), money(debts.total)],
@@ -571,6 +647,7 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.debt.interest'), money(debts.interest)],
     ]), ...debtTable(debts.rows, money));
   }
+  if (debtForeign) out.push('', debtForeign);
 
   /* ------------------------------ net worth -------------------------------- */
   out.push('', `## ${i18n.t('report.section.netWorth')}`, i18n.t('report.asOf'),
@@ -579,6 +656,13 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.owned'), money(netWorth.assets)],
       [i18n.t('report.col.owed'), money(netWorth.liabilities)],
     ]));
+  /* Built since issue #28 and never emitted — the line existed, correct, at
+     the top of this function, and no `out.push` ever carried it into the
+     document. So the fix that was supposed to stop this section printing a
+     rand total that silently dropped a euro flat and a euro bond shipped as
+     a computation with no reader. Under the kvTable rather than above it:
+     the sentence is about the three figures it follows. */
+  if (otherLine) out.push('', otherLine);
 
   /* --------------------------- financial health ---------------------------
      Only when healthSnapshot() itself has something honest to say — the same
@@ -617,7 +701,17 @@ function financialReportMarkdown(data, money) {
        amount of rand that never moved. */
     for (const r of transactions) {
       out.push(transactionRow(r, (v, row) => (row && row.currency && row.currency !== household
-        ? `${row.currency} ${Number(v).toFixed(2)}` : money(v))));
+        ? `${row.currency} ${Number(v).toFixed(2)}` : money(v)),
+      /* The Currency CELL, from the same per-row field the formatter beside
+         it already reads. transactionRow used to emit no such cell at all
+         under a header that declared one (see its own comment in
+         exporter.js), so this table's amounts rendered under "Currency" and
+         everything after them one column left. Injected rather than left to
+         that function's `_symbol` default because THIS caller stamps
+         `currency` — views/report.js's buildReportData, from symbolOf() —
+         and one fact answering to two field names is what the injection
+         exists to stop. */
+      row => (row && row.currency) || ''));
     }
   }
 
@@ -662,6 +756,14 @@ function jsonTransactionRow(r) {
   };
 }
 
+/* The JSON shape of a "held out of these figures" fact — one spelling for
+   the two sections that carry one, so a consumer writes one reader. Always
+   an object with both keys, never null or absent: see income_vs_spend's own
+   note on why a key that comes and goes is worse than a zeroed one. */
+function foreignFact(f) {
+  return { count: (f && f.count) || 0, symbols: (f && f.symbols) || [] };
+}
+
 /* The JSON sibling of financialReportMarkdown() — same `data`, reshaped into
    named sections and stringified, never re-derived. See this file's own
    header for why that discipline is the whole point of splitting the two
@@ -680,7 +782,7 @@ function financialReportJson(data) {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
-    otherCurrencies,
+    otherCurrencies, foreign,
   } = data;
 
   const shape = {
@@ -707,6 +809,12 @@ function financialReportJson(data) {
     income_vs_spend: {
       income, spend, net,
       budget_income: budgetIncome, budget_spend: budgetSpend,
+      /* ISSUE 28 — the same fact the Markdown sibling states in prose
+         (dash.foreignExcluded), as raw data. Always present and zeroed on a
+         single-currency vault rather than absent, matching every other count
+         in this object: a consumer testing `foreign.count > 0` must not have
+         to also handle the key not being there. */
+      foreign: foreignFact(foreign),
     },
     /* `orphaned` and `category_gap` are C2's fix — see categoryTable's own
        header in this file, and financialReportMarkdown's identical branch:
@@ -734,7 +842,15 @@ function financialReportJson(data) {
       category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: r.budget - r.actual,
       orphaned: !!r.orphaned,
     })),
-    savings: (savings && savings.total)
+    /* Present when there is a home-currency total OR a foreign pool held out
+       of it. The gate used to be `savings.total` alone, and since
+       savingsSummary() narrows `total` to the household's currency, a pool
+       that is entirely foreign gave total 0 → `savings: null` → the
+       `foreign` fact below never shipped — while the Markdown twin hoists
+       its sentence outside the same branch precisely for that vault. One
+       click, two documents, one of them silent about the household's
+       savings. Now both say it. */
+    savings: (savings && (savings.total || (savings.foreign && savings.foreign.count)))
       ? {
         growth: savings.growth,
         rate_growth: savings.rateGrowth,
@@ -756,6 +872,11 @@ function financialReportJson(data) {
            (never absent), matching every other count in this object. */
         neg_capital: savings.negCapital || 0,
         total: savings.total,
+        /* ISSUE 28 — which accounts the growth figures above were narrowed
+           to one currency to produce. Without it `growth` and `rate_pct`
+           read as covering the whole pool, which is exactly what they no
+           longer do. */
+        foreign: foreignFact(savings.foreign),
       }
       : null,
     debts: (debts && debts.count)
@@ -763,13 +884,26 @@ function financialReportJson(data) {
         count: debts.count, active: debts.active, total: debts.total,
         per_month: debts.perMonth, interest: debts.interest,
         rows: debts.rows.map(d => ({ name: d.name, balance: d.balance, rate: d.rate, interest: d.interest })),
+        /* ISSUE 30 — the debts every figure above holds out, per symbol.
+           `others` rather than `symbols` because a foreign debt's BALANCE is
+           the fact a reader of this section wants and cannot reconstruct
+           from `rows` (which no longer carries it), where a foreign
+           ACCOUNT's balance already reaches them through other_currencies. */
+        foreign: {
+          count: (debts.foreign && debts.foreign.count) || 0,
+          others: ((debts.foreign && debts.foreign.others) || []).map(([symbol, amount]) => ({ symbol, amount })),
+        },
       }
       : null,
     net_worth: { net: netWorth.net, assets: netWorth.assets, liabilities: netWorth.liabilities },
-    /* Every other currency the household holds, each in its own symbol and
-       never converted, so a document that spans currencies declares itself
-       rather than claiming to be in one. Empty on the single-currency vaults
-       that are nearly all of them. */
+    /* The household's NET position in every other currency — accounts plus
+       assets minus debts, per symbol, never converted (worth.js's
+       otherCurrencyNet, the same list the Net Worth section's caveat prints).
+       Not "what the household holds": a euro flat against a larger euro bond
+       nets negative here, and a symbol that nets to exactly nothing is
+       absent. Empty on the single-currency vaults that are nearly all of
+       them. The per-ledger gross figures are in `debts.foreign` (balances
+       owed) and the transaction rows' own `currency` field. */
     other_currencies: (otherCurrencies || []).map(([symbol, amount]) => ({ symbol, amount })),
     health_score: health
       ? {

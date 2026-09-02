@@ -132,6 +132,96 @@ assert.strictEqual(localeFor(''), PROFILES.za, 'localeFor(empty) still means za 
 assert.strictEqual(localeFor(undefined), PROFILES.za, 'localeFor(undefined) still means za, for the same reason');
 assert.strictEqual(localeFor('ZA '), PROFILES.za, 'localeFor is case/space-insensitive');
 
+/* ---------------- currentTaxYear: the cutover, to the DAY ------------------
+
+   currentTaxYear names the most recently COMPLETED tax year — the one the
+   reader can actually work on — so its answer must change on the day after
+   that year's last day, and not before. `yearSpan` states where each of those
+   days is, and the two are the same fact written twice: any profile whose
+   cutover disagrees with its own yearSpan is telling the reader to gather
+   documents for a year that has not finished.
+
+   Two of the three non-calendar year-ends fall on a month boundary (za: end
+   February, so 1 March; au: 30 June, so 1 July) and a month-only test is
+   exactly right for them — they are the negative controls here. The UK's does
+   NOT: the year ends 5 April and the next begins on the 6th, which is the one
+   date in this file where a month-only comparison is wrong. `>= 4` reported
+   the year 1–5 April as though it had already ended, so a reader opening the
+   Tax page on 2 April 2026 was shown 2026 — a year still four days from
+   finishing — with the SA302 checklist and the January filing deadline that
+   belong to it.
+
+   Local noon, deliberately: currentTaxYear reads local calendar parts (the
+   dates.js rule), and a midnight boundary in a UTC-constructed date would
+   make this test's own answers depend on the machine's zone.
+
+   The calendar-year profiles (us, ca, eu, cn, other) are a different
+   convention — they name the return currently in season, not a year-end — so
+   their boundary is asserted where their own rule puts it: on 1 January. */
+{
+  const noon = (y, m, d) => new Date(y, m - 1, d, 12, 0, 0);
+  const cases = [
+    // [country, last day of the year, first day of the next, the year that just ended]
+    ['za', [2026, 2, 28], [2026, 3, 1], 2026],
+    ['uk', [2026, 4, 5], [2026, 4, 6], 2026],
+    ['au', [2026, 6, 30], [2026, 7, 1], 2026],
+  ];
+  for (const [code, last, next, ended] of cases) {
+    const f = PROFILES[code].currentTaxYear;
+    assert.strictEqual(f(noon(...last)), ended - 1,
+      `${code}: on ${last.join('-')} the year ending that day has NOT ended yet — ` +
+      `${PROFILES[code].yearSpan(ended)} is still running`);
+    assert.strictEqual(f(noon(...next)), ended,
+      `${code}: the day after (${next.join('-')}) it has, and becomes the year to work on`);
+    // A day either side of the pair, so the answer is a step and not a spike.
+    assert.strictEqual(f(noon(last[0], last[1], last[2] - 1)), ended - 1, `${code}: the day before the cutover agrees with it`);
+    assert.strictEqual(f(noon(next[0], next[1], next[2] + 1)), ended, `${code}: and the day after does too`);
+  }
+
+  /* The UK's mid-month boundary, walked across in full — this is the range the
+     month-only test admitted, and every day of it was wrong. */
+  for (const d of [1, 2, 3, 4, 5]) {
+    assert.strictEqual(PROFILES.uk.currentTaxYear(noon(2026, 4, d)), 2025,
+      `uk: 2026-04-0${d} falls INSIDE the tax year ending 5 Apr 2026 — the year to work on is still ${PROFILES.uk.yearSpan(2025)}`);
+  }
+  for (const d of [6, 7, 30]) {
+    assert.strictEqual(PROFILES.uk.currentTaxYear(noon(2026, 4, d)), 2026,
+      `uk: 2026-04-${d} is in the NEXT tax year, so 2026 is the one that just ended`);
+  }
+  assert.strictEqual(PROFILES.uk.currentTaxYear(noon(2026, 3, 31)), 2025, 'uk: March is unambiguously the old year');
+  assert.strictEqual(PROFILES.uk.currentTaxYear(noon(2026, 5, 1)), 2026, 'uk: May is unambiguously the new one');
+
+  /* The calendar-year profiles answer a DIFFERENT question, and the difference
+     is easy to mistake for a bug. Their tax year is Jan–Dec, so it has always
+     already ended by the time anyone reads the page; what moves instead is
+     which return is in SEASON. They hold last year's return open through the
+     filing window and step the month after it closes — 1 May for the 15 April
+     deadline countries, 1 July for cn. So the year they name in April is
+     deliberately last year's, and "fixing" that to 1 January would hand a
+     reader in February a year they cannot yet file.
+
+     Pinned per profile rather than derived, so a country whose deadline moves
+     has to say so here. The step is asserted to be exactly one month wide and
+     exactly +1 year, which is what rules out the off-by-a-day shape the UK
+     profile had. */
+  const SEASON_STEP = { us: 5, ca: 5, eu: 5, other: 5, cn: 7 };
+  for (const [code, month] of Object.entries(SEASON_STEP)) {
+    const p = PROFILES[code];
+    if (!p) { fail(code, 'SEASON_STEP names a profile that does not exist'); continue; }
+    assert.ok(/Jan\s*–\s*Dec/.test(p.yearSpan(2026)),
+      `${code}: SEASON_STEP is only for calendar-year profiles — this one's span is "${p.yearSpan(2026)}"`);
+    const f = p.currentTaxYear;
+    assert.strictEqual(f(noon(2026, month, 1)), f(noon(2026, month - 1, 28)) + 1,
+      `${code}: the filing season turns over on 1 ${['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'][month]}, once, by one year`);
+    assert.strictEqual(f(noon(2026, month, 1)), 2026,
+      `${code}: and lands on the calendar year that has just become fileable`);
+    assert.strictEqual(f(noon(2026, 12, 31)), f(noon(2026, month, 1)),
+      `${code}: nothing moves again before the year is out`);
+    assert.strictEqual(f(noon(2026, 1, 1)), 2025,
+      `${code}: January still belongs to last year's return, not to the calendar's new one`);
+  }
+}
+
 /* The two resolvers read the same key and must agree about what it means. */
 {
   const { loanProfileFor } = require('../src/loan-math');

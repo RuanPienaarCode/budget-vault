@@ -42,13 +42,20 @@
         (src/table-schema.js), not a fourth hand-written copy — so a column
         appended there cannot silently reach the vault file, the loader and
         the byte-golden gate while never reaching either export.
+    11. A rendered ROW is as wide as the header claims. Item 10 compares the
+        header of an export with no rows in it, so it stayed green while
+        transactionRow() emitted eight cells under a nine-column header —
+        the Currency column reached TX_HEAD and the CSV and never reached
+        the one row template the Markdown export and the Report's own
+        transaction-detail table both draw through. Every value from Amount
+        onward was one column left, in a table that still parsed.
 
    Pure — no DOM, no obsidian, no vault. */
 
 const assert = require('assert');
 const {
   transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown,
-  exportPaths, safeName, EXPORT_DIR,
+  exportPaths, safeName, EXPORT_DIR, txHeaderLines, transactionRow,
 } = require('../src/exporter');
 const { SCHEMAS } = require('../src/table-schema');
 
@@ -64,6 +71,13 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 const { csvCell } = require('../src/csv');
 
 const money = v => `R ${v < 0 ? '-' : ''}${Math.abs(v).toFixed(2)}`;
+
+/* Read off the SHIPPED header rather than written down as a literal, so
+   appending a column moves this test's expectation and the file under test
+   together. A hardcoded 8 here is precisely what let the Currency column ship
+   into the header while the row template stayed one cell short (item 11
+   below) — the number was pinned in one place and the shape in another. */
+const TX_HEAD_LEN = txHeaderLines()[0].split('|').length - 2;
 
 const ROWS = [
   { date: '2026-08-01', desc: 'GROCER ONE CITYVILLE', label: 'Cheque', cat: 'Food', amount: -250.5, excluded: false, note: '' },
@@ -217,7 +231,7 @@ const SPLIT_ROWS = [
   ok(line.includes('PAY \\| ROLL'), 'a pipe in a description is escaped');
   // (?<!\\) is a plain node-side test helper, not shipped src/ — src/ itself
   // never uses lookbehind (it is a parse-time SyntaxError before iOS 16.4).
-  eq(line.split(/(?<!\\)\|/).length - 2, 8, 'so the row still has exactly eight cells (Split is the 8th)');
+  eq(line.split(/(?<!\\)\|/).length - 2, TX_HEAD_LEN, `so the row still has exactly ${TX_HEAD_LEN} cells (Split is the last)`);
 }
 
 /* ---- 5b. a wrapped cell cannot break the table either ----
@@ -259,6 +273,64 @@ const SPLIT_ROWS = [
   const headerLine = md.split('\n').find(l => l.startsWith('| Date'));
   const mdHead = headerLine.split('|').slice(1, -1).map(s => s.trim());
   eq(mdHead, expectedHead, 'the markdown header matches the schema plus Account and Currency');
+}
+
+/* ---- 11. a rendered ROW carries as many cells as the header says it does,
+   and the Currency cell is the row's own symbol ----
+
+   The bug this pins: TX_CURRENCY_AT spliced `Currency` into TX_HEAD and
+   TX_ALIGN (so txHeaderLines() emitted nine columns) and transactionsCsv
+   grew its matching `csvCell(sym(r))` — but transactionRow(), the ONE row
+   template the Markdown export and views/report.js's transaction-detail
+   table both draw through, was left at eight. Every value from Amount
+   onward landed one column to the left, so a reader of either document saw
+   the amount filed under "Currency", the Excluded flag under "Amount" and
+   the Split role under "Note", in a table that still looked perfectly
+   well-formed.
+
+   Item 10 above could not see it: it compares the header of an export with
+   NO ROWS in it. A header-only file has no row to be short. So the check
+   that actually has teeth is header-width against a REAL row — and against
+   more than one, since a single row is also what the CSV/Markdown parity
+   checks below would have caught by luck rather than by design. */
+{
+  const rows = [
+    { ...ROWS[0], _symbol: 'R' },
+    { date: '2026-08-05', desc: 'Rent Berlin', label: 'Euro Savings', cat: 'Housing', amount: -900, excluded: true, note: 'lease', split: 'parent', _symbol: '\u20ac' },
+  ];
+  const symbolFor = r => r._symbol || '';
+  const md = transactionsMarkdown(rows, { range: 'Aug 2026', filters: [], generated: 'x', household: 'R' }, money, symbolFor);
+  const lines = md.split('\n');
+  const head = lines.find(l => l.startsWith('| Date')).split('|').slice(1, -1).map(x => x.trim());
+  const body = lines.filter(l => /^\| 2026-/.test(l));
+  eq(body.length, 2, 'both rows rendered');
+  for (const l of body) {
+    eq(l.split('|').length - 2, head.length,
+      'a rendered row has exactly as many cells as the header — one short shifts every value from Amount onward into the wrong column');
+  }
+
+  const CUR = head.indexOf('Currency');
+  ok(CUR !== -1, 'the markdown header carries a Currency column');
+  eq(body[0].split('|')[CUR + 1].trim(), 'R', 'a household-currency row states the household symbol');
+  eq(body[1].split('|')[CUR + 1].trim(), '\u20ac', 'and a euro row states the euro symbol, not the household one');
+
+  /* The SAME per-row symbol both files resolve — the CSV had this from the
+     start (csvCell(sym(r))) and the Markdown did not, which is the whole
+     defect: one click writing two files that disagree about the unit of the
+     figure beside it. */
+  const csv = transactionsCsv(rows, symbolFor);
+  const cols = csv.split('\n')[0].split(',');
+  const csvRows = csv.trim().split('\n').slice(1).map(l => l.split(','));
+  eq(csvRows[1][cols.indexOf('Currency')], '\u20ac', 'the CSV resolves the same symbol for the same row');
+  eq(body[1].split('|')[CUR + 1].trim(), csvRows[1][cols.indexOf('Currency')],
+    'and the two files agree on it — one row template, one symbol rule');
+
+  /* transactionRow() driven directly, the shape src/report.js's own
+     transaction-detail table calls it in: a caller that injects nothing
+     still gets a full-width row rather than a silently short one. */
+  const bare = transactionRow(rows[1], money, symbolFor);
+  eq(bare.split('|').length - 2, TX_HEAD_LEN,
+    'transactionRow() on its own emits a full-width row — this is the exact call src/report.js makes');
 }
 
 /* ---- 6. filters are disclosed in the document ---- */

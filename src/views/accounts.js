@@ -1118,6 +1118,27 @@ module.exports = function registerAccounts(ctx) {
     if (r.state === 'stale') {
       return i18n.t('acct.deck.why.stale', { count: r.days, date: r.a.balance_updated });
     }
+    /* Its own branch rather than the generic fallthrough below, because this is
+       the only `why` line besides drift and stale that states a NUMBER — the
+       count of rows nothing can date, which travels on the reconciliation
+       (rec.unreadable) rather than being recoverable from the state name.
+
+       The sentence shipped inline in English for one wave, while `unreadable`
+       was a new state (see src/acct-status.js) and no lang table carried a key
+       for it: this file is in tests/i18n.test.cjs's TRANSLATED_VIEWS, so a key
+       added to only one table fails that suite, and a key called before it
+       exists renders its own dotted name on screen in EVERY language — which
+       is tests/i18n-render.test.cjs's first and highest-value assertion. All
+       twelve tables now carry `acct.deck.why.unreadable`, so the words live
+       where the other eleven languages can reach them.
+
+       Whole sentence per plural form, not a fragment assembled around the
+       number: the singular says "against it" and the plural "against them",
+       which is the distinction the old inline `carries a date`/`carry dates`
+       concatenation could not make on the tail of the sentence. */
+    if (r.state === 'unreadable') {
+      return i18n.t('acct.deck.why.unreadable', { count: r.rec.unreadable });
+    }
     return i18n.t(`acct.deck.why.${r.state}`);
   }
 
@@ -1140,6 +1161,18 @@ module.exports = function registerAccounts(ctx) {
        statement has been parsed, so there is nothing to select yet. */
     if (r.state === 'notx') {
       return { label: i18n.t('acct.deck.do.notx'), run: () => ctx.switchView('import') };
+    }
+    /* The fix for an unreadable date is in the transaction file, not in any
+       dialog this page owns — so the action is to go and look at the rows.
+       Reuses `acct.btn.seeTx`, an existing translated key that says exactly
+       the right thing, rather than minting an `acct.deck.do.unreadable` that
+       would read identically — a second key for the same words is a second
+       thing to keep in step across twelve tables, for no gain a reader of any
+       of them can see. */
+    if (r.state === 'unreadable') {
+      const primary = [...(r.labels || [])][0];
+      return { label: i18n.t('acct.btn.seeTx'),
+        run: () => (primary ? openTransactions(primary) : ctx.switchView('transactions')) };
     }
     return { label: i18n.t('acct.deck.do.nofolder'), run: () => editAccount(r.a) };
   }
@@ -1405,7 +1438,14 @@ module.exports = function registerAccounts(ctx) {
   }
 
   function statePill(r) {
-    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', nodate: 'warn', notx: 'warn', nofolder: 'warn' }[r.state];
+    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', unreadable: 'warn',
+      nodate: 'warn', notx: 'warn', nofolder: 'warn' }[r.state];
+    /* `stale` is the only state whose pill states a number, so it is the only
+       one that needs a param; every other state — `unreadable` now included —
+       is a bare label the state name itself selects. The template-literal form
+       is invisible to tests/i18n.test.cjs's source scan, which is why the
+       rendered proof in tests/reconcile-unreadable-dates.test.cjs asserts the
+       pill through this same i18n.t call rather than against a literal. */
     const label = r.state === 'stale'
       ? i18n.t('acct.state.stale', { count: r.days })
       : i18n.t(`acct.state.${r.state}`);
@@ -1616,6 +1656,21 @@ module.exports = function registerAccounts(ctx) {
   function reconLine(r) {
     const a = r.a, rec = r.rec;
     const line = el('div', { class: 'acct-recon' });
+    /* Stated on EVERY branch below, not only on its own state. An account that
+       is ALSO drifting, or also stale, still has money the vault cannot place;
+       reporting the count only when it happens to be the headline is how it
+       would go missing on exactly the accounts that have more than one thing
+       wrong with them — and the drift branch is the one that offers a figure
+       to accept, so it is the branch where an unstated omission does the most
+       damage.
+
+       `acct.recon.undatable` carries its own leading " · " inside the string,
+       exactly as `acct.recon.pending` beside it does — the separator belongs to
+       the fragment rather than to the concatenation, so a language that wants a
+       different join (or none) can say so in its own table instead of being
+       held to a punctuation mark decided here. */
+    const n = (rec && rec.unreadable) || 0;
+    const undatable = n ? i18n.t('acct.recon.undatable', { count: n }) : '';
     if (rec.state === 'drift') {
       const diff = rec.implied - a.balance;
       line.append(el('div', { class: 'acct-recon-txt' },
@@ -1625,7 +1680,7 @@ module.exports = function registerAccounts(ctx) {
           implied: acctMoney(a, rec.implied),
           diff: acctMoney(a, Math.abs(diff), 0),
           dir: i18n.t(diff < 0 ? 'acct.drawer.lower' : 'acct.drawer.higher'),
-        }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '')));
+        }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '') + undatable));
       const btn = el('button', { type: 'button', class: 'acct-recon-btn',
         'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: acctMoney(a, rec.implied) }) },
         icoEl(['check']), i18n.t('acct.recon.useThis'));
@@ -1636,10 +1691,12 @@ module.exports = function registerAccounts(ctx) {
     const txt = r.state === 'notx' ? i18n.t('acct.drawer.recon.notx')
       : r.state === 'nofolder' ? i18n.t('acct.drawer.recon.nofolder')
         : r.state === 'nodate' ? i18n.t('acct.drawer.recon.nodate')
-          : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
-            : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
-              : i18n.t('acct.drawer.recon.ok');
-    line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` }, txt));
+          : r.state === 'unreadable' ? i18n.t('acct.drawer.recon.unreadable')
+            : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
+              : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
+                : i18n.t('acct.drawer.recon.ok');
+    line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` },
+      txt + undatable));
     if (r.state === 'stale' || r.state === 'nodate') {
       const btn = el('button', { type: 'button', class: 'acct-recon-btn' },
         i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'));

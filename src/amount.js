@@ -197,20 +197,36 @@ function normalizeAmount(raw, opts) {
   return neg ? -n : n;
 }
 
-/* Strict numeric-cell parse. Returns { ok, value, raw }. `ok` is true only for
-   a plain decimal (the app's on-disk format); anything else (e.g. "1 234,56",
-   "R100") is preserved verbatim in `raw` so a serializer can write it back
-   unchanged instead of silently coercing it to a wrong number.
+/* Strict numeric-cell parse. Returns { ok, value, raw, readable }. `ok` is true
+   only for a plain decimal (the app's on-disk format); anything else (e.g.
+   "1 234,56", "R100") is preserved verbatim in `raw` so a serializer can write
+   it back unchanged instead of silently coercing it to a wrong number.
 
    The fallback `value` still has to be the reader's best guess, because it
    feeds every total and KPI — but it must not be a *plausible wrong number*.
    Bare parseFloat reads "1,234.56" as 1 and "R150.00" as 0, which shows up as
    a quietly wrong balance rather than an obvious error. normalizeAmount knows
-   both separator conventions and every statement flavour, so use it. */
+   both separator conventions and every statement flavour, so use it.
+
+   `readable` is the THIRD question, and it is not `ok`. `ok` asks "is this
+   already in the canonical on-disk form"; `readable` asks "did a number come
+   out of this cell at all". "1 234,56" answers no to the first and yes to the
+   second — it is read correctly as 1234.56 and rewritten canonically, which is
+   the byte behaviour tests/golden-tables.test.cjs pins. "12 000 R" and
+   "prime + 2" answer no to both: normalizeAmount refuses them and the 0 in
+   `value` is FABRICATED, not measured.
+
+   Callers needed that separation and could not derive it — `value: 0` looks
+   identical whether the file said "0.00" or something nobody can read — so
+   table-schema.js's money() reader used to write its fabricated 0 back over
+   the reader's own text on the next save. The distinction lives here, beside
+   the parse that makes it, rather than as a second normalizeAmount call at
+   each call site that would be free to drift from this one. */
 function parseNum(s) {
   const t = (s ?? '').toString().trim();
-  if (/^-?\d+(\.\d+)?$/.test(t)) return { ok: true, value: parseFloat(t) };
-  return { ok: false, value: normalizeAmount(t) ?? 0, raw: t };
+  if (/^-?\d+(\.\d+)?$/.test(t)) return { ok: true, value: parseFloat(t), readable: true };
+  const n = normalizeAmount(t);
+  return { ok: false, value: n ?? 0, raw: t, readable: n != null };
 }
 
 module.exports = { normalizeAmount, inferGrouping, parseNum };

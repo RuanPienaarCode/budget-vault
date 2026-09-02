@@ -412,7 +412,21 @@ const PROFILES = {
     yearHint: 'Tax year (ends 5 Apr of this year)',
     figureCodeLabel: 'Box',
     yearSpan: y => `6 Apr ${y - 1} – 5 Apr ${y}`,
-    currentTaxYear: now => (now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1),
+    /* The one cutover in this file that does NOT fall on a month boundary, and
+       the only one that needs a day. za's year ends at the end of February and
+       au's on 30 June, so `>= 3` and `>= 7` are exactly right for them; the
+       UK's ends on 5 April and the next begins on the 6th, so a month-only
+       `>= 4` reported the year 1–5 April as though it had already ended.
+       A reader opening the Tax page on 2 April 2026 was shown 2026 — a year
+       still four days from finishing — with the SA302 checklist and the
+       January filing deadline that belong to a completed one. The yearSpan
+       directly above says where the boundary is; this now agrees with it.
+       Pinned day by day in tests/locale-profiles.test.cjs. */
+    currentTaxYear: (now) => {
+      const m = now.getMonth() + 1;
+      const started = m > 4 || (m === 4 && now.getDate() >= 6);
+      return started ? now.getFullYear() : now.getFullYear() - 1;
+    },
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-01-31`, deadline_provisional: `${y}-10-31` }),
     deadlineLabels: ['Online filing deadline', 'Paper filing deadline'],
     activeDeadline: t => t.deadline_standard,

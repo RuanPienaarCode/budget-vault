@@ -65,6 +65,41 @@ function isStale(iso, today) {
   return d === null || d < 0 || d > STALE_DAYS;
 }
 
+/* The same verdict for a VALUATION, whose clock is a year rather than thirty
+   days — "is this figure still current?" — with the threshold passed in
+   rather than defaulted.
+
+   Two reasons it lives here and not where it is used. The first is the
+   1.23.1 hole named above: `d > staleDays` is false for a NEGATIVE d, so a
+   `valued:` date typo'd into the future (2099 for 2029, or a year slip) read
+   as a fresh valuation. views/assets.js and views/savings.js were each
+   answering this question with their own `d !== null && d > VALUED_STALE_DAYS`,
+   and BOTH still had that hole open long after isStale() and
+   stalenessSummary() were patched for it — measured: an Assets page printing
+   "Needs a new valuation: 0 — every value is current" directly above a row
+   whose own caption (valuedAge, which has always had the `d < 0` branch) read
+   "valued ahead of today". A fourth and fifth spelling of one rule is how that
+   happens; this is the one spelling.
+
+   `null` is NOT stale here, and that is deliberate rather than an oversight:
+   "this date is over a year old" and "I cannot read this date at all" are two
+   different claims, and views/assets.js keeps them apart on purpose (its own
+   `dateUnreadable`) so a row the page cannot date is not told to its face that
+   its figure is a specific kind of old. A caller that wants both —
+   views/savings.js, which is asking how much MONEY rests on a figure nobody
+   has checked — says so explicitly at its own call site.
+
+   The NUMBER stays where it was documented: views/assets.js declares
+   VALUED_STALE_DAYS = 365 as its single source and publishes it on `ctx`
+   (tests/vocabulary.test.cjs, TERM 10, pins that). A default here would be a
+   second home for exactly the constant that term exists to keep in one place,
+   so this module owns the rule and that file owns the number. */
+function isStaleValuation(valued, today, staleDays) {
+  const d = daysSince(valued, today);
+  if (d === null) return false;
+  return d < 0 || d > staleDays;
+}
+
 /* What the balance should read RIGHT NOW: the last confirmed figure plus
    everything dated after it, up to and including today.
 
@@ -94,7 +129,16 @@ function isStale(iso, today) {
      no-date  a balance with no readable date — can't place the window
      clean    nothing has moved since it was confirmed
      pending  nothing has moved, but rows are dated ahead
-     drift    money has moved; `implied` is what it would read */
+     drift    money has moved; `implied` is what it would read
+
+   Every state that walked the rows also carries `unreadable`: how many of
+   them carry a date naming no day, and so could not be placed in EITHER
+   window. It is a count and not a state on purpose — views/dashboard.js and
+   views/savings.js both switch on `state`, and a sixth value would have had
+   to be understood by each of them before this could ship. `clean` therefore
+   now means "nothing READABLE has moved", and a caller may not present it as
+   agreement while `unreadable` is non-zero; src/acct-status.js is where that
+   refusal is enforced for the Accounts page. */
 function reconcile(a, rows, today) {
   /* The DATE is checked before the rows, and the order is load-bearing.
 
@@ -124,14 +168,42 @@ function reconcile(a, rows, today) {
   if (a.balance_updated > now) return { state: 'no-date' };
   if (!rows || !rows.length) return { state: 'no-tx' };
   const since = [], ahead = [];
+  /* ROWS WHOSE DATE NAMES NO DAY. Both comparisons below are STRING
+     comparisons — correct for a real ISO date and meaningless for anything
+     else — and "anything else" is not exotic: `2026-13-05` is the ordinary
+     day/month-swap typo (the writer meant 2026-05-13), `2026-02-30` is a
+     month-length slip, and "end of June" is what a person types into a column
+     nothing validated. Sorted as strings all three land after today, so the
+     row went into `ahead`, this returned 'clean', acct-status returned 'ok',
+     the Accounts pill went green on "agrees", the account left the decision
+     queue and the attention count, and the R2 000 the row records was absent
+     from the implied balance with nothing on screen saying so.
+
+     `isRealIsoDate` has been imported at the top of this file since the
+     balance date got its own realness test; the rows never got one.
+     savings-math.js:283 learned the same lesson from the same input class —
+     its `monthOf` routes an unwalkable key into a visible UNDATABLE bucket
+     rather than letting the row fall off the chart.
+
+     They are COUNTED, not placed and not dropped. Placing them in `since`
+     would put money of unknown date into an offer the reader can accept in
+     one tap — and because the row stays undatable, the next reconciliation
+     would count it again against the freshly stamped balance, compounding on
+     every accept. Placing them in `ahead` is the bug. So the count travels
+     with the verdict and acct-status refuses to call the account settled
+     while one exists: the app argues, it never silently corrects. */
+  let unreadable = 0;
   for (const r of rows) {
     if (supersededBySplit(r)) continue;   // its parts are in this same list
+    if (!isRealIsoDate(r.date)) { unreadable++; continue; }
     if (r.date <= a.balance_updated) continue;
     (r.date > now ? ahead : since).push(r);
   }
   const delta = since.reduce((s, r) => s + r.amount, 0);
   if (!since.length) {
-    return ahead.length ? { state: 'pending', ahead: ahead.length } : { state: 'clean' };
+    return ahead.length
+      ? { state: 'pending', ahead: ahead.length, unreadable }
+      : { state: 'clean', unreadable };
   }
   /* Rows that NET TO NOTHING have not moved the balance, so there is nothing
      to disagree about. Read as a drift, R2 000 out to savings and R2 000
@@ -141,12 +213,12 @@ function reconcile(a, rows, today) {
      offer to move the confirmation date forward. Cent precision, because the
      rows are money and float noise is not a disagreement either. */
   if (Math.round(delta * 100) === 0) {
-    return { state: 'clean', count: since.length, ahead: ahead.length, since };
+    return { state: 'clean', count: since.length, ahead: ahead.length, unreadable, since };
   }
   /* `since` travels with the verdict so the view can show WHICH rows moved the
      figure. Reporting a delta and then making the reader hunt for its cause is
      most of the work of reconciling left undone. */
-  return { state: 'drift', count: since.length, ahead: ahead.length, delta, implied: a.balance + delta, since };
+  return { state: 'drift', count: since.length, ahead: ahead.length, unreadable, delta, implied: a.balance + delta, since };
 }
 
 /* How many of a set of accounts are carrying an unconfirmed balance, and the
@@ -169,4 +241,4 @@ function stalenessSummary(accounts, today) {
   return { total: (accounts || []).length, stale, dated, oldestDays: oldest };
 }
 
-module.exports = { STALE_DAYS, daysSince, isStale, reconcile, stalenessSummary };
+module.exports = { STALE_DAYS, daysSince, isStale, isStaleValuation, reconcile, stalenessSummary };

@@ -92,7 +92,14 @@ ok(isSettled({ amount: 2000, repaid: 0, status: 'paid' }), 'and a reader may sim
    calls this before it knows whether the vault has an Owed Money.md at all. */
 for (const [label, input] of [['empty', []], ['absent', undefined], ['null', null]]) {
   const s = owedSummary(input, '2026-07-01');
-  eq(s, { outstanding: 0, recovered: 0, open: 0, entries: 0, oldestDays: null, otherCurrencies: [] },
+  /* Deliberately the WHOLE object, not a field at a time: a new key added to
+     the summary shape has to be an explicit decision here, because the
+     dashboard band destructures this and a key that appears without anyone
+     noticing is a key nobody wired up. `recoveredOthers` (foreign money that
+     came back — see tests/owed-foreign-settlement.test.cjs) arrived through
+     exactly this check. */
+  eq(s, { outstanding: 0, recovered: 0, open: 0, entries: 0, oldestDays: null,
+    otherCurrencies: [], recoveredOthers: [] },
     `an ${label} ledger summarises to zeroes rather than throwing`);
 }
 

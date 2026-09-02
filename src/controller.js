@@ -46,11 +46,29 @@ const registerReport = require('./views/report');
    "R NaN,undefined" — a garbage figure sitting next to every real one on the
    screen. No loader coercion or render-path division has been found to reach
    this un-guarded (every one is already checked), so this is a latent-hazard
-   guard, not a fix for a proven path: render 0 rather than propagate garbage. */
+   guard, not a fix for a proven path: render 0 rather than propagate garbage.
+
+   The sign is decided from the ROUNDED magnitude, not from `v`. Taking it from
+   the unrounded value while the digits came from the rounded one let the two
+   halves of the string disagree, and the reader got a minus in front of a zero.
+   -0 was safe by accident (`-0 < 0` is false in JS); every other negative that
+   rounds away to nothing was not. Summing signed floats leaves a remainder like
+   -7.1e-15 behind — the exact remainder currency.js's primaryTotal exists to
+   collapse — so a break-even household printed "R -0,00", a negative figure in
+   danger red for a household that owes nothing; and at decimals=0 (the compact
+   tiles) every amount between -0,5 and 0 printed "R -0". A minus is the
+   strongest claim a money label makes, and it must not outlive the rounding
+   that erased the number it belonged to. It survives only while a digit does —
+   -0,005 still rounds to a cent, so it keeps its sign.
+
+   currency.js's formatAmount is the byte-for-byte twin of this function (its
+   header explains why the copy exists) and carries the identical change; the
+   two are held together by tests/controller-money.test.cjs. */
 function formatMoney(symbol, v, decimals, loc) {
   if (!Number.isFinite(v)) v = 0;
-  const sign = v < 0 ? '-' : '';
-  const parts = Math.abs(v).toFixed(decimals).split('.');
+  const abs = Math.abs(v).toFixed(decimals);
+  const sign = v < 0 && Number(abs) !== 0 ? '-' : '';
+  const parts = abs.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
   return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
 }

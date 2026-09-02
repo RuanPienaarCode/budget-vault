@@ -178,10 +178,13 @@ function amountCell(row) {
 
 /* `symbolFor` resolves a row's own currency symbol from its account, injected
    for the same reason `money` is: the mapping is a runtime lookup over
-   S.accounts, which a pure module cannot do. Optional, and defaulted to the
-   household symbol — an older caller that has not been updated still produces
-   a valid file rather than one with an empty column, and a single-currency
-   vault (nearly all of them) is unaffected either way. */
+   S.accounts, which a pure module cannot do. Optional, and defaulted to an
+   EMPTY cell rather than the household symbol: a pure module does not know
+   the household's symbol, and inventing one ("R") would stamp a currency the
+   vault never declared onto every row. A caller that passes nothing still
+   produces a valid nine-column file — the column is present, blank — and
+   both writers below default the same way so the CSV and the Markdown cannot
+   disagree about a row's currency. */
 function transactionsCsv(rows, symbolFor) {
   const head = TX_HEAD;
   const sym = symbolFor || (() => '');
@@ -220,8 +223,32 @@ function categoriesCsv(categories) {
    used to be the household's formatter applied to every row, which stamped
    "R -900.00" on a €900 charge. That is not a missing label but a wrong
    figure: it asserts an amount of rand that was never spent. */
-function transactionRow(r, money) {
-  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
+/* `symbolFor` is the SAME per-row resolver transactionsCsv already takes,
+   injected for the same reason: the account -> symbol mapping is a runtime
+   lookup over S.accounts that a pure module cannot do. It fills the Currency
+   cell, which this template did not emit at all until now.
+
+   That omission is the defect this signature exists to close. TX_CURRENCY_AT
+   spliced `Currency` into TX_HEAD/TX_ALIGN, so txHeaderLines() started
+   writing a NINE-column header, and transactionsCsv grew its matching
+   `csvCell(sym(r))` — but this function, the one row template both the
+   Markdown export and views/report.js's transaction-detail table draw
+   through, stayed at eight. A short markdown row does not break the table;
+   it SILENTLY SHIFTS, so every value from Amount onward rendered one column
+   to the left: the amount under "Currency", the Excluded flag under
+   "Amount", the split role under "Note". Both documents looked perfectly
+   well-formed and were unreadable — the same class of failure exporter.js's
+   own header describes for a CSV whose column of correct-looking figures
+   will not add up, because nothing announces it.
+
+   Defaulted to the row's stamped `_symbol` so a caller that pre-stamps its
+   rows (rather than injecting a lookup) still produces a full-width row, and
+   to '' rather than the household symbol for the same reason transactionsCsv
+   defaults that way: a caller that knows nothing about currencies writes an
+   empty cell, never a symbol it invented. */
+function transactionRow(r, money, symbolFor) {
+  const sym = symbolFor ? symbolFor(r) : (r && r._symbol) || '';
+  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${escMd(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
 }
 
 /* `money(amount, row)` is the view's own formatter, injected because the
@@ -232,8 +259,16 @@ function transactionRow(r, money) {
 
    `foreignSymbols` names the other currencies present, so the totals line can
    say what it does NOT cover — see the note built below. */
-function transactionsMarkdown(rows, meta, money) {
+function transactionsMarkdown(rows, meta, money, symbolFor) {
   const { range, filters, generated } = meta;
+  /* ONE symbol rule for this whole file — the totals line's "which rows may
+     be added together", the Currency cell in every row, and the CSV sibling
+     written by the same click all read it. It used to be two: this function
+     read a `_symbol` its caller stamped onto each row, while transactionsCsv
+     called an injected lookup, and nothing made the two agree. Injected here
+     too, defaulting to that same stamped field so a caller that has not been
+     updated is unchanged. */
+  const sym = symbolFor || (r => (r && r._symbol) || '');
   const included = rows.filter(r => !r.excluded);
   /* Totals over the HOUSEHOLD-currency rows only. They used to add every
      amount whatever its account's currency and print the result as one
@@ -242,9 +277,9 @@ function transactionsMarkdown(rows, meta, money) {
      else. Rows in other currencies are still LISTED, each in its own symbol;
      they are just not summed into a number that could not mean anything. */
   const foreignSymbols = [...new Set(rows
-    .map(r => (r._symbol || ''))
-    .filter(sym => sym && sym !== (meta.household || '')))];
-  const counted = included.filter(r => !r._symbol || r._symbol === (meta.household || ''));
+    .map(r => sym(r) || '')
+    .filter(s => s && s !== (meta.household || '')))];
+  const counted = included.filter(r => !sym(r) || sym(r) === (meta.household || ''));
   const inTotal = counted.filter(r => r.amount > 0).reduce((t, r) => t + r.amount, 0);
   const outTotal = counted.filter(r => r.amount < 0).reduce((t, r) => t + r.amount, 0);
 
@@ -277,7 +312,7 @@ function transactionsMarkdown(rows, meta, money) {
   // splitRole, not r.split raw: same reason serializeTxFile reads it this
   // way — only two strings are ever legal here, so the cell never needs
   // escMd, and a stray hand-typed word in the source column reads as ''.
-  for (const r of rows) out.push(transactionRow(r, money));
+  for (const r of rows) out.push(transactionRow(r, money, sym));
   return out.join('\n') + '\n';
 }
 

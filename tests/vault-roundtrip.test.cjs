@@ -69,18 +69,18 @@ const FILES = {
      they must be READ, not truncated — and this file is the one place that can
      prove it, because owed-math's own suite builds its rows from numeric
      literals and never goes through the loader. */
-  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | |\n| Léa | 40.00 | multi<br>line | | paid | |\n| Thabo | 1 500,00 | space-grouped \\| comma decimal | 2026-09-01 | outstanding | |\n| Nadia | R4000 | currency prefix, part repaid | | outstanding | 1 000,00 |\n| Yusuf | 12,500.00 | comma-grouped thousands | | outstanding | |\n',
+  [`${B}/Owed Money.md`]: '---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | |\n| Léa | 40.00 | multi<br>line | | paid | |\n| Thabo | 1 500,00 | space-grouped \\| comma decimal | 2026-09-01 | outstanding | |\n| Nadia | R4000 | currency prefix, part repaid | | outstanding | 1 000,00 |\n| Yusuf | 12,500.00 | comma-grouped thousands | | outstanding | |\n| Pieter | ask him | never wrote it down | | outstanding | |\n',
 
-  [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n',
+  [`${B}/Debts.md`]: '---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1 234,56 | 90000.00 | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n| Store card | Edgars | credit card | 2 400 R | prime + 2 | prime + 2 | 300.00 | 0.00 | 2025-05-01 |  | active | three cells nobody can read |\n',
 
   /* A hand-written Assets.md: a space-grouped value that parseFloat would read
      as 15, an unescaped pipe in a name, a non-ISO valuation date, a kind that
      is not one of the presets, and a row with nothing but a name. */
-  [`${B}/Assets.md`]: '---\nkind: assets\naliases: [possessions]\n---\n\n# Assets\n\n| Item | Kind | Value | Valued | Notes |\n|------|------|------:|--------|-------|\n| The house \\| Gardens | property | 15 000 000 | 2026-03-01 | bonded \\| see Debts |\n| Corolla | vehicle | 70000.00 | when we bought it | non-ISO date |\n| Rings | jewellery | 60000.00 | 2019-11-02 | multi<br>line |\n| Krugerrands | precious metals | 1.234,56 | | hand-edited cell |\n| Nameplate only | | | | |\n',
+  [`${B}/Assets.md`]: '---\nkind: assets\naliases: [possessions]\n---\n\n# Assets\n\n| Item | Kind | Value | Valued | Notes |\n|------|------|------:|--------|-------|\n| The house \\| Gardens | property | 15 000 000 | 2026-03-01 | bonded \\| see Debts |\n| Corolla | vehicle | 70000.00 | when we bought it | non-ISO date |\n| Rings | jewellery | 60000.00 | 2019-11-02 | multi<br>line |\n| Krugerrands | precious metals | 1.234,56 | | hand-edited cell |\n| Nameplate only | | | | |\n| Ring | jewellery | 12 000 R | 2026-01-01 | value nobody can read |\n',
 
   /* Same hazard in the Services amount column, which feeds the committed total
      the Dashboard subtracts from "actually free to spend". */
-  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n',
+  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n| Gym | Virgin Active | about R400 | monthly | 2026-08-20 | | yes | amount typed as prose |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: assessed\ndeadline_standard: "2026-10-20"\nassessment_ref: "ITA34: 2026/0031"\nassessment_result: -1250.00\nassessment_income: 480000\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | banks \\| investments |\n| File ITR12 | todo |  |  |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | uploaded | irp5.pdf | |\n| IT3(b) | Bank \\| A | needed | | multi<br>line |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n| 4201 | Local interest | Bank B | 12000.00 |\n',
 };
@@ -180,9 +180,9 @@ const FILES = {
   const splitRows = S.txFiles[splitKey].rows;
   eq(splitRows.filter(r => r.split === 'part').reduce((s, r) => s + r.amount, 0), -1000,
     'the parts loaded off disk sum to the parent loaded off disk');
-  eq(S.owed.length, 5, 'every owed row loads');
-  eq(S.services.length, 4, 'every service loads');
-  eq(S.debts.length, 2, 'both debts load');
+  eq(S.owed.length, 6, 'every owed row loads');
+  eq(S.services.length, 5, 'every service loads');
+  eq(S.debts.length, 3, 'every debt loads');
 
   /* The Owed and Services money columns were the last three in this file still
      read with parseFloat, which stops at the first character it cannot use:
@@ -215,7 +215,7 @@ const FILES = {
   eq(svcOf('Insurance').amount, 1299, 'a space-grouped service amount must not be truncated to 1');
   eq(svcOf('Netflix | HD').amount, 199, 'a plain service amount is unaffected');
 
-  eq(S.assets.length, 5, 'every asset row loads, including the one with only a name');
+  eq(S.assets.length, 6, 'every asset row loads, including the one with only a name');
   const house = S.assets.find(a => a.name === 'The house | Gardens');
   eq(house.value, 15000000, 'a space-grouped value must be READ, not truncated to 15');
   eq(house.type, 'property', 'the kind loads');
@@ -308,6 +308,45 @@ const FILES = {
   /* ---------------- the non-canonical cell is written back verbatim ------- */
   ok(rewritten[`${B}/Transactions/FNB Cheque/2026-07.md`].includes('1 234,56'),
     'a cell the strict parser rejected must be written back byte-for-byte');
+
+  /* ---------------- the UNREADABLE cell survives a save ------------------ */
+  /* The four flat tables were the unfinished half of the amountRaw contract
+     above. A cell normalizeAmount cannot read — "12 000 R", "prime + 2",
+     "ask him", "about R400" — parses to a FABRICATED 0, and the write side
+     used to render that 0 as "0.00" and put it on disk, so a save triggered by
+     an edit to some other row on the page overwrote the reader's own text with
+     a figure the file never stated.
+
+     This has to be asserted on the REWRITTEN BYTES, not by the deep-equality
+     round-trip below: a destroyed cell reloads as 0 and both passes agree
+     perfectly on the wrong number — self-consistent and silently destructive,
+     exactly the trap the Thabo/Yusuf comment further up names. */
+  for (const [file, cell, why] of [
+    [`${B}/Assets.md`, '12 000 R', 'an asset value'],
+    [`${B}/Debts.md`, '2 400 R', 'a debt balance'],
+    [`${B}/Debts.md`, 'prime + 2', 'a rate written as the thing it tracks (twice: Original and Rate)'],
+    [`${B}/Owed Money.md`, 'ask him', 'an amount the lender never worked out'],
+    [`${B}/Services.md`, 'about R400', 'a service amount typed as prose'],
+  ]) {
+    ok(rewritten[file].includes(cell),
+      `${why} nobody can read must come back byte-for-byte, never "0.00" over it`);
+  }
+  ok(!/\| Ring \| jewellery \| 0\.00 \|/.test(rewritten[`${B}/Assets.md`]),
+    'and specifically NOT as the fabricated zero the reader never typed');
+
+  /* Both of the debt's unreadable cells, not just the first — Original is a
+     hand-spelled column rather than one money() built, and had to learn the
+     same rule separately. */
+  eq((rewritten[`${B}/Debts.md`].match(/prime \+ 2/g) || []).length, 2,
+    'Original and Rate each keep their own text — the bespoke column follows money()\'s contract');
+
+  /* The value the app COMPUTES with is still the honest fallback. Preserving
+     the text is not the same as trusting it: every total this row reaches
+     still sees 0, which is what the reader is shown and can act on. */
+  eq(S.assets.find(a => a.name === 'Ring').value, 0,
+    'an unreadable value is still 0 for arithmetic — the text is kept, not believed');
+  eq(S.assets.find(a => a.name === 'Ring').valueRaw, '12 000 R',
+    'and the raw rides alongside it, the way balanceRaw does on an account');
 
   /* ---------------- txSegment: memory key and write path agree ------------ */
   // The bug this guards: load keyed by the raw folder name while writers keyed

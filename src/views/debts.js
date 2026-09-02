@@ -621,16 +621,21 @@ module.exports = function registerDebts(ctx) {
               [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.balance || '',
             style: 'width:120px', 'aria-label': `Balance owed on ${d.name}`,
-            onchange: e => { d.balance = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+            /* Each `<key>Raw = null` clears the verbatim text table-schema.js's
+               money() keeps for a cell it could not read; the writer prefers
+               that text over the fabricated 0 so a save cannot erase it. A
+               number typed here supersedes it — same as views/budgets.js
+               clearing amountRaw on edit. */
+            onchange: e => { d.balance = Math.max(0, parseFloat(e.target.value) || 0); d.balanceRaw = null; refreshAll(); } })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.rate || '',
             style: 'width:84px', 'aria-label': `Annual interest rate on ${d.name}`,
-            onchange: e => { d.rate = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+            onchange: e => { d.rate = Math.max(0, parseFloat(e.target.value) || 0); d.rateRaw = null; refreshAll(); } })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.payment || '',
             style: 'width:110px', 'aria-label': `Monthly payment on ${d.name}`,
-            onchange: e => { d.payment = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+            onchange: e => { d.payment = Math.max(0, parseFloat(e.target.value) || 0); d.paymentRaw = null; refreshAll(); } })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.extra || '',
             style: 'width:100px', 'aria-label': `Extra paid each month on ${d.name}`,
-            onchange: e => { d.extra = Math.max(0, parseFloat(e.target.value) || 0); refreshAll(); } })),
+            onchange: e => { d.extra = Math.max(0, parseFloat(e.target.value) || 0); d.extraRaw = null; refreshAll(); } })),
           // A category that no longer exists in Categories/ (renamed, or a
           // hand-edited Debts.md) still gets an option of its own. Without it
           // the select falls back to "— none —" and shows a link that IS on

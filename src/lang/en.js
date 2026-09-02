@@ -695,6 +695,7 @@ module.exports = {
     one: ' · {count} dated ahead, not counted yet',
     other: ' · {count} dated ahead, not counted yet',
   },
+  'acct.recon.undatable': { one: ' · {count} transaction carrying a date this app cannot read, in neither window', other: ' · {count} transactions carrying dates this app cannot read, in neither window' },
   'acct.recon.useThis': 'Use this',
   'acct.aria.useThis': 'Set {name} balance to {amount}',
   'acct.recon.matches': 'Matches your transactions',
@@ -758,6 +759,11 @@ module.exports = {
   'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
   'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
+  /* The liability-side twin, for the Report's Debt section. The line above
+     says "held", which under a Debt heading reads as an asset — "Plus
+     € 100 000 held in other currencies" about a euro bond the household
+     OWES. The figure is right; the verb inverts its sign. */
+  'report.debt.otherCurrencies': ' Plus {list} owed in other currencies, not converted.',
   'acct.hero.muted': 'Warnings ignored',
   /* Settings' half of the same two questions the wizard asks above. */
   /* The transaction path's own disclosure. Every figure built from
@@ -807,6 +813,7 @@ module.exports = {
   'acct.deck.ariaReview': 'Open the {name} row below',
   'acct.deck.more': { one: '{count} more account — show them all in the table', other: '{count} more accounts — show them all in the table' },
   'acct.deck.why.drift': { one: '{count} transaction since you last confirmed implies {implied}, not {stated}', other: '{count} transactions since you last confirmed imply {implied}, not {stated}' },
+  'acct.deck.why.unreadable': { one: '{count} transaction carries a date this app cannot read, so the balance cannot be checked against it', other: '{count} transactions carry dates this app cannot read, so the balance cannot be checked against them' },
   'acct.deck.why.stale': { one: 'Unconfirmed for {count} day — last checked {date}', other: 'Unconfirmed for {count} days — last checked {date}' },
   'acct.deck.why.nodate': 'No date on this figure, so nothing can check it',
   'acct.deck.why.notx': 'A folder is linked, but nothing has imported into it yet',
@@ -856,6 +863,7 @@ module.exports = {
   'acct.aria.row': 'Show detail for {name}',
   'acct.state.ok': 'agrees',
   'acct.state.drift': 'doesn\'t match',
+  'acct.state.unreadable': 'date unreadable',
   'acct.state.stale': { one: '{count} day old', other: '{count} days old' },
   'acct.state.nodate': 'never confirmed',
   'acct.state.notx': 'nothing imported',
@@ -872,6 +880,7 @@ module.exports = {
   'acct.drawer.recon.nodate': 'No confirmed date yet — set one and this figure can be checked against your transactions.',
   'acct.drawer.recon.notx': 'A transactions folder is linked, but nothing has imported into it yet. Import a statement and the figure becomes checkable.',
   'acct.drawer.recon.nofolder': 'Nothing imports into this account. Link a transactions folder and the figure becomes checkable.',
+  'acct.drawer.recon.unreadable': 'This figure cannot be checked against your transactions yet.',
   'acct.drawer.drift': { one: '{count} transaction since {date} implies {implied} — {diff} {dir} than the figure on file.', other: '{count} transactions since {date} imply {implied} — {diff} {dir} than the figure on file.' },
   'acct.drawer.lower': 'lower',
   'acct.drawer.higher': 'higher',

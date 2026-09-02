@@ -183,14 +183,25 @@ function donutTotal(ctx, p) {
 
 /* Independent netting: for each named non-income/non-transfer category, gross
    outgoings from the RAW rows minus what the donut keeps of that category.
-   Computed from the same row list the identity ranges over (excluded and
-   non-budget vetoes applied, transfers kept out of the named set). */
+   Computed from the same row list the identity ranges over (excluded,
+   non-budget AND foreign vetoes applied, transfers kept out of the named set).
+
+   THREE vetoes, not two. The currency one is the newest and was the last to
+   reach every consumer: summaryInRange() has held foreign rows out of income
+   and spend since ISSUE 28, and periodSpend() (src/trend-math.js) joined it
+   only in the third pass. An oracle that restates the arithmetic over a WIDER
+   row population than the code under test is not an independent check of that
+   code, it is a different question — so this walks the same three, reading
+   each off ctx rather than re-deriving any of them. Section 8 below is where
+   that third one is actually exercised; on a single-currency vault
+   `foreignLabels()` is empty and this line costs nothing. */
 function nettingOf(ctx, p, sum) {
   const skip = ctx.nonBudgetLabels();
+  const foreign = ctx.foreignLabels();
   const { start, end } = ctx.periodRange(p);
   const gross = {};
   for (const t of ctx.txInPeriod(p)) {
-    if (t.date < start || t.date > end || t.excluded || skip.has(t.label)) continue;
+    if (t.date < start || t.date > end || t.excluded || skip.has(t.label) || foreign.has(t.label)) continue;
     const type = ctx.catType(t.cat);
     if (!t.cat || type === 'income' || type === 'transfer') continue;
     if (t.amount < 0) gross[t.cat] = (gross[t.cat] || 0) + -t.amount;
@@ -656,25 +667,31 @@ async function mountBudget(files) {
     ctx.renderBudgets();
     const sum = ctx.periodSummary('2026-08');
 
-    /* An assume-spent category that ALSO nets a REFUND this period (more
-       came back than went out) is a second, DIFFERENT live bug from the one
-       reported below — verified separately, not the one this identity is
-       pinning: the row's own Actual correctly shows the budgeted amount, but
-       the tile's overlay (line 259's unclamped `realSpend`) adds the
-       shortfall against a NEGATIVE realSpend and so counts the refund
-       itself as extra shortfall on top of the full budgeted amount. That is
-       a real, separate overstatement in budgets.js, reported in this run's
-       summary rather than folded into the identity below — skip the round
-       rather than let a second bug's noise obscure the first. */
-    const assumedNetsRefund = Object.entries(budgeted).some(([cat, meta]) => meta.assumed && (sum.byCat[cat] || 0) > 0);
-    if (assumedNetsRefund) continue;
+    /* An assume-spent category that ALSO nets a REFUND this period (more came
+       back than went out) used to be SKIPPED here, and the skip named a second
+       live bug as the reason: the tile's overlay subtracted an unclamped
+       `realSpend`, so a negative one counted the refund's own excess as extra
+       shortfall on top of the full budgeted amount — budgeted R1 000 against a
+       net refund of R700 gave an overlay of R1 700 for a row the table beneath
+       showed at R1 000.
+
+       That bug is fixed (views/budgets.js clamps at zero, and the overlay is
+       now DERIVED from the row's own assumedActual() rather than restated), so
+       the skip has to go — a suite that keeps stepping around a repaired
+       defect stops guarding it, and this is the round that would catch it
+       coming back. The oracle below clamps the same way the code does, which
+       is the whole assertion: two clamps, one answer. */
 
     // ---- (a) Budget vs Dashboard, decomposed by the REAL overlay ----
     let realOverlay = 0;
     for (const [cat, meta] of Object.entries(budgeted)) {
       if (!meta.assumed) continue;
       const realSpend = -(sum.byCat[cat] || 0);
-      realOverlay += Math.max(0, meta.amount - realSpend);
+      /* Math.max(0, realSpend), restated independently rather than imported:
+         a refunded category contributes NOTHING to what was really spent, not
+         a negative slice of it, so the shortfall the assumption still has to
+         cover is the whole budgeted amount. */
+      realOverlay += Math.max(0, meta.amount - Math.max(0, realSpend));
     }
     const tiles = findAllByClass(ctx.$('#budTotalsTop'), 'bud-total');
     const spentTileText = tiles[tiles.length - 1] && findByClass(tiles[tiles.length - 1], 'bud-total-v').textContent;
@@ -778,6 +795,78 @@ async function mountBudget(files) {
   }
   ok(rounds >= 20, 'score-pillars: enough live-scoring randomised rounds ran');
   console.log(`  ok — score pillars: headline and popup always add up, no pillar ever over its own maximum (${rounds} of ${60} rounds scored something measurable)`);
+}
+
+/* ===========================================================================
+   8. THE SAME THREE IDENTITIES, WITH A SECOND CURRENCY IN THE VAULT
+
+   Sections 1 and 2 prove the hero, the donut and the comparison column
+   reconcile on a rand vault. They could not see the last hole ISSUE 28 left
+   open, because a single-currency vault has no foreign row for anything to
+   leak: `summaryInRange()` (src/period.js) held foreign rows out of the hero
+   and the donut, and `periodSpend()` (src/trend-math.js) went on adding them
+   into the comparison column and the trend chart. Two pages, one period, and
+   a Rp 3 000 000 market trip drawn as rand groceries on exactly one of them.
+
+   So this is the same fixture as section 1, plus one rupiah account spending
+   under the household's OWN categories — the shape that lands inside an
+   existing bar and reads as a real month of overspending, rather than adding
+   an obviously foreign row somebody would notice. Every identity
+   assertIdentities already makes must survive it unchanged, and the hero's
+   own figure must be unchanged by the account's presence at all: nothing
+   about a rupiah row belongs in a rand comparison, in either direction.
+
+   The two vaults are compared rather than checked against constants, for the
+   reason tests/score-currency-isolation.test.cjs states in its own header: an
+   equality between two loads needs no expected number, so nothing about it
+   can be tuned to whatever the code happens to do. --------------------- */
+{
+  const HOUSEHOLD_ROWS = [
+    ['2026-08-01', 'Salary', 'Salary', 30000],
+    ['2026-08-02', 'Shop', 'Groceries', -5000],
+    ['2026-08-04', 'Refund', 'Groceries', 150],
+    ['2026-08-05', 'Tickets', 'Fun', -200],
+    ['2026-08-07', 'Mystery out', '', -700],
+    ['2026-08-09', 'Ghost out', 'Ghost', -800],
+  ];
+  const files = { [`${B}/Transactions/Cheque/2026-08.md`]: txFile(HOUSEHOLD_ROWS) };
+
+  const home = await vault(files);
+  const mixed = await vault({
+    ...files,
+    [`${B}/Accounts/Holiday.md`]:
+      '---\ntype: checking\ncurrency: "Rp"\ntx_label: "Holiday"\nbalance: 5000000.00\nbalance_updated: 2026-08-01\n---\n',
+    [`${B}/Transactions/Holiday/2026-08.md`]: txFile([
+      ['2026-08-03', 'Freelance', 'Salary', 20000000],
+      ['2026-08-06', 'Market', 'Groceries', -3000000],
+      ['2026-08-08', 'Villa', 'Fun', -15000000],
+    ]),
+  });
+
+  /* The identities themselves, over the mixed vault. Each of the three terms
+     is computed by a different module, and the currency filter had reached
+     only two of them. */
+  assertIdentities(mixed, '2026-08', 'foreign account present');
+
+  /* And the figures are not merely CONSISTENT with each other, they are the
+     household's own. Three pages could agree perfectly on a wrong number —
+     that is what a shared leak looks like — so each is compared against the
+     same vault without the rupiah account in it. */
+  const hs = home.periodSummary('2026-08');
+  const ms = mixed.periodSummary('2026-08');
+  eqMoney(ms.spend, hs.spend, 'the hero\'s Total Spent is unchanged by a rupiah account');
+  eqMoney(donutTotal(mixed, '2026-08'), donutTotal(home, '2026-08'),
+    'and so is the donut it is drawn beside');
+  const total = ctx => Object.values(ctx.periodSpend('2026-08', null).whole).reduce((t, v) => t + v, 0);
+  eqMoney(total(mixed), total(home),
+    'and so is the comparison column — a rupiah market trip is not rand groceries');
+
+  /* The anchor. Without it every equality above would hold on a pair of
+     vaults that both read zero, which is the one way this section could pass
+     while measuring nothing. */
+  ok(total(home) > 0 && hs.spend > 0,
+    'the household vault really does spend something for the comparisons above to be about');
+  console.log('  ok — a second currency changes none of the three figures, and the identities hold over it');
 }
 
 console.log(`PASS — the pages agree: hero, donut, note and comparison column reconcile exactly (${checks} assertions, 30 randomised rounds).`);

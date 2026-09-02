@@ -30,6 +30,18 @@
              so it outranks the two below even when they are also true.
      nodate  a figure with no readable date — there is no window to place, so
              nothing can be measured from it.
+     unreadable
+             the FIGURE has a date, but one or more TRANSACTIONS do not: a row
+             dated 2026-13-05 (the ordinary day/month swap), 2026-02-30, or
+             "end of June". Such a row cannot be placed before or after the
+             confirmation, so the check is incomplete and the account cannot
+             honestly be called settled — see reconcile()'s own note on why it
+             is counted rather than guessed at. Ranked below `stale` because a
+             stale figure has an answer the reader can give from inside the app
+             ("Confirm balance") while this one is a typo they have to go and
+             find in a transaction file, and above the three set-up gaps
+             because, unlike those, this is a figure that LOOKED checked and
+             was not.
      stale   probably still right, just old.
      ok      it agrees with the transactions.
 
@@ -54,7 +66,7 @@ const { daysSince, isStale, reconcile, STALE_DAYS } = require('./reconcile');
    `notx` sorts above `nofolder` because it is the nearer of the two to being
    answered — the folder is already there, so the reader is one import from a
    checkable figure, where the other still has to decide what to link. */
-const URGENCY = { drift: 0, stale: 1, nodate: 2, notx: 3, nofolder: 4, ok: 9 };
+const URGENCY = { drift: 0, stale: 1, unreadable: 2, nodate: 3, notx: 4, nofolder: 5, ok: 9 };
 
 /* Never-confirmed sorts as the oldest thing on the page. MAX_SAFE_INTEGER
    rather than Infinity so two of them subtract to 0 rather than to NaN — a NaN
@@ -89,6 +101,23 @@ function statusOf(a, rows, today, hasFolder) {
      in the first place. */
   else if (rec.state === 'no-date') state = 'nodate';
   else if (isStale(a.balance_updated, today)) state = 'stale';
+  /* THE LAST GATE BEFORE `ok`, and it is a gate rather than a rank. A row
+     whose date names no day (2026-13-05, 2026-02-30, "end of June") cannot be
+     placed on either side of the confirmation, so reconcile() counted it and
+     placed nothing — which means "clean" here means "nothing READABLE has
+     moved", and reporting that as `ok` would paint the pill green on "agrees"
+     over a check that never finished. That is exactly how R2 000 of spending
+     went missing: the row sorted after today as a string, landed in `ahead`,
+     and the account left the decision queue entirely.
+
+     It sits AFTER `stale` deliberately. Both are true of the same account
+     often enough (nobody who mistypes a date is confirming balances weekly),
+     and of the two only `stale` has an answer the reader can give without
+     leaving the page — the same reasoning that puts `drift` ahead of `stale`
+     twelve lines up, applied one rung down. The count still travels on `rec`
+     either way, so a view showing a stale account can still say what else is
+     wrong with it. */
+  else if (rec.unreadable) state = 'unreadable';
   else state = 'ok';
   /* Resolved against the state that was actually reached, not against every
      state the account could have been in. An account told to ignore `notx`
@@ -102,7 +131,15 @@ function statusOf(a, rows, today, hasFolder) {
 
 /* Every state that can be silenced. `ok` is absent because there is nothing
    there to silence, and its absence is what stops `ignore_warnings: ok` from
-   parsing into something meaningless. */
+   parsing into something meaningless.
+
+   `unreadable` is absent for a different reason: every state in this list is a
+   JUDGEMENT the reader may reasonably disagree with — a cash wallet nobody
+   will ever import into, a fund whose balance is confirmed yearly on purpose.
+   A transaction date that names no day is not a judgement, it is a typo with
+   one correct answer, and offering to hide it would let a vault carry money
+   nothing can place, permanently and by consent. It is also the one state a
+   reader can settle for good: fix the date and it never returns. */
 const WARNINGS = ['drift', 'stale', 'nodate', 'notx', 'nofolder'];
 
 /* The frontmatter is written by hand as often as by the dialog, so the words a

@@ -83,31 +83,58 @@ function byYear(rows) {
   return years;
 }
 
-/* The headline numbers, all derived from the ROUNDED instalment — because that
-   is the number on the page, and "R 13 935 × 240" is arithmetic the reader can
-   check on their own phone. Deriving the totals from the unrounded instalment
-   instead would be marginally more accurate and would look wrong. */
+/* The headline numbers, read OFF THE SCHEDULE the page draws directly beneath
+   them — the instalment itself is still the rounded one, because that is the
+   number on the page.
+
+   This used to be `payment * n + b`: the instalment times the term the reader
+   ASKED for, defended as "arithmetic the reader can check on their own phone".
+   The defence was sound and the arithmetic was not, because amortise() does
+   two things multiplication cannot see. It FORCES the last row onto the
+   balloon (rounding leaves a few cents of drift over 240 months, and a
+   schedule ending at "R 3 outstanding" reads as a bug), so the final payment
+   is not a full instalment. And it BREAKS EARLY when the rounded instalment
+   overshoots, so a small principal over a long term clears before month n.
+
+   Both make the schedule cost less than `payment * n`, and neither reached the
+   figure printed above it. R15 000 at 11% over 360 months announced R36 480 of
+   interest over a table that runs 358 months and totals R36 059 — the headline
+   charging for two months the loan was already paid off. The shipped R1.35m
+   home-loan example drifts R395 the other way, claiming more repaid than the
+   schedule ever collects. One loan, two bases: this repository's most-repeated
+   bug shape.
+
+   So the totals come from the same rows the table renders. The reader's check
+   is stronger for it, not weaker — they can add up the table in front of them
+   rather than trusting a term the schedule may not have run.
+
+   `totalRepaid` is every row's interest and capital plus the balloon settled at
+   the end, which reduces to principal + interest. That reduction is why the
+   0% case needs no special-casing any more: at i = 0 every row's interest is
+   `bal * 0`, so the sum is exactly 0 and the repaid total is exactly the
+   principal. The old code had to hard-code that (it printed "Total interest
+   R -18" above a table of zeroes on the shipped vehicle defaults) because
+   `payment * n` multiplied rounding drift by every month in the term. There is
+   no drift left to hide. tests/loan-schedule-identity.test.cjs sweeps the 0%
+   case anyway, so the absence of the special case is pinned rather than
+   assumed. */
 function totalsFor(principal, annualRatePct, months, balloon = 0) {
   const exact = monthlyPayment(principal, annualRatePct, months, balloon);
   const payment = Math.round(exact);
   const n = Math.round(Number(months) || 0);
   const b = Math.min(Math.max(Number(balloon) || 0, 0), principal);
-  const totalRepaid = payment * n + b;
   const p = Number(principal) || 0;
-  /* A 0% loan borrows exactly what it repays — that is what 0% MEANS — but
-     `exact` is rarely an integer of its own, so rounding it to the instalment
-     actually shown (payment = Math.round(exact)) multiplies a few cents of
-     rounding drift by every month in the term. On the shipped vehicle
-     defaults (R350 000, 10% deposit, 54 months, 0%) that produced "Total
-     interest R -18" in warning-coloured text sitting directly above an
-     amortisation table that shows R0 interest in every single row — the page
-     contradicting itself. There is no equivalent drift to hide at a real
-     rate: the interest itself dwarfs a few rounded cents. So this is special-
-     cased rather than generalised into a tolerance band. */
-  const totalInterest = (Number(annualRatePct) || 0) <= 0 ? 0 : totalRepaid - p;
+  const rows = amortise(p, annualRatePct, n, payment, b);
+  const totalInterest = rows.reduce((sum, r) => sum + r.interest, 0);
   return {
     payment, exact, months: n, balloon: b,
-    totalRepaid: (Number(annualRatePct) || 0) <= 0 ? p : totalRepaid,
+    /* The term the schedule ACTUALLY ran, which is `months` for every loan
+       that goes the distance and shorter for one the rounded instalment
+       clears early. Kept beside `months` rather than replacing it: "how long
+       did you ask for" and "how long did it take" are different questions,
+       and a caller that wants the first must not silently get the second. */
+    termMonths: rows.length,
+    totalRepaid: p + totalInterest,
     totalInterest,
   };
 }

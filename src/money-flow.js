@@ -51,6 +51,7 @@
 
 const { activeDebts } = require('./worth');
 const { monthlyInterest } = require('./debt-math');
+const { isForeign } = require('./currency');
 const { largestRemainder } = require('./share-percents');
 const { PILLARS } = require('./health-math');
 
@@ -128,7 +129,7 @@ function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished }
 
 function periodFlow({
   income, spentTotal, budgeted, spendByCat, fixedCats, catType,
-  savingContribution, debts, budgetIncome, periodFinished,
+  savingContribution, debts, household, budgetIncome, periodFinished,
 } = {}) {
   const inc = Number(income) > 0 ? Number(income) : 0;
   const spent = Math.max(0, Number(spentTotal) || 0);
@@ -178,16 +179,26 @@ function periodFlow({
      deliberately independent of the trailing-average snapshot (see buildFlow's
      own header) or calling healthSnapshot() a second time per render — this
      is the audit's own "leave a comment, not a refactor" case. debtInterestMonthly
-     is a pure function of S.debts with no other input, so the two calls give
-     the same answer today; if that function ever grows a second argument (a
-     date, a rate override) THIS call site and health-data.js:308 must be
-     updated together or the two figures on this page will drift apart again.
+     is a pure function of S.debts and the household's own currency symbol, so
+     the two calls give the same answer today; if that function ever grows a
+     THIRD argument (a date, a rate override) THIS call site and
+     health-data.js's own must be updated together or the two figures on this
+     page will drift apart again. That sentence has already been cashed once:
+     debtInterestMonthly grew `household` in the ISSUE 28 second pass, and
+     this line was the copy that had to move with it — a euro mortgage was
+     printing R1 000 of "of which interest" under the flow card while the
+     breakdown directly beneath it, off the same book, said R333,33.
+     `household` is optional here for the same reason it is optional there:
+     a caller that has not been taught about currencies gets exactly what it
+     always got.
 
      It is a subset of `debtRepayments`, never an addend on top of it: an
      instalment already covers interest before principal, so "of which
      interest" is capped at the repayment line it sits under rather than
      ever printing larger than its own parent. */
-  const interestRaw = activeDebts(debts).reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
+  const interestRaw = activeDebts(debts)
+    .filter(d => !household || !isForeign(d, household))
+    .reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
   const interest = Math.min(interestRaw, debtRepayments);
 
   /* `living` used to be `spent - committed`, and `spent` (periodSummary's own

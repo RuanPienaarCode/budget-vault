@@ -750,6 +750,11 @@ module.exports = function registerScore(ctx) {
     return periodFlow({
       income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
+      /* The household's own symbol, so this card's "of which interest" holds
+         foreign debts out exactly the way the breakdown beneath it (and the
+         Debt page it links to) already does — see money-flow.js's own note on
+         `interestRaw`, which is the second copy of that one figure. */
+      household: S.settings.currency,
       /* "Allocated of income" is a question about the PLAN, so it is measured
          against the income the plan states — the same rule, from the same
          helper, the Dashboard's "N% allocated" uses. This card always draws

@@ -47,8 +47,13 @@
 
 const { el } = require('../dom');
 const { rangePills } = require('../chart');
-const { worth } = require('../worth');
-const { symbolOf, splitByCurrency } = require('../currency');
+/* otherCurrencyNet: worth() has returned `otherCurrencies` — the foreign
+   assets and foreign debts it filtered out — since ADR-0004, and this page
+   disclosed the ACCOUNTS half only (splitByCurrency's `others`). So a euro
+   flat and a euro bond left the Net Worth section with nothing said. See
+   that function's own header in src/worth.js. */
+const { worth, otherCurrencyNet } = require('../worth');
+const { symbolOf, splitByCurrency, isForeign } = require('../currency');
 const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
 const { todayIso, nowLocalMinute } = require('../dates');
@@ -401,7 +406,34 @@ module.exports = function registerReport(ctx) {
     const pool = S.accounts.filter(a => typeIs(a, 'savings') || typeIs(a, 'investment'));
     const idx = accountIndex();
     const entries = pool.map(a => ({ account: a, rows: (idx.get(a) || {}).rows || [] }));
-    return growthTotals(entries, poolType, { today: todayIso() });
+    /* HOME-CURRENCY ENTRIES ONLY — the same predicate and the same name
+       views/savings.js's growthTile() uses, so one grep finds both call
+       sites and neither can quietly stop matching the other.
+
+       That file's own comment says the narrowing was put at the CALL SITE
+       rather than inside growthTotals precisely because "that function is
+       shared with src/report.js's savings section, and it has no business
+       learning about currencies when what it actually needs is a homogeneous
+       pool". Only one of the two call sites ever did the narrowing. So on a
+       mixed pool this section printed "Total growth R 5900.00 / +53.2%"
+       while the Savings page printed "R 1000.00 / +9.1%" for the same
+       household on the same day — and the report is the copy that gets
+       forwarded to somebody who cannot open the app and see the other one.
+       growthTotals sums `growth` and `capitalIn` and the caller divides one
+       by the other; across two currencies that is not an overstated rate but
+       a percentage of a quantity that does not exist. */
+    const homeEntry = e => !isForeign(e.account, S.settings.currency);
+    const foreignEntries = entries.filter(e => !homeEntry(e));
+    return {
+      ...growthTotals(entries.filter(homeEntry), poolType, { today: todayIso() }),
+      /* Named, never silently dropped — currency.js's own header is explicit
+         that this app does not exclude in silence, and an account left out
+         of a growth figure is an exclusion however good the reason. */
+      foreign: {
+        count: foreignEntries.length,
+        symbols: [...new Set(foreignEntries.map(e => symbolOf(e.account, S.settings.currency)))],
+      },
+    };
   }
 
   /* Debt, as of today — worth.js's own activeDebts() (via w.active) is the
@@ -411,15 +443,45 @@ module.exports = function registerReport(ctx) {
      views/debts.js's own committed() one-liner — payment plus any extra —
      rather than importing a closure that file does not export. */
   function debtsSummary(w) {
-    const active = w.active;
-    const rows = active.map(d => ({ name: d.name, balance: d.balance || 0, rate: d.rate || 0, interest: monthlyInterest(d.balance, d.rate) }));
+    /* ISSUE 30's rule, which this section was the last surface not to apply.
+       `w.active` is activeDebts() — a STATUS filter ("not paid off"), with no
+       currency filter in it at all — so every figure below used to add a euro
+       bond into a rand total, print its balance in the per-debt table as
+       though R100 000 were owed, and sum its interest with the cards'.
+       views/debts.js has narrowed its own page since ADR-0004 landed
+       (`activeAll().filter(d => !isForeign(...))`), and worth.js narrows the
+       same list eight lines into its own body — which is why THIS document's
+       Net Worth section already excluded that bond from `Owed` while the
+       section above it included it. One report, two answers, one debt.
+
+       `count` stays the FULL tracked list, exactly as the Debt page's own
+       tile does ("N active · M tracked"): a foreign debt is still tracked,
+       still listed on its page, still real. It is only held out of arithmetic
+       that cannot span currencies. */
+    const home = w.active.filter(d => !isForeign(d, S.settings.currency));
+    const away = w.active.filter(d => isForeign(d, S.settings.currency));
+    const rows = home.map(d => ({ name: d.name, balance: d.balance || 0, rate: d.rate || 0, interest: monthlyInterest(d.balance, d.rate) }));
+    /* Per SYMBOL, not a bare count — the same shape worth.js's own
+       foreignTotals() returns and the same shape the Net Worth disclosure
+       below reads, so src/report.js prints ONE sentence for both rather than
+       two differently-worded caveats a reader has to decide are the same
+       statement. The count travels too, for the JSON sibling. */
+    const others = new Map();
+    for (const d of away) {
+      const sym = symbolOf(d, S.settings.currency);
+      others.set(sym, (others.get(sym) || 0) + Math.max(0, d.balance || 0));
+    }
     return {
       count: S.debts.length,
-      active: active.length,
+      active: home.length,
       total: rows.reduce((t, r) => t + r.balance, 0),
-      perMonth: active.reduce((t, d) => t + (d.payment || 0) + (d.extra || 0), 0),
+      perMonth: home.reduce((t, d) => t + (d.payment || 0) + (d.extra || 0), 0),
       interest: rows.reduce((t, r) => t + r.interest, 0),
       rows,
+      foreign: {
+        count: away.length,
+        others: [...others].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]),
+      },
     };
   }
 
@@ -457,9 +519,29 @@ module.exports = function registerReport(ctx) {
        a second time for figures already in hand. */
     let uncat = 0, netted = 0;
     const spendRowsByPeriod = [];
+    /* periodSummary() returns `foreign` WITH the figures rather than beside
+       them, and period.js's own comment says every tile, table, chart and
+       aria-label built from that object is expected to say something when
+       `foreign.count` is non-zero. views/dashboard.js's hero does
+       (dash.foreignExcluded). This page read the same object, summed the
+       five figures it carries and printed them with no caveat at all — in
+       the one document that gets forwarded to a reader who cannot open the
+       app and check.
+
+       LABELS unioned rather than counts summed: the same foreign account
+       appears in every period of a 12-month selection, and adding its count
+       twelve times would report twelve accounts. Symbols keep first-met
+       order, the same stability rule currenciesIn() and splitByCurrency()
+       already follow so two documents about one household list them alike. */
+    const foreignLabels = new Set();
+    const foreignSymbols = [];
     for (const p of periods) {
       const sum = periodSummary(p);
       income += sum.income; spend += sum.spend; net += sum.net;
+      for (const l of (sum.foreign && sum.foreign.labels) || []) foreignLabels.add(l);
+      for (const sym of (sum.foreign && sum.foreign.symbols) || []) {
+        if (!foreignSymbols.includes(sym)) foreignSymbols.push(sym);
+      }
       const bt = budgetTotals(p);
       budgetIncome += bt.income; budgetSpend += bt.spend;
 
@@ -539,7 +621,18 @@ module.exports = function registerReport(ctx) {
          about itself — a parser (the stated audience for the JSON) reads
          -900 as rand when it is euro. So the list is stated, and the
          per-row currency below closes the same gap for transactions. */
-      otherCurrencies: reportOthers,
+      /* The ACCOUNTS half was all this ever carried — splitByCurrency's
+         `others`, computed above — so a euro flat and a euro bond, both
+         already held out of the net-worth total by worth() itself, were
+         disclosed nowhere. otherCurrencyNet merges all three ledgers into
+         one per-symbol NET, which is the right shape for a figure that
+         calls itself a net worth: "held" beside that number means "in the
+         household's position", not "in a bank". See its own header in
+         src/worth.js. */
+      otherCurrencies: otherCurrencyNet(w, reportOthers),
+      /* What the Income & Spend section leaves out, travelling with the
+         figures the same way periodSummary hands it over. */
+      foreign: { count: foreignLabels.size, symbols: foreignSymbols },
       household: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
       categories, spendByCategory,

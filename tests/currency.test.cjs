@@ -148,6 +148,24 @@ const acct = (name, currency) => ({ name, currency });
   eq(formatAmount('R', Infinity, 2, loc), 'R 0,00', 'and never "RInfinity"');
   eq(formatAmount('$', 40000, 2, { thousands: ',', decimal: '.' }), '$ 40,000.00',
     'a different locale profile\'s own separators are used, not South Africa\'s');
+
+  /* The signed zero. This module is where it bites hardest: primaryTotal a few
+     dozen lines up exists precisely because summing signed floats leaves
+     -7.1e-15 behind, and its own comment says a break-even household must not
+     render as "-R0,00" in danger red — but formatAmount then took its sign from
+     the UNROUNDED value and its digits from the rounded magnitude, and printed
+     exactly that. Same rule at decimals=0, where every amount between -0,5 and
+     0 came out "R -0".
+
+     The sign now follows the digits that survived the rounding, and no
+     further: a figure that still rounds to a cent keeps its minus. */
+  eq(formatAmount('R', -7.1e-15, 2, loc), 'R 0,00',
+    'the float remainder primaryTotal collapses must not reappear as a minus in the formatter');
+  eq(formatAmount('R', -0.004, 2, loc), 'R 0,00', 'anything under half a cent prints as a plain zero');
+  eq(formatAmount('R', -0.4, 0, loc), 'R 0', 'and at decimals=0, anything under half a unit does too');
+  eq(formatAmount('R', -0.005, 2, loc), 'R -0,01', 'a figure that still rounds to a cent KEEPS its sign');
+  eq(formatAmount('R', -0.5, 0, loc), 'R -1', 'and so does one that still rounds to a whole unit');
+  eq(formatAmount('R', -0, 2, loc), 'R 0,00', 'negative zero itself was always safe — the negative control');
 }
 
 console.log(`PASS tests/currency.test.cjs (${checks} checks)`);

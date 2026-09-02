@@ -9,7 +9,7 @@ const { SCHEMAS, headerLines, rowLine } = require('../table-schema');
 const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
-const { ISO_DATE, todayIso } = require('../dates');
+const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf } = require('../currency');
 const { applySplit, splitRole } = require('../tx-role');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
@@ -827,16 +827,26 @@ module.exports = function registerTransactions(ctx) {
     if (!answer) return;                       // cancelled — say nothing, do nothing
 
     const paths = exportPaths(range, answer.folder);
-    const generated = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    /* nowLocalMinute(), not `new Date().toISOString()` — the same M3 fix
+       views/report.js took in the 2026-08-29 audit, applied to the OTHER
+       document this app writes a `generated:` stamp into. toISOString() is
+       UTC: an export made at 06:18 SAST stamped itself "04:18", and east of
+       Greenwich that is the wrong CALENDAR DAY, not merely the wrong hour —
+       in the frontmatter and in the only line telling a reader how old the
+       file in front of them is. dates.js exists to hold that rule once; see
+       its own header. */
+    const generated = nowLocalMinute();
     let written;
     try {
       written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, rowSymbol));
-      /* Each row is stamped with its own symbol on the way in, so the
-         markdown writer can both PRINT it correctly and know which rows its
-         totals may add together. */
-      const stamped = rows.map(r => ({ ...r, _symbol: rowSymbol(r) }));
-      await writeVaultFile(paths.txMd, transactionsMarkdown(stamped,
-        { range, filters, generated, household: S.settings.currency }, rowMoney));
+      /* The SAME rowSymbol both files resolve through, injected rather than
+         stamped onto copies of the rows. It used to be stamped as `_symbol`
+         here for the markdown while the CSV called rowSymbol directly — one
+         fact with two spellings, which is how the markdown row template came
+         to be missing the Currency cell the CSV was already writing. One
+         resolver, handed to both writers. */
+      await writeVaultFile(paths.txMd, transactionsMarkdown(rows,
+        { range, filters, generated, household: S.settings.currency }, rowMoney, rowSymbol));
       await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {

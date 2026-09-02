@@ -85,16 +85,58 @@ const verbatim = (key, header) => ({
   write: r => escMd(r[key]),
 });
 
-// Arithmetic input: strict-parsed so "15 000 000" is READ rather than
-// truncated, optionally floored, rewritten canonically as toFixed(2). No
-// *Raw write-back — a rejected cell falls back to 0, same as the loader
-// today. `guarded` writes (r[key] || 0) for rows minted by UI paths that
-// predate the column and never set it — serializeOwed's repaid guard.
-const money = (key, header, { floor = false, guarded = false } = {}) => ({
-  key, header, align: 'right',
-  read: c => ({ [key]: floor ? Math.max(0, parseNum(c || '0').value || 0) : (parseNum(c || '0').value || 0) }),
-  write: guarded ? (r => (r[key] || 0).toFixed(2)) : (r => r[key].toFixed(2)),
-});
+/* Arithmetic input: strict-parsed so "15 000 000" is READ rather than
+   truncated, optionally floored, and rewritten canonically as toFixed(2).
+   `guarded` writes (r[key] || 0) for rows minted by UI paths that predate the
+   column and never set it — serializeOwed's repaid guard.
+
+   A cell normalizeAmount cannot read keeps its verbatim text in `<key>Raw`,
+   exactly as the transactions `amount` column has kept `amountRaw` since this
+   file was written. That column is the working precedent; these four tables
+   were the unfinished half of it. Without it, parseNum's FABRICATED 0 was
+   rendered as "0.00" and saved over the reader's own text the next time
+   anything on the page was saved — so `| Ring | other | 12 000 R | … |` came
+   back as `| Ring | other | 0.00 | … |`, the value gone, the fact that
+   anything had been typed gone, and nothing on screen saying so. That is data
+   loss, and it is this app silently CORRECTING a figure the reader typed
+   instead of arguing with them.
+
+   READABLE, not `ok` — the boundary that keeps this safe. "1 234,56",
+   "15 000 000" and "R4000" are cells normalizeAmount reads correctly; they fail
+   `ok` only by not already being canonical, and they have always been rewritten
+   canonically. tests/golden-tables.test.cjs pins those exact bytes, and these
+   files live in user vaults under iCloud sync, so keeping THEIR raw would
+   rewrite every table on the planet on upgrade for no gain. Only the cell that
+   yielded no number at all is preserved (src/amount.js's `readable`).
+
+   The write prefers the raw only while the row still HOLDS the 0 that raw
+   produced. views/assets.js and views/debts.js edit these fields in place
+   (`d.balance = Math.max(0, parseFloat(e.target.value) || 0)`) and — unlike
+   views/budgets.js with amountRaw — have no way to clear a sibling key they
+   have never heard of. Preferring the raw unconditionally would make an edit to
+   a previously-unreadable cell vanish on save: the same bug one step to the
+   left. A reader who deliberately types 0 into such a cell sees no change and
+   the raw stands; the app cannot tell that from "never touched", and leaving
+   the reader's own text alone is the honest side to be wrong on. */
+const money = (key, header, { floor = false, guarded = false } = {}) => {
+  const rawKey = key + 'Raw';
+  return {
+    key, header, align: 'right',
+    read: c => {
+      const a = parseNum(c || '0');
+      const v = floor ? Math.max(0, a.value || 0) : (a.value || 0);
+      /* `!a.raw` is the blank-but-present cell — parseNum trims, so a cell of
+         nothing but spaces arrives here as ''. Absent has always meant 0.00 on
+         these tables and there is no reader's text to protect, so it must not
+         be preserved: writing '' back would leave an empty cell where every
+         other row states a figure. */
+      return a.readable || !a.raw ? { [key]: v } : { [key]: v, [rawKey]: a.raw };
+    },
+    write: r => (r[rawKey] != null && !(r[key] || 0)
+      ? r[rawKey]
+      : (guarded ? (r[key] || 0) : r[key]).toFixed(2)),
+  };
+};
 
 // A closed vocabulary: anything that trims+folds to `match` is `match`,
 // everything else — including an absent cell — is `other`. Written raw:
@@ -213,10 +255,23 @@ const SCHEMAS = {
         /* Absent-or-empty is null, NOT 0: load.js's post() step fills it
            from the parsed balance so the "paid off" bar reads 0% rather
            than dividing by zero. The schema cannot see a sibling column —
-           null is the signal that crosses the boundary. */
+           null is the signal that crosses the boundary. That is why this
+           column is spelled out rather than built by money(): only this one
+           distinguishes "not stated" from "stated as nothing".
+
+           Everything else about it IS money()'s contract, unreadable-cell
+           preservation included — see the comment there. A cell nobody can
+           read is present, so it does not take the null branch; it takes the
+           fabricated 0 and keeps `originalRaw` so the next save writes the
+           reader's text back instead of "0.00" over it. */
         key: 'original', header: 'Original', align: 'right',
-        read: c => ({ original: c !== undefined && c !== '' ? Math.max(0, parseNum(c).value || 0) : null }),
-        write: r => r.original.toFixed(2),
+        read: c => {
+          if (c === undefined || c === '') return { original: null };
+          const a = parseNum(c);
+          const v = Math.max(0, a.value || 0);
+          return a.readable || !a.raw ? { original: v } : { original: v, originalRaw: a.raw };
+        },
+        write: r => (r.originalRaw != null && !(r.original || 0) ? r.originalRaw : r.original.toFixed(2)),
       },
       money('rate', 'Rate', { floor: true }),
       money('payment', 'Payment', { floor: true }),

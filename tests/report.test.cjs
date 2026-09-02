@@ -62,6 +62,15 @@
         gives (see src/report.js's own R5 comment for why a real merge across
         a rename was judged unsafe to attempt). Gated correctly both ways:
         absent on a single period, absent with nothing orphaned to explain.
+    13. ISSUE 28's four remaining silences in this document (2026-09-02).
+        `otherCurrencies` was computed and never emitted, so the Net Worth
+        section printed a household-currency total with the euro flat and the
+        euro bond it had held out mentioned nowhere. The Income & Spend,
+        Savings and Debt sections each print figures their own screen twins
+        narrow to one currency and disclose beside — and printed them with no
+        caveat at all. All four are pinned here in BOTH serialisers, and
+        gated the other way too: a single-currency vault (nearly all of them)
+        must get no caveat anywhere.
 
    Pure — no DOM, no obsidian, no vault. */
 
@@ -244,6 +253,11 @@ const DATA = {
   eq(json.savings, {
     growth: 1250.5, rate_growth: 1250.5, rate_capital: 30000, rate_pct: (1250.5 / 30000) * 100,
     measured: 2, unmeasured: 1, neg_capital: 1, total: 3,
+    /* ISSUE 28 (item 13) — zeroed rather than absent on this single-currency
+       fixture, which is the shape the field's own comment in src/report.js
+       argues for: a consumer testing `foreign.count > 0` must never also
+       have to test whether the key exists. */
+    foreign: { count: 0, symbols: [] },
   }, 'savings section carries the raw figures, snake_cased, including M4\'s neg_capital and L4\'s rate_pct');
   ok(md.includes(money(1250.5)), 'the same growth figure appears formatted in the Markdown');
   /* L4 — the Markdown row rounds rate_pct to one decimal for display only;
@@ -530,6 +544,110 @@ const DATA = {
   eq(json.transactions.length, 2, 'JSON carries the same two rows');
   eq(json.transactions[1].excluded, true, 'excluded is a real boolean in JSON, not a "yes" string');
   eq(json.transactions[1].amount, -1000, 'amount is the raw number, never money-formatted');
+}
+
+/* ---- 13. ISSUE 28 — every figure this document narrows to one currency
+   says so, and the Net Worth section finally emits the line it always built ----
+
+   The house rule this file's own subject already states twice over: an
+   exported document carries the caveats its on-screen twin prints beside the
+   number. The report is the ONE document meant to leave the app and be read
+   by somebody with none of that context, and it was the surface carrying the
+   fewest of them. */
+{
+  const MIXED = {
+    ...DATA,
+    otherCurrencies: [['€', 150000]],
+    foreign: { count: 2, symbols: ['€'] },
+    savings: { ...DATA.savings, foreign: { count: 1, symbols: ['€'] } },
+    debts: { ...DATA.debts, foreign: { count: 1, others: [['€', 100000]] } },
+  };
+  const md = financialReportMarkdown(MIXED, money);
+  const json = JSON.parse(financialReportJson(MIXED));
+
+  /* (a) Net Worth — the line src/report.js has BUILT since issue #28 landed
+     and never pushed into `out`. Asserted in position, not merely present:
+     a disclosure that floats into the wrong section explains the wrong
+     number. */
+  const otherLine = i18n.t('acct.hero.otherCurrencies', { list: '€ 150000' }).trim();
+  ok(md.includes(otherLine), 'the Net Worth section states what the total held out, in its own symbol');
+  const lines = md.split('\n');
+  const nwIdx = lines.indexOf(`## ${i18n.t('report.section.netWorth')}`);
+  const lineIdx = lines.findIndex(l => l.trim() === otherLine);
+  ok(nwIdx >= 0 && lineIdx > nwIdx, 'and it sits UNDER the Net Worth heading, beside the figure it qualifies');
+  const nextHeading = lines.findIndex((l, i) => i > nwIdx && l.startsWith('## '));
+  ok(nextHeading === -1 || lineIdx < nextHeading, 'not spilled into the section after it');
+  eq(json.other_currencies, [{ symbol: '€', amount: 150000 }], 'and JSON carries the same list raw');
+
+  /* (b) Income & Spend — periodSummary() holds foreign accounts out of every
+     figure in this section (period.js's own comment: every consumer is
+     expected to say something when foreign.count is non-zero). The Dashboard
+     hero says it; this said nothing. Same key, same params. */
+  const incomeCaveat = i18n.t('dash.foreignExcluded', { count: 2, symbols: '€' });
+  ok(md.includes(incomeCaveat), 'Income & Spend discloses the accounts its totals leave out');
+  eq(json.income_vs_spend.foreign, { count: 2, symbols: ['€'] }, 'and JSON carries the same fact as data');
+
+  /* (c) Savings — the rate is growth over capital and both must come from
+     ONE currency (views/savings.js's growthTile narrows for exactly this
+     reason). The narrowing is only honest if the pool it dropped is named. */
+  const savingsCaveat = i18n.t('dash.foreignExcluded', { count: 1, symbols: '€' });
+  ok(md.split(`## ${i18n.t('report.section.savings')}`)[1].includes(savingsCaveat),
+    'the Savings section names the accounts its growth figures exclude');
+  eq(json.savings.foreign, { count: 1, symbols: ['€'] }, 'JSON agrees');
+
+  /* (d) Debt — a euro bond cannot be added into a rand total, ordered by
+     rate against rand cards, or have its interest summed with theirs. The
+     Debt PAGE holds them out and tags the tile; this section did neither. */
+  /* report.debt.otherCurrencies, not the hero's "held in" sentence: under a
+     Debt heading "held" reads as an asset, about a bond the household owes. */
+  const debtLine = i18n.t('report.debt.otherCurrencies', { list: '€ 100000' }).trim();
+  ok(md.split(`## ${i18n.t('report.section.debt')}`)[1].includes(debtLine),
+    'the Debt section states the foreign debt its totals hold out, in its own symbol and as money owed');
+  eq(json.debts.foreign, { count: 1, others: [{ symbol: '€', amount: 100000 }] }, 'JSON agrees');
+
+  /* (e) A household whose ONLY active debts are foreign is not debt-free,
+     and must not be told it is. The count-based "Debt-free" sentence is
+     suppressed rather than printed above a line naming a live euro bond. */
+  const onlyForeign = financialReportMarkdown({
+    ...MIXED,
+    debts: { count: 1, active: 0, total: 0, perMonth: 0, interest: 0, rows: [], foreign: { count: 1, others: [['€', 100000]] } },
+  }, money);
+  ok(!onlyForeign.includes(i18n.t('report.debt.free', { count: 1 })),
+    'a household whose only active debt is a euro bond is never called debt-free');
+  ok(onlyForeign.includes(debtLine), 'it is told about the bond instead');
+
+  /* (f) The gate the other way. A single-currency vault — which is nearly
+     every vault — must get none of these four lines. A caveat that always
+     prints is one nobody reads. */
+  const plain = financialReportMarkdown(DATA, money);
+  ok(!/held in other currencies/.test(plain), 'a single-currency report carries no other-currency line at all');
+  ok(!plain.includes(i18n.t('dash.foreignExcluded', { count: 2, symbols: '€' })), 'nor any foreign-account caveat');
+  const plainJson = JSON.parse(financialReportJson(DATA));
+  eq(plainJson.other_currencies, [], 'and JSON says so with an empty list rather than a missing key');
+  eq(plainJson.income_vs_spend.foreign, { count: 0, symbols: [] }, 'the JSON fields are always present, zeroed');
+}
+
+/* ---- 14. the transaction-detail table carries each row's own currency ----
+   Same defect exporter.test.cjs item 11 pins from the other side: this table
+   is drawn through exporter.js's transactionRow(), so a row template one cell
+   short shifted every value from Amount onward one column left HERE too. */
+{
+  const rows = [
+    { date: '2026-08-01', desc: 'Salary', label: 'Cheque', cat: 'Salary', amount: 40000, excluded: false, note: '', currency: 'R' },
+    { date: '2026-08-05', desc: 'Rent Berlin', label: 'Euro Savings', cat: 'Housing', amount: -900, excluded: false, note: '', currency: '€' },
+  ];
+  const md = financialReportMarkdown({ ...DATA, detail: 'detail', transactions: rows }, money);
+  const lines = md.split('\n');
+  const head = lines.find(l => l.startsWith('| Date')).split('|').slice(1, -1).map(x => x.trim());
+  const body = lines.filter(l => /^\| 2026-/.test(l));
+  eq(body.length, 2, 'both rows rendered');
+  for (const l of body) {
+    eq(l.split('|').length - 2, head.length,
+      'every detail row is as wide as its header — a short row files the amount under "Currency" in a table that still parses');
+  }
+  const CUR = head.indexOf('Currency');
+  eq(body[1].split('|')[CUR + 1].trim(), '€', 'and the euro row states the euro symbol');
+  ok(/€\s*-?900/.test(body[1]), 'with the amount itself printed in euro, not stamped with the household symbol');
 }
 
 /* ---- 6. copyBody strips the frontmatter for the clipboard ---- */

@@ -94,6 +94,63 @@ function periodCtx(monthStartDay, txFiles = {}) {
     'start day 28 lands inside February in every year — this is why the loader clamps to 28');
 }
 
+/* ---- the floor of MONTH_KEY, and the promise its comment makes ----
+
+   MONTH_KEY admits years 0100–9999 and its comment states the rule outright:
+   "a month key it would refuse as a date must not be reachable as a month".
+   The floor is 0100 because Date.UTC relocates years 0–99 onto 1900–1999, so
+   '0000-01' would have resolved to a window starting in 1899 — a period the
+   name never claimed.
+
+   The half nobody was checking is the OTHER side of that promise: the
+   boundaries the key resolves to have to be dates too. isoOf and
+   isoFromDayNumber never padded the year, so periodRange('0100-01') came back
+   {start: '99-12-23', end: '100-01-22'} — neither ISO-shaped, both refused by
+   isRealIsoDate, and both sorting in FRONT of every real transaction in a
+   codebase whose date comparisons are all string comparisons. Pinned here
+   rather than only in tests/dates.test.cjs because this is the caller that
+   makes the year reachable at all: subtracting month_start_day from the
+   lowest legal key is the one path into year 0099. */
+{
+  const { periodRange, periodKeyValid } = periodCtx(23);
+  const { ISO_DATE, isRealIsoDate } = require('../src/dates');
+
+  ok(periodKeyValid('0100-01'), 'the lowest year MONTH_KEY admits is a period key');
+  ok(!periodKeyValid('0099-01'), 'and the year below it is not — this is the floor, not a suggestion');
+
+  eq(periodRange('0100-01'), { start: '0099-12-23', end: '0100-01-22' },
+    'the lowest legal key resolves to two ISO-shaped, four-digit-year boundaries');
+  for (const key of ['0100-01', '0100-12', '2026-08', '9999-12']) {
+    const r = periodRange(key);
+    ok(ISO_DATE.test(r.start) && ISO_DATE.test(r.end), `${key}: both boundaries are date-SHAPED`);
+  }
+  for (const key of ['0100-02', '0100-12', '2026-08', '9999-12']) {
+    const r = periodRange(key);
+    ok(isRealIsoDate(r.start) && isRealIsoDate(r.end),
+      `${key}: and both name days that happened — a key isRealIsoDate would refuse must not be reachable as a month`);
+  }
+
+  /* The one boundary that still cannot, and the reason it is pinned rather
+     than fixed here. '0100-01' is the LOWEST key MONTH_KEY admits, and
+     subtracting month_start_day from it reaches back into year 0099 — a year
+     isRealIsoDate cannot represent at all, because it round-trips through
+     Date.UTC and Date.UTC relocates years 0–99 to 1900–1999. So the start of
+     that single period is now correctly SHAPED but still not a date this app
+     will confirm.
+
+     Closing it means either raising MONTH_KEY's floor to 0101 or teaching
+     isRealIsoDate setUTCFullYear, and both are decisions with a blast radius
+     wider than a formatting fix — isRealIsoDate is the shared gate the loader,
+     the period maths and both settings tabs agree through. Asserted as it
+     stands so the residue is visible and deliberate rather than discovered
+     again from scratch. */
+  ok(!isRealIsoDate(periodRange('0100-01').start),
+    'the residue: the lowest key\'s START still falls in a year isRealIsoDate cannot represent — ' +
+    'shaped correctly now, but not confirmable, and closing it moves MONTH_KEY\'s floor or isRealIsoDate itself');
+  ok(isRealIsoDate(periodRange('0100-01').end),
+    'its END is a real date, so only the one boundary of the one lowest period is affected');
+}
+
 /* ---- interval periods (fortnightly and friends) ---- */
 function intervalCtx(period_days, period_anchor, txFiles = {}) {
   const ctx = makeCtx({}, { settings: { month_start_day: 23, period_days, period_anchor } });

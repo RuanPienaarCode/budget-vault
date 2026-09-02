@@ -19,6 +19,7 @@
 
 const { monthlyInterest } = require('./debt-math');
 const { activeDebts } = require('./worth');
+const { isForeign } = require('./currency');
 const { largestRemainder } = require('./share-percents');
 
 const DAYS_PER_MONTH = 30.44;
@@ -96,8 +97,28 @@ function resolveEarmarks(accounts) {
    safe direction, and a partial figure moves the score toward the truth where
    null leaves it untouched. An empty book stays 0 — no debts really is no
    interest, and that is a claim about the household, not a gap in it. */
-function debtInterestMonthly(debts) {
-  const active = activeDebts(debts);
+/* ISSUE 28/30. `household` is the same OPTIONAL symbol worth() and
+   owedSummary() already take, with the same contract: absent means "add every
+   debt", which is exactly how this function always behaved and is the right
+   answer for a vault whose Debts.md states no currency — which is all of them
+   until someone sets one.
+
+   Supplied, foreign debts are held out, because this figure is a rand bill
+   and a euro mortgage's interest is not one. It had to be: worth() eight
+   lines below this function's own call site in health-data.js already filtered
+   them (worth.js's `fromDebts`), and so did views/debts.js's KPI — so a
+   household that recorded a euro bond saw the Debt page print R333,33 a month
+   while the Score page's debt pillar divided R1 000,00 by the same income,
+   moving interestShare from 0.83% to 2.5% off a liability net worth had
+   already declined to count. Three readers of one ledger, two rules — this
+   repository's most-repeated bug shape, and the third occurrence of it on
+   this exact figure.
+
+   Held out BEFORE the all-blank-rates test, so a book of one rand debt with
+   no rate and one euro debt with a rate still returns null rather than
+   reporting the foreign rate as the household's whole interest bill. */
+function debtInterestMonthly(debts, household) {
+  const active = activeDebts(debts).filter(d => !household || !isForeign(d, household));
   const stated = active.filter(d => (Number(d.rate) || 0) > 0);
   if (active.length && !stated.length) { return null; }
   return active.reduce((sum, d) => sum + monthlyInterest(d.balance, d.rate), 0);

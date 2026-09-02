@@ -17,7 +17,7 @@
 const { todayIso, isoDayNumber, isoFromDayNumber } = require('./dates');
 
 module.exports = function registerTrendMath(ctx) {
-  const { S, shiftPeriod, periodRange, currentPeriod, txInPeriod, nonBudgetLabels, catType } = ctx;
+  const { S, shiftPeriod, periodRange, currentPeriod, txInPeriod, nonBudgetLabels, foreignLabels, catType } = ctx;
 
   /* How many periods a calendar-month range covers. A period is a pay cycle,
      which may be a week or a fortnight, so "6M" is 6 points on a monthly cycle
@@ -108,15 +108,55 @@ module.exports = function registerTrendMath(ctx) {
      30-day one caps at 30).
 
      Filtering mirrors periodSummary() exactly — the per-row veto, the
-     per-account one, transfers dropped, income dropped, and NET per category so
-     a refund nets off rather than counting as spend. A baseline built by
-     different rules than the figure it is subtracted from is not a comparison.
+     per-account one, THE PER-CURRENCY ONE, transfers dropped, income dropped,
+     and NET per category so a refund nets off rather than counting as spend.
+     A baseline built by different rules than the figure it is subtracted from
+     is not a comparison.
+
+     ISSUE 28, third pass. The currency filter was the sentence above being
+     false. summaryInRange() (src/period.js) held foreign rows out of income
+     and spend in the first pass and healthSnapshot() (src/health-data.js) was
+     taught the same predicate in the second, while this function — which the
+     Dashboard's trend chart, its comparison column and the SCORE's budget
+     pillar all read — went on adding every remaining row into one per-category
+     rand map. Three consequences, each measured on a two-currency vault:
+
+       · the trend chart drew a rupiah holiday month as a rand spike
+       · the comparison column announced the same rupiah as "up R 3 000 000
+         on Groceries" against a rand baseline
+       · health-data's `consumptionBudget` (the numerator of the score's
+         `budgetUsed`) divided rupiah spending by a rand budget and read
+         102 954% where the household's own answer was 97%. Only the numerator
+         could ever go wrong there: a plan is written in the household's
+         currency by construction, so there was nothing on the other side of
+         the division to balance it.
+
+     `foreignLabels()` is READ OFF ctx rather than restated here, deliberately.
+     It is the SAME Map of transaction-folder label to symbol that
+     summaryInRange filters by, so the hero, this comparison column and the
+     score cannot come to different conclusions about which rows are household
+     money — which is precisely this repository's recurring bug shape ("two
+     figures derived by different rules"), and the one it keeps landing on
+     when a second copy of a predicate is written rather than the first one
+     shared. Resolved per call, for the reason nonBudgetLabels() states at its
+     own definition: an account can be re-stamped with a currency between two
+     of the six periods the trend draws.
+
+     What is held out is NOT dropped silently — currency.js:14 forbids that.
+     The exclusion is disclosed where these figures are printed: the Dashboard
+     hero's own `dash.foreignExcluded` line names the same accounts, because
+     the predicate is the same one.
 
      `count` deliberately ignores the cap. It answers "does the vault cover this
      period at all", and a month whose data starts on the 20th still happened —
-     counting only the capped rows would drop it from the average entirely. */
+     counting only the capped rows would drop it from the average entirely. It
+     narrows with the rest, though: a period covered only by a rupiah account
+     is not a rand period this vault can average, and counting it as one is
+     what let compareTotals build a baseline out of months it holds no
+     household spending for. */
   function periodSpend(p, days) {
     const skip = nonBudgetLabels();
+    const foreign = foreignLabels();
     let cut = null;
     if (days !== null) {
       const { start, end } = periodRange(p);
@@ -126,7 +166,7 @@ module.exports = function registerTrendMath(ctx) {
     const net = {}, netPart = {};
     let count = 0;
     for (const t of txInPeriod(p)) {
-      if (t.excluded || skip.has(t.label)) continue;
+      if (t.excluded || skip.has(t.label) || foreign.has(t.label)) continue;
       count++;
       if (catType(t.cat) === 'transfer') continue;
       const k = t.cat || '';

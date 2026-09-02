@@ -271,6 +271,28 @@ module.exports = function registerTax(ctx) {
   /* Totals grouped by code: one row per code, which is the shape a return asks
      for (three banks' interest is one 4201 line, not three). Replaced on its
      own so a figure edit leaves the input it was typed into standing. */
+  /* ISSUE 30. The figures on this page are read off certificates and checked
+     against statutes, so they are denominated in the TAX AUTHORITY's currency
+     — renderChecks says exactly that in a paragraph above this table, and
+     locale.js's figureChecks formats every callout with `this.currency`.
+     This totals row printed through money(), the HOUSEHOLD formatter, so a
+     `country: za` vault set to `currency: Rp` read "R 23 800,00" in the
+     callout and "Rp 23 800,00" in the row beneath it: one figure, two
+     currencies, on one card, under a sentence promising nothing had been
+     converted.
+
+     Byte-for-byte views/loans.js's `tariffMoney`, which fixed the identical
+     defect on the statutory tariff cards, rather than a second idea about the
+     same problem — and like it, a household already budgeting in the
+     authority's own currency (nearly every vault) falls through to money()
+     and reads exactly what it always did. */
+  const figureMoney = (v, dp = 2) => {
+    const cur = locale().currency;
+    return cur && cur !== S.settings.currency && typeof ctx.moneyIn === 'function'
+      ? ctx.moneyIn(cur, v, dp)
+      : money(v, dp);
+  };
+
   function renderFigureTotals(t) {
     const tbl = $('#taxFiguresTable');
     const old = tbl.querySelector('tfoot');
@@ -287,7 +309,7 @@ module.exports = function registerTax(ctx) {
       foot.append(el('tr', { class: 'tax-fig-total' },
         el('td', { style: 'font-weight:600' }, code),
         el('td', { colspan: '2', class: 'text-muted' }, `Total for ${code}`),
-        el('td', { class: 'num', style: 'font-weight:600' }, money(total)),
+        el('td', { class: 'num', style: 'font-weight:600' }, figureMoney(total)),
         el('td', {})));
     }
     tbl.append(foot);
