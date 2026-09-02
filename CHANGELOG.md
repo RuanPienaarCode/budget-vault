@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.34.0 — 2026-09-02
 
 A calculation audit. Five reviewers each took one slice of the arithmetic —
 the foundation (amounts, periods, currency), the budget and spend chain,
