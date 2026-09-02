@@ -6,7 +6,9 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "build": "node esbuild.config.mjs",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "figures": "node scripts/figures.cjs",
+    "figures:bless": "node tests/figures-ledger.test.cjs --bless"
   },
   "devDependencies": {
     "esbuild": "0.25.10"
