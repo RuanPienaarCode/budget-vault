@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.35.0 — 2026-09-02
 
 The follow-on from 1.34.0's calculation audit. Five things it found and did
 not fix: four figures that were wrong or claims the app could not support,
