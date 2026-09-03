@@ -1,20 +1,10 @@
 'use strict';
-/* The Financial-health inputs, assembled once for every surface that shows them.
-
-   The Dashboard's health card and the Score page ask the same five questions of
-   the same six periods. Assembling that twice is how the two end up disagreeing:
-   the figure a reader sees on the card and the figure behind the breakdown they
-   opened to explain it would drift the moment one copy learned something the
-   other did not. So the assembly lives here and both call it.
-
-   Registered like trend-math.js rather than exported as a plain function,
-   because every input is reached through a ctx helper — periodSpend,
-   periodSummary, accountIndex, budgetTotals — and re-deriving those would be
-   the same duplication one level down.
-
-   Pure of the DOM, but not of ctx: the arithmetic it feeds is in
-   health-math.js, which IS pure and is where the rules live. This module only
-   gathers. */
+/* The Financial-health inputs, assembled once for every surface that shows
+   them — the Dashboard's health card and the Score page both read this one
+   snapshot, so the card and the breakdown behind it cannot drift apart.
+   Registered on ctx like trend-math.js because every input is a ctx helper.
+   Pure of the DOM, not of ctx: the arithmetic lives in health-math.js, which
+   IS pure and holds the rules. ADR-0007 · health-data.js — purpose. */
 
 const {
   healthMetrics, resolveEarmarks, debtInterestMonthly, essentialTotal,
@@ -47,48 +37,11 @@ const { daysBetween } = require('./dates');
    ADR-0006; the comments above them stay as the record of why pairing
    exists. */
 
-/* EXCLUDED ROWS THAT PAIR OFF AGAINST EACH OTHER — the two legs of one
-   movement, found by their own arithmetic rather than trusted from the flag.
-
-   `excluded` is overloaded, and that is the whole problem this solves. A
-   reader uses it for two different things:
-
-     · the second leg of money already counted once — settling a credit card,
-       moving between own accounts, a reimbursement passing through
-     · a bill that genuinely left the household but sits outside the budget
-       for some unrelated reason
-
-   Treating every excluded row as spending double-counted a real vault by
-   R10 453 a month and told it it had 2.2 months of emergency cover instead of
-   2.7. Treating none of them as spending threw away real reimbursed bills, and
-   a guard test rightly pins that case. Neither blanket answer is right, so
-   neither is used: a row is dropped only when an equal and opposite excluded
-   row sits in a DIFFERENT account within a few days, which is what a transfer
-   actually looks like once both sides are written down.
-
-   Same account never pairs. On a real vault the credit card holds both the
-   R11 514.04 purchase and the R11 514.00 that later settles it, and those are
-   two different events — the purchase is real spending and must survive. Its
-   partner is the R11 514.00 leaving the savings account, which is where the
-   money actually came from. */
-/* WITHIN THE PERIOD, not within three days. The window used to be three days
-   and the number decided real figures: a household whose bank settled a card
-   in four days counted the same rand twice in its spending, and read a lower
-   emergency cover than the identical household on an instant transfer. Two
-   people doing the same thing got different answers because of their bank.
-
-   Every caller already hands this one period's rows, so the period IS the
-   window and nothing here needs a calendar. Checked against a real vault
-   before widening: it finds one more genuine pair (a plumber paid on a card on
-   the 21st, reimbursed from the transaction account on the 29th — 22 days, and
-   invisible to a three-day rule) and no false ones.
-
-   Description agreement was tried as a stricter test and rejected on the same
-   data: it threw away four real pairs, because the two sides of one movement
-   are written by two different banks — "Discovery Bank account...6397" against
-   "Notice savings account payout", "VITALITY TRAVEL" against "CAPITEC D
-   COLENBRANDER". Equal and opposite, in two different accounts, once each, is
-   the signal that actually holds. */
+/* ADR-0007 · Pass-through pairing: excluded rows that cancel each other. An
+   excluded row is dropped only when an equal and opposite excluded row sits in
+   a DIFFERENT account in the same period. Code now lives in ledger.js. */
+/* ADR-0007 · The pairing window is the period, not three days. No day window
+   and no description test — both were tried on a real vault and rejected. */
 const { worth, otherCurrencyNet } = require('./worth');
 const { splitByCurrency, isForeign } = require('./currency');
 
@@ -115,57 +68,14 @@ module.exports = function registerHealthData(ctx) {
     const want = periodsForMonths(TRAILING_MONTHS);
     const idx = accountIndex();
 
-    /* ISSUE 28, second pass. Every household walk below feeds a RATIO, and
-       until this line each of them read `txInPeriod(p)` raw — so a vault with
-       one rupiah holiday account divided rand by rupiah in every one of them
-       while the block at the foot of this function narrowed only the ACCOUNTS
-       and its comment claimed "the pool is narrowed to the household's own
-       currency before any of it is divided". It was not, and the page said so
-       out loud: "1 account in another currency (Rp) is not in these figures",
-       printed beside figures that very much included it. Measured on the
-       fixture in tests/score-currency-isolation.test.cjs: cover 3.5 months →
-       0.003, saving rate 11.1% → 0.02%, the score 69 → 22. A wrong total at
-       least looks like a number; a wrong percentage looks like a measurement.
-
-       `foreignLabels()` (src/period.js) is the SAME predicate summaryInRange
-       already filters by — a Map of transaction-folder label to symbol for
-       every folder whose account states a currency that is not the
-       household's — so the Dashboard's period summary and this snapshot
-       cannot come to different conclusions about which rows are household
-       money. Resolved once per snapshot rather than per period: it is a
-       property of the accounts, and the six periods below cannot disagree
-       about it.
-
-       What is held out is NOT dropped silently. Because the predicate is the
-       account's own `currency:`, the folders excluded here belong to exactly
-       the accounts `splitByCurrency` hands back as `scoreOthers` at the foot
-       of this function — so the disclosure the page already prints now names
-       precisely what these walks left out, which is what it always claimed
-       to be doing. currency.js:14 forbids the alternative. */
+    /* ADR-0007 · Household walks read household-currency rows only (ISSUE 28,
+       second pass). Every ratio below divides rand by rand; what is held out is
+       named on the page by otherCurrencies. */
     const foreign = foreignLabels();
     const homeRows = p => txInPeriod(p).filter(t => !foreign.has(t.label));
-    /* Contributions into savings AND investment accounts both count as saving —
-       the rate measures money the household kept, not which wrapper it kept it
-       in. splitFlows already knows a contribution from growth and from a split
-       parent, so no raw-row reading happens here.
-
-       Case-folded and trimmed against the account's own type, not compared
-       raw — the same trap views/savings.js's own `typeIs` documents (and
-       worth.js:122-141 names by name): `load.js` only defaults `type` when
-       the key is ABSENT, so `type: Savings` or `type: ' savings '` reached
-       here exactly as written and dropped straight out of the saving-rate
-       pillar while worth() still counted the same balance toward net worth
-       elsewhere on the same score. Kept as its own copy here rather than a
-       shared helper — health-data.js and views/savings.js are siblings, not
-       a shared module, and each carries this comment for a reader who lands
-       in only one of them. */
-    /* Household currency only, matching the rows the pairing below is handed
-       (homeRows drops foreign folders). With the pool boundary drawn wider
-       than the row set, a foreign savings account sat in saverLabels while
-       none of its rows were present — so a transfer OUT of a euro savings
-       account INTO a rand one lost its outflow leg and counted as fresh
-       saving from outside the pool. Both sides of the pairing now see the
-       same accounts. */
+    /* ADR-0007 · The savings pool: savings and investment accounts, household
+       currency only — the same boundary homeRows draws, so both legs of a
+       transfer are seen. Type is case-folded inside poolAccounts. */
     const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));
 
     const periods = [];
@@ -181,12 +91,8 @@ module.exports = function registerHealthData(ctx) {
       /* Gathered across the WHOLE pool before anything is counted, because an
          internal transfer is only recognisable from both of its legs at once —
          see the matching step below. */
-      /* Walked off the HOUSEHOLD rows, filtered down to the pool by label,
-         rather than off accountIndex's per-account row lists. Those lists hold
-         the raw file rows, which carry no `label` — so a key built from one
-         could never match a key built from a household row, and the
-         pass-through check below silently did nothing at all. Same rows either
-         way; this is the shape that can be compared. */
+      /* ADR-0007 · Pool rows are household rows filtered by label. accountIndex's
+         raw file rows carry no `label`, so a key built from one never matched. */
       const saverLabels = new Map();
       for (const a of savers) {
         for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
@@ -194,56 +100,18 @@ module.exports = function registerHealthData(ctx) {
       /* ISSUE 32 — catType, so a fund purchase can no longer be paired away
          as the leg of an internal move. */
       savings = savedFromOutside(householdRows, saverLabels, declaredCatType);
-      /* Three slices of one period, because they answer three questions.
-         `essential` is what must be paid with no income — the emergency
-         divisor. `consumption` is what living cost: everything except money
-         moved into the household's own funds, without which funding an
-         investment reads as overspending. `fixed` is the part that cannot be
-         stopped this month. */
-      /* BUDGET-SCOPED, and used for exactly one thing: "budget used". That
-         question compares what was spent against THE PLAN, and a plan is
-         budget-scoped by definition — measuring a household-wide numerator
-         against a budget-only denominator would be the same mixing this whole
-         block exists to end. Every other share below is household-wide, built
-         from householdSpend further down. */
+      /* ADR-0007 · Three spend slices per period, and one of them budget-scoped.
+         essential / consumption / fixed are household-wide; consumptionBudget is
+         budget-scoped and feeds "budget used" alone. */
       /* ADR-0005: the SAME numerator the Dashboard hero prints, so the ring's
          six-period average is an average of the figure the reader has already
          seen. This used to sum periodSpend()'s NET map with savings types
          dropped — refunds netted, uncategorised gone — and so differed from
          the hero even over a single counted period. */
       const consumptionBudget = budgetUsed(p).spent;
-      /* The emergency fund's DIVISOR, built from every account rather than
-         periodSpend's budget-scoped map. `essential` answers "what must the
-         HOUSEHOLD keep paying with no income", and periodSpend deliberately
-         drops `excluded` rows and `budget: false` accounts — the right rule
-         for a BUDGET total, the wrong one here: rent paid from a joint
-         account the household marked out of the budget is still a bill the
-         fund has to cover the month income stops. The numerator already
-         reads every account (resolveEarmarks walks S.accounts unfiltered),
-         so a divisor built from the narrower budget-only set is the exact
-         "two figures derived by different rules" shape this app keeps
-         tripping on — proven on a real vault as R48,000 of real essential
-         spend measured against an R8,000 divisor, "6 months covered" where
-         the truth was 2.
-
-         The net-then-flip transform below is periodSpend's own `spendOf`
-         (trend-math.js), reproduced rather than reused: periodSpend cannot be
-         called without ALSO pulling in the excluded/budget-scoped row filter
-         this fix exists to bypass, so the two shapes have to be built
-         separately even though the arithmetic is identical. Net first, THEN
-         drop income-typed and net-positive categories (a refund month nets a
-         category positive and it must not invert into essential spend) and
-         flip the negative remainder to a positive rand figure — essentialTotal
-         expects spend as positive amounts, the same shape periodSpend's
-         `whole` already handed it. Transfers drop out before the net is
-         built, the one exclusion periodSpend itself applies before anything
-         else can. */
-      /* Phase 2 of ADR-0006: the household walk is tally(ledger(p),
-         LENSES.HOUSEHOLD) — foreign and transfer rows dropped, pass-through
-         pairs dropped, excluded and non-budget rows KEPT, net per category
-         then flipped. Every argument the walk used to carry as prose is the
-         HOUSEHOLD lens's own definition in src/ledger.js, and
-         tests/ledger-lenses.test.cjs pins the three slices below to it. */
+      /* ADR-0007 · The household walk is the HOUSEHOLD lens: every account, net
+         then flip. Excluded and non-budget rows KEPT (R48,000 of essential spend
+         was once divided by R8,000). Pinned by tests/ledger-lenses.test.cjs. */
       const h = tally(ledger(start, end), LENSES.HOUSEHOLD);
       const householdNet = h.byCat;
       const householdSpend = h.spendByCat;
@@ -253,30 +121,15 @@ module.exports = function registerHealthData(ctx) {
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
         savings, consumption, fixed, consumptionBudget,
         budgeted: budgetTotals(p).spend,
-        /* Household coverage, not budget coverage: a period whose only real
-           activity sat in an excluded or non-budget account is still a period
-           that happened, and dropping it from the trailing average would
-           silently understate the very essential figure this fix exists to
-           correct. Read off `householdNet` (before the income/transfer drop
-           and the sign flip) rather than `householdSpend`, since a period
-           that held only income transactions is still a real period too. */
+        /* ADR-0007 · A period counts if the household did anything in it. Read off
+           householdNet, before the income/transfer drop and the sign flip. */
         counted: spend.count > 0 || Object.keys(householdNet).length > 0,
       });
     }
 
-    /* ISSUE 28 (2026-08-29 audit). Every figure this snapshot feeds the score
-       is a RATIO, and a ratio is the one shape where mixing currencies does
-       more than overstate a total — it inverts the verdict. Measured on a
-       two-currency vault: a rand emergency fund over a rupiah-polluted
-       essential-spend average printed "0.0 months" in red where the true
-       reading was 6.7 months in green, and the overall score fell 26 points.
-       A wrong total at least looks like a number; a wrong percentage looks
-       like a measurement.
-
-       So the pool is narrowed to the household's own currency before any of
-       it is divided. What that leaves out is counted and named on the page —
-       currency.js:14 forbids excluding an account silently, and "left out of
-       a score" is an exclusion however good the reason. */
+    /* ADR-0007 · Net worth and earmarks are measured on household-currency
+       accounts, and the rest is named (ISSUE 28): a ratio over mixed currencies
+       inverts the verdict — "0.0 months" printed where 6.7 was true. */
     const { primary: homeAccounts, others: scoreOthers } =
       splitByCurrency(impliedAccounts(), S.settings.currency);   // ISSUE 44 — one as-of across every net worth
     const earmarks = resolveEarmarks(homeAccounts);
@@ -287,30 +140,9 @@ module.exports = function registerHealthData(ctx) {
        changes the filter in only one place. */
     const debtInterest = debtInterestMonthly(S.debts, S.settings.currency);
 
-    /* What the household is committed to repaying each month — or null when
-       nothing says.
-
-       The Debts table reads a blank `Payment` cell as 0 (see table-schema.js's
-       money() reader), so a household that listed its debts and left that
-       column empty produced instalments of 0 — full marks, and indistinguishable
-       from a household with no repayments at all. A stated 0 is treated the
-       same as a blank here deliberately: a debt you repay nothing on states no
-       commitment either way, so there is nothing the two could mean differently
-       for this measure.
-
-       Some payments known and others blank still totals what IS known rather
-       than refusing to answer: understating a burden is the safe direction, and
-       a partial figure moves the score toward the truth where null leaves it
-       untouched. */
-    /* Foreign debts held out, the same way debtInterestMonthly above and
-       worth() below already hold them out — and for the sharper reason. A
-       €900 monthly repayment is not R900 of commitment, and instalmentShare
-       divides this straight by rand income: on a two-currency book the score
-       read a household as spending a quarter more of its income on debt than
-       it does, against a Debt page six inches away still printing the
-       rand-only total. `isForeign` through debtInterestMonthly's own
-       argument would not reach here — this is a second figure off the same
-       ledger, so it takes the same filter rather than trusting that one. */
+    /* ADR-0007 · Debt instalments: null when nothing states a payment, foreign
+       debts held out. A blank Payment reads 0 upstream and would score full
+       marks; a partial total moves toward the truth where null stays put. */
     const active = activeDebts(S.debts)
       .filter(d => !isForeign(d, S.settings.currency));
     const stated = active.filter(d => (d.payment || 0) > 0);
@@ -341,37 +173,16 @@ module.exports = function registerHealthData(ctx) {
     });
 
     return {
-      /* Handed to the page so the Score can SAY what it left out, rather than
-         quietly scoring a household on part of its money.
-
-         ACCOUNTS ONLY, and that is what it is for: `homeRows` narrows every
-         period walk above by account, so this names what is missing from the
-         RATIOS. Every consumer that states a NET WORTH wants the other list. */
+      /* ADR-0007 · otherCurrencies is ACCOUNTS ONLY — what homeRows removed from
+         the RATIOS. A consumer stating a NET WORTH wants worthOtherCurrencies. */
       otherCurrencies: scoreOthers,
-      /* ISSUE 56/57. What the net worth above left out, across all three of
-         the ledgers worth() reads — accounts, assets, debts and receivables
-         merged into one per-symbol net by otherCurrencyNet.
-
-         The Score printed "1 account in another currency (EUR) is not in these
-         figures", naming EUR 500, beside a net worth that had also silently
-         dropped a EUR 200 000 flat, a EUR 100 000 loan and EUR 500 lent out —
-         0.17% of what it excluded, on a figure the score divides by income.
-         The Dashboard, the Savings page and the Report were all moved onto
-         otherCurrencyNet when ISSUE 30 found exactly this; the Score and the
-         exported report were the two surfaces that never were. */
+      /* ADR-0007 · The Score's net worth discloses every ledger it left out
+         (ISSUE 56/57): accounts, assets, debts and receivables, one net per symbol. */
       worthOtherCurrencies: otherCurrencyNet(netWorthFull, scoreOthers),
       metrics, earmarks, target, debtInterest,
       hasFixed: fixedCats.size > 0,
-      /* Whether the debt score rests on anything the household actually wrote.
-         False means the pillar's full marks are an ASSUMPTION — see the note in
-         health-math's PILLARS block — and the surfaces say so rather than
-         letting a reader believe the vault checked.
-
-         Off the currency-filtered `active`, deliberately. A household whose
-         only debt is a euro bond has written one down, but not one this score
-         can measure — every figure the pillar reads is now the rand book —
-         so full marks there ARE an assumption, and saying otherwise would be
-         the pillar quietly claiming a check it did not perform. */
+      /* ADR-0007 · debtsRecorded reads the currency-filtered debts. False means the
+         pillar's full marks are an ASSUMPTION, and the surfaces say so. */
       debtsRecorded: active.length > 0,
       breakdown: scoreBreakdown(metrics, target),
       /* Nothing honest to say: no fund to measure and nothing computable from

@@ -1,132 +1,29 @@
 'use strict';
-/* Where a savings or investment balance actually came from.
-
-   Every provider statement in the world reports the same shape:
-
-     Opening + Contributions + Growth − Withdrawals = Closing
-
-   and the app used to report `balance − total_invested`, calling the result
-   growth. Those are only the same number while `total_invested` keeps pace with
-   every contribution, and nothing makes it. A monthly debit order moves the
-   balance and leaves the baseline where it was, so the difference grows by the
-   contribution and is then presented as performance. Measured against four real
-   accounts it was wrong on all four — most starkly on a tax-free account where
-   contributions outweighed real growth by roughly twenty to one.
-
-   So the split is DERIVED from the account's own transactions rather than
-   recorded a second time by hand. A transfer into a fund already exists in the
-   vault, dated and named; asking the reader to also type it into a
-   `## Contributions` table would create a fourth hand-maintained ledger, and
-   hand-maintained ledgers in this app die within three weeks of being created.
-   See docs/adr/0003.
-
-   THE CLASSIFICATION RULE (ITEM 2, 2026-08-26 — replaces the rule this
-   header used to state, see the note below the table for why):
-
-     outflow                                  → withdrawal
-     inflow, category flagged `interest: true` → growth
-     inflow, anything else (real, non-transfer) → contribution
-
-   Growth is recognised by a category FLAG, not a category name: "Interest
-   income" is one vault's English label, and a rule keyed to that string is
-   wrong in every other language and in any vault that named it differently.
-
-   WHY A FLAG AND NOT THE `income` TYPE ANY MORE. The rule used to be simpler
-   — any income-typed inflow was growth — and it had exactly one known
-   weakness, named in this header since the day it shipped: a salary, a
-   client payment or a UIF payment landing DIRECTLY in a savings or
-   investment account is ALSO an income-type inflow, and was counted as
-   growth when it is really a contribution. `type` alone cannot tell the two
-   apart — both are income arriving from outside — so the household now
-   says so itself: a category is growth-worthy only once it carries
-   `interest: true` in its frontmatter (load.js, the same additive,
-   opt-in, defaults-false shape `fixed` already uses — see load.js's own
-   comment on that field). Every other real, non-transfer inflow is a
-   contribution: money the household put in, by hand or by debit order,
-   whatever the category is called or typed, income included.
-
-   `typeOf` here is not the household's raw category type any more — every
-   caller must inject `poolCatType` (this module's own export, built once
-   from `S.categories` and shared by views/savings.js AND views/accounts.js's
-   totalReturn() call) rather than `ctx.catType` directly, or an income-typed
-   Interest category answers 'income' again here and silently stops being
-   growth. poolCatType folds `type === 'income' && category.interest` down to
-   the single string 'interest' this rule checks for; every other type passes
-   through unchanged.
-
-   BACKWARD COMPATIBILITY, stated rather than hidden: an existing "Interest"
-   category (income-typed, `interest` unset) now reads as an ordinary
-   contribution until the household ticks the flag — a visible move (the
-   category simply stops appearing under "growth from…" and starts appearing
-   as money put in), not a silent one, and `growthCategories` below still
-   names whatever DOES feed growth so a miscategorised row is never invisible
-   either way. Silent misclassification is the failure this module exists to
-   end, so it must not introduce one of its own.
-
-   Contributions deliberately have no category of their own. They wear the
-   budget category they came FROM — in one real vault "Baby fund Jan" is
-   uncategorised, "Emergency savings Dec" is a savings category, and
-   "Sam Jan 26 tax" is a personal one. Any rule keyed to a single
-   contribution category would be wrong on real data.
-
-   Excluded rows COUNT. Every transaction in a fund account is typically
-   `Excluded: yes` — that keeps the money out of income and spend totals, which
-   is right, and has nothing to do with whether it entered the account. Skipping
-   them would report every fund as having received nothing, ever.
-
-   A split PARENT is the one row that does not count, and for the same reason
-   the rest do: its parts are in this list too, carrying the same money under
-   finer categories, so honouring the rule above without this exception counts
-   the contribution twice. Skipped by role, not by `excluded` — see
-   src/tx-role.js.
-
-   Pure — no DOM, no obsidian import. `typeOf` is injected so this module never
-   has to know how categories are stored. */
+/* Where a savings or investment balance actually came from. Every provider
+   statement reports Opening + Contributions + Growth − Withdrawals = Closing,
+   and this module DERIVES that split from the account's own transactions
+   rather than a hand-typed baseline. Classification (ADR-0007 · The savings
+   classification rule): outflow → withdrawal; inflow whose category carries
+   `interest: true` → growth; any other real, non-transfer inflow →
+   contribution. Excluded rows count; a split parent does not. Every caller
+   injects poolCatType, never ctx.catType. Pure — no DOM, no obsidian
+   import. Narrative: ADR-0007, savings-math.js — purpose. */
 
 const { ISO_DATE, todayIso, isRealIsoDate } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
 
-/* Builds the `typeOf` classifyRow (and everything downstream of it) actually
-   wants: a category's ordinary type, EXCEPT an income-typed category the
-   household has flagged `interest: true` reports as the single string
-   'interest' instead — the one thing classifyRow now recognises as growth.
-
-   Takes `categories` (S.categories) directly rather than being handed an
-   existing `ctx.catType`-style function, so this can be built ONCE, here, and
-   shared byte-for-byte by every caller. That sharing is load-bearing, not
-   tidiness: views/accounts.js's totalReturn() call feeds the SAME goal-cell
-   and drawer growth figure views/savings.js shows for the same account (see
-   accounts.js's own comment on that totalReturn() call for the exact bug —
-   `balance - total_invested` disagreeing by R60 000 on one real account —
-   this repo has already shipped once from two call sites deriving "what this
-   account earned" independently). A caller that passes `ctx.catType` straight
-   through instead of this wrapper silently reverts to the OLD rule for
-   itself alone: every income-typed category, flagged or not, answers
-   'income' again, and interest keeps registering as growth on THAT screen
-   while the household's own flag is respected everywhere else. */
+/* ADR-0007 · poolCatType is built once and shared byte-for-byte. Passing
+   ctx.catType instead reverts that one screen to the old rule (two call
+   sites once disagreed by R60 000 on one account). */
 function poolCatType(categories, name) {
   const c = (categories || []).find(x => x.name === name);
   if (!c) return null;
   return (c.type === 'income' && c.interest) ? 'interest' : c.type;
 }
 
-/* THE classification rule, in one place.
-
-   Extracted so splitFlows() and monthlyFlows() below cannot drift: they answer
-   different questions — "what does this account total" and "what did it do each
-   month" — but a row that is growth to one and a contribution to the other
-   would put two irreconcilable figures on the same page. Returns null for a row
-   that does not count at all.
-
-   Deliberately does NOT apply the date window: splitFlows filters by date after
-   calling this, and the ORDER matters. A split parent excluded here is excluded
-   whether or not it falls inside the window, which is what stops a window whose
-   edge lands between a parent and its parts from counting the money twice.
-
-   `typeOf` is expected to already be pool-aware — poolCatType() above, not a
-   bare category-type lookup — so the ONLY thing that reads as growth here is
-   the string 'interest'. Everything else a real, non-transfer inflow answers
-   (income included) is a contribution; see this file's own header for why. */
+/* ADR-0007 · classifyRow is the one rule, and it does not apply the date
+   window: callers window AFTER it, so a split parent at the window's edge
+   cannot count twice. Only the string 'interest' reads as growth. */
 function classifyRow(r, typeOf) {
   if (!r || typeof r.amount !== 'number' || !r.amount) return null;
   if (supersededBySplit(r)) return null;   // its parts are in this same list
@@ -170,22 +67,8 @@ function splitFlows(rows, typeOf, opts) {
   };
 }
 
-/* The account's story end to end.
-
-   `opening` is what the account held before any of these rows — inferred as
-   closing less everything that moved, because no file records it. That makes
-   the identity hold by construction, which is the point: the figures shown to
-   a reader must add up to the balance they can see, or the page is arguing
-   with itself.
-
-   `basis` says which figure the growth came from, so the view never presents a
-   derived split and a hand-typed one as though they were the same claim:
-
-     'derived'  from the account's own transactions
-     'stated'   no transactions — falls back to balance − total_invested, the
-                old formula, which is the best available for an account the
-                vault holds no history for (a provider-only TFSA, say)
-     'none'     neither available */
+/* ADR-0007 · An account's opening balance is inferred so the identity holds.
+   basis: 'derived' | 'stated' (balance − total_invested) | 'none'. */
 function accountFlows(account, rows, typeOf, opts) {
   const a = account || {};
   const balance = typeof a.balance === 'number' ? a.balance : 0;
@@ -205,15 +88,8 @@ function accountFlows(account, rows, typeOf, opts) {
     };
   }
 
-  /* The same two rules totalReturn applies below, in the same order —
-     starting_amount first, and a WRITTEN zero is a real baseline. This used
-     to read `a.total_invested || a.starting_amount || 0`, which both
-     reversed the precedence and falsy-skipped `starting_amount: 0` (an
-     account opened empty and funded by transfer fell through to 'none',
-     growth 0). Masked today only because the sole consumer prefers
-     totalReturn wherever the two would disagree — a new consumer would have
-     inherited the bug. fmNum writes null for an absent key and a number for
-     a written one, so `typeof` is the "was it written" test. */
+  /* ADR-0007 · Stated baseline: starting_amount first, and a written zero is
+     real. `typeof` is the was-it-written test; the old `||` chain got both wrong. */
   const baseline = typeof a.starting_amount === 'number' ? a.starting_amount
     : typeof a.total_invested === 'number' ? a.total_invested : null;
   if (baseline !== null) {
@@ -234,32 +110,9 @@ function accountFlows(account, rows, typeOf, opts) {
   };
 }
 
-/* ── total return ─────────────────────────────────────────────────────────
-   accountFlows() answers "what did this account RECORD". On a market-linked
-   fund the answer is "nothing" — the value moves, the balance is retyped, and
-   no row is ever written — so the card it feeds reads "no growth recorded",
-   which on the largest holdings on the page is the least useful sentence it
-   could print.
-
-   This answers a different question: what is the account WORTH against what
-   was put into it. It works backwards from the balance —
-
-     growth = balance − starting_amount − contributions + withdrawals
-
-   — because anything in the balance the household did not put there is, by
-   definition, what the account earned. That catches growth no transaction
-   records, which is the whole point.
-
-   It buys that with a dependency the derived figure does not have, and the
-   dependency is the reason `trust` exists:
-
-     · `starting_amount` must be the balance AT `inception_date`, not a rough
-       recollection;
-     · the vault must hold the account's transactions FROM that date onward.
-
-   Where the history starts well after inception, contributions are undercounted
-   and growth is OVERSTATED — silently, and in the flattering direction. So the
-   gap is measured and reported rather than left for the reader to notice. */
+/* ADR-0007 · Total return works backwards from the balance — growth =
+   balance − starting_amount − contributions + withdrawals — and reports its
+   own trust, because a late-starting history overstates growth silently. */
 
 const HISTORY_GAP_DAYS = 45;
 const MS_PER_DAY = 86400000;
@@ -272,18 +125,8 @@ function daysBetween(fromIso, toIso) {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
 
-/* isRealIsoDate, not ISO_DATE — ISO_DATE is SHAPE-only ("2026-13-45 passes",
-   per its own comment in dates.js) and this key feeds a month WALK below that
-   rolls 12 to the next year's 01 and stops at the last real month reached. A
-   row dated '2025-13-05' — the ordinary day/month-swap typo, the real date
-   meant being 2025-05-13 — used to slip past this test, get bucketed under
-   the unwalkable key '2025-13' by monthlyFlows, and then never be visited by
-   any point on the chart: not in a band, not in `undated`, just gone, and
-   `capital + posted + undated = closing` broke under fuzzing on exactly this
-   input class (64/4000 vaults) and no other. Falling back to '' here routes
-   the row into the existing UNDATABLE/pending path instead, which already
-   folds an unplaceable row into the first point — the fix is entirely this
-   one gate. */
+/* ADR-0007 · Month keys come from real dates only. '2025-13-05' used to
+   vanish from the chart (64/4000 fuzzed vaults); '' routes it to UNDATABLE. */
 const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : '');
 
 function nextMonth(m) {
@@ -292,36 +135,17 @@ function nextMonth(m) {
   return `${y}-${String(mo).padStart(2, '0')}`;
 }
 
-/* `basis`:
-     'measured'  starting_amount is set — the formula above, growth included
-     'stated'    no starting_amount, no transactions: balance − total_invested,
-                 the same fallback accountFlows() makes and no stronger a claim
-     'none'      nothing to measure the balance against
-
-   `trust`:
-     'ok'           the record covers the period
-     'history-gap'  the transactions begin well after the account did, so
-                    contributions are undercounted and growth overstated
-     'none'         basis 'none' — there is no figure to trust or distrust */
+/* ADR-0007 · Total return: basis 'measured' | 'stated' | 'none'; trust 'ok' |
+   'history-gap' (first row > HISTORY_GAP_DAYS after inception) |
+   'pre-inception' | 'none'. */
 function totalReturn(account, rows, typeOf, opts) {
   const a = account || {};
   const today = (opts && opts.today) || todayIso();
   const balance = typeof a.balance === 'number' ? a.balance : 0;
 
-  /* `starting_amount` is the balance AT `inception_date` — so it ALREADY
-     contains everything that happened before that date. Summing the rows
-     unwindowed added those contributions a second time, and the error runs in
-     the UNFLATTERING direction: capital too high, growth too low, a fund that
-     earned R200 reporting R0. Nothing disclosed it, because the trust check
-     below only fires when history starts LATE.
-
-     Reached by importing an account's full statement history into an account
-     whose `inception_date` marks when tracking started rather than when the
-     account opened — which is the ordinary way to adopt an existing account.
-
-     `all` stays unwindowed: `f.first` and the gap test have to see the whole
-     record to answer "when does the history actually begin". Only the capital
-     sums are windowed. */
+  /* ADR-0007 · Capital sums are windowed from inception; the first-row test is
+     not. Unwindowed sums counted pre-inception contributions twice (a fund
+     that earned R200 reported R0); `all` must see the whole record. */
   const all = splitFlows(rows, typeOf);
   const from = ISO_DATE.test(a.inception_date || '') ? a.inception_date : '';
   const f = from ? splitFlows(rows, typeOf, { from }) : all;
@@ -330,13 +154,8 @@ function totalReturn(account, rows, typeOf, opts) {
      deliberate `starting_amount: 0` — an account opened empty and funded by
      transfer — is a real baseline and must not fall through to 'none'. */
   const hasBaseline = typeof a.starting_amount === 'number';
-  /* typeof, not a trailing truthiness test — the exact bug the comment above
-     `baseline` in accountFlows() forbids for `starting_amount`, reached here
-     via `total_invested` instead: a written `total_invested: 0` is a real
-     baseline (an account funded entirely by transfer, nothing invested up
-     front by any other name), and the truthy test used to read it as absent.
-     accountFlows() already got this right with the bare `typeof` test; this
-     one had drifted from it. */
+  /* ADR-0007 · Stated baseline: a written `total_invested: 0` is real; the
+     same `typeof` rule accountFlows applies, from which this had drifted. */
   const stated = !hasBaseline && !f.count && typeof a.total_invested === 'number';
 
   let basis, baseline, capitalIn, postedGrowth;
@@ -377,15 +196,8 @@ function totalReturn(account, rows, typeOf, opts) {
   const days = since ? daysBetween(since, today) : null;
   const years = days !== null && days > 0 ? days / DAYS_PER_YEAR : null;
 
-  /* Annualised, and flagged by every caller as approximate — it is NOT
-     money-weighted. A contribution made last month is treated as though it had
-     been invested since inception, which understates the true annual rate. A
-     correct IRR needs a dated cash flow for every contribution, and the whole
-     reason this function exists is accounts that date nothing.
-
-     Withheld under a year outright: annualising four months of a fund's noise
-     produces a number like "+180% a year" that is arithmetically defensible and
-     completely false as a description. */
+  /* ADR-0007 · Annualised return is approximate (not money-weighted) and
+     withheld under a year ("+180% a year" otherwise). */
   const annualisedPct = years !== null && years >= 1 && capitalIn > 0 && balance > 0
     ? (Math.pow(balance / capitalIn, 1 / years) - 1) * 100
     : null;
@@ -402,19 +214,8 @@ function totalReturn(account, rows, typeOf, opts) {
        and the gap could never be seen. */
     const g = daysBetween(a.inception_date, all.first || today);
     if (g !== null && g > HISTORY_GAP_DAYS) { trust = 'history-gap'; gapDays = g; }
-    /* The mirror case, which used to pass silently as 'ok'. Rows exist BEFORE
-       the stated opening date, so either the date is wrong or the baseline is
-       not the balance at it — and both mean the split between capital and
-       growth is a guess. Named rather than swallowed; the figure is still
-       shown, because it is the best one available.
-
-       Gated on `all.first` being real: the `|| today` fallback above exists so
-       an account with NO transactions at all still gets the history-gap flag
-       when its inception is old (see the comment on that branch). But this
-       branch reads a NEGATIVE gap as "records begin before opening", and with
-       no records `g` is manufactured from `today` rather than from a row — a
-       future `inception_date` on an account with zero transactions measured
-       the distance to today and asserted records exist that do not. */
+    /* ADR-0007 · Records before the opening date are named, not swallowed. Gated
+       on all.first being real: with no rows `g` is measured from today, not a row. */
     else if (all.first !== null && g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
   }
 
@@ -430,12 +231,8 @@ function totalReturn(account, rows, typeOf, opts) {
    uses. `capital` is money the household moved (contributions less
    withdrawals, so a withdrawal month is negative); `posted` is growth the
    account actually wrote down. */
-/* A row whose date this cannot place lands under this key rather than being
-   dropped. splitFlows counts such a row (it filters on `from`/`to`, not on
-   shape), so discarding it here put money in the total that appears nowhere in
-   the bands — the identity the chart's whole trustworthiness rests on, broken
-   silently and in a direction nobody would think to check. `date` is stored
-   verbatim by the loader, so an unparseable one is a hand-edit away. */
+/* ADR-0007 · Undatable rows keep a bucket, or the total holds money the
+   bands never show. */
 const UNDATABLE = '';
 
 function monthlyFlows(rows, typeOf, opts) {
@@ -445,14 +242,8 @@ function monthlyFlows(rows, typeOf, opts) {
   for (const r of rows || []) {
     const kind = classifyRow(r, typeOf);
     if (!kind) continue;
-    /* The SAME window splitFlows applies, character for character — including
-       the raw string comparison, which is the point. totalReturn windows its
-       capital sum from `inception_date`; if the month buckets did not window
-       identically, a row one side of that line would be counted by one and not
-       the other, and the chart would disagree with the tiles above it by
-       exactly that row. Which it did: windowing the sum without windowing the
-       buckets was how a non-ISO date cell put R200 in the bands that the total
-       had already accounted for as undated growth. */
+    /* ADR-0007 · monthlyFlows windows exactly as splitFlows does; a non-ISO date
+       cell once put R200 in the bands the total had already called undated. */
     if (from && r.date < from) continue;
     if (to && r.date > to) continue;
     const m = monthOf(r.date);          // '' when the date is not a real ISO date
@@ -464,62 +255,19 @@ function monthlyFlows(rows, typeOf, opts) {
   return out;
 }
 
-/* ── what built the balance, month by month ───────────────────────────────
-   `entries` is [{ account, rows }] for the accounts the page is showing.
-
-   WHAT THIS DELIBERATELY DOES NOT DO: draw a growth curve. Growth that no
-   transaction records has no date — a fund's value moved every day for four
-   years and the vault holds one number, today's. Spreading that across the
-   months to make a smooth line would be inventing the very measurements this
-   module exists because nobody took. So the series carries only what is dated,
-   and the undated remainder is returned separately for the view to show at the
-   right-hand edge, labelled as undated.
-
-   The identity that makes the card trustworthy:
-
-     closing = capital + posted + undated = Σ balances of included accounts
-
-   so the chart cannot disagree with the tiles beneath it. That is what forces
-   the exclusion below: an account whose growth cannot be measured would put its
-   contributions in the bar and its growth nowhere, and the identity would fail
-   quietly. It is left out and COUNTED, never silently dropped. */
-/* Whether growthSeries below would actually draw this account into the
-   chart's totals: 'measured' basis (starting_amount set — 'stated' accounts
-   have no transactions at all and would draw a flat step from a date nobody
-   wrote down) AND a month it can be placed at, from inception_date or the
-   first row totalReturn counted.
-
-   Exported so the Growth tile (views/savings.js) counts the SAME set the
-   chart draws. It used to count anything `basis !== 'none'`, which included
-   'stated' accounts the chart has always excluded — a vault could read
-   "measured 2, unmeasured 0" in the tile and "1 of 2 accounts measurable" in
-   the chart's own subtitle, on the same screen, about the same two
-   accounts. */
+/* ADR-0007 · The growth chart carries only dated money, and closing =
+   capital + posted + undated = Σ balances of included accounts. `entries` is
+   [{ account, rows }]; an unmeasurable account is excluded and COUNTED. */
+/* ADR-0007 · chartable: measured basis AND a placeable month, and the tile counts the same set. Exported so
+   the Growth tile counts the SAME set the chart draws. */
 function chartable(account, r) {
   const at = monthOf((account || {}).inception_date) || monthOf(r.since);
   return r.basis === 'measured' && !!at;
 }
 
-/* Aggregate growth across a POOL of accounts — `entries` is
-   `[{ account, rows }]`, the same shape both callers already build (Savings
-   page's own `entries` and views/report.js's `savingsSummary()`). Extracted
-   out of views/savings.js's own growthTile() (2026-08-29 audit, M4) rather
-   than left as a DOM-bound closure only that view could call: the Report
-   page needs the EXACT same number, not a second guess at what "growth"
-   and "rate of growth" mean, which is this codebase's most-repeated bug
-   shape (see report.js's own header). Any future third caller gets it free.
-
-   `negCapital` — accounts DRAWN DOWN rather than grown (a living annuity
-   mid-withdrawal, `capitalIn <= 0`) are still `measured` and still counted
-   in the plain `growth` total (real money, not a ratio), but excluded from
-   `rateGrowth`/`rateCapital` — the same guard `totalReturn` itself puts on
-   `returnPct`. Without this a single drawn-down account shrinks the capital
-   the rate is measured against and inflates the headline percentage for
-   every other account riding along with it. Counted rather than silently
-   dropped, so a caller can disclose it — see views/savings.js's own
-   growthTile() sub-text and src/report.js's `report.savings.negCapital`
-   for the two places that disclosure has to happen once this number
-   exists to disclose. */
+/* ADR-0007 · growthTotals is the one pool aggregate (2026-08-29 audit, M4);
+   drawn-down accounts (capitalIn <= 0) stay in `growth` but leave the rate
+   as `negCapital`, counted so a caller can disclose them. */
 function growthTotals(entries, typeOf, opts) {
   let growth = 0, rateGrowth = 0, rateCapital = 0, measured = 0, unmeasured = 0, negCapital = 0;
   for (const e of entries) {
@@ -566,26 +314,9 @@ function growthSeries(entries, typeOf, opts) {
        inception_date it sits at the first month the account did anything,
        which is the earliest point the vault can honestly place it. */
     const at = monthOf(a.inception_date) || monthOf(r.since);
-    /* …and where it can be placed NOWHERE — no opening date, and no
-       transaction to borrow a date from — the account is not chartable, so it
-       is excluded rather than half-included. It used to be counted into
-       `closing` while its baseline went nowhere, which is how a fund with
-       R60 000 of opening capital printed a R95 000 total over bands that
-       topped out at R35 000 and called the difference "growth carrying no
-       date". Exactly the market-linked holding this whole feature exists for:
-       `inception_date` is optional and nothing cross-validates it against
-       `starting_amount`, so filling one and not the other is one keystroke.
-
-       The guard used to read `r.baseline && !at` — testing the BASELINE for
-       truthiness rather than testing `at` alone. A 'measured' account always
-       has `r.baseline !== null` (that is what 'measured' means), but a
-       deliberate `starting_amount: 0` — the same real baseline
-       accountFlows() defends a few screens up — made `r.baseline` falsy, so
-       an unplaceable zero-baseline account skipped this exclusion and was
-       counted INCLUDED while contributing nothing to `closing` or `undated`:
-       `closing = Σ balances of included` broke for exactly this account. A
-       'measured' account's baseline is never null, so testing `at` alone is
-       both simpler and correct. */
+    /* ADR-0007 · An account that can be placed nowhere is excluded, not
+       half-included — test `at` via chartable, never the baseline's truthiness
+       (a `starting_amount: 0` account once broke closing = Σ balances). */
     if (!chartable(a, r)) { excluded++; continue; }
     included++;
     closing += r.balance;
@@ -613,12 +344,8 @@ function growthSeries(entries, typeOf, opts) {
     d.posted += pending.posted;
   }
 
-  /* The walk has to reach the LAST month anything happens in, not merely
-     today. A row dated next month is counted by splitFlows and bucketed by
-     monthlyFlows, but a walk that stopped at today never accumulated it into
-     any point — the second way the identity could fail. Future dates are not
-     hypothetical: a scheduled transfer captured in advance, or a typo in the
-     year, and the loader stores `date` verbatim. */
+  /* ADR-0007 · The month walk reaches the last month anything happened in; a
+     future-dated row is otherwise counted but never accumulated. */
   let lastMonth = monthOf(today) || firstMonth;
   for (const m of deltas.keys()) if (m > lastMonth) lastMonth = m;
   const months = [];
@@ -648,109 +375,28 @@ function growthSeries(entries, typeOf, opts) {
 }
 
 
-/* MONEY CANNOT ARRIVE BEFORE IT LEAVES — the ordering test savedFromOutside()
-   applies to a candidate pair of legs. Used only there; the full reasoning
-   sits beside the predicate it gates.
-
-   Deliberately a DIRECTION and not a window. A symmetric "within N days" rule
-   was written first and rejected: tests/household-shapes.test.cjs pins, with a
-   negative control and a header explaining why, that the savings rate must not
-   move with how fast a bank settles — the shipped defect was a score stepping
-   66 -> 76 because two legs of one transfer landed four days apart instead of
-   three, "one number, two cliffs, both set by a bank". A window puts that
-   cliff straight back at the far end. Direction has no cliff at all in that
-   axis: settlement lag only ever pushes the ARRIVAL later, and later is
-   allowed without limit.
-
-   `backstamp` is the one concession, and it is not a settlement window: two
-   institutions occasionally value-date one movement in the opposite order, so
-   the receiving leg can carry the earlier date. Three days covers that
-   artefact. Beyond it, an outflow dated after the inflow it would cancel is
-   not that inflow's other leg — it is a later, separate decision, which is
-   exactly what a sinking-fund purchase is.
-
-   Null — a leg nothing can date — is NOT a match, the same reading
-   reconcile.js takes of an unplaceable row. `daysBetween` is this module's
-   own, shape-gated and null-safe; a second copy of the counting would be the
-   drift dates.js's header warns about. */
+/* ADR-0007 · Money cannot arrive before it leaves: a DIRECTION, not a window
+   (a window re-opens the 66 -> 76 settlement cliff tests/household-shapes
+   .test.cjs pins). Backstamp covers reversed value-dating; null never matches. */
 const BACKSTAMP_DAYS = 3;
 function couldBeSameMovement(outIso, inIso) {
   const d = daysBetween(outIso, inIso);   // positive when the money left first
   return d !== null && d >= -BACKSTAMP_DAYS;
 }
 
-/* WHAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT, for one period.
-
-   Lives here, and is called from BOTH health-data.js (which averages it over
-   six periods for the score's savings rate) and views/score.js (which shows
-   this period's figure on the "Where the money went" card), because the two
-   used to answer "how much did you save" differently on one screen. The card
-   read splitFlows' gross contributions and reported R4 270 for a period in
-   which R4 270 had simply moved from a baby fund into an emergency fund; the
-   score, applying the rule below, said R0. Same money, same screen, same day.
-
-   `saverLabels` maps a transaction label to the pool account it belongs to,
-   so a caller decides what counts as the pool and this decides what crossed
-   into it.
-*/
-/* ISSUE 32. `catType` closes the mirror case this function's own header used
-   to record as unreachable.
-
-   The pairing is directional — money cannot arrive before it leaves — which
-   settled the common order (a deposit on the 1st, a pram on the 28th). The
-   mirror is still indistinguishable BY DATE: a pram bought from the baby fund
-   on the 1st and an equal deposit into the emergency fund on the 28th looks
-   exactly like a slow transfer, and R5 000 of real saving disappeared from the
-   score.
-
-   The signal that settles it is the OUTFLOW's category. A transfer leg leaves
-   under a transfer- or savings-typed category (the vehicle's own name); a
-   purchase leaves under a real expense category, and a shop is not another one
-   of your accounts. So an outflow the household has categorised as spending
-   can never be the other leg of an internal move, whatever its magnitude and
-   whatever its date.
-
-   THE OUTFLOW SIDE ONLY, and that asymmetry is the whole history above. A
-   first attempt applied a category rule to the INFLOW and was reverted: a
-   household moving R10 000 from cheque into investments categorises it
-   `Investing`, a savings-typed category naming the DESTINATION, which is the
-   ordinary way people label real new saving. The inflow's category says where
-   money went; only the outflow's says what it was for.
-
-   OPTIONAL, and absent means exactly what this function did before — every
-   outflow stays matchable. An UNKNOWN category is matchable too: a row under a
-   name no category file answers to has told us nothing, and refusing to pair
-   it would turn "unclassified" into "definitely a purchase", which is the same
-   unprovable-is-not-disproved error one direction over. */
+/* ADR-0007 · savedFromOutside is the one answer to "how much did you save"
+   for health-data.js and views/score.js alike (R4 270 moved fund-to-fund once
+   read as saving on one surface and R0 on the other). `saverLabels`: label → pool account. */
+/* ADR-0007 · The outflow's category closes the mirror case, on the outflow
+   side only (ISSUE 32). Optional; absent or unknown means every outflow
+   stays matchable. */
 function savedFromOutside(rows, saverLabels, catType) {
   let savings = 0;
   const labels = saverLabels instanceof Map ? saverLabels : new Map(saverLabels || []);
   const householdRows = rows || [];
-/* ISSUE 32. Can this outflow be the other leg of an internal move at all?
-
-   Only the three types money moving between the household's own accounts is
-   ever labelled with. `income` is excluded with the rest: an outflow under an
-   income-typed category is a refund or a reversal, not a transfer leg.
-
-   AND ONLY WHEN THE TWO LEGS ARE FAR APART. That narrowing is not caution, it
-   is what stops this fix from re-opening the bug it sits next to.
-
-   tests/health-data.test.cjs pins a household moving R5 000 from one savings
-   account to another every month and labelling it `Move` — a category it has
-   typed `expense`. That is an internal move mislabelled, and the legs land on
-   the SAME DAY. Read on category alone this fix would refuse to pair them and
-   credit the household R5 000 a month of saving it did not do, which is
-   exactly the 1.23.0 overstatement the pairing was written to end. Trading one
-   direction of error for the other is not a fix.
-
-   Inside the settlement window the DATES are evidence enough: two equal and
-   opposite rows in two pool accounts within a few days are one movement,
-   whatever the household called it, and the label adds nothing. Weeks apart,
-   the dates have stopped being evidence — that is the whole of what ISSUE 32
-   reports — and the label is the only thing left. An expense-typed outflow
-   then says what it says: the money went to a shop.
-
-   So the category is consulted exactly where the dates have run out. */
+/* ADR-0007 · The category is consulted only where the dates have run out
+   (ISSUE 32): inside the backstamp window equal-and-opposite rows pair
+   whatever they are called — tests/health-data.test.cjs pins `Move`. */
 const { INTERNAL_LEG_TYPES } = require('./vocabulary');
 const looksLikeSpending = r => {
   if (typeof catType !== 'function') return false;  // unchanged for every caller that has not been taught
@@ -773,151 +419,20 @@ const inflows = [], outflows = [];
     if (supersededBySplit(r)) { continue; }   // its parts are in this same list
     const a = labels.get(r.label);
     if (!a) { continue; }                     // not a savings or investment account
-    /* NOTHING IS SKIPPED HERE ON THE STRENGTH OF THE ROW'S OWN FLAGS,
-       and the reason is worth writing down because two releases got it
-       wrong in opposite directions.
-
-       The old rule paired the legs of a movement household-wide and
-       dropped both, to stop a R40 000 UIF payment counting as saving
-       "while the same rand is not counted as income". That premise was
-       never true. `income` further down is built from householdNet,
-       which filters transfer-typed rows and paired pass-throughs and
-       NOTHING ELSE — it does not look at `excluded` at all. Measured on
-       the vault the rule was written for, August income reads R91 627
-       against R44 850-R57 984 in every other month: the UIF is in the
-       base, and always was.
-
-       So the honest reading is the plain one. The household received
-       R40 000 and put it in a fund. Income counts it once, saving counts
-       it once, and the rate that month is 100% because that is what
-       happened. Dropping the savings leg while income kept it was the
-       inconsistency, not the cure for one.
-
-       A replacement rule — skip anything income-typed AND excluded —
-       was written, tested and reverted for the same reason: it moved the
-       error from one side of the ratio to the other, and would have
-       taken R1 402 of interest credited into savings accounts out of the
-       numerator while income went on counting it.
-
-       What remains is the pool boundary alone, tested just below: money
-       is saved if it arrived from outside the pool, and merely moved if
-       its matching leg left another account inside it. */
+    /* ADR-0007 · Nothing is skipped on the strength of a row's own flags; the
+       pool boundary is the only test (the R40 000 UIF is in the income base,
+       so it is in the saving too). */
     (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
   }
 }
 const spent = new Set();
 for (const { acct, row } of inflows) {
-  /* MONEY THAT CROSSED INTO THE SAVINGS POOL FROM OUTSIDE IT. Not gross
-     inflow, and not net-of-everything — both of those shipped, and both
-     were wrong in opposite directions.
-
-     Gross contributions (to 1.23.0) counted a rand moved from one
-     savings account to another as fresh saving in the receiving account,
-     with nothing taken off the sending one. On a real vault that
-     overstated the rate by R1 250 a month.
-
-     Netting ALL outflows (1.23.1) fixed that and broke something worse:
-     it treated a sinking fund doing its job as dis-saving. A household
-     that had been paying into a Baby Fund and a Car Fund for months, and
-     then bought the pram and serviced the car, was told it was saving
-     NOTHING — R12 022 a month of "Subaru maintenance", "Private room &
-     pram" and "Baby carrier" came straight off a real R12 224 a month of
-     saving and drove the whole pillar to zero. Spending a fund you built
-     on purpose is the fund working, not a failure to save; the STOCK
-     going down is a different statement from the RATE going negative,
-     and the Savings page already tells that first story properly.
-
-     So: count what arrives from outside the pool, and ignore movement
-     WITHIN it in both directions. The vault distinguishes them cleanly
-     without guessing — an internal transfer carries a savings- or
-     investment-typed category (the receiving vehicle's own name), while
-     spending a fund carries a real expense category. Both legs of an
-     internal move are skipped, so a transfer can neither inflate the
-     rate on the way in nor deflate it on the way out.
-
-     Read off the rows directly rather than through splitFlows' buckets:
-     classifyRow sorts a positive row into `growth` purely because its
-     category is income-typed, which is right for the Savings page's
-     growth chart and wrong here — a salary or a UIF reimbursement paid
-     into a savings account is exactly the household putting money aside.
-     supersededBySplit is the same split-parent guard splitFlows applies,
-     imported from the same module so the two cannot drift.
-
-     KNOWN LIMIT, stated rather than hidden: money paid in and spent
-     straight back out within the window still counts in full, because
-     nothing in the data separates "spending what I just put in" from
-     "drawing on a fund I built last year" — both are an expense-typed
-     row leaving a savings account. This is the conventional reading of a
-     savings RATE (what share of income was set aside) and it is the one
-     that does not punish a sinking fund, which is the shape real
-     households actually use. The other story — the balance itself going
-     down — is not lost: the Savings page's growth chart and its
-     per-account "in / out" lines tell it directly, and tell it better
-     than a single ratio could. */
-  /* THE OTHER LEG is the only honest signal for an internal move, and
-     deliberately the ONLY test applied here.
-
-     A first attempt also skipped any inflow whose CATEGORY was
-     savings-typed, reasoning that such a category names the vehicle the
-     money came out of. On one real vault it did. In general it does not,
-     and a guard fixture caught it: a household moving R10 000 a month
-     from its CHEQUE account into Investments categorises that
-     `Investing` — a savings-typed category naming the DESTINATION, which
-     is the ordinary way people label it. That is new saving from outside
-     the pool, and the category rule silently threw it away, taking a
-     genuinely strong vault out of its band.
-
-     So the pairing does the work instead: an equal and opposite row, in
-     a DIFFERENT savings account, within a few days. Matched legs cancel
-     and neither counts; each outflow can only cancel one inflow, so two
-     genuine deposits are never swallowed by one withdrawal. A
-     sinking-fund purchase has no such counterpart — the money went to a
-     shop, not to another account of yours — so it never matches and
-     never reduces the rate. And money arriving from a cheque account has
-     no counterpart in the pool either, so it counts, whatever it is
-     called.
-
-     THE DATE WAS NEVER CONSULTED AT ALL, which made "the money went to a
-     shop" a claim the code could not check. Any outflow of equal
-     magnitude from any other pool account, anywhere in the period,
-     cancelled a deposit — and on a household running sinking funds, the
-     shape this whole rule exists to protect, that is not a rare
-     coincidence but the normal month:
-
-       1 Aug   Emergency fund   +5 000   a real deposit from the cheque account
-       28 Aug  Baby fund        -5 000   the pram, bought from the fund
-
-     Unrelated, twenty-seven days apart, and the period reported R0
-     saved. Price the pram at R4 999 and the same month reports R5 000 —
-     a rounding of a shop's price moving the household's scored savings
-     rate by the whole deposit, which is the signature of a predicate
-     matching on the wrong thing.
-
-     couldBeSameMovement is the smallest test that separates them without
-     re-opening the defect tests/household-shapes.test.cjs pins. MONEY
-     CANNOT ARRIVE BEFORE IT LEAVES: an outflow dated after the inflow it
-     would cancel is a LATER decision, not that inflow's other leg. The
-     pram fails it; a transfer never does, however slowly the bank
-     settles — and "however slowly" is the point, because a symmetric
-     "within N days" window (written first, rejected) would put back the
-     exact cliff that file exists to keep out, a score stepping 66 -> 76
-     because two legs landed four days apart instead of three.
-
-     WHAT THIS STILL CANNOT SEE, stated rather than hidden: the mirror of
-     the pram — a fund purchase EARLY in the month cancelled by an equal
-     deposit later — is still matched, because from the dates alone it is
-     indistinguishable from a slow transfer. The signal that would settle
-     it is the outflow's CATEGORY (a real expense, against the
-     savings-typed category a transfer leg carries), which this function
-     cannot reach: it takes rows and a label map, not the category table,
-     and health-data.js and views/score.js both depend on that signature.
-     Closing it means giving this function a category type lookup, which
-     is a larger decision than this fix.
-
-     A leg nothing can date cannot be ordered against anything, so
-     daysBetween's null does not match — the same reading reconcile.js
-     takes of an unplaceable row. The app does not get to assume the
-     convenient answer about a date it cannot read. */
+  /* ADR-0007 · Saving is what crossed into the pool from outside it — not
+     gross inflow (1.23.0, +R1 250 a month) and not net of every outflow
+     (1.23.1, a sinking fund read as dis-saving). Rows read directly. */
+  /* ADR-0007 · The other leg is the only test, and the dates are consulted:
+     equal and opposite, a DIFFERENT pool account, one cancel per outflow,
+     couldBeAnInternalLeg and couldBeSameMovement (the 1 Aug / 28 Aug pram). */
   const j = outflows.findIndex((o, i) => !spent.has(i)
     && o.acct !== acct
     && couldBeAnInternalLeg(o.row, row)

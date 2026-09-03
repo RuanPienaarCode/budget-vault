@@ -1,17 +1,12 @@
 'use strict';
 /* Net worth — what is owned, what is owed, and where each figure came from.
 
-   This exists because "owed" has two homes in this vault and used to have two
-   different answers depending on which part of the Savings page you read. An
-   account with a negative balance is a liability (a card, an overdrawn cheque
-   account). So is a row on the Debt page. The KPI tile counted only the first,
-   the chart beneath it counted only the first, and the subtitle disclosed the
-   omission as a phrase — which is not a disclosure when the omitted item is a
-   home loan and the number it qualifies is the headline of the page.
-
-   One definition, used by the tiles and the chart, so they cannot drift apart
-   again. Pure — no DOM, no obsidian import — so tests/worth.test.cjs runs it in
-   bare node. */
+   "Owed" has two homes in this vault (a negative account balance and a
+   Debt-page row) and the Savings tiles and chart once counted only the
+   first, disclosing the omission as a phrase. One definition, used by the
+   tiles and the chart, so they cannot drift apart again (ADR-0007 ·
+   worth.js — purpose). Pure — no DOM, no obsidian import — so
+   tests/worth.test.cjs runs it in bare node. */
 
 /* committed.js owns what counts as a credit card. A strict `===` here read a
    hand-typed `Credit_Card` as not-a-card while the committed chain trimmed and
@@ -19,12 +14,8 @@
 const { isCreditCard } = require('./committed');
 const { accountType } = require('./vocabulary');
 const { currenciesIn, isForeign, symbolOf } = require('./currency');
-/* owed-math.js owns what "still out" means — a row's amount less what has come
-   back, floored, with a hand-set `paid` status winning over the arithmetic. Net
-   worth reads it from there rather than summing `amount` itself, because a
-   part-recovered loan (R2 000 lent, R500 back) is R1 500 of receivable and any
-   second copy of that subtraction is one more place for the balance sheet and
-   the Owed page to disagree. */
+/* ADR-0007 · Net worth reads outstanding from owed-math: a part-recovered
+   loan (R2 000 lent, R500 back) is R1 500, subtracted in one place. */
 const { outstandingOf, isSettled } = require('./owed-math');
 
 /* Only `active` debts count. A debt marked paid is history; leaving it in
@@ -49,23 +40,9 @@ function assetTotal(assets, household) {
     .reduce((t, a) => t + Math.max(0, a.value || 0), 0);
 }
 
-/* What people still owe the household — the third OWNED ledger, and the one
-   net worth did not read until ISSUE 39.
-
-   Measured on the `BudgetAudit` fixture: R2 000 lent to Thabo on 2026-06-01,
-   still outstanding, absent from a R120 000 net worth on a card whose own copy
-   reads "owned · owed" — where that "owed" means liabilities, so the reader had
-   no word left for the money owed TO them and no line that counted it. The
-   Dashboard's position band already computed owedSummary() four lines from
-   worth()'s own call site and printed the receivable in its own tile: one card,
-   two ledgers, and the balance sheet only added one of them.
-
-   Same three rules the two ledgers beside it follow. Settled rows are
-   history (activeDebts' rule, one ledger over). Foreign rows are held out
-   and named through `otherCurrencies` rather than converted, because this
-   vault holds no rate — currency.js:10 and :14. And `household` absent means
-   "add them all", so every caller that has not been taught about currencies
-   behaves exactly as it did. */
+/* ADR-0007 · Receivables are the third owned ledger (ISSUE 39): R2 000 lent
+   to Thabo was missing from a R120 000 net worth. Settled rows are history,
+   foreign rows are named not converted, absent `household` adds them all. */
 function owedTotal(owed, household) {
   return (owed || [])
     .filter(o => o && !isSettled(o) && (!household || !isForeign(o, household)))
@@ -86,39 +63,9 @@ function foreignTotals(rows, household, valueKey) {
   return [...by].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]);
 }
 
-/* Owned is positive account balances PLUS the Assets page; owed is negative
-   account balances PLUS every active debt-page balance.
-
-   Accounts split by SIGN rather than by type, matching the chart: a cheque
-   account in overdraft is a liability however it is labelled, and a credit
-   card in credit is an asset. Returned as positive magnitudes — callers negate
-   for display.
-
-   The three ledgers are kept separable on the way out (`ownedAccounts`,
-   `ownedAssets`, `fromAccounts`, `fromDebts`) because every page that states a
-   total also has to be able to say where it came from. `fromAccounts` is the
-   OWED half of the account ledger and `ownedAccounts` the owned half — an
-   asymmetry in the names, kept because `fromAccounts`/`fromDebts` already
-   shipped and renaming them buys nothing.
-
-   A house here and its bond on the Debt page is NOT a double count: one is
-   owned and one is owed, which is exactly the arithmetic net worth is.
-
-   `household`, if given, is the household's own currency symbol
-   (S.settings.currency) — passed through to currenciesIn() so the returned
-   `currencies` list names it first. Optional and defaults through to
-   currenciesIn()'s own "R" fallback so every existing caller (none of which
-   pass it yet) keeps working unchanged; a caller that wants the disclosure to
-   actually name the household's real symbol should start passing it.
-
-   `currencies` walks ACCOUNTS only, the same list currenciesIn() already
-   covers everywhere else in the app (views/accounts.js:589 is the one other
-   call site). Assets have no currency field at all — SCHEMAS.assets is
-   name/type/value/valued/notes, and table-schema.js is append-only with a
-   byte-golden gate, so adding one is a bigger decision than this fix; a
-   R-valued house and a €20 000 account are summed together either way (as
-   documented above they always have been) and this only gives a caller
-   something to name the mix with. */
+/* ADR-0007 · Net worth splits accounts by sign, keeps the ledgers separable,
+   and a house here plus its bond on the Debt page is not a double count.
+   `currencies` names the household first and walks accounts only. */
 function worth(accounts, debts, assets, household, owed) {
   const list = accounts || [];
   const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
@@ -144,13 +91,8 @@ function worth(accounts, debts, assets, household, owed) {
     .filter(d => !household || !isForeign(d, household))
     .reduce((t, d) => t + Math.max(0, d.balance || 0), 0);
   const liabilities = fromAccounts + fromDebts;
-  // Rounded to the cent, then `|| 0` collapses -0 — the same two-step
-  // `fromAccounts` already applies above, extended to the difference itself.
-  // A household exactly break-even (50.30 owned, 10.10 + 40.20 owed) leaves
-  // a float remainder like -7.1e-15 behind; read raw, `net < 0` reports a
-  // solvent household as short and renders "-R0.00". The remainder is a
-  // read-off-the-sign bug, not a summing one — nothing above this line
-  // changes.
+  /* ADR-0007 · Net rounded to the cent, then `|| 0`: a break-even household
+     leaves -7.1e-15 and read raw renders "-R0.00" and reports short. */
   const net = (Math.round((owned - liabilities) * 100) / 100) || 0;
   return {
     assets: owned, ownedAccounts, ownedAssets, ownedOwed,
@@ -175,16 +117,8 @@ function worth(accounts, debts, assets, household, owed) {
   };
 }
 
-/* A credit card can honestly be tracked as an account OR as a debt-page row,
-   and nothing stops someone doing both — at which point net worth counts it
-   twice.
-
-   This deliberately does NOT guess or dedupe. Names are free text, and
-   "Discovery" on an account file need not match "Discovery Bank" on a debt row,
-   so any matching rule would be wrong on real data in both directions. It
-   reports that the overlap is POSSIBLE and lets the reader look. Silently
-   picking one ledger would be the worse failure: it hides money either way, and
-   without saying so. */
+/* ADR-0007 · Card overlap is reported, not deduped: names are free text, so
+   any matching rule would be wrong on real data in both directions. */
 function cardOverlap(accounts, debts) {
   const cardAccounts = (accounts || []).filter(a => isCreditCard(a) && (a.balance || 0) < 0);
   const cardDebts = activeDebts(debts).filter(d => /credit\s*card/i.test(d.type || ''));
@@ -193,12 +127,8 @@ function cardOverlap(accounts, debts) {
     : null;
 }
 
-/* Grouped by TYPE, largest first, so a bond and a car loan (or a house and a
-   car) are tellable apart in the chart rather than merged into one anonymous
-   block. Zero and negative amounts are dropped — a segment of no width is
-   noise in the legend. `debtsByType` and `assetsByType` below are this same
-   grouping over a different value key on a different list; kept as one
-   function so the drop rule and the sort cannot drift between the two. */
+/* ADR-0007 · Grouped by type, largest first. Zero and negative values dropped.
+   One function so debtsByType and assetsByType cannot drift. */
 function groupedByType(rows, valueOf) {
   const byType = new Map();
   for (const r of rows || []) {
@@ -210,65 +140,25 @@ function groupedByType(rows, valueOf) {
   return [...byType].sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount }));
 }
 
-/* Debt-page rows grouped by their own type.
-
-   `household`, if given, holds out the rows stated in another currency —
-   exactly the filter `fromDebts` inside worth() already applies, and for the
-   same reason. Optional, and absent means "add everything", so a caller that
-   has not been taught about currencies is unchanged rather than quietly
-   altered — the same contract assetTotal() carries.
-
-   It has to be on offer because of what these groups ARE. A chart row's
-   widths are shares of ONE scale under a single heading: the Savings
-   composition chart took its heading from worth() (which holds foreign rows
-   out) and its segments from here (which did not), so a two-currency vault
-   drew R2 300 000 of blocks under a R2 100 000 heading on a track scaled to
-   R2 100 000 — 109.5% of the bar's own width, running over its neighbour —
-   and sharePercents then stated each wedge against the SEGMENT sum, a
-   denominator the reader was never shown. Unlike a total, a bar has nowhere
-   to print a disclosure inside itself, so the held-out rows are named
-   underneath instead; see views/savings.js's `worthNote`. */
+/* ADR-0007 · Chart segments and heading from one filter: foreign rows held
+   out as in worth()'s fromDebts (a two-currency vault once drew 109.5% of its
+   own bar); named underneath via views/savings.js's `worthNote`. */
 function debtsByType(debts, household) {
   return groupedByType(
     activeDebts(debts).filter(d => !household || !isForeign(d, household)),
     d => d.balance);
 }
 
-/* Every account, grouped for the composition chart, split by SIGN — the known
-   types first in the order given, then any type the vault actually carries that
-   the caller's list does not know about.
-
-   That second half is the whole reason this is not a filter in the view. The
-   chart used to walk a fixed list of six types while `worth()` above counted
-   every account by sign, so an account whose file says `type: tfsa` — or
-   `type: Savings` with a capital S, which is the same bug wearing a hat — was
-   inside the net-worth tile and absent from the chart beneath it. Measured: one
-   R80 000 account of an unlisted type put "Net worth R740 000" in the tile and
-   "Net worth R660 000" in the chart's own label, on one screen, with nothing
-   saying which was wrong. `load.js` only defaults the type when the key is
-   ABSENT, so a present-but-unrecognised value reaches here verbatim, and a
-   vault whose files a person could have written by hand will produce them.
-
-   Unlisted types keep their OWN name rather than being folded into "other":
-   this is the same choice debtsByType and assetsByType already make, and
-   renaming a reader's own label to make a chart tidy is the kind of quiet
-   correction this app does not do.
-
-   `known` marks which groups came from the caller's list, so it can pair them
-   with their fixed labels and colours and colour-walk the rest. */
+/* ADR-0007 · Account groups carry unlisted types under their own name, known
+   types first in the caller's order: an unlisted R80 000 account once read
+   R740 000 in the tile and R660 000 in the chart on one screen. */
 function accountGroups(accounts, knownTypes) {
   const known = knownTypes || [];
   const order = new Map(known.map((t, i) => [t, i]));
   const owned = new Map(), owed = new Map();
   for (const a of accounts || []) {
-    /* Case-folded as well as trimmed. This file's own header (see the note
-       above accountGroups' siblings) named `type: Savings` with a capital S as
-       "the same bug wearing a hat" after it cost the composition chart R80 000
-       — and then this function kept comparing `.trim()` alone, so a
-       capital-S account still missed the sealed `savings` bucket and drew as
-       its own unlisted group under its own label. views/savings.js and
-       health-data.js were folded first; this was the last raw reading of the
-       field, and the one that decides which colour a segment gets. */
+    /* ADR-0007 · Account type case-folded in the chart: the last raw reading
+       of `type`, and the one that decides a segment's colour. */
     const t = accountType(a) || 'other';
     const bal = (a && a.balance) || 0;
     if (bal > 0) owned.set(t, (owned.get(t) || 0) + bal);
@@ -298,24 +188,9 @@ function assetsByType(assets, household) {
     a => a.value);
 }
 
-/* Everything a net-worth figure held out, per symbol, as ONE list a page can
-   print beside it.
-
-   worth() has returned `otherCurrencies` — the foreign assets and the foreign
-   debts it filtered out — since ADR-0004 landed, and no page ever read it.
-   Every surface disclosed the ACCOUNTS half only (splitByCurrency's `others`,
-   computed by the caller before worth() was reached), so a €200 000 flat and
-   a €100 000 bond vanished from the Dashboard, Savings and Report net-worth
-   tiles with nothing said — the silent exclusion currency.js forbids, on the
-   one figure that claims to be the whole picture.
-
-   Merged into a per-symbol NET (accounts + assets − debts), because the figure
-   it sits beside is a net worth and "held" in the disclosure sentence means
-   "in the household's position", not "in a bank". A symbol that nets to
-   nothing is dropped and -0 is collapsed, so a household whose euro flat
-   exactly matches its euro bond does not print "€ 0" beside a rand total.
-   Insertion order is accounts first, then assets, then debts, so two pages
-   listing the same household print the symbols in the same order. */
+/* ADR-0007 · Other-currency net disclosure: one per-symbol net of everything
+   worth() held out (a €200 000 flat and €100 000 bond once vanished unsaid);
+   zero symbols dropped, -0 collapsed, stable insertion order. */
 function otherCurrencyNet(w, accountOthers) {
   const by = new Map();
   const add = (pairs, sign) => {

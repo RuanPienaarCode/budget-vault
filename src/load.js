@@ -19,24 +19,15 @@ const { parseOwners } = require('./owners');
 const { parseGroups, parseNonEssential, typeOrder, typeRank } = require('./groups');
 const { NOTES_DIR, parseNote, sortNotes } = require('./note-file');
 
-/* An optional numeric frontmatter key: absent or blank → null ("not set"),
-   anything normalizeAmount can read → that number, anything it cannot → null.
-   Deliberately NOT parseNum: its fallback resolves an unreadable cell to 0,
-   which for a savings goal or a credit limit is a figure the file never
-   claimed. Here "I could not read this" has to stay distinguishable from
-   "the user wrote zero", because the writers skip null and keep the line. */
+/* ADR-0007 · fmNum: absent or unreadable is null, never 0. NOT parseNum — its fallback
+   of 0 is a figure the file never claimed. */
 function fmNum(v) {
   const s = (v ?? '').toString().trim();
   return s ? normalizeAmount(s) : null;
 }
 
-/* Slice a body by `## Heading` into the chunk under one heading, lower-cased
-   and matched by prefix. Plans and Tax each hold several tables in one file (a
-   plan, or a tax year, is read as one thing) and parseMdTable reads every
-   table row it's handed, so it would run them together into one malformed
-   list without this cut first. One definition for both — it was written out
-   twice, character for character, and a heading typo fixed in one copy would
-   silently not be fixed in the other. */
+/* ADR-0007 · Heading slice before parseMdTable. The chunk under one `## Heading`,
+   lower-cased and prefix-matched; the one definition Plans and Tax share. */
 function section(body, name) {
   for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
     if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
@@ -44,12 +35,8 @@ function section(body, name) {
   return '';
 }
 
-/* An optional BOOLEAN frontmatter key, tri-state for the same reason fmNum is:
-   absent → undefined ("not set, decide by the default"), written → true/false.
-   Collapsing absent to false would turn every account in every existing vault
-   into an explicit opt-out on upgrade, which is precisely the silent figure
-   change a default is supposed to avoid. Anything unreadable is treated as
-   unset rather than as false, so a typo cannot quietly exclude an account. */
+/* ADR-0007 · fmBool is tri-state. absent → undefined, written → true/false,
+   unreadable → undefined (never false). */
 function fmBool(v) {
   const s = (v ?? '').toString().trim().toLowerCase();
   if (!s) return undefined;
@@ -61,33 +48,15 @@ function fmBool(v) {
 module.exports = function registerLoad(ctx) {
   const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid, relPath } = ctx;
 
-  /* Reads go out in parallel; parsing stays serial. Every loop below used to
-     await one file at a time — ~163 sequential round trips on a real vault,
-     and on mobile each one crosses the Capacitor bridge (an iCloud-backed
-     file may have to be materialised first). Parsing all 5,700 transactions
-     measures ~7ms, so the wait was almost entirely I/O latency. Ordering and
-     results are unchanged: `read` keeps each file paired with its own text.
-
-     Declared HERE rather than inside loadVault, where it lived until 1.16.1.
-     Being a local of loadVault made it unreachable from loadNotes — a sibling
-     function added later in the same file — so that loader re-invented the
-     sequential loop this comment exists to warn about, and the notes read grew
-     to three quarters of the whole vault load. A helper that documents a trap
-     has to be in scope for the next person who would fall into it. */
+  /* ADR-0007 · Reads in parallel, parsing serial. The wait is I/O round trips, not work.
+     ADR-0007 · read() is declared where loadNotes can reach it. Not inside loadVault. */
   const read = async files => {
     const texts = await Promise.all(files.map(f => vault.cachedRead(f)));
     return files.map((file, i) => ({ file, text: texts[i] }));
   };
 
-  /* Single-flight. Six sections below use the `S.x = [] … await … push()`
-     shape, so two OVERLAPPING loads don't merely repeat work — they duplicate:
-     run B clears the array run A is still filling, then both push, and the
-     vault ends up with 2× categories/accounts/debts/assets/owed/services while
-     the keyed-object sections (budgets, txFiles, plans, tax) survive. Partial
-     corruption reads as "the maths is wrong", not "it loaded twice". Two live
-     paths overlap today: the drawer's reload link stays tappable for the whole
-     load, and unlockGate can race a pending scheduleReload timer. One latch
-     covers every caller, so a load already in flight is joined, not restarted. */
+  /* ADR-0007 · loadVault is single-flight. Overlapping loads duplicate the array sections;
+     one latch joins a load already in flight instead of restarting it. */
   let loadInFlight = null;
   function loadVault() {
     if (!loadInFlight) {
@@ -106,12 +75,8 @@ module.exports = function registerLoad(ctx) {
         const n = parseInt(fm.month_start_day, 10) || 23;
         S.settings.month_start_day = Math.min(28, Math.max(1, n));
       }
-      /* Pay cycle, as its own length in days — see the header of period.js for
-         why it isn't a named type. Absent means the payday month, so a vault
-         that has never heard of this setting behaves exactly as it always did.
-         A cycle without an anchor has no way to place a boundary, so both are
-         dropped together rather than deriving periods from a missing date;
-         period.js clamps the length itself. */
+      /* ADR-0007 · Pay cycle is a length in days with an anchor. Absent means payday months;
+         a cycle without an anchor is dropped with it. */
       /* A real date, not merely a date-SHAPED string — the same test period.js
          gates the cycle on. A shape check accepted 2026-13-45 and stored the
          pair, while period.js refused it and ran payday months, so the settings
@@ -121,21 +86,11 @@ module.exports = function registerLoad(ctx) {
       S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
       S.settings.period_anchor = anchorOk ? anchor : '';
       if (fm.currency) S.settings.currency = fm.currency;
-      /* ISSUE 30 — exchange rates, opt-in and off by default. Absent means
-         off, so every vault written before this key existed keeps making
-         ZERO network requests, which is the promise the README makes.
-         Normalised to a real boolean here rather than left as the raw cell:
-         `exchange_rates: yes` reads as YAML true while `exchange_rates: maybe`
-         reads as a string, and fx.js's canConvert() deliberately refuses a
-         truthy string — a hand-edited value must not switch money conversion
-         on by accident. */
+      /* ADR-0007 · Exchange rates are opt-in and normalised to a boolean. ISSUE 30 — absent
+         means off: zero network requests. */
       S.settings.exchange_rates = String(fm.exchange_rates ?? '').trim().toLowerCase() === 'on';
-      /* How often those rates may be re-asked for: daily, weekly or monthly.
-         Absent resolves to daily, which is what the setting and the wizard
-         have always described, so a vault written before this key existed
-         keeps the behaviour its own Settings.md documents. Normalised through
-         fx.normalizeCadence so a hand-edited `rate_refresh: hourly` falls back
-         rather than reaching the refresh gate as an unknown. */
+      /* ADR-0007 · rate_refresh defaults to daily and is normalised. Through fx.normalizeCadence,
+         so a hand-edited `hourly` falls back. */
       S.settings.rate_refresh = normalizeCadence(fm.rate_refresh);
       /* The ISO code the rate lookup asks for. The `currency` symbol above is
          what gets PRINTED; this says which currency that symbol means, because
@@ -145,20 +100,11 @@ module.exports = function registerLoad(ctx) {
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
       // values, so a hand-edited Settings.md can't break the app.
       S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
-      /* Interface language, deliberately independent of country — see the
-         header of i18n.js. Absent means "follow Obsidian's own display
-         language", so a vault that has never heard of this setting reads in
-         whatever language the rest of Obsidian is already in. resolveLanguage
-         falls back to English for an unknown hand-edited value, the same
-         contract localeFor gives country. */
+      /* ADR-0007 · Language is independent of country. Absent follows Obsidian's display
+         language; an unknown value falls back to English. */
       S.settings.language = setLanguage(fm.language || defaultLanguage());
-      /* How this household gets transactions in: 'csv' or 'manual'. Absent
-         means 'csv', so every vault written before this key existed keeps the
-         import affordances it has always had — see inputMode() in constants.js,
-         which is the ONE normaliser the loader, the settings tab and the wizard
-         share. Assigned unconditionally, like emergency_target_months below: a
-         hand-deleted line has to fall back to the default on the next load
-         rather than leaving the old value alive in memory. */
+      /* ADR-0007 · input_mode defaults to csv and is assigned unconditionally. inputMode() in
+         constants.js is the one normaliser. */
       S.settings.input_mode = inputMode(fm.input_mode);
       S.settings.household = fm.household || '';
       /* The people the household's accounts can belong to. Absent means "one
@@ -172,20 +118,11 @@ module.exports = function registerLoad(ctx) {
          written before these keys existed says. */
       S.settings.groups = parseGroups(fm.groups);
       S.settings.nonessential_groups = parseNonEssential(fm.nonessential_groups, S.settings.groups);
-      /* How many periods back "pull last period's overspend" reads from. 1 is
-         the obvious answer and the default; it is a setting because a credit
-         card settles a month in arrears, so the hole you are funding in August
-         is often June's, not July's. Clamped to 1–12: a 0 would read the period
-         you are standing in (whose deficit is still growing, so the figure
-         would change every time you pressed the button) and a negative one
-         would read the future. */
+      /* ADR-0007 · overspend_lag is clamped to 1–12. A credit card settles a month in arrears;
+         0 would read a deficit that is still growing. */
       S.settings.overspend_lag = overspendLag(fm.overspend_lag);
-      /* Months of essential spending the emergency fund aims to cover.
-         Assigned unconditionally, unlike month_start_day above: a hand-deleted
-         line has to fall back to the default on the next load rather than
-         keeping the old value alive in memory. The clamp lives in constants.js
-         because the settings tab applies the same one on the way out — see
-         emergencyTarget() there for what the bounds are protecting. */
+      /* ADR-0007 · emergency_target_months is assigned unconditionally. The clamp lives in
+         constants.js beside the settings tab's. */
       S.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
     }
     S.categories = [];
@@ -195,54 +132,17 @@ module.exports = function registerLoad(ctx) {
       // chars, so the frontmatter `name` is the source of truth.
       S.categories.push({
         name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888',
-        /* Whether the household ANSWERED the type question, as distinct from
-           the answer. `type` defaults to `expense`, so a category note carrying
-           only a colour is indistinguishable from one deliberately typed
-           `expense` — and ISSUE 32's pairing rule reads "expense" as the
-           household saying "this was a purchase, not a transfer leg". It is
-           not; it is the loader's default. A 4-day internal shuffle labelled
-           with an untyped `Move` category was counted as R5 000 of fresh
-           saving, which is the 1.23.0 overstatement that rule exists to
-           prevent, arriving through the door the rule opened.
-
-           Same shape as `in_budget_stated` on accounts, for the same reason:
-           an absent key is not an answer. */
+        /* ADR-0007 · type_stated: an absent type is not an answer. `type` defaults to expense;
+           ISSUE 32's pairing rule must not read the default as a statement. */
         type_stated: String(fm.type ?? '').trim() !== '',
-        /* A category whose budgeted amount IS the actual spend — no transaction
-           will ever arrive for it, because the money left in a previous period.
-           "Previous month overspending" is the case it was written for: the hole
-           is real, it has to be funded out of this period's income, and the
-           bank line that dug it is sitting in last period's statement under some
-           other category. Budgeting it as an ordinary row left it reading
-           "R1 900 left" all month — the exact opposite of the truth.
-           fmBool, so an unreadable value is "unset" rather than a silent false.
-           The path travels with it so the Budget page can toggle the flag
-           without re-deriving a filename from a display name (two names can
-           sanitise to one file — see promptCreateCategory). */
+        /* ADR-0007 · assume_spent: a category whose budget is its actual spend. The money left
+           last period; fmBool, so unreadable is unset; `rel` below carries the path. */
         assumeSpent: fmBool(fm.assume_spent) === true,
-        /* Money the household cannot stop paying this month — rent or a bond,
-           medical aid, the debit orders. Its own flag rather than a guess from
-           `type`, because the biggest fixed cost most households have is rent,
-           and rent is an ordinary `expense`: deriving the set from type would
-           have reported 19.9% of income committed on the vault this was built
-           against, where the real figure including rent is 44.4%. A ratio that
-           silently omits the largest term is worse than no ratio. */
+        /* ADR-0007 · fixed is its own flag, not derived from type. Rent is an ordinary expense
+           (19.9% vs 44.4% of income committed). */
         fixed: fmBool(fm.fixed) === true,
-        /* ITEM 2 (2026-08-26): which `income`-typed categories the household
-           has told us are what a savings/investment account itself EARNED —
-           interest, dividends — rather than money the household put in.
-           savings-math.js's classifyRow used to treat EVERY income-typed
-           inflow as growth, which caught a salary, a client payment or a UIF
-           payment landing directly in a pool account exactly as hard as it
-           caught real interest — nothing in `type` alone tells them apart.
-           Same additive-flag shape as `fixed` just above: opt-in, defaults
-           false, so an existing "Interest" category (income-typed, this flag
-           unset) now reads as an ordinary contribution until the household
-           ticks it — a one-time, VISIBLE move (the category simply stops
-           appearing under "growth from…" and starts appearing as money put
-           in), not a silent one. See savings-math.js's own header for the
-           full rule and why it lives on the category rather than being
-           guessed from the category's name. */
+        /* ADR-0007 · interest marks income a fund itself earned. ITEM 2 (2026-08-26); opt-in,
+           read by savings-math.js's classifyRow. */
         interest: fmBool(fm.interest) === true,
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
@@ -254,39 +154,13 @@ module.exports = function registerLoad(ctx) {
     S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
 
     S.accounts = [];
-    /* ISSUE 60. Account files the loader is IGNORING, named rather than lost.
-
-       mdFilesIn reads one level, and io.js's own comment defends that for
-       Accounts/ on the grounds that the folder is "flat by construction,
-       because the plugin names the files itself" — the same argument that
-       comment then narrates as having been wrong for Notes/. The vault is
-       user-writable markdown and filing dormant accounts into
-       `Accounts/Closed/` is an ordinary tidy-up.
-
-       Measured: `Accounts/Closed/Old Savings.md` holding R88 000, with its own
-       transactions folder. The account loaded nowhere, so net worth read
-       R12 000 instead of R100 000 — while its R250 of interest DID reach the
-       period income total, because transaction folders are read by label. The
-       rows counted, the balance did not, and nothing said so.
-
-       Reading them in is the fuller fix and is NOT what this does: every write
-       site addresses an account as `Accounts/<name>.md`, so loading a nested
-       file without also teaching those sites its real path would have the next
-       save create a duplicate at the top level and silently strand the
-       original — a worse bug than the one being fixed, and the same class.
-       So this states the omission and leaves the file alone. */
+    /* ADR-0007 · Nested account files are named, not loaded. ISSUE 60: every write site
+       addresses Accounts/<name>.md, so loading them would fork the file on the next save. */
     const nested = mdFilesUnder('Accounts')
       .filter(f => f.path.slice(0, f.path.lastIndexOf('/')) !== relPath('Accounts'));
     S.accountsIgnored = nested.map(f => f.path);
-    /* ISSUE 72. Two account files claiming ONE transaction folder. accountForLabel
-       returns the first match, so the second account gets no rows, reconciles as
-       `no-tx` forever — which reads exactly like a new account with no history —
-       and still adds its whole stated balance to net worth. Nothing said so.
-       views/accounts.js guards duplicate NAMES in addAccount and never looks at
-       tx_label at all; a hand-written vault has no guard on either axis, and
-       copying an account file is the obvious way to open a second account at the
-       same bank. Detected here, keyed the way accountForLabel keys, and named on
-       the Accounts page. Filled after the accounts loop below. */
+    /* ADR-0007 · Two accounts claiming one transaction folder. ISSUE 72: keyed the way
+       accountForLabel keys; filled after the accounts loop below. */
     S.accountsDuplicated = [];
     for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {
       const { fm, body, raw } = parseFrontmatter(acctText);
@@ -305,42 +179,12 @@ module.exports = function registerLoad(ctx) {
            the household's, so no existing vault renders differently on
            upgrade. It never converts and never excludes — see currency.js. */
         currency: String(fm.currency || '').trim(),
-        /* The ISO code that symbol MEANS, and the one thing an exchange-rate
-           lookup can use — "$" is USD, AUD, CAD and SGD, so the symbol above
-           cannot answer it. Absent is a complete answer: the account is then
-           simply not convertible and is stated in its own symbol instead,
-           which is exactly what every account did before this existed.
-
-           Read here because it was written into Settings.md and the account
-           dialog and read by NOTHING for a whole release — a field the user
-           can fill in that has no effect is the precise failure this issue
-           was opened about (see docs/adr/0004), and it very nearly shipped
-           inside the fix for it. */
+        /* ADR-0007 · currency_code is read at load. "$" is four currencies; absent means
+           not convertible (docs/adr/0004). */
         currency_code: normalizeCode(fm.currency_code),
-        /* THE TWO FIELDS DISAGREEING ABOUT WHETHER THIS IS HOUSEHOLD MONEY.
-
-           `currency` is a display SYMBOL and `currency_code` is an ISO code for
-           rate lookup, and nothing had ever compared them. So an account
-           written `currency: R` with `currency_code: USD` in a rand/ZAR vault
-           was HOME to currency.js (its symbol matches, so its balance is added
-           to the rand total at par) and FOREIGN to fx.js (its code is not the
-           household's, so convertAccounts converts it). Measured: R1 000 in the
-           Accounts split headline against R17 985,61 on the converted line —
-           the same account, the same page, eighteen times apart.
-
-           Decided HERE, at load, rather than inside isForeign(): that function
-           takes a household SYMBOL and cannot see a code, and teaching it to
-           would mean threading a second argument through every one of its call
-           sites — which is exactly how the 1.36.0 fixes reached some consumers
-           and not others. Settings are parsed above accounts, so both halves
-           are in scope at this one point, and the answer travels on the account
-           the way `in_budget_stated` and a category's `type_stated` already do.
-
-           Only when the symbol claims to be the household's. A symbol that is
-           already foreign needs no help — isForeign has always caught it — and
-           an account stating a code and no symbol is the ordinary way to
-           record a foreign account, so it is the CODE that carries the claim
-           there. What is left is precisely the contradictory case. */
+        /* ADR-0007 · currency_conflict is decided at load. A home symbol with a foreign code was
+           HOME to currency.js and FOREIGN to fx.js (R1 000 vs R17 985,61); flagged here, where
+           both halves are in scope, only for the contradictory case. */
         ...(((sym, code) => {
           const home = String(S.settings.currency || '').trim();
           const homeCode = normalizeCode(S.settings.currency_code);
@@ -360,20 +204,11 @@ module.exports = function registerLoad(ctx) {
         // exactly as amountRaw does for transaction cells.
         ...(bal => ({ balance: bal.value, balanceRaw: bal.ok ? null : bal.raw }))(parseNum(fm.balance || '0')),
         balance_updated: fm.balance_updated || '',
-        // `budget: false` opts an account out of the household budget totals —
-        // an investment or tax-free wrapper whose interest is not income and
-        // whose debit orders are not spending. Absent means IN, so no existing
-        // vault's Dashboard figures move on upgrade. The money still leaving
-        // the cheque account is budgeted as normal; only the arriving leg here
-        // is suppressed, which is what stops it being counted twice.
+        /* ADR-0007 · budget: false opts an account out; absent means in. So no vault's figures
+           move on upgrade. */
         in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()),
-        /* ISSUE 41. Whether the household ANSWERED the budget question, as
-           distinct from the answer. `in_budget` cannot tell an explicit
-           `budget: true` from a file that never mentions it — both are true —
-           and the earmark rule in period.js needs exactly that difference: a
-           savings account is held out of the budget's spend totals BY DEFAULT,
-           and only a household that has written `budget: true` on it has said
-           otherwise. An absent key is not consent. */
+        /* ADR-0007 · in_budget_stated: an absent key is not consent. ISSUE 41: the earmark
+           rule in period.js needs the difference. */
         in_budget_stated: String(fm.budget ?? '').trim() !== '',
         /* A card the household clears in full before interest. Its outstanding
            balance is money already spent that has not left the cheque account
@@ -381,22 +216,11 @@ module.exports = function registerLoad(ctx) {
            `settle_day` narrows WHEN; it is optional and only ever narrows. */
         settle_monthly: /^(true|yes|on|1)$/i.test(String(fm.settle_monthly ?? '').trim()),
         settle_day: fmNum(fm.settle_day),
-        /* Same parseNum reasoning as `balance` above, and for the same reason:
-           every one of these is hand-editable and every one is WRITTEN BACK by
-           saveAccount's FM_WRITERS. parseFloat reads "15,000" as 15 and
-           "1.234,56" as 1.234, and the next edit to any field on the account
-           serialises that back over the user's own figure — silent destruction
-           of a number nobody was even editing. */
+        /* ADR-0007 · Account numbers go through fmNum, never parseFloat. Every one is
+           written back by saveAccount's FM_WRITERS. */
         credit_limit: fmNum(fm.credit_limit),
-        /* Which part of this account is the household's emergency fund:
-           `true` earmarks the whole balance, a number earmarks that slice,
-           absent means "never asked" — three different answers, so all three
-           survive the read. health-math.js owns what each one is worth (the
-           cap at the held balance, the over-claim report); this only carries
-           the claim across. An unreadable value is unset rather than zero,
-           for the same reason fmNum refuses parseNum's fallback: "I could not
-           read this" must stay distinguishable from "the user earmarked
-           nothing". */
+        /* ADR-0007 · emergency_fund is tri-state. true (whole balance), a number (that slice),
+           null (never asked, or unreadable). */
         emergency_fund: (v => {
           if (fmBool(v) === true) { return true; }
           const n = fmNum(v);
@@ -432,22 +256,11 @@ module.exports = function registerLoad(ctx) {
     }
 
     S.txFiles = {};
-    /* The undo receipt goes with them. It holds references to the row objects
-       about to be replaced, so after this line it could only ever remove
-       nothing — and an undo button that quietly does nothing is worse than no
-       button. Cleared HERE, beside the state it depends on, rather than in the
-       caller: reloadFromDisk (controller.js) is loadVault's only call site
-       today, but the reset belongs to loadVault regardless — a second caller
-       added later must not have to remember this line too. */
+    /* ADR-0007 · The undo receipt is cleared beside the state it depends on. It holds
+       references to the rows just replaced. */
     S.lastImport = null;
-    /* Every folder under Transactions/, whether or not it holds a month file.
-
-       S.txFiles cannot answer "does this account have a folder?" — it is keyed
-       per month file, so a folder someone created and has not imported into yet
-       contributes no entry and reads exactly like a folder that was never
-       linked. Those are different situations with different next steps (import
-       a statement vs. link a folder), and telling the second story to someone
-       in the first sends them to re-link a folder they already have. */
+    /* ADR-0007 · Every Transactions/ folder is recorded. S.txFiles is keyed per month
+       file and cannot see an empty folder. */
     {
       const seen = new Map();
       for (const a of S.accounts) {
@@ -509,20 +322,8 @@ module.exports = function registerLoad(ctx) {
          Original is null when absent: a file written before the column
          existed, or a debt added without one. Fall back to the balance so
          the "paid off" bar reads 0% rather than dividing by zero. */
-      /* ISSUE 68. The fallback is for ARITHMETIC — the "paid off" bar divides
-         by it and would otherwise divide by null — and it must not reach the
-         file. Assigned to `original` alone, the serializer then stamped the
-         derived figure into the Debts row on the next save:
-
-             IN  : | Bond | ABSA | home | 480000.00 |           | 9.50 | …
-             OUT : | Bond | ABSA | home | 480000.00 | 480000.00 | 9.50 | …
-
-         and the household was permanently on record as having borrowed exactly
-         what they still owe, with the bar reading 0% forever and no way to
-         un-say it. The schema goes to real trouble to keep null ("not stated")
-         apart from 0 ("stated as nothing"); this threw that away one step
-         later. `originalStated` carries the distinction across the boundary so
-         the writer can put the cell back the way it found it — empty. */
+      /* ADR-0007 · A debt's original falls back for arithmetic only. ISSUE 68: originalStated
+         lets the writer put the cell back empty. */
       if (d.original === null) { d.original = d.balance; d.originalStated = false; }
       else { d.originalStated = true; }
       S.debts.push(d);
@@ -546,13 +347,8 @@ module.exports = function registerLoad(ctx) {
       if (!c[0]) continue;
       S.services.push(rowToObject(SCHEMAS.services, c));
     }
-    /* Plans — one file per plan in Plans/, keyed by the file's basename. Same
-       multi-file shape as Tax above, and read with the same heading-slice
-       trick: the three tables ("Money in", "Envelopes", "Items") live in one
-       file because a plan is read as one thing, and parseMdTable would happily
-       run them together into a single malformed list if they were handed to it
-       whole. The section names are load-bearing — plan.js's serializer writes
-       exactly these headings. */
+    /* ADR-0007 · Plans: one file per plan, sliced by heading. The section names are
+       load-bearing (plan.js writes them). */
     S.plans = {}; S.planDirty = false;
     for (const { file: f, text } of await read(mdFilesIn('Plans'))) {
       const { fm, raw, body } = parseFrontmatter(text);
@@ -568,24 +364,8 @@ module.exports = function registerLoad(ctx) {
       // balances do: a hand-typed "40 000,00" read as 40 would be written
       // straight back over a figure nobody was editing.
       const amt = v => normalizeAmount(v) ?? 0;
-      /* ISSUE 59/63. The contract table-schema.js's money() and vocab() give
-         every OTHER hand-editable table, applied here by hand because Plans
-         and Tax carry private loader/serializer pairs that ADR-0003's
-         migration has not reached yet.
-
-         Without it, `normalizeAmount(v) ?? 0` turned a cell nobody could read
-         into a real, stated 0.00 on the next save — "| Cot and pram | 12 000 R
-         |" became "| Cot and pram | 0.00 |", and a range like "8000 - 12000"
-         became 0.00 — which is the exact defect table-schema's own header
-         (lines 96-102) records having fixed for Assets, Debts, Owed and
-         Services. The status columns had the same shape one column over:
-         `pending` was coerced to `received` and WRITTEN BACK, flipping a plan
-         source from "expected" to "money in hand" and destroying the word that
-         said otherwise — the Services `weekly` incident again.
-
-         `<key>Raw` is set only when the cell was present AND unreadable, so a
-         blank stays blank and "not stated" never becomes "stated as nothing".
-         The serializers write the raw back verbatim when it is there. */
+      /* ADR-0007 · Plans and Tax cells keep <key>Raw when unreadable. ISSUE 59/63 —
+         table-schema's money()/vocab() contract, applied by hand. */
       const cellMoney = (key, v) => {
         const raw = String(v ?? '').trim();
         const n = normalizeAmount(v);
@@ -598,13 +378,8 @@ module.exports = function registerLoad(ctx) {
       };
 
       S.plans[f.basename] = {
-        /* KEYED BY BASENAME, not by display name, and `file` carries it back
-           out. The two differ on purpose: a plan can be called "Baby &
-           catch-up" while living in a filesystem-safe file, and frontmatter is
-           hand-editable — so two files could name themselves the same thing.
-           The file is the identity; the name is a label. Writers must derive
-           the path from `file` and never re-sanitise the name, or a rename in
-           frontmatter would fork the plan into a second file. */
+        /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
+           writers derive the path from `file`. */
         file: f.basename,
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
@@ -646,32 +421,11 @@ module.exports = function registerLoad(ctx) {
         const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
         return t === 'uploaded' ? 'uploaded' : (t === 'n/a' || t === 'na') ? 'n/a' : 'needed';
       };
-      /* Figures are written as raw numbers, but a hand-edited file may carry a
-         currency symbol or either separator convention — coerce rather than
-         throw, mirroring how stepStatus falls back instead of failing.
-         normalizeAmount is the same reader the statement importer and every
-         other hand-editable amount goes through; this used to be a fourth
-         private copy of that logic, with a test that asserted against its own
-         mirror of it rather than against the shipped function. */
+      /* ADR-0007 · Tax figures go through normalizeAmount. The one reader every hand-editable
+         amount shares; coerce, do not throw. */
       const figAmount = s => normalizeAmount(s) ?? 0;
-      /* ISSUE 59/63 (Tax half). The contract table-schema.js's money() and vocab() give
-         every OTHER hand-editable table, applied here by hand because Plans
-         and Tax carry private loader/serializer pairs that ADR-0003's
-         migration has not reached yet.
-
-         Without it, `normalizeAmount(v) ?? 0` turned a cell nobody could read
-         into a real, stated 0.00 on the next save — "| Cot and pram | 12 000 R
-         |" became "| Cot and pram | 0.00 |", and a range like "8000 - 12000"
-         became 0.00 — which is the exact defect table-schema's own header
-         (lines 96-102) records having fixed for Assets, Debts, Owed and
-         Services. The status columns had the same shape one column over:
-         `pending` was coerced to `received` and WRITTEN BACK, flipping a plan
-         source from "expected" to "money in hand" and destroying the word that
-         said otherwise — the Services `weekly` incident again.
-
-         `<key>Raw` is set only when the cell was present AND unreadable, so a
-         blank stays blank and "not stated" never becomes "stated as nothing".
-         The serializers write the raw back verbatim when it is there. */
+      /* ADR-0007 · Plans and Tax cells keep <key>Raw when unreadable. ISSUE 59/63, Tax half —
+         the same contract as the Plans copy above. */
       const cellMoney = (key, v) => {
         const raw = String(v ?? '').trim();
         const n = normalizeAmount(v);
@@ -683,28 +437,8 @@ module.exports = function registerLoad(ctx) {
         return (!raw || hit) ? { [key]: hit || fallback } : { [key]: fallback, [`${key}Raw`]: raw };
       };
 
-      /* ISSUE 52. `normalizeAmount`, not a digit-scraper.
-
-         This read `Number(String(v).replace(/[^\d.-]/g, ''))`, which DELETES
-         separators instead of interpreting them — and it is the reader for the
-         two figures a household copies straight off an ITA34:
-
-             cell           was          should be
-             -1 234,56      -123456      -1234.56
-             480 000,00     48000000     480000
-             1.250,00       1.25         1250
-
-         A refund of R1 234,56 was read as R123 456 and written back, and since
-         these are numbers in memory there was no raw text to fall back to. This
-         is exactly what src/amount.js exists to prevent, in the one file that
-         never called it — the same argument table-schema.js's money() reader
-         already carries for every other hand-editable amount.
-
-         An UNREADABLE cell returns null and keeps its text in `<key>Raw`, so
-         the serializer writes the household's own words back rather than
-         stamping a fabricated 0 over them (views/tax.js reads the pair). A
-         blank cell is null with no raw: nothing was said, and nothing is
-         preserved. */
+      /* ADR-0007 · Assessment figures: normalizeAmount, not a digit-scraper. ISSUE 52:
+         "-1 234,56" read as -123456; unreadable keeps its text in <key>Raw. */
       const signedNum = v => {
         if (v === undefined || v === null || String(v).trim() === '') return { value: null, raw: null };
         const n = normalizeAmount(v);
@@ -759,28 +493,9 @@ module.exports = function registerLoad(ctx) {
     await loadNotes();
   }
 
-  /* Notes/ — one markdown file per note. Unlike every other file read above,
-     the BODY is content rather than a serialized table, so the excerpt comes
-     out of it; parseNote in src/notes.js owns that and is the same module the
-     writer serializes through.
-
-     Exposed on ctx as well as called from loadVault, because views/notes.js
-     re-reads after every write it makes — so what the page lists always comes
-     from the same parse as everything else, and a serializer/parser
-     disagreement shows up on the first note rather than after the next reload.
-
-     A note that cannot be read is SKIPPED rather than failing the load: these
-     are files the user creates and edits by hand, and one unreadable note must
-     not take the whole budget down with it. That is why this cannot simply
-     call `read` above — a single rejection there takes the whole Promise.all
-     down, and with it the entire budget. The catch is per file.
-
-     Reads in parallel for the reason `read`'s own comment gives, and this
-     loader is the case that proves it: measured against a Ruan-shaped vault it
-     was 172ms of a 233ms load at THIRTY notes — three quarters of the wait, at
-     a fraction of the files — because the cost is round trips, not work
-     (parsing measures ~5.5µs a note). Sequential, it grew without bound in the
-     one folder the user is invited to keep adding to. */
+  /* ADR-0007 · A note that cannot be read is skipped. Per-file catch, so one bad note cannot
+     take the budget down; exposed on ctx because views/notes.js re-reads after every write.
+     ADR-0007 · Notes read in parallel. 172ms of a 233ms load at thirty notes when sequential. */
   async function loadNotes() {
     /* Under, not in: a user who files a year of notes into Notes/2026/ has
        tidied a folder of markdown, not deleted it, and the page must not go
@@ -800,22 +515,10 @@ module.exports = function registerLoad(ctx) {
     S.notes = sortNotes(notes);
   }
 
-  /* Resolve an account label to the exact folder segment to key by AND write
-     to. Both must be the same string: S.txFiles is keyed by the folder name as
-     it exists on disk, so a writer that re-sanitises the label can miss the
-     lookup while the write still lands on the existing file — rebuilding that
-     month from scratch with only the new rows.
-
-     A folder that already exists wins verbatim. Re-sanitising it would create a
-     second, near-identical folder and split the account in half; and the name
-     is self-evidently legal, because the filesystem is already holding it. Only
-     a label that has never been written gets sanitised into a new segment. */
-  /* Case-folded, because the filesystems this plugin ships on are. macOS, iOS
-     and Windows all resolve `Transactions/cheque/` and `Transactions/Cheque/`
-     to one directory, so a `tx_label` differing only in case — hand-editable
-     frontmatter that syncs between devices — missed the in-memory lookup while
-     the write still landed on the existing file. Folding here keeps the two
-     sides agreeing, which is the whole contract vault-path.js exists to hold. */
+  /* ADR-0007 · An existing transaction folder wins verbatim. Only a never-written label
+     is sanitised into a new segment. */
+  /* ADR-0007 · txSegment is case-folded. macOS, iOS and Windows resolve cheque/ and
+     Cheque/ to one directory. */
   function txSegment(label) {
     const want = safeSeg(label);
     const key = want.toLowerCase();

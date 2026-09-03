@@ -1,24 +1,16 @@
 'use strict';
 /* Debt amortisation + payoff-strategy simulation.
 
-   Pure arithmetic, no DOM and no obsidian import, so the numbers the Debt view
-   shows can be driven directly from a bare-node test. Every function here is
-   iterative rather than closed-form on purpose: the closed-form payoff formula
-   (-ln(1 - rB/P) / ln(1+r)) silently returns NaN for the exact case that
-   matters most to a reader in trouble — a payment at or below the monthly
-   interest, where the balance never falls. Iterating lets that case come back
-   as `settled: false` with a month count instead of a blank cell.
+   Pure arithmetic — no DOM, no obsidian import, no clock read — so the Debt
+   view's numbers can be driven from a bare-node test. Iterative on purpose,
+   never closed-form (ADR-0007, "debt-math.js — purpose").
 
    Convention: `rate` is the ANNUAL nominal rate as a percentage (18.5 means
-   18.5%), compounded monthly — how a lender quotes it and how it is stored in
-   Debts.md. Amounts are positive numbers; a balance is what is still owed. */
+   18.5%), compounded monthly. Amounts are positive; a balance is what is
+   still owed. */
 
-/* isRealIsoDate, not ISO_DATE: ISO_DATE is shape-only (dates.js:19 — "2026-13-45
-   passes") and expectedBalance walks `start` as real elapsed months. A
-   shape-valid, impossible start date used to sail through and get projected as
-   though it had actually happened, feeding views/debts.js's "schedule says …
-   since {date}" line a fabricated figure dressed as arithmetic — the same trap
-   savings-math.js's monthOf hit in 1.23.0, fixed there the same way. */
+/* ADR-0007 · Real start date, not a date-shaped one. ISO_DATE is shape-only and
+   expectedBalance walks `start` as real elapsed months. */
 const { ISO_DATE, isRealIsoDate } = require('./dates');
 
 /* Below this, a balance is settled. Floating-point interest leaves fractions
@@ -53,13 +45,8 @@ function amortise(balance, rate, payment, maxMonths = MAX_MONTHS) {
    useful single number on the page: it is the price of doing nothing. */
 const monthlyInterest = (balance, rate) => Math.max(0, Number(balance) || 0) * monthlyRate(rate);
 
-/* Attack order for the pooled extra payment.
-     avalanche — highest rate first (mathematically cheapest)
-     snowball  — smallest balance first (closes accounts soonest)
-   Recomputed every month against live balances, so snowball re-targets as
-   accounts close. Ties break on name and then on key, so a run is reproducible
-   even when two debts share a name — which households do have ("Credit card"
-   twice, one per bank). */
+/* ADR-0007 · Attack order and tie-break. avalanche = highest rate first, snowball =
+   smallest balance first, recomputed monthly; ties break on name then key. */
 function priorityOrder(debts, strategy) {
   const open = debts.filter(d => d.balance > EPS);
   const tie = (a, b) => a.name.localeCompare(b.name) || ((a.key ?? 0) - (b.key ?? 0));
@@ -69,28 +56,8 @@ function priorityOrder(debts, strategy) {
   return open.sort((a, b) => b.rate - a.rate || a.balance - b.balance || tie(a, b));
 }
 
-/* Run every debt forward together under one strategy.
-
-   `strategy: 'minimum'` is the do-nothing baseline — contracted payments plus
-   each debt's own standing extra, no pooled extra and no rollover. The other
-   two add `extra` per month AND roll a closed debt's payment into the pool,
-   which is the entire point of both methods and the reason their debt-free
-   date beats the baseline even when `extra` is 0.
-
-   `payoff` is keyed by each debt's `key` — its own if it carries one, otherwise
-   its position in the INPUT array. Keying by name looks tidier and is wrong:
-   two debts called "Credit card" would share one entry, so the second one's
-   payoff month would overwrite the first's and both rows would show the same
-   clear date. Mapping before filtering keeps those positions stable even when a
-   settled debt drops out.
-
-   `series` is the total still owed at the END of each month, with `series[0]`
-   the opening balance before a cent is paid — so it always has months + 1
-   entries and can be plotted straight against a month axis. Recorded inside
-   this loop rather than by a second pass on purpose: a payoff CURVE drawn from
-   its own re-implementation would be free to disagree with the payoff DATE
-   printed beside it, and the reader would have no way to tell which one lied.
-
+/* ADR-0007 · Minimum is the no-rollover baseline. ADR-0007 · Payoff keyed by key, not name.
+   ADR-0007 · The payoff curve is recorded in the payoff loop. `series[0]` is the opening balance.
    Returns { months, interest, payoff: {key: month}, settled, stalled, series }. */
 function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MONTHS } = {}) {
   const list = (debts || [])
@@ -143,14 +110,8 @@ function simulate(debts, { extra = 0, strategy = 'avalanche', maxMonths = MAX_MO
   return { months: m, interest, payoff, settled: !stalled.length, stalled, series };
 }
 
-/* 'YYYY-MM' n months after `from` (a Date, REQUIRED — no clock read here).
-   Day-of-month is deliberately dropped: a payoff month is the honest
-   resolution here, and keeping the day would invent precision the model does
-   not have. Every production caller lives in views/debts.js, which already
-   has an injected today (see its own todayIso() import) — a `new Date()`
-   default here would have been an untested branch no guard test could ever
-   exercise honestly, the same clock-in-a-pure-module trap this module's
-   header steers away from everywhere else. */
+/* ADR-0007 · addMonths takes an injected date and drops the day. 'YYYY-MM' n months
+   after `from` (a Date, REQUIRED — no clock read here). */
 function addMonths(n, from) {
   const d = new Date(from.getFullYear(), from.getMonth() + n, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -165,25 +126,9 @@ function humanMonths(n) {
   return r ? `${y} yr ${r} mo` : `${y} year${y === 1 ? '' : 's'}`;
 }
 
-/* Where a debt SHOULD be today, given what it started at and what has been paid
-   into it since — the Accounts page's reconciliation argument, made on the one
-   page where a hand-typed figure goes out of date fastest, because a debt
-   balance moves every single month.
-
-   It cannot be made the same way as an account's. A debt row carries no
-   "balance as of" date, and payments are attributed per CATEGORY rather than
-   per debt (three debts sharing one category would each claim the full amount).
-   So the projection runs from the fields the file already has — `original`,
-   `rate`, `payment` + `extra`, `start` — and needs no new column.
-
-   Interest is applied BEFORE each payment, month by month, because a debt does
-   not fall by the instalment: the lender adds interest between statements.
-   Subtracting payments alone would report a debt shrinking faster than it is,
-   which is the flattering direction and therefore the dangerous one.
-
-   Returns null when the row cannot support the projection — no start date, no
-   original, no instalment, or a start date in the future. A missing answer is
-   the honest output; a projection from guessed inputs is not. */
+/* ADR-0007 · Expected balance projects from the fields the row already has.
+   ADR-0007 · Interest before each payment. ADR-0007 · Missing input is null, not a guess.
+   Where a debt SHOULD be today, or null when the row cannot support the projection. */
 function expectedBalance(debt, today) {
   const d = debt || {};
   const original = Number(d.original) || 0;
@@ -197,41 +142,15 @@ function expectedBalance(debt, today) {
 
   const [sy, sm, sd] = d.start.split('-').map(Number);
   const [ty, tm, td] = today.split('-').map(Number);
-  /* WHOLE months elapsed, floored on the day of the month.
-
-     A difference of month indices alone counts any part-month as a full one, so
-     a debt starting on the 31st and read on the 1st was charged a whole month of
-     interest AND credited a whole instalment for a single day. The instalment is
-     the larger of the two, so the error runs in the flattering direction — the
-     one this module's header already refuses to take on the interest ordering,
-     arriving by a different route. Only completed months count.
-
-     The billing day is clamped to a short month's last day, the same way
-     nextOnDay() does it in committed.js: an agreement running on the 31st is
-     debited on the 28th in February, and treating that month as incomplete
-     would swing the error the other way and report a debt LARGER than it is. */
+  /* ADR-0007 · Whole months elapsed, billing day clamped. Only completed months count; the
+     billing day is clamped to a short month's last day as nextOnDay() in committed.js does. */
   const lastDay = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
   const billDay = Math.min(sd, lastDay);
   const months = (ty - sy) * 12 + (tm - sm) - (td < billDay ? 1 : 0);
   if (months <= 0) return null;
 
-  /* UNANCHORED: `original` and `start` are only ever set together, by
-     addDebt, as `original = balance` on the day the row is created — nothing
-     in the Debt table edits either field afterward. The only way `original`
-     later disagrees with a fresh row's balance is a hand edit to Debts.md
-     (which the view's own comment invites, to record the loan's true original
-     amount), and that edit moves `original` alone: `start` is left reading as
-     the ROW's creation date, not the day that original amount was actually
-     owed.
-
-     That is provable, not a guess: a balance can only fall by cash actually
-     paid, and crediting every rand of it straight to principal (0% interest,
-     the most generous case) still bounds the drop by payment(+extra) × months
-     elapsed. `original - balance` exceeding that bound means the balance
-     could not possibly have gone from `original` to today's figure on this
-     schedule — proof the pair does not describe one continuous debt, not a
-     material discrepancy to flag. Gated on a real `.balance` so the bare
-     date/month arithmetic exercised without one (above) is untouched. */
+  /* ADR-0007 · An unanchored original/start pair returns null. A drop beyond payment × months is
+     impossible even at 0% interest, so `original` was edited alone and the pair is not one debt. */
   if (Number.isFinite(d.balance)) {
     const maxCashPaid = pay * months;
     if (original - d.balance > maxCashPaid + 0.01) return null;

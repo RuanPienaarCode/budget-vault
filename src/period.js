@@ -2,22 +2,14 @@
 /* Financial-period math + per-period summaries.
 
    A period has a NAME its files are addressed by and BOUNDARIES deciding which
-   transactions fall inside it, and the two are deliberately separate — see
-   CONTEXT.md and docs/adr/0001. Two shapes of name exist:
+   transactions fall inside it, and the two are deliberately separate (CONTEXT.md,
+   ADR-0001). 'YYYY-MM' is a payday month, named for the month it ends in;
+   'YYYY-MM-DD' is an interval period named for the day it starts on, derived
+   from period_anchor plus period_days. Nothing is materialised, and the anchor
+   matters only MODULO the interval.
 
-     'YYYY-MM'     a payday month, running from month_start_day of the previous
-                   month to the day before it in the named month. The name is
-                   stable no matter what month_start_day is, so retuning the
-                   boundary day re-slices the window without orphaning a file.
-
-     'YYYY-MM-DD'  an interval period (every two weeks, and friends), named for
-                   the day it starts on. Derived from period_anchor — one known
-                   payday — plus period_days. Nothing is materialised.
-
-   The anchor is meaningful only MODULO the interval: two anchors a whole number
-   of intervals apart describe the same set of periods, so all maths below runs
-   off the anchor's phase rather than its literal value. Only a shift that isn't
-   a whole number of intervals actually moves a boundary. */
+   ADR-0007 · period.js — purpose. The full narrative, and every rule this file
+   used to carry as prose, is in the ADR-0007 register. */
 
 const { MONTHS } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
@@ -35,27 +27,11 @@ const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
 const { stamp, tally, LENSES } = require('./ledger');
 
-/* The pay cycle is stored as its own length in days rather than a named type.
-   A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
-   and foreign in us/ca, "biweekly" is idiomatic there and genuinely ambiguous
-   (every two weeks, or twice a week?) — and locale.js has no vocabulary layer
-   to swap it per country. A number reads the same everywhere, needs no new word
-   when a cycle is added, and lets someone paid every ten days simply work.
+/* ADR-0007 · Pay cycle is a number of days. A word would need a dialect; absent
+   or zero means the payday month; periodDaysOrZero bands it on load. */
 
-   Absent or zero means the payday month, so a vault that has never heard of
-   this setting behaves exactly as it always did. The band the value must fall
-   in is enforced by periodDaysOrZero in dates.js, which the loader applies on
-   the way in so the stored setting and the running one can never disagree. */
-
-/* Month 01–12, not any two digits: '2026-13' is date-SHAPED but not a month,
-   and Date's rollover turned it into a real 31-day window titled "undefined
-   2026" that the arrows would happily walk into.
-
-   Year 0100–9999 for the same reason one step up. Date.UTC maps years 0–99 onto
-   1900–1999, so '0000-01' passed a bare \d{4} and then resolved to a window
-   starting 1899-12-23 — a period the name never claimed. That is the same
-   relocation isRealIsoDate rejects by round-trip, and the two must agree: a
-   month key it would refuse as a date must not be reachable as a month. */
+/* ADR-0007 · Month key shape. Month 01–12 and year 0100–9999 only — Date's
+   rollover turned '2026-13' and '0000-01' into windows the name never claimed. */
 const MONTH_KEY = /^(?:0[1-9]\d{2}|[1-9]\d{3})-(0[1-9]|1[0-2])$/;
 
 /* Whole-day arithmetic in UTC (dayNum / isoFromDayNum, from src/dates.js).
@@ -66,13 +42,8 @@ const MONTH_KEY = /^(?:0[1-9]\d{2}|[1-9]\d{3})-(0[1-9]|1[0-2])$/;
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
 
-  /* The anchor as a day number, or null if it isn't a real calendar date.
-     Presence alone was not enough: the loader's shape check admits 2026-13-45,
-     which Date.UTC rolls forward to a date the file never named, and a state
-     built without the loader at all can hold anything — which surfaced as a
-     period literally called 'NaN-NaN-NaN'. Round-tripping the day number back
-     to ISO is the cheapest check that catches both, because only a real date
-     survives it unchanged. */
+  /* ADR-0007 · Anchor must be a real date. Only an ISO round-trip catches both
+     2026-13-45 and a state built without the loader ('NaN-NaN-NaN'). */
   function anchorDay() {
     return isRealIsoDate(S.settings.period_anchor) ? dayNum(S.settings.period_anchor) : null;
   }
@@ -92,29 +63,14 @@ module.exports = function registerPeriod(ctx) {
     return a + Math.floor((day - a) / iv) * iv;
   }
 
-  /* Can the current settings address a period of this name? S.period is
-     remembered across a reload, but the period LENGTH can change underneath it,
-     and the two shapes are not interchangeable. Left unchecked, a month name
-     under a 14-day cycle falls through every reader's interval branch and comes
-     back as a 31-day window that navigates to another month name — so a user who
-     switches to a fortnightly cycle keeps seeing month-long periods, with no way
-     to reach their own. The reverse leaks a date-named budget file into a vault
-     that is back on payday months. Checked on load, where the switch lands. */
+  /* ADR-0007 · Period key must be addressable under current settings. S.period
+     survives a reload but the period LENGTH can change underneath it. */
   function periodKeyValid(p) {
     if (typeof p !== 'string') return false;
     const iv = intervalDays();
     if (!iv) return MONTH_KEY.test(p);
-    /* Shape alone is not enough for an interval period. Every YYYY-MM-DD passes
-       the regex, but only the dates a whole number of cycles from the anchor
-       are period STARTS — and both a length change and an off-cycle anchor move
-       redraw that set. Switching 7 → 14 leaves half the old starts sitting
-       BETWEEN the new boundaries, and each one still looked addressable here:
-       the remembered period kept its old phase, so its window straddled two
-       real periods, prev/next walked that off-phase track forever (only "jump
-       to current" escaped it), and any budget saved meanwhile wrote a file no
-       later period could ever address. Round-tripping p as well rejects a
-       filename like 2026-13-45, which the regex accepts and Date.UTC would
-       silently roll into a date the name doesn't say. */
+    /* ADR-0007 · Interval key must sit on the anchor's phase. Shape alone is not
+       enough: a length change or off-cycle anchor move redraws the set of starts. */
     if (!isRealIsoDate(p)) return false;
     return (dayNum(p) - anchorDay()) % iv === 0;
   }
@@ -184,14 +140,8 @@ module.exports = function registerPeriod(ctx) {
     }
     return `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`;
   }
-  /* "Aug 22" — a real calendar DAY, for a full 'YYYY-MM-DD'.
-
-     Deliberately not periodShortLabel, which takes a period KEY and renders the
-     YEAR as its second half: 'Aug 26' there means August 2026 and is right on a
-     trend axis. Handed an end DATE it still printed 'Aug 26', so a period ending
-     on the 22nd announced itself as ending on the 26th — six inches below a
-     header reading "Jul 23 – Aug 22, 2026". Two labels, two jobs; the mistake
-     was reaching for the axis one to name a day. */
+  /* ADR-0007 · dayLabel names a day; periodShortLabel names a period. The axis
+     label renders the YEAR second, so it printed 'Aug 26' for a period ending the 22nd. */
   const dayLabel = d => `${MONTHS[parseInt(d.slice(5, 7), 10) - 1]} ${parseInt(d.slice(8), 10)}`;
 
   function periodTitle(p) {
@@ -220,23 +170,8 @@ module.exports = function registerPeriod(ctx) {
   }
 
   /* ---------------------------- calculations ---------------------------- */
-  /* The account file behind a transaction-folder label. The two are usually the
-     same string, but need not be: `tx_label` points an account at a folder of
-     another name, and safeSeg() strips filesystem-illegal characters on the way
-     to disk. Same three-way match as txSegment() in load.js, run the other way
-     round. Returns null for a folder with no account file — an orphan whose
-     rows stay in the budget, since nothing says otherwise.
-
-     Case-folded, because txSegment() is and for the same reason: the
-     filesystems this plugin ships on resolve `cheque/` and `Cheque/` to one
-     directory. txSegment gained the fold and this side did not, so a
-     `tx_label: cheque` against an on-disk `Cheque` folder imported happily —
-     the write side matched — while every read through this door saw an
-     orphan: rows counted in the budget, the account told to link a folder it
-     was already importing from. The two halves of one contract must fold the
-     same way. tx_label goes through safeSeg here too — it is the same
-     hand-typed frontmatter a.name is, and a "Visa: Gold" tx_label names a
-     folder the filesystem holds as "Visa- Gold". */
+  /* ADR-0007 · accountForLabel folds case and safeSegs both sides. The mirror of
+     txSegment() in load.js; null for an orphan folder, whose rows stay in. */
   function accountForLabel(label) {
     const key = safeSeg(label).toLowerCase();
     return S.accounts.find(a =>
@@ -244,32 +179,10 @@ module.exports = function registerPeriod(ctx) {
       (!!a.tx_label && safeSeg(a.tx_label).toLowerCase() === key) ||
       safeSeg(a.name).toLowerCase() === key) || null;
   }
-  /* account -> { rows, labels } in ONE pass over S.txFiles.
-
-     Lives here rather than in a view because Accounts and Savings both need it
-     and would otherwise keep private copies that drift. Resolving per account
-     instead of indexing once would walk every month file once per account.
-
-     Rows are handed over unfiltered — excluded ones included. Callers decide
-     what to drop, and the two that exist deliberately drop nothing: money that
-     left the bank still left the bank whether or not it counts in the budget. */
-  /* ISSUE 61. One folded-key lookup built ONCE per index, instead of
-     accountForLabel's linear scan once per transaction FILE.
-
-     accountForLabel is O(accounts) with two safeSeg calls per account, and
-     accountIndex called it per file — O(files x accounts), rebuilt around
-     fifteen times per Dashboard render. Measured with the row count held
-     constant at 9 600: 2 accounts 6 ms, 40 accounts 47 ms for the fifteen
-     rebuilds, and over a million safeSeg calls per render at 40. Desktop V8
-     shrugs; the iOS 15 floor this plugin targets does not.
-
-     EXACTLY equivalent to the scan it replaces, not approximately. find()
-     returns the first account (in array order) for which ANY of four tests
-     holds — exact tx_label, exact name, folded tx_label, folded name. An
-     exact match implies a folded match (safeSeg(x).toLowerCase() of an equal
-     string IS the key), so the folded tests are a superset, and a map from
-     folded key to the FIRST account claiming it gives the same answer for
-     every label, colliding vaults included (#72 is about those). */
+  /* ADR-0007 · accountIndex hands over rows unfiltered. ONE pass over S.txFiles;
+     callers decide what to drop, and both existing ones drop nothing. */
+  /* ADR-0007 · One folded-key lookup per index. ISSUE 61 — exactly equivalent to
+     accountForLabel's scan, built once instead of once per transaction file. */
   function labelLookup() {
     const map = new Map();
     for (const a of S.accounts) {
@@ -295,27 +208,9 @@ module.exports = function registerPeriod(ctx) {
     return idx;
   }
 
-  /* Every account with the balance it should read RIGHT NOW, rather than the
-     one last confirmed — ISSUE 44.
-
-     The Dashboard held two as-of dates at once and said so in its own copy.
-     "Money you have right now" ran every account through reconcile(), so a
-     R1 200 Checkers shop on 2 September was inside its R41 800. Net worth,
-     four tiles along, called worth() on the raw `balance` fields and printed
-     R120 000 built on a R43 000 cash pile that still read as of 1 September.
-     One card, one household, two answers to "as of when" — and the second one
-     was captioned "these do not move with the period", which is true and does
-     not mean "these do not move".
-
-     `reconcile()` is the app's one definition of "what this account should
-     read now" and it is not restated here: a drift verdict carries `implied`
-     and every other verdict means nothing readable has moved since the
-     confirmation, in which case the stated figure IS the current one.
-
-     Returns NEW objects rather than mutating S.accounts. The account files are
-     the source of truth and a stated balance is "a claim with an age, never a
-     fact" — writing a derived figure back onto the model would make the claim
-     unrecoverable and the next save would persist a number nobody typed. */
+  /* ADR-0007 · Implied balances are as of now, on new objects. ISSUE 44 —
+     reconcile() is the one definition of "what this account should read now";
+     S.accounts is never mutated, a stated balance being a claim with an age. */
   function impliedAccounts(todayArg) {
     const idx = accountIndex();
     /* Passed straight through to reconcile, which has always taken `today` as
@@ -327,17 +222,8 @@ module.exports = function registerPeriod(ctx) {
     });
   }
 
-  /* The accounts a Transactions/ folder resolves to, EMPTY FOLDERS INCLUDED.
-
-     accountIndex() cannot answer this and never could: it is built from
-     S.txFiles, so an account whose folder exists but holds no month file yet
-     produces no entry there and is indistinguishable from one with no folder at
-     all. Both come back as zero rows; only this set separates them.
-
-     Resolved through accountForLabel, the same door accountIndex uses, so a
-     `tx_label` pointing at a differently-named folder counts here exactly as it
-     counts there — otherwise an account would be told to link the folder it is
-     already successfully importing from. */
+  /* ADR-0007 · Folders resolve to accounts even when empty. accountIndex() is
+     built from S.txFiles and cannot see a folder with no month file yet. */
   function accountsWithFolder() {
     const set = new Set();
     for (const name of S.txFolders || []) {
@@ -359,61 +245,10 @@ module.exports = function registerPeriod(ctx) {
     return out;
   }
 
-  /* ISSUE 41. Transaction folders belonging to money the household has already
-     said is set aside — a savings or investment account, or one carrying an
-     `emergency_fund` earmark.
-
-     On the `BudgetAudit` vault the baby fund (type savings, opening R8 000)
-     held `Pram | Groceries | -5000`. That R5 000 went into Total Spent, into
-     the Groceries envelope and therefore into "budget remaining", so buying a
-     pram out of an earmarked fund read on screen exactly like blowing the
-     grocery budget at Checkers — and the same R8 000 was simultaneously being
-     counted as emergency cover by the health card. One fund, spent twice, in
-     two directions.
-
-     OUTGOINGS ONLY, and the asymmetry is deliberate. Money LEAVING a fund was
-     funded by an earlier period's income and is not this period's household
-     spending; money ARRIVING in one is arriving now and is income like any
-     other — a bonus paid straight into savings would otherwise vanish from the
-     figure it belongs in. The three vetoes above this one are whole-row
-     because their subject is the ROW (a per-row veto, an opted-out account, an
-     unconvertible currency); this one's subject is a DIRECTION.
-
-     `in_budget_stated` is the opt-out's opt-out. A household that genuinely
-     runs its spending through an account it has typed savings writes
-     `budget: true` on it and is taken at its word — an absent key is not
-     consent, which is why load.js records whether the question was answered
-     rather than only what the answer was. */
-  /* WHAT COUNTS AS A DECLARATION, and why `type: savings` alone is not one.
-
-     This veto removes a row from the budget entirely — out of `spend`, out of
-     `byCat`, and therefore off the per-category Budget table as well as the
-     hero. That is a strong response, and it was keyed on the account's TYPE,
-     which is a classification of what kind of account it is and not a statement
-     about whether its money is spoken for.
-
-     Measured on a household whose only account is a high-interest transactional
-     account (a real and ordinary South African product) typed `savings`, with a
-     R35 000 salary in and R4 250 of real spending out: `periodSummary().spend`
-     read R0, every category row read R0 of its budget, and the hero offered the
-     whole R7 000 budget as still available. The budget stopped measuring
-     anything, silently, off one frontmatter word — worse than the defect this
-     veto was added to fix.
-
-     So the veto now requires the household to have SAID the money is set
-     aside, using fields this app already has and already asks for:
-
-       — `emergency_fund` (true, or an amount): the explicit flag.
-       — a savings/investment account with a GOAL on it (`goal_amount`,
-         `target_date` or `monthly_contribution`). A baby fund has a goal; a
-         transactional account does not.
-
-     A bare `type: savings` still earmarks the balance against "actually free"
-     (committed.js) — there the deduction is a named, visible term the reader
-     can disagree with in one glance — and its outgoings are still LABELLED as
-     funded from savings on the hero. What it no longer does is silently delete
-     them from the budget. The strength of the response now matches the
-     strength of the declaration. */
+  /* ADR-0007 · Earmarked outgoings leave the budget. ISSUE 41 — money leaving a
+     declared fund is not this period's spend; money arriving is income. */
+  /* ADR-0007 · type: savings alone is not a declaration. Earmarked means an
+     emergency_fund flag, or a pool account with a goal; in_budget_stated opts out. */
   function isEarmarkedAccount(a) {
     if (!a || a.in_budget_stated) return false;
     const ef = a.emergency_fund;
@@ -422,43 +257,14 @@ module.exports = function registerPeriod(ctx) {
     return (a.goal_amount > 0) || !!a.target_date || (a.monthly_contribution > 0);
   }
 
-  /* The category type ONLY where the household stated one. `catType` answers
-     "what type does this category behave as", and its `expense` default is
-     right for every consumer that buckets a row. It is wrong for the one
-     consumer that reads the type as EVIDENCE OF INTENT — savedFromOutside's
-     ISSUE 32 rule, which treats a non-internal type as the household saying
-     "this was a purchase". A default is not a statement, and null here means
-     "they have not said", which that rule already handles by leaving the row
-     matchable. */
+  /* ADR-0007 · Declared category type is null when unstated. A default is not
+     evidence of intent for savedFromOutside's ISSUE 32 rule. */
   function declaredCatType(name) {
     const c = (S.categories || []).find(x => x.name === name);
     return c && c.type_stated ? c.type : null;
   }
-  /* ISSUE 43. What the household ACTUALLY moved into its own funds this
-     period — the figure the budget could not see.
-
-     On the `BudgetAudit` vault, Emergency and Investing are budgeted R2 000
-     each. The funding is a matched pair of rows, `To emergency fund` out of the
-     cheque account and `From cheque` into the fund, and BOTH are categorised
-     Transfer. summaryInRange skips transfer-typed rows entirely — correctly:
-     a transfer is money moving between the reader's own pockets and folding it
-     into income or spend would count one rand twice. So the envelopes' actuals
-     stayed at R0 and the budget went on reporting R4 000 still to set aside
-     after the household had already moved half of it. Not a wrong total: a
-     figure that says you have not done the thing you did this morning.
-
-     There is no link from a transfer row to a budget CATEGORY — the cheque leg
-     says "Transfer", the envelope says "Emergency", and matching them on the
-     description would mean guessing at free text, which this repo refuses to
-     do for the reason worth.js's cardOverlap sets out. What CAN be answered
-     without guessing is the aggregate: how much arrived in the household's own
-     funds from outside them. That is what this returns, and the Dashboard
-     states it beside the budgeted figure so the reader compares two totals
-     rather than being told a false zero per envelope.
-
-     savedFromOutside() pairs the legs, so a shuffle between two funds is not
-     counted as fresh saving — the same reading the score's own saving rate
-     takes, from the same function. */
+  /* ADR-0007 · Moved-to-funds is an aggregate, not per envelope. ISSUE 43 — no
+     link exists from a transfer row to a category, and free text is not guessed. */
   function movedToFunds(p, todayArg) {
     const { start, end } = periodRange(p);
     const labels = new Map();
@@ -471,16 +277,8 @@ module.exports = function registerPeriod(ctx) {
     if (!labels.size) return 0;
     /* Injected like periodSummary's, and for the same reason. */
     const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
-    /* Windowed the way periodSummary is (ISSUE 35), so "budgeted R4 000,
-       moved R2 000" cannot be a comparison against a figure that includes next
-       week's standing order.
-
-       A period that has not STARTED yet moves nothing, and returning its whole
-       window would read as "you have already set aside R7 000" beside a
-       budgeted R4 000 — a forecast wearing the past tense. periodSummary can
-       state a future window because it hands back `scheduled` alongside to say
-       what the figure is; this is a single number with nowhere to put that
-       caveat, so it answers the question it was asked. */
+    /* ADR-0007 · Moved-to-funds windows as of today. ISSUE 35's shape: a period
+       not yet started moves nothing, and this figure has nowhere to put a caveat. */
     if (today < start) { return 0; }
     const stop = today < end ? today : end;
     return savedFromOutside(txInRange(start, stop), labels, declaredCatType);
@@ -494,29 +292,9 @@ module.exports = function registerPeriod(ctx) {
     }
     return out;
   }
-  /* Transaction folders whose ACCOUNT is stated in another currency.
-
-     ISSUE 28 (2026-08-29 audit). Currency never reached the transaction path
-     at all: txInRange stamps each row with its folder label and nothing else,
-     and summaryInRange then did `income += t.amount` over the lot. So a
-     Rp 1 500 000 lunch and a R 3 000 grocery shop were the same number.
-     Measured, on a two-currency vault: the Dashboard hero read "R 1 499 000
-     over" where R 1 000 was actually left; the Groceries budget row read
-     "Spent R 1 503 000" against a R 4 000 budget; the donut, the trend line
-     and the month-on-month deadband all inherited it. Not one of those
-     figures carried a disclosure, because the account-level ones are the only
-     place this app had ever thought to put one.
-
-     A household-currency total cannot include foreign spend, and there is no
-     rate here to convert it with. So those rows are held OUT of the totals —
-     and named, every time, via the `foreign` field summaryInRange returns.
-     Silence is the thing currency.js:14 actually forbids; a stated exclusion
-     the reader can act on is what `budget: false` already is.
-
-     Deliberately a SECOND set beside nonBudgetLabels() rather than folded
-     into it: they answer different questions ("the reader opted this out" vs
-     "this app cannot add these together"), and the disclosure a consumer
-     writes for one is not the sentence for the other. */
+  /* ADR-0007 · Foreign folders are held out and named. ISSUE 28 — no rate to
+     convert with; a SECOND set beside nonBudgetLabels() because the disclosure
+     for "opted out" is not the sentence for "cannot be added together". */
   function foreignLabels() {
     const out = new Map();
     for (const f of Object.values(S.txFiles)) {
@@ -526,20 +304,8 @@ module.exports = function registerPeriod(ctx) {
     return out;
   }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
-  /* Does a category file actually answer to this name?
-
-     The companion to catType, and deliberately a SEPARATE question. catType
-     returns null both for "this row has no category" and for "this row names a
-     category that isn't there", and collapsing those two is the same mistake
-     detectHeaderlessColumns made with `verified:false` — "disproved" and "no
-     evidence" are different answers, and reading one as the other is how a
-     guess gets laundered into a number.
-
-     Both states are reachable on supported paths: promptDeleteCategory leaves
-     the name on existing rows on purpose, and there is no rename UI, so
-     renaming a category means editing its file and orphaning every row that
-     used it. Same exact-name match, through the same list, so catType and this
-     can never disagree about which categories exist. */
+  /* ADR-0007 · catKnown is a separate question from catType. "No category" and
+     "category file gone" are different answers, both reachable. */
   function catKnown(name) { return !!name && S.categories.some(c => c.name === name); }
   /* Is this category one whose budgeted amount IS its actual spend? See the
      comment on the flag in src/load.js. Its own lookup rather than a field on
@@ -548,68 +314,15 @@ module.exports = function registerPeriod(ctx) {
      written before the flag existed. */
   function catAssumeSpent(name) { return S.categories.find(c => c.name === name)?.assumeSpent === true; }
 
-  /* THE type of a budget row: the category's live type, and only when no
-     category file answers (catType null — no category named, or the file
-     gone) the cell the row itself stored.
-
-     One function because there were three readers of a budget row's type and
-     the 2026-09-02 audit found them disagreeing: budgetTotals() had just been
-     taught to read the live type, while the Budget page's assumed overlay and the
-     Dashboard's budgetVsActualRows still read `b.type` — the cell
-     serializeBudgetFile writes back verbatim, so it never heals after a
-     category is retyped. Measured through the real loader: a category file
-     saying `expense, assume_spent: true` whose July row still said `income`
-     gave budgetTotals {income: 10 000, spend: 1 200} and assumedSpend 0 —
-     two figures on one page from two rules. `??`, not `||`: null is the only
-     value that means "no live answer". */
+  /* ADR-0007 · A budget row's type is the category's live type. The stored cell
+     stands in only when no file answers; `??`, not `||`. */
   function budgetRowType(b) {
     return catType(b.category) ?? b.type;
   }
 
-  /* How far a period ended in the hole: what actually went out, less what
-     actually came in. Positive means overspent by that much; zero or less means
-     the period paid for itself and there is nothing to carry.
-
-     Real transactions only — deliberately NOT including the assume-spent overlay. An
-     assume-spent row is this period's provision for an EARLIER period's hole;
-     counting it here would carry the same overspend forward a second time, and
-     then a third, growing by itself every month with no bank line anywhere
-     behind it. The money that dug the hole is already in `spend`, in whichever
-     period and category it actually left.
-
-     Read off `net` — the signed sum of every counted row — and NOT off
-     `spend - income`, which is the same sentence written a second way and drew
-     a different answer. `spend` is gross outgoings and counts an uncategorised
-     payment in full; `income` counts only income-TYPED rows, so the deposit
-     beside it was credited to nothing. Every period holding uncategorised money
-     in was therefore reported deeper in the hole than it was — on the vault
-     this was found against, two periods' stated overspend was materially
-     wrong, and a third was offered here as a hole to carry for a period
-     that had actually finished ahead. Two figures derived by different rules,
-     which is this codebase's recurring bug shape; there is now one rule and
-     one figure.
-
-     `net`'s flat "every row, one rule" count is what makes THREE separate leak
-     classes disappear at once, not three separate fixes: an uncategorised
-     deposit (credited to nothing under `spend - income`), a refund inside an
-     expense category (nets off inside `byCat` but was never reachable from
-     `income` or `spend` either), and a deposit under a category name no file
-     answers to (see catKnown — same "credited to nothing" shape as the first).
-
-     It also COVERS a fourth, for free, that was never a bug to fix: a
-     two-legged Contribution (CONTEXT.md — money the household moves into
-     savings, which "wears the budget category it came from rather than one of
-     its own"). The outgoing leg is a real negative row under an ordinary
-     category, and the incoming leg on the savings side is a real positive row
-     under that same category — neither is transfer-typed, so neither is
-     skipped, and `net` counts both. Equal and opposite, they cancel on their
-     own; periodDeficit does not need to know a Contribution happened at all.
-     That cancellation only holds while both legs are actually counted, though
-     — a savings account carrying `budget: false` (a non-budget account, its
-     own veto, unrelated to this one) drops its own leg out of `net` entirely,
-     which turns a Contribution's outgoing half into what LOOKS like real
-     spend. See tests/summary-conservation.test.cjs's two-legged-contribution
-     case for both shapes pinned side by side. */
+  /* ADR-0007 · Deficit is read off net, not spend − income. ADR-0007 · Deficit
+     excludes the assume-spent overlay. Positive means overspent by that much;
+     zero or less means there is nothing to carry. */
   function periodDeficit(p) {
     /* `0 - net`, not `-net`: negating a zero balance yields NEGATIVE zero,
        which money() formats as "-R0.00" — the same break-even wart this repo
@@ -618,49 +331,11 @@ module.exports = function registerPeriod(ctx) {
     return 0 - periodSummary(p).net;
   }
 
-  /* ISSUE 35. "What has happened", not "what this calendar month contains".
-
-     On 2026-09-02 the `BudgetAudit` household's Dashboard read Income R40 000
-     and Spent R11 590 for September. Inside those figures were a family gift
-     dated 28 SEPTEMBER and three gym charges dated the 10th, 17th and 24th —
-     money that had not moved, on a card whose every other figure is present
-     tense. The arithmetic was right for the question "what does this month's
-     ledger add up to"; nobody reading a dashboard on the 2nd is asking that
-     one. On the 2nd, the month was already padded with future money and
-     future bills, and the reader had no way to see it.
-
-     So the window closes at TODAY whenever the period contains today, and the
-     rest of the period is handed back separately as `scheduled` rather than
-     dropped — the money is real, it is just not yet spent, and this app does
-     not remove a figure without naming it.
-
-     Done HERE rather than in each card, and that is the load-bearing part.
-     Every period figure on the Dashboard — the hero, the donut, the budget
-     table's actuals — comes through this one function, and
-     tests/cross-page-consistency.test.cjs pins an exact identity between
-     them. Narrowing the window in the hero alone would have satisfied this
-     issue and broken that identity in the same edit, which is how "two
-     figures derived by different rules" gets to eight-plus occurrences.
-
-     A FINISHED period is untouched: `end` is already behind today, so the
-     clamp is a no-op and `scheduled` comes back empty. A period in the FUTURE
-     is untouched for the opposite reason — clamping it to today would empty
-     it, so a window that starts after today keeps its own range and reports
-     the whole of itself as scheduled, which is exactly what it is. */
-  /* `today` INJECTED, defaulting to the clock — CLAUDE.md's rule for this
-     codebase is "`today` injected rather than read off the clock", and
-     committed.js already honours it (whatsLeft, serviceCommitments and
-     debtCommitments all take it as an argument the caller supplies). This
-     function read the clock directly when it gained its as-of boundary, which
-     left every guard test around that boundary having to monkeypatch the
-     GLOBAL Date constructor to say anything at all — a test that fakes the
-     clock proves the arithmetic and never the seam, and there was no seam.
-
-     Optional, so every existing caller is unchanged and production still reads
-     the real day. What it buys is that the boundary can now be DRIVEN: a test
-     names the date as an argument, which is also the only shape in which a
-     future caller (a report generated "as at" a stated date, a what-if) can
-     ask this question at all. */
+  /* ADR-0007 · Period figures close at today. ISSUE 35 — the rest of the window
+     comes back as `scheduled`, not dropped; done here so every Dashboard figure
+     shares one boundary (tests/cross-page-consistency.test.cjs). */
+  /* ADR-0007 · today is injected. Optional, defaulting to the clock, so the
+     boundary can be driven by a test or an "as at" report, not a faked global Date. */
   function periodSummary(p, todayArg) {
     const { start, end } = periodRange(p);
     const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
@@ -669,13 +344,8 @@ module.exports = function registerPeriod(ctx) {
          boundary inside this window to draw. */
       const whole = summaryInRange(start, end);
       if (today < start) {
-        /* ISSUE 73. Entirely ahead of us: NOTHING has happened yet, so the
-           headline figures are zero and the whole window is `scheduled`. This
-           used to hand back the whole window in BOTH — the hero then printed
-           "Income R40 000 · Spent R6 590" and, under it, "R46 590 more is
-           dated later this period": the same money twice, one line apart,
-           captioned "Up to today" on a period today is not in. A future period
-           is a plan, and a plan's figures live in the scheduled half. */
+        /* ADR-0007 · A future period is all scheduled. ISSUE 73 — nothing has
+           happened yet, so the headline figures are zero and the plan is `scheduled`. */
         const nothing = summaryInRange(end, start);   // an empty window, same shape
         nothing.asOf = start;
         nothing.scheduled = { income: whole.income, spend: whole.spend, count: whole.count, from: start };
@@ -698,13 +368,8 @@ module.exports = function registerPeriod(ctx) {
     };
     return soFar;
   }
-  /* ISSUE 40. The two category types that mean "moved, not consumed". One
-     copy, read by both halves of the ratio — the budgeted envelopes and the
-     actual outgoings — because a set of types that drifted between the two
-     would produce exactly the mismatch this issue is about, one level down.
-     health-data.js's own `consumption` walk excludes the same pair for the
-     same reason, and states it there for a reader who lands only in that
-     file. */
+  /* ADR-0007 · Set-aside types are one copy. ISSUE 40 — SET_ASIDE_TYPES in
+     vocabulary.js, read by both halves of the budget-used ratio. */
 
   /* Frozen so every caller that reads `scheduled` off a finished period gets
      the same object shape rather than a fresh literal each render — and so
@@ -716,14 +381,8 @@ module.exports = function registerPeriod(ctx) {
      two disagree by a day either side of midnight in half the world. */
   const nextDay = iso => isoFromDayNum(dayNum(iso) + 1);
 
-  /* Phase 2 of ADR-0006: the walk this function used to be is now
-     tally(ledger(start, end), LENSES.BUDGET) in src/ledger.js, and every
-     field below is read off that one tally. The vetoes, the gross sign rule,
-     the disclosures (`foreign`, `fundedFromSavings`), the three category
-     states and the conservation identity are all unchanged — the reasoning
-     that used to sit here as prose is the BUDGET lens's own definition, and
-     tests/ledger-lenses.test.cjs proves the two readings identical on
-     randomised vaults. */
+  /* ADR-0007 · summaryInRange is the BUDGET tally. ADR-0006 Phase 2 — every
+     field is read off tally(ledger(start, end), LENSES.BUDGET). */
   function summaryInRange(start, end) {
     const t = tally(ledger(start, end), LENSES.BUDGET);
     return {
@@ -751,65 +410,13 @@ module.exports = function registerPeriod(ctx) {
      figure should take. */
   function ledger(start, end) { return stamp(txInRange(start, end), ledgerEnv()); }
 
-  /* A monthly income figure, for the one page that has to talk in months no
-     matter what the period length is (Debt — an instalment is quoted monthly,
-     and the 36% threshold only means anything against a month).
-
-     Scaling a SINGLE period up by the number of periods in a month is right
-     only when income lands every period, which is the fortnightly case it was
-     written for. On a weekly cycle a monthly salary arrives in one period out
-     of four: the three empty ones showed no ratio at all, and the fourth
-     multiplied one paycheque by 4.35. So the window is widened to at least
-     three months and the whole thing averaged — the same salary now reads the
-     same in every week of the month.
-
-     Leading periods with NO transactions are dropped rather than counted as
-     zero-income months: a vault whose data starts three weeks ago must not be
-     divided by three months of silence it was never around for. A gap INSIDE
-     the window still counts, because there the silence is real.
-
-     The payday month returns its own income untouched — the period already IS
-     a month, and averaging would only blur it. */
+  /* ADR-0007 · Monthly income averages calendar months. For the Debt page's 36%
+     threshold; scaling one period up breaks on a weekly cycle, and the payday
+     month is returned untouched. */
   const MONTH_DAYS = 365.25 / 12;
-  /* How many periods to average over: whichever count between two and four
-     months lands CLOSEST to a whole number of months. Length matters more than
-     it looks. A window a ragged 3.22 months long catches three monthly paydays
-     in some weeks and four in others, which puts a 33% step into a number that
-     should barely move; thirteen weeks is 2.99 months and catches three every
-     time. Where income arrives every period the choice is moot, so this costs
-     those cycles nothing.
-
-     The two roundings go OPPOSITE ways on purpose, because both bounds have to
-     stay inside the band rather than merely near it: lo rounds UP to the first
-     count at or above two months, hi rounds DOWN to the last one at or below
-     four. Rounding hi up instead let the search consider a window longer than
-     its own stated ceiling — a fortnightly cycle picked 9 periods, 126 days,
-     4.14 months — which is only harmless because income lands every period on
-     that cycle. Nothing in the search knew that; it was luck, not design.
-     Math.max keeps hi ≥ lo for the long end of the band, where floor can bite. */
-  /* The window is three CALENDAR months, and that is the whole point.
-
-     It used to be a count of PERIODS, chosen so that count × interval landed
-     closest to a whole number of average months — thirteen weeks being 91 days,
-     2.99 months, which the comment here claimed "catches three paydays every
-     time". It does not, and neither does any other length. A monthly payday
-     recurs every 28 to 31 days, so whether a fixed span of DAYS contains two of
-     them or three depends on where in the month the span happens to begin.
-     Swept over every start date, every candidate from 63 to 366 days holds a
-     varying count — even a full 365 days holds eleven paydays or twelve. There
-     is no count that fixes it, which is why the search that picked one is gone
-     rather than retuned.
-
-     Measured on the code this replaces: a household earning R40 000 a month saw
-     its stated monthly income move 50% between consecutive weeks, reading as
-     little as R26 758 — and that figure is what the Debt page divides by to
-     compare against a 36% threshold.
-
-     Calendar months are exact where day counts can only approximate: step back
-     three months and you have stepped over exactly three monthly paydays,
-     whatever day of the month they fall on and however long those months were.
-     Swept the same way over 5 117 windows and seven payday days, it holds three
-     every time, with zero deviation. */
+  /* ADR-0007 · Income window is three calendar months, not a period count. No
+     span of days holds a fixed number of monthly paydays (R26 758 for a R40 000
+     household); three calendar months holds three every time. */
   const INCOME_MONTHS = 3;
   /* n calendar months before an ISO date, clamping a day the target month does
      not have: 31 March back one month is 28 February, not 3 March. */
@@ -821,13 +428,8 @@ module.exports = function registerPeriod(ctx) {
     return t.toISOString().slice(0, 10);
   }
   const nextDayIso = d => isoFromDayNum(dayNum(d) + 1);
-  /* Monthly income, for a cycle that is not already monthly.
-
-     A period still RUNNING is a partial one: whatever has landed so far divided
-     by a whole cycle reads low, and a low income is a HIGH debt-to-income ratio
-     shown in red on the strength of nothing but which day of the week it is. So
-     the window ends at the last COMPLETE period. A p in the past is already
-     complete and ends at itself. */
+  /* ADR-0007 · Monthly income ends at the last complete period. A running
+     period is partial, reads low, and a low income is a high ratio shown in red. */
   function monthlyIncome(p) {
     const iv = intervalDays();
     // The payday month is untouched: the period already IS a month, and
@@ -859,55 +461,11 @@ module.exports = function registerPeriod(ctx) {
     }
     return { income: w.income / months, months, complete: true };
   }
-  /* What a period's budget FILE adds up to, bucketed by the category's type as
-     it reads TODAY — not by the Type cell the file happens to carry.
-
-     That cell is written on save and never again: there is no re-type UI, so
-     correcting a category means editing Categories/<name>.md, and
-     serializeBudgetFile writes `r.type` back verbatim, so every row saved under
-     the old type stays stale until its own next save. views/budgets.js has read
-     the live answer since the stale-type fix (`catType(d.category) ?? d.type`,
-     in the totals strip and again for the group bars — see
-     tests/budget-stale-type-guard.test.cjs); this function did not, so the two
-     disagreed about the same file with no save in between. And this is the one
-     the rest of the app believes: the Dashboard hero's remaining line, the
-     trend chart's budget line, money-flow's budgetUsed denominator,
-     health-data.js's budget pillar in the score, and the Report.
-
-     Measured on the fixture in tests/period-budget-totals-live-type.test.cjs
-     (Bonus retyped to income in its category file, its July row still saying
-     expense): the Budget page's own tiles read income 15 000 / budgeted 3 000
-     while this returned {income: 10 000, spend: 8 000} — so the Dashboard
-     printed "R 6 800 remaining", R 5 000 too high, on the very period the
-     Budget page had just described correctly.
-
-     `?? `, not `||`, for the reason views/budgets.js gives: catType returns
-     null both for "this row names no category" and for "the category has no
-     file", and only then may the row's own stored cell stand in. One predicate,
-     computed once per row, so income and spend can never bucket the same row
-     two different ways — which a pair of independent filters could. */
-  /* ISSUE 40. "Budget remaining" was counting envelopes the household never
-     meant to spend.
-
-     On the `BudgetAudit` vault, September budgeted R14 500 — Groceries 6 000,
-     Gym 1 000, Medical 3 500, and Emergency 2 000 + Investing 2 000. Against
-     R11 590 of spending that left R2 910 under a hero reading "Budget
-     remaining this period". It was not money left to spend: it was R4 000 of
-     unfilled savings envelopes less R1 090 of grocery overspend, and the two
-     had cancelled each other into a number that looked like headroom. A
-     household reading that figure spends the emergency fund's allocation on
-     groceries and the card calls it fine.
-
-     So a budget row typed savings or investment is `setAside`, not `spend`.
-     Both are budgeted and both are shown; only one of them answers "how much
-     is left to spend".
-
-     `budgetRowType` is the ONE reading of a row's type — the same one
-     views/dashboard.js's budgetVsActualRows takes — so the hero, the table and
-     the Budget page cannot bucket one row three ways. A category with no file
-     falls through to the row's own `type` cell, and a household that has typed
-     neither gets exactly what it always got: the row counts as spend, because
-     nothing it has written says otherwise. */
+  /* ADR-0007 · Budget totals bucket by the live category type. Through
+     budgetRowType — the stored Type cell never heals after a retype
+     (tests/period-budget-totals-live-type.test.cjs). */
+  /* ADR-0007 · Set-aside envelopes are not budget to spend. ISSUE 40 — a savings
+     or investment row is `setAside`, budgeted and shown, but not "left to spend". */
   function budgetTotals(p) { return budgetTotalsOf(S.budgets[p] || []); }
   /* The same bucketing over any set of budget rows — the Budget page hands in
      its unsaved draft so its tiles move as the reader types. */
@@ -923,15 +481,8 @@ module.exports = function registerPeriod(ctx) {
     return { income, spend, setAside };
   }
 
-  /* ADR-0005. "Budget used" for one period, by the one rule in
-     money-flow.js's budgetUsedShare(): (spend − setAside + assumed) / budgeted.
-     Returns the two operands with the share, because every surface that
-     prints the percentage prints the rand figure beside it, and the two must
-     be the same reading — the Dashboard hero's "spent", the Budget page's
-     "Total spent" tile and the Score ring's per-period numerator are all
-     `spent` here. `opts.today` passes through to periodSummary so an as-of
-     reading can be driven the way that function's own note describes;
-     `opts.rows` lets the Budget page measure its unsaved draft. */
+  /* ADR-0007 · Budget used has one period-level reading. The rule is ADR-0005's;
+     the operands come back with the share because every surface prints both. */
   function budgetUsed(p, opts) {
     const { today, rows } = opts || {};
     const sum = periodSummary(p, today);
