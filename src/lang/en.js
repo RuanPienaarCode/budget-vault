@@ -1401,6 +1401,10 @@ module.exports = {
   'report.category.empty': 'No spending recorded for this period.',
   'report.category.uncat': '{amount} of spend this period is uncategorised and does not appear as a row above.',
   'report.category.netted': '{amount} in refunds is netted off inside its own category and does not appear as a separate row.',
+  'report.category.fromFunds': {
+    one: '{amount} left an account you have set aside ({count} transaction) and is not counted above.',
+    other: '{amount} left accounts you have set aside ({count} transactions) and is not counted above.',
+  },
   'report.category.orphaned': 'Rows marked * use a category name no category file answers to, so nothing budgets or classifies them: {names}.',
   'report.category.renameCaveat': 'This report spans more than one period. A row marked * might be a category that was renamed partway through — this app cannot always tell a rename from a deleted category after the fact, so check before assuming the totals are two categories rather than one.',
   'report.category.percentNote': 'This table lists every category in full — the Dashboard\'s "Where it went" chart groups everything past the top {count} into "Other", so a percentage here may not exactly match the chart\'s for the same category.',

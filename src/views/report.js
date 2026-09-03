@@ -536,6 +536,13 @@ module.exports = function registerReport(ctx) {
        spendByCategory's own merge (below) does not call categorySpendRows()
        a second time for figures already in hand. */
     let uncat = 0, netted = 0;
+    /* ISSUE 41's omission, carried into the exported document. summaryInRange
+       vetoes outgoings from an account the household has declared set aside, so
+       `spend` below can be R4 700 on a period that moved R9 700 out of its
+       accounts. The Dashboard hero says so and the Budget page now says so;
+       this is the copy that LEAVES the app, read by someone who cannot see
+       either screen. */
+    let fundedSpend = 0, fundedCount = 0;
     const spendRowsByPeriod = [];
     /* periodSummary() returns `foreign` WITH the figures rather than beside
        them, and period.js's own comment says every tile, table, chart and
@@ -575,6 +582,8 @@ module.exports = function registerReport(ctx) {
       const uncatHere = Math.min(sum.uncatSpend || 0, notShown);
       uncat += uncatHere;
       netted += notShown - uncatHere;
+      const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
+      fundedSpend += ff.spend || 0; fundedCount += ff.count || 0;
     }
     /* H1 in the audit — typeRank order, same as renderBudgetTable's own sort
        (views/dashboard.js), off the SAME S.settings.groups this vault's
@@ -661,6 +670,7 @@ module.exports = function registerReport(ctx) {
       income, spend, net, budgetIncome, budgetSpend,
       categories, spendByCategory,
       categoryGap: { uncat, netted },
+      fundedFromSavings: { spend: fundedSpend, count: fundedCount },
       savings: savingsSummary(),
       debts: debtsSummary(w),
       netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },

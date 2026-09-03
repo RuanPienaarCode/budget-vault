@@ -1273,6 +1273,10 @@ module.exports = {
   'report.category.empty': 'Für diesen Zeitraum sind keine Ausgaben erfasst.',
   'report.category.uncat': '{amount} der Ausgaben dieses Zeitraums sind nicht kategorisiert und erscheinen oben nicht als Zeile.',
   'report.category.netted': '{amount} an Rückerstattungen werden innerhalb der eigenen Kategorie verrechnet und erscheinen nicht als eigene Zeile.',
+  'report.category.fromFunds': {
+    one: '{amount} ging von einem zurückgelegten Konto ab ({count} Buchung) und ist oben nicht enthalten.',
+    other: '{amount} ging von zurückgelegten Konten ab ({count} Buchungen) und ist oben nicht enthalten.',
+  },
   'report.category.orphaned': 'Mit * markierte Zeilen verwenden einen Kategorienamen, dem keine Kategoriedatei entspricht, sodass nichts sie budgetiert oder einordnet: {names}.',
   'report.category.renameCaveat': 'Dieser Bericht umfasst mehr als einen Zeitraum. Eine mit * markierte Zeile könnte eine Kategorie sein, die zwischenzeitlich umbenannt wurde — diese App kann eine Umbenennung im Nachhinein nicht immer von einer gelöschten Kategorie unterscheiden, also prüfen Sie das, bevor Sie annehmen, die Summen gehörten zu zwei Kategorien statt einer.',
   'report.category.percentNote': 'Diese Tabelle listet jede Kategorie vollständig auf — die Übersicht-Grafik „Wohin es ging" fasst alles jenseits der obersten {count} zu „Sonstiges" zusammen, sodass ein Prozentsatz hier nicht genau mit dem der Grafik für dieselbe Kategorie übereinstimmen muss.',

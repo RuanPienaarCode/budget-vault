@@ -1274,6 +1274,10 @@ module.exports = {
   'report.category.empty': 'No se registró ningún gasto en este periodo.',
   'report.category.uncat': '{amount} del gasto de este periodo no está categorizado y no aparece como fila arriba.',
   'report.category.netted': '{amount} en reembolsos se compensó dentro de su propia categoría y no aparece como fila aparte.',
+  'report.category.fromFunds': {
+    one: '{amount} salió de una cuenta que has reservado ({count} movimiento) y no se cuenta arriba.',
+    other: '{amount} salió de cuentas que has reservado ({count} movimientos) y no se cuenta arriba.',
+  },
   'report.category.orphaned': 'Las filas marcadas con * usan un nombre de categoría que ningún archivo de categoría reconoce, así que nada las presupuesta ni las clasifica: {names}.',
   'report.category.renameCaveat': 'Este informe abarca más de un periodo. Una fila marcada con * podría ser una categoría que se renombró a mitad de camino — esta aplicación no siempre puede distinguir un cambio de nombre de una categoría eliminada después del hecho, así que compruébalo antes de suponer que los totales son de dos categorías en lugar de una.',
   'report.category.percentNote': 'Esta tabla enumera cada categoría por completo — el gráfico "Adónde fue" del Panel agrupa todo lo que supera las {count} principales en "Otros", así que un porcentaje aquí puede no coincidir exactamente con el del gráfico para la misma categoría.',

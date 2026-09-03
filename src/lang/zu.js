@@ -1299,6 +1299,10 @@ module.exports = {
   'report.category.empty': 'Ayikho intengiselwano eqoshiwe kulesi sikhathi.',
   'report.category.uncat': '{amount} yentengiselwano yalesi sikhathi ayihlelwanga futhi ayiboniswa njengomugqa ongenhla.',
   'report.category.netted': '{amount} yezimbuyiselo ihlangene ngaphakathi kwesigaba sayo futhi ayiboniswa njengomugqa ohlukile.',
+  'report.category.fromFunds': {
+    one: 'I-{amount} iphume ku-akhawunti oyibekele eceleni ({count} ukuthengiselana) futhi ayibalwa ngenhla.',
+    other: 'I-{amount} iphume kuma-akhawunti owabekele eceleni ({count} ukuthengiselana) futhi ayibalwa ngenhla.',
+  },
   'report.category.orphaned': 'Imigqa ephawulwe nge- * isebenzisa igama lesigaba elingaphenduli kunoma iyiphi ifayela lesigaba, ngakho akukho okuyihlelayo noma okuyihlukanisayo: {names}.',
   'report.category.renameCaveat': 'Lo mbiko ubandakanya isikhathi esingaphezu kwesisodwa. Umugqa ophawulwe nge- * ungase kube isigaba esaphinda saqanjwa igama phakathi nendlela — le app ayikwazi njalo ukuhlukanisa ukuqanjwa kabusha kokuphelile emuva kwesikhathi, ngakho qinisekisa ngaphambi kokucabanga ukuthi izinombolo eziphelele zezigaba ezimbini kunesisodwa.',
   'report.category.percentNote': 'Leli tafula lidwelisa isigaba ngasinye ngokugcwele — ishadi le-Ideshbhodi elithi "Lapho kuye khona" liqoqela konke okungaphezu kwe-{count} eziphezulu ku-"Okunye", ngakho iphesenti lapha kungenzeka lingahambisani ncamashi nelalo ishadi esigabeni esifanayo.',

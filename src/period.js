@@ -284,10 +284,13 @@ module.exports = function registerPeriod(ctx) {
      the source of truth and a stated balance is "a claim with an age, never a
      fact" — writing a derived figure back onto the model would make the claim
      unrecoverable and the next save would persist a number nobody typed. */
-  function impliedAccounts() {
+  function impliedAccounts(todayArg) {
     const idx = accountIndex();
+    /* Passed straight through to reconcile, which has always taken `today` as
+       its third argument — this function simply stopped supplying one. */
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : undefined;
     return (S.accounts || []).map(a => {
-      const rec = reconcile(a, (idx.get(a) || {}).rows || []);
+      const rec = reconcile(a, (idx.get(a) || {}).rows || [], today);
       return rec.state === 'drift' ? { ...a, balance: rec.implied } : a;
     });
   }
@@ -425,7 +428,7 @@ module.exports = function registerPeriod(ctx) {
      savedFromOutside() pairs the legs, so a shuffle between two funds is not
      counted as fresh saving — the same reading the score's own saving rate
      takes, from the same function. */
-  function movedToFunds(p) {
+  function movedToFunds(p, todayArg) {
     const { start, end } = periodRange(p);
     const labels = new Map();
     for (const f of Object.values(S.txFiles)) {
@@ -435,11 +438,20 @@ module.exports = function registerPeriod(ctx) {
       }
     }
     if (!labels.size) return 0;
-    const today = todayIso();
+    /* Injected like periodSummary's, and for the same reason. */
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
     /* Windowed the way periodSummary is (ISSUE 35), so "budgeted R4 000,
        moved R2 000" cannot be a comparison against a figure that includes next
-       week's standing order. */
-    const stop = (today >= start && today < end) ? today : end;
+       week's standing order.
+
+       A period that has not STARTED yet moves nothing, and returning its whole
+       window would read as "you have already set aside R7 000" beside a
+       budgeted R4 000 — a forecast wearing the past tense. periodSummary can
+       state a future window because it hands back `scheduled` alongside to say
+       what the figure is; this is a single number with nowhere to put that
+       caveat, so it answers the question it was asked. */
+    if (today < start) { return 0; }
+    const stop = today < end ? today : end;
     return savedFromOutside(txInRange(start, stop), labels, declaredCatType);
   }
 
@@ -620,9 +632,23 @@ module.exports = function registerPeriod(ctx) {
      is untouched for the opposite reason — clamping it to today would empty
      it, so a window that starts after today keeps its own range and reports
      the whole of itself as scheduled, which is exactly what it is. */
-  function periodSummary(p) {
+  /* `today` INJECTED, defaulting to the clock — CLAUDE.md's rule for this
+     codebase is "`today` injected rather than read off the clock", and
+     committed.js already honours it (whatsLeft, serviceCommitments and
+     debtCommitments all take it as an argument the caller supplies). This
+     function read the clock directly when it gained its as-of boundary, which
+     left every guard test around that boundary having to monkeypatch the
+     GLOBAL Date constructor to say anything at all — a test that fakes the
+     clock proves the arithmetic and never the seam, and there was no seam.
+
+     Optional, so every existing caller is unchanged and production still reads
+     the real day. What it buys is that the boundary can now be DRIVEN: a test
+     names the date as an argument, which is also the only shape in which a
+     future caller (a report generated "as at" a stated date, a what-if) can
+     ask this question at all. */
+  function periodSummary(p, todayArg) {
     const { start, end } = periodRange(p);
-    const today = todayIso();
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
     if (today < start || today >= end) {
       /* Behind us, or entirely ahead of us. Either way there is no "so far"
          boundary inside this window to draw. */

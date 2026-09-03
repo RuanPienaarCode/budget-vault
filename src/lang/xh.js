@@ -1294,6 +1294,10 @@ module.exports = {
   'report.category.empty': 'Akukho ndleko ibhaliweyo kwelo xesha.',
   'report.category.uncat': '{amount} yendleko yeli xesha ayikho kwididi kwaye ayiboniswa njengomgca ongasentla.',
   'report.category.netted': '{amount} yembuyekezo ihlangenwe ngaphakathi kwedidi layo kwaye ayiboniswa njengomgca owahlukileyo.',
+  'report.category.fromFunds': {
+    one: 'I-{amount} iphume kwiakhawunti oyibekele bucala ({count} intengiselwano) kwaye ayibalwanga ngasentla.',
+    other: 'I-{amount} iphume kwiiakhawunti ozibekele bucala ({count} iintengiselwano) kwaye ayibalwanga ngasentla.',
+  },
   'report.category.orphaned': 'Imigca ephawulwe nge- * isebenzisa igama ledidi elingaphenduli kuyo nayiphi na ifayile yedidi, ngoko akukho nto eyihlelayo okanye eyihlukanisayo: {names}.',
   'report.category.renameCaveat': 'Le ngxelo igubungela ngaphezu kwexesha elinye. Umgca ophawulwe nge- * usenokuba lolunye udidi olwaguqulwa igama phakathi endleleni — le app ayikwazi ngamaxesha onke ukwahlula phakathi kokuguqulwa kwegama nodidi olucinyiweyo emva koko, ngoko qinisekisa phambi kokuba ucinge ukuba isixa sibhekisa kwiindidi ezimbini kunye enye.',
   'report.category.percentNote': 'Le tafile idwelisa ididi ngalinye ngokupheleleyo — ishadi le-Ideshbhodi elithi "Apho iye khona" liqokelela yonke into engaphaya kwe-{count} ephezulu ibe "Enye", ngoko ipesenti apha isenokungangqamani ngqo naleyo yeshadi kwidido elifanayo.',

@@ -1272,6 +1272,10 @@ module.exports = {
   'report.category.empty': 'Geen besteding aangeteken vir hierdie tydperk nie.',
   'report.category.uncat': '{amount} van hierdie tydperk se besteding is ongekategoriseer en verskyn nie as \'n ry hierbo nie.',
   'report.category.netted': '{amount} in terugbetalings is binne sy eie kategorie verreken en verskyn nie as \'n aparte ry nie.',
+  'report.category.fromFunds': {
+    one: '{amount} het uit ’n rekening gegaan wat jy opsy gesit het ({count} transaksie) en word nie hierbo getel nie.',
+    other: '{amount} het uit rekeninge gegaan wat jy opsy gesit het ({count} transaksies) en word nie hierbo getel nie.',
+  },
   'report.category.orphaned': 'Rye gemerk met * gebruik \'n kategorienaam waarop geen kategorielêer antwoord nie, sodat niks dit begroot of klassifiseer nie: {names}.',
   'report.category.renameCaveat': 'Hierdie verslag strek oor meer as een tydperk. \'n Ry gemerk met * kan \'n kategorie wees wat halfpad hernoem is — hierdie app kan nie altyd \'n hernoeming van \'n geskrapte kategorie onderskei nie, so maak seker voordat jy aanvaar dat die totale twee kategorieë eerder as een is.',
   'report.category.percentNote': 'Hierdie tabel lys elke kategorie ten volle — die Paneelbord se "Waar dit gegaan het"-grafiek groepeer alles verby die boonste {count} in "Ander", sodat \'n persentasie hier nie noodwendig presies ooreenstem met dié van die grafiek vir dieselfde kategorie nie.',

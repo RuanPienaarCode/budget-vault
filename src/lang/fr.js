@@ -1286,6 +1286,10 @@ module.exports = {
   'report.category.empty': 'Aucune dépense enregistrée pour cette période.',
   'report.category.uncat': '{amount} des dépenses de cette période ne sont pas catégorisées et n\'apparaissent pas comme ligne ci-dessus.',
   'report.category.netted': '{amount} de remboursements sont compensés à l\'intérieur de leur propre catégorie et n\'apparaissent pas comme ligne distincte.',
+  'report.category.fromFunds': {
+    one: '{amount} est sorti d’une réserve ({count} opération) et n’est pas compté ci-dessus.',
+    other: '{amount} est sorti de réserves ({count} opérations) et n’est pas compté ci-dessus.',
+  },
   'report.category.orphaned': 'Les lignes marquées d\'un * utilisent un nom de catégorie qu\'aucun fichier de catégorie ne reconnaît, donc rien ne les budgétise ni ne les classe : {names}.',
   'report.category.renameCaveat': 'Ce rapport couvre plus d\'une période. Une ligne marquée d\'un * pourrait être une catégorie renommée en cours de route — cette application ne peut pas toujours distinguer un renommage d\'une catégorie supprimée après coup, donc vérifiez avant de supposer que les totaux correspondent à deux catégories plutôt qu\'une seule.',
   'report.category.percentNote': 'Ce tableau liste chaque catégorie en intégralité — le graphique « Où est passé l\'argent » du Tableau de bord regroupe tout ce qui dépasse les {count} premières dans « Autre », donc un pourcentage ici peut ne pas correspondre exactement à celui du graphique pour la même catégorie.',

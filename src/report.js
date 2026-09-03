@@ -445,7 +445,7 @@ function financialReportMarkdown(data, money) {
   const {
     generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, fundedFromSavings, savings, debts, netWorth, health, transactions,
     otherCurrencies, household, foreign,
   } = data;
 
@@ -548,6 +548,14 @@ function financialReportMarkdown(data, money) {
   if (gapStated) {
     if (categoryGap.uncat >= 1) out.push('', i18n.t('report.category.uncat', { amount: money(categoryGap.uncat) }));
     if (categoryGap.netted >= 1) out.push('', i18n.t('report.category.netted', { amount: money(categoryGap.netted) }));
+  }
+  /* ISSUE 41's omission, stated in the same block as the other two — a reader
+     reconciling this section's total against their own bank statement needs
+     all three reasons it can differ, not two of them. */
+  if (fundedFromSavings && fundedFromSavings.count) {
+    out.push('', i18n.t('report.category.fromFunds', {
+      amount: money(fundedFromSavings.spend), count: fundedFromSavings.count,
+    }));
   }
   const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMd(r.cat));
   if (orphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: orphanedNames.join(', ') }));
@@ -822,7 +830,7 @@ function financialReportJson(data) {
   const {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, fundedFromSavings, savings, debts, netWorth, health, transactions,
     otherCurrencies, foreign,
   } = data;
 
@@ -872,6 +880,13 @@ function financialReportJson(data) {
        float a consumer might reasonably expect but that would no longer sum
        to 100 either. */
     categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount, percent: r.pct, orphaned: !!r.orphaned })),
+    /* The THIRD reason this section's total can differ from what left the
+       household's accounts, in the same object as the other two so a machine
+       reader cannot get one without the others. */
+    funded_from_savings: {
+      spend: (fundedFromSavings && fundedFromSavings.spend) || 0,
+      count: (fundedFromSavings && fundedFromSavings.count) || 0,
+    },
     category_gap: {
       uncategorised: (categoryGap && categoryGap.uncat) || 0,
       netted: (categoryGap && categoryGap.netted) || 0,

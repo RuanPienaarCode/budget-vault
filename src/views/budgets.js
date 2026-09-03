@@ -389,7 +389,21 @@ module.exports = function registerBudgets(ctx) {
     const grossGap = Math.max(0, sum.spend - namedNetSpend);
     const gapUncat = Math.min((sum.uncatSpend || 0) + (sum.unknown.spend || 0), grossGap);
     const gapNetted = grossGap - gapUncat;
+    /* The tile's OWN sentence, computed here rather than at the return below,
+       because every separator decision under it needs to know whether anything
+       precedes it. It did not, and the two fragments that carry no leading
+       ' · ' of their own guarded on `gapNote` alone — so on a period whose
+       only disclosure was a foreign account, or (now) a fund purchase, the
+       fragment ran straight onto the end of the sentence:
+       "45% of budget usedR 5000,00 more went out of your funds". */
+    const spentNote = assumed > 0
+      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
+      : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '');
+
     let gapNote = '';
+    /* ' · ' exactly when something already stands to the left of this
+       fragment — the tile's own sentence, or an earlier fragment. */
+    const sep = () => ((spentNote || gapNote) ? ' · ' : '');
     if (gapUncat >= 1) gapNote += i18n.t('dash.split.uncatNote', { amount: money(gapUncat) });
     if (gapNetted >= 1) gapNote += i18n.t('dash.split.nettedNote', { amount: money(gapNetted) });
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
@@ -413,8 +427,24 @@ module.exports = function registerBudgets(ctx) {
          a stray bullet). On a period with a foreign account and no home
          spend or budget — gapNote still empty — an unconditional ' · ' opened
          the tile's note with a bullet. */
-      gapNote += (gapNote ? ' · ' : '') + i18n.t('dash.foreignExcluded', {
+      gapNote += sep() + i18n.t('dash.foreignExcluded', {
         count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
+      });
+    }
+    /* A THIRD omission, and the newest: money that left an account the
+       household has declared set aside (ISSUE 41). summaryInRange vetoes those
+       outgoings, so "Total spent" here is R4 700 on a household that moved
+       R9 700 out of its accounts this period — and until now the Dashboard
+       hero was the only surface that said so. Two screens, one figure, one of
+       them silent, which is the shape this whole audit keeps finding.
+
+       Same key as the hero's, so the two cannot word one fact differently, and
+       appended rather than substituted because all three omissions can be true
+       at once. */
+    const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
+    if (fromFunds.count) {
+      gapNote += sep() + i18n.t('dash.fundedFromSavings', {
+        amount: money(fromFunds.spend), count: fromFunds.count,
       });
     }
 
@@ -460,8 +490,7 @@ module.exports = function registerBudgets(ctx) {
         note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
       ...(unallocatedTile ? [unallocatedTile] : []),
       { label: i18n.t('bud.total.spent'), value: money(spent), over: budgeted > 0 && spent > budgeted,
-        note: (assumed > 0 ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
-          : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '')) + gapNote },
+        note: spentNote + gapNote },
     ];
   }
 

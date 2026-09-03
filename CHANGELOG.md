@@ -3,6 +3,31 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.36.3 — 2026-09-03
+
+### Fixed
+
+- **Money spent out of a fund is now disclosed everywhere, not just on the
+  Dashboard.** When you buy something out of an account you have set aside, the
+  budget deliberately does not count it — so "Total spent" can read R4 700 in a
+  month where R9 700 left your accounts. The Dashboard said so; the Budget page
+  and the exported report did not. Both do now, and the report carries it in
+  its JSON as well, so whoever reads that file can reconcile it against a bank
+  statement without having seen either screen.
+- **A note could run onto the end of the sentence before it** on the Budget
+  page's "Total spent" tile — "45% of budget usedR 5 000,00 more went out of
+  your funds". Two of that note's fragments carried no separator of their own
+  and asked the wrong question about whether one was needed.
+- **Viewing a month that has not started yet** reported the whole month's
+  transfers into your funds as already moved.
+
+### Changed
+
+- Period figures now take the date they are measured against as a parameter
+  rather than reading the clock. Nothing you see changes; it means the app's
+  as-of behaviour can be tested by naming a day instead of by pretending it is
+  one, which is how the rest of this codebase already works.
+
 ## 1.36.2 — 2026-09-03
 
 ### Fixed

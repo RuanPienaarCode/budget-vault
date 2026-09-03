@@ -1293,6 +1293,10 @@ module.exports = {
   'report.category.empty': 'Nenhum gasto registrado neste período.',
   'report.category.uncat': '{amount} dos gastos deste período estão sem categoria e não aparecem como linha acima.',
   'report.category.netted': '{amount} em estornos são abatidos dentro da própria categoria e não aparecem como linha separada.',
+  'report.category.fromFunds': {
+    one: '{amount} saiu de uma conta que reservou ({count} lançamento) e não está contado acima.',
+    other: '{amount} saiu de contas que reservou ({count} lançamentos) e não está contado acima.',
+  },
   'report.category.orphaned': 'As linhas marcadas com * usam um nome de categoria a que nenhum arquivo de categoria responde, então nada as orça nem as classifica: {names}.',
   'report.category.renameCaveat': 'Este relatório abrange mais de um período. Uma linha marcada com * pode ser uma categoria que foi renomeada no meio do caminho — este aplicativo nem sempre consegue distinguir, depois do fato, um renomear de uma categoria excluída, então confira antes de supor que os totais são duas categorias em vez de uma.',
   'report.category.percentNote': 'Esta tabela lista todas as categorias por inteiro — o gráfico "Para onde foi" do Painel agrupa tudo o que passa das {count} maiores em "Outros", então uma porcentagem aqui pode não bater exatamente com a do gráfico para a mesma categoria.',

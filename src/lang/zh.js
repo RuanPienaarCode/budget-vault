@@ -1216,6 +1216,9 @@ module.exports = {
   'report.category.empty': '本周期没有支出记录。',
   'report.category.uncat': '本周期有{amount}的支出未分类，未显示为上方的一行。',
   'report.category.netted': '{amount}的退款已在其自身分类内抵消，未作为单独的一行显示。',
+  'report.category.fromFunds': {
+    other: '有 {amount} 从您预留的账户支出（{count} 笔），未计入上表。',
+  },
   'report.category.orphaned': '标有 * 的行使用的分类名称没有对应的分类文件，因此未被纳入预算或分类：{names}。',
   'report.category.renameCaveat': '本报告跨越了不止一个周期。标有 * 的行可能是中途被重命名过的分类 — 本应用无法总是事后区分"重命名"和"已删除的分类"，因此在认定合计属于两个分类而非一个之前，请先核实。',
   'report.category.percentNote': '本表完整列出每一个分类 — 仪表板的"钱花到哪里"图表会把前 {count} 名之外的全部归入"其他"，因此这里的百分比可能与图表中同一分类的百分比不完全一致。',

@@ -1243,6 +1243,9 @@ module.exports = {
   'report.category.empty': 'Tidak ada pengeluaran tercatat untuk periode ini.',
   'report.category.uncat': '{amount} pengeluaran pada periode ini tidak berkategori dan tidak muncul sebagai baris di atas.',
   'report.category.netted': '{amount} pengembalian dana dikurangkan di dalam kategorinya sendiri dan tidak muncul sebagai baris tersendiri.',
+  'report.category.fromFunds': {
+    other: '{amount} keluar dari dana yang Anda sisihkan ({count} transaksi) dan tidak dihitung di atas.',
+  },
   'report.category.orphaned': 'Baris bertanda * memakai nama kategori yang tidak dijawab berkas kategori mana pun, jadi tidak ada yang menganggarkan atau menggolongkannya: {names}.',
   'report.category.renameCaveat': 'Laporan ini mencakup lebih dari satu periode. Baris bertanda * bisa jadi kategori yang namanya diganti di tengah jalan — aplikasi ini tidak selalu bisa membedakan penggantian nama dari kategori yang dihapus setelah kejadiannya, jadi periksalah sebelum menganggap totalnya milik dua kategori dan bukan satu.',
   'report.category.percentNote': 'Tabel ini mendaftar setiap kategori secara lengkap — grafik "Ke mana uangnya pergi" di Dasbor menggabungkan semua yang di luar {count} teratas menjadi "Lainnya", jadi persentase di sini bisa saja tidak persis sama dengan persentase di grafik untuk kategori yang sama.',
