@@ -751,7 +751,7 @@ function savedFromOutside(rows, saverLabels, catType) {
    then says what it says: the money went to a shop.
 
    So the category is consulted exactly where the dates have run out. */
-const INTERNAL_LEG_TYPES = new Set(['transfer', 'savings', 'investment']);
+const { INTERNAL_LEG_TYPES } = require('./vocabulary');
 const looksLikeSpending = r => {
   if (typeof catType !== 'function') return false;  // unchanged for every caller that has not been taught
   const t = catType(r.cat);

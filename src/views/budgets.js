@@ -50,7 +50,7 @@ const i18n = require('../i18n');
 const { assumedActual } = require('../money-flow');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, movedToFunds, periodDeficit, catType, currentPeriod, locale } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -301,7 +301,7 @@ module.exports = function registerBudgets(ctx) {
          kept only as the fallback for a category with no file to ask, which
          is exactly what `?? ` (not `||`) buys: catType returns null for that
          case and the row's own amount for income can legitimately be 0. */
-      const type = catType(d.category) ?? d.type;
+      const type = budgetRowType(d);
       if (type === 'income') {
         income += d.amount || 0;
         // d.inFile, not "this row exists" — budgetDraft() seeds a ZERO row
@@ -576,7 +576,7 @@ module.exports = function registerBudgets(ctx) {
          for the group it lands in, the sign of its Actual, and every other
          type-driven decision below, so all four can never disagree with each
          other about which group this row belongs to. */
-      const type = catType(d.category) ?? d.type;
+      const type = budgetRowType(d);
       if (!groups.has(type)) groups.set(type, []);
       groups.get(type).push(d);
     }

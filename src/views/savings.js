@@ -2,6 +2,7 @@
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
+const { accountsOfType, accountType } = require('../vocabulary');
 const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
@@ -89,11 +90,10 @@ module.exports = function registerSavings(ctx) {
      including the per-account `investment` checks further down, which read
      the same possibly-mixed-case field a second time — so the next reader
      cannot add a sixth raw `=== 'savings'`. */
-  const typeIs = (a, type) => String((a && a.type) || '').trim().toLowerCase() === type;
 
   function renderSavings() {
-    const savings = S.accounts.filter(a => typeIs(a, 'savings'));
-    const investments = S.accounts.filter(a => typeIs(a, 'investment'));
+    const savings = accountsOfType(S.accounts, 'savings');
+    const investments = accountsOfType(S.accounts, 'investment');
     /* Split BEFORE summing, and split BEFORE worth() — the same order
        views/accounts.js's hero uses. worth()'s arithmetic is shared with the
        Dashboard, the Report and the health score, so this view narrows the
@@ -539,7 +539,7 @@ module.exports = function registerSavings(ctx) {
              Only for investments, and only when no growth was recorded at all —
              a savings account crediting monthly interest has a real figure
              above and needs no explanation of one it does not have. */
-          if (typeIs(a, 'investment') && !g) {
+          if (accountType(a) === 'investment' && !g) {
             card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
               'no growth recorded — it is inside the balance, not measured here',
               'Growth only appears here when the account posts it as a transaction the vault can read. '
@@ -608,7 +608,7 @@ module.exports = function registerSavings(ctx) {
              transaction reconciles exactly, and taking the offer away from those
              accounts to protect the others helps nobody. What it gets is the one
              sentence that stops it reading as a correction. */
-          if (typeIs(a, 'investment')) {
+          if (accountType(a) === 'investment') {
             card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
               'added up from recorded movements only — growth is not in it',
               'The implied figure adds up recorded movements only. Growth that never posted a '
@@ -716,7 +716,7 @@ module.exports = function registerSavings(ctx) {
         'based on the account file, not transactions',
         'No transactions in the vault for this account, so this is the balance less what the '
           + 'account file records as put in. Import its statements and the split becomes real.')));
-    } else if (r.undatedGrowth && typeIs(a, 'investment')) {
+    } else if (r.undatedGrowth && accountType(a) === 'investment') {
       /* Named because the chart above cannot draw it. A fund's value moved every
          day for years and the vault holds one number — today's — so this growth
          is real, is in the balance, and has no date anywhere. */

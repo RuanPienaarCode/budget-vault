@@ -32,6 +32,7 @@ const { reconcile } = require('./reconcile');
    defect this whole audit keeps finding. */
 const { savedFromOutside } = require('./savings-math');
 const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
+const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -412,12 +413,11 @@ module.exports = function registerPeriod(ctx) {
      funded from savings on the hero. What it no longer does is silently delete
      them from the budget. The strength of the response now matches the
      strength of the declaration. */
-  const EARMARKED_ACCOUNT_TYPES = new Set(['savings', 'investment']);
   function isEarmarkedAccount(a) {
     if (!a || a.in_budget_stated) return false;
     const ef = a.emergency_fund;
     if (ef === true || (typeof ef === 'number' && ef > 0)) return true;
-    if (!EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase())) return false;
+    if (!isPoolAccount(a)) return false;
     return (a.goal_amount > 0) || !!a.target_date || (a.monthly_contribution > 0);
   }
 
@@ -463,7 +463,7 @@ module.exports = function registerPeriod(ctx) {
     const labels = new Map();
     for (const f of Object.values(S.txFiles)) {
       const a = accountForLabel(f.label);
-      if (isEarmarkedAccount(a) || (a && EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase()))) {
+      if (isEarmarkedAccount(a) || isPoolAccount(a)) {
         labels.set(f.label, a);
       }
     }
@@ -704,7 +704,6 @@ module.exports = function registerPeriod(ctx) {
      health-data.js's own `consumption` walk excludes the same pair for the
      same reason, and states it there for a reader who lands only in that
      file. */
-  const SET_ASIDE_TYPES = new Set(['savings', 'investment']);
 
   /* Frozen so every caller that reads `scheduled` off a finished period gets
      the same object shape rather than a fresh literal each render — and so

@@ -17,6 +17,7 @@
    hand-typed `Credit_Card` as not-a-card while the committed chain trimmed and
    case-folded — the same account, a card to one page and not the other. */
 const { isCreditCard } = require('./committed');
+const { accountType } = require('./vocabulary');
 const { currenciesIn, isForeign, symbolOf } = require('./currency');
 /* owed-math.js owns what "still out" means — a row's amount less what has come
    back, floored, with a hand-set `paid` status winning over the arithmetic. Net
@@ -268,7 +269,7 @@ function accountGroups(accounts, knownTypes) {
        its own unlisted group under its own label. views/savings.js and
        health-data.js were folded first; this was the last raw reading of the
        field, and the one that decides which colour a segment gets. */
-    const t = (a && typeof a.type === 'string' && a.type.trim().toLowerCase()) || 'other';
+    const t = accountType(a) || 'other';
     const bal = (a && a.balance) || 0;
     if (bal > 0) owned.set(t, (owned.get(t) || 0) + bal);
     else if (bal < 0) owed.set(t, (owed.get(t) || 0) - bal);

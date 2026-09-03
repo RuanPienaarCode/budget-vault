@@ -31,7 +31,9 @@ const DAYS_PER_MONTH = 30.44;
    really gives. Income and transfer never reach this filter (periodSpend drops
    them upstream), but they are listed anyway so a caller with a different
    upstream cannot quietly count a transfer as an essential bill. */
-const NON_ESSENTIAL_TYPES = new Set(['luxuries', 'giving', 'savings', 'investment', 'income', 'transfer']);
+/* Owned by vocabulary.js since Phase 1 of ADR-0006; re-exported below because
+   settings-tab.js reads it from here. */
+const { NON_ESSENTIAL_TYPES } = require('./vocabulary');
 
 /* Sum the essential slice of one period's per-category spend map (the `whole`
    shape periodSpend returns). An unknown or blank type counts as essential

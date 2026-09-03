@@ -88,6 +88,8 @@ const files = {
   worth: read('worth.js'),
   transactions: read('views/transactions.js'),
   dates: read('dates.js'),
+  vocabulary: read('vocabulary.js'),
+  period: read('period.js'),
 };
 const live = {}; // same files, comments stripped, for "must not contain the old shape" checks
 for (const [k, v] of Object.entries(files)) live[k] = stripComments(v);
@@ -413,16 +415,25 @@ function provenFalse(desc, exactShape, mangled) {
    the live file, so a corrected category could show −R5 000 on one page and
    +R5 000 on the other for the same row. ======================================================================= */
 {
-  const BUDGET_LINE = 'const type = catType(d.category) ?? d.type;';
+  /* Phase 1 of ADR-0006: the Budget page no longer re-spells the rule at
+     all — it reads budgetRowType() off ctx, the ONE reading period.js owns
+     (and tests/one-vocabulary.test.cjs forbids a second spelling anywhere in
+     src/). The rule itself is pinned where it lives. */
+  const RULE_LINE = 'return catType(b.category) ?? b.type;';
+  ok(live.period.includes(RULE_LINE),
+    'Category type (owner): budgetRowType() reads the live category file first, the stored cell only as a fallback for a deleted category file');
+  const BUDGET_LINE = 'const type = budgetRowType(d);';
   const occurrences = live.budgets.split(BUDGET_LINE).length - 1;
-  ok(occurrences >= 1, 'Category type (Budget): the row\'s live type comes from catType() first, the stored cell only as a fallback for a deleted category file');
+  ok(occurrences >= 2, 'Category type (Budget): both the totals strip and the table read budgetRowType(), not a copy of it');
+  ok(!/catType\(d\.category\) \?\? d\.type/.test(live.budgets),
+    'Category type (Budget): confirmed — the local copy is gone');
 
   const DASH_LINE = 'const type = catType(cat);';
   ok(live.dashboard.split(DASH_LINE).length - 1 >= 1, 'Category type (Dashboard): the budget table also reads the live category file through catType(), the same function Budget uses');
 
   // Negative control: reversing the `??` operands makes the STALE cell win
   // whenever it happens to be present — the exact bug the changelog names.
-  provenFalse('Category type (Budget)', BUDGET_LINE, 'const type = d.type ?? catType(d.category);');
+  provenFalse('Category type (owner)', RULE_LINE, 'return b.type ?? catType(b.category);');
 }
 
 /* ========================================================================
@@ -494,8 +505,8 @@ function provenFalse(desc, exactShape, mangled) {
   const SCORE_LINE = 'budgetUsed: (hasIncome && avg.budgeted > 0 && avg.consumptionForBudget !== null)';
   ok(live.healthMath.includes(SCORE_LINE),
     'Budget used (Score ring): health-math.js\'s score-facing budgetUsed is gated on the six-period trailing `avg.consumptionForBudget`');
-  ok(live.healthData.includes("if (type !== 'savings' && type !== 'investment') { consumption += amt; }"),
-    'Budget used (Score ring): that consumption figure explicitly excludes savings/investment-typed spend');
+  ok(live.healthData.includes("if (!isSetAsideType(type)) { consumption += amt; }"),
+    'Budget used (Score ring): that consumption figure explicitly excludes set-aside spend, through the vocabulary owner (Phase 1 of ADR-0006)');
 
   /* 2026-09-03, ADR-0005: the numerator is no longer inferred from the
      category map at all. budgetUsedShare() is the ONE rule —
@@ -541,42 +552,34 @@ function provenFalse(desc, exactShape, mangled) {
    present under the word "savings" on some screens and absent under the
    same word on others.
 
-   Fixed as three independent copies of the SAME fold rule, not one shared
-   function — savings.js's own header on `typeIs` and health-data.js's own
-   comment on `savers` both say so explicitly and both name the reason: the
-   three files are siblings, not a shared module, and each is meant to carry
-   the trap's explanation for a reader who lands in only one of them. Checked
-   here the same way TERM 6 checks two independently-written lines rather
-   than one literal call shape shared verbatim: the RULE is what must be
-   unified, not the source text expressing it. */
+   Fixed on 2026-08-24 as three independent copies of the SAME fold rule;
+   folded into ONE on 2026-09-03 (Phase 1 of ADR-0006): src/vocabulary.js
+   owns normType()/accountType(), the pool set, and the filters built on
+   them, and tests/one-vocabulary.test.cjs forbids the literal pair and the
+   hand-written fold anywhere else in src/. What this term pins is now the
+   STRONGER form the file's own header prefers — the shared function and
+   each consumer's call to it — rather than three hand-matched lines. */
 {
-  ok(live.dashboard.includes("String(a.type || '').trim().toLowerCase() === type"),
-    'Account type (Dashboard): accountsOfType() case-folds the account type before comparing');
+  const FOLD_LINE = "function normType(t) { return String(t || '').trim().toLowerCase(); }";
+  ok(live.vocabulary.includes(FOLD_LINE),
+    'Account type: the case/whitespace fold is declared ONCE, in src/vocabulary.js');
+  ok(live.vocabulary.includes("const POOL_ACCOUNT_TYPES = SET_ASIDE_TYPES;"),
+    'Account type: the pool set IS the set-aside set — one object, seen from the account side');
 
-  const SAVINGS_LINE = "const typeIs = (a, type) => String((a && a.type) || '').trim().toLowerCase() === type;";
-  ok(live.savings.includes(SAVINGS_LINE),
-    'Account type (Savings page): every type test on this page — the KPI tile, the entries list, the per-account investment checks — now goes through one case/whitespace-folded typeIs()');
+  ok(live.dashboard.includes("const accountsOfType = type => vocabAccountsOfType(S.accounts, type);"),
+    'Account type (Dashboard): accountsOfType() is the owner\'s filter');
+  ok(live.savings.includes("const { accountsOfType, accountType } = require('../vocabulary');")
+    && !/typeIs/.test(live.savings.replace(/\/\*[\s\S]*?\*\//g, '')),
+    'Account type (Savings page): every type test on this page goes through the owner; the local typeIs() is gone');
   ok(!/S\.accounts\.filter\(a => a\.type === 'savings'\)/.test(live.savings),
     'Account type (Savings page): confirmed — the raw, unfolded `a.type === \'savings\'` filter is gone');
-
-  /* The two literal comparisons became one shared POOL_TYPES set when the
-     saving RATE was rewritten — the same set now answers both "is this account
-     part of the savings pool" and "does this category name a vehicle inside
-     it", because they are one idea seen from two sides. What this term
-     actually guards is unchanged and is asserted the same way: the field is
-     folded and trimmed BEFORE it is compared, so `type: Savings` cannot count
-     toward net worth while showing as nothing on the tile beside it. */
-  ok(/POOL_TYPES\.has\(String\(\(a && a\.type\) \|\| ''\)\.trim\(\)\.toLowerCase\(\)\)/.test(live.healthData),
-    'Account type (Score\'s saving rate): health-data.js\'s savers filter folds case/whitespace before comparing');
-  ok(/const POOL_TYPES = new Set\(\['savings', 'investment'\]\)/.test(live.healthData),
-    'Account type (Score\'s saving rate): and the pool is one declared set, not a pair of inline literals');
+  ok(live.healthData.includes("const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));"),
+    'Account type (Score\'s saving rate): health-data.js\'s savers are the owner\'s pool filter');
   ok(!/a\.type === 'savings'/.test(live.healthData),
     'Account type (Score\'s saving rate): confirmed — no raw, unfolded comparison survives in health-data.js');
-  ok(!/a\.type === 'savings' \|\| a\.type === 'investment'/.test(live.healthData),
-    'Account type (Score\'s saving rate): confirmed — the raw, unfolded OR-chain is gone');
 
-  // Negative control: the pre-fix savings.js line, comparing the raw string.
-  provenFalse('Account type (Savings page)', SAVINGS_LINE, "const savings = S.accounts.filter(a => a.type === 'savings');");
+  // Negative control: the pre-fix shape, comparing the raw string.
+  provenFalse('Account type (owner)', FOLD_LINE, "function normType(t) { return String(t || ''); }");
 }
 
 /* ========================================================================

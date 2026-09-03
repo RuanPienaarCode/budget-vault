@@ -46,6 +46,7 @@
    document rather than leaving the two kinds of figure to look like one. */
 
 const { el } = require('../dom');
+const { poolAccounts } = require('../vocabulary');
 const { rangePills } = require('../chart');
 /* otherCurrencyNet: worth() has returned `otherCurrencies` — the foreign
    assets and foreign debts it filtered out — since ADR-0004, and this page
@@ -408,8 +409,7 @@ module.exports = function registerReport(ctx) {
      different rules" shape this codebase keeps repeating. */
   function savingsSummary() {
     const poolType = name => poolCatType(S.categories, name);
-    const typeIs = (a, t) => String((a && a.type) || '').trim().toLowerCase() === t;
-    const pool = S.accounts.filter(a => typeIs(a, 'savings') || typeIs(a, 'investment'));
+    const pool = poolAccounts(S.accounts);
     const idx = accountIndex();
     const entries = pool.map(a => ({ account: a, rows: (idx.get(a) || {}).rows || [] }));
     /* HOME-CURRENCY ENTRIES ONLY — the same predicate and the same name

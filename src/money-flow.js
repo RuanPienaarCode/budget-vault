@@ -53,6 +53,7 @@ const { activeDebts } = require('./worth');
 const { monthlyInterest } = require('./debt-math');
 const { isForeign } = require('./currency');
 const { largestRemainder } = require('./share-percents');
+const { isSetAsideType } = require('./vocabulary');
 const { PILLARS } = require('./health-math');
 
 /* Category TYPES (not the household's custom groups) that fall inside the two
@@ -227,13 +228,13 @@ function periodFlow({
   let savingsTypedSpend = 0;
   for (const [cat, amt] of Object.entries(byCat)) {
     const type = catType ? catType(cat) : null;
-    if ((type === 'savings' || type === 'investment') && amt > 0) { savingsTypedSpend += amt; }
+    if (isSetAsideType(type) && amt > 0) { savingsTypedSpend += amt; }
     if (!cat || !fixed.has(cat) || !(amt > 0)) { continue; }
     committed += amt;
     if (type === 'debt') { debtRepayments += amt; }
     else if (HOUSING_TYPES.has(type)) { housing += amt; }
     else if (SUBSCRIPTION_TYPES.has(type)) { subscriptions += amt; }
-    if (type === 'savings' || type === 'investment') { committedSavingsTyped += amt; }
+    if (isSetAsideType(type)) { committedSavingsTyped += amt; }
   }
   /* A fixed-flagged category can never claim more than the period actually
      spent — a category that happened to net a refund this period must not

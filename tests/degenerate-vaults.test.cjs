@@ -743,9 +743,12 @@ async function runNegativeControls() {
     eq(tileValue(sane.nodes.get('#savingsKpis'), 'Savings'), 'R 55000.00',
       'NC6 sanity: the unmodified scratch copy still agrees with main before the revert');
 
+    /* Phase 1 of ADR-0006 moved the fold into src/vocabulary.js; the scratch
+       copy only holds views/, so the revert swaps the view's import for a raw
+       local pair — the exact pre-fix shape, reproduced where it used to live. */
     revert(dir6, 'views/savings.js',
-      "const typeIs = (a, type) => String((a && a.type) || '').trim().toLowerCase() === type;",
-      'const typeIs = (a, type) => a && a.type === type;');
+      "const { accountsOfType, accountType } = require('../vocabulary');",
+      'const accountsOfType = (accounts, type) => (accounts || []).filter(a => a && a.type === type); const accountType = a => a && a.type;');
     delete require.cache[require.resolve(path.join(dir6, 'views', 'savings.js'))];
     const red = await mount(f, undefined, path.join(dir6, 'views'));
     red.ctx.renderSavings();
@@ -812,7 +815,7 @@ async function confirmFixedBugsHold() {
     ok(savingsTile === 'R 55000.00',
       `pins the fix for the former LIVE BUG 2: type:"Savings" (capital) reads "${savingsTile}" `
       + 'on the savings tile itself, matching the net-worth tile beside it — fixed in '
-      + 'src/views/savings.js, typeIs');
+      + 'src/vocabulary.js, accountsOfType');
   }
 
   /* Formerly LIVE BUG 3 — renderDebtKpis (src/views/debts.js) only took its

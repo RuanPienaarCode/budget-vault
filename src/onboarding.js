@@ -28,6 +28,7 @@
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
+const { SET_ASIDE_TYPES } = require('./vocabulary');
 /* Namespace import for the same reason settings-tab.js uses one: this file
    binds `t` as a parameter in several `.addText(t => …)` callbacks, so a bare
    `t` from i18n would be silently shadowed inside exactly those callbacks. */
@@ -113,7 +114,7 @@ const FIRST_BUDGET_LINES = [
   { key: 'housing', label: 'wiz.first.housing', prefer: 'Rent / Bond', types: ['housing', 'expense', 'debt'] },
   { key: 'food', label: 'wiz.first.food', prefer: 'Groceries', types: ['food', 'expense'] },
   { key: 'services', label: 'wiz.first.services', prefer: 'Electricity & water', types: ['utilities', 'services', 'expense'] },
-  { key: 'savings', label: 'wiz.first.savings', prefer: 'Savings', types: ['savings', 'investment'] },
+  { key: 'savings', label: 'wiz.first.savings', prefer: 'Savings', types: [...SET_ASIDE_TYPES] },
 ];
 const firstBudgetOptions = line => STARTER_CATEGORIES.filter(c => line.types.includes(c.type));
 const firstBudgetDefault = line => {

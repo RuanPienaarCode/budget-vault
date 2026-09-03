@@ -15,6 +15,7 @@
    figure — they just do not go first. */
 
 const { el, icoEl } = require('../dom');
+const { poolAccounts } = require('../vocabulary');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
@@ -764,8 +765,7 @@ module.exports = function registerScore(ctx) {
        own `typeIs` — health-data.js and this file are siblings, not a shared
        module, and each carries this comment for a reader who lands in only one
        of them. */
-    const savers = S.accounts.filter(a =>
-      ['savings', 'investment'].includes(String((a && a.type) || '').trim().toLowerCase()));
+    const savers = poolAccounts(S.accounts);
     const saverLabels = new Map();
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }

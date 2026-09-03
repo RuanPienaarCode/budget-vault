@@ -21,6 +21,7 @@ const {
   scoreBreakdown, DAYS_PER_MONTH,
 } = require('./health-math');
 const { activeDebts } = require('./worth');
+const { poolAccounts, isSetAsideType } = require('./vocabulary');
 const { splitFlows, savedFromOutside } = require('./savings-math');
 /* The same split-parent guard splitFlows applies, from the same module, so the
    saving-rate walk below and the Savings page's own flows cannot disagree
@@ -32,7 +33,6 @@ const { daysBetween } = require('./dates');
    mark a movement WITHIN it. One set, used for both, because they are the same
    idea seen from two sides: an account of this type holds saved money, and a
    category of this type names a vehicle it moved into. */
-const POOL_TYPES = new Set(['savings', 'investment']);
 
 /* How far apart the two legs of one transfer may be dated and still be read as
    the same movement. Banks settle an internal transfer same-day or next-day,
@@ -183,9 +183,7 @@ module.exports = function registerHealthData(ctx) {
        account INTO a rand one lost its outflow leg and counted as fresh
        saving from outside the pool. Both sides of the pairing now see the
        same accounts. */
-    const savers = S.accounts.filter(a =>
-      !isForeign(a, S.settings.currency)
-      && POOL_TYPES.has(String((a && a.type) || '').trim().toLowerCase()));
+    const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));
 
     const periods = [];
     for (let i = 1; i <= want; i++) {
@@ -322,7 +320,7 @@ module.exports = function registerHealthData(ctx) {
       let consumption = 0, fixed = 0;
       for (const [cat, amt] of Object.entries(householdSpend)) {
         const type = catType(cat);
-        if (type !== 'savings' && type !== 'investment') { consumption += amt; }
+        if (!isSetAsideType(type)) { consumption += amt; }
         if (fixedCats.has(cat)) { fixed += amt; }
       }
       let income = 0;

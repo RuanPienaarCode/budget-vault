@@ -53,6 +53,7 @@
    bare node, and `today` is injected rather than read off the clock. */
 
 const { ISO_DATE, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
+const { isPoolAccount, accountType } = require('./vocabulary');
 const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
 
@@ -89,7 +90,7 @@ const WHOLE_MONTH_DAYS = 28;
    so an account typed `Credit_Card` was a card to the committed chain and not
    a card to net worth or the import sign check: the same account, two
    different answers, depending on which page asked. */
-const isCreditCard = a => !!a && String(a.type || '').trim().toLowerCase() === 'credit_card';
+const isCreditCard = a => !!a && accountType(a) === 'credit_card';
 
 const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) && isCreditCard(a);
 
@@ -198,7 +199,6 @@ function nextOnDay(from, d) {
    this app already gives them: `budget: false` keeps an account out of these
    figures entirely. What they must not have is a card silently counting a
    sinking fund as this week's spending money. */
-const EARMARKED_TYPES = new Set(['savings', 'investment']);
 function earmarkOf(a) {
   const held = Math.max(0, a.implied || 0);
   if (!held) return 0;
@@ -214,7 +214,7 @@ function earmarkOf(a) {
   const ef = a.emergencyFund;
   if (ef === true) return held;
   if (typeof ef === 'number' && ef > 0) return Math.min(ef, held);
-  return EARMARKED_TYPES.has(String(a.type || '').trim().toLowerCase()) ? held : 0;
+  return isPoolAccount(a) ? held : 0;
 }
 
 function cashOnHand(accounts) {
@@ -573,7 +573,7 @@ function cardsOwed(accounts) {
   const entries = [];
   for (const a of accounts || []) {
     if (!a || a.inBudget === false || !a.dated) continue;
-    if (String(a.type || '').trim().toLowerCase() !== 'credit_card') continue;
+    if (accountType(a) !== 'credit_card') continue;
     if (a.implied < 0) {
       owed += -a.implied; cards.push(a.name);
       entries.push({ name: a.name, amount: -a.implied });

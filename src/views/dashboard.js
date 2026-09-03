@@ -37,6 +37,7 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
+const { accountsOfType: vocabAccountsOfType, poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
@@ -1052,7 +1053,7 @@ module.exports = function registerDashboard(ctx) {
      Savings composition chart R80 000 in an account of an unrecognised type;
      it was never applied here, so a household holding R85 000 saw this tile
      read R5 000 while net worth beside it counted the full amount. */
-  const accountsOfType = type => S.accounts.filter(a => String(a.type || '').trim().toLowerCase() === type);
+  const accountsOfType = type => vocabAccountsOfType(S.accounts, type);
   const balanceOf = type => accountsOfType(type).reduce((t, a) => t + (a.balance || 0), 0);
 
   /* A tile whose value is a button into the page that owns it. kpiTiles() is
@@ -1123,7 +1124,7 @@ module.exports = function registerDashboard(ctx) {
        of. */
     const worthOtherNet = otherCurrencyNet(w, worthOthers);
     const owed = owedSummary(S.owed, undefined, S.settings.currency);
-    const savingsAccounts = [...accountsOfType('savings'), ...accountsOfType('investment')];
+    const savingsAccounts = poolAccounts(S.accounts);
     const { others: savingsOthers } = splitByCurrency(savingsAccounts, S.settings.currency);
     const savings = primaryTotal(accountsOfType('savings'), S.settings.currency);
     const invest = primaryTotal(accountsOfType('investment'), S.settings.currency);
