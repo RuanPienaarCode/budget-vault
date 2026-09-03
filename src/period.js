@@ -33,6 +33,7 @@ const { reconcile } = require('./reconcile');
 const { savedFromOutside } = require('./savings-math');
 const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
+const { stamp, tally, LENSES } = require('./ledger');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -715,150 +716,41 @@ module.exports = function registerPeriod(ctx) {
      two disagree by a day either side of midnight in half the world. */
   const nextDay = iso => isoFromDayNum(dayNum(iso) + 1);
 
+  /* Phase 2 of ADR-0006: the walk this function used to be is now
+     tally(ledger(start, end), LENSES.BUDGET) in src/ledger.js, and every
+     field below is read off that one tally. The vetoes, the gross sign rule,
+     the disclosures (`foreign`, `fundedFromSavings`), the three category
+     states and the conservation identity are all unchanged — the reasoning
+     that used to sit here as prose is the BUDGET lens's own definition, and
+     tests/ledger-lenses.test.cjs proves the two readings identical on
+     randomised vaults. */
   function summaryInRange(start, end) {
-    // Excluded rows are the user's per-row veto; the non-budget set is the
-    // per-account one. Both drop out of income/spend here and nowhere else —
-    // Transactions still lists every row, so nothing goes invisible.
-    const skip = nonBudgetLabels();
-    const foreignBy = foreignLabels();
-    /* ISSUE 41. The fourth veto, and the only one that reads a row's SIGN —
-       see earmarkedLabels() for why. Counted on the way past rather than
-       silently dropped: `fundedFromSavings` is what the Dashboard names, so a
-       R5 000 pram that stopped burning the grocery envelope does not simply
-       cease to exist on screen. */
-    const earmarked = earmarkedLabels();
-    const fundedOut = t => t.amount < 0 && earmarked.has(t.label);
-    const fundedFromSavings = { spend: 0, count: 0 };
-    for (const t of txInRange(start, end)) {
-      if (t.excluded || skip.has(t.label) || foreignBy.has(t.label)) continue;
-      if (!fundedOut(t)) continue;
-      if (catType(t.cat) === 'transfer') continue;
-      fundedFromSavings.spend += -t.amount;
-      fundedFromSavings.count++;
-    }
-    const tx = txInRange(start, end).filter(t =>
-      !t.excluded && !skip.has(t.label) && !foreignBy.has(t.label) && !fundedOut(t));
-    /* Only the folders that actually CONTRIBUTED rows in this window — a
-       foreign account with nothing in the period is not something to warn
-       about, and a disclosure that fires on every period regardless of the
-       data is one readers learn to stop seeing. */
-    const foreignHere = new Map();
-    for (const t of txInRange(start, end)) {
-      if (!t.excluded && !skip.has(t.label) && foreignBy.has(t.label)) {
-        foreignHere.set(t.label, foreignBy.get(t.label));
-      }
-    }
-    let income = 0, spend = 0, net = 0, uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
-    /* ISSUE 40. The part of `spend` that is money the household MOVED rather
-       than money it consumed — outgoings under a category the household has
-       typed savings or investment.
-
-       Kept INSIDE `spend` rather than taken out of it, so every existing
-       consumer, the conservation identity in
-       tests/summary-conservation.test.cjs and the donut's own gap note are all
-       unchanged. It is a second reading of the same rows, offered to the one
-       caller that has to answer "how much is left to SPEND" — a question
-       funding your own emergency fund is not an answer to. */
-    let setAside = 0;
-    /* Consumer map, so no half of this object reads as orphaned on a cold
-       read: `count`/`names` drive the Dashboard's "Missing categories" stat,
-       and `income` its Income-tile disclosure — a deposit under a missing name
-       is NOT counted as income, so the omission has to be said where the
-       figure is read. `spend` has no tile on purpose: outgoings under a
-       missing name are already inside gross `spend` and drawn as their own
-       donut slices, so there is no omission to disclose. Its job is the
-       conservation identity in tests/summary-conservation.test.cjs, which
-       needs both halves to prove every rand landed somewhere. */
-    const unknown = { count: 0, spend: 0, income: 0, names: [] };
-    const unknownSeen = new Set();
-    // Object.create(null): a category named "constructor" or "__proto__"
-    // otherwise collides with Object.prototype instead of getting its own
-    // slot — src/views/debts.js:224 does the same for the same reason.
-    const byCat = Object.create(null);
-    for (const t of tx) {
-      const type = catType(t.cat);
-      /* A transfer is money moving between the reader's own pockets. It leaves
-         the arithmetic entirely rather than netting to zero inside it, because
-         the two legs need not land in the same period. */
-      if (type === 'transfer') continue;
-
-      /* THE LEDGER LINE, taken before any classification can decline the row.
-
-         `net` is the signed sum of everything counted, and periodDeficit reads
-         nothing else. That is what stops a classification bug from becoming a
-         money bug: a wrong bucket is now a wrong LABEL, where it used to be a
-         missing rand. The chain below used to be `if income … else if negative`
-         with no final else, so an uncategorised deposit, a refund inside an
-         expense category, and money under a name no category file answers to
-         each matched nothing and were counted by nothing — while `spend`
-         counted their outgoing siblings in full. On the vault this was found
-         in, that put five figures of deposits beyond the reach of every total
-         built on `income`, and turned a period that had finished ahead into a
-         reported overspend — which is the figure the Budget page offers to
-         carry forward as money already spent.
-
-         tests/summary-conservation.test.cjs pins the buckets back to this sum,
-         so a future branch that swallows a row breaks arithmetic rather than
-         quietly shrinking a total. */
-      net += t.amount;
-      if (t.amount < 0 && SET_ASIDE_TYPES.has(type)) { setAside += -t.amount; }
-      byCat[t.cat || ''] = (byCat[t.cat || ''] || 0) + t.amount;
-
-      /* THREE states, not two. "" is a row nobody has categorised yet. A name
-         no category file answers to is a different thing entirely — see
-         catKnown above for why both are reachable — and it used to be invisible:
-         `uncategorised` did not count it, so nothing on screen said a word.
-         Neither state can ever resolve to a transfer type, so counting them
-         after that skip changes nothing. */
-      if (!t.cat) {
-        uncategorised++;
-        if (t.amount < 0) uncatSpend += -t.amount; else uncatIncome += t.amount;
-      } else if (!catKnown(t.cat)) {
-        unknown.count++;
-        if (t.amount < 0) unknown.spend += -t.amount; else unknown.income += t.amount;
-        /* `names` is first-seen order over this period's transaction rows, not
-           a sort — deliberately: the dashboard tile only ever shows the first
-           MISSING_NAMES_SHOWN of them (dashboard.js) and any deterministic
-           order would do equally well there, so this stays whatever order the
-           rows happen to iterate in rather than paying to sort a list nobody
-           has asked to read in a particular order. If a future reader needs
-           this stable (e.g. two renders of the same period disagreeing on
-           which names got cut by "+N more"), sort it here — this comment is
-           that decision recorded, not an oversight. */
-        if (!unknownSeen.has(t.cat)) { unknownSeen.add(t.cat); unknown.names.push(t.cat); }
-      }
-
-      if (type === 'income') income += t.amount;
-      else if (t.amount < 0) spend += -t.amount;
-    }
-    /* `uncatSpend` is the GROSS outgoing half of the uncategorised bucket, and
-       it is deliberately not derivable from byCat[''], which is a NET figure. A
-       period holding more uncategorised deposits than uncategorised payments
-       nets POSITIVE, so byCat[''] reports nothing while `spend` above has
-       already counted the whole outgoing half. The Dashboard's donut discloses
-       what it left out by subtracting from `spend`, so it needs the same half
-       of the bucket that `spend` counted — see renderSplit.
-
-       `uncatIncome` is its other half, and the Dashboard's Income tile
-       discloses it for the same reason: money that arrived with no category is
-       NOT counted as income (it may be a transfer in from savings, and
-       guessing would inflate every ratio built on income), but a figure that
-       quietly omits a real deposit has to say so where it is read. */
-    /* `foreign` travels WITH the figures, not beside them, so a consumer
-       cannot read the totals without having been handed the caveat. Every
-       tile, table, chart and aria-label built from this object is expected to
-       say something when `foreign.count` is non-zero. */
+    const t = tally(ledger(start, end), LENSES.BUDGET);
     return {
-      income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat,
-      setAside, fundedFromSavings,
-      count: tx.length,
-      foreign: {
-        count: foreignHere.size,
-        labels: [...foreignHere.keys()],
-        symbols: [...new Set(foreignHere.values())],
-      },
+      income: t.income, spend: t.spend, net: t.net,
+      uncategorised: t.uncategorised, uncatSpend: t.uncatSpend, uncatIncome: t.uncatIncome,
+      unknown: t.unknown, byCat: t.byCat,
+      setAside: t.setAside, fundedFromSavings: t.fundedFromSavings,
+      count: t.count,
+      foreign: t.foreign,
     };
   }
+  /* The env the ledger stamps rows against: every household fact a veto
+     reads, resolved once per call. `fixedCats` rides along for the HOUSEHOLD
+     lens's `fixed` slice. */
+  function ledgerEnv() {
+    return {
+      nonBudgetLabels: nonBudgetLabels(),
+      foreignLabels: foreignLabels(),
+      earmarkedLabels: earmarkedLabels(),
+      fixedCats: new Set(S.categories.filter(c => c.fixed).map(c => c.name)),
+      catType, catKnown,
+    };
+  }
+  /* Every row in the window, stamped once. The one entry point a period
+     figure should take. */
+  function ledger(start, end) { return stamp(txInRange(start, end), ledgerEnv()); }
+
   /* A monthly income figure, for the one page that has to talk in months no
      matter what the period length is (Debt — an instalment is quoted monthly,
      and the 36% threshold only means anything against a month).
@@ -1072,6 +964,9 @@ module.exports = function registerPeriod(ctx) {
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,
+    /* ADR-0006 Phase 2. The ledger and its lenses, for every consumer that
+       needs a period figure the three named seams do not already hand back. */
+    ledgerEnv, ledger, tally, LENSES,
     /* The one reading of a budget row's type — views/dashboard.js's
        budgetVsActualRows reads it too, so the table, the hero and the Budget
        page cannot bucket one row three ways. */

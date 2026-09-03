@@ -43,7 +43,9 @@ const { daysBetween } = require('./dates');
 /* Which row is which, for pairing. `label` is the transactions folder the row
    was read from, so it identifies the ACCOUNT without needing the account
    object — and two legs of one movement always sit in different ones. */
-const rowKey = r => `${r.label}|${r.date}|${(r.amount || 0).toFixed(2)}|${r.desc || ''}`;
+/* rowKey and passthroughPairs moved verbatim to src/ledger.js in Phase 2 of
+   ADR-0006; the comments above them stay as the record of why pairing
+   exists. */
 
 /* EXCLUDED ROWS THAT PAIR OFF AGAINST EACH OTHER — the two legs of one
    movement, found by their own arithmetic rather than trusted from the flag.
@@ -87,25 +89,6 @@ const rowKey = r => `${r.label}|${r.date}|${(r.amount || 0).toFixed(2)}|${r.desc
    "Notice savings account payout", "VITALITY TRAVEL" against "CAPITEC D
    COLENBRANDER". Equal and opposite, in two different accounts, once each, is
    the signal that actually holds. */
-function passthroughPairs(rows) {
-  const drop = new Set();
-  const ex = (rows || []).filter(r => r && r.excluded
-    && typeof r.amount === 'number' && r.amount);
-  const used = new Array(ex.length).fill(false);
-  for (let i = 0; i < ex.length; i++) {
-    if (used[i]) { continue; }
-    for (let j = i + 1; j < ex.length; j++) {
-      if (used[j]) { continue; }
-      const a = ex[i], b = ex[j];
-      if (a.label === b.label) { continue; }
-      if (Math.abs(a.amount + b.amount) > 0.005) { continue; }
-      used[i] = true; used[j] = true;
-      drop.add(rowKey(a)); drop.add(rowKey(b));
-      break;
-    }
-  }
-  return drop;
-}
 const { worth, otherCurrencyNet } = require('./worth');
 const { splitByCurrency, isForeign } = require('./currency');
 
@@ -116,7 +99,7 @@ const TRAILING_MONTHS = 6;
 
 module.exports = function registerHealthData(ctx) {
   const {
-    S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, impliedAccounts, catType, declaredCatType,
+    S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, impliedAccounts, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
     foreignLabels,
   } = ctx;
@@ -255,79 +238,16 @@ module.exports = function registerHealthData(ctx) {
          `whole` already handed it. Transfers drop out before the net is
          built, the one exclusion periodSpend itself applies before anything
          else can. */
-      const householdNet = Object.create(null);
-      /* One filtered row list for both, so the pairing and the walk it feeds
-         can never see different rows. `homeRows`, not `txInPeriod` — see the
-         currency note above healthSnapshot's loop. */
-      const netRows = homeRows(p);
-      const householdPass = passthroughPairs(netRows);
-      for (const t of netRows) {
-        if (catType(t.cat) === 'transfer') { continue; }
-        /* PAIRED excluded rows drop; lone ones stay. Dropping the `excluded`
-           filter outright was a real bug, and so would restoring it be.
-
-           The fix this block exists for was about ACCOUNTS: periodSpend drops
-           `budget: false` accounts, and a bill paid from a joint account the
-           household marked out of the budget is still a bill the emergency
-           fund must cover. That argument stands. But the same edit also
-           dropped the `excluded` filter, and a reader uses that flag for two
-           different things — the second leg of already-counted money, and a
-           real bill that sits outside the budget for an unrelated reason.
-
-           Caught on a real vault: a R11 514 car service appeared as a card
-           purchase AND as the savings withdrawal that settled the card, five
-           days apart. Counting both put R63 293 a month of already-counted
-           money into the divisor and reported 2.2 months of cover instead of
-           2.7. Credit-card settlements, a UIF reimbursement passing through,
-           and moves into other savings vehicles all landed the same way — and
-           every one of them has a matching opposite leg in another account,
-           which is exactly what passthroughPairs looks for. A genuinely
-           reimbursed rent top-up has no such partner and still counts.
-
-           CLAUDE.md's rule that anything measuring the ACCOUNT must not filter
-           on `excluded` — reconcile, periodActivity, splitFlows — stands, and
-           is a different question: the money did move. This measures SPENDING,
-           and counting a rand twice because it moved twice is the thing the
-           flag exists to prevent. */
-        if (householdPass.has(rowKey(t))) { continue; }
-        const k = t.cat || '';
-        householdNet[k] = (householdNet[k] || 0) + t.amount;
-      }
-      const householdSpend = Object.create(null);
-      for (const [cat, amt] of Object.entries(householdNet)) {
-        const type = catType(cat);
-        if (!cat || type === 'income' || type === 'transfer' || amt >= 0) { continue; }
-        householdSpend[cat] = -amt;
-      }
-
-      /* ONE ROW POPULATION FOR EVERY SHARE OF INCOME.
-
-         A ratio only means something when both halves are counted the same
-         way, and this module had drifted into counting them two ways: income,
-         consumption and fixed came from periodSpend (budget-scoped — excluded
-         rows and non-budget accounts dropped), while essential and the saving
-         rate were built household-wide with pass-throughs paired off. On a
-         real vault those two views differ by about R16 000 a month, so the
-         saving rate was a household numerator over a budget denominator and
-         read 11.3% where the consistent answer either way is nearer 9%.
-
-         Both views are legitimate — one answers "how did I do against my
-         plan", the other "what actually moved through this household" — but a
-         single ratio cannot straddle them. Everything below now lives in the
-         household view, with `passthroughPairs` removing the second leg of
-         money already counted once. `budgeted` and `consumptionBudget` stay
-         budget-scoped on purpose: they answer the plan question. */
-      let consumption = 0, fixed = 0;
-      for (const [cat, amt] of Object.entries(householdSpend)) {
-        const type = catType(cat);
-        if (!isSetAsideType(type)) { consumption += amt; }
-        if (fixedCats.has(cat)) { fixed += amt; }
-      }
-      let income = 0;
-      for (const [cat, amt] of Object.entries(householdNet)) {
-        if (catType(cat) === 'income' && amt > 0) { income += amt; }
-      }
-
+      /* Phase 2 of ADR-0006: the household walk is tally(ledger(p),
+         LENSES.HOUSEHOLD) — foreign and transfer rows dropped, pass-through
+         pairs dropped, excluded and non-budget rows KEPT, net per category
+         then flipped. Every argument the walk used to carry as prose is the
+         HOUSEHOLD lens's own definition in src/ledger.js, and
+         tests/ledger-lenses.test.cjs pins the three slices below to it. */
+      const h = tally(ledger(start, end), LENSES.HOUSEHOLD);
+      const householdNet = h.byCat;
+      const householdSpend = h.spendByCat;
+      const consumption = h.consumption, fixed = h.fixed, income = h.netIncome;
       periods.push({
         income,
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),

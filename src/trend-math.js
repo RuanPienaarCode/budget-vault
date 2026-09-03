@@ -17,7 +17,7 @@
 const { todayIso, isoDayNumber, isoFromDayNumber } = require('./dates');
 
 module.exports = function registerTrendMath(ctx) {
-  const { S, shiftPeriod, periodRange, currentPeriod, txInPeriod, nonBudgetLabels, foreignLabels, catType } = ctx;
+  const { S, shiftPeriod, periodRange, currentPeriod, txInPeriod, nonBudgetLabels, foreignLabels, catType, ledger, tally, LENSES } = ctx;
 
   /* How many periods a calendar-month range covers. A period is a pay cycle,
      which may be a week or a fortnight, so "6M" is 6 points on a monthly cycle
@@ -154,37 +154,23 @@ module.exports = function registerTrendMath(ctx) {
      is not a rand period this vault can average, and counting it as one is
      what let compareTotals build a baseline out of months it holds no
      household spending for. */
+  /* Phase 2 of ADR-0006: tally(ledger(p), LENSES.TREND) — BUDGET's vetoes
+     under the net sign rule, minus the earmarkedOut veto ISSUE 41 never
+     taught this walk (see the TREND lens's own note in src/ledger.js; the
+     omission is preserved and named, not fixed, in this phase). `part` is
+     the same tally over the rows dated on or before the cap. */
   function periodSpend(p, days) {
-    const skip = nonBudgetLabels();
-    const foreign = foreignLabels();
+    const { start, end } = periodRange(p);
     let cut = null;
     if (days !== null) {
-      const { start, end } = periodRange(p);
       const c = isoFromDayNumber(isoDayNumber(start) + days - 1);
       if (c < end) cut = c;
     }
-    const net = {}, netPart = {};
-    let count = 0;
-    for (const t of txInPeriod(p)) {
-      if (t.excluded || skip.has(t.label) || foreign.has(t.label)) continue;
-      count++;
-      if (catType(t.cat) === 'transfer') continue;
-      const k = t.cat || '';
-      net[k] = (net[k] || 0) + t.amount;
-      if (!cut || t.date <= cut) netPart[k] = (netPart[k] || 0) + t.amount;
-    }
-    const spendOf = m => {
-      const out = {};
-      for (const [cat, amt] of Object.entries(m)) {
-        const type = catType(cat);
-        if (!cat || type === 'income' || type === 'transfer' || amt >= 0) continue;
-        out[cat] = -amt;
-      }
-      return out;
-    };
-    return { count, whole: spendOf(net), part: spendOf(netPart) };
+    const stamped = ledger(start, end);
+    const whole = tally(stamped, LENSES.TREND);
+    const part = cut ? tally(stamped.filter(s => s.date <= cut), LENSES.TREND) : whole;
+    return { count: whole.count, whole: whole.spendByCat, part: part.spendByCat };
   }
-
   /* Spend per category, summed over the N periods BEFORE the one on screen —
      the numeric core of the comparison baseline. Returns null when there is
      not a single completed period to compare with: a first-month vault gets

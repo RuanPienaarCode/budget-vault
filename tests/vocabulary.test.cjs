@@ -90,6 +90,7 @@ const files = {
   dates: read('dates.js'),
   vocabulary: read('vocabulary.js'),
   period: read('period.js'),
+  ledger: read('ledger.js'),
 };
 const live = {}; // same files, comments stripped, for "must not contain the old shape" checks
 for (const [k, v] of Object.entries(files)) live[k] = stripComments(v);
@@ -505,8 +506,12 @@ function provenFalse(desc, exactShape, mangled) {
   const SCORE_LINE = 'budgetUsed: (hasIncome && avg.budgeted > 0 && avg.consumptionForBudget !== null)';
   ok(live.healthMath.includes(SCORE_LINE),
     'Budget used (Score ring): health-math.js\'s score-facing budgetUsed is gated on the six-period trailing `avg.consumptionForBudget`');
-  ok(live.healthData.includes("if (!isSetAsideType(type)) { consumption += amt; }"),
-    'Budget used (Score ring): that consumption figure explicitly excludes set-aside spend, through the vocabulary owner (Phase 1 of ADR-0006)');
+  /* Phase 2 of ADR-0006: the consumption slice is computed once, in
+     tally() (src/ledger.js), and health-data.js reads it off the HOUSEHOLD
+     tally rather than looping itself. */
+  ok(live.ledger.includes("if (!isSetAsideType(type)) consumption += -amt;")
+    && live.healthData.includes("const consumption = h.consumption, fixed = h.fixed, income = h.netIncome;"),
+    'Budget used (Score ring): the consumption figure excludes set-aside spend through the vocabulary owner, inside the one tally the Score reads');
 
   /* 2026-09-03, ADR-0005: the numerator is no longer inferred from the
      category map at all. budgetUsedShare() is the ONE rule —

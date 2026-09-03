@@ -973,7 +973,7 @@ module.exports = function registerTransactions(ctx) {
          to be missing the Currency cell the CSV was already writing. One
          resolver, handed to both writers. */
       await writeVaultFile(paths.txMd, transactionsMarkdown(rows,
-        { range, filters, generated, household: S.settings.currency }, rowMoney, rowSymbol));
+        { range, filters, generated, household: S.settings.currency, env: ctx.ledgerEnv() }, rowMoney, rowSymbol));
       await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {

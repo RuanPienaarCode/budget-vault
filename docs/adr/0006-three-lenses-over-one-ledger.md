@@ -17,7 +17,7 @@ it, and so that the reasoning now scattered across those comments has one home.
 
 ## The vocabulary
 
-A transaction row can be held out of a total for eight reasons. Each has a
+A transaction row can be held out of a total for nine reasons. Each has a
 name here, and each will be stamped on the row exactly once by the ledger:
 
 | Stamp | Set by | Meaning |
@@ -27,7 +27,8 @@ name here, and each will be stamped on the row exactly once by the ledger:
 | `foreign` | the account's `currency:` differing from the household's | not household money; never summed into a rand figure |
 | `earmarkedOut` | an outflow from an account whose type is savings/investment | money leaving a fund, not spending from the budget |
 | `transfer` | the category's type | money moving between the reader's own pockets |
-| `splitPart` | the split marker | a part of a row already counted as its parent |
+| `splitParent` | the split marker, `parent` | a row superseded by its parts; excluded by construction |
+| `splitPart` | the split marker, `part` | one of the parts that carry a split row's money |
 | `passthrough` | a matching opposite leg in another account in the same window | the second leg of money already counted once |
 | `setAside` | an outflow under a savings/investment-typed category | money the household kept, not consumed |
 
@@ -48,7 +49,7 @@ sign rule and is what the trend chart and comparison column draw from; the two
 sign rules are the one documented difference between them.
 
 **HOUSEHOLD** — "what actually moved through this household". Drops `foreign`,
-`transfer`, `splitPart`, and `passthrough`; keeps `excluded` and `nonBudget`
+`transfer`, `passthrough` and `splitParent`; keeps `excluded` and `nonBudget`
 rows because a bill paid from a joint account the household marked out of the
 budget is still a bill the emergency fund must cover. Net sign rule per
 category, then flipped. This is `healthSnapshot`'s household walk today, and it
@@ -95,6 +96,36 @@ The gate at every phase is the same: all guard suites green and
 `tests/figures/ledger.txt` byte-identical, except for moves named in the
 commit with the figure, the old value, the new value and the lens decision
 that moved it.
+
+## Phase 2, landed (2026-09-03)
+
+`src/ledger.js` holds `stamp()`, `tally()`, `LENSES` and `lensDifference()`.
+`summaryInRange`, `periodSpend` and the household walk in `healthSnapshot`
+are tallies under BUDGET, TREND and HOUSEHOLD behind their old names; the
+export's totals are a BUDGET tally over the env its page hands it.
+`tests/ledger-lenses.test.cjs` proves conservation under every lens against
+an independent oracle on randomised vaults, and that the gap between any two
+lenses is exactly the rows `lensDifference()` names. The figures ledger is
+byte-identical.
+
+Making the lenses data made two things visible that five loops had hidden:
+
+- **TREND does not drop `earmarkedOut`.** ISSUE 41 taught `summaryInRange`
+  that an outflow from an earmarked fund is not budget spend; `periodSpend`
+  was never taught. So the trend chart, the comparison column and the money
+  rail's category map count fund-paid spending the hero excludes. Preserved
+  in this phase so no figure moves; it is one word in the TREND row, and
+  whether to add it is a Phase 3 decision, with the ledger re-blessed if it
+  is.
+- **HOUSEHOLD counted a split parent and its parts.** A split's parent row is
+  excluded by construction; the household lens keeps excluded rows; the
+  pairing that drops pass-throughs never sees a parent (same label as its
+  parts). One R900 purchase split 600/300 read R1 800 in the Score's
+  consumption and essential spend. Corrected in this phase by adding
+  `splitParent` to the HOUSEHOLD row — a double count, not a product
+  reading — and pinned in the lens suite. The committed fixture holds no
+  split, so the ledger did not move; a vault that splits transactions will
+  see its Score pillars change by exactly the parents it had been counting.
 
 ## What this does not change
 
