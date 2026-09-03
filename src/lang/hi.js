@@ -668,6 +668,8 @@ module.exports = {
   'acct.badge.notInBudget': 'बजट से बाहर',
   'acct.badge.noTx': 'कोई लेन-देन नहीं',
   'acct.badge.asOf': '{date} तक',
+  'acct.badge.currencyClash': '{symbol} नहीं, {code} के रूप में पढ़ा जाता है',
+  'acct.drawer.currencyClash': 'मुद्रा विरोध',
   'acct.badge.neverConfirmed': 'कभी पुष्टि नहीं हुई',
   'acct.badge.unconfirmed': { one: '{count} दिन से बिना पुष्टि', other: '{count} दिनों से बिना पुष्टि' },
 

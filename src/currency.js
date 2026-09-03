@@ -40,6 +40,14 @@
    household's, so every account in a single-currency vault — which is nearly
    all of them — is unchanged and needs no frontmatter key. */
 function symbolOf(a, household) {
+  /* A conflicted account is labelled by its CODE, not by the symbol it states.
+     Its symbol claims to be the household's, so leaving it alone would file a
+     dollar balance under "R … held in other currencies" in a rand vault —
+     a disclosure naming the household's own symbol as a foreign one, which
+     reads as a bug rather than as the warning it is. The code is the half of
+     the contradiction that says something specific. */
+  const clash = a && a.currency_conflict;
+  if (clash) return clash.code;
   const own = String((a && a.currency) || '').trim();
   return own || String(household || '').trim() || 'R';
 }
@@ -49,7 +57,15 @@ function symbolOf(a, household) {
    "same", not as a second currency that happens to look identical. */
 function isForeign(a, household) {
   const own = String((a && a.currency) || '').trim();
-  return !!own && own !== String(household || '').trim();
+  if (own && own !== String(household || '').trim()) return true;
+  /* An account whose `currency_code` contradicts its symbol is NOT household
+     money, whatever its symbol says — see load.js, which is where the two
+     fields are compared. Foreign is the safe direction and the only one this
+     module may take: held out of the rand total and NAMED, which is what
+     currency.js has always done with money it cannot add. Counting it at par
+     is the alternative, and it is how R1 000 of dollars became R1 000 of
+     rands. */
+  return !!(a && a.currency_conflict);
 }
 
 /* Every distinct symbol across a set of accounts, household first, in the

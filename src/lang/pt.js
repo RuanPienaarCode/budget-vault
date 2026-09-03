@@ -669,6 +669,8 @@ module.exports = {
   'acct.badge.notInBudget': 'fora do orçamento',
   'acct.badge.noTx': 'sem transações',
   'acct.badge.asOf': 'em {date}',
+  'acct.badge.currencyClash': 'lido como {code}, não {symbol}',
+  'acct.drawer.currencyClash': 'Conflito de moeda',
   'acct.badge.neverConfirmed': 'nunca confirmado',
   'acct.badge.unconfirmed': { one: 'não confirmado há {count} dia', other: 'não confirmado há {count} dias' },
 

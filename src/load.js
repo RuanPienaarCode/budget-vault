@@ -283,6 +283,38 @@ module.exports = function registerLoad(ctx) {
            was opened about (see docs/adr/0004), and it very nearly shipped
            inside the fix for it. */
         currency_code: normalizeCode(fm.currency_code),
+        /* THE TWO FIELDS DISAGREEING ABOUT WHETHER THIS IS HOUSEHOLD MONEY.
+
+           `currency` is a display SYMBOL and `currency_code` is an ISO code for
+           rate lookup, and nothing had ever compared them. So an account
+           written `currency: R` with `currency_code: USD` in a rand/ZAR vault
+           was HOME to currency.js (its symbol matches, so its balance is added
+           to the rand total at par) and FOREIGN to fx.js (its code is not the
+           household's, so convertAccounts converts it). Measured: R1 000 in the
+           Accounts split headline against R17 985,61 on the converted line —
+           the same account, the same page, eighteen times apart.
+
+           Decided HERE, at load, rather than inside isForeign(): that function
+           takes a household SYMBOL and cannot see a code, and teaching it to
+           would mean threading a second argument through every one of its call
+           sites — which is exactly how the 1.36.0 fixes reached some consumers
+           and not others. Settings are parsed above accounts, so both halves
+           are in scope at this one point, and the answer travels on the account
+           the way `in_budget_stated` and a category's `type_stated` already do.
+
+           Only when the symbol claims to be the household's. A symbol that is
+           already foreign needs no help — isForeign has always caught it — and
+           an account stating a code and no symbol is the ordinary way to
+           record a foreign account, so it is the CODE that carries the claim
+           there. What is left is precisely the contradictory case. */
+        ...(((sym, code) => {
+          const home = String(S.settings.currency || '').trim();
+          const homeCode = normalizeCode(S.settings.currency_code);
+          const claimsHome = !sym || sym === home;
+          return (claimsHome && code && homeCode && code !== homeCode)
+            ? { currency_conflict: { symbol: sym || home, code, homeCode } }
+            : {};
+        })(String(fm.currency || '').trim(), normalizeCode(fm.currency_code))),
         /* Warnings this account has been told to stay quiet about — `true`, or
            a list like [no-transactions, unconfirmed]. Kept as the raw string;
            acct-status.js owns what the words mean, so there is one parser

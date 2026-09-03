@@ -632,6 +632,8 @@ module.exports = {
   'acct.badge.notInBudget': '不计入预算',
   'acct.badge.noTx': '没有交易',
   'acct.badge.asOf': '截至 {date}',
+  'acct.badge.currencyClash': '按 {code} 读取，而非 {symbol}',
+  'acct.drawer.currencyClash': '货币冲突',
   'acct.badge.neverConfirmed': '从未确认',
   'acct.badge.unconfirmed': { other: '已 {count} 天未确认' },
 

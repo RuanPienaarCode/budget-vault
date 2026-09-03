@@ -3,6 +3,20 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.36.4 — 2026-09-03
+
+### Fixed
+
+- **An account stating both a currency symbol and a currency code could have
+  them contradict each other,** and the app believed a different one depending
+  on which page you were looking at. `currency: R` with `currency_code: USD` in
+  a rand vault was counted as R 1 000 of your own money in the Accounts
+  headline and as R 17 985,61 of converted dollars on the line underneath it.
+  Such an account is now treated as foreign everywhere — held out of your
+  household total and listed under its code — and the account row is flagged
+  with a badge saying which of the two words the app is reading, so you can
+  correct the file. Nothing is rewritten for you.
+
 ## 1.36.3 — 2026-09-03
 
 ### Fixed

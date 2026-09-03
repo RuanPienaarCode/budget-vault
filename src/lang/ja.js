@@ -632,6 +632,8 @@ module.exports = {
   'acct.badge.notInBudget': '予算対象外',
   'acct.badge.noTx': '取引なし',
   'acct.badge.asOf': '{date} 時点',
+  'acct.badge.currencyClash': '{symbol} ではなく {code} として読まれます',
+  'acct.drawer.currencyClash': '通貨の不一致',
   'acct.badge.neverConfirmed': '未確認',
   'acct.badge.unconfirmed': { other: '{count} 日間未確認' },
 

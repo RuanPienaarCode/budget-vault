@@ -1530,7 +1530,15 @@ module.exports = function registerAccounts(ctx) {
     const a = r.a, v = view();
     const open = v.open === a.name;
     const tr = el('tr', {
-      class: `acct-row${r.state === 'drift' ? ' is-drift' : wantsALook(r) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
+      /* A currency conflict flags the ROW as well as carrying a badge in the
+         drawer: it is a contradiction in the file, not a figure that has merely
+         aged, and a reader should not have to open an account to discover that
+         the app is reading it as a different currency from the one they wrote.
+         Deliberately NOT a new `state`: acct-status.js's own note says a sixth
+         one has to be understood by every consumer of the pill, the queue and
+         the mute aliases before it can ship, and this needs none of that — the
+         existing "look at me" styling says enough, and the badge says which. */
+      class: `acct-row${r.state === 'drift' ? ' is-drift' : (wantsALook(r) || r.a.currency_conflict) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
       tabindex: '0',
       'aria-expanded': String(open),
       'aria-label': i18n.t('acct.aria.row', { name: a.name }),
@@ -1674,6 +1682,11 @@ module.exports = function registerAccounts(ctx) {
        a question with a blank answer is itself the answer. Suppressed only in a
        vault that has no owner question at all. */
     if (ownerInPlay()) f(i18n.t('acct.field.owner'), ownerLabel(a.owner, declaredOwners()));
+    if (a.currency_conflict) {
+      f(i18n.t('acct.drawer.currencyClash'), i18n.t('acct.badge.currencyClash', {
+        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
+      }));
+    }
     f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
     f(i18n.t('acct.drawer.inBudget'), i18n.t(a.in_budget ? 'acct.drawer.yes' : 'acct.drawer.no'));
     box.append(grid);
@@ -1686,6 +1699,21 @@ module.exports = function registerAccounts(ctx) {
     if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
     if (a.balance_updated && r.days === null) {
       badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
+    }
+    /* The account's own two currency fields contradicting each other, said on
+       the row rather than left to be inferred from a total. `currency: R` with
+       `currency_code: USD` in a rand vault used to be HOME to currency.js and
+       FOREIGN to fx.js — R1 000 in the split headline against R17 985,61 on
+       the converted line. The app now takes the safe reading (foreign, named
+       by its code, never added at par), and this badge is the other half of
+       that: the reader is told which of the two words won, so they can correct
+       the file rather than wonder why their rand account is listed under USD.
+       Warning-toned, because it is a fact about the FILE and not about the
+       money — nothing here is stale or unconfirmed, it is contradictory. */
+    if (a.currency_conflict) {
+      badges.append(badge(i18n.t('acct.badge.currencyClash', {
+        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
+      }), 'warn'));
     }
     if (badges.childElementCount) box.append(badges);
 

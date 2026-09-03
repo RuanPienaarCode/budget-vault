@@ -116,7 +116,28 @@ scope: it makes a rate table load-bearing for the health score and the exported
 report, and a stale table would then move a figure that has no way to say so.
 Nothing here forecloses it; it would be its own ADR.
 
-**Still open:** `currency` and `currency_code` can contradict each other on one
-account (`currency: R` with `currency_code: USD` is *home* to `isForeign` and
-*foreign* to `fx.codeOf`). Nothing validates the pair. It only bites together
-with conversion, and is recorded here rather than fixed.
+**Resolved, 1.36.4.** `currency` and `currency_code` could contradict each other
+on one account — `currency: R` with `currency_code: USD` in a rand/ZAR vault was
+*home* to `isForeign` (symbol matches, balance added at par) and *foreign* to
+`fx.codeOf` (code does not). Measured on the Accounts page: **R 1 000 in the
+split headline against R 17 985,61 on the converted line**, one account, one
+page.
+
+The comparison happens in `load.js`, at the single point where the household's
+own symbol and code are both already in scope, and the answer is stamped on the
+account as `currency_conflict` — the shape `in_budget_stated` and a category's
+`type_stated` already use. Deliberately *not* inside `isForeign()`: that takes a
+household symbol and cannot see a code, and teaching it to would mean threading
+a second argument through every call site, which is how the 1.36.0 fixes reached
+some consumers and not others twice over.
+
+The safe reading wins: a conflicted account is **foreign** — held out of the
+household total and named, which is what this module has always done with money
+it cannot add — and it is named by its **code**, since filing a dollar balance
+under "R … held in other currencies" in a rand vault reads as a bug rather than
+as the warning it is. The household is told, on the row and in the account
+drawer, rather than having a winner picked for them silently: `currency_code`
+has no field in the account dialog, so a conflict can only arrive by hand-
+editing frontmatter, and this app does not rewrite what someone typed.
+
+Guard: `tests/currency-fields-agree.test.cjs`.

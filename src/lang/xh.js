@@ -668,6 +668,8 @@ module.exports = {
   'acct.badge.notInBudget': 'ayikho kwibhajethi',
   'acct.badge.noTx': 'akukho ntengiselwano',
   'acct.badge.asOf': 'ukuya ku-{date}',
+  'acct.badge.currencyClash': 'ifundwa njenge-{code}, hayi i-{symbol}',
+  'acct.drawer.currencyClash': 'Ungquzulwano lwemali',
   'acct.badge.neverConfirmed': 'ayizange iqinisekiswe',
   'acct.badge.unconfirmed': { one: 'ayiqinisekiswanga usuku olungu-{count}', other: 'ayiqinisekiswanga iintsuku ezingu-{count}' },
 

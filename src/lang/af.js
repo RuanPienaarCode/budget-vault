@@ -654,6 +654,8 @@ module.exports = {
   'acct.badge.notInBudget': 'nie in begroting nie',
   'acct.badge.noTx': 'geen transaksies',
   'acct.badge.asOf': 'soos op {date}',
+  'acct.badge.currencyClash': 'lees as {code}, nie {symbol} nie',
+  'acct.drawer.currencyClash': 'Valuta-konflik',
   'acct.badge.neverConfirmed': 'nooit bevestig nie',
   'acct.badge.unconfirmed': { one: 'onbevestig vir {count} dag', other: 'onbevestig vir {count} dae' },
 

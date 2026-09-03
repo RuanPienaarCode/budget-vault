@@ -643,6 +643,8 @@ module.exports = {
   'acct.badge.notInBudget': 'luar anggaran',
   'acct.badge.noTx': 'tanpa transaksi',
   'acct.badge.asOf': 'per {date}',
+  'acct.badge.currencyClash': 'dibaca sebagai {code}, bukan {symbol}',
+  'acct.drawer.currencyClash': 'Konflik mata uang',
   'acct.badge.neverConfirmed': 'belum pernah dikonfirmasi',
   'acct.badge.unconfirmed': { other: 'belum dikonfirmasi {count} hari' },
 
