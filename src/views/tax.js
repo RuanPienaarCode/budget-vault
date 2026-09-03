@@ -614,8 +614,15 @@ module.exports = function registerTax(ctx) {
       deadline_provisional: t.deadline_provisional ? yamlStr(t.deadline_provisional) : null,
       assessment_date: t.assessment_date ? yamlStr(t.assessment_date) : null,
       assessment_ref: t.assessment_ref ? yamlStr(t.assessment_ref) : null,
-      assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result : null,
-      assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income : null,
+      /* ISSUE 52. A cell nobody could read is written back VERBATIM, never as
+         a number and never as a fabricated 0 — the same contract
+         table-schema.js's money() reader gives every other hand-editable
+         amount. `<key>Raw` is set only when the text was present and
+         unreadable, so a blank field still writes null. */
+      assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result
+        : (t.assessment_resultRaw ? yamlStr(t.assessment_resultRaw) : null),
+      assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income
+        : (t.assessment_incomeRaw ? yamlStr(t.assessment_incomeRaw) : null),
     });
     const loc = locale();
     const lines = ['---', ...fm.split('\n'), '---', '', `# Tax Year ${year}`, '',

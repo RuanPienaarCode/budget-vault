@@ -3,6 +3,41 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.37.0 — 2026-09-03
+
+### Fixed
+
+Four defects found by an audit of the whole app, two of them destroying data
+you had typed. None came from the recent changes — all four have been shipping
+for some time.
+
+- **Importing a statement could silently swallow a block of transactions.** A
+  double quote anywhere in a field — an inch mark in a merchant name, like
+  `BUILDERS 15" HOSE` — made the reader treat everything after it as one long
+  field. On a twelve-row file, seven transactions disappeared into one merged
+  row, and the import screen still said "0 unparseable". Quotes now only open a
+  quoted field where a quote is supposed to: at the start of one.
+- **Tax assessment amounts were read 100× wrong.** A refund typed the way SARS
+  prints it, `-1 234,56`, was read as `-123456` — the reader deleted the
+  spacing instead of understanding it — and saved back in that form. It now
+  goes through the same amount reader everything else in the app uses, and a
+  figure it cannot read keeps your original text instead of being replaced with
+  `0.00`.
+- **Text with quotes or backslashes in it grew slashes on every save.** An
+  account at `O"Reilly Bank` became `O\"Reilly Bank`, then `O\\\"Reilly
+  Bank`, doubling each time you saved. It affected account names and numbers,
+  institution, owner, household name, plan names and the tax reference fields.
+- **Correcting the account on an import did not re-check the +/− signs.** If the
+  app could not tell which account a statement belonged to and you picked it
+  yourself, the sign check kept its original guess — so a credit-card statement
+  could import every purchase as income, under a green "amounts check out"
+  message.
+
+Also: an account file you have filed into a sub-folder of `Accounts/` is not
+read, which made its balance vanish from every total while its transactions
+still counted. The Accounts page now names any file it is skipping so you can
+move it back.
+
 ## 1.36.4 — 2026-09-03
 
 ### Fixed

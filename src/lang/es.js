@@ -721,6 +721,10 @@ module.exports = {
   'acct.hero.label': 'Neto entre tus cuentas',
   'acct.hero.sub': '{assets} a favor frente a {liabilities} en descubierto.',
   'acct.hero.elsewhere': ' Los bienes y las deudas registrados en sus propias páginas no se cuentan aquí.',
+  'acct.ignoredFiles': {
+    one: '{count} archivo de cuenta en una subcarpeta de Accounts/ no se está leyendo ({names}). Muévelo directamente a Accounts/ para incluirlo.',
+    other: '{count} archivos de cuenta en subcarpetas de Accounts/ no se están leyendo ({names}). Muévelos directamente a Accounts/ para incluirlos.',
+  },
   'acct.hero.mixed': ' Este total suma cuentas mantenidas en más de una moneda ({symbols}) sin convertirlas.',
   'acct.hero.converted': ' Incluye {list}, convertido a los tipos del {date}.',
   'acct.hero.convertedTotal': 'Total convertido {amount}',

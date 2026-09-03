@@ -265,11 +265,12 @@ module.exports = function registerImport(ctx) {
        keeps the asset reading rather than guessing at a sign, which is the one
        thing this whole block exists to avoid. */
     const acct0 = label0 ? accountForLabel(label0) : null;
-    const rec = iBalance !== -1
-      ? reconcileAmounts(ledger, { liability: isCreditCard(acct0) })
-      : null;
-    const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
-    if (flipped) for (const it of items) it.amount = -it.amount;
+    /* ISSUE 53. The unflipped parsed amount, kept so the verdict can be
+       RE-decided. Everything below reads `amount0` and writes `amount`, so
+       applying the verdict twice, or after the reader corrects the account,
+       lands on the same numbers rather than negating them again. */
+    for (const it of items) it.amount0 = it.amount;
+    const rec = signVerdict(items, ledger, iBalance, iAmount, acct0);
     /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
        `verified && flip` means the file only reconciles with every amount
        negated — so the balance column has just proved that what the header calls
@@ -281,7 +282,7 @@ module.exports = function registerImport(ctx) {
        message, on the one file that had just failed. That is precisely the
        plausible-wrong-number outcome this whole reconciliation exists to
        prevent, arriving through the one branch that does not correct it. */
-    const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
+    const inverted = !!rec && rec.inverted;
     /* The file's own date span. The near-duplicate pass treats "this row is no
        longer in the statement" as evidence it settled and was rewritten, so it
        may only reason about vault rows the statement actually covers. */
@@ -294,7 +295,10 @@ module.exports = function registerImport(ctx) {
       // What the FILE says it is, kept beside what the user picked — the two
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
-      reconcile: rec ? { ...rec, flipped, inverted } : null,
+      reconcile: rec,
+      // Kept so the verdict can be recomputed when the reader corrects the
+      // account — see signVerdict() and the #impAccount handler.
+      ledger, iBalance, iAmount,
       // Kept so "Columns wrong?" can reopen the mapper on the SAME file without
       // asking the user to find and drop it again.
       rows, map, file };
@@ -464,6 +468,46 @@ module.exports = function registerImport(ctx) {
   const IMPORT_PAGE = 200;
   let importShown = IMPORT_PAGE;
 
+  /* ISSUE 53. THE ONE PLACE the sign verdict is decided, and the reason it is a
+     function rather than four lines inside runImport.
+
+     `rec`, `flipped` and `inverted` used to be computed ONCE, from
+     `accountForLabel(label0)` — the filename/preamble guess. renderImportReview
+     re-runs applyCounterparties on every account change and never recomputed
+     any of them. This file's own applyCounterparties header says the guess
+     failing is "the ordinary case for any hand-saved or renamed export, not an
+     edge one"; that reasoning reached transfers and not the sign.
+
+     What it cost: a credit-card export whose account the importer could not
+     identify keeps the ASSET reading (deliberately — guessing a sign is the one
+     thing that block avoids). The reader then picks the card in the account
+     select, and the verdict, the banner and every amount stay on the asset
+     reading straight through commitImport. R1 894,75 of card spending imports
+     as INCOME, under a green "Amounts check out against this statement's own
+     balance column" — the reassuring sentence, on the file that had just been
+     read backwards.
+
+     IDEMPOTENT BY CONSTRUCTION. It reads `amount0` (the unflipped parsed value,
+     stamped once at parse time) and writes `amount`, so calling it again — on
+     every account switch, however many times — cannot double-negate. The old
+     code negated `amount` in place, which is why recomputation was not simply a
+     matter of calling it twice. */
+  function signVerdict(items, ledger, iBalance, iAmount, account) {
+    const rec = iBalance !== -1
+      ? reconcileAmounts(ledger, { liability: isCreditCard(account) })
+      : null;
+    const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
+    /* `verified && flip` on a Debit/Credit PAIR, where it cannot be acted on:
+       the balance column has proved that what the header calls "money out" is
+       money in. Not auto-correcting is deliberate — the sign came from a column
+       NAME, so a disagreement means the mapping is wrong, not the arithmetic —
+       but the verdict must still reach the banner rather than falling through
+       to "amounts check out". */
+    const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
+    for (const it of items) it.amount = flipped ? -it.amount0 : it.amount0;
+    return rec ? { ...rec, flipped, inverted } : null;
+  }
+
   function renderImportReview() {
     const p = S.pendingImport;
     if (!p) return;
@@ -481,6 +525,15 @@ module.exports = function registerImport(ctx) {
        recomputed every render rather than left as parse-time guesswork; rows
        the reader has decided on carry manualExclude and are skipped. */
     applyCounterparties(p.items, S.accounts, p.label);
+
+    /* ISSUE 53. The account is settled by the line above, so the sign verdict
+       is re-decided here from the SAME account — not from the parse-time guess.
+       Idempotent (see signVerdict), so re-rendering for "show more" or a
+       category change costs nothing and changes nothing. */
+    if (p.ledger) {
+      p.reconcile = signVerdict(p.items, p.ledger, p.iBalance, p.iAmount,
+        p.label ? accountForLabel(p.label) : null);
+    }
 
     /* The statement is already parsed and on screen by the time anyone notices
        it belongs to an account this vault has never had — and on a fresh vault

@@ -59,7 +59,7 @@ function fmBool(v) {
 }
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
+  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid, relPath } = ctx;
 
   /* Reads go out in parallel; parsing stays serial. Every loop below used to
      await one file at a time — ~163 sequential round trips on a real vault,
@@ -254,6 +254,30 @@ module.exports = function registerLoad(ctx) {
     S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
 
     S.accounts = [];
+    /* ISSUE 60. Account files the loader is IGNORING, named rather than lost.
+
+       mdFilesIn reads one level, and io.js's own comment defends that for
+       Accounts/ on the grounds that the folder is "flat by construction,
+       because the plugin names the files itself" — the same argument that
+       comment then narrates as having been wrong for Notes/. The vault is
+       user-writable markdown and filing dormant accounts into
+       `Accounts/Closed/` is an ordinary tidy-up.
+
+       Measured: `Accounts/Closed/Old Savings.md` holding R88 000, with its own
+       transactions folder. The account loaded nowhere, so net worth read
+       R12 000 instead of R100 000 — while its R250 of interest DID reach the
+       period income total, because transaction folders are read by label. The
+       rows counted, the balance did not, and nothing said so.
+
+       Reading them in is the fuller fix and is NOT what this does: every write
+       site addresses an account as `Accounts/<name>.md`, so loading a nested
+       file without also teaching those sites its real path would have the next
+       save create a duplicate at the top level and silently strand the
+       original — a worse bug than the one being fixed, and the same class.
+       So this states the omission and leaves the file alone. */
+    const nested = mdFilesUnder('Accounts')
+      .filter(f => f.path.slice(0, f.path.lastIndexOf('/')) !== relPath('Accounts'));
+    S.accountsIgnored = nested.map(f => f.path);
     for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       S.accounts.push({
@@ -567,11 +591,35 @@ module.exports = function registerLoad(ctx) {
          private copy of that logic, with a test that asserted against its own
          mirror of it rather than against the shipped function. */
       const figAmount = s => normalizeAmount(s) ?? 0;
+      /* ISSUE 52. `normalizeAmount`, not a digit-scraper.
+
+         This read `Number(String(v).replace(/[^\d.-]/g, ''))`, which DELETES
+         separators instead of interpreting them — and it is the reader for the
+         two figures a household copies straight off an ITA34:
+
+             cell           was          should be
+             -1 234,56      -123456      -1234.56
+             480 000,00     48000000     480000
+             1.250,00       1.25         1250
+
+         A refund of R1 234,56 was read as R123 456 and written back, and since
+         these are numbers in memory there was no raw text to fall back to. This
+         is exactly what src/amount.js exists to prevent, in the one file that
+         never called it — the same argument table-schema.js's money() reader
+         already carries for every other hand-editable amount.
+
+         An UNREADABLE cell returns null and keeps its text in `<key>Raw`, so
+         the serializer writes the household's own words back rather than
+         stamping a fabricated 0 over them (views/tax.js reads the pair). A
+         blank cell is null with no raw: nothing was said, and nothing is
+         preserved. */
       const signedNum = v => {
-        if (v === undefined || v === null || v === '') return null;
-        const n = Number(String(v).replace(/[^\d.-]/g, ''));
-        return Number.isFinite(n) ? n : null;
+        if (v === undefined || v === null || String(v).trim() === '') return { value: null, raw: null };
+        const n = normalizeAmount(v);
+        return n === null ? { value: null, raw: String(v) } : { value: n, raw: null };
       };
+      const assessResult = signedNum(fm.assessment_result);
+      const assessIncome = signedNum(fm.assessment_income);
       S.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         taxpayer_type: ['provisional', 'standard'].includes(fm.taxpayer_type) ? fm.taxpayer_type : 'unknown',
@@ -582,8 +630,10 @@ module.exports = function registerLoad(ctx) {
         // Result is signed the way tax authorities print it: negative = refund.
         assessment_date: fm.assessment_date || '',
         assessment_ref: fm.assessment_ref || '',
-        assessment_result: signedNum(fm.assessment_result),
-        assessment_income: signedNum(fm.assessment_income),
+        assessment_result: assessResult.value,
+        assessment_resultRaw: assessResult.raw,
+        assessment_income: assessIncome.value,
+        assessment_incomeRaw: assessIncome.raw,
         steps: parseMdTable(section(body, 'progress')).slice(1).filter(c => c[0]).map(c => ({
           step: unescMd(c[0]), status: stepStatus(c[1]), due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
         })),

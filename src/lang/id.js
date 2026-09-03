@@ -704,6 +704,9 @@ module.exports = {
   'acct.hero.label': 'Bersih di seluruh rekening Anda',
   'acct.hero.sub': '{assets} bersaldo positif berbanding {liabilities} bersaldo negatif.',
   'acct.hero.elsewhere': ' Aset dan utang yang dicatat di halamannya masing-masing tidak dihitung di sini.',
+  'acct.ignoredFiles': {
+    other: '{count} berkas akun di subfolder Accounts/ tidak dibaca ({names}). Pindahkan langsung ke Accounts/ agar disertakan.',
+  },
   'acct.hero.mixed': ' Total ini menjumlahkan rekening dalam lebih dari satu mata uang ({symbols}) tanpa mengonversinya.',
   'acct.hero.converted': ' Termasuk {list}, dikonversi dengan kurs {date}.',
   'acct.hero.convertedTotal': 'Total terkonversi {amount}',

@@ -690,6 +690,9 @@ module.exports = {
   'acct.hero.label': '口座全体の純額',
   'acct.hero.sub': '残高 {assets} に対し、当座借越 {liabilities}。',
   'acct.hero.elsewhere': ' それぞれのページに記録された資産と負債はここには含まれません。',
+  'acct.ignoredFiles': {
+    other: 'Accounts/ のサブフォルダにある {count} 件の口座ファイルは読み込まれていません（{names}）。Accounts/ 直下に移動すると含まれます。',
+  },
   'acct.hero.mixed': ' この合計は複数の通貨（{symbols}）で保有する口座を、換算せずに合算しています。',
   'acct.hero.converted': ' {date} のレートで換算した {list} を含みます。',
   'acct.hero.convertedTotal': '換算合計 {amount}',

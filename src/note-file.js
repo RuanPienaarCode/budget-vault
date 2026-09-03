@@ -238,13 +238,16 @@ function parseNote(text, path = '') {
      absent, which covers a note a user wired up by hand with a wikilink and no
      subject key. Reading them the other way round would let a stale wikilink
      win over the key the plugin maintains. */
-  const subject = unyaml(fm.note_subject) || unwrapLink(fm.note_for);
+  /* ISSUE 54. No unyaml() — parseFrontmatter is now the inverse of yamlStr at
+     the boundary, so the value arriving here is already unescaped. Running
+     both would eat a legitimate backslash. */
+  const subject = (fm.note_subject || '').toString().trim() || unwrapLink(fm.note_for);
   const base = (path.split('/').pop() || '').replace(/\.md$/, '');
   const h1 = /^#\s+(.+)$/m.exec(body || '');
   return {
     kind,
     subject,
-    created: unyaml(fm.created) || firstDate(base),
+    created: (fm.created || '').toString().trim() || firstDate(base),
     title: (h1 ? h1[1].trim() : base.replace(/^\d{4}-\d{2}-\d{2}\s+/, '')) || 'Untitled note',
     excerpt: noteExcerpt(body),
   };

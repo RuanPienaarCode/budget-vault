@@ -690,6 +690,9 @@ module.exports = {
   'acct.hero.label': '所有账户净额',
   'acct.hero.sub': '结余 {assets}，透支 {liabilities}。',
   'acct.hero.elsewhere': ' 记录在各自页面上的资产与债务不计入此处。',
+  'acct.ignoredFiles': {
+    other: 'Accounts/ 子文件夹中的 {count} 个账户文件未被读取（{names}）。将其直接移入 Accounts/ 即可包含。',
+  },
   'acct.hero.mixed': ' 此总计将以多种货币（{symbols}）持有的账户相加，未进行换算。',
   'acct.hero.converted': ' 包含 {list}，按 {date} 的汇率换算。',
   'acct.hero.convertedTotal': '折算合计 {amount}',

@@ -769,6 +769,10 @@ module.exports = {
   'acct.hero.label': 'Net across your accounts',
   'acct.hero.sub': '{assets} in credit against {liabilities} overdrawn.',
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
+  'acct.ignoredFiles': {
+    one: '{count} account file in a sub-folder of Accounts/ is not being read ({names}). Move it directly into Accounts/ to include it.',
+    other: '{count} account files in sub-folders of Accounts/ are not being read ({names}). Move them directly into Accounts/ to include them.',
+  },
   /* ITEM 5: the hero itself no longer does this — its own total now sums only
      the household's own currency (acct.hero.otherCurrencies, below, is what
      it says instead). This key stays live for the Ring and the "Whose it is"

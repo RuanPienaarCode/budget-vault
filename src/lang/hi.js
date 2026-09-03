@@ -734,6 +734,10 @@ module.exports = {
   'acct.hero.label': 'आपके खातों का शुद्ध जोड़',
   'acct.hero.sub': '{liabilities} ओवरड्रॉन के सामने {assets} जमा में।',
   'acct.hero.elsewhere': ' अपने-अपने पेजों पर दर्ज संपत्ति और कर्ज़ यहाँ नहीं गिने जाते।',
+  'acct.ignoredFiles': {
+    one: 'Accounts/ के उप-फ़ोल्डर में {count} खाता फ़ाइल नहीं पढ़ी जा रही ({names})। इसे सीधे Accounts/ में ले जाएँ।',
+    other: 'Accounts/ के उप-फ़ोल्डरों में {count} खाता फ़ाइलें नहीं पढ़ी जा रहीं ({names})। उन्हें सीधे Accounts/ में ले जाएँ।',
+  },
   'acct.hero.mixed': ' यह जोड़ एक से ज़्यादा मुद्राओं ({symbols}) में रखे खातों को बिना बदले जोड़ देता है।',
   'acct.hero.converted': ' इसमें {list} शामिल है, {date} की दरों पर परिवर्तित।',
   'acct.hero.convertedTotal': 'परिवर्तित कुल {amount}',

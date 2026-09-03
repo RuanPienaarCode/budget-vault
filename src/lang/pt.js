@@ -735,6 +735,10 @@ module.exports = {
   'acct.hero.label': 'Saldo líquido das suas contas',
   'acct.hero.sub': '{assets} positivos contra {liabilities} negativos.',
   'acct.hero.elsewhere': ' Bens e dívidas registrados nas páginas deles não entram nesta conta.',
+  'acct.ignoredFiles': {
+    one: '{count} ficheiro de conta numa subpasta de Accounts/ não está a ser lido ({names}). Mova-o directamente para Accounts/ para o incluir.',
+    other: '{count} ficheiros de conta em subpastas de Accounts/ não estão a ser lidos ({names}). Mova-os directamente para Accounts/ para os incluir.',
+  },
   'acct.hero.mixed': ' Este total soma contas mantidas em mais de uma moeda ({symbols}) sem convertê-las.',
   'acct.hero.converted': ' Inclui {list}, convertido às taxas de {date}.',
   'acct.hero.convertedTotal': 'Total convertido {amount}',

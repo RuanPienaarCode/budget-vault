@@ -739,6 +739,10 @@ module.exports = {
   'acct.hero.label': 'Okusele kuwo wonke ama-akhawunti akho',
   'acct.hero.sub': '{assets} enemali ngokumelene ne-{liabilities} edonswe ngokweqile.',
   'acct.hero.elsewhere': ' Amafa nezikweletu ezibhalwe emakhasini awo awabalwa lapha.',
+  'acct.ignoredFiles': {
+    one: 'Ifayela le-akhawunti elingu-{count} kufolda engaphansi kwe-Accounts/ alifundwa ({names}). Lidlulisele ngqo ku-Accounts/ ukuze lifakwe.',
+    other: 'Amafayela e-akhawunti angu-{count} kumafolda angaphansi kwe-Accounts/ awafundwa ({names}). Wadlulisele ngqo ku-Accounts/ ukuze afakwe.',
+  },
   'acct.hero.mixed': ' Leli samba lihlanganisa ama-akhawunti agcinwe ezimalini ezingaphezu kweyodwa ({symbols}) ngaphandle kokuwaguqula.',
   'acct.hero.converted': ' Ihlanganisa {list}, eguqulwe ngamazinga osuku lwe-{date}.',
   'acct.hero.convertedTotal': 'Isamba esiguqulwe {amount}',

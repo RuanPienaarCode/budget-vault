@@ -720,6 +720,10 @@ module.exports = {
   'acct.hero.label': 'Netto über deine Konten',
   'acct.hero.sub': '{assets} im Haben gegenüber {liabilities} im Soll.',
   'acct.hero.elsewhere': ' Vermögen und Schulden, die auf ihren eigenen Seiten erfasst sind, zählen hier nicht mit.',
+  'acct.ignoredFiles': {
+    one: '{count} Kontodatei in einem Unterordner von Accounts/ wird nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',
+    other: '{count} Kontodateien in Unterordnern von Accounts/ werden nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',
+  },
   'acct.hero.mixed': ' Diese Summe addiert Konten in mehr als einer Währung ({symbols}), ohne sie umzurechnen.',
   'acct.hero.converted': ' Enthält {list}, umgerechnet zu Kursen vom {date}.',
   'acct.hero.convertedTotal': 'Umgerechnete Summe {amount}',

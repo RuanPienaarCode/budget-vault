@@ -719,6 +719,10 @@ module.exports = {
   'acct.hero.label': 'Netto oor jou rekeninge',
   'acct.hero.sub': '{assets} in krediet teenoor {liabilities} oortrokke.',
   'acct.hero.elsewhere': ' Bates en skulde wat op hul eie bladsye aangeteken is, tel nie hier nie.',
+  'acct.ignoredFiles': {
+    one: '{count} rekeninglêer in ’n subgids van Accounts/ word nie gelees nie ({names}). Skuif dit direk na Accounts/ om dit in te sluit.',
+    other: '{count} rekeninglêers in subgidse van Accounts/ word nie gelees nie ({names}). Skuif hulle direk na Accounts/ om hulle in te sluit.',
+  },
   'acct.hero.mixed': ' Hierdie totaal tel rekeninge in meer as een geldeenheid ({symbols}) bymekaar sonder om om te skakel.',
   'acct.hero.converted': ' Sluit {list} in, omgeskakel teen koerse vir {date}.',
   'acct.hero.convertedTotal': 'Omgeskakelde totaal {amount}',

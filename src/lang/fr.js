@@ -733,6 +733,10 @@ module.exports = {
   'acct.hero.label': 'Net sur vos comptes',
   'acct.hero.sub': '{assets} au crédit face à {liabilities} à découvert.',
   'acct.hero.elsewhere': ' Les biens et les dettes enregistrés sur leurs propres pages ne sont pas comptés ici.',
+  'acct.ignoredFiles': {
+    one: '{count} fichier de compte dans un sous-dossier de Accounts/ n’est pas lu ({names}). Déplacez-le directement dans Accounts/ pour l’inclure.',
+    other: '{count} fichiers de compte dans des sous-dossiers de Accounts/ ne sont pas lus ({names}). Déplacez-les directement dans Accounts/ pour les inclure.',
+  },
   'acct.hero.mixed': ' Ce total additionne des comptes tenus dans plusieurs devises ({symbols}) sans les convertir.',
   'acct.hero.converted': ' Comprend {list}, converti aux taux du {date}.',
   'acct.hero.convertedTotal': 'Total converti {amount}',

@@ -813,6 +813,22 @@ module.exports = function registerAccounts(ctx) {
        back to — see unreadableBalance() above. It still appears in the table,
        flagged, so the reader can fix it; it just does not silently count as
        R0,00 toward what the household is worth. */
+    /* ISSUE 60. Account files the loader ignored because they sit in a
+       sub-folder, named on the page that owns accounts. Their money is in no
+       figure here — while their transactions, which are read by label, DO
+       reach the period totals. That split is exactly why silence was the wrong
+       answer: the vault looks internally inconsistent and nothing explains it. */
+    const ignored = S.accountsIgnored || [];
+    if (ignored.length) {
+      const el0 = $('#acctSummary');
+      if (el0) {
+        el0.append(el('div', { class: 'kpi-caveat-txt' },
+          i18n.t('acct.ignoredFiles', {
+            count: ignored.length,
+            names: ignored.map(p2 => p2.split('/').pop().replace(/\.md$/, '')).join(' · '),
+          })));
+      }
+    }
     const unreadable = S.accounts.filter(unreadableBalance);
     /* ITEM 5: the headline used to ADD every readable balance and disclose
        that the result mixed currencies. It now sums only the accounts stated
