@@ -690,6 +690,11 @@ module.exports = {
   'acct.hero.label': '口座全体の純額',
   'acct.hero.sub': '残高 {assets} に対し、当座借越 {liabilities}。',
   'acct.hero.elsewhere': ' それぞれのページに記録された資産と負債はここには含まれません。',
+  'imp.dateReading.dayFirst': 'このファイルの日付は日/月として読み取りました。逆に読むと順序が崩れるためです。',
+  'imp.dateReading.monthFirst': 'このファイルの日付は月/日として読み取りました。逆に読むと順序が崩れるためです。',
+  'acct.duplicateFolders': {
+    other: '{count} 件の取引フォルダが2つの口座に割り当てられています（{names}）。最初の口座のみ読み込まれます。各口座に固有のフォルダ名を付けてください。',
+  },
   'acct.ignoredFiles': {
     other: 'Accounts/ のサブフォルダにある {count} 件の口座ファイルは読み込まれていません（{names}）。Accounts/ 直下に移動すると含まれます。',
   },

@@ -829,6 +829,18 @@ module.exports = function registerAccounts(ctx) {
           })));
       }
     }
+    /* ISSUE 72. Two accounts, one transaction folder — see load.js. */
+    const dup = S.accountsDuplicated || [];
+    if (dup.length) {
+      const el0 = $('#acctSummary');
+      if (el0) {
+        el0.append(el('div', { class: 'kpi-caveat-txt' },
+          i18n.t('acct.duplicateFolders', {
+            count: dup.length,
+            names: dup.map(d => `${d.label}: ${d.first} · ${d.second}`).join(' — '),
+          })));
+      }
+    }
     const unreadable = S.accounts.filter(unreadableBalance);
     /* ITEM 5: the headline used to ADD every readable balance and disclose
        that the result mixed currencies. It now sums only the accounts stated

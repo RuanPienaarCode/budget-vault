@@ -704,6 +704,11 @@ module.exports = {
   'acct.hero.label': 'Bersih di seluruh rekening Anda',
   'acct.hero.sub': '{assets} bersaldo positif berbanding {liabilities} bersaldo negatif.',
   'acct.hero.elsewhere': ' Aset dan utang yang dicatat di halamannya masing-masing tidak dihitung di sini.',
+  'imp.dateReading.dayFirst': 'Tanggal dalam berkas ini dibaca sebagai hari/bulan, karena cara sebaliknya membuatnya tidak berurutan.',
+  'imp.dateReading.monthFirst': 'Tanggal dalam berkas ini dibaca sebagai bulan/hari, karena cara sebaliknya membuatnya tidak berurutan.',
+  'acct.duplicateFolders': {
+    other: '{count} folder transaksi diklaim oleh dua akun ({names}); hanya yang pertama dibaca. Beri setiap akun nama folder sendiri.',
+  },
   'acct.ignoredFiles': {
     other: '{count} berkas akun di subfolder Accounts/ tidak dibaca ({names}). Pindahkan langsung ke Accounts/ agar disertakan.',
   },

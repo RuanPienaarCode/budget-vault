@@ -719,6 +719,12 @@ module.exports = {
   'acct.hero.label': 'Netto oor jou rekeninge',
   'acct.hero.sub': '{assets} in krediet teenoor {liabilities} oortrokke.',
   'acct.hero.elsewhere': ' Bates en skulde wat op hul eie bladsye aangeteken is, tel nie hier nie.',
+  'imp.dateReading.dayFirst': 'Datums in hierdie lêer is as dag/maand gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
+  'imp.dateReading.monthFirst': 'Datums in hierdie lêer is as maand/dag gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
+  'acct.duplicateFolders': {
+    one: '{count} transaksiegids word deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
+    other: '{count} transaksiegidse word elk deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
+  },
   'acct.ignoredFiles': {
     one: '{count} rekeninglêer in ’n subgids van Accounts/ word nie gelees nie ({names}). Skuif dit direk na Accounts/ om dit in te sluit.',
     other: '{count} rekeninglêers in subgidse van Accounts/ word nie gelees nie ({names}). Skuif hulle direk na Accounts/ om hulle in te sluit.',

@@ -735,6 +735,12 @@ module.exports = {
   'acct.hero.label': 'Saldo líquido das suas contas',
   'acct.hero.sub': '{assets} positivos contra {liabilities} negativos.',
   'acct.hero.elsewhere': ' Bens e dívidas registrados nas páginas deles não entram nesta conta.',
+  'imp.dateReading.dayFirst': 'As datas deste ficheiro foram lidas como dia/mês, porque lê-las ao contrário as deixava fora de ordem.',
+  'imp.dateReading.monthFirst': 'As datas deste ficheiro foram lidas como mês/dia, porque lê-las ao contrário as deixava fora de ordem.',
+  'acct.duplicateFolders': {
+    one: '{count} pasta de movimentos é reclamada por duas contas ({names}); só a primeira é lida. Dê a cada conta o seu próprio nome de pasta.',
+    other: '{count} pastas de movimentos são reclamadas por duas contas cada ({names}); só a primeira é lida. Dê a cada conta o seu próprio nome de pasta.',
+  },
   'acct.ignoredFiles': {
     one: '{count} ficheiro de conta numa subpasta de Accounts/ não está a ser lido ({names}). Mova-o directamente para Accounts/ para o incluir.',
     other: '{count} ficheiros de conta em subpastas de Accounts/ não estão a ser lidos ({names}). Mova-os directamente para Accounts/ para os incluir.',

@@ -3,6 +3,35 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+The third audit batch — seven more, in the importer, the committed chain and
+the page's own speed.
+
+- **Statement dates are read the way the file itself supports.** A US-format
+  export on a day/month household read `01/03` as the 1st of March and spread a
+  three-month statement across five months. The file's own row order now
+  decides when the two readings disagree, and the review says which was used.
+- **A statement with no grouping evidence no longer imports a thousandfold
+  small.** `250.000` on a dot-grouping household is a quarter of a million, not
+  two hundred and fifty; your own country profile now breaks the tie.
+- **Short learned rules stopped eating unrelated merchants.** `CASH` no longer
+  categorises CASHBUILD, and `FEES` no longer catches COFFEES.
+- **Two accounts pointing at one transaction folder are now named on the
+  Accounts page.** Before, the second silently got no transactions and could
+  never be reconciled.
+- **Viewing next month no longer shows its money twice.** A period that has not
+  started reports nothing so far and everything as scheduled, and is no longer
+  treated as finished.
+- **A debt paid either side of a month end is due around the 1st, not the
+  16th.** Days of the month are a circle; the old median treated them as a
+  line, and on a fortnightly cycle the half holding the payment said nothing
+  was due.
+- **The Dashboard is much faster with many accounts** — the account index was
+  rebuilt with a scan that grew with the square of the account count.
+
 ## 1.38.0 — 2026-09-03
 
 ### Fixed

@@ -204,10 +204,9 @@ function nextExpected(stats, cycle) {
   const step = STEP_DAYS[cycle];
   if (step) { return isoFromDayNumber(isoDayNumber(stats.last) + step); }
   if (cycle === 'annual') {
-    // Same clamp as the monthly branch below: "+1 year, same month/day" lands
-    // on 2029-02-29 for a service last charged 2028-02-29, a date that does
-    // not exist. String comparison keeps the ordering sane either way, so
-    // nothing crashes — it just renders a due date nobody's calendar has.
+    // Same clamp as the monthly branch below: "+1 year, same month/day" WOULD
+    // land on 2029-02-29 for a service last charged 2028-02-29, a date that
+    // does not exist — which is why the clamp is here. It returns 2029-02-28.
     const [y, m, d] = stats.last.split('-').map(Number);
     const ny = y + 1;
     const lastDay = new Date(Date.UTC(ny, m, 0)).getUTCDate();

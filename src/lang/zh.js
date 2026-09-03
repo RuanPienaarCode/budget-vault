@@ -690,6 +690,11 @@ module.exports = {
   'acct.hero.label': '所有账户净额',
   'acct.hero.sub': '结余 {assets}，透支 {liabilities}。',
   'acct.hero.elsewhere': ' 记录在各自页面上的资产与债务不计入此处。',
+  'imp.dateReading.dayFirst': '此文件中的日期按日/月读取，因为按另一种方式读取会使其顺序错乱。',
+  'imp.dateReading.monthFirst': '此文件中的日期按月/日读取，因为按另一种方式读取会使其顺序错乱。',
+  'acct.duplicateFolders': {
+    other: '{count} 个交易文件夹被两个账户同时使用（{names}）；仅读取第一个。请为每个账户设置独立的文件夹名。',
+  },
   'acct.ignoredFiles': {
     other: 'Accounts/ 子文件夹中的 {count} 个账户文件未被读取（{names}）。将其直接移入 Accounts/ 即可包含。',
   },

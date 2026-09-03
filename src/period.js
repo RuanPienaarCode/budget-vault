@@ -250,10 +250,39 @@ module.exports = function registerPeriod(ctx) {
      Rows are handed over unfiltered — excluded ones included. Callers decide
      what to drop, and the two that exist deliberately drop nothing: money that
      left the bank still left the bank whether or not it counts in the budget. */
+  /* ISSUE 61. One folded-key lookup built ONCE per index, instead of
+     accountForLabel's linear scan once per transaction FILE.
+
+     accountForLabel is O(accounts) with two safeSeg calls per account, and
+     accountIndex called it per file — O(files x accounts), rebuilt around
+     fifteen times per Dashboard render. Measured with the row count held
+     constant at 9 600: 2 accounts 6 ms, 40 accounts 47 ms for the fifteen
+     rebuilds, and over a million safeSeg calls per render at 40. Desktop V8
+     shrugs; the iOS 15 floor this plugin targets does not.
+
+     EXACTLY equivalent to the scan it replaces, not approximately. find()
+     returns the first account (in array order) for which ANY of four tests
+     holds — exact tx_label, exact name, folded tx_label, folded name. An
+     exact match implies a folded match (safeSeg(x).toLowerCase() of an equal
+     string IS the key), so the folded tests are a superset, and a map from
+     folded key to the FIRST account claiming it gives the same answer for
+     every label, colliding vaults included (#72 is about those). */
+  function labelLookup() {
+    const map = new Map();
+    for (const a of S.accounts) {
+      for (const k of [a.tx_label, a.name]) {
+        if (!k) continue;
+        const key = safeSeg(k).toLowerCase();
+        if (!map.has(key)) map.set(key, a);
+      }
+    }
+    return label => map.get(safeSeg(label).toLowerCase()) || null;
+  }
   function accountIndex() {
     const idx = new Map();
+    const lookup = labelLookup();
     for (const f of Object.values(S.txFiles)) {
-      const a = accountForLabel(f.label);
+      const a = lookup(f.label);
       if (!a) continue;                 // an orphan folder with no account file
       let e = idx.get(a);
       if (!e) { e = { rows: [], labels: new Set() }; idx.set(a, e); }
@@ -653,10 +682,21 @@ module.exports = function registerPeriod(ctx) {
       /* Behind us, or entirely ahead of us. Either way there is no "so far"
          boundary inside this window to draw. */
       const whole = summaryInRange(start, end);
+      if (today < start) {
+        /* ISSUE 73. Entirely ahead of us: NOTHING has happened yet, so the
+           headline figures are zero and the whole window is `scheduled`. This
+           used to hand back the whole window in BOTH — the hero then printed
+           "Income R40 000 · Spent R6 590" and, under it, "R46 590 more is
+           dated later this period": the same money twice, one line apart,
+           captioned "Up to today" on a period today is not in. A future period
+           is a plan, and a plan's figures live in the scheduled half. */
+        const nothing = summaryInRange(end, start);   // an empty window, same shape
+        nothing.asOf = start;
+        nothing.scheduled = { income: whole.income, spend: whole.spend, count: whole.count, from: start };
+        return nothing;
+      }
       whole.asOf = end;
-      whole.scheduled = today < start
-        ? { income: whole.income, spend: whole.spend, count: whole.count, from: start }
-        : EMPTY_SCHEDULED;
+      whole.scheduled = EMPTY_SCHEDULED;
       return whole;
     }
     const soFar = summaryInRange(start, today);

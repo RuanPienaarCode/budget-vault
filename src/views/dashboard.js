@@ -1393,7 +1393,10 @@ module.exports = function registerDashboard(ctx) {
        income as having planned for nothing. */
     const allocated = allocatedShare({
       budgeted: bud.spend + (bud.setAside || 0), budgetIncome: bud.income, actualIncome: sum.income,
-      periodFinished: S.period !== currentPeriod(),
+      /* ISSUE 73: BEFORE today's period, not merely different from it — a
+         future period has not finished, and treating it as finished let
+         incomeBaseFor fall back to income that has not arrived. */
+      periodFinished: S.period < currentPeriod(),
     });
     /* sharePercentLabel, not a bare Math.round: 100.24% allocated rounding to
        "100%" sat beside the Budget page's red "over-budgeted R 97,80" tile,
@@ -1419,7 +1422,10 @@ module.exports = function registerDashboard(ctx) {
        would be noise qualifying nothing. */
     const incomeBase = incomeBaseFor({
       budgetIncome: bud.income, actualIncome: sum.income,
-      periodFinished: S.period !== currentPeriod(),
+      /* ISSUE 73: BEFORE today's period, not merely different from it — a
+         future period has not finished, and treating it as finished let
+         incomeBaseFor fall back to income that has not arrived. */
+      periodFinished: S.period < currentPeriod(),
     });
     const baseDiffers = allocated !== null && Math.round((incomeBase - sum.income) * 100) !== 0;
     const usedPct = bud.spend > 0 ? sharePercentLabel(spent / bud.spend, locale().decimal) : null;

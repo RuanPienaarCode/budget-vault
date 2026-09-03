@@ -100,6 +100,27 @@ const median = arr => {
   const m = a.length >> 1;
   return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
 };
+/* ISSUE 74. Days of the month are a CIRCLE, and a plain median treats them as
+   a line. Two debit orders posting either side of a month end — the 31st and
+   the 1st, one weekend apart — have a numeric median of 16, a day no payment
+   has ever fallen on. On a monthly period the instalment was still claimed
+   once, so only its printed date and `missed` flag were wrong; on a fortnight
+   the half of the month that actually holds the payment reported NOTHING DUE.
+
+   When the spread exceeds half a month the cluster straddles the boundary, so
+   the low days are lifted by a month before the median is taken and the
+   result folded back. 31 and 1 become 31 and 32, median 32, folded to 1.
+   Unreadable dates (NaN) are dropped rather than allowed to poison the sort —
+   the same discipline recurring.js's chargeStats takes since ISSUE 75. */
+const usualDay = days => {
+  const ds = days.filter(d => Number.isFinite(d) && d >= 1 && d <= 31);
+  if (!ds.length) return 0;
+  const lo = Math.min(...ds), hi = Math.max(...ds);
+  if (hi - lo <= 15) return median(ds);
+  const lifted = ds.map(d => (d < 16 ? d + 31 : d));
+  const m = median(lifted);
+  return m > 31 ? m - 31 : m;
+};
 
 /* The first date on or after `from` that falls on day-of-month `d`, clamped to
    a short month's last day so "the 31st" does not skip February entirely. */
@@ -446,7 +467,7 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today
     const asOf = ISO_DATE.test(today || '') && today < to ? today : to;
     if (paid.some(r => r.date >= periodStart && r.date <= asOf)) continue;   // rule 2
 
-    const usual = paid.length ? median(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
+    const usual = paid.length ? usualDay(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
     let due = usual ? nextOnDay(periodStart, usual) : null;
 
     if (due) {

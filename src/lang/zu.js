@@ -739,6 +739,12 @@ module.exports = {
   'acct.hero.label': 'Okusele kuwo wonke ama-akhawunti akho',
   'acct.hero.sub': '{assets} enemali ngokumelene ne-{liabilities} edonswe ngokweqile.',
   'acct.hero.elsewhere': ' Amafa nezikweletu ezibhalwe emakhasini awo awabalwa lapha.',
+  'imp.dateReading.dayFirst': 'Izinsuku kuleli fayela zifundwe njengosuku/inyanga, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
+  'imp.dateReading.monthFirst': 'Izinsuku kuleli fayela zifundwe njengenyanga/usuku, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
+  'acct.duplicateFolders': {
+    one: 'Ifolda yokuthengiselana engu-{count} ifunwa ama-akhawunti amabili ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
+    other: 'Amafolda okuthengiselana angu-{count} afunwa ama-akhawunti amabili ngalinye ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
+  },
   'acct.ignoredFiles': {
     one: 'Ifayela le-akhawunti elingu-{count} kufolda engaphansi kwe-Accounts/ alifundwa ({names}). Lidlulisele ngqo ku-Accounts/ ukuze lifakwe.',
     other: 'Amafayela e-akhawunti angu-{count} kumafolda angaphansi kwe-Accounts/ awafundwa ({names}). Wadlulisele ngqo ku-Accounts/ ukuze afakwe.',

@@ -907,6 +907,7 @@ const SHELL_HTML = `
               <div class="sub" id="impStats"></div>
               <div class="sub imp-legend" id="impLegend"></div>
               <div class="sub imp-reconcile hidden" id="impReconcile"></div>
+              <div class="sub imp-reconcile hidden" id="impDateReading"></div>
               <div class="sub imp-nonbudget hidden" id="impNonBudget"></div>
               <!-- The account-identity block: shown only when the statement's
                    own account number disagrees with the account picked, and the

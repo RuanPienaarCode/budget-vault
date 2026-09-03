@@ -733,6 +733,12 @@ module.exports = {
   'acct.hero.label': 'Net sur vos comptes',
   'acct.hero.sub': '{assets} au crédit face à {liabilities} à découvert.',
   'acct.hero.elsewhere': ' Les biens et les dettes enregistrés sur leurs propres pages ne sont pas comptés ici.',
+  'imp.dateReading.dayFirst': 'Les dates de ce fichier ont été lues jour/mois, car l’autre lecture les mettait dans le désordre.',
+  'imp.dateReading.monthFirst': 'Les dates de ce fichier ont été lues mois/jour, car l’autre lecture les mettait dans le désordre.',
+  'acct.duplicateFolders': {
+    one: '{count} dossier d’opérations est revendiqué par deux comptes ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
+    other: '{count} dossiers d’opérations sont revendiqués par deux comptes chacun ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
+  },
   'acct.ignoredFiles': {
     one: '{count} fichier de compte dans un sous-dossier de Accounts/ n’est pas lu ({names}). Déplacez-le directement dans Accounts/ pour l’inclure.',
     other: '{count} fichiers de compte dans des sous-dossiers de Accounts/ ne sont pas lus ({names}). Déplacez-les directement dans Accounts/ pour les inclure.',

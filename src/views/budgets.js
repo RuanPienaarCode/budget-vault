@@ -463,7 +463,7 @@ module.exports = function registerBudgets(ctx) {
        is simply omitted. Once the period is FINISHED, actual income is a whole,
        settled figure and stands in, exactly as renderHero's incomeBase does. */
     const noIncomeInfo = income === 0 && !hasIncomeRow;
-    const periodFinished = S.period !== currentPeriod();
+    const periodFinished = S.period < currentPeriod();   // ISSUE 73: a future period is not finished
     let unallocatedTile = null;
     if (!noIncomeInfo) {
       const unallocated = income - budgeted;

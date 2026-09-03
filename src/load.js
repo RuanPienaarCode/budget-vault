@@ -278,6 +278,16 @@ module.exports = function registerLoad(ctx) {
     const nested = mdFilesUnder('Accounts')
       .filter(f => f.path.slice(0, f.path.lastIndexOf('/')) !== relPath('Accounts'));
     S.accountsIgnored = nested.map(f => f.path);
+    /* ISSUE 72. Two account files claiming ONE transaction folder. accountForLabel
+       returns the first match, so the second account gets no rows, reconciles as
+       `no-tx` forever — which reads exactly like a new account with no history —
+       and still adds its whole stated balance to net worth. Nothing said so.
+       views/accounts.js guards duplicate NAMES in addAccount and never looks at
+       tx_label at all; a hand-written vault has no guard on either axis, and
+       copying an account file is the obvious way to open a second account at the
+       same bank. Detected here, keyed the way accountForLabel keys, and named on
+       the Accounts page. Filled after the accounts loop below. */
+    S.accountsDuplicated = [];
     for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       S.accounts.push({
@@ -438,6 +448,14 @@ module.exports = function registerLoad(ctx) {
        linked. Those are different situations with different next steps (import
        a statement vs. link a folder), and telling the second story to someone
        in the first sends them to re-link a folder they already have. */
+    {
+      const seen = new Map();
+      for (const a of S.accounts) {
+        const key = safeSeg(a.tx_label || a.name).toLowerCase();
+        if (seen.has(key)) S.accountsDuplicated.push({ label: a.tx_label || a.name, first: seen.get(key), second: a.name });
+        else seen.set(key, a.name);
+      }
+    }
     S.txFolders = [];
     // Flattened first so every month file across every account goes out in one
     // batch — this is the bulk of the read count on a real vault.

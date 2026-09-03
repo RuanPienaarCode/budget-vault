@@ -720,6 +720,12 @@ module.exports = {
   'acct.hero.label': 'Netto über deine Konten',
   'acct.hero.sub': '{assets} im Haben gegenüber {liabilities} im Soll.',
   'acct.hero.elsewhere': ' Vermögen und Schulden, die auf ihren eigenen Seiten erfasst sind, zählen hier nicht mit.',
+  'imp.dateReading.dayFirst': 'Die Daten in dieser Datei wurden als Tag/Monat gelesen, weil sie andersherum außer der Reihe lagen.',
+  'imp.dateReading.monthFirst': 'Die Daten in dieser Datei wurden als Monat/Tag gelesen, weil sie andersherum außer der Reihe lagen.',
+  'acct.duplicateFolders': {
+    one: '{count} Buchungsordner wird von zwei Konten beansprucht ({names}); nur das erste wird gelesen. Geben Sie jedem Konto einen eigenen Ordnernamen.',
+    other: '{count} Buchungsordner werden von je zwei Konten beansprucht ({names}); nur das erste wird gelesen. Geben Sie jedem Konto einen eigenen Ordnernamen.',
+  },
   'acct.ignoredFiles': {
     one: '{count} Kontodatei in einem Unterordner von Accounts/ wird nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',
     other: '{count} Kontodateien in Unterordnern von Accounts/ werden nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',

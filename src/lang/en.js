@@ -769,6 +769,12 @@ module.exports = {
   'acct.hero.label': 'Net across your accounts',
   'acct.hero.sub': '{assets} in credit against {liabilities} overdrawn.',
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
+  'imp.dateReading.dayFirst': 'Dates in this file were read as day/month, because reading them the other way put them out of order.',
+  'imp.dateReading.monthFirst': 'Dates in this file were read as month/day, because reading them the other way put them out of order.',
+  'acct.duplicateFolders': {
+    one: '{count} transaction folder is claimed by two accounts ({names}); only the first is read. Give each account its own folder name.',
+    other: '{count} transaction folders are claimed by two accounts each ({names}); only the first is read. Give each account its own folder name.',
+  },
   'acct.ignoredFiles': {
     one: '{count} account file in a sub-folder of Accounts/ is not being read ({names}). Move it directly into Accounts/ to include it.',
     other: '{count} account files in sub-folders of Accounts/ are not being read ({names}). Move them directly into Accounts/ to include them.',

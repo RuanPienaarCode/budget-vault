@@ -285,6 +285,7 @@ function mountApp(view) {
     budgetMeta: {},
     txFiles: {},               // 'label/YYYY-MM' -> {label, month, rows, dirty}
     accountsIgnored: [],       // ISSUE 60 — account .md paths below Accounts/ that mdFilesIn does not read
+    accountsDuplicated: [],    // ISSUE 72 — {label, first, second}: two accounts claiming one transaction folder
     txFolders: [],             // account names whose Transactions/ folder exists on disk
     rules: [],                 // {pattern, category}
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
