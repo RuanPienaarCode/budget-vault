@@ -10,22 +10,27 @@ percent	73%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1
 number	45	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
 number	1,1	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
 number	6	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
-money	R 15 000	15000	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
+money	R 16 000	16000	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
 percent	0%	-	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lv[0]
 money	R 0	0	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lm[2]
-percent	0%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lv[0]
+percent	0,4%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lv[0]
 money	R 133	133.33333333333334	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lm[2]
 money	R 33 000	33000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lv[0]
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
-money	R 1 000	1000	leftBody/div.left-grid[0]/div.left-fig[2]/div.lv[0]
-number	1	-	leftBody/div.left-grid[0]/div.left-fig[2]/div.lm[2]
-money	R 32 000	32000	leftBody/div.left-grid[0]/div.left-fig[4]/div.lv[0]
-number	28	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
-money	R 1 143	1142.857142857143	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
+number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
+money	R 21 000	21000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
+money	R 16 000	16000	leftBody/div.left-grid[0]/div.left-fig[2]/div.lv[0]
+money	R 1 600	1600	leftBody/div.left-grid[0]/div.left-fig[4]/div.lv[0]
+number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
+number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
+money	R 15 400	15400	leftBody/div.left-grid[0]/div.left-fig[6]/div.lv[0]
+number	28	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
+money	R 550	550	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
 money	$ 1 000	1000	leftBody/div.left-fx[1]/span.left-fx-txt[1]
-money	$ 1 000	1000	leftBody/div.left-fx[1]/span.left-fx-txt[1]
-money	R 1 000	1000	leftBody/details.left-open/table.left-disc/tr/td[0]/div.dd[1]
-money	R 1 000	1000	leftBody/details.left-open/table.left-disc/tr/td.da[1]
+money	$ 0	0	leftBody/div.left-fx[1]/span.left-fx-txt[1]
+money	R 1 000	1000	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
+money	R 1 000	1000	leftBody/details.left-open/table.left-disc/tr[0]/td.da[1]
+money	R 600	600	leftBody/details.left-open/table.left-disc/tr[1]/td.da[1]
 number	30	-	leftSub/
 number	26	-	trendChart/svg/rect[0]/title
 money	R 14 000,00	14000	trendChart/svg/rect[0]/title
@@ -79,8 +84,8 @@ money	R 0,00	0	dashBudget/tbody/tr[5]/td.num[4]
 number	2026	-	dashBudgetSub/
 number	1	-	dashBudgetSub/
 number	30, 2026	-	dashBudgetSub/
-money	R 107 000	107000	dashPositionKpis/div.mini[0]/button.v
-money	R 115 000	115000	dashPositionKpis/div.mini[0]/div.s[1]
+money	R 106 500	106500	dashPositionKpis/div.mini[0]/button.v
+money	R 114 500	114500	dashPositionKpis/div.mini[0]/div.s[1]
 money	R 8 000	8000	dashPositionKpis/div.mini[0]/div.s[1]
 money	$ 1 000	1000	dashPositionKpis/div.mini[0]/div.s[1]
 money	R -8 000	-8000	dashPositionKpis/div.mini[1]/button.v
@@ -94,10 +99,10 @@ money	R 0	0	dashPositionKpis/div.mini[3]/div.s[1]
 money	$ 1 000	1000	dashPositionKpis/div.mini[3]/div.s[1]
 
 ## score
-number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
-money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[1]/title
@@ -106,18 +111,18 @@ percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold
 money	R 0	0	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[1]/title
 number	19	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[2]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[2]/title
-percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[2]/title
+percent	0,4%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[2]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
-number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-money	R 107 000	107000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
-money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/path.score-ring-seg/title
@@ -126,35 +131,35 @@ percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold
 money	R 0	0	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/path.score-ring-seg/title
 number	19	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[6]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[6]/title
-percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[6]/title
+percent	0,4%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[6]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
-number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
-money	R 107 000	107000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	45	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]
 number	100	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]/small
 number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
+number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
 percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 0	0	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-pts[2]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-pts[2]
-percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[2]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+percent	0,4%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[2]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	19	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[2]/span.score-ring-row-pts[2]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[2]/span.score-ring-row-pts[2]
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
-money	R 107 000	107000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
+number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	1	-	scoreHero/div.score-hero/p.score-hero-sub[1]
 number	80	-	scoreHero/div.score-hero/p.score-hero-note[3]
@@ -166,22 +171,22 @@ number	20	-	scoreGood/div.score-win[0]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreGood/div.score-win[0]/div.score-win-body/div.score-win-pts[2]
 number	19	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
-number	21	-	scoreWork/div.score-gap[0]/div.score-gap-h[0]/div.score-gap-pts[1]
+number	20	-	scoreWork/div.score-gap[0]/div.score-gap-h[0]/div.score-gap-pts[1]
 number	1.1	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
-money	R 15 000	15000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
+money	R 16 000	16000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 number	6	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 money	R 14 000	14000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
-money	R 69 000	69000	scoreWork/div.score-gap[0]/p.score-gap-do[0]
+money	R 68 000	68000	scoreWork/div.score-gap[0]/p.score-gap-do[0]
 number	6	-	scoreWork/div.score-gap[0]/p.score-gap-do[0]
 number	20	-	scoreWork/div.score-gap[1]/div.score-gap-h[0]/div.score-gap-pts[1]
 percent	0%	-	scoreWork/div.score-gap[1]/div.score-gap-now[2]
 money	R 0	0	scoreWork/div.score-gap[1]/div.score-gap-now[2]
 money	R 6 000	6000	scoreWork/div.score-gap[1]/p.score-gap-do[0]
 percent	20%	-	scoreWork/div.score-gap[1]/p.score-gap-do[0]
-number	13	-	scoreWork/div.score-gap[2]/div.score-gap-h[0]/div.score-gap-pts[1]
-money	R 107 000	107000	scoreWork/div.score-gap[2]/div.score-gap-now[2]
+number	14	-	scoreWork/div.score-gap[2]/div.score-gap-h[0]/div.score-gap-pts[1]
+money	R 106 500	106500	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 number	0.30	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
-money	R 973 000	973000	scoreWork/div.score-gap[2]/p.score-gap-do[0]
+money	R 973 500	973500	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 number	3	-	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 money	R 30 000	30000	view-score/div.card/div.body-pad[1]/div.score-flow-top[0]/div.score-flow-in[1]
 money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
@@ -268,7 +273,7 @@ number	12	-	reportPeriodPills/div.chart-range/button.chart-range-btn[2]
 number	2026	-	reportPreview/
 
 ## savings
-money	R 107 000,00	107000	savingsKpis/div.mini[0]/div.v[1]
+money	R 106 500,00	106500	savingsKpis/div.mini[0]/div.v[1]
 money	$ 1 000	1000	savingsKpis/div.mini[0]/div.s[2]
 money	R 15 000,00	15000	savingsKpis/div.mini[1]/div.v[1]
 money	$ 1 000	1000	savingsKpis/div.mini[1]/div.s[2]
@@ -278,20 +283,23 @@ percent	36.4%	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 11 000	11000	savingsKpis/div.mini[3]/div.s[2]
 number	1	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 80 000	80000	savingsStale/div.kpi-caveat-txt
-money	R 115 000	115000	savingsWorth/svg.worth-svg/text[1]
-money	R 15 000,00	15000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
-percent	13%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
-money	R 20 000,00	20000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
-percent	17%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
+money	R 114 500	114500	savingsWorth/svg.worth-svg/text[1]
+money	R 16 000,00	16000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
+percent	14%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
+money	R 17 000,00	17000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
+percent	15%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
 money	R 80 000,00	80000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[2]/rect/title
 percent	70%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[2]/rect/title
+money	R 1 500,00	1500	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[3]/rect/title
+percent	1%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[3]/rect/title
 money	R 8 000	8000	savingsWorth/svg.worth-svg/text[3]
 money	R 8 000,00	8000	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
 percent	100%	-	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
-money	R 15 000	15000	savingsWorth/ul.donut-legend/li[0]/span.dl-val[1]
-money	R 20 000	20000	savingsWorth/ul.donut-legend/li[1]/span.dl-val[1]
+money	R 16 000	16000	savingsWorth/ul.donut-legend/li[0]/span.dl-val[1]
+money	R 17 000	17000	savingsWorth/ul.donut-legend/li[1]/span.dl-val[1]
 money	R 80 000	80000	savingsWorth/ul.donut-legend/li[2]/span.dl-val[1]
-money	R 8 000	8000	savingsWorth/ul.donut-legend/li[3]/span.dl-val[1]
+money	R 1 500	1500	savingsWorth/ul.donut-legend/li[3]/span.dl-val[1]
+money	R 8 000	8000	savingsWorth/ul.donut-legend/li[4]/span.dl-val[1]
 money	$ 1 000	1000	savingsWorthSub/
 money	R 11 000,00	11000	savingsGrowth/svg.growth-svg/g/path[0]/title
 money	R 4 000,00	4000	savingsGrowth/svg.growth-svg/g/rect/title
