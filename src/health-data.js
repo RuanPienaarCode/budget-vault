@@ -210,7 +210,9 @@ module.exports = function registerHealthData(ctx) {
       for (const a of savers) {
         for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
       }
-      savings = savedFromOutside(householdRows, saverLabels);
+      /* ISSUE 32 — catType, so a fund purchase can no longer be paired away
+         as the leg of an internal move. */
+      savings = savedFromOutside(householdRows, saverLabels, catType);
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency
          divisor. `consumption` is what living cost: everything except money

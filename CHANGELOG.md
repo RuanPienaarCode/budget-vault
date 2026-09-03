@@ -3,6 +3,65 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+Everything below came out of a live audit of 1.35.1 run on 2 September 2026,
+and every item was reproduced against one seeded household before it was
+touched.
+
+### Fixed
+
+- **The Dashboard was counting money that had not moved.** Read on the 2nd,
+  September's income included a family gift dated the 28th and its spending
+  included gym charges dated the 10th, 17th and 24th. Period figures now stop
+  at today, and what is dated later in the period is stated underneath instead
+  of folded in. The same as-of now runs through the Accounts change pills, net
+  worth, and the Score.
+- **"Actually free" was offering your emergency fund.** R41 800 at R1 493 a
+  day, sinking funds included, on the same screen as a health card saying you
+  had 1.6 months of cover. Money you have flagged as an emergency fund, or that
+  sits in a savings or investment account, is now shown as set aside and comes
+  out of what is free to spend. Say `budget: true` on such an account if you
+  really do spend from it.
+- **"Budget remaining" counted envelopes you never meant to spend.** R2 910
+  "remaining" was R4 000 of unfilled savings envelopes less R1 090 of grocery
+  overspend. Savings and investment envelopes are now stated separately from
+  what is left to spend, and a purchase made out of a fund no longer burns the
+  grocery budget.
+- **Debt interest showed 0%.** A card at 22.25% on R8 000 costs R148 a month;
+  against a R35 000 income that is 0.42%, which rounded to "0%" directly above
+  the tile's own "R 148 / month". Percentages that would round away to nothing
+  now keep the digit that says they are not nothing.
+- **Net worth ignored money owed to you.** R2 000 out on loan was absent from
+  the total on a card that printed "1 outstanding" in the tile beside it.
+- **A missed debt instalment vanished** from "still committed" the day after it
+  was due. It stays, marked "was due", until something pays it.
+- **Weekly and fortnightly billing cycles exist.** `Services.md` could state
+  only `monthly` or `annual`; anything else was quietly stored as `monthly`. A
+  weekly R250 gym now records as weekly and the "still committed" figure counts
+  every charge left in the period rather than dropping the whole service after
+  the first one.
+- **Cash on hand now says what it is standing on.** Transactions dated on the
+  day a balance was confirmed are treated as already inside that balance —
+  which is right, and was silent. On a payday confirmation it looked like the
+  salary had been missed.
+- **Two figures on one card no longer disagree** about what "income" means, or
+  about which day it is. The Accounts hero's headline is the same
+  home-currency split every other page uses; a converted total is shown
+  separately and labelled as one (see ADR-0004's amendment).
+- **A fund purchase can no longer cancel a later deposit** in the savings rate,
+  where the two happened weeks apart and the purchase carries a real spending
+  category.
+- **The README and the setup wizard now say** that opening your `Finances/`
+  folder as a vault hides the plugin — Obsidian loads plugins from the vault
+  root, so it is an install that looks failed and is not.
+
+### Files
+
+- `Services.md`'s header comment gains the two new cycle names on its next
+  save. One comment line; no table, column or cell changes, and existing rows
+  round-trip byte for byte.
+
 ## 1.35.1 — 2026-09-02
 
 ### Fixed

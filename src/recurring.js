@@ -21,7 +21,7 @@
    useful, honest answer, and far better than confidently pairing a service with
    another company's debit order. */
 
-const { ISO_DATE, isoDayNumber } = require('./dates');
+const { ISO_DATE, isoDayNumber, isoFromDayNumber } = require('./dates');
 
 /* Words that appear in so many service names they cannot identify a merchant. */
 const STOP = new Set([
@@ -155,8 +155,15 @@ function matchCharges(service, rows, tokens) {
    Beats the hand-typed field it replaces, every value of which was months in
    the past on the vault this was built against — a date nobody updates is not
    a prediction, it is a fossil. */
+/* ISSUE 33. Sub-monthly cadences step in DAYS, through dates.js's day
+   numbering rather than through Date: a `new Date(iso)` parses as UTC while
+   every period boundary in this app is built from local getters, and the two
+   disagree by a day either side of midnight in half the world. */
+const STEP_DAYS = { weekly: 7, fortnightly: 14 };
 function nextExpected(stats, cycle) {
   if (!stats || !stats.last) return null;
+  const step = STEP_DAYS[cycle];
+  if (step) { return isoFromDayNumber(isoDayNumber(stats.last) + step); }
   if (cycle === 'annual') {
     // Same clamp as the monthly branch below: "+1 year, same month/day" lands
     // on 2029-02-29 for a service last charged 2028-02-29, a date that does
@@ -309,5 +316,9 @@ function findRecurringCredit(rows, today) {
 
 module.exports = {
   normDesc, serviceTokens, matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice,
+  /* ISSUE 33/47. Exported so committed.js walks the SAME cadence table
+     nextExpected steps by — a second copy of "how long is a fortnight" is
+     precisely the shape this repo keeps finding. */
+  STEP_DAYS,
   findRecurringCredit,
 };

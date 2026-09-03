@@ -128,7 +128,12 @@ for (const [name, cells] of Object.entries(FULL_CELLS)) {
 
    The unrecognised word is substituted into each vocab column in turn rather
    than all at once, so a failure names one column. */
-const UNRECOGNISED = { owed: 'disputed', services: 'weekly', debts: 'written off' };
+/* ISSUE 33: `weekly` used to be the unrecognised word here, which is exactly
+   the finding — a household could type it and the app stored `monthly`. It is
+   a real cycle now, so this guard needs a word that genuinely is not one.
+   `quarterly` is the honest next request and is deliberately still outside the
+   set: this fix widened the vocabulary, it did not open it. */
+const UNRECOGNISED = { owed: 'disputed', services: 'quarterly', debts: 'written off' };
 
 for (const [name, word] of Object.entries(UNRECOGNISED)) {
   const schema = SCHEMAS[name];

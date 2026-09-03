@@ -52,8 +52,8 @@
    Pure — no DOM, no obsidian import — so tests/committed.test.cjs drives it in
    bare node, and `today` is injected rather than read off the clock. */
 
-const { ISO_DATE, daysBetween: isoDaysBetween } = require('./dates');
-const { matchCharges, chargeStats, nextExpected, findRecurringCredit } = require('./recurring');
+const { ISO_DATE, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
+const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
 
 /* A debt instalment can only be placed inside a window at least this long when
@@ -240,32 +240,128 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
        (see its `chargeStats(m.all)`); this is the same rule applied to the half
        that moves money. */
     const stats = chargeStats(m.charges);        // price
-    const seen = chargeStats(m.all);             // liveness + cadence
+    /* CHARGED BY TODAY, not merely present in the ledger — `from` is today (see
+       whatsLeft). A row dated later this period is a charge that has not
+       happened: pre-recorded, imported from a statement carrying scheduled
+       debits, or typed ahead. Read as history it did two things at once, and
+       both suppressed the commitment it describes — it satisfied `landed`, and
+       it dragged the cadence ANCHOR forward so the next expected date fell
+       past the window. On the audit household the four gym rows dated the 3rd,
+       10th, 17th and 24th were all in the ledger on the 2nd, and every one of
+       them "proved" its own charge had gone.
 
-    /* Already charged in this period? Asked of the merchant's own charges, not
-       of the category — a phone contract and a cloud subscription share a
-       category on real data, and one would cancel the other out. Across every
-       description, so a renamed debit order is not claimed a second time. */
-    const landed = (m.all || []).some(c => c.date >= periodStart && c.date <= to);
-    if (landed) continue;
+       This is the same as-of the rest of the app now takes (ISSUE 35 for the
+       period totals, 42 for the account pills, 44 for net worth) reaching the
+       last figure that had not had it.
+
+       PRICE is deliberately not filtered: `stats` above answers "what does this
+       merchant charge", and a scheduled debit states that as well as a settled
+       one does. Only WHEN is a question about what has already happened. */
+    const charged = (m.all || []).filter(c => c.date <= from);
+    const seen = chargeStats(charged);           // liveness + cadence
 
     /* Derived first, typed second. Every next-billing date in the reference
        vault was months in the past; the charge history knows better. */
     const due = nextExpected(seen, s.cycle) || (ISO_DATE.test(s.next || '') ? s.next : null);
-    if (!due || due < from || due > to) continue;
 
     const derived = stats && stats.recent > 0;
     const amount = derived ? stats.recent : Math.abs(s.amount || 0);
     if (!amount) continue;
 
+    /* ISSUE 47. HOW MANY CHARGES REMAIN, not "the next one, if it has not
+       landed yet".
+
+       The old rule was two lines — any charge inside the period and the whole
+       service is dropped for the rest of it — and for a monthly bill it is
+       right: the money has gone, once. For a WEEKLY one it is a lie of
+       omission. Measured on the `BudgetAudit` household on 2026-09-02: Virgin
+       Active at R250 a week, charges dated the 3rd, 10th, 17th and 24th
+       already in the ledger. The 3rd is inside the period, so the service was
+       skipped entirely and the card read "nothing scheduled" over R1 000 still
+       to leave the account — under the one figure on this page that tells a
+       reader how much is safe to spend, which is the direction it must never
+       be wrong in.
+
+       So a sub-monthly service is walked: every date the cadence produces
+       between the window's start and its end, minus the ones a charge in the
+       ledger already accounts for. Monthly and annual services keep the old
+       rule EXACTLY — one charge per period is what "landed" was always
+       measuring, and rewriting that path would put six years of correct
+       behaviour at risk to fix a case it never had. */
+    const step = STEP_DAYS[s.cycle];
+    if (!step) {
+      /* Unchanged since 1.20 apart from that window: at most one charge per
+         period, so evidence of one is evidence there is nothing left to come. */
+      if (charged.some(c => c.date >= periodStart)) continue;
+      if (!due || due < from || due > to) continue;
+      out.push({
+        kind: 'service', name: s.name, detail: s.provider || '',
+        due, amount, occurrences: 1, unit: amount,
+        basis: derived ? 'charged' : 'stated',
+      });
+      continue;
+    }
+
+    const dates = remainingCharges({ anchor: seen && seen.last, next: s.next, step, from, to, charges: charged });
+    if (!dates.length) continue;
     out.push({
       kind: 'service',
       name: s.name,
       detail: s.provider || '',
-      due,
-      amount,
+      /* The FIRST of the remaining charges. The card's disclosure row prints
+         one date, and the first one is the one a reader can act on. */
+      due: dates[0],
+      /* What the window still owes this merchant, which is what "still
+         committed" has always meant. `unit` and `occurrences` travel with it
+         so the row can say "4 × R250" rather than asserting a R1 000 charge
+         nobody will ever see on a statement. */
+      amount: amount * dates.length,
+      occurrences: dates.length,
+      unit: amount,
       basis: derived ? 'charged' : 'stated',
     });
+  }
+  return out;
+}
+
+/* ISSUE 47. The dates a sub-monthly service still has to charge on, inside
+   [from, to].
+
+   The cadence is anchored on the merchant's own last charge where there is
+   one — the same "derived first, typed second" preference the amount takes,
+   and for the same reason: on the reference vault every hand-typed
+   `Next billing` was months in the past. Walked BACKWARDS from that anchor
+   first, so a service last charged before the window still lands on the right
+   days inside it.
+
+   A generated date is dropped when a real charge sits within
+   CHARGE_MATCH_DAYS of it: banks post a debit order a day or two either side
+   of its due day, and an exact-date match would claim every charge twice —
+   once as history and once as a commitment. Each charge can only account for
+   one date, so four charges cannot clear five expected ones.
+
+   Bounded at MAX_STEPS. A corrupt anchor (a date in 1970) against a weekly
+   cadence would otherwise walk a quarter of a million iterations to reach the
+   window, and this runs inside a render. */
+const CHARGE_MATCH_DAYS = 3;
+const MAX_STEPS = 400;
+function remainingCharges({ anchor, next, step, from, to, charges }) {
+  const start = ISO_DATE.test(anchor || '') ? anchor : (ISO_DATE.test(next || '') ? next : null);
+  if (!start) return [];
+  const toN = isoDayNumber(to), fromN = isoDayNumber(from);
+  let n = isoDayNumber(start);
+  if (n === null || toN === null || fromN === null) return [];
+  /* Back to the last occurrence at or before the window, then forward. */
+  let guard = 0;
+  while (n - step >= fromN && guard++ < MAX_STEPS) { n -= step; }
+  const seen = (charges || []).map(c => isoDayNumber(c.date)).filter(d => d !== null);
+  const used = new Set();
+  const out = [];
+  for (let guard2 = 0; n <= toN && guard2 < MAX_STEPS; n += step, guard2++) {
+    if (n < fromN) continue;
+    const hit = seen.findIndex((d, i) => !used.has(i) && Math.abs(d - n) <= CHARGE_MATCH_DAYS);
+    if (hit !== -1) { used.add(hit); continue; }
+    out.push(isoFromDayNumber(n));
   }
   return out;
 }

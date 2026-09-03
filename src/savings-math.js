@@ -693,10 +693,79 @@ function couldBeSameMovement(outIso, inIso) {
    so a caller decides what counts as the pool and this decides what crossed
    into it.
 */
-function savedFromOutside(rows, saverLabels) {
+/* ISSUE 32. `catType` closes the mirror case this function's own header used
+   to record as unreachable.
+
+   The pairing is directional — money cannot arrive before it leaves — which
+   settled the common order (a deposit on the 1st, a pram on the 28th). The
+   mirror is still indistinguishable BY DATE: a pram bought from the baby fund
+   on the 1st and an equal deposit into the emergency fund on the 28th looks
+   exactly like a slow transfer, and R5 000 of real saving disappeared from the
+   score.
+
+   The signal that settles it is the OUTFLOW's category. A transfer leg leaves
+   under a transfer- or savings-typed category (the vehicle's own name); a
+   purchase leaves under a real expense category, and a shop is not another one
+   of your accounts. So an outflow the household has categorised as spending
+   can never be the other leg of an internal move, whatever its magnitude and
+   whatever its date.
+
+   THE OUTFLOW SIDE ONLY, and that asymmetry is the whole history above. A
+   first attempt applied a category rule to the INFLOW and was reverted: a
+   household moving R10 000 from cheque into investments categorises it
+   `Investing`, a savings-typed category naming the DESTINATION, which is the
+   ordinary way people label real new saving. The inflow's category says where
+   money went; only the outflow's says what it was for.
+
+   OPTIONAL, and absent means exactly what this function did before — every
+   outflow stays matchable. An UNKNOWN category is matchable too: a row under a
+   name no category file answers to has told us nothing, and refusing to pair
+   it would turn "unclassified" into "definitely a purchase", which is the same
+   unprovable-is-not-disproved error one direction over. */
+function savedFromOutside(rows, saverLabels, catType) {
   let savings = 0;
   const labels = saverLabels instanceof Map ? saverLabels : new Map(saverLabels || []);
   const householdRows = rows || [];
+/* ISSUE 32. Can this outflow be the other leg of an internal move at all?
+
+   Only the three types money moving between the household's own accounts is
+   ever labelled with. `income` is excluded with the rest: an outflow under an
+   income-typed category is a refund or a reversal, not a transfer leg.
+
+   AND ONLY WHEN THE TWO LEGS ARE FAR APART. That narrowing is not caution, it
+   is what stops this fix from re-opening the bug it sits next to.
+
+   tests/health-data.test.cjs pins a household moving R5 000 from one savings
+   account to another every month and labelling it `Move` — a category it has
+   typed `expense`. That is an internal move mislabelled, and the legs land on
+   the SAME DAY. Read on category alone this fix would refuse to pair them and
+   credit the household R5 000 a month of saving it did not do, which is
+   exactly the 1.23.0 overstatement the pairing was written to end. Trading one
+   direction of error for the other is not a fix.
+
+   Inside the settlement window the DATES are evidence enough: two equal and
+   opposite rows in two pool accounts within a few days are one movement,
+   whatever the household called it, and the label adds nothing. Weeks apart,
+   the dates have stopped being evidence — that is the whole of what ISSUE 32
+   reports — and the label is the only thing left. An expense-typed outflow
+   then says what it says: the money went to a shop.
+
+   So the category is consulted exactly where the dates have run out. */
+const INTERNAL_LEG_TYPES = new Set(['transfer', 'savings', 'investment']);
+const looksLikeSpending = r => {
+  if (typeof catType !== 'function') return false;  // unchanged for every caller that has not been taught
+  const t = catType(r.cat);
+  /* An unknown category stays matchable: a row under a name no category file
+     answers to has told us nothing, and reading that as "definitely a
+     purchase" is the same unprovable-is-not-disproved error one direction
+     over. */
+  return !!t && !INTERNAL_LEG_TYPES.has(t);
+};
+const couldBeAnInternalLeg = (outRow, inRow) => {
+  const gap = daysBetween(outRow.date, inRow.date);   // positive when the money left first
+  if (gap === null || gap <= BACKSTAMP_DAYS) return true;
+  return !looksLikeSpending(outRow);
+};
 const inflows = [], outflows = [];
 {
   for (const r of householdRows) {
@@ -851,6 +920,7 @@ for (const { acct, row } of inflows) {
      convenient answer about a date it cannot read. */
   const j = outflows.findIndex((o, i) => !spent.has(i)
     && o.acct !== acct
+    && couldBeAnInternalLeg(o.row, row)
     && Math.abs(-o.row.amount - row.amount) < 0.005
     && couldBeSameMovement(o.row.date, row.date));
   if (j !== -1) { spent.add(j); continue; }

@@ -57,9 +57,13 @@ async function heroOf(files, today) {
   ctx.renderAccounts();
   const sum = ctx.$('#acctSummary');
   const hero = descend(sum).find(n => n._cls && n._cls.has('acct-hero'));
+  const conv = descend(hero).find(n => n._cls && n._cls.has('acct-hero-converted'));
   return {
     num: descend(hero).find(n => n._cls && n._cls.has('hero-num')).textContent,
     sub: descend(hero).find(n => n._cls && n._cls.has('hero-sub')).textContent,
+    /* ISSUE 31: the converted total is a labelled line of its own now, not the
+       headline. Absent (empty string) whenever nothing converted. */
+    conv: conv ? conv.textContent : '',
   };
 }
 
@@ -88,10 +92,21 @@ async function heroOf(files, today) {
     files[`${B}/Exchange Rates.md`] = RATES;
     const h = await heroOf(files);
 
+    /* ISSUE 31. The HEADLINE is the split — home currency summed, every other
+       symbol named beside it — because that is the one rule currency.js and
+       ADR-0004 state and every other surface in the app follows. It was the
+       converted figure until now, which made this page's own subtitle
+       (worth(), home-currency only) describe a different number from the one
+       above it, and made Accounts disagree with the Dashboard and the Savings
+       page in the same session.
+
+       The conversion is not lost and is not demoted to a footnote: it is a
+       line of its own, saying what it is. */
+    eq(h.num, 'Rp 5,200,000.00',
+      'the headline is the household-currency split, the same rule every other page uses');
     // ¥3 956 / 0.000437 ≈ Rp 9 052 632, on top of Rp 5 200 000.
-    ok(/^Rp 14,2/.test(h.num),
-      `the headline is now one number the reader can act on — got ${h.num}`);
-    ok(!/Rp 5,200,000/.test(h.num), 'not the rupiah-only figure any more');
+    ok(/^Rp 14,2/.test(h.conv.replace(/[^\d,.RpA-Za-z ]/g, '').replace(/^\D*/, 'Rp ')) || /14,2/.test(h.conv),
+      `and the converted total is stated separately, labelled as converted — got ${h.conv}`);
     ok(/CNY 3,956/.test(h.sub), 'the ORIGINAL amount is still stated, in its own currency');
     ok(/2026-08-27/.test(h.sub),
       'and never without the date its rates are for — currency.js refused conversion because a rate is a fact about a DAY, so the day travels with the number');

@@ -139,17 +139,21 @@ atAuditDate(async () => {
     `the emergency fund and the baby fund are shown as set aside — got: ${left}`);
   ok(left.includes('Baby fund') && left.includes('Emergency fund'),
     'named, so the reader can disagree with the claim');
-  ok(left.includes(`R 18300${i18n.t('dash.left.free')}`),
+  /* R41 800 − R23 000 set aside − R1 500 committed. The committed figure is
+     R1 500 rather than R500 because ISSUE 47 landed after this one: the weekly
+     gym now claims the four charges still ahead of it this period, where it
+     used to claim nothing at all. */
+  ok(left.includes(`R 17300${i18n.t('dash.left.free')}`),
     `and actually free is what is left of the cheque account — got: ${left}`);
   ok(!left.includes(`R 41800${i18n.t('dash.left.free')}`),
     'never the whole pile, sinking funds included');
 
   /* The strip re-adds in the ROUNDED figures a reader sees. */
-  eq(41800 - 23000 - 500, 18300, 'cash − set aside − committed = free, by eye');
+  eq(41800 - 23000 - 1500, 17300, 'cash − set aside − committed = free, by eye');
 
   /* And the per-day rate is drawn from the same figure as the headline —
      committed.js's own rule that every "free" on this card is ONE number. */
-  ok(left.includes('R 654/day'),
+  ok(left.includes('R 618/day'),
     `the per-day rate divides the free figure, not the cash pile — got: ${left}`);
 
   console.log(`PASS earmarked-cash (${checks} checks)`);

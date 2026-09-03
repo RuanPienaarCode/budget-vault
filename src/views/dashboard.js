@@ -978,7 +978,15 @@ module.exports = function registerDashboard(ctx) {
         const when = it.due
           ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: it.due })
           : i18n.t('dash.left.thisPeriod');
-        const src = it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
+        /* ISSUE 47. A weekly service commits several charges in one period, so
+           the row states the CADENCE — "4 × R250" — rather than a single
+           R1 000 debit nobody will ever find on a statement. `dash.left
+           .lastCharged` names what the merchant last took, and for a
+           multi-occurrence item that is `unit`, never the total. */
+        const many = (it.occurrences || 1) > 1;
+        const each = it.unit != null ? it.unit : it.amount;
+        const src = many ? i18n.t('dash.left.times', { count: it.occurrences, amount: money(each, 0) })
+          : it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
           : it.basis === 'stated' ? i18n.t('dash.left.asListed')
             : it.basis === 'settled' ? i18n.t('dash.left.settledInFull')
               : i18n.t('dash.left.contracted');

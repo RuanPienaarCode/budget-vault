@@ -768,6 +768,10 @@
 .budget-app-root .hero-num--negative { background: none; -webkit-text-fill-color: var(--color-danger-ink); color: var(--color-danger-ink); }
 .budget-app-root .hero-sub { font-size: 14px; color: var(--text-muted); margin-top: 16px; max-width: 400px; }
 .budget-app-root .hero-sub b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* ISSUE 31. The converted total, secondary to the split headline above it and
+   deliberately so: it is a derived view of that figure, not a rival to it. */
+.budget-app-root .acct-hero-converted { margin-top: 6px; font-size: 15px; font-weight: 600;
+  color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* ISSUE 35. The second sub-line — what this card's figures stop short of.
    Tighter to the line above it than that line is to the number, because the
    two are one statement: "spent X of Y" and "and here is what is not in X

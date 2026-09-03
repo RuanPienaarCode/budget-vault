@@ -747,7 +747,9 @@ module.exports = function registerScore(ctx) {
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
-    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels);
+    /* ISSUE 32 — the same third argument health-data.js passes, so this card
+       and the score it explains cannot pair rows differently. */
+    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, catType);
 
     return periodFlow({
       income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,

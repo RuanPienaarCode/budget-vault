@@ -876,8 +876,35 @@ module.exports = function registerAccounts(ctx) {
 
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
-      el('div', { class: `hero-num${(conv ? conv.total : net) < 0 ? ' hero-num--negative' : ''}` },
-        money(conv ? conv.total : net)),
+      /* ISSUE 31. THE HEADLINE IS THE SPLIT, always — home currency summed,
+         every other symbol named beside it. The converted figure moves to a
+         line of its own below.
+
+         It was the headline until now, and that made this page the only
+         surface in the app running a different rule from every other. Measured
+         on 2026-09-02 with rates on: a R20 000 cheque account and a US$1 000
+         broker account gave a hero of 37 985.61, its OWN subtitle "R20 000
+         credit" (worth() is home-currency only), the Dashboard's net-worth
+         tile R20 000, and the Savings page R0 invested. One card disagreeing
+         with itself, and the page disagreeing with two others in the same
+         session — which is the exact ISSUE 28 symptom the Dashboard's comment
+         says was closed, true only while rates were off.
+
+         The arithmetic was never wrong; the rule was inconsistent. currency.js
+         has one ("sum home currency and name the rest") and ADR-0004 records
+         it, so the fix is the headline joining it rather than four other
+         surfaces leaving it — a conversion is a DERIVED view of a total, and a
+         derived view does not get to be the number a reader acts on while its
+         own subtitle describes a different one.
+
+         Nothing is lost: `convLine` below still lists what each foreign
+         holding converts to and when its rates are from, and the converted
+         total now says out loud that that is what it is. */
+      el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
+      conv
+        ? el('div', { class: 'acct-hero-converted' },
+          i18n.t('acct.hero.convertedTotal', { amount: money(conv.total) }))
+        : '',
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')

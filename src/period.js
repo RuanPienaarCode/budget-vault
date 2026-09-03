@@ -396,7 +396,7 @@ module.exports = function registerPeriod(ctx) {
        moved R2 000" cannot be a comparison against a figure that includes next
        week's standing order. */
     const stop = (today >= start && today < end) ? today : end;
-    return savedFromOutside(txInRange(start, stop), labels);
+    return savedFromOutside(txInRange(start, stop), labels, catType);
   }
 
   function earmarkedLabels() {

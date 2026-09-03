@@ -80,7 +80,7 @@ const FILES = {
 
   /* Same hazard in the Services amount column, which feeds the committed total
      the Dashboard subtracts from "actually free to spend". */
-  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n| Gym | Virgin Active | about R400 | weekly | 2026-08-20 | | yes | amount AND cycle nobody can model |\n',
+  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Domain | Xneelo | 250.00 | annual | end of month | | no | non-ISO date |\n| School fees | Academy | 5,430.00 | monthly | 2026-08-01 | | yes | comma-grouped |\n| Insurance | Broker | 1 299,00 | monthly | 2026-08-15 | | yes | space-grouped |\n| Gym | Virgin Active | about R400 | quarterly | 2026-08-20 | | yes | amount AND cycle nobody can model |\n| Padel | Club | 250.00 | weekly | 2026-08-20 | | yes | ISSUE 33: a cycle this app models now |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: assessed\ndeadline_standard: "2026-10-20"\nassessment_ref: "ITA34: 2026/0031"\nassessment_result: -1250.00\nassessment_income: 480000\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | banks \\| investments |\n| File ITR12 | todo |  |  |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | uploaded | irp5.pdf | |\n| IT3(b) | Bank \\| A | needed | | multi<br>line |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n| 4201 | Local interest | Bank B | 12000.00 |\n',
 };
@@ -181,7 +181,7 @@ const FILES = {
   eq(splitRows.filter(r => r.split === 'part').reduce((s, r) => s + r.amount, 0), -1000,
     'the parts loaded off disk sum to the parent loaded off disk');
   eq(S.owed.length, 6, 'every owed row loads');
-  eq(S.services.length, 5, 'every service loads');
+  eq(S.services.length, 6, 'every service loads');
   eq(S.debts.length, 3, 'every debt loads');
 
   /* The Owed and Services money columns were the last three in this file still
@@ -361,7 +361,7 @@ const FILES = {
      is: a destroyed cell reloads as the coerced default and both passes agree
      perfectly on the wrong word — self-consistent and silently destructive. */
   for (const [file, cell, why] of [
-    [`${B}/Services.md`, 'weekly', 'a billing cycle this app does not model (issue #33)'],
+    [`${B}/Services.md`, 'quarterly', 'a billing cycle this app does not model'],
     [`${B}/Debts.md`, 'written off', 'a debt status the lender uses and the column has no room for'],
     [`${B}/Owed Money.md`, 'disputed', 'a loan the two parties do not agree about'],
   ]) {
@@ -377,7 +377,18 @@ const FILES = {
      known values and must not have changed behaviour by one row. */
   eq(svcOf('Gym').cycle, 'monthly',
     'an unrecognised cycle still reads as monthly for every consumer — only the file changed');
-  eq(svcOf('Gym').cycleRaw, 'weekly', 'with the reader\'s own word riding alongside it');
+  eq(svcOf('Gym').cycleRaw, 'quarterly', 'with the reader\'s own word riding alongside it');
+
+  /* ISSUE 33. `weekly` used to be the example on this very line — a word the
+     household could type and the app would quietly store as `monthly`. It is a
+     cycle now, so it reads as itself and carries no raw: the preservation
+     machinery above is for words the app genuinely cannot model, and widening
+     the vocabulary is what stops a real cadence needing it. */
+  eq(svcOf('Padel').cycle, 'weekly', 'a weekly service reads as weekly, for every consumer');
+  eq(svcOf('Padel').cycleRaw, undefined,
+    'and carries no preserved raw, because nothing was coerced');
+  ok(/\| Padel \| Club \| 250.00 \| weekly \|/.test(rewritten[`${B}/Services.md`]),
+    'and round-trips byte-for-byte as the word the reader typed');
   eq(S.debts.find(d => d.name === 'Store card').status, 'active',
     'and an unrecognised debt status still reads as active, exactly as it always did');
 

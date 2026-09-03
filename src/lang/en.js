@@ -777,6 +777,7 @@ module.exports = {
      does not hold" — so the day travels with the number, and a rate old
      enough to matter says how old. */
   'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
+  'acct.hero.convertedTotal': 'Converted total {amount}',
   'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   /* The liability-side twin, for the Report's Debt section. The line above
@@ -1279,6 +1280,7 @@ module.exports = {
   'dash.left.overdue': 'was due {date}',
   'dash.left.thisPeriod': 'due this period',
   'dash.left.lastCharged': 'last charged {amount}',
+  'dash.left.times': '{count} × {amount}',
   'dash.left.asListed': 'as listed, no charge history',
   'dash.left.contracted': 'contracted instalment',
   'dash.left.settledInFull': 'settled in full, current balance',
