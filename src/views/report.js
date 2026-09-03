@@ -47,6 +47,7 @@
 
 const { el } = require('../dom');
 const { poolAccounts } = require('../vocabulary');
+const { debtMonthly } = require('../committed');
 const { rangePills } = require('../chart');
 /* otherCurrencyNet: worth() has returned `otherCurrencies` — the foreign
    assets and foreign debts it filtered out — since ADR-0004, and this page
@@ -91,7 +92,7 @@ module.exports = function registerReport(ctx) {
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
     periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
     accountIndex, impliedAccounts, healthSnapshot, txInPeriod,
-    budgetVsActualRows, categorySpendRows,
+    budgetVsActualRows, categorySpendRows, categoryGap,
   } = ctx;
 
   /* -------------------------------- state --------------------------------
@@ -492,7 +493,7 @@ module.exports = function registerReport(ctx) {
       count: S.debts.length,
       active: home.length,
       total: rows.reduce((t, r) => t + r.balance, 0),
-      perMonth: home.reduce((t, d) => t + (d.payment || 0) + (d.extra || 0), 0),
+      perMonth: home.reduce((t, d) => t + debtMonthly(d), 0),
       interest: cover.monthly,
       coverage: { shown: cover.shown, total: cover.total, missing: cover.missing },
       rows,
@@ -597,11 +598,9 @@ module.exports = function registerReport(ctx) {
 
       const spendRows = categorySpendRows(p);
       spendRowsByPeriod.push(spendRows);
-      const total = spendRows.reduce((t, r) => t + r.amount, 0);
-      const notShown = Math.max(0, sum.spend - total);
-      const uncatHere = Math.min(sum.uncatSpend || 0, notShown);
-      uncat += uncatHere;
-      netted += notShown - uncatHere;
+      const gap = categoryGap(p);   // Phase 3 of ADR-0006: one owner for the split's gap
+      uncat += gap.uncat;
+      netted += gap.netted;
       const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
       fundedSpend += ff.spend || 0; fundedCount += ff.count || 0;
       const sch = sum.scheduled || { income: 0, spend: 0, count: 0 };

@@ -22,6 +22,7 @@ const registerLoad = require('./load');
 const registerCategories = require('./categories');
 const registerTrendMath = require('./trend-math');
 const registerHealthData = require('./health-data');
+const registerFigures = require('./figures');
 const registerDashboard = require('./views/dashboard');
 const registerScore = require('./views/score');
 const registerTransactions = require('./views/transactions');
@@ -443,6 +444,7 @@ function mountApp(view) {
   // After trend-math, whose periodsForMonths it uses, and before the two views
   // that read the snapshot it assembles.
   registerHealthData(ctx);  // healthSnapshot
+  registerFigures(ctx);     // periodFigures, budgetVsActualRows, categorySpendRows, categoryGap (ADR-0006 Phase 3)
   /* Before the views, because five of them render its noteButton() chip — they
      reach it through ctx at render time rather than by destructuring, so the
      order is belt-and-braces rather than load-bearing. loadVault calls

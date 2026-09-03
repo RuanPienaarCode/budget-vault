@@ -205,6 +205,36 @@ function assumedProvision(rows, realSpendOf) {
   return total;
 }
 
+/* A budget-vs-actual row's status, the one rule for every page that prints
+   the table (Phase 3 of ADR-0006). `remaining` is what is left of the
+   envelope; `unbudgeted` is spend under a category nobody budgeted — never an
+   assume-spent row, which is consumed by construction and has nothing to be
+   "unbudgeted" about (the serialiser used to say otherwise; the Dashboard's
+   reading wins). `pct`, `over` and `near` are the bar's own three states. */
+function budgetRowStatus({ budget, actual, type, assumed } = {}) {
+  const b = Number(budget) || 0;
+  const a = Number(actual) || 0;
+  const over = b > 0 && a > b;
+  return {
+    remaining: b - a,
+    unbudgeted: type !== 'income' && !b && a > 0 && !assumed,
+    over,
+    near: !over && b > 0 && a / b >= 0.85,
+    pct: b > 0 ? Math.min(100, (a / b) * 100) : (a > 0 ? 100 : 0),
+  };
+}
+
+/* What a category split leaves out of gross spend, decomposed into the two
+   parts the donut's note names: uncategorised outgoings, and refunds netted
+   inside named categories. Clamped so rounding never invents a negative gap.
+   tests/cross-page-consistency.test.cjs pins the identity this expresses. */
+function categoryGap({ spend, uncatSpend, rows } = {}) {
+  const total = (rows || []).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+  const notShown = Math.max(0, (Number(spend) || 0) - total);
+  const uncat = Math.min(Number(uncatSpend) || 0, notShown);
+  return { total, notShown, uncat, netted: notShown - uncat };
+}
+
 function periodFlow({
   income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
@@ -480,5 +510,6 @@ function railSegments(breakdown) {
 
 module.exports = {
   periodFlow, railSegments, incomeBaseFor, allocatedShare, budgetUsedShare, budgetSpent, assumedActual, assumedProvision,
+  budgetRowStatus, categoryGap,
   HOUSING_TYPES, SUBSCRIPTION_TYPES,
 };

@@ -930,4 +930,13 @@ for (const { acct, row } of inflows) {
   return savings;
 }
 
-module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType };
+/* The pool's growth rate, as a percentage of the capital it was measured on,
+   or null when nothing rated was put in. One owner (Phase 3 of ADR-0006):
+   views/savings.js and report.js each divided the two figures growthTotals()
+   hands back. */
+function growthRate(g) {
+  const cap = Number(g && g.rateCapital) || 0;
+  return cap > 0 ? ((Number(g.rateGrowth) || 0) / cap) * 100 : null;
+}
+
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType, growthRate };

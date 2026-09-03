@@ -127,6 +127,33 @@ Making the lenses data made two things visible that five loops had hidden:
   split, so the ledger did not move; a vault that splits transactions will
   see its Score pillars change by exactly the parents it had been counting.
 
+## Phase 3, landed (2026-09-03)
+
+`src/figures.js` is the snapshot layer. `periodFigures(p)` hands a period
+page its summary, budget, budget-used reading, trend map, budget-vs-actual
+rows (each carrying its status), category split and the split's gap;
+`bookFigures()` reconciles every account once and hands the cards the
+figures they used to derive from three separate passes. Two pure rules moved
+to money-flow.js so the serialiser reads them too: `budgetRowStatus` (the
+"remaining", "unbudgeted", over, near and bar rules — the serialiser's
+`unbudgeted` had already drifted from the Dashboard's and now cannot) and
+`categoryGap` (the donut's decomposition, once instead of twice).
+
+Smaller owners in the same phase: `debtMonthly` in committed.js (the Debt
+page, the Report and the what's-left chain each spelled it), `growthRate` in
+savings-math.js (the Savings page and the serialiser each divided it), and
+`primaryTotal` replacing the Accounts page's longhand `roundedSum`. The
+ACCOUNT lens is now real: the Accounts page's flow chips and sparkline read
+two tallies under it, and the Debt page's paid-vs-planned reads the BUDGET
+tally's gross outgoings by category instead of a walk with three of the five
+vetoes. `tests/period-figures.test.cjs` pins the rules, the snapshot and the
+pages' rendering of it, and gates the old arithmetic out of `src/views/`.
+
+Still open, deliberately: the TREND lens's missing `earmarkedOut` (above).
+It is one word, and it moves the trend chart, the comparison column and the
+money rail on any vault with an earmarked fund; it waits for a decision and
+a re-bless rather than riding in on a refactor.
+
 ## What this does not change
 
 Every product decision the comments record stands: gross versus net, the

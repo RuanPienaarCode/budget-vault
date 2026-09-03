@@ -15,7 +15,7 @@ const { normalizeAmount } = require('../amount');
    display-only by design (tests/currency.test.cjs's own §7 pins that), so the
    ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
    this view's arithmetic, not that module's. */
-const { symbolOf, splitByCurrency: splitAccounts } = require('../currency');
+const { symbolOf, splitByCurrency: splitAccounts, primaryTotal } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -78,7 +78,7 @@ const { worth, cardOverlap } = require('../worth');
 const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
+  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt, ledger, tally, LENSES,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName,
     periodRange, currentPeriod } = ctx;
 
@@ -110,7 +110,6 @@ module.exports = function registerAccounts(ctx) {
      the table's group-total rows) that worth.js itself never touches — it only
      ever sees the household-wide figure — so the same rule is repeated here
      rather than imported. */
-  const roundedSum = accts => (Math.round(accts.reduce((s, a) => s + a.balance, 0) * 100) / 100) || 0;
 
   /* ITEM 5, now module-level. The rule this page introduced — sum the
      household's own currency, state every other symbol beside it, convert
@@ -357,32 +356,22 @@ module.exports = function registerAccounts(ctx) {
      app does not remove a figure without naming it. A finished or future
      period is unclamped — there is no "today" inside it to split on, which is
      the same rule periodSummary() applies for the same reason. */
+  /* Phase 3 of ADR-0006: the ACCOUNT lens — every row moves the balance,
+     whatever the budget thinks of it; only a split's superseded parent is
+     not money. Two tallies, either side of the as-of day, so "so far" and
+     "ahead" are the same reading of the same rows. */
   function periodActivity(labels) {
-    let inAmt = 0, outAmt = 0, count = 0;
-    let aheadIn = 0, aheadOut = 0, aheadCount = 0;
     const { start, end } = periodRange(S.period);
     const now = todayIso();
     const asOf = (S.period === currentPeriod() && now >= start && now < end) ? now : end;
-    for (const t of txInPeriod(S.period)) {
-      if (!labels.has(t.label)) continue;
-      if (supersededBySplit(t)) continue;
-      if (t.date > asOf) {
-        aheadCount++;
-        if (t.amount >= 0) aheadIn += t.amount; else aheadOut += -t.amount;
-        continue;
-      }
-      count++;
-      if (t.amount >= 0) inAmt += t.amount; else outAmt += -t.amount;
-    }
-    return { inAmt, outAmt, count, asOf, ahead: { inAmt: aheadIn, outAmt: aheadOut, count: aheadCount } };
+    const mine = ledger(start, end).filter(s => labels.has(s.label));
+    const done = tally(mine.filter(s => s.date <= asOf), LENSES.ACCOUNT);
+    const ahead = tally(mine.filter(s => s.date > asOf), LENSES.ACCOUNT);
+    return {
+      inAmt: done.inflow, outAmt: -done.outflow, count: done.count, asOf,
+      ahead: { inAmt: ahead.inflow, outAmt: -ahead.outflow, count: ahead.count },
+    };
   }
-
-  /* ------------------------------ actions ------------------------------- */
-  /* Jump to Transactions filtered to this account. switchView renders the view
-     first, which is what rebuilds the account <select>'s options — so the label
-     is on the list by the time it is selected. The other two filters are reset
-     because a search left over from a previous visit would land the reader on
-     "0 rows" with no visible reason. */
   function openTransactions(label) {
     ctx.switchView('transactions');
     const sel = $('#txAccount');
@@ -1003,7 +992,7 @@ module.exports = function registerAccounts(ctx) {
     const rows = netByOwner(S.accounts, declaredOwners()).map(r => {
       const { primary, others } = splitByCurrency(
         S.accounts.filter(a => ownerKey(a.owner) === r.key));
-      return { ...r, net: roundedSum(primary), others };
+      return { ...r, net: primaryTotal(primary, S.settings.currency), others };
     });
     if (rows.length < 2) return null;
 
@@ -1061,7 +1050,7 @@ module.exports = function registerAccounts(ctx) {
       return {
         key,
         colour: GROUP_COLOUR[key] || 'var(--color-accent)',
-        total: roundedSum(primary),
+        total: primaryTotal(primary, S.settings.currency),
         others,
       };
       /* A group holding ONLY foreign money nets zero in the household's
@@ -2024,7 +2013,7 @@ module.exports = function registerAccounts(ctx) {
              currency in the group gets its own small side figure rather than
              being folded in and marked with an asterisk. */
           const { primary, others } = splitByCurrency(inGroup.map(r => r.a));
-          const total = roundedSum(primary);
+          const total = primaryTotal(primary, S.settings.currency);
           body.append(el('tr', { class: 'type-row' },
             el('td', { colspan: '8' },
               i18n.t(key),

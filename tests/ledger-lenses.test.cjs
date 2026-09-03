@@ -19,6 +19,8 @@
         randomised vaults, not on a fixture chosen to agree.
      4. THE LENSES SAY WHAT THEY DROP: BUDGET and TREND differ by exactly
         earmarkedOut on any vault (the ISSUE 41 gap, preserved and named).
+     5. ACCOUNT (Phase 3) keeps everything but a split's superseded parent —
+        the Accounts page's own reading, proved by the same oracle.
 
      node tests/ledger-lenses.test.cjs */
 const assert = require('assert');
@@ -104,6 +106,7 @@ function oracleKeeps(ctx, lensName, t, paired) {
     case 'TREND': return !t.excluded && !nonBudget && !foreign && !transfer;
     case 'HOUSEHOLD': return !foreign && !transfer && !supersededBySplit(t)
       && !paired.has(`${t.label}|${t.date}|${(t.amount || 0).toFixed(2)}|${t.desc || ''}`);
+    case 'ACCOUNT': return !supersededBySplit(t);
     default: throw new Error(lensName);
   }
 }

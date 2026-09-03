@@ -60,6 +60,8 @@
 
 const { escMd } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
+const { budgetRowStatus } = require('./money-flow');
+const { growthRate } = require('./savings-math');
 const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
    reads it instead of a raw r.split test: see src/tx-role.js's own header
@@ -284,8 +286,9 @@ function budgetTable(rows, money) {
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
     '|---|---|---:|---:|---:|'];
   for (const r of rows) {
-    const remaining = r.budget - r.actual;
-    const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
+    /* Phase 3 of ADR-0006: the same rule the Dashboard's table reads, so an
+       assume-spent row cannot be "unbudgeted" here and budgeted there. */
+    const { remaining, unbudgeted } = budgetRowStatus(r);
     out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
   }
   return out;
@@ -386,7 +389,7 @@ function prepareReportData(data) {
   const spendByCategory = data.spendByCategory || [];
   const pct = sharePercents(spendByCategory.map(r => r.amount));
   const savings = data.savings
-    ? { ...data.savings, rate: data.savings.rateCapital > 0 ? (data.savings.rateGrowth / data.savings.rateCapital) * 100 : null }
+    ? { ...data.savings, rate: growthRate(data.savings) }
     : data.savings;
   return {
     ...data,
@@ -933,7 +936,7 @@ function financialReportJson(data) {
        already carries, added here too so the two arrays are equally
        interpretable (H1's own reasoning for carrying `type` in both). */
     budgets_vs_actuals: categories.map(r => ({
-      category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: r.budget - r.actual,
+      category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: budgetRowStatus(r).remaining,
       orphaned: !!r.orphaned,
     })),
     /* Present when there is a home-currency total OR a foreign pool held out

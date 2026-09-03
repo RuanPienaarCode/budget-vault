@@ -4,9 +4,9 @@
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { accountsOfType, accountType } = require('../vocabulary');
 const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
-const { isStale, isStaleValuation, stalenessSummary, reconcile } = require('../reconcile');
+const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType } = require('../savings-math');
+const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate } = require('../savings-math');
 const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
@@ -31,7 +31,7 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, accountIndex, impliedAccounts } = ctx;
+  const { S, $, root, money, accountIndex, impliedAccounts, bookFigures } = ctx;
 
   /* ---------------------------- currency ----------------------------------
      This page was the pre-issue-#28 code verbatim, and an audit found every
@@ -227,7 +227,7 @@ module.exports = function registerSavings(ctx) {
         : 'no account has a Starting amount set — use "Add starting amount" on an account below');
     }
     const sub = [
-      g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
+      growthRate(g) !== null ? `${pct(growthRate(g))} on ${money(g.rateCapital, 0)} put in` : null,
       g.unmeasured ? `${g.unmeasured} of ${g.total} missing a starting amount or date` : null,
       g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
       /* Named, never silently dropped — currency.js:14 is explicit that this
@@ -450,6 +450,8 @@ module.exports = function registerSavings(ctx) {
   }
 
   function renderSections(savings, investments, idx) {
+    /* Phase 3 of ADR-0006: one reconcile pass, shared with the Dashboard. */
+    const book = bookFigures();
     const wrap = $('#savingsSections'); wrap.empty();
     /* The loop below `continue`s past whichever of the two lists is empty —
        right when exactly one of them has accounts, so the page doesn't print
@@ -587,7 +589,7 @@ module.exports = function registerSavings(ctx) {
 
         /* Reconciliation — the same argument the Accounts page makes, on the
            page where the balance is largest and least often confirmed. */
-        const rec = reconcile(a, rows);
+        const rec = book.reconciled.get(a);
         if (rec.state === 'drift') {
           const line = el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt' },

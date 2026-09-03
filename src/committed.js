@@ -217,6 +217,12 @@ function earmarkOf(a) {
   return isPoolAccount(a) ? held : 0;
 }
 
+/* A debt's monthly commitment: the instalment plus whatever extra the
+   household has chosen to pay. One owner (Phase 3 of ADR-0006) — the Debt
+   page's "Paying per month", its debt-to-income ratio, its amortisation and
+   the what's-left chain below all used to spell this themselves. */
+function debtMonthly(d) { return (Number(d && d.payment) || 0) + (Number(d && d.extra) || 0); }
+
 function cashOnHand(accounts) {
   let cash = 0, counted = 0, earmarked = 0;
   const unknown = [];
@@ -441,7 +447,7 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today
   const history = (rows || []).filter(r => !isSplitPart(r));
   for (const d of debts || []) {
     if (!d || d.status === 'paid') continue;
-    const payment = (d.payment || 0) + (d.extra || 0);
+    const payment = debtMonthly(d);
     if (payment <= 0) continue;
 
     const paid = d.category
@@ -796,5 +802,5 @@ function daysBetween(a, b) {
 
 module.exports = {
   WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
-  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
+  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft, debtMonthly,
 };

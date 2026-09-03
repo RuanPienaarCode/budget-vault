@@ -6,7 +6,7 @@ const { safeSeg } = require('../vault-path');
 const { typeOrder, typeRank } = require('../groups');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
-const { stalenessSummary, reconcile, isStale } = require('../reconcile');
+const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso } = require('../dates');
@@ -40,7 +40,7 @@ const { assumedActual } = require('../money-flow');
 const { accountsOfType: vocabAccountsOfType, poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -443,7 +443,6 @@ module.exports = function registerDashboard(ctx) {
 
        See unreadableNote() above for why the sentence may still come out
        empty even when this count is not. */
-    const unplacedBy = new Map();
     /* ISSUE 45. The same shape, one row along: activity dated ON an account's
        own confirmation day, which reconcile() treats as already inside the
        stated balance (correctly — see its own note) and which nothing on this
@@ -461,19 +460,11 @@ module.exports = function registerDashboard(ctx) {
        the identical reason: an account the reader opted out of contributes to
        no figure here, so a caveat drawn from it would qualify a total it
        cannot have affected. */
-    const confirmDayBy = new Map();
+    /* Phase 3 of ADR-0006: one reconcile pass per render, in figures.js. */
+    const book = bookFigures();
+    const { unplacedBy, confirmDayBy } = book;
     const accounts = S.accounts.map(a => {
-      const rows = (idx.get(a) || {}).rows || [];
-      const rec = reconcile(a, rows);
-      if (rec.unreadable && a.in_budget !== false) {
-        const sym = symbolOf(a, S.settings.currency);
-        unplacedBy.set(sym, (unplacedBy.get(sym) || 0) + rec.unreadable);
-      }
-      if (rec.sameDay && rec.sameDay.count && a.in_budget !== false) {
-        const sym = symbolOf(a, S.settings.currency);
-        const at = confirmDayBy.get(sym) || { count: 0, net: 0 };
-        confirmDayBy.set(sym, { count: at.count + rec.sameDay.count, net: at.net + rec.sameDay.net });
-      }
+      const rec = book.reconciled.get(a);
       return {
         name: a.name,
         inBudget: a.in_budget !== false,
@@ -1179,7 +1170,7 @@ module.exports = function registerDashboard(ctx) {
        credit-card account, nothing on the Debt page at all. Each ledger now
        gets its own sentence, and the count quoted is always a count of the
        thing the figure was built from. */
-    const owedAccounts = S.accounts.filter(a => (a.balance || 0) < 0).length;
+    const owedAccounts = bookFigures().overdrawn;
     /* ISSUE 30. `w.active` is every active debt-page row, foreign ones
        included — worth() keeps it whole on purpose, so a foreign debt holds
        its positional key and the payoff projections do not repoint (ADR-0004).
@@ -1299,28 +1290,9 @@ module.exports = function registerDashboard(ctx) {
        Home-currency accounts only, and the count of what that leaves out
        travels with it — the sentence below states both. */
     const idx = accountIndex();
-    let drift = 0, driftForeign = 0, driftUnplaced = 0;
-    for (const a of S.accounts) {
-      const rec = reconcile(a, (idx.get(a) || {}).rows || []);
-      /* COUNTED BEFORE THE STATE TEST, on purpose, and this is the whole
-         reason `unreadable` is a count on every verdict rather than a sixth
-         state. An account holding nothing but undatable rows comes back
-         'clean' — reconcile's own doc says 'clean' now means "nothing
-         READABLE has moved" — so a tally taken after `state !== 'drift'`
-         would report zero unplaced rows on exactly the account whose entire
-         movement went unplaced. `rec.unreadable` is undefined on the two
-         verdicts that never walked the rows ('no-date', 'no-tx'), which is
-         falsy and adds nothing.
-
-         Foreign accounts are skipped here as they are for the drift sum
-         itself: this sentence qualifies a rand figure, and a rupiah row
-         nobody can date did not move it. Their own count is disclosed on
-         their own band in renderLeft. */
-      if (!isForeign(a, S.settings.currency)) driftUnplaced += rec.unreadable || 0;
-      if (rec.state !== 'drift') continue;
-      if (isForeign(a, S.settings.currency)) { driftForeign++; continue; }
-      drift += rec.delta;
-    }
+    /* Phase 3 of ADR-0006: the same reconcile pass the what's-left card
+       reads — see bookFigures() in figures.js for the counting rules. */
+    const { drift, driftForeign, driftUnplaced } = bookFigures().drift;
     /* Below a whole currency unit there is nothing to report but rounding. */
     const driftNote = Math.abs(drift) >= 1
       ? i18n.t(drift > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: money(Math.abs(drift), 0) })
@@ -1635,81 +1607,8 @@ module.exports = function registerDashboard(ctx) {
      assumed-spend/orphaned-category logic drifting from this one the way
      income and saving-rate already have twice in this codebase. Pure of the
      DOM: returns data, renderBudgetTable (and now report.js) draw it. */
-  function budgetVsActualRows(p) {
-    const sum = periodSummary(p);
-    const budget = S.budgets[p] || [];
-    const rows = new Map();
-    /* An assume-spent row starts AT its own assumption — the money left in an
-       earlier period, which no transaction here is expected to match. Seeded
-       before the transaction pass so the bar, the remaining figure and the red
-       are computed off that amount rather than off a zero nothing will fill.
-       The transaction pass below may raise it; it can never lower it. See the
-       flag's comment in src/load.js, and assumedActual() for the rule itself. */
-    for (const b of budget) {
-      /* The LIVE type, through period.js's one reading of it — not `b.type`,
-         the cell the budget file stores and never heals. Read raw, a category
-         retyped from expense to income sat in this table (and the Report and
-         both exports, which carry `type` from here) as an expense with its
-         full amount "remaining", while budgetTotals() one call away counted
-         the same row as income. */
-      const type = ctx.budgetRowType(b);
-      const assumed = type !== 'income' && type !== 'transfer' && catAssumeSpent(b.category);
-      rows.set(b.category, { budget: b.amount, type, actual: assumed ? assumedActual(b.amount, 0) : 0, notes: b.notes, assumed });
-    }
-    for (const [cat, amt] of Object.entries(sum.byCat)) {
-      if (!cat) continue;
-      const type = catType(cat);
-      if (type === 'transfer') continue;
-      /* An assume-spent row REPLACES rather than accumulates: seeded above at
-         the assumption, it must not have this period's transactions piled on
-         top of it — that doubled both Spent and the red "over budget" it
-         produced while the Budget page, reading the same category, stayed on
-         budget.
-
-         Replacing is not the same as ignoring, and that is where this line was
-         wrong. It skipped the row outright, citing views/budgets.js's older
-         `assumed ? d.amount : …` — which had since become a max(), because a
-         reader can and does pay an assumed bill from a tracked account anyway.
-         So a Carry category budgeted R2 500 against a real R4 000 payment read
-         R4 000 and over on the Budget page and R2 500 and "on budget" here,
-         in the Report and in both exports, all four off one vault. The rule
-         now comes from ONE function, in the view that owns it. */
-      const existing = rows.get(cat);
-      if (existing && existing.assumed) {
-        // -amt because sum.byCat is signed: an expense nets negative, and a
-        // category refunded past its spending nets positive, which
-        // assumedActual reads as "nothing really moved" and leaves at the
-        // assumption rather than below it.
-        existing.actual = assumedActual(existing.budget, -amt);
-        continue;
-      }
-      /* An ORPHANED category — catType(cat) === null, either a name no
-         category file has ever answered to, or one whose file has since
-         been deleted (catKnown/catType in period.js draw that line) — has no
-         reliable sign to guess. `type || 'expense'` used to fall straight to
-         the else branch and sign-flip a positive DEPOSIT into a negative
-         "Spent" figure, the same wrong-bucket trap period.js's own comment on
-         `net` warns about, just re-introduced one file downstream of the fix.
-
-         A row that already carries a budget entry (this category is still
-         IN the budget file, only its category note is gone) keeps signing by
-         its OWN recorded type — read off the budget row itself, not off the
-         missing category file — so a still-budgeted category is unaffected.
-         A row with no budget entry at all has no type from anywhere and is
-         left out of this table entirely, same as periodSummary's own
-         `unknown` bucket and what renderHero already discloses by name
-         instead of guessing a sign for it. */
-      if (type === null && !existing) continue;
-      const r = existing || rows.set(cat, { budget: 0, type: type || 'expense', actual: 0, notes: '' }).get(cat);
-      const signType = type === null ? r.type : type;
-      r.actual += signType === 'income' ? amt : -amt;
-    }
-    const order = typeOrder(S.settings.groups);
-    return [...rows.entries()]
-      .sort((a, b) => typeRank(a[1].type, order) - typeRank(b[1].type, order) || a[0].localeCompare(b[0]))
-      .map(([cat, r]) => ({ cat, ...r }));
-  }
-
+  /* budgetVsActualRows moved to src/figures.js in Phase 3 of ADR-0006; the
+     comment above it stays as the record of the rule. */
   function renderBudgetTable() {
     const t = $('#dashBudget'); t.empty();
     $('#dashBudgetSub').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -1725,8 +1624,8 @@ module.exports = function registerDashboard(ctx) {
         lastType = r.type;
         body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '5' }, r.type)));
       }
-      const pct = r.budget > 0 ? Math.min(100, (r.actual / r.budget) * 100) : (r.actual > 0 ? 100 : 0);
-      const over = r.budget > 0 && r.actual > r.budget;
+      /* Phase 3 of ADR-0006: the row's status comes with the row. */
+      const { pct, over, unbudgeted, near, remaining } = r;
       /* Spending in a category nobody budgeted for is over budget by the whole
          amount, and it used to be the one kind of overspend this table said
          nothing about: the Remaining cell was left blank whenever there was no
@@ -1735,10 +1634,7 @@ module.exports = function registerDashboard(ctx) {
          blank cell reads as "nothing to report" — the opposite of the truth. */
       // An assume-spent row is on budget by construction, and a zero-budget one
       // has nothing to be over — neither is the unbudgeted-spending case.
-      const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0 && !r.assumed;
-      const near = !over && r.budget > 0 && r.actual / r.budget >= 0.85;
       const barCls = r.type === 'income' ? '' : (over || unbudgeted) ? ' bg-danger' : near ? ' bg-warning' : '';
-      const remaining = r.budget - r.actual;
       const bar = el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${barCls}`, style: `width:${pct}%` }));
       body.append(el('tr', {},
         el('td', {}, cat, r.notes ? el('div', { class: 'text-muted', style: 'font-size:11.5px;margin-top:2px' }, r.notes.split('\n')[0]) : ''),
@@ -2275,19 +2171,7 @@ module.exports = function registerDashboard(ctx) {
      (income and transfer types dropped, a category that netted positive this
      period is not spending), minus the donut's own colour/slice-collapsing
      concerns, which are display, not arithmetic. Pure of the DOM. */
-  function categorySpendRows(p) {
-    const sum = periodSummary(p);
-    const spend = [];
-    for (const [cat, amt] of Object.entries(sum.byCat)) {
-      const type = catType(cat);
-      if (!cat || type === 'income' || type === 'transfer') continue;
-      if (amt >= 0) continue;
-      spend.push({ cat, amount: -amt });
-    }
-    spend.sort((a, b) => b.amount - a.amount);
-    return spend;
-  }
-
+  /* categorySpendRows moved to src/figures.js in Phase 3 of ADR-0006. */
   function renderSplit() {
     const wrap = $('#dashSplit'); wrap.empty();
     const sum = periodSummary(S.period);
@@ -2339,9 +2223,9 @@ module.exports = function registerDashboard(ctx) {
        uncategorised payments nets positive, so the note said nothing at all
        while the two figures sat materially apart. Rounding is the only thing
        left under a currency unit, so that is where it goes quiet. */
-    const notShown = Math.max(0, sum.spend - total);
-    const uncat = Math.min(sum.uncatSpend || 0, notShown);
-    const netted = notShown - uncat;
+    /* Phase 3 of ADR-0006: the decomposition is computed once, in
+       figures.js's categoryGap(), and the Report page reads the same one. */
+    const { uncat, netted } = categoryGap(S.period);
     const parts = [];
     if (uncat >= 1) parts.push(i18n.t('dash.split.uncatNote', { amount: money(uncat) }));
     if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted) }));
@@ -2598,7 +2482,7 @@ module.exports = function registerDashboard(ctx) {
      views/report.js is the obvious candidate and does not need it today —
      its Net Worth section is built from worth(), which reads stated balances
      and never calls reconcile(). */
-  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, budgetVsActualRows, categorySpendRows, unreadableNote });
+  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote });
 };
 
 /* Exposed for a direct, DOM-free unit test of the rounding algorithm itself —

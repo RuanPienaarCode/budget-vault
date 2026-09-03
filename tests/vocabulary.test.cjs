@@ -91,6 +91,7 @@ const files = {
   vocabulary: read('vocabulary.js'),
   period: read('period.js'),
   ledger: read('ledger.js'),
+  figures: read('figures.js'),
 };
 const live = {}; // same files, comments stripped, for "must not contain the old shape" checks
 for (const [k, v] of Object.entries(files)) live[k] = stripComments(v);
@@ -384,9 +385,11 @@ function provenFalse(desc, exactShape, mangled) {
 
   ok(live.dashboard.includes("const { assumedActual } = require('../money-flow');"),
     'Assume-spent (Dashboard): reads the SAME function rather than re-deriving it — its own copy used to discard real spend, so a category over its budget read "on budget" here and over there');
-  ok(live.dashboard.includes('actual: assumed ? assumedActual(b.amount, 0) : 0'),
+  /* Phase 3 of ADR-0006: budgetVsActualRows moved from the Dashboard view
+     into src/figures.js, the one owner of the period's rows. */
+  ok(live.figures.includes('actual: assumed ? assumedActual(b.amount, 0) : 0'),
     'Assume-spent (Dashboard): an assume-spent row is SEEDED through the rule, with nothing yet spent against it');
-  ok(live.dashboard.includes('existing.actual = assumedActual(existing.budget, -amt);'),
+  ok(live.figures.includes('existing.actual = assumedActual(existing.budget, -amt);'),
     'Assume-spent (Dashboard): and a transaction landing in that category re-reads the rule with the real figure — REPLACES, never PLUS');
 
   // Negative control 1: the pre-1.23.0 Budget-page line added the WHOLE
@@ -430,7 +433,7 @@ function provenFalse(desc, exactShape, mangled) {
     'Category type (Budget): confirmed — the local copy is gone');
 
   const DASH_LINE = 'const type = catType(cat);';
-  ok(live.dashboard.split(DASH_LINE).length - 1 >= 1, 'Category type (Dashboard): the budget table also reads the live category file through catType(), the same function Budget uses');
+  ok(live.figures.split(DASH_LINE).length - 1 >= 1, 'Category type (period figures): the budget-vs-actual rows read the live category file through catType(), the same function Budget uses — built in src/figures.js since Phase 3 of ADR-0006');
 
   // Negative control: reversing the `??` operands makes the STALE cell win
   // whenever it happens to be present — the exact bug the changelog names.

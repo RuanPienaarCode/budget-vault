@@ -150,6 +150,10 @@ const LENSES = Object.freeze({
      so the pairing never saw it); it is a row superseded by its parts, and
      it is dropped by name. tests/ledger-lenses.test.cjs §5b pins it. */
   HOUSEHOLD: Object.freeze({ name: 'HOUSEHOLD', drop: Object.freeze(['foreign', 'transfer', 'passthrough', 'splitParent']), sign: 'net' }),
+  /* "What did this one account do." Every row moves the balance, whatever
+     the budget thinks of it; only a split's superseded parent is not money.
+     The Accounts page's flow chips and sparkline. */
+  ACCOUNT: Object.freeze({ name: 'ACCOUNT', drop: Object.freeze(['splitParent']), sign: 'gross' }),
 });
 
 const dropsAnyOf = (lens, s, except) => lens.drop.some(k => k !== except && s[k]);
@@ -190,6 +194,9 @@ function tally(stamped, lens) {
   const unknown = { count: 0, spend: 0, income: 0, names: [] };
   const unknownSeen = new Set();
   const byCat = Object.create(null);
+  /* Gross outgoings per category — what was PAID under a name, refunds not
+     netted. The Debt page's "paid vs planned" reads it. */
+  const grossOutByCat = Object.create(null);
   const typeOf = Object.create(null);
   const fixedCat = Object.create(null);
   for (const s of kept) {
@@ -197,6 +204,7 @@ function tally(stamped, lens) {
     if (s.amount > 0) inflow += s.amount; else outflow += s.amount;
     if (s.setAside) setAside += -s.amount;
     byCat[s.cat] = (byCat[s.cat] || 0) + s.amount;
+    if (s.amount < 0) grossOutByCat[s.cat] = (grossOutByCat[s.cat] || 0) - s.amount;
     typeOf[s.cat] = s.type;
     fixedCat[s.cat] = s.fixed;
     if (!s.cat) {
@@ -228,7 +236,7 @@ function tally(stamped, lens) {
   }
   return {
     lens: lens.name, count, kept,
-    income, spend, net, setAside, byCat, inflow, outflow,
+    income, spend, net, setAside, byCat, grossOutByCat, inflow, outflow,
     uncategorised, uncatSpend, uncatIncome, unknown,
     foreign: { count: foreignHere.size, labels: [...foreignHere.keys()], symbols: [...new Set(foreignHere.values())] },
     fundedFromSavings,

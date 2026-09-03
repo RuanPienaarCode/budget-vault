@@ -161,7 +161,11 @@ atAuditDate(async () => {
     const rows = ctx.budgetVsActualRows
       ? ctx.budgetVsActualRows(PERIOD) : null;
     if (rows) {
-      const tableTotal = rows.reduce((t, r) => t + (r.budget || 0), 0);
+      /* The table lists income and transfer rows too; the summary's
+         budgetSpend is the spend envelopes plus set-aside, so compare like
+         with like. (This branch first RAN in Phase 3 of ADR-0006, when
+         budgetVsActualRows moved onto ctx before the views register.) */
+      const tableTotal = rows.filter(r => r.type !== 'income' && r.type !== 'transfer').reduce((t, r) => t + (r.budget || 0), 0);
       eq(tableTotal, budgetSpend,
         'the summary figure and the table beneath it are one number, in the document that leaves the app');
     }
