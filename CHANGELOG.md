@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.36.0 — 2026-09-03
 
 Everything below came out of a live audit of 1.35.1 run on 2 September 2026,
 and every item was reproduced against one seeded household before it was
