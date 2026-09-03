@@ -15,6 +15,15 @@
    a debt with a rate and an extra payment, an asset old enough to be stale, a
    service, money owed, a plan and a tax year.
 
+   Since 1.39.0 it also holds one of each row shape the four-phase calculation
+   refactor settled (ADR-0005, ADR-0006), so the ledger pins those rules too:
+   a set-aside envelope with its contribution (Investing), an assume-spent
+   category with no transaction behind it (Carry), a split (a Takealot parent
+   with two parts), and an outflow from the earmarked emergency fund (the
+   pram). Before this the fixture held none of them, which is why every phase
+   of that refactor left the ledger byte-identical — it could not see what
+   had changed.
+
    Every figure is a round number a reader can do in their head. That is
    deliberate: when the ledger moves, the diff should be legible without a
    calculator, and a fixture full of realistic-looking noise makes a one-cent
@@ -28,7 +37,7 @@ const TX_HEAD = '---\nkind: transactions\n---\n\n'
   + '| Date | Description | Category | Amount | Excluded | Note | Split |\n'
   + '|---|---|---|---:|---|---|---|\n';
 const tx = rows => TX_HEAD + rows.map(
-  r => `| ${r[0]} | ${r[1]} | ${r[2] || ''} | ${r[3].toFixed(2)} |  |  |  |\n`).join('');
+  r => `| ${r[0]} | ${r[1]} | ${r[2] || ''} | ${r[3].toFixed(2)} | ${r[4] || ''} |  | ${r[5] || ''} |\n`).join('');
 
 const SEED = {
   [`${B}/Settings.md`]:
@@ -39,6 +48,11 @@ const SEED = {
   [`${B}/Categories/Rent.md`]: '---\ntype: expense\ncolor: "#aa3366"\n---\n',
   [`${B}/Categories/Gym.md`]: '---\ntype: expense\ncolor: "#3366aa"\n---\n',
   [`${B}/Categories/Transfer.md`]: '---\ntype: transfer\ncolor: "#6c757d"\n---\n',
+  /* Set-aside: an investment-typed category. Its outflow is money the
+     household KEPT, so it leaves "spent" and "budget used" (ADR-0005). */
+  [`${B}/Categories/Investing.md`]: '---\ntype: investment\ncolor: "#66aa33"\n---\n',
+  /* Assume-spent: consumed at its budget with no statement line behind it. */
+  [`${B}/Categories/Carry.md`]: '---\ntype: expense\ncolor: "#aa6633"\nassume_spent: true\n---\n',
 
   [`${B}/Accounts/Cheque.md`]:
     '---\ntype: checking\ntx_label: "Cheque"\nbalance: 20000.00\nbalance_updated: 2026-09-01\n---\n',
@@ -57,7 +71,9 @@ const SEED = {
     + '| Salary | income | 30000.00 |  |\n'
     + '| Groceries | expense | 5000.00 |  |\n'
     + '| Rent | expense | 9000.00 |  |\n'
-    + '| Gym | expense | 1000.00 |  |\n',
+    + '| Gym | expense | 1000.00 |  |\n'
+    + '| Investing | investment | 2000.00 |  |\n'
+    + '| Carry | expense | 500.00 |  |\n',
 
   /* August: the last COMPLETED period, which is what the health card and every
      comparison column measure. Without one, each of those is a dash — a valid
@@ -73,9 +89,19 @@ const SEED = {
     ['2026-09-01', 'Landlord', 'Rent', -9000],
     ['2026-09-02', 'Checkers', 'Groceries', -2000],
     ['2026-09-02', 'To emergency fund', 'Transfer', -1000],
+    /* The set-aside contribution: one leg, to a platform outside the vault. */
+    ['2026-09-02', 'To unit trust', 'Investing', -2000],
+    /* The split: the parent is excluded by construction and superseded by its
+       parts, which carry the money — 600 in total, across two categories. */
+    ['2026-09-02', 'Takealot', 'Groceries', -600, 'yes', 'parent'],
+    ['2026-09-02', 'Takealot', 'Groceries', -400, '', 'part'],
+    ['2026-09-02', 'Takealot', 'Gym', -200, '', 'part'],
   ]),
   [`${B}/Transactions/Emergency fund/2026-09.md`]: tx([
     ['2026-09-02', 'From cheque', 'Transfer', 1000],
+    /* The earmarked outflow: spend the fund paid for, disclosed on the hero
+       as funded-from-savings and held out of budget spend (ISSUE 41). */
+    ['2026-09-02', 'Pram', 'Groceries', -1500],
   ]),
 
   [`${B}/Debts.md`]: '---\nkind: debts\n---\n\n'

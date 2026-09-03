@@ -1,31 +1,35 @@
 ## dashboard
-number	4 000	-	heroCard/div.hero-grid/div[0]/div.hero-num[1]
-money	R 11 000,00	11000	heroCard/div.hero-grid/div[0]/div.hero-sub[2]
-money	R 15 000,00	15000	heroCard/div.hero-grid/div[0]/div.hero-sub[2]
+number	3 400	-	heroCard/div.hero-grid/div[0]/div.hero-num[1]
+money	R 13 600,00	13600	heroCard/div.hero-grid/div[0]/div.hero-sub[2]
+money	R 15 500,00	15500	heroCard/div.hero-grid/div[0]/div.hero-sub[2]
+money	R 1 500	1500	heroCard/div.hero-grid/div[0]/div.hero-sub[3]
+number	1	-	heroCard/div.hero-grid/div[0]/div.hero-sub[3]
 money	R 30 000,00	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
-money	R 15 000,00	15000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
-percent	50%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 11 000,00	11000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
-percent	73%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
+money	R 17 500,00	17500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
+percent	58%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
+money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
+money	R 1 000	1000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
+money	R 13 600,00	13600	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
+percent	78%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
 number	45	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
-number	1,1	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
+number	1,0	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
 number	6	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
-money	R 16 000	16000	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
+money	R 14 500	14500	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
 percent	0%	-	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lv[0]
 money	R 0	0	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lm[2]
 percent	0,4%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lv[0]
 money	R 133	133.33333333333334	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lm[2]
-money	R 33 000	33000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lv[0]
+money	R 28 900	28900	leftBody/div.left-grid[0]/div.left-fig[0]/div.lv[0]
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
 money	R 21 000	21000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
-money	R 16 000	16000	leftBody/div.left-grid[0]/div.left-fig[2]/div.lv[0]
+money	R 14 500	14500	leftBody/div.left-grid[0]/div.left-fig[2]/div.lv[0]
 money	R 1 600	1600	leftBody/div.left-grid[0]/div.left-fig[4]/div.lv[0]
 number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
 number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
-money	R 15 400	15400	leftBody/div.left-grid[0]/div.left-fig[6]/div.lv[0]
+money	R 12 800	12800	leftBody/div.left-grid[0]/div.left-fig[6]/div.lv[0]
 number	28	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
-money	R 550	550	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
+money	R 457	457.14285714285717	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
 money	$ 1 000	1000	leftBody/div.left-fx[1]/span.left-fx-txt[1]
 money	$ 0	0	leftBody/div.left-fx[1]/span.left-fx-txt[1]
 money	R 1 000	1000	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
@@ -37,8 +41,8 @@ money	R 14 000,00	14000	trendChart/svg/rect[0]/title
 money	R 0,00	0	trendChart/svg/rect[0]/title
 money	R 30 000,00	30000	trendChart/svg/rect[0]/title
 number	26	-	trendChart/svg/rect[1]/title
-money	R 11 000,00	11000	trendChart/svg/rect[1]/title
-money	R 15 000,00	15000	trendChart/svg/rect[1]/title
+money	R 13 600,00	13600	trendChart/svg/rect[1]/title
+money	R 15 500,00	15500	trendChart/svg/rect[1]/title
 money	R 30 000,00	30000	trendChart/svg/rect[1]/title
 number	26	-	trendChart/svg/text[0]
 number	26	-	trendChart/svg/text[1]
@@ -47,45 +51,61 @@ number	6	-	trendRange/div.chart-range/button.chart-range-btn[1]
 number	1	-	trendRange/div.chart-range/button.chart-range-btn[2]
 number	2	-	trendSub/
 money	R 9 000,00	9000	dashSplit/svg.donut/path.donut-slice[0]/title
-percent	82%	-	dashSplit/svg.donut/path.donut-slice[0]/title
-money	R 2 000,00	2000	dashSplit/svg.donut/path.donut-slice[1]/title
+percent	66%	-	dashSplit/svg.donut/path.donut-slice[0]/title
+money	R 2 400,00	2400	dashSplit/svg.donut/path.donut-slice[1]/title
 percent	18%	-	dashSplit/svg.donut/path.donut-slice[1]/title
-money	R 11 000	11000	dashSplit/svg.donut/text[1]
+money	R 2 000,00	2000	dashSplit/svg.donut/path.donut-slice[2]/title
+percent	15%	-	dashSplit/svg.donut/path.donut-slice[2]/title
+money	R 200,00	200	dashSplit/svg.donut/path.donut-slice[3]/title
+percent	1%	-	dashSplit/svg.donut/path.donut-slice[3]/title
+money	R 13 600	13600	dashSplit/svg.donut/text[1]
 number	3	-	dashSplit/ul.donut-legend/li.donut-legend-head[0]/span.dl-base[3]
 money	R 9 000	9000	dashSplit/ul.donut-legend/li[1]/button.dl-link[0]/span.dl-val[1]
-percent	82%	-	dashSplit/ul.donut-legend/li[1]/button.dl-link[0]/span.dl-pct[2]
+percent	66%	-	dashSplit/ul.donut-legend/li[1]/button.dl-link[0]/span.dl-pct[2]
 money	R 9 000	9000	dashSplit/ul.donut-legend/li[1]/button.dl-link[0]/span.dl-base[3]
 money	R 0	0	dashSplit/ul.donut-legend/li[1]/button.dl-link[0]/span.dl-delta[4]
-money	R 2 000	2000	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-val[1]
+money	R 2 400	2400	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-val[1]
 percent	18%	-	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-pct[2]
 money	R 0	0	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-base[3]
-money	R 2 000	2000	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-delta[4]
+money	R 2 400	2400	dashSplit/ul.donut-legend/li[2]/button.dl-link[0]/span.dl-delta[4]
+money	R 2 000	2000	dashSplit/ul.donut-legend/li[3]/button.dl-link[0]/span.dl-val[1]
+percent	15%	-	dashSplit/ul.donut-legend/li[3]/button.dl-link[0]/span.dl-pct[2]
+money	R 200	200	dashSplit/ul.donut-legend/li[4]/button.dl-link[0]/span.dl-val[1]
+percent	1%	-	dashSplit/ul.donut-legend/li[4]/button.dl-link[0]/span.dl-pct[2]
+money	R 0	0	dashSplit/ul.donut-legend/li[4]/button.dl-link[0]/span.dl-base[3]
+money	R 200	200	dashSplit/ul.donut-legend/li[4]/button.dl-link[0]/span.dl-delta[4]
 number	2	-	dashSplit/p.donut-note
 number	3	-	dashSplit/p.donut-note
 number	2	-	dashSplit/p.donut-note
 number	3	-	splitRange/div.chart-range/button.chart-range-btn[1]
 number	6	-	splitRange/div.chart-range/button.chart-range-btn[2]
 number	1	-	splitRange/div.chart-range/button.chart-range-btn[3]
-money	R 11 000,00	11000	dashSplitSub/
-number	2	-	dashSplitSub/
+money	R 13 600,00	13600	dashSplitSub/
+number	4	-	dashSplitSub/
 number	2026	-	dashSplitSub/
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[1]
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[2]
 money	R 0,00	0	dashBudget/tbody/tr[1]/td.num[4]
-money	R 5 000,00	5000	dashBudget/tbody/tr[3]/td.num[1]
-money	R 2 000,00	2000	dashBudget/tbody/tr[3]/td.num[2]
-money	R 3 000,00	3000	dashBudget/tbody/tr[3]/td.num[4]
-money	R 1 000,00	1000	dashBudget/tbody/tr[4]/td.num[1]
-money	R 0,00	0	dashBudget/tbody/tr[4]/td.num[2]
-money	R 1 000,00	1000	dashBudget/tbody/tr[4]/td.num[4]
-money	R 9 000,00	9000	dashBudget/tbody/tr[5]/td.num[1]
-money	R 9 000,00	9000	dashBudget/tbody/tr[5]/td.num[2]
-money	R 0,00	0	dashBudget/tbody/tr[5]/td.num[4]
+money	R 500,00	500	dashBudget/tbody/tr[3]/td.num[1]
+money	R 500,00	500	dashBudget/tbody/tr[3]/td.num[2]
+money	R 0,00	0	dashBudget/tbody/tr[3]/td.num[4]
+money	R 5 000,00	5000	dashBudget/tbody/tr[4]/td.num[1]
+money	R 2 400,00	2400	dashBudget/tbody/tr[4]/td.num[2]
+money	R 2 600,00	2600	dashBudget/tbody/tr[4]/td.num[4]
+money	R 1 000,00	1000	dashBudget/tbody/tr[5]/td.num[1]
+money	R 200,00	200	dashBudget/tbody/tr[5]/td.num[2]
+money	R 800,00	800	dashBudget/tbody/tr[5]/td.num[4]
+money	R 9 000,00	9000	dashBudget/tbody/tr[6]/td.num[1]
+money	R 9 000,00	9000	dashBudget/tbody/tr[6]/td.num[2]
+money	R 0,00	0	dashBudget/tbody/tr[6]/td.num[4]
+money	R 2 000,00	2000	dashBudget/tbody/tr[8]/td.num[1]
+money	R 2 000,00	2000	dashBudget/tbody/tr[8]/td.num[2]
+money	R 0,00	0	dashBudget/tbody/tr[8]/td.num[4]
 number	2026	-	dashBudgetSub/
 number	1	-	dashBudgetSub/
 number	30, 2026	-	dashBudgetSub/
-money	R 106 500	106500	dashPositionKpis/div.mini[0]/button.v
-money	R 114 500	114500	dashPositionKpis/div.mini[0]/div.s[1]
+money	R 102 400	102400	dashPositionKpis/div.mini[0]/button.v
+money	R 110 400	110400	dashPositionKpis/div.mini[0]/div.s[1]
 money	R 8 000	8000	dashPositionKpis/div.mini[0]/div.s[1]
 money	$ 1 000	1000	dashPositionKpis/div.mini[0]/div.s[1]
 money	R -8 000	-8000	dashPositionKpis/div.mini[1]/button.v
@@ -99,10 +119,10 @@ money	R 0	0	dashPositionKpis/div.mini[3]/div.s[1]
 money	$ 1 000	1000	dashPositionKpis/div.mini[3]/div.s[1]
 
 ## score
-number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
-money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+number	1.0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+money	R 14 500	14500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[1]/title
@@ -115,15 +135,15 @@ percent	0,4%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-ho
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[3]/title
-number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+money	R 102 400	102400	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+number	0.28	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 money	$ 1 000	1000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
-money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+number	1.0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+money	R 14 500	14500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/path.score-ring-seg/title
@@ -136,18 +156,18 @@ percent	0,4%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-ho
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[7]/title
-number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
-money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
-number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+money	R 102 400	102400	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+number	0.28	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 money	$ 1 000	1000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	45	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]
 number	100	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]/small
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-money	R 16 000	16000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+number	1.0	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+money	R 14 500	14500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 14 000	14000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
+number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-pts[2]
 percent	0%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 0	0	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[1]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
@@ -159,10 +179,10 @@ number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legen
 percent	47%	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
-money	R 106 500	106500	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	0.30	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+money	R 102 400	102400	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+number	0.28	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	$ 1 000	1000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
+number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	1	-	scoreHero/div.score-hero/p.score-hero-sub[1]
 number	80	-	scoreHero/div.score-hero/p.score-hero-note[3]
@@ -174,64 +194,70 @@ number	20	-	scoreGood/div.score-win[0]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreGood/div.score-win[0]/div.score-win-body/div.score-win-pts[2]
 number	19	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
-number	20	-	scoreWork/div.score-gap[0]/div.score-gap-h[0]/div.score-gap-pts[1]
-number	1.1	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
-money	R 16 000	16000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
+number	21	-	scoreWork/div.score-gap[0]/div.score-gap-h[0]/div.score-gap-pts[1]
+number	1.0	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
+money	R 14 500	14500	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 number	6	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 money	R 14 000	14000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
-money	R 68 000	68000	scoreWork/div.score-gap[0]/p.score-gap-do[0]
+money	R 69 500	69500	scoreWork/div.score-gap[0]/p.score-gap-do[0]
 number	6	-	scoreWork/div.score-gap[0]/p.score-gap-do[0]
 number	20	-	scoreWork/div.score-gap[1]/div.score-gap-h[0]/div.score-gap-pts[1]
 percent	0%	-	scoreWork/div.score-gap[1]/div.score-gap-now[2]
 money	R 0	0	scoreWork/div.score-gap[1]/div.score-gap-now[2]
 money	R 6 000	6000	scoreWork/div.score-gap[1]/p.score-gap-do[0]
 percent	20%	-	scoreWork/div.score-gap[1]/p.score-gap-do[0]
-number	14	-	scoreWork/div.score-gap[2]/div.score-gap-h[0]/div.score-gap-pts[1]
-money	R 106 500	106500	scoreWork/div.score-gap[2]/div.score-gap-now[2]
-number	0.30	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
+number	13	-	scoreWork/div.score-gap[2]/div.score-gap-h[0]/div.score-gap-pts[1]
+money	R 102 400	102400	scoreWork/div.score-gap[2]/div.score-gap-now[2]
+number	0.28	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 money	$ 1 000	1000	scoreWork/div.score-gap[2]/div.score-gap-now[2]
-money	R 973 500	973500	scoreWork/div.score-gap[2]/p.score-gap-do[0]
+money	R 977 600	977600	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 number	3	-	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 money	R 30 000	30000	view-score/div.card/div.body-pad[1]/div.score-flow-top[0]/div.score-flow-in[1]
 money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
 percent	0%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
-money	R 11 000	11000	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
-percent	37%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
-percent	37%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[4]
+money	R 11 600	11600	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
+percent	39%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
+percent	39%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[4]
 money	R 1 000	1000	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[6]
 percent	3%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[6]
-money	R 18 000	18000	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[8]
-percent	60%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[8]
-money	R 4 000	4000	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[9]
-money	R 15 000	15000	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[9]
+money	R 17 400	17400	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[8]
+percent	58%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[8]
+money	R 1 900	1900	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[9]
+money	R 14 500	14500	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-caption[9]
 money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[0]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
 percent	0%	-	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[0]/div.score-flow-m-sub[2]
-money	R 11 000	11000	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[1]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
-percent	37%	-	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[1]/div.score-flow-m-sub[2]
+money	R 11 600	11600	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[1]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
+percent	39%	-	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[1]/div.score-flow-m-sub[2]
 money	R 1 000	1000	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[2]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
 percent	3%	-	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[2]/div.score-flow-m-sub[2]
-money	R 18 000	18000	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
-money	R 4 000	4000	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
-money	R 15 000	15000	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
-money	R 15 000	15000	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[1]/b.num
-percent	50%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[2]/b.num
-money	R 11 000	11000	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[3]/b.num
-percent	73%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[4]/b.num
-money	R 4 000	4000	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[1]/b.num
-money	R 15 000	15000	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[2]/b.num
-money	R 19 000	19000	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[3]/b.num
+money	R 17 400	17400	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
+money	R 1 900	1900	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
+money	R 14 500	14500	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
+money	R 17 500	17500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[1]/b.num
+percent	58%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[2]/b.num
+money	R 12 100	12100	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[3]/b.num
+percent	78%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[4]/b.num
+money	R 1 900	1900	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[1]/b.num
+money	R 14 500	14500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[2]/b.num
+money	R 16 400	16400	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[3]/b.num
 number	2	-	scoreGoodSub/
 
 ## transactions
 number	2026	-	txSubNote/
 number	1	-	txSubNote/
 number	30, 2026	-	txSubNote/
-number	5	-	txCount/
+number	10	-	txCount/
 money	R -2 000,00	-2000	txTable/tbody/tr[0]/td.num[4]
 money	R 1 000,00	1000	txTable/tbody/tr[1]/td.num[4]
-money	R -1 000,00	-1000	txTable/tbody/tr[2]/td.num[4]
-money	R -9 000,00	-9000	txTable/tbody/tr[3]/td.num[4]
-money	R 30 000,00	30000	txTable/tbody/tr[4]/td.num[4]
+money	R -1 500,00	-1500	txTable/tbody/tr[2]/td.num[4]
+money	R -600,00	-600	txTable/tbody/tr[3]/td.num[4]
+number	2	-	txTable/tbody/tr[3]/td[5]/button.caveat-chip-btn
+money	R -400,00	-400	txTable/tbody/tr[4]/td.num[4]
+money	R -200,00	-200	txTable/tbody/tr[5]/td.num[4]
+money	R -1 000,00	-1000	txTable/tbody/tr[6]/td.num[4]
+money	R -2 000,00	-2000	txTable/tbody/tr[7]/td.num[4]
+money	R -9 000,00	-9000	txTable/tbody/tr[8]/td.num[4]
+money	R 30 000,00	30000	txTable/tbody/tr[9]/td.num[4]
 
 ## budgets
 number	2026	-	budPeriodLabel/
@@ -239,27 +265,40 @@ number	1	-	budPeriodLabel/
 number	30, 2026	-	budPeriodLabel/
 money	R 0,00	0	budTable/tbody/tr[1]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 30 000,00	30000	budTable/tbody/tr[1]/td.num[3]
-money	R 3 000,00	3000	budTable/tbody/tr[3]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
-money	R 2 000,00	2000	budTable/tbody/tr[3]/td.num[3]
-money	R 1 000,00	1000	budTable/tbody/tr[4]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
-money	R 0,00	0	budTable/tbody/tr[4]/td.num[3]
-money	R 0,00	0	budTable/tbody/tr[5]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
-money	R 9 000,00	9000	budTable/tbody/tr[5]/td.num[3]
-money	R 0,00	0	budTable/tbody/tr[7]/td.num[3]
+money	R 500,00	500	budTable/tbody/tr[3]/td.num[3]
+money	R 2 600,00	2600	budTable/tbody/tr[4]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
+money	R 2 400,00	2400	budTable/tbody/tr[4]/td.num[3]
+money	R 800,00	800	budTable/tbody/tr[5]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
+money	R 200,00	200	budTable/tbody/tr[5]/td.num[3]
+money	R 0,00	0	budTable/tbody/tr[6]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
+money	R 9 000,00	9000	budTable/tbody/tr[6]/td.num[3]
+money	R 0,00	0	budTable/tbody/tr[8]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
+money	R 2 000,00	2000	budTable/tbody/tr[8]/td.num[3]
+money	R 0,00	0	budTable/tbody/tr[10]/td.num[3]
 money	R 30 000,00	30000	budTotalsTop/div.bud-total[0]/div.bud-total-v[1]
 money	R 30 000,00	30000	budTotalsTop/div.bud-total[0]/div.bud-total-n[2]
-money	R 15 000,00	15000	budTotalsTop/div.bud-total[1]/div.bud-total-v[1]
-percent	50%	-	budTotalsTop/div.bud-total[1]/div.bud-total-n[2]
-money	R 15 000,00	15000	budTotalsTop/div.bud-total[2]/div.bud-total-v[1]
-money	R 11 000,00	11000	budTotalsTop/div.bud-total[3]/div.bud-total-v[1]
-percent	73%	-	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+money	R 17 500,00	17500	budTotalsTop/div.bud-total[1]/div.bud-total-v[1]
+percent	58%	-	budTotalsTop/div.bud-total[1]/div.bud-total-n[2]
+money	R 12 500,00	12500	budTotalsTop/div.bud-total[2]/div.bud-total-v[1]
+money	R 12 100,00	12100	budTotalsTop/div.bud-total[3]/div.bud-total-v[1]
+percent	78%	-	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+money	R 500,00	500	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+money	R 2 000	2000	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+money	R 1 000	1000	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+money	R 1 500,00	1500	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
+number	1	-	budTotalsTop/div.bud-total[3]/div.bud-total-n[2]
 money	R 30 000,00	30000	budTotalsBottom/div.bud-total[0]/div.bud-total-v[1]
 money	R 30 000,00	30000	budTotalsBottom/div.bud-total[0]/div.bud-total-n[2]
-money	R 15 000,00	15000	budTotalsBottom/div.bud-total[1]/div.bud-total-v[1]
-percent	50%	-	budTotalsBottom/div.bud-total[1]/div.bud-total-n[2]
-money	R 15 000,00	15000	budTotalsBottom/div.bud-total[2]/div.bud-total-v[1]
-money	R 11 000,00	11000	budTotalsBottom/div.bud-total[3]/div.bud-total-v[1]
-percent	73%	-	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+money	R 17 500,00	17500	budTotalsBottom/div.bud-total[1]/div.bud-total-v[1]
+percent	58%	-	budTotalsBottom/div.bud-total[1]/div.bud-total-n[2]
+money	R 12 500,00	12500	budTotalsBottom/div.bud-total[2]/div.bud-total-v[1]
+money	R 12 100,00	12100	budTotalsBottom/div.bud-total[3]/div.bud-total-v[1]
+percent	78%	-	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+money	R 500,00	500	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+money	R 2 000	2000	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+money	R 1 000	1000	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+money	R 1 500,00	1500	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
+number	1	-	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
 
 ## plan
 number	2026	-	planPicker/button.plan-seg
@@ -277,40 +316,40 @@ number	12	-	reportPeriodPills/div.chart-range/button.chart-range-btn[2]
 number	2026	-	reportPreview/
 
 ## savings
-money	R 106 500,00	106500	savingsKpis/div.mini[0]/div.v[1]
+money	R 102 400,00	102400	savingsKpis/div.mini[0]/div.v[1]
 money	$ 1 000	1000	savingsKpis/div.mini[0]/div.s[2]
 money	R 15 000,00	15000	savingsKpis/div.mini[1]/div.v[1]
 money	$ 1 000	1000	savingsKpis/div.mini[1]/div.s[2]
 money	R 0,00	0	savingsKpis/div.mini[2]/div.v[1]
-money	R 4 000,00	4000	savingsKpis/div.mini[3]/div.v[1]
-percent	36.4%	-	savingsKpis/div.mini[3]/div.s[2]
-money	R 11 000	11000	savingsKpis/div.mini[3]/div.s[2]
+money	R 5 500,00	5500	savingsKpis/div.mini[3]/div.v[1]
+percent	57.9%	-	savingsKpis/div.mini[3]/div.s[2]
+money	R 9 500	9500	savingsKpis/div.mini[3]/div.s[2]
 number	1	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 80 000	80000	savingsStale/div.kpi-caveat-txt
-money	R 114 500	114500	savingsWorth/svg.worth-svg/text[1]
-money	R 16 000,00	16000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
-percent	14%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
-money	R 17 000,00	17000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
-percent	15%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
+money	R 110 400	110400	savingsWorth/svg.worth-svg/text[1]
+money	R 14 500,00	14500	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
+percent	13%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
+money	R 14 400,00	14400	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
+percent	13%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[1]/rect/title
 money	R 80 000,00	80000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[2]/rect/title
-percent	70%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[2]/rect/title
+percent	73%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[2]/rect/title
 money	R 1 500,00	1500	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[3]/rect/title
 percent	1%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[3]/rect/title
 money	R 8 000	8000	savingsWorth/svg.worth-svg/text[3]
 money	R 8 000,00	8000	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
 percent	100%	-	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
-money	R 16 000	16000	savingsWorth/ul.donut-legend/li[0]/span.dl-val[1]
-money	R 17 000	17000	savingsWorth/ul.donut-legend/li[1]/span.dl-val[1]
+money	R 14 500	14500	savingsWorth/ul.donut-legend/li[0]/span.dl-val[1]
+money	R 14 400	14400	savingsWorth/ul.donut-legend/li[1]/span.dl-val[1]
 money	R 80 000	80000	savingsWorth/ul.donut-legend/li[2]/span.dl-val[1]
 money	R 1 500	1500	savingsWorth/ul.donut-legend/li[3]/span.dl-val[1]
 money	R 8 000	8000	savingsWorth/ul.donut-legend/li[4]/span.dl-val[1]
 money	$ 1 000	1000	savingsWorthSub/
-money	R 11 000,00	11000	savingsGrowth/svg.growth-svg/g/path[0]/title
-money	R 4 000,00	4000	savingsGrowth/svg.growth-svg/g/rect/title
+money	R 9 500,00	9500	savingsGrowth/svg.growth-svg/g/path[0]/title
+money	R 5 500,00	5500	savingsGrowth/svg.growth-svg/g/rect/title
 number	2026	-	savingsGrowth/svg.growth-svg/text[0]
 number	2026	-	savingsGrowth/svg.growth-svg/text[1]
-money	R 11 000	11000	savingsGrowth/ul.donut-legend/li[0]/span.dl-val[1]
-money	R 4 000	4000	savingsGrowth/ul.donut-legend/li[1]/span.dl-val[1]
+money	R 9 500	9500	savingsGrowth/ul.donut-legend/li[0]/span.dl-val[1]
+money	R 5 500	5500	savingsGrowth/ul.donut-legend/li[1]/span.dl-val[1]
 number	1	-	savingsGrowthSub/
 number	1	-	savingsGrowthSub/
 money	R 15 000,00	15000	savingsGrowthTotal/span/b.num
@@ -319,12 +358,13 @@ money	R 15 000,00	15000	savingsSections/div.card/div.card-h[0]/div.legend[1]/spa
 money	$ 1 000	1000	savingsSections/div.card/div.card-h[0]/div.legend[1]/span/span.acct-group-other
 money	$ 1 000,00	1000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[0]/button.v
 money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/button.v
-money	R 11 000	11000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]
-money	R 4 000	4000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]/span.num
-percent	36.4%	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[3]
+money	R 9 500	9500	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]
+money	R 1 500	1500	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]
+money	R 5 500	5500	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]/span.num
+percent	57.9%	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[3]
 number	244	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[4]/span.caveat-chip/button.caveat-chip-btn
-number	1	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt
-money	R 16 000,00	16000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt/b.num
+number	2	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt
+money	R 14 500,00	14500	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt/b.num
 
 ## accounts
 money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-num[1]
@@ -347,14 +387,14 @@ money	R 15 000	15000	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[
 money	$ 1 000	1000	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-val[1]/span.acct-group-other
 percent	43%	-	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-pct[2]
 number	3	-	acctDeck/div.acct-deck-h[0]/h2
-number	2	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 17 000,00	17000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
+number	5	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
+money	R 14 400,00	14400	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
 money	R 20 000,00	20000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 17 000,00	17000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
-number	1	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 16 000,00	16000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
+money	R 14 400,00	14400	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
+number	2	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
+money	R 14 500,00	14500	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
 money	R 15 000,00	15000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 16 000,00	16000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
+money	R 14 500,00	14500	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
 number	3	-	acctFilters/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[1]/span.acct-seg-n
 number	2	-	acctFilters/button.acct-seg[2]/span.acct-seg-n
@@ -362,13 +402,13 @@ number	3	-	acctFilters/button.acct-seg[3]/span.acct-seg-n
 number	2026	-	acctTable/thead/tr/th.acct-col-drop[2]/button
 money	R 20 000,00	20000	acctTable/tbody/tr.type-row[0]/td/span.acct-group-total
 money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.num[1]/button.acct-bal
-money	R 18 000	18000	acctTable/tbody/tr.acct-row[1]/td.num[2]/span.acct-chip
+money	R 15 400	15400	acctTable/tbody/tr.acct-row[1]/td.num[2]/span.acct-chip
 money	R 15 000,00	15000	acctTable/tbody/tr.type-row[2]/td/span.acct-group-total
 money	$ 1 000	1000	acctTable/tbody/tr.type-row[2]/td/span.acct-group-total/span.acct-group-other
 money	R 15 000,00	15000	acctTable/tbody/tr.acct-row[3]/td.num[1]/button.acct-bal
-money	R 1 000	1000	acctTable/tbody/tr.acct-row[3]/td.num[2]/span.acct-chip
-percent	36%	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
-money	R 11 000	11000	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
+money	R 500	500	acctTable/tbody/tr.acct-row[3]/td.num[2]/span.acct-chip
+percent	58%	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
+money	R 9 500	9500	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
 money	$ 1 000,00	1000	acctTable/tbody/tr.acct-row[4]/td.num[1]/button.acct-bal
 number	3	-	acctTblSub/
 
