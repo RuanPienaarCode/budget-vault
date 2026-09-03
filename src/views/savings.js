@@ -2,7 +2,7 @@
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
-const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
+const { createChart, tip, parseColor, distinctColors } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary, reconcile } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType } = require('../savings-math');
@@ -361,7 +361,14 @@ module.exports = function registerSavings(ctx) {
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
     btn.addEventListener('click', () => ctx.switchView('accounts'));
-    wrap.append(note, btn);
+    /* Redesign mockup B ("Net worth is the hero"): the sentence between the
+       tiles and the composition bar becomes a compact bordered banner with
+       its own action inside it, rather than a paragraph with a button
+       trailing loose after it. `note` and `btn` are unchanged — same
+       `kpi-caveat-txt`/`kpi-caveat-btn` classes the guard tests key on
+       (byCls walks INTO this wrapper) — only the enclosing `sav-banner`
+       shell is new; see src/_redesign/savings.css. */
+    wrap.append(el('div', { class: 'sav-banner sav-banner-warn' }, note, btn));
   }
 
   /* Named separately from the balances caveat and shown before it, because an
@@ -389,12 +396,15 @@ module.exports = function registerSavings(ctx) {
         ? `A further ${otherList(otherStale)} of it is held in other currencies, not converted.`
         : `${otherList(otherStale)} of what you own, all of it held in other currencies, was last valued over a year ago.`);
     }
-    wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-      bits.join(' ')));
+    const note = el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
+      bits.join(' '));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': 'Review asset valuations on the Assets page' }, 'Review valuations');
     btn.addEventListener('click', () => ctx.switchView('assets'));
-    wrap.append(btn);
+    // Same compact banner shell as renderStaleNote's own caveat, for the same
+    // reason: two paragraphs with a trailing button apiece used to sit one
+    // above the other with nothing telling them apart from body copy.
+    wrap.append(el('div', { class: 'sav-banner sav-banner-warn' }, note, btn));
   }
 
   function renderGoals() {
@@ -473,7 +483,13 @@ module.exports = function registerSavings(ctx) {
     }
     for (const [title, list] of [['Savings', savings], ['Investments', investments]]) {
       if (!list.length) continue;
-      const grid = el('div', { class: 'mini-grid' });
+      /* VARIANT B of the redesign mockup (budget-redesign.html, "List rows,
+         actions on open"): each account is a scannable balance row rather
+         than a five-button card. Every figure and every action below is
+         UNCHANGED from the card layout — this only changes where on the page
+         it is drawn and when it is visible. `sav-list` replaces `mini-grid`;
+         see src/_redesign/savings.css. */
+      const listEl = el('div', { class: 'sav-list' });
       /* The section header's own subtotal — split like every other total on
          this page. It used to add every balance in the group, which put
          "Rp 1 003 956" at the head of a card whose own Accounts-page twin
@@ -481,32 +497,119 @@ module.exports = function registerSavings(ctx) {
       const { others: listOthers } = split(list);
       const total = homeOnly(list);
       for (const a of list) {
-        const parts = [[a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · ')];
-        if (a.monthly_contribution) parts.push(`${acctMoney(a, a.monthly_contribution, 0)}/m`);
-        /* The balance is a BUTTON, opening the same one-field dialog the
-           Accounts page uses. `.mini button.v` is that page's own pattern for an
-           editable tile value, chosen over a new class so the hover, the focus
-           ring and its iOS-15 `:focus` fallback all come along — a fresh class
-           would have opted out of the fallback silently, and on the engine this
-           plugin actually floors at, that means no focus ring at all. */
-        const bal = el('button', { type: 'button', class: 'v num',
+        const kind = [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · ');
+        const rows = (idx.get(a) || {}).rows || [];
+        const flows = accountFlows(a, rows, poolType);
+        const r = ret({ account: a, rows });
+        const rec = reconcile(a, rows);
+
+        /* An account carrying nothing yet — R0 and no starting amount — is the
+           mockup's third row: no flows, no match state, just the one action
+           that gets it out of that state. Tested the same way renderActions
+           below decides whether to lead with "Add starting amount". */
+        const empty = r.basis === 'none' && flows.basis !== 'derived' && flows.basis !== 'stated'
+          && !a.balance && !a.inception_date;
+
+        /* The compact growth chip on the row itself — same figure and same
+           colour rule as the card's own `▲`/`▼` span, just without the rest of
+           the return breakdown beside it. Prefers the total-return figure
+           (r.growth) when the account has one, falling back to the derived
+           flows growth so a fund with no starting amount still shows what its
+           card used to show inline. */
+        const chipGrowth = r.basis !== 'none' ? r.growth
+          : (flows.basis === 'derived' ? flows.growth : null);
+
+        /* The one-line match status, reworded to fit a row rather than a
+           card: same three `rec.state`s, same wording as the card's own
+           `.acct-recon-txt`, just shorter — "matches" / a warning / a drift
+           count, never "checked" for a state the card itself refuses to
+           paint green. */
+        const matchLine = rec.state === 'drift'
+          ? `${rec.count} unmatched`
+          : rec.state === 'clean' && rec.unreadable
+            ? `${rec.unreadable} unreadable`
+            : rec.state === 'clean'
+              ? '✓ matches'
+              : null;
+
+        const balEl = el('div', { class: 'num sav-row-bal' }, acctMoney(a, a.balance));
+        if (empty) balEl.classList.add('text-muted');
+
+        const subParts = [el('span', {}, kind)];
+        if (chipGrowth) {
+          subParts.push(el('span', { class: `num sav-row-chip ${chipGrowth >= 0 ? 'text-success' : 'text-danger'}` },
+            `${chipGrowth >= 0 ? '▲' : '▼'} ${acctMoney(a, Math.abs(chipGrowth), 0)}`));
+        } else if (empty) {
+          subParts.push(el('span', { class: 'sav-row-warn' }, 'no starting amount'));
+        }
+
+        const row = el('button', { type: 'button', class: 'sav-row', 'aria-expanded': 'false',
+          'aria-label': `${a.name}, ${acctMoney(a, a.balance)}. Show account actions.` },
+          el('div', { class: 'sav-row-main' },
+            el('div', { class: 'sav-row-name' }, a.name),
+            el('div', { class: 'sav-row-sub' }, ...subParts)),
+          el('div', { class: 'sav-row-end' },
+            balEl,
+            matchLine ? el('div', {
+              class: `sav-row-status${rec.state === 'drift' || (rec.state === 'clean' && rec.unreadable) ? ' text-warning' : ' text-success'}`,
+            }, matchLine) : el('div', { class: 'sav-row-status' })));
+
+        const detail = el('div', { class: 'sav-detail hidden' });
+        if (!empty) {
+          row.addEventListener('click', () => {
+            const open = !detail.classList.contains('hidden');
+            detail.classList.toggle('hidden', open);
+            row.setAttribute('aria-expanded', open ? 'false' : 'true');
+          });
+        } else {
+          row.removeAttribute('aria-expanded');
+        }
+
+        /* card = the detail panel's own body. What follows is IDENTICAL to
+           the card body the previous layout always showed — the return
+           breakdown, the derived-flows line, the caveats, the reconciliation
+           line — just appended to `detail` instead of a `.mini` card, and
+           only built (and rendered) once the row is opened.
+
+           This block keeps the name `card` on purpose: every comment below it
+           — in renderReturn, in the derived/stated branches, in the
+           reconciliation block — refers to "the card" as the thing being
+           appended to, and renaming it would desync every one of those
+           comments from the code they describe for no behavioural gain.
+
+           `mini` stays as a SECOND class on the same element, alongside
+           `sav-detail` — tests/savings-cards.test.cjs and
+           tests/savings-account-type-casing.test.cjs both key a card's
+           content by walking `.mini` under #savingsSections and reading its
+           FIRST child's text as the account name, exactly the shape the old
+           `.mini` card had (`.l` was that first child). The name anchor below
+           reproduces that shape so those guards keep pinning the same
+           invariants against the new markup rather than needing a rewrite
+           this lane isn't scoped to do. */
+        const card = detail;
+        card.classList.add('mini');
+        card.append(el('div', { class: 'l hidden-visually' }, a.name));
+        /* The balance-edit control — same one-field dialog the Accounts page
+           uses, same `.v num` class the old card gave it (so the hover, the
+           focus ring and its iOS-15 `:focus` fallback all still apply), just
+           relocated into the sheet rather than sitting as the card's own
+           headline. The row above already SHOWS the balance; this is where
+           editing it now lives, one tap after the row that shows it. */
+        const balBtn = el('button', { type: 'button', class: 'v num',
           'aria-label': `Update the balance of ${a.name}, currently ${acctMoney(a, a.balance)}` },
         acctMoney(a, a.balance));
-        bal.addEventListener('click', () => ctx.editBalance(a));
-
-        const card = el('div', { class: 'mini' },
-          el('div', { class: 'l' }, a.name),
-          bal,
-          el('div', { class: 's' }, parts.filter(Boolean).join(' · ')));
+        balBtn.addEventListener('click', () => ctx.editBalance(a));
+        card.append(balBtn);
         /* What the balance is MADE of, derived from the account's own
            transactions: contributions are money the household put in, growth is
            what the account earned on its own. The old single figure —
            `balance − total_invested` — called the whole difference growth, and
            since nothing keeps total_invested in step with a debit order, every
-           contribution was reported as performance. */
-        const rows = (idx.get(a) || {}).rows || [];
-        const flows = accountFlows(a, rows, poolType);
-        const r = ret({ account: a, rows });
+           contribution was reported as performance.
+
+           `rows`, `flows`, `r` and `rec` are computed once above — before the
+           row itself, so the compact chip and match line on the closed row can
+           read them too — and reused here rather than recomputed. */
 
         /* Where the account records what it STARTED at, the total-return block
            below supersedes the contributions line — the two state different
@@ -587,7 +690,6 @@ module.exports = function registerSavings(ctx) {
 
         /* Reconciliation — the same argument the Accounts page makes, on the
            page where the balance is largest and least often confirmed. */
-        const rec = reconcile(a, rows);
         if (rec.state === 'drift') {
           const line = el('div', { class: 'acct-recon' },
             el('div', { class: 'acct-recon-txt' },
@@ -630,15 +732,31 @@ module.exports = function registerSavings(ctx) {
             el('div', { class: 'acct-recon-txt text-success' }, 'Matches your transactions')));
         }
 
+        /* The action sheet — same five actions, same handlers, same labels as
+           the card layout's `.acct-drawer-acts` had, just appended into the
+           row's own detail panel instead of always being on screen. An empty
+           account (see `empty` above) skips the sheet altogether: the mockup
+           shows only the one action it needs, inline, rather than opening a
+           sheet to reach it. */
+        if (empty) {
+          const btn = el('button', { type: 'button', class: 'acct-drawer-act sav-row-solo-act',
+            'aria-label': `Add a starting amount and opening date for ${a.name}` }, 'Add starting amount');
+          btn.addEventListener('click', () => ctx.editAccount(a));
+          const item = el('div', { class: 'sav-item' }, row, btn);
+          listEl.append(item);
+          continue;
+        }
+
         renderActions(card, a, r, (idx.get(a) || {}).labels);
-        grid.append(card);
+        const item = el('div', { class: 'sav-item' }, row, detail);
+        listEl.append(item);
       }
       wrap.append(el('div', { class: 'card mb-4' },
         el('div', { class: 'card-h' },
           el('div', {}, el('h2', {}, title), el('div', { class: 'sub' }, `${list.length} account${list.length === 1 ? '' : 's'}`)),
           el('div', { class: 'legend' }, el('span', {}, el('b', { class: 'num', style: 'font-size:15px;color:var(--text-primary)' }, money(total)),
             ...(listOthers.length ? [el('span', { class: 'acct-group-other' }, ` ${otherTag(listOthers)}`)] : [])))),
-        el('div', { class: 'body-pad' }, grid)));
+        el('div', { class: 'body-pad' }, listEl)));
     }
   }
 
@@ -762,10 +880,15 @@ module.exports = function registerSavings(ctx) {
     return bar;
   }
 
-  /* The actions, on the class the Accounts drawer uses. Both dialogs are that
-     page's — one account form in this plugin, not two that drift. */
+  /* The actions, on the class the Accounts drawer uses — same dialogs, same
+     handlers, same labels as the card layout always had. Variant B of the
+     redesign mockup fences Delete below a divider inside the sheet rather
+     than putting it in the wrapping five-across row; `sav-sheet-fence`
+     carries just that spacing/border, in src/_redesign/savings.css, layered
+     on top of the unchanged `acct-drawer-act`/`acct-drawer-del` classes so
+     hover, focus-visible and its iOS-15 `:focus` fallback all still apply. */
   function renderActions(card, a, r, labels) {
-    const acts = el('div', { class: 'acct-drawer-acts' });
+    const acts = el('div', { class: 'acct-drawer-acts sav-sheet-acts' });
     const act = (label, aria, run) => {
       const b = el('button', { type: 'button', class: 'acct-drawer-act', 'aria-label': aria }, label);
       b.addEventListener('click', run);
@@ -783,15 +906,15 @@ module.exports = function registerSavings(ctx) {
     if (primary) act('Transactions', `Show transactions for ${a.name}`,
       () => ctx.openAccountTransactions(primary));
     act('Open note', `Open the note for ${a.name}`, () => ctx.openAccountFile(a));
+    card.append(acts);
     /* Same dialog the Accounts drawer opens — one delete for an account in this
        plugin, not two that drift apart on what they say about the transactions
-       folder. Last, and on the same muted class the drawer gives it, so it is
+       folder. Fenced below the rest of the sheet by its own divider, so it is
        never the button a thumb reaches for by accident. */
-    const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del',
+    const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del sav-sheet-fence',
       'aria-label': `Delete the account ${a.name}` }, 'Delete');
     del.addEventListener('click', () => ctx.deleteAccount(a));
-    acts.append(del);
-    card.append(acts);
+    card.append(del);
   }
 
   /* --------------------- what built this balance -------------------------
@@ -1044,7 +1167,6 @@ module.exports = function registerSavings(ctx) {
   function renderWorth() {
     const wrap = $('#savingsWorth'); wrap.empty();
     const css = getComputedStyle(root);
-    const c = themeColors(root);
 
     /* Split by SIGN, not by type: a cheque account overdrawn is a liability
        however it is labelled, and a credit card in credit is an asset.
@@ -1248,7 +1370,13 @@ module.exports = function registerSavings(ctx) {
       return;
     }
 
-    const W = 1000, H = 210, padL = 8, padR = 8, barH = 46;
+    /* Thin strips, not the old 46px bars — redesign mockup B draws the
+       composition bar at 12-14px, with everything a label used to say inside
+       a segment now living once, in the ranked list below. H shrinks with
+       barH; the two rows keep the same 8px gap between a row's own heading
+       text and its bar, and a ~26px gap between the two bars for the second
+       heading to sit in. */
+    const W = 1000, H = 118, padL = 8, padR = 8, barH = 14;
     const scale = Math.max(totalAssets, totalDebts, 1);
     const innerW = W - padL - padR;
 
@@ -1311,8 +1439,11 @@ module.exports = function registerSavings(ctx) {
         fill: 'currentColor', 'fill-opacity': '0.8', 'font-family': 'inherit',
       }).textContent = money(total, 0);
       // The track shows how far short of the longer bar this one falls.
+      // rx capped at half of the new thin barH, not the old bar's 10 — a
+      // corner radius bigger than the strip is tall drew a barely-rounded
+      // pill wherever this constant was reused unscaled.
       add('rect', {
-        x: padL, y, width: innerW, height: barH, rx: 10,
+        x: padL, y, width: innerW, height: barH, rx: barH / 2,
         fill: 'currentColor', 'fill-opacity': '0.05',
       });
       if (!total) return;
@@ -1365,7 +1496,7 @@ module.exports = function registerSavings(ctx) {
         }, band);
         const node = add('rect', {
           x, y, width: dw, height: barH,
-          fill: seg.color, rx: w > 20 ? 10 : 2,
+          fill: seg.color, rx: w > 20 ? barH / 2 : 2,
         }, g);
         if (hoverable) {
           g.addEventListener('pointerenter', () => {
@@ -1379,13 +1510,13 @@ module.exports = function registerSavings(ctx) {
         } else {
           tip(add, node, `${seg.label}: ${money(seg.amount)} · ${share}% of ${heading.toLowerCase()}`);
         }
-        // Only label a segment wide enough to hold the text without clipping.
-        if (w > 96) {
-          add('text', {
-            x: x + dw / 2, y: y + barH / 2 + 5, 'text-anchor': 'middle',
-            'font-size': '13', 'font-weight': '600', fill: c.hole, 'font-family': 'inherit',
-          }, g).textContent = seg.label;
-        }
+        /* NO IN-BAR LABEL — redesign mockup B ("Net worth is the hero"): the
+           bar becomes a thin strip (`barH` below) too narrow to ever hold a
+           9px label without clipping, and the label now lives once, in the
+           ranked list under the bar, rather than fighting for space inside a
+           segment on top of the identical text the <title>/tooltip above
+           already carries. `c.hole` (the colour this removed text used) is
+           now unused here; still read for `c.axis` elsewhere in this scope. */
         x += dw;
       });
 
@@ -1397,13 +1528,13 @@ module.exports = function registerSavings(ctx) {
          UNclamped sum, so once any segment above was sub-2px and clamped
          wider, the sheen fell short of the last segment's real right edge. */
       add('rect', {
-        x: padL, y, width: x - padL, height: barH, rx: 10,
+        x: padL, y, width: x - padL, height: barH, rx: barH / 2,
         fill: `url(#${uid}-sheen)`, 'pointer-events': 'none',
       }, band);
     };
 
-    row(34, assets, totalAssets, 'What you own', 0);
-    row(132, debts, totalDebts, 'What you owe', 1);
+    row(30, assets, totalAssets, 'What you own', 0);
+    row(86, debts, totalDebts, 'What you owe', 1);
 
     if (hoverable) {
       /* Positioned from the pointer rather than from the segment: a segment can
@@ -1423,14 +1554,55 @@ module.exports = function registerSavings(ctx) {
 
     wrap.append(svg, tipBox);
 
-    const legend = el('ul', { class: 'donut-legend donut-legend--inline' });
-    for (const seg of [...assets, ...debts.map(d => ({ ...d, label: `${d.label} (owed)` }))]) {
-      legend.append(el('li', {},
-        el('i', { style: `background:${seg.color}` }),
-        el('span', { class: 'dl-name' }, seg.label),
-        el('span', { class: 'dl-val num' }, money(seg.amount, 0))));
+    /* RANKED LIST, replacing the swatch/name/value legend grid — redesign
+       mockup B ("Net worth is the hero"). Same segments, same colours, same
+       amounts as the legend it replaces (and the same figures the bars and
+       their <title>s state — one set of numbers, three views of it), just
+       ordered largest-first and carrying the share the bar's own tooltip
+       already computes, so a reader gets on the page what used to cost a
+       hover/hold. `sharePercents` — not a per-row Math.round — for the same
+       reason `row()` above uses it: a naive per-slice rounder can announce
+       "0%" for a real segment while a neighbour silently absorbs the missing
+       point (see that function's own comment). One call per bar, matching
+       the one `row()` makes for the same segments, so the percentage printed
+       here is never a second, independently-rounded answer to the same
+       question the bar's tooltip already answered. */
+    const assetShares = sharePercents(assets.map(s => s.amount));
+    const debtShares = sharePercents(debts.map(s => s.amount));
+    const ranked = [
+      ...assets.map((seg, i) => ({ seg, share: assetShares[i], of: 'own' })),
+      ...debts.map((seg, i) => ({ seg: { ...seg, label: `${seg.label} (owed)` }, share: debtShares[i], of: 'owe' })),
+    ].sort((a, b) => b.seg.amount - a.seg.amount);
+
+    /* TAPPABLE, ROW-BY-ROW — the composition list becomes another way into
+       the page that actually owns each segment's figure, the same way the
+       legend on the Debt page's own donut and the Dashboard's net-worth tile
+       already route a tap to Debts/Accounts. A segment drawn from the
+       Assets or Debt page, or from money owed, goes to the page that owns
+       it; every account-type segment (including an unlisted one, on either
+       bar) goes to Accounts, where its balance lives and can be edited. */
+    const navFor = seg => (seg.fromAssetPage ? 'assets' : seg.fromOwedPage ? 'owed'
+      : seg.fromDebtPage ? 'debts' : 'accounts');
+
+    const list = el('ul', { class: 'sav-worth-list' });
+    for (const { seg, share, of } of ranked) {
+      const dest = navFor(seg);
+      const btn = el('button', { type: 'button', class: 'sav-worth-btn',
+        'aria-label': `${seg.label}, ${money(seg.amount, 0)}, ${share}% of what you ${of}. Open ${dest === 'owed' ? 'Owed Money' : dest[0].toUpperCase() + dest.slice(1)}.` },
+        /* `i`, not `span` — tests/savings-cards.test.cjs walks the swatch by
+           TAG (`e.tagName === 'I'`), the same shape the legend it replaces
+           used, so the colour-per-unlisted-type guard keeps pinning the same
+           invariant against this markup without a rewrite. */
+        el('i', { class: 'sav-worth-swatch', style: `background:${seg.color}` }),
+        el('span', { class: 'sav-worth-name' }, seg.label),
+        el('span', { class: 'sav-worth-end' },
+          el('span', { class: 'sav-worth-share' }, `${share}%`),
+          el('span', { class: 'num sav-worth-val' }, money(seg.amount, 0))));
+      btn.addEventListener('click', () => ctx.switchView(dest));
+      const row = el('li', { class: `sav-worth-row${of === 'owe' ? ' sav-worth-row--owe' : ''}` }, btn);
+      list.append(row);
     }
-    wrap.append(legend);
+    wrap.append(list);
   }
 
   ctx.provide({ renderSavings, renderWorth });

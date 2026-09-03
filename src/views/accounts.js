@@ -44,7 +44,7 @@ const { reconcile } = require('../reconcile');
 const { isCreditCard } = require('../committed');
 /* The state machine behind the decision queue — which accounts land in it, in
    what order, and why. Pure, and tested without a DOM. */
-const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings } = require('../acct-status');
+const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings, URGENCY } = require('../acct-status');
 /* isSplitPart, alongside supersededBySplit: the delete dialog counts what the
    BANK actually printed, and a split's parts are rows this app created, not
    statement lines — see tx-role.js's own header. */
@@ -1165,11 +1165,6 @@ module.exports = function registerAccounts(ctx) {
      KNOWN which accounts could not be trusted — it reported the number in a
      tile and then left the reader to find them. */
 
-  /* Four is what fits without pushing the ledger off the screen. A queue that
-     scrolls is not a queue — but the remainder is NAMED rather than dropped,
-     because a silent cap reads as "that is all of them". */
-  const DECK_MAX = 4;
-
   function deckWhy(r) {
     if (r.state === 'drift') {
       // acctMoney, not money: both figures are THIS account's own, in its own
@@ -1239,6 +1234,15 @@ module.exports = function registerAccounts(ctx) {
     return { label: i18n.t('acct.deck.do.nofolder'), run: () => editAccount(r.a) };
   }
 
+  /* Redesign variant B (see budget-redesign.html, screen 8, variant B): the
+     four-card deck collapsed to one line. The per-account "why" sentence and
+     the one-tap action (deckWhy / deckAction above) are NOT retired — they
+     move onto the row itself (see accountRow's `acct-row-acts`, and
+     reasonGroups() below for the once-per-reason header that replaces the
+     old once-per-account repetition of the same sentence). This function's
+     only job now is to say how many accounts want a look and offer the one
+     door into them; the table (already filterable to "Needs a look") is
+     where the reader actually acts. */
   function renderDeck(rows) {
     const wrap = $('#acctDeck');
     if (!wrap) return;
@@ -1253,7 +1257,7 @@ module.exports = function registerAccounts(ctx) {
          nothing. The class is cleared too: leaving a stale `acct-deck` on an
          empty div would paint a bordered amber box with no content in it. */
       if (!S.accounts.length) { wrap.className = ''; return; }
-      wrap.className = 'acct-deck is-clear mb-4';
+      wrap.className = 'acct-deck is-clear acct-deck--banner mb-4';
       wrap.append(
         el('div', { class: 'acct-deck-h' },
           el('span', { class: 'acct-deck-dot' }),
@@ -1262,41 +1266,40 @@ module.exports = function registerAccounts(ctx) {
       return;
     }
 
-    wrap.className = 'acct-deck mb-4';
-    wrap.append(
-      el('div', { class: 'acct-deck-h' },
-        el('span', { class: 'acct-deck-dot' }),
-        el('h2', {}, i18n.t('acct.deck.title', { count: flagged.length }))),
-      el('div', { class: 'acct-deck-sub' }, i18n.t('acct.deck.sub')));
-
-    const list = el('div', { class: 'acct-deck-list' });
-    for (const r of flagged.slice(0, DECK_MAX)) {
-      const act = deckAction(r);
-      const reviewBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost',
-        'aria-label': i18n.t('acct.deck.ariaReview', { name: r.a.name }) }, i18n.t('acct.deck.review'));
-      reviewBtn.addEventListener('click', () => openRow(r.a.name, true));
-      const doBtn = el('button', { type: 'button', class: 'acct-deck-btn' }, icoEl(['check']), act.label);
-      doBtn.addEventListener('click', act.run);
-      list.append(el('div', { class: 'acct-deck-item' },
-        el('div', { class: 'acct-deck-txt' },
-          el('div', { class: 'acct-deck-name' }, r.a.name),
-          el('div', { class: 'acct-deck-why' }, deckWhy(r))),
-        el('div', { class: 'acct-deck-acts' }, reviewBtn, doBtn)));
-    }
-    wrap.append(list);
-
-    const rest = flagged.length - Math.min(flagged.length, DECK_MAX);
-    if (rest > 0) {
-      const more = el('button', { type: 'button', class: 'acct-deck-btn ghost acct-deck-more' },
-        i18n.t('acct.deck.more', { count: rest }));
-      more.addEventListener('click', () => {
-        view().filter = 'flag';
-        view().open = null;
-        renderAccounts();
-      });
-      wrap.append(more);
-    }
+    wrap.className = 'acct-deck acct-deck--banner mb-4';
+    const line = el('div', { class: 'acct-deck-banner' },
+      el('span', { class: 'acct-deck-dot' }),
+      el('span', { class: 'acct-deck-banner-txt' }, i18n.t('acct.deck.title', { count: flagged.length })));
+    const showBtn = el('button', { type: 'button', class: 'acct-deck-btn' }, i18n.t('acct.deck.show'));
+    showBtn.addEventListener('click', () => {
+      view().filter = 'flag';
+      view().open = null;
+      renderAccounts();
+    });
+    wrap.append(line, showBtn);
   }
+
+  /* Distinct reasons in the flagged set, most urgent first, each carrying the
+     accounts that share it. This is what lets the table print "nothing
+     imports into these" ONCE above five accounts instead of once per account
+     — reasonHeader() below states the reason in general terms; the
+     account-specific numbers (a stale count, an implied balance) stay on the
+     row via deckWhy(), same as they did inside the old deck cards. */
+  function reasonGroups(flagged) {
+    const byState = new Map();
+    for (const r of flagged) {
+      if (!byState.has(r.state)) byState.set(r.state, []);
+      byState.get(r.state).push(r);
+    }
+    return [...byState.keys()]
+      .sort((x, y) => URGENCY[x] - URGENCY[y])
+      .map(state => ({ state, rows: byState.get(state) }));
+  }
+
+  /* The reason stated once, with no account name in it — the sentence a
+     reader sees above a whole group, not the per-account one deckWhy()
+     prints on the row underneath it. */
+  function reasonHeader(state) { return i18n.t(`acct.deck.groupReason.${state}`); }
 
   /* ------------------------------- band 3 --------------------------------
      The ledger. Reuses the sheet's own .table rules, so a row here and a row
@@ -1360,7 +1363,12 @@ module.exports = function registerAccounts(ctx) {
       if (v.owner !== null) { v.owner = null; }
       return;
     }
-    wrap.className = 'acct-segs acct-segs--owner';
+    /* acct-rail: variant B's scrolling chip rail (see budget-redesign.html
+       screen 8) — overflow-x rather than flex-wrap, so a long owner list
+       scrolls sideways instead of wrapping a row that clips at the panel's
+       left edge. Presentation only: same chips, same click handler, same
+       counts. */
+    wrap.className = 'acct-segs acct-segs--owner acct-rail';
 
     const chip = (key, label, n) => {
       const b = el('button', { type: 'button', class: 'acct-seg',
@@ -1377,6 +1385,10 @@ module.exports = function registerAccounts(ctx) {
     const wrap = $('#acctFilters');
     if (!wrap) return;
     wrap.empty();
+    // See renderOwnerFilters' own note on acct-rail — same scrolling-rail
+    // treatment, kept off shell.js's static class list so the two agree
+    // even if shell.js's markup changes under a concurrent edit.
+    wrap.classList.add('acct-rail');
     const v = view();
     /* Counted WITHIN the current owner, so the two chip rows agree with each
        other and with the table. A "Savings 5" sitting above three rows is not a
@@ -1526,6 +1538,45 @@ module.exports = function registerAccounts(ctx) {
     return el('span', { class: `acct-pill ${cls}` }, label);
   }
 
+  /* Variant B's per-row actions (see budget-redesign.html screen 8, variant
+     B): the deck's own Review / one-tap-fix pair, now printed on the row that
+     wants it instead of duplicated on a card above the table. `null` for a
+     clean account — nothing here is a decision, so nothing here has buttons. */
+  function rowActions(r) {
+    if (!wantsALook(r)) return null;
+    const act = deckAction(r);
+    const reviewBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost sm',
+      'aria-label': i18n.t('acct.deck.ariaReview', { name: r.a.name }) }, i18n.t('acct.deck.review'));
+    reviewBtn.addEventListener('click', e => { e.stopPropagation(); openRow(r.a.name, true); });
+    const doBtn = el('button', { type: 'button', class: 'acct-deck-btn sm' }, icoEl(['check']), act.label);
+    doBtn.addEventListener('click', e => { e.stopPropagation(); act.run(); });
+    /* The reason travels with the row: a flagged account must say WHY on the
+       same surface it is flagged, whichever filter is active (the reason
+       group header only exists under the "Needs a look" filter). */
+    /* Ignore: the third answer to a decision, beside "look" and "fix". Only
+       for a state that is a judgement (WARNINGS); `unreadable` is a typo with
+       one correct answer and is never offered, the same rule mutedWarnings
+       applies to a hand-written key. Appends to whatever is already muted on
+       the account and saves that one key, so nothing else in the file moves. */
+    const kids = [el('span', { class: 'acct-row-why' }, deckWhy(r)), reviewBtn, doBtn];
+    if (WARNINGS.includes(r.state)) {
+      const ignBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost sm',
+        'aria-label': i18n.t('acct.deck.ariaIgnore', { name: r.a.name }) }, i18n.t('acct.deck.ignore'));
+      ignBtn.addEventListener('click', e => { e.stopPropagation(); ignoreWarning(r); });
+      kids.push(ignBtn);
+    }
+    return el('span', { class: 'acct-row-acts' }, ...kids);
+  }
+
+  async function ignoreWarning(r) {
+    const a = r.a;
+    const mute = WARNINGS.filter(w => mutedWarnings(a).has(w) || w === r.state);
+    a.ignore_warnings = mute.length === WARNINGS.length ? 'true' : `[${mute.join(', ')}]`;
+    if (!(await saveAccount(a, ['ignore_warnings']))) return;
+    renderAccounts();
+    toast(i18n.t('acct.toast.ignored', { name: a.name }));
+  }
+
   function accountRow(r) {
     const a = r.a, v = view();
     const open = v.open === a.name;
@@ -1585,7 +1636,7 @@ module.exports = function registerAccounts(ctx) {
       el('td', { class: 'acct-col-drop' }, goalCell(r)),
       el('td', { class: 'acct-col-drop' },
         el('span', { class: 'acct-when' }, a.balance_updated || i18n.t('acct.noDate'))),
-      el('td', {}, statePill(r)),
+      el('td', { class: 'acct-col-state' }, statePill(r), rowActions(r)),
       /* Notes get a column of their own, at the end.
          It rode with the account NAME first, which read fine on one-line names
          and badly on the real ones: "Discovery Bank Transaction Account
@@ -1959,6 +2010,22 @@ module.exports = function registerAccounts(ctx) {
         body.append(el('tr', { class: 'acct-empty' },
           el('td', { colspan: '8' },
             S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
+      } else if (v.filter === 'flag') {
+        /* Variant B (screen 8): filtered to "Needs a look", the table groups
+           by REASON rather than by kind — the sentence that used to repeat
+           on every one of the old deck's cards now heads the group instead,
+           and each row underneath states only what is specific to IT
+           (deckWhy, via rowActions' own doBtn label). Overrides the kind
+           toggle deliberately: "group by kind" and "why does this account
+           need a look" are two different questions, and the reason grouping
+           is the one this filter exists to answer. */
+        for (const g of reasonGroups(shown)) {
+          body.append(el('tr', { class: 'type-row' },
+            el('td', { colspan: '8' },
+              reasonHeader(g.state),
+              el('span', { class: 'acct-group-total num' }, String(g.rows.length)))));
+          for (const r of g.rows) emit(r);
+        }
       } else if (v.grouped) {
         for (const [key] of ACCT_GROUPS) {
           const inGroup = shown.filter(r => r.group === key);

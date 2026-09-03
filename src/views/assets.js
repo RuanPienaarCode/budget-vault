@@ -12,10 +12,11 @@
    shown on every row and summarised above the table, because a net worth
    dominated by one number somebody typed four years ago should say so. */
 
-const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
+const i18n = require('../i18n');
 /* `staleValuationOf` is reconcile.js's shared "is this figure still current"
    rule, aliased on the way in so the local predicate below keeps the name this
    file already uses everywhere. See that function's own header for why the
@@ -160,25 +161,51 @@ module.exports = function registerAssets(ctx) {
     }
     const revaluationCount = S.assets.filter(needsRevaluation).length;
 
-    const tile = kpiTiles($('#assetKpis'));
-    tile('Total value', money(total), total > 0 ? 'text-success' : '',
-      assetOthers.length ? `plus ${otherList(assetOthers)} held abroad, not converted` : null);
-    tile('Items', String(S.assets.length));
+    /* Variant B of the redesign mockup (Screen 6): the four flat tiles this
+       page used to render — total, items, largest, a "needs a new valuation"
+       count that spent most of a household's life reading 0 — collapse into
+       one hero card. The total keeps its own line because it is the number
+       everything else here supports; items and largest move into a single
+       79px-tall stat strip under it; and the revaluation count becomes a
+       badge that speaks in the same two states valuedAge()'s own captions
+       already use ("current" / "needs a new valuation") instead of a tile
+       whose entire good outcome was a zero next to its own label.
+
+       `#assetKpis` is shell.js's — this only appends to it and marks it with
+       a class this file's own stylesheet scopes to, so a future change to the
+       grid classes shell.js still carries doesn't have to be undone here. */
+    const wrap = $('#assetKpis');
+    wrap.empty();
+    wrap.classList.add('assets-hero-wrap');
+
+    const badgeWarn = revaluationCount > 0;
+    const badge = el('span', { class: `assets-hero-badge${badgeWarn ? ' assets-hero-badge-warn' : ' assets-hero-badge-ok'}` },
+      badgeWarn ? i18n.t('assets.hero.badgeWarn', { count: revaluationCount }) : i18n.t('assets.hero.badgeOk'));
+
     /* Two clauses because they answer two questions, and folding them into one
        sentence would imply a ranking between them that no rate exists to make.
        `aMoney` rather than `money` even though `biggest` is a household row by
        construction: the row's own formatter is what every other figure on this
        page uses, and a second spelling here is how the two drift apart. */
     const biggestSub = [biggest ? biggest.name : null,
-      biggestOthers.size ? `largest abroad ${otherList([...biggestOthers])}, not converted` : null]
+      biggestOthers.size ? i18n.t('assets.hero.largestAbroad', { list: otherList([...biggestOthers]) }) : null]
       .filter(Boolean).join(' · ') || null;
-    tile('Largest', biggest ? aMoney(biggest, biggest.value, 0) : '—', '', biggestSub);
-    // Labelled by what it means to do about it, not by the predicate shape —
-    // this used to read "Unvalued" while counting rows that plainly HAVE a
-    // value (a house priced 400 days ago), which reads as though the app
-    // lost the reader's own figures.
-    tile('Needs a new valuation', String(revaluationCount), revaluationCount > 0 ? 'text-warning' : '',
-      revaluationCount > 0 ? 'not valued in the last year' : 'every value is current');
+
+    wrap.append(el('div', { class: 'card assets-hero' },
+      el('div', { class: 'assets-hero-top' },
+        el('div', {},
+          el('div', { class: 'hero-lbl' }, i18n.t('assets.hero.totalLabel')),
+          el('div', { class: `assets-hero-num${total > 0 ? ' text-success' : ''}` }, money(total))),
+        badge),
+      assetOthers.length
+        ? el('div', { class: 'assets-hero-sub' }, i18n.t('assets.hero.heldAbroad', { list: otherList(assetOthers) }))
+        : '',
+      el('div', { class: 'assets-hero-hr' }),
+      el('div', { class: 'assets-hero-strip' },
+        el('span', {}, i18n.t('assets.hero.items', { count: S.assets.length })),
+        el('span', { class: 'assets-hero-largest' }, i18n.t('assets.hero.largest'), ' ',
+          el('b', { class: 'num-sm' }, biggest ? aMoney(biggest, biggest.value, 0) : '—'),
+          biggestSub ? el('span', { class: 'assets-hero-sub' }, ' · ', biggestSub) : ''))));
   }
 
   /* The caveat under the tiles, for the same reason Savings carries one: a

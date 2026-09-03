@@ -248,7 +248,11 @@ const row = (date, amount) => ({ date, amount });
      1 because the fixture carries exactly one undatable row — which is also
      what makes this the SINGULAR form, the one the old inline concatenation
      rendered as "1 transaction … against them". */
-  const deck = $('#acctDeck').textContent;
+  /* Since the 3 Sep 2026 redesign (variant B) the deck is a one-line banner
+     carrying the count, and the per-account "why" sentence sits on the
+     account's own row in the table. The invariant is unchanged, so both
+     surfaces are read together. */
+  const deck = $('#acctDeck').textContent + ' ' + $('#acctTable').textContent;
   ok(!/is-clear/.test($('#acctDeck').attrs.class || ''), 'the deck is not in its all-clear state');
   ok(deck.includes(i18n.t('acct.deck.why.unreadable', { count: 1 })),
     `the queue names the account and says why — got: ${JSON.stringify(deck)}`);
@@ -271,7 +275,7 @@ const row = (date, amount) => ({ date, amount });
     i18n.setLanguage('af');
     ctx.renderAccounts();
     const afTable = $('#acctTable').textContent;
-    const afDeck = $('#acctDeck').textContent;
+    const afDeck = $('#acctDeck').textContent + ' ' + afTable;
     ok(afTable.includes(i18n.t('acct.state.unreadable')),
       `the Afrikaans pill states the Afrikaans label — got: ${JSON.stringify(afTable)}`);
     ok(!/date unreadable/.test(afTable),

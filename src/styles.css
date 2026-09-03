@@ -2931,6 +2931,15 @@
   .budget-app-root .upload-area:focus  { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .topbar .brand:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
   .budget-app-root .mini button.v:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+
+  /* mobile redesign (3 Sep 2026): mirrors of the new rings in the plan and
+     savings blocks appended at the end of this file. */
+  .budget-app-root .src2-main:focus,
+  .budget-app-root .env-sum:focus,
+  .budget-app-root .env-collapse:focus,
+  .budget-app-root .env-del-ico:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .sav-row:focus,
+  .budget-app-root .sav-worth-btn:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .budget-app-root .health-fig-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 10px; }
   .budget-app-root .health-fig.is-score .health-fig-btn:focus { outline-color: #ffffff; }
   .budget-app-root.bud-dark .health-fig.is-score .health-fig-btn:focus { outline-color: var(--color-primary); }
@@ -4020,3 +4029,644 @@
   white-space: nowrap; flex: none;
 }
 .budget-app-root .tx-actions { flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* ==========================================================================
+   Mobile redesign (ui/mobile-redesign) — cross-cutting fixes.
+   Chosen from the 3 Sep 2026 variant review: the same handful of CSS causes
+   showed up on every screen the phone screenshots covered, so they are fixed
+   once here rather than per view.
+     - action and chip rows never wrap into a second line that is pushed off
+       the LEFT edge: on a narrow viewport they become a single-line rail that
+       scrolls sideways inside its own box;
+     - nothing inside the content column claims a width wider than the column
+       (no auto margins on a row wider than its parent, no fixed min-widths);
+     - one gutter for every section on a phone.
+   ========================================================================== */
+.budget-app-root .rail,
+.budget-app-root .acct-rail,
+.budget-app-root .plan-actions-v2 {
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 8px;
+  max-width: 100%; overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.budget-app-root .rail::-webkit-scrollbar,
+.budget-app-root .acct-rail::-webkit-scrollbar,
+.budget-app-root .plan-actions-v2::-webkit-scrollbar { display: none; }
+.budget-app-root .rail > *,
+.budget-app-root .acct-rail > *,
+.budget-app-root .plan-actions-v2 > * { flex: none; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .budget-app-root .plan-strip { align-items: stretch; }
+  .budget-app-root .plan-strip > .row { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .budget-app-root .plan-strip > .row > * { flex: none; }
+  .budget-app-root .plan-env-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .budget-app-root .plan-env-head > .btn-ghost { align-self: flex-start; max-width: 100%; }
+  .budget-app-root .acct-segs { display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; border-radius: 18px; -webkit-overflow-scrolling: touch; }
+  .budget-app-root .acct-segs > * { flex: none; }
+  .budget-app-root .acct-toolbar, .budget-app-root .acct-search-row { flex-direction: column; align-items: stretch; }
+  .budget-app-root .mini-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- mobile redesign: plan view ---- */
+/* Plan view — mobile redesign (ui/mobile-redesign).
+
+   Additive only: every rule here targets a class introduced by the redesign
+   (suffixed 2/-v2, or new to this file), scoped under .budget-app-root so
+   nothing here can leak into another view. Existing Plan classes in
+   src/styles.css (.env, .env-slider, .split-key, .src-row, ...) are left
+   exactly as they are — plan.js still uses several of them unchanged, and
+   this file only adds what the redesign needed on top.
+
+   iOS 15 / WebKit floor: no :has(), no lookbehind, no inset shorthand. The
+   :focus-visible rings below are mirrored onto plain :focus inside the one
+   @supports not selector(:focus-visible) block near line 2921, which the
+   parity guard test reads. */
+
+/* ---- action rail: Save + New as pills, Delete demoted to a quiet icon ---- */
+.budget-app-root .plan-actions-v2 {
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 4px; margin: 0 -2px;
+}
+.budget-app-root .plan-actions-rail { display: flex; gap: 8px; flex: none; }
+.budget-app-root .plan-actions-rail > * { flex: none; white-space: nowrap; }
+.budget-app-root .btn-sm { padding: 7px 14px; font-size: 13px; min-height: 34px; }
+.budget-app-root .plan-del-ico {
+  flex: none; width: 34px; min-width: 34px; height: 34px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; margin-inline-start: auto;
+}
+.budget-app-root .plan-del-ico .ico svg { width: 15px; height: 15px; }
+
+/* ---- hero: "Left to place", the pot as context beneath it ---- */
+.budget-app-root .pot-fig.text-danger { color: var(--color-danger-ink); }
+.budget-app-root .split-key2 { margin-top: 14px; }
+.budget-app-root .sk2-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 0; border-top: 1px solid var(--line-soft);
+}
+.budget-app-root .sk2-row:first-child { border-top: 0; padding-top: 0; }
+.budget-app-root .sk2-label {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: var(--text-muted); font-weight: 600;
+}
+.budget-app-root .sk2-label i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.budget-app-root .sk2-fig { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* The one row that is a subtotal, not a fourth swatch — same convention as
+   .sk-left had: a border rather than a dot marks it off from the three rows
+   above it, and it only ever renders when it disagrees with the hero figure
+   (an overspent plan) — see the note beside its call site in plan.js. */
+.budget-app-root .sk2-left { border-top-style: dashed; font-style: italic; }
+.budget-app-root .sk2-left .sk2-label { font-style: italic; }
+
+/* ---- money in: compact read-only ledger rows, ~62px each ---- */
+.budget-app-root .src2-list { display: flex; flex-direction: column; }
+.budget-app-root .src2-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 0; border-top: 1px solid var(--line-soft);
+}
+.budget-app-root .src2-row:first-child { border-top: 0; }
+.budget-app-root .src2-main {
+  flex: 1; min-width: 0; text-align: left; background: none; border: 0;
+  font: inherit; cursor: pointer; padding: 2px 0;
+}
+.budget-app-root .src2-main:hover .src2-name { text-decoration: underline; }
+.budget-app-root .src2-main:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px;
+}
+.budget-app-root .src2-line1 { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.budget-app-root .src2-name { font-size: 13.5px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .src2-line2 {
+  font-size: 12px; color: var(--text-muted); margin-top: 3px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.budget-app-root .src2-status-in { color: var(--color-primary); font-weight: 700; }
+.budget-app-root .src2-status-exp { color: var(--color-warning-ink); font-weight: 700; }
+.budget-app-root .src2-amt { flex: none; white-space: nowrap; }
+.budget-app-root .src2-amt-muted { color: var(--text-muted); font-weight: 600; }
+.budget-app-root .src2-del { flex: none; }
+
+/* ---- spending buckets: accordion — collapsed rows, one card open ---- */
+/* Overrides the base .mini-grid this host also carries (two classes beat one
+   at equal specificity — no !important needed): a stacked single column
+   reads as a list here, not a tile grid. */
+.budget-app-root .plan-env-accordion.mini-grid { display: flex; flex-direction: column; gap: 8px; }
+/* The tint wash on .env::before bled past the tighter accordion card's own
+   rounded corner — this switches it off for accordion cards only; the
+   collapsed swatch dot and the expanded card's 3px accent bar (.env-accent)
+   carry the same colour cue without the bleed. */
+.budget-app-root .plan-env-accordion .env::before { opacity: 0; }
+
+.budget-app-root .env-sum {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--border-color); background: var(--surface);
+  font: inherit; cursor: pointer; text-align: left;
+}
+.budget-app-root .env-sum:hover { border-color: var(--color-primary); }
+.budget-app-root .env-sum:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .env-sum.is-overcommitted { border-color: var(--color-warning); background: var(--color-warning-light); }
+.budget-app-root .env-sum.is-overspent { border-color: var(--color-danger); background: var(--color-danger-light); }
+.budget-app-root .env-sum-swatch {
+  width: 10px; height: 10px; border-radius: 3px; flex: none;
+  background: var(--tint, var(--color-primary));
+}
+.budget-app-root .env-sum-name {
+  flex: 1; min-width: 0; font-size: 13.5px; font-weight: 650; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.budget-app-root .env-sum-amt { font-size: 13.5px; font-weight: 700; flex: none; }
+.budget-app-root .env-sum-pct {
+  font-size: 11px; font-weight: 700; color: var(--text-muted); flex: none;
+  min-width: 34px; text-align: right;
+}
+
+/* The expanded card's own header row grows a collapse chevron on the left and
+   a delete icon on the right, either side of the existing rename button and
+   share chip — the redesign's "destructive action off in its own corner"
+   rule, kept out of the footer where it used to sit beside nothing else. */
+.budget-app-root .env-top { gap: 8px; }
+.budget-app-root .env-collapse, .budget-app-root .env-del-ico {
+  flex: none; width: 26px; height: 26px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 7px; color: var(--ink-faint); cursor: pointer;
+}
+.budget-app-root .env-collapse:hover, .budget-app-root .env-del-ico:hover {
+  background: rgba(127, 127, 127, .12); color: var(--text-primary);
+}
+.budget-app-root .env-del-ico:hover { color: var(--color-danger-ink); }
+.budget-app-root .env-collapse:focus-visible, .budget-app-root .env-del-ico:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 2px;
+}
+.budget-app-root .env-collapse .ico svg, .budget-app-root .env-del-ico .ico svg { width: 15px; height: 15px; }
+.budget-app-root .env-name { flex: 1; min-width: 0; }
+
+/* 3px accent rule, contained by the card's own overflow:hidden — replaces the
+   radial-gradient tint wash on the expanded card, per the note above .env in
+   this file. Negative margins pull it flush to the card's own edges and
+   corner radius rather than leaving a border gap around it. */
+.budget-app-root .env-accent {
+  height: 3px; margin: -22px -24px 16px; border-radius: 24px 24px 0 0;
+}
+
+/* ---- mobile redesign: savings view ---- */
+/* Savings account cards — variant B of the redesign mockup ("List rows,
+   actions on open"). Accounts render as a scannable balance list; every
+   action that used to sit on a five-pill row now lives in a sheet opened
+   from the row, fenced below a divider for Delete. Every figure and class
+   this reuses from src/styles.css (.s2, .s2-caveat, .acct-recon*,
+   .acct-drawer-act, .acct-drawer-del, .acct-mbar, .card, .body-pad, .num)
+   is untouched — this file only adds the row/list/sheet shell around them,
+   scoped to .budget-app-root like every other rule in this app. */
+
+.budget-app-root .sav-list { display: flex; flex-direction: column; gap: 10px; }
+
+.budget-app-root .sav-item {
+  border: 1px solid var(--border-color, var(--line-soft, rgba(127,127,127,.18)));
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* The row itself is a <button> — one tap target, full width, opening the
+   sheet below it. Reuses the app's own row-hover tone rather than inventing
+   a new one. */
+.budget-app-root .sav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.budget-app-root .sav-row:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+.budget-app-root .sav-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+.budget-app-root .sav-row-main { min-width: 0; }
+.budget-app-root .sav-row-name { font-size: 14px; font-weight: 700; }
+.budget-app-root .sav-row-sub {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted); margin-top: 3px;
+}
+.budget-app-root .sav-row-chip { font-weight: 700; }
+.budget-app-root .sav-row-warn { color: var(--color-warning-ink, var(--color-warning)); }
+
+.budget-app-root .sav-row-end { text-align: right; flex-shrink: 0; }
+.budget-app-root .sav-row-bal { font-size: 14px; font-weight: 700; }
+.budget-app-root .sav-row-status { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+
+/* The sheet. Same body padding the rest of this page's cards use, opened
+   directly under the row it belongs to, with a top border standing in for
+   the divider the mockup draws between the row and the sheet. */
+/* `.sav-detail` also carries `.mini` (see savings.js's own comment on why:
+   two guard tests key a card's content off `.mini` under #savingsSections).
+   `.mini` in src/styles.css sets padding/border-radius/background/border of
+   its own, same specificity (one class) — these three declarations must
+   stay AFTER styles.css in the merged stylesheet to win on source order, and
+   restate every property `.mini` sets so none of its rounded-tile look
+   leaks into what is now a flush sheet panel. */
+.budget-app-root .sav-detail {
+  padding: 14px;
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--border-color, var(--line-soft, rgba(127,127,127,.18)));
+  background: var(--background-secondary, rgba(127,127,127,.03));
+}
+.budget-app-root .sav-detail.hidden { display: none; }
+/* The hidden name anchor `.mini .l` picks up styles.css's uppercase/spaced
+   look, which would show through if it were ever unhidden by accident.
+   Visually hidden rather than `display:none` so the account name it carries
+   stays in the accessible text a screen reader walking .sav-detail hears —
+   the sheet inside no longer opens by naming the account first the way the
+   old card's `.l` line did. */
+.budget-app-root .sav-detail .hidden-visually {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; margin: -1px; padding: 0; border: 0;
+}
+
+.budget-app-root .sav-sheet-acts { margin-top: 12px; }
+
+/* Delete, fenced below its own divider — the mockup's "sheet-hint" band —
+   instead of sitting in the same five-across row as every other action. */
+.budget-app-root .sav-sheet-fence {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, var(--line-soft, rgba(127,127,127,.18)));
+  text-align: center;
+}
+
+/* The empty-account row: header plus one inline action, no sheet. */
+.budget-app-root .sav-row-solo-act { margin: 0 14px 12px; width: calc(100% - 28px); }
+
+@media (max-width: 700px) {
+  .budget-app-root .sav-row { padding: 12px; }
+  .budget-app-root .sav-detail { padding: 12px; }
+}
+
+/* ----------------------------------------------------------------------
+   Net worth screen — variant B ("Net worth is the hero"). Investments and
+   Growth pair up as shorter tiles instead of stacking full-width, the
+   staleness sentence becomes a bordered banner with its action inside, and
+   the composition bars' legend becomes a ranked, tappable list. Every
+   figure and class this reuses (.kpi-caveat-txt, .kpi-caveat-btn, .mini,
+   .num) is untouched. ---------------------------------------------------- */
+
+/* #savingsKpis carries Net worth, Savings, Investments, Growth in that
+   order (see savings.js renderSavings — Growth is added last via
+   growthTile() and can be absent on a vault with nothing measurable). An
+   ID selector beats the class-only `.mini-kpis-5` rules in styles.css
+   regardless of file order, so this reliably wins without depending on
+   where in the merged stylesheet it lands.
+
+   styles.css's own 640px breakpoint collapses `.mini-kpis-5` to a single
+   column — every tile "full-width... one number each", the mockup's own
+   complaint. Overridden here to two columns with Net worth and Savings
+   (children 1 and 2) still spanning both, so only Investments and Growth
+   (children 3 and 4) end up side by side. */
+@media (max-width: 640px) {
+  .budget-app-root #savingsKpis.mini-kpis-5,
+  .budget-app-root #savingsKpis.mini-kpis-4,
+  .budget-app-root #savingsKpis.mini-kpis-3 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .budget-app-root #savingsKpis > .mini:nth-child(1),
+  .budget-app-root #savingsKpis > .mini:nth-child(2) { grid-column: 1 / -1; }
+}
+/* Shorter — less padding, a smaller value — on the two tiles that pair up,
+   at every width, not only the narrow one: they read as a pair even where
+   the grid already sat them side by side above 640px. */
+.budget-app-root #savingsKpis > .mini:nth-child(3),
+.budget-app-root #savingsKpis > .mini:nth-child(4) { padding: 12px 14px; }
+.budget-app-root #savingsKpis > .mini:nth-child(3) .v,
+.budget-app-root #savingsKpis > .mini:nth-child(4) .v { font-size: 18px; }
+
+/* The staleness / stale-valuation caveats — a compact bordered banner with
+   the review button inside it, replacing a paragraph with a button
+   trailing loose after it. Amber, matching the warning tone the mockup's
+   own callout uses; the two children keep their own `.kpi-caveat-txt` /
+   `.kpi-caveat-btn` look, just inside a bordered box now. */
+.budget-app-root .sav-banner {
+  border: 1px solid var(--color-warning, #f5a524);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--color-warning-light, rgba(245,165,36,.08));
+}
+.budget-app-root .sav-banner .kpi-caveat-btn { margin-top: 8px; }
+
+/* The composition bars' ranked list, replacing `.donut-legend`'s grid. One
+   row per segment, largest amount first (see renderWorth's own `ranked`),
+   each a full-width tap target into the page that owns that segment's
+   figure. */
+.budget-app-root .sav-worth-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.budget-app-root .sav-worth-row + .sav-worth-row { border-top: 1px solid var(--border-color, var(--line-soft, rgba(127,127,127,.18))); }
+.budget-app-root .sav-worth-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 2px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.budget-app-root .sav-worth-btn:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+.budget-app-root .sav-worth-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.budget-app-root .sav-worth-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+.budget-app-root .sav-worth-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+.budget-app-root .sav-worth-end { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.budget-app-root .sav-worth-share { font-size: 12px; color: var(--text-muted); }
+.budget-app-root .sav-worth-val { font-size: 13px; font-weight: 700; }
+/* The single "what you owe" rows sit on the same warning tint the mockup's
+   own bottom row carries, so debt reads as debt in the list too, not only
+   by its bar's colour above. */
+.budget-app-root .sav-worth-row--owe .sav-worth-btn { background: var(--color-danger-light, rgba(244,63,94,.06)); }
+.budget-app-root .sav-worth-row--owe .sav-worth-val { color: var(--color-danger-ink, var(--color-danger)); }
+
+/* iOS 15.0–15.3 have no :focus-visible at all — an unguarded rule using it
+   does not degrade, it drops the WHOLE selector, silently deleting this
+   row's focus ring on those versions. Guarded the same way every other
+   :focus-visible rule in styles.css is guarded (see that file's own
+   @supports block, ~line 2921); kept local here rather than added to that
+   block because this class is owned by this file, not styles.css. */
+   (Merged into that block on 3 Sep 2026: the parity guard only reads the first one.) */
+
+/* ---- mobile redesign: assets view ---- */
+/* Assets page — redesign variant B ("hero plus a stat strip").
+   Screen 6 of the mockup: replaces four ~130px stacked/gridded tiles with
+   one hero card carrying the total, a valuation-health badge, and a compact
+   strip for item count and largest item. Scoped to .assets-hero-wrap so it
+   only overrides the `.mini-grid.mini-kpis-4` shell.js still puts on
+   #assetKpis — no other view's KPI tiles are touched.
+
+   Tokens reused, not reinvented: --color-primary-light / --color-success /
+   --color-warning-ink / --border-color / --text-muted / --ink-faint are the
+   same variables the rest of the app draws its palette from, so this variant
+   repaints correctly across both the light and dark presets, and across a
+   plugin theme mismatched with Obsidian's own, without deriving anything new. */
+
+.budget-app-root .assets-hero-wrap.mini-grid { display: block; }
+
+.budget-app-root .assets-hero { padding: 18px 20px; }
+
+.budget-app-root .assets-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.budget-app-root .assets-hero-num {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 5vw, 38px);
+  color: var(--text-primary);
+}
+
+.budget-app-root .assets-hero-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .1px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.budget-app-root .assets-hero-badge-ok {
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border-color: rgba(34, 197, 94, .3);
+}
+
+.budget-app-root .assets-hero-badge-warn {
+  background: var(--color-warning-light, rgba(154, 92, 9, .12));
+  color: var(--color-warning-ink);
+  border-color: rgba(154, 92, 9, .28);
+}
+
+.budget-app-root .assets-hero-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.budget-app-root .assets-hero-hr {
+  height: 1px;
+  background: var(--border-color);
+  margin: 12px 0;
+}
+
+/* The ~79px-tall strip the mockup calls out: one row, three short facts,
+   no per-fact vertical padding left over from the tile component that used
+   to hold a single number in ~130px. */
+.budget-app-root .assets-hero-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.budget-app-root .assets-hero-strip b {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .budget-app-root .assets-hero-top { flex-wrap: wrap; }
+  .budget-app-root .assets-hero-strip { gap: 12px; }
+}
+
+/* ---- mobile redesign: score view ---- */
+/* Variant A of "Where the money went" (score.js's flow card), ui/mobile-redesign.
+   Scoped under .budget-app-root the same as every rule in src/styles.css, and
+   reuses that file's own tokens (--color-danger*, --border-color) rather than
+   inventing new ones — the palette is sealed. No :focus-visible, no
+   color-mix(), no :has() here, so no @supports fallback is needed. */
+
+/* The overspend row that replaces "Not yet spent" once spend has actually
+   passed income this period (score.js's buildFlowRows). Danger ink on the
+   name/amount, matching the existing "is-zero" row's own use of
+   --color-danger-ink for the same "this needs the reader's attention"
+   signal a few lines above it in styles.css. */
+.budget-app-root .score-flow-m-row.is-overspent .score-flow-m-name,
+.budget-app-root .score-flow-m-row.is-overspent .score-flow-m-amt {
+  color: var(--color-danger-ink);
+}
+.budget-app-root .score-flow-m-row.is-overspent .score-flow-m-sub {
+  color: var(--color-danger-ink);
+}
+
+/* The bar itself: capped at 100% of the track (score.js sets width:100% for
+   this row specifically, never scaled down like the other bands — see the
+   comment beside that assignment for why), filled solid danger colour with a
+   diagonal-stripe cap at the right edge as the "this ran past the edge of the
+   track" cue the mockup calls for. repeating-linear-gradient is Safari 3+/
+   iOS 1+, so no @supports guard is needed here either. */
+.budget-app-root .score-flow-m-bar i.is-overcap {
+  background: var(--color-danger);
+  position: relative;
+  overflow: hidden;
+}
+.budget-app-root .score-flow-m-bar i.is-overcap::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 18px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-danger-ink) 0,
+    var(--color-danger-ink) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+  opacity: .55;
+}
+
+/* Desktop Sankey ribbon for the same row (buildFlowSankey reads the same
+   `rows`, including the swapped-in overspend row, so its class needs a fill
+   too or the ribbon renders with the SVG's default black). */
+.budget-app-root .score-flow-rib.is-overspent { fill: var(--color-danger); }
+
+/* ---- mobile redesign: accounts view ---- */
+/* Accounts — redesign variant B (budget-redesign.html, screen 8, variant B).
+   Presentation only: every filter, count and action this file styles is the
+   same one src/views/accounts.js already wired up. Scoped under
+   .budget-app-root and layered on top of the existing .acct-* classes in
+   src/styles.css rather than replacing them, so a rule this file does not
+   touch (the pill colours, the segmented-control look) keeps behaving
+   exactly as it did before the redesign.
+
+   iOS 15 / WebKit: no :has(), no color-mix(), no :focus-visible without the
+   existing @supports guard already carried in styles.css for that selector
+   — this file adds no new instance of it. */
+
+/* ---- the deck collapsed to a one-line banner --------------------------- */
+/* .acct-deck already gives the amber card frame; this only changes what sits
+   inside it from a stack of cards to one row: a dot, the count sentence, and
+   a single "Show them" door into the table (already filtered to "Needs a
+   look" — see renderDeck's own comment on why the per-account sentence and
+   the one-tap fix moved onto the row instead of staying here). */
+.budget-app-root .acct-deck--banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.budget-app-root .acct-deck--banner.is-clear {
+  display: block;
+}
+.budget-app-root .acct-deck-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.budget-app-root .acct-deck-banner-txt {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--color-warning-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.budget-app-root .acct-deck--banner .acct-deck-btn {
+  flex: none;
+}
+
+/* ---- scrolling chip rails, never clipped at the left edge -------------- */
+/* The mockup's bug was flex-wrap inside a padded panel: a chip row that
+   wraps can still clip its own first chip against the panel edge once the
+   row is taller than one line. overflow-x replaces wrapping outright, so
+   there is only ever one line and nothing to clip. No negative margins and
+   no min-width wider than the viewport — both were how the original clipped
+   in the first place. */
+.budget-app-root .acct-rail {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  /* Each chip keeps its own width; the RAIL scrolls instead of the chips
+     shrinking or wrapping off it. */
+}
+.budget-app-root .acct-rail .acct-seg {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ---- per-row inline actions -------------------------------------------- */
+/* The state column now carries the pill AND, for a flagged row, the same
+   Review / one-tap-fix pair the old deck card offered — same buttons, same
+   handlers (rowActions() in accounts.js), just printed once per row instead
+   of once per card. */
+.budget-app-root .acct-col-state {
+  white-space: nowrap;
+}
+.budget-app-root .acct-row-acts {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.budget-app-root .acct-deck-btn.sm {
+  padding: 3px 10px;
+  font-size: 11.5px;
+}
+.budget-app-root .acct-deck-btn.sm .ico svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+/* A row's inline actions are decoration on top of a row that is already a
+   click target (accountRow opens the drawer on click) — stop the click from
+   also toggling the drawer. Handled in JS via stopPropagation on each
+   button; this rule only keeps the buttons from visually merging into the
+   pill they sit beside. */
+.budget-app-root .acct-pill + .acct-row-acts {
+  margin-left: 8px;
+}
+.budget-app-root .acct-row-why { display: block; font-size: 12px; color: var(--text-muted); margin: 2px 0 6px; white-space: normal; }
+
+/* Plan view, phone gutter: the sections arrived with three different left
+   edges (14px sources, 20px pot, 0px buckets and their header), which is what
+   read as "the button is cut off" on the phone. One gutter for all of them. */
+@media (max-width: 640px) {
+  .budget-app-root #planContent .plan-strip,
+  .budget-app-root #planContent .plan-env-head,
+  .budget-app-root #planContent #planEnvelopes,
+  .budget-app-root #planContent #planSources,
+  .budget-app-root #planContent #planPot,
+  .budget-app-root #planContent .section-h { padding-left: 16px; padding-right: 16px; }
+  .budget-app-root #planContent .plan-env-head .section-h { padding-left: 0; padding-right: 0; }
+}
+/* Bucket items read left to right: tick, name, amount. */
+.budget-app-root .env-item .ei-name, .budget-app-root .env-item .ei-name > * { text-align: left; justify-content: flex-start; }
+
+/* Accounts view, phone gutter: the two filter rails and the toolbar are
+   direct children of the view with no padding of their own, so they sat on
+   the screen edge while every card beside them kept a gutter. */
+@media (max-width: 640px) {
+  .budget-app-root #acctOwners,
+  .budget-app-root #acctFilters,
+  .budget-app-root .acct-toolbar { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); }
+}

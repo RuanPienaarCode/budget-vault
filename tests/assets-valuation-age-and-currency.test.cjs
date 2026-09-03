@@ -103,10 +103,12 @@ async function mount(files = FILES) {
     const { ctx, $ } = await mount();
     ctx.renderAssets();
     const kpis = $('#assetKpis').textContent;
-    ok(/Needs a new valuation/.test(kpis), 'the tile is on the page');
-    ok(!/Needs a new valuation0/.test(kpis) && !/every value is current/.test(kpis),
+    /* The 3 Sep 2026 hero (variant B) states this as a badge rather than a
+       zero-count tile: "every value current" or "N need a new valuation". */
+    ok(/new valuation|every value current/.test(kpis), 'the badge is on the page');
+    ok(!/every value current/.test(kpis),
       `a valuation dated ahead of today needs a new one — got: ${JSON.stringify(kpis)}`);
-    ok(/Needs a new valuation2/.test(kpis),
+    ok(/2 need a new valuation/.test(kpis),
       'both rows need one: the 2024 house and the 2099 flat');
   }
 
@@ -143,7 +145,7 @@ async function mount(files = FILES) {
     ctx.renderAssets();
     const kpis = $('#assetKpis').textContent;
     const note = $('#assetStale').textContent;
-    ok(/Needs a new valuation1/.test(kpis), 'one of the two rows is stale');
+    ok(/1 needs a new valuation/.test(kpis), 'one of the two rows is stale');
     ok(/1 of 2 values are over a year old/.test(note), 'and the caveat counts it');
     ok(!/% of the total/.test(note),
       'a quarter of the total is under the 50% gate, so the share is not stated — unchanged behaviour');
