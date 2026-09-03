@@ -110,13 +110,15 @@ byte-identical.
 
 Making the lenses data made two things visible that five loops had hidden:
 
-- **TREND does not drop `earmarkedOut`.** ISSUE 41 taught `summaryInRange`
+- **TREND did not drop `earmarkedOut`.** ISSUE 41 taught `summaryInRange`
   that an outflow from an earmarked fund is not budget spend; `periodSpend`
   was never taught. So the trend chart, the comparison column and the money
-  rail's category map count fund-paid spending the hero excludes. Preserved
-  in this phase so no figure moves; it is one word in the TREND row, and
-  whether to add it is a Phase 3 decision, with the ledger re-blessed if it
-  is.
+  rail's category map counted fund-paid spending the hero excluded. Preserved
+  through Phases 2 and 3 so no figure moved on a refactor; **closed by Ruan
+  on 2026-09-03**: the veto is in the TREND row, BUDGET and TREND now keep the
+  same rows and differ only by sign rule, and the lens suite pins that. The
+  committed fixture's fund has no outflow in its period, so the figures
+  ledger did not move.
 - **HOUSEHOLD counted a split parent and its parts.** A split's parent row is
   excluded by construction; the household lens keeps excluded rows; the
   pairing that drops pass-throughs never sees a parent (same label as its
@@ -149,10 +151,22 @@ tally's gross outgoings by category instead of a walk with three of the five
 vetoes. `tests/period-figures.test.cjs` pins the rules, the snapshot and the
 pages' rendering of it, and gates the old arithmetic out of `src/views/`.
 
-Still open, deliberately: the TREND lens's missing `earmarkedOut` (above).
-It is one word, and it moves the trend chart, the comparison column and the
-money rail on any vault with an earmarked fund; it waits for a decision and
-a re-bless rather than riding in on a refactor.
+The one decision Phase 3 left open — the TREND lens's missing `earmarkedOut`
+— was taken the same day (see the Phase 2 findings above).
+
+## Phase 4, landed (2026-09-03)
+
+The narratives moved. `docs/adr/0007-calculation-rules-register.md` holds
+208 entries, one per rule the ten calculation and loading modules used to
+carry as comments, each with its decision, the evidence the comment kept
+(issue numbers, measured figures, dates, releases) and the suite that pins
+it. The modules keep pointers of at most three lines. The gate was
+mechanical: the comment-stripped source of every module is byte-identical
+to the commit before, so nothing but comments moved. Line counts fell from
+5 896 to 3 313 across the ten files, and comment share from 57–78% to
+37–57%. `tests/narratives-live-in-adrs.test.cjs` keeps it so: no comment
+block over twelve lines, every pointer naming a register entry, every entry
+naming a function that still exists.
 
 ## What this does not change
 

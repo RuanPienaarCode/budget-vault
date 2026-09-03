@@ -17,8 +17,10 @@
         household walk in healthSnapshot return exactly what tally() returns
         under BUDGET, TREND and HOUSEHOLD — proved against the real loader on
         randomised vaults, not on a fixture chosen to agree.
-     4. THE LENSES SAY WHAT THEY DROP: BUDGET and TREND differ by exactly
-        earmarkedOut on any vault (the ISSUE 41 gap, preserved and named).
+     4. THE LENSES SAY WHAT THEY DROP: BUDGET and TREND keep exactly the
+        same rows on any vault and differ only by sign rule — the ISSUE 41
+        gap (TREND lacked earmarkedOut) was found by this suite and closed
+        on 2026-09-03.
      5. ACCOUNT (Phase 3) keeps everything but a split's superseded parent —
         the Accounts page's own reading, proved by the same oracle.
 
@@ -103,7 +105,7 @@ function oracleKeeps(ctx, lensName, t, paired) {
   const transfer = ctx.catType(t.cat) === 'transfer';
   switch (lensName) {
     case 'BUDGET': return !t.excluded && !nonBudget && !foreign && !earmarkedOut && !transfer;
-    case 'TREND': return !t.excluded && !nonBudget && !foreign && !transfer;
+    case 'TREND': return !t.excluded && !nonBudget && !foreign && !earmarkedOut && !transfer;
     case 'HOUSEHOLD': return !foreign && !transfer && !supersededBySplit(t)
       && !paired.has(`${t.label}|${t.date}|${(t.amount || 0).toFixed(2)}|${t.desc || ''}`);
     case 'ACCOUNT': return !supersededBySplit(t);
@@ -165,10 +167,10 @@ function oracleKeeps(ctx, lensName, t, paired) {
     eq(Object.keys(sp.whole).sort(), Object.keys(tt.spendByCat).sort(), `round ${round}: periodSpend.whole keys === tally(TREND).spendByCat keys`);
     for (const k of Object.keys(sp.whole)) eqMoney(sp.whole[k], tt.spendByCat[k], `round ${round}: periodSpend.whole[${k}] agrees`);
 
-    /* ---- 4. BUDGET and TREND differ by exactly earmarkedOut -------------- */
+    /* ---- 4. BUDGET and TREND keep the same rows ------------------------- */
     const d = lensDifference(stamped, LENSES.BUDGET, LENSES.TREND);
     eq(d.BUDGET, [], `round ${round}: nothing is in BUDGET and not in TREND`);
-    ok(d.TREND.every(s => s.earmarkedOut), `round ${round}: every row TREND keeps and BUDGET drops is a fund outflow (ISSUE 41)`);
+    eq(d.TREND, [], `round ${round}: nothing is in TREND and not in BUDGET — since 2026-09-03 the two differ only by sign rule (earmarkedOut closed)`);
   }
   ok(rounds >= 30, `enough non-empty rounds ran (${rounds})`);
 

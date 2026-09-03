@@ -132,12 +132,13 @@ const LENSES = Object.freeze({
      the Report, the deficit carry. summaryInRange's own vetoes, in order. */
   BUDGET: Object.freeze({ name: 'BUDGET', drop: Object.freeze(['excluded', 'nonBudget', 'foreign', 'earmarkedOut', 'transfer']), sign: 'gross' }),
   /* The trend chart, the comparison column and the money rail's category
-     map. BUDGET under a net sign rule — and WITHOUT the earmarkedOut veto,
-     which ISSUE 41 taught summaryInRange and never taught periodSpend. That
-     omission is preserved here so no figure moves in this phase; it is now a
-     visible difference between two lens rows rather than between two loops,
-     and closing it is a named decision for Phase 3. */
-  TREND: Object.freeze({ name: 'TREND', drop: Object.freeze(['excluded', 'nonBudget', 'foreign', 'transfer']), sign: 'net' }),
+     map: BUDGET's rows under a net sign rule. Until 2026-09-03 this lens
+     lacked the earmarkedOut veto — ISSUE 41 taught summaryInRange that an
+     outflow from an earmarked fund is not budget spend and never taught
+     periodSpend — so the trend counted fund-paid spending the hero excluded.
+     Ruan closed the gap on 2026-09-03 (ADR-0006, Phase 2 findings): the two
+     lenses now keep the same rows and differ only by sign rule. */
+  TREND: Object.freeze({ name: 'TREND', drop: Object.freeze(['excluded', 'nonBudget', 'foreign', 'earmarkedOut', 'transfer']), sign: 'net' }),
   /* "What actually moved through this household." The Score's pillars.
      Keeps excluded and non-budget rows — a bill paid from a joint account the
      household marked out of the budget is still a bill the emergency fund
