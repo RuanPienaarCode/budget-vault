@@ -29,7 +29,7 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodSpend, periodSummary, budgetTotals, catType, accountIndex,
+    periodSpend, periodSummary, budgetTotals, catType, declaredCatType, accountIndex,
     txInPeriod, locale,
   } = ctx;
 
@@ -749,7 +749,7 @@ module.exports = function registerScore(ctx) {
     }
     /* ISSUE 32 — the same third argument health-data.js passes, so this card
        and the score it explains cannot pair rows differently. */
-    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, catType);
+    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, declaredCatType);
 
     return periodFlow({
       income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,

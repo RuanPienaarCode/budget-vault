@@ -195,6 +195,19 @@ module.exports = function registerLoad(ctx) {
       // chars, so the frontmatter `name` is the source of truth.
       S.categories.push({
         name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888',
+        /* Whether the household ANSWERED the type question, as distinct from
+           the answer. `type` defaults to `expense`, so a category note carrying
+           only a colour is indistinguishable from one deliberately typed
+           `expense` — and ISSUE 32's pairing rule reads "expense" as the
+           household saying "this was a purchase, not a transfer leg". It is
+           not; it is the loader's default. A 4-day internal shuffle labelled
+           with an untyped `Move` category was counted as R5 000 of fresh
+           saving, which is the 1.23.0 overstatement that rule exists to
+           prevent, arriving through the door the rule opened.
+
+           Same shape as `in_budget_stated` on accounts, for the same reason:
+           an absent key is not an answer. */
+        type_stated: String(fm.type ?? '').trim() !== '',
         /* A category whose budgeted amount IS the actual spend — no transaction
            will ever arrive for it, because the money left in a previous period.
            "Previous month overspending" is the case it was written for: the hole

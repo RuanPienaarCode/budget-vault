@@ -349,12 +349,56 @@ module.exports = function registerPeriod(ctx) {
      `budget: true` on it and is taken at its word — an absent key is not
      consent, which is why load.js records whether the question was answered
      rather than only what the answer was. */
+  /* WHAT COUNTS AS A DECLARATION, and why `type: savings` alone is not one.
+
+     This veto removes a row from the budget entirely — out of `spend`, out of
+     `byCat`, and therefore off the per-category Budget table as well as the
+     hero. That is a strong response, and it was keyed on the account's TYPE,
+     which is a classification of what kind of account it is and not a statement
+     about whether its money is spoken for.
+
+     Measured on a household whose only account is a high-interest transactional
+     account (a real and ordinary South African product) typed `savings`, with a
+     R35 000 salary in and R4 250 of real spending out: `periodSummary().spend`
+     read R0, every category row read R0 of its budget, and the hero offered the
+     whole R7 000 budget as still available. The budget stopped measuring
+     anything, silently, off one frontmatter word — worse than the defect this
+     veto was added to fix.
+
+     So the veto now requires the household to have SAID the money is set
+     aside, using fields this app already has and already asks for:
+
+       — `emergency_fund` (true, or an amount): the explicit flag.
+       — a savings/investment account with a GOAL on it (`goal_amount`,
+         `target_date` or `monthly_contribution`). A baby fund has a goal; a
+         transactional account does not.
+
+     A bare `type: savings` still earmarks the balance against "actually free"
+     (committed.js) — there the deduction is a named, visible term the reader
+     can disagree with in one glance — and its outgoings are still LABELLED as
+     funded from savings on the hero. What it no longer does is silently delete
+     them from the budget. The strength of the response now matches the
+     strength of the declaration. */
   const EARMARKED_ACCOUNT_TYPES = new Set(['savings', 'investment']);
   function isEarmarkedAccount(a) {
     if (!a || a.in_budget_stated) return false;
     const ef = a.emergency_fund;
     if (ef === true || (typeof ef === 'number' && ef > 0)) return true;
-    return EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase());
+    if (!EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase())) return false;
+    return (a.goal_amount > 0) || !!a.target_date || (a.monthly_contribution > 0);
+  }
+
+  /* The category type ONLY where the household stated one. `catType` answers
+     "what type does this category behave as", and its `expense` default is
+     right for every consumer that buckets a row. It is wrong for the one
+     consumer that reads the type as EVIDENCE OF INTENT — savedFromOutside's
+     ISSUE 32 rule, which treats a non-internal type as the household saying
+     "this was a purchase". A default is not a statement, and null here means
+     "they have not said", which that rule already handles by leaving the row
+     matchable. */
+  function declaredCatType(name) {
+    const c = (S.categories || []).find(x => x.name === name);
+    return c && c.type_stated ? c.type : null;
   }
   /* ISSUE 43. What the household ACTUALLY moved into its own funds this
      period — the figure the budget could not see.
@@ -396,7 +440,7 @@ module.exports = function registerPeriod(ctx) {
        moved R2 000" cannot be a comparison against a figure that includes next
        week's standing order. */
     const stop = (today >= start && today < end) ? today : end;
-    return savedFromOutside(txInRange(start, stop), labels, catType);
+    return savedFromOutside(txInRange(start, stop), labels, declaredCatType);
   }
 
   function earmarkedLabels() {
@@ -946,7 +990,7 @@ module.exports = function registerPeriod(ctx) {
     /* ISSUE 41. Published for the same reason foreignLabels above it is: an
        oracle or a view that re-spells "which folders are set aside" is a second
        rule waiting to disagree with this one. */
-    earmarkedLabels, movedToFunds,
+    earmarkedLabels, movedToFunds, declaredCatType,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, assumedSpend, periodDeficit,
     /* The one reading of a budget row's type — views/dashboard.js's
        budgetVsActualRows reads it too, so the table, the hero and the Budget

@@ -116,7 +116,7 @@ const TRAILING_MONTHS = 6;
 
 module.exports = function registerHealthData(ctx) {
   const {
-    S, periodSpend, periodSummary, budgetTotals, accountIndex, impliedAccounts, catType,
+    S, periodSpend, periodSummary, budgetTotals, accountIndex, impliedAccounts, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
     foreignLabels,
   } = ctx;
@@ -212,7 +212,7 @@ module.exports = function registerHealthData(ctx) {
       }
       /* ISSUE 32 — catType, so a fund purchase can no longer be paired away
          as the leg of an internal move. */
-      savings = savedFromOutside(householdRows, saverLabels, catType);
+      savings = savedFromOutside(householdRows, saverLabels, declaredCatType);
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency
          divisor. `consumption` is what living cost: everything except money

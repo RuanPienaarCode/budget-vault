@@ -3,6 +3,32 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.36.1 — 2026-09-03
+
+### Fixed
+
+Two regressions introduced by 1.36.0 itself, found by a red-team pass over that
+release and reproduced before either was touched. Both had one cause: **a
+loader default was read as something the household had said.**
+
+- **A savings-typed everyday account stopped the budget measuring anything.**
+  1.36.0 took outgoings from savings and investment accounts out of budget
+  spending. But `type: savings` says what kind of account it is, not that its
+  money is spoken for — and a high-interest transactional account is an
+  ordinary product that carries that word. A household whose only account was
+  one saw every category read R0 spent and the whole budget still available,
+  with R4 250 already gone. Now only an account you have actually flagged —
+  `emergency_fund`, or a savings account with a goal on it — is treated as set
+  aside. A bare `type: savings` still comes out of "actually free", where the
+  deduction is a visible line you can disagree with, and its spending is still
+  labelled on the Dashboard; it no longer disappears from your budget.
+- **Money moved between two of your own funds could count as saving.** 1.36.0
+  used a transaction's category type to tell a purchase from a transfer. A
+  category note with no `type:` line loads as an expense, so an ordinary
+  internal transfer that took four days to clear was read as a purchase and
+  counted as new saving, inflating the savings rate on your score. Only a type
+  you have actually written now counts as you saying so.
+
 ## 1.36.0 — 2026-09-03
 
 Everything below came out of a live audit of 1.35.1 run on 2 September 2026,
