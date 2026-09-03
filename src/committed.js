@@ -181,6 +181,15 @@ const EARMARKED_TYPES = new Set(['savings', 'investment']);
 function earmarkOf(a) {
   const held = Math.max(0, a.implied || 0);
   if (!held) return 0;
+  /* THE HOUSEHOLD'S ANSWER WINS, and it has to win in both places.
+     period.js's isEarmarkedAccount opens with the same test — a stated
+     `budget:` key means they have told us how this account is treated, and an
+     absent one is not consent. This function had no equivalent, so one
+     declaration produced two rules on ONE card: writing `budget: true` moved
+     the hero (the fund's spending came back into the budget) while the
+     what's-left strip four tiles away went on withholding the whole balance,
+     understating "actually free" by it. */
+  if (a.budgetStated) return 0;
   const ef = a.emergencyFund;
   if (ef === true) return held;
   if (typeof ef === 'number' && ef > 0) return Math.min(ef, held);

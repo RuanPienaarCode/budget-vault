@@ -197,7 +197,15 @@ function chargeStatus(stats, cycle, today) {
   if (!stats) return { state: 'unseen', daysSince: null };
   if (!ISO_DATE.test(today || '')) return { state: 'active', daysSince: null };
   const gap = isoDayNumber(today) - isoDayNumber(stats.last);
-  const cycleDays = cycle === 'annual' ? 365 : 31;
+  /* ISSUE 33 follow-up. This read `cycle === 'annual' ? 365 : 31` — written
+     when `monthly` and `annual` were the only two cycles that existed, and
+     left behind when weekly and fortnightly arrived. So a weekly gym silent
+     for forty days — six missed charges — reported "active", because forty is
+     less than two 31-day cycles. The doc above says "two full cycles"; this
+     now measures the cycle the household actually stated, off the same
+     STEP_DAYS table nextExpected steps by, so the two cannot disagree about
+     how long a fortnight is. */
+  const cycleDays = cycle === 'annual' ? 365 : (STEP_DAYS[cycle] || 31);
   return { state: gap > cycleDays * 2 ? 'overdue' : 'active', daysSince: gap };
 }
 

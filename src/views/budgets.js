@@ -295,7 +295,7 @@ module.exports = function registerBudgets(ctx) {
   function budgetTotalsStrip() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    let income = 0, budgeted = 0, assumed = 0, namedNetSpend = 0, hasIncomeRow = false;
+    let income = 0, budgeted = 0, budgetedSpend = 0, assumed = 0, namedNetSpend = 0, hasIncomeRow = false;
     for (const d of draft) {
       /* The row's own stored Type cell (d.type, the Type column read out of
          Budgets/<period>.md) versus the category's CURRENT type (catType).
@@ -320,6 +320,14 @@ module.exports = function registerBudgets(ctx) {
       }
       if (type === 'transfer') continue;
       budgeted += d.amount || 0;
+      /* ISSUE 40 follow-up. The spend half on its own. `budgeted` above stays
+         the WHOLE plan — that is what "Total budgeted" means and what
+         `allocPct` should be a share of — but "% of budget used" divides by
+         this, because nothing in its numerator can ever fill a savings
+         envelope: their funding is transfer-typed and summaryInRange drops it,
+         so a household that has funded every envelope read 32% used against
+         the Dashboard's 45% for the same period. */
+      if (type !== 'savings' && type !== 'investment') { budgetedSpend += d.amount || 0; }
       /* Real spend already inside sum.spend for THIS category — periodSummary
          doesn't know an assume-spent flag exists, but it knows every real
          transaction, including one in a category the flag was turned on for.
@@ -364,7 +372,7 @@ module.exports = function registerBudgets(ctx) {
        rounded onto the boundary the red tile says the plan has crossed. Same
        rule for "used": 100% is the same kind of boundary there. */
     const allocPct = income > 0 ? sharePercentLabel(budgeted / income, locale().decimal) : null;
-    const usedPct = budgeted > 0 ? sharePercentLabel(spent / budgeted, locale().decimal) : null;
+    const usedPct = budgetedSpend > 0 ? sharePercentLabel(spent / budgetedSpend, locale().decimal) : null;
 
     /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
        netted, uncategorised and unknown-name spend counted in full. Every row

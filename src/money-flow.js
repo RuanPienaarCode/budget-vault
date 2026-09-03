@@ -127,8 +127,28 @@ function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished }
   return base > 0 ? bud / base : null;
 }
 
+/* `budgetSetAside` is the savings/investment half of the plan (ISSUE 40), and
+   it exists because the two ratios below want DIFFERENT denominators off one
+   budget — which is exactly the trap that made this argument necessary.
+
+     "share of income budgeted"  — the WHOLE plan. A rand into the emergency
+                                   fund is every bit as allocated as a rand of
+                                   groceries.
+     "budget used"               — the SPEND envelopes alone. Nothing in the
+                                   numerator can ever fill a savings envelope
+                                   (its funding is transfer-typed and
+                                   summaryInRange drops it), so including them
+                                   reports a household that has funded every
+                                   envelope as under-spent.
+
+   1.36.0 split budgetTotals and moved the Dashboard hero to the first rule
+   while this function kept receiving `spend` alone for both. On the audit
+   household that printed "41% of income budgeted" on the Dashboard and the
+   Budget page against "30%" on the Score, and "45% used" against "32%" — the
+   same phrase, the same period, one household. Optional and defaulting to 0,
+   so a caller that has not been taught is unchanged. */
 function periodFlow({
-  income, spentTotal, budgeted, spendByCat, fixedCats, catType,
+  income, spentTotal, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
 } = {}) {
   const inc = Number(income) > 0 ? Number(income) : 0;
@@ -242,8 +262,12 @@ function periodFlow({
      against `inc`, which is what has landed so far. Dividing by `inc` made
      this line disagree with the Dashboard's "N% allocated" on the same data,
      and drift a little every day as more income arrived. */
+  /* ISSUE 40 follow-up: the WHOLE plan, so this agrees with the Dashboard hero
+     and the Budget page. `budgetUsed` below keeps `bud` (spend envelopes
+     alone) — see the header for why one budget needs two denominators. */
+  const setAside = Math.max(0, Number(budgetSetAside) || 0);
   const allocatedOfIncome = allocatedShare({
-    budgeted: bud, budgetIncome, actualIncome: inc, periodFinished,
+    budgeted: bud + setAside, budgetIncome, actualIncome: inc, periodFinished,
   });
   /* NOT `spent / bud`. `spent` is periodSummary().spend, which the comment
      on `living` two blocks above already documents as INCLUDING
@@ -347,7 +371,7 @@ function periodFlow({
       },
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
-    budget: { budgeted: bud, spentTotal: spent, allocatedOfIncome, budgetUsed },
+    budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, allocatedOfIncome, budgetUsed },
     lefts: { leftInBudget, neverBudgeted, together, display: displayLefts },
   };
 }

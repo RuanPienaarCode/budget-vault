@@ -752,7 +752,12 @@ module.exports = function registerScore(ctx) {
     const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, declaredCatType);
 
     return periodFlow({
-      income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,
+      /* ISSUE 40 follow-up. `budgetSetAside` passed, so the Score's "share of
+         income budgeted" is the WHOLE plan the Dashboard and the Budget page
+         state (41%), not the spend envelopes alone (30%). Its "budget used"
+         still divides by the spend envelopes — see periodFlow's header. */
+      income: summary.income, spentTotal: summary.spend,
+      budgeted: budget.spend, budgetSetAside: budget.setAside,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
       /* The household's own symbol, so this card's "of which interest" holds
          foreign debts out exactly the way the breakdown beneath it (and the

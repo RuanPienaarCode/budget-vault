@@ -561,7 +561,12 @@ module.exports = function registerReport(ctx) {
         if (!foreignSymbols.includes(sym)) foreignSymbols.push(sym);
       }
       const bt = budgetTotals(p);
-      budgetIncome += bt.income; budgetSpend += bt.spend;
+      /* ISSUE 40 follow-up, and this is the document that LEAVES the app.
+         `bt.spend` alone stated R10 500 as the budget directly above a
+         Budget-vs-Actual table listing rows that sum to R14 500 — the summary
+         and the table of one file, disagreeing, with no caveat between them.
+         The table lists every envelope, so the total states every envelope. */
+      budgetIncome += bt.income; budgetSpend += bt.spend + (bt.setAside || 0);
 
       const spendRows = categorySpendRows(p);
       spendRowsByPeriod.push(spendRows);

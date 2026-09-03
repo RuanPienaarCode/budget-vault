@@ -3,6 +3,35 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.36.2 — 2026-09-03
+
+### Fixed
+
+Four more consequences of 1.36.0's budget split, found by an audit pass over
+that release. Splitting the budget into "spend" and "set aside" reached the
+Dashboard and not the three other places that state the same figures.
+
+- **The exported report contradicted its own table.** It stated your budget as
+  R10 500 directly above a Budget-vs-Actual table listing envelopes that add up
+  to R14 500 — in one file, with nothing to explain the gap. This is the
+  document that leaves the app, so it now states the whole plan its own table
+  shows.
+- **"Share of income budgeted" said 41% on two pages and 30% on the Score.**
+  Same household, same month. It is the whole plan everywhere now — a rand into
+  your emergency fund is as budgeted as a rand of groceries.
+- **"% of budget used" said 45% on the Dashboard and 32% on the Budget page.**
+  The Budget page was dividing by envelopes nothing can ever fill: savings
+  envelopes are funded by transfers, which the budget deliberately does not
+  count as spending. It divides by your spending budget now, like the
+  Dashboard.
+- **Saying `budget: true` on a savings account only half worked.** Your budget
+  started counting that account's spending, but "actually free" carried on
+  withholding the whole balance — one setting, two answers, on one screen.
+- **A weekly or fortnightly service could go silent without being noticed.**
+  The "is this still being charged" check still measured every non-annual
+  cycle as a month, so a weekly gym could stop for forty days — six missed
+  charges — and still read as active.
+
 ## 1.36.1 — 2026-09-03
 
 ### Fixed

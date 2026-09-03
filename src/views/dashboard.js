@@ -489,6 +489,9 @@ module.exports = function registerDashboard(ctx) {
            file. `emergency_fund` is `true` or a NUMBER; both survive the
            handover unconverted because both mean different things. */
         emergencyFund: a.emergency_fund,
+        /* Whether the household ANSWERED the budget question — committed.js
+           needs it to honour `budget: true` the way period.js already does. */
+        budgetStated: !!a.in_budget_stated,
         settleDay: a.settle_day || 0,
         institution: a.institution || '',
         /* ISSUE 30. One field, added at the one place this list is built.
