@@ -81,10 +81,12 @@ async function mount(files) {
      this one — a test that passes on its neighbour's disclosure while the tile
      under examination says nothing. Each tile is a `.mini` whose first child
      is its `.l` label (src/dom.js kpiTiles). */
+  /* The hero (variant B of the 3 Sep 2026 redesign) folds the four tiles into
+     one card; the "largest" figure and its footnotes now live together in one
+     `.assets-hero-largest` span, which is the single node this test reads. */
   return label => {
-    const t = $('#assetKpis').querySelectorAll('.mini')
-      .find(m => (m.querySelector('.l') || {}).textContent === label);
-    assert.ok(t, `the "${label}" tile must be on the page`);
+    const t = $('#assetKpis').querySelector(label === 'Largest' ? '.assets-hero-largest' : '.assets-hero');
+    assert.ok(t, `the "${label}" figure must be on the page`);
     return t.textContent;
   };
 }
