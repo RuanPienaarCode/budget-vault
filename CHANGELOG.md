@@ -3,6 +3,49 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.38.0 — 2026-09-03
+
+### Fixed
+
+The second batch from the audit — nine more defects, in the figures you act on
+and in the files the app writes.
+
+- **A debt payment dated later this month was read as already paid**, so the
+  instalment disappeared from "still committed" while the money was still in
+  your account. "Actually free" over-stated by the whole instalment.
+- **Your Score said it had left out one account when it had left out three
+  ledgers.** With a foreign savings account, an overseas property and a loan in
+  another currency, it named the account and silently dropped the rest from the
+  net worth it scores you on. It now names the lot, the way every other page
+  already did.
+- **The exported report stated a score with nothing at all to qualify it** —
+  the screen said which money was left out and the document said nothing. It
+  now carries the same caveat, in the Markdown and in the JSON.
+- **The exported report listed transactions it did not count.** Since totals
+  stop at today, a report could show twelve rows under figures covering six.
+  It now says so.
+- **Tax and Plan cells stopped being overwritten.** An amount the app cannot
+  read — `12 000 R`, or an estimate range like `8000 - 12000` — was replaced
+  with `0.00` on the next save, and a status word it did not recognise was
+  replaced too, turning a plan source marked `pending` into `received`. Both
+  now keep exactly what you typed.
+- **A blank "Original" on a debt is no longer filled in for you.** The app
+  needs a figure to draw the paid-off bar and was writing its guess into your
+  file, putting you on record as having borrowed exactly what you still owe.
+- **Uploading a certificate named `IRP5.pdf` where `irp5.pdf` exists no longer
+  risks overwriting it** — that check, and two others, now compare the way the
+  filesystem does.
+- **One mistyped transaction date no longer breaks a subscription's schedule.**
+  A single bad date became the anchor for the whole prediction, producing due
+  dates like `2026-14-05` that the app then offered to write into your
+  Services file.
+- **The screen-reader description of the money bar matches the screen.** It
+  said "R 24 500 is committed" where the bar showed R 23 000 set aside and
+  R 1 500 committed — a figure that appeared nowhere, and which counted your
+  emergency and baby funds as committed spending.
+- The Accounts hero no longer says a converted total is "included" in a figure
+  that excludes it.
+
 ## 1.37.0 — 2026-09-03
 
 ### Fixed

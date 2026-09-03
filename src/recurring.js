@@ -21,7 +21,7 @@
    useful, honest answer, and far better than confidently pairing a service with
    another company's debit order. */
 
-const { ISO_DATE, isoDayNumber, isoFromDayNumber } = require('./dates');
+const { ISO_DATE, isoDayNumber, isoFromDayNumber, isRealIsoDate } = require('./dates');
 
 /* Words that appear in so many service names they cannot identify a merchant. */
 const STOP = new Set([
@@ -56,8 +56,38 @@ const median = arr => {
 /* Statistics over one merchant's charges. Amounts are positive magnitudes. */
 function chargeStats(charges) {
   if (!charges || !charges.length) return null;
-  const sorted = [...charges].sort((a, b) => a.date.localeCompare(b.date));
-  const amounts = sorted.map(c => Math.abs(c.amount));
+  /* ISSUE 75. Only rows whose date names a real day can ORDER this list, and
+     `last` is what the whole cadence is anchored on.
+
+     A single typo'd row poisoned it, because a string sort puts a bad date
+     LAST: one `2026-13-05` among four clean charges made `last` "2026-13-05",
+     nextExpected returned "2026-14-05", and chargeStatus reported daysSince
+     -125 while still calling the service active. `"end of June"` produced
+     "NaN-NaN-NaN". views/services.js then offered that as a one-tap correction
+     to `Services.md` — gated only on `c.next !== s.next`, with no shape check
+     — so the app was ready to WRITE a date that does not exist into the
+     household's own file.
+
+     `2026-13-05` and "end of June" are the exact shapes src/reconcile.js
+     documents as ordinary and reachable, and load.js applies no date
+     validation to transaction rows.
+
+     Amounts are untouched: an undatable charge still happened and still counts
+     toward the price. It just cannot say WHEN, so it does not get to. */
+  const datable = charges.filter(c => isRealIsoDate(c.date));
+  const sorted = [...(datable.length ? datable : [])].sort((a, b) => a.date.localeCompare(b.date));
+  if (!sorted.length) {
+    /* Every charge undatable: there is a price but no cadence. `last` absent
+       is the signal nextExpected and chargeStatus already handle. */
+    const amts = charges.map(c => Math.abs(c.amount));
+    const recent3 = amts.slice(-3);
+    const med = median(recent3);
+    return { count: charges.length, months: 0, median: median(amts), recent: med,
+      varies: med ? (Math.max(...recent3) - Math.min(...recent3)) / med > 0.15 : false,
+      first: '', last: '', day: 0, drift: null, undatable: charges.length };
+  }
+  /* Amounts come from EVERY charge; only the dates are narrowed. */
+  const amounts = charges.map(c => Math.abs(c.amount));
   const months = [...new Set(sorted.map(c => c.date.slice(0, 7)))];
   const days = sorted.map(c => Number(c.date.slice(8, 10)));
 
@@ -91,7 +121,13 @@ function chargeStats(charges) {
   const spread = recent ? (Math.max(...recentAmounts) - Math.min(...recentAmounts)) / recent : 0;
 
   return {
-    count: sorted.length,
+    /* ISSUE 75. Every charge, not just the datable ones — an undatable row is
+       a charge that happened, and dropping it from the count would understate
+       a merchant's history because one date was mistyped. `undatable` says how
+       many could not be PLACED, which is a different question and the one a
+       caller needs when the cadence looks thin. */
+    count: charges.length,
+    undatable: charges.length - sorted.length,
     months: months.length,
     median: median(amounts),
     recent,
@@ -161,7 +197,10 @@ function matchCharges(service, rows, tokens) {
    disagree by a day either side of midnight in half the world. */
 const STEP_DAYS = { weekly: 7, fortnightly: 14 };
 function nextExpected(stats, cycle) {
-  if (!stats || !stats.last) return null;
+  /* ISSUE 75. A shape check, not just a presence check. Everything below does
+     string arithmetic on `last` and hands the result to a view that offers to
+     write it into the user's file; "NaN-NaN-NaN" must never get that far. */
+  if (!stats || !stats.last || !ISO_DATE.test(stats.last)) return null;
   const step = STEP_DAYS[cycle];
   if (step) { return isoFromDayNumber(isoDayNumber(stats.last) + step); }
   if (cycle === 'annual') {
@@ -195,7 +234,12 @@ function nextExpected(stats, cycle) {
      'overdue'  nothing for more than two cycles */
 function chargeStatus(stats, cycle, today) {
   if (!stats) return { state: 'unseen', daysSince: null };
-  if (!ISO_DATE.test(today || '')) return { state: 'active', daysSince: null };
+  if (!ISO_DATE.test(today || '') || !ISO_DATE.test(stats.last || '')) {
+    /* ISSUE 75. An unanchorable history is not a healthy one — it is one
+       nothing can measure, and reporting `active` with a NaN age was how a
+       weekly service silent for weeks read as fine. */
+    return { state: 'active', daysSince: null };
+  }
   const gap = isoDayNumber(today) - isoDayNumber(stats.last);
   /* ISSUE 33 follow-up. This read `cycle === 'annual' ? 365 : 31` — written
      when `monthly` and `annual` were the only two cycles that existed, and

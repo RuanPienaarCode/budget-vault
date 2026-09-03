@@ -37,7 +37,7 @@ const { planSummary, barSegments, SOURCE_KINDS, sharePct,
   envelopeOverState } = require('../plan-math');
 
 module.exports = function registerPlan(ctx) {
-  const { S, $, app, money, toast, writeFile, fileAt } = ctx;
+  const { S, $, app, money, toast, writeFile, fileAt, pathTaken } = ctx;
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('planDirty', '#planSave');
 
@@ -544,7 +544,8 @@ module.exports = function registerPlan(ctx) {
     if (S.plans[key]) { S.planName = key; return renderPlan(); }
     /* A file on disk that the loader did not pick up means something else owns
        that path — refuse rather than overwrite it on the first save. */
-    if (fileAt(`Plans/${key}.md`)) {
+    // ISSUE 64: pathTaken, not fileAt — the filesystem is case-insensitive.
+    if (pathTaken(`Plans/${key}.md`)) {
       return toast('A file with that name already exists in Plans/', true);
     }
     S.plans[key] = { file: key, name, fmRaw: '', started: todayIso(), status: 'active',
@@ -622,6 +623,12 @@ module.exports = function registerPlan(ctx) {
       started: p.started ? yamlStr(p.started) : null,
       status: p.status || 'active',
     });
+    /* ISSUE 59/63. A cell nobody could read goes back exactly as it was
+       typed, never as a fabricated 0.00 and never as a coerced status word.
+       load.js sets `<key>Raw` only when the cell was present and unreadable —
+       the same contract table-schema.js gives every other table. */
+    const cash = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : Number(r[key] || 0).toFixed(2));
+    const word = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : r[key]);
     const lines = ['---', ...fm.split('\n'), '---', '', `# ${p.name}`, '',
       'Money that arrives once, divided on purpose.',
       'Source `status` is `received` or `expected`; item `status` is `planned`, `part` or `done`.',
@@ -630,19 +637,19 @@ module.exports = function registerPlan(ctx) {
       '| Source | Kind | Amount | Date | Status | Notes |',
       '|--------|------|-------:|------|--------|-------|'];
     for (const s of p.sources) {
-      lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${Number(s.amount || 0).toFixed(2)} | ${escMd(s.date || '')} | ${s.status} | ${escMd(s.notes || '')} |`);
+      lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${cash(s, 'amount')} | ${escMd(s.date || '')} | ${word(s, 'status')} | ${escMd(s.notes || '')} |`);
     }
     lines.push('', '## Envelopes', '',
       '| Envelope | Amount | Note | Tint |',
       '|----------|-------:|------|------|');
     for (const e of p.envelopes) {
-      lines.push(`| ${escMd(e.name)} | ${Number(e.amount || 0).toFixed(2)} | ${escMd(e.note || '')} | ${escMd(e.tint || '')} |`);
+      lines.push(`| ${escMd(e.name)} | ${cash(e, 'amount')} | ${escMd(e.note || '')} | ${escMd(e.tint || '')} |`);
     }
     lines.push('', '## Items', '',
       '| Item | Envelope | Amount | Spent | Status | Category | Notes |',
       '|------|----------|-------:|------:|--------|----------|-------|');
     for (const i of p.items) {
-      lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${Number(i.amount || 0).toFixed(2)} | ${Number(i.spent || 0).toFixed(2)} | ${i.status} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
+      lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${cash(i, 'amount')} | ${cash(i, 'spent')} | ${word(i, 'status')} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
     }
     lines.push('');
     return lines.join('\n');

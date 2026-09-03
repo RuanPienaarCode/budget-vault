@@ -426,7 +426,25 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today
     const paid = d.category
       ? history.filter(r => r.cat === d.category && r.amount < 0)
       : [];
-    if (paid.some(r => r.date >= periodStart && r.date <= to)) continue;   // rule 2
+    /* ISSUE 55. Rule 2 asks "has this ALREADY been paid", and its window used
+       to run to `to` — the period END — so a payment row dated later this
+       period satisfied it. Services were given exactly this as-of filter in
+       ISSUE 47 (`charged` is `date <= from`); the debt half was not.
+
+       Measured: an FNB card, R500/month, due day 1, today 2 Sep, with a payment
+       row dated 20 Sep sitting in the ledger the way an imported scheduled
+       debit order does. reconcile() correctly places that row in `ahead`, so
+       the money is still in cash — and this dropped the commitment. R500 in
+       neither figure, and "actually free" over-states by the whole instalment,
+       which committed.js's own header says is the one direction this card must
+       never be wrong in.
+
+       `asOf` rather than `from`: `from` is already today for the running
+       period, but it falls back to periodStart when today is outside the
+       window, and a past period must not start reading its own rows as
+       "not yet taken". */
+    const asOf = ISO_DATE.test(today || '') && today < to ? today : to;
+    if (paid.some(r => r.date >= periodStart && r.date <= asOf)) continue;   // rule 2
 
     const usual = paid.length ? median(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
     let due = usual ? nextOnDay(periodStart, usual) : null;

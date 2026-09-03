@@ -86,6 +86,13 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
+    /* ISSUE 56. The net-worth disclosure, held for whereYouAre() rather than
+       threaded through buildScoreRing -> renderWork -> whereYouAre as a fifth
+       argument. Four signature changes to carry one string is how a fix
+       reaches three of four call sites; this page already computes exactly one
+       snapshot per render (see this file's header), so one variable holding it
+       cannot go stale between them. */
+    worthOthers = snap.worthOtherCurrencies || [];
     renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies);
     renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
@@ -185,6 +192,9 @@ module.exports = function registerScore(ctx) {
     const large = len / RING_R > Math.PI ? 1 : 0;
     return `M ${x0.toFixed(2)},${y0.toFixed(2)} A ${RING_R},${RING_R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
   }
+
+  /* Set once per render by renderScore, read by whereYouAre. See ISSUE 56. */
+  let worthOthers = [];
 
   function buildScoreRing(breakdown, M, target, earmarks) {
     const wrap = el('div', { class: 'score-ring-wrap' });
@@ -676,10 +686,23 @@ module.exports = function registerScore(ctx) {
       if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }
       return bits.length ? bits.join(' · ') : null;
     }
-    return M.netWorthMultiple === null ? null
-      : i18n.t('score.now.wealth', {
-        times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
-      });
+    if (M.netWorthMultiple === null) return null;
+    /* ISSUE 56. What this net worth left out, across all three ledgers worth()
+       reads — not the accounts-only list the hero sentence carries. The hero's
+       list is the right one for the RATIOS above (homeRows narrows those by
+       account); this figure also drops foreign assets, debts and receivables,
+       and named only the accounts it printed R500 for while EUR 300 500 of
+       property, loan and lending sat outside it. Same wording key the Accounts
+       hero and the Savings page use, so three screens cannot word one fact
+       three ways. */
+    const otherLine = worthOthers && worthOthers.length
+      ? ' ' + i18n.t('acct.hero.otherCurrencies', {
+        list: worthOthers.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · '),
+      })
+      : '';
+    return i18n.t('score.now.wealth', {
+      times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
+    }) + otherLine;
   }
 
   /* ------------------------- where the money went ------------------------ */

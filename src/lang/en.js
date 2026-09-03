@@ -782,9 +782,9 @@ module.exports = {
      refused conversion because "a rate is a fact about a day that this vault
      does not hold" — so the day travels with the number, and a rate old
      enough to matter says how old. */
-  'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
+  'acct.hero.converted': ' Plus {list} — converted on the line above at rates for {date}.',
   'acct.hero.convertedTotal': 'Converted total {amount}',
-  'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
+  'acct.hero.convertedStale': ' Plus {list} — converted on the line above at rates for {date}, {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   /* The liability-side twin, for the Report's Debt section. The line above
      says "held", which under a Debt heading reads as an asset — "Plus
@@ -1274,6 +1274,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/day',
   'dash.left.barAria': 'Of {cash}, {committed} is committed and {free} is free',
+  'dash.left.barAriaSetAside': 'Of {cash}, {earmarked} is set aside, {committed} is committed and {free} is free',
   /* The same bar when the commitments exceed the cash. The sighted reader sees
      a fully-amber bar and the figure above it labelled "short"; the neutral
      wording announced "{free} is free" for money that is not there, which is
@@ -1407,6 +1408,11 @@ module.exports = {
   'report.category.empty': 'No spending recorded for this period.',
   'report.category.uncat': '{amount} of spend this period is uncategorised and does not appear as a row above.',
   'report.category.netted': '{amount} in refunds is netted off inside its own category and does not appear as a separate row.',
+  'report.category.scheduled': {
+    one: '{count} transaction dated later in this period ({amount}) is listed below but not counted in the totals above.',
+    other: '{count} transactions dated later in this period ({amount}) are listed below but not counted in the totals above.',
+  },
+  'report.health.otherCurrencies': 'This score was measured without {list}.',
   'report.category.fromFunds': {
     one: '{amount} left an account you have set aside ({count} transaction) and is not counted above.',
     other: '{amount} left accounts you have set aside ({count} transactions) and is not counted above.',

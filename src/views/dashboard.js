@@ -934,9 +934,23 @@ module.exports = function registerDashboard(ctx) {
           ? i18n.t('dash.left.barAriaShort', {
             cash: money(L.cash), committed: money(barCommitted), short: money(Math.abs(L.free)),
           })
-          : i18n.t('dash.left.barAria', {
-            cash: money(L.cash), committed: money(barCommitted), free: money(Math.abs(L.free)),
-          }),
+          : L.earmarked > 0
+            /* ISSUE 65. `barCommitted` is cash − free, which since ISSUE 48
+               silently means committed PLUS earmarked. The bar's geometry is
+               right to derive it that way — it cannot then drift from the
+               chain — but the LABEL inherited a word that no longer covers
+               what it names: a screen-reader user heard "R 24 500 is
+               committed", a figure on no screen, of which R 23 000 was the
+               emergency and baby funds. The sighted reader gets three terms;
+               so does this now. */
+            ? i18n.t('dash.left.barAriaSetAside', {
+              cash: money(L.cash), earmarked: money(L.earmarked),
+              committed: money(Math.max(0, barCommitted - L.earmarked)),
+              free: money(Math.abs(L.free)),
+            })
+            : i18n.t('dash.left.barAria', {
+              cash: money(L.cash), committed: money(barCommitted), free: money(Math.abs(L.free)),
+            }),
       },
       el('i', { class: 'b-com', style: `width:${comPct.toFixed(2)}%` }),
       el('i', { class: 'b-free', style: `width:${(100 - comPct).toFixed(2)}%` })));

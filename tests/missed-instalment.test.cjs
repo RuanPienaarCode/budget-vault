@@ -77,8 +77,19 @@ const run = (debts, rows, today, from) => debtCommitments({
 {
   const paidEarly = run([CARD], [{ date: '2026-09-01', cat: 'Debt', amount: -500 }], TODAY);
   eq(paidEarly, [], 'a payment on the due day clears it');
+  /* ISSUE 55 CORRECTED THIS LINE. It used to assert that a payment dated
+     LATER in the period also cleared the commitment, on the reasoning that
+     "rule 2 reads the whole period, and always did". That was the defect: the
+     money has not left the account yet — reconcile() puts such a row in
+     `ahead` and cash still counts it — so clearing the commitment took R500
+     out of both figures and over-stated "actually free" by the whole
+     instalment. Services had carried a `date <= today` filter since ISSUE 47;
+     the debt half now does too. */
   const paidLate = run([CARD], [{ date: '2026-09-28', cat: 'Debt', amount: -500 }], TODAY);
-  eq(paidLate, [], 'and so does one recorded later in the period than today — rule 2 reads the whole period, and always did');
+  eq(paidLate.length, 1, 'a payment dated LATER in the period has not happened yet, so the instalment is still committed');
+  eq(paidLate[0].amount, 500, 'for its full amount — the money is still in the account');
+  const paidLateArrived = run([CARD], [{ date: '2026-09-28', cat: 'Debt', amount: -500 }], '2026-09-29');
+  eq(paidLateArrived, [], 'and once that day arrives it clears, exactly as an earlier payment does');
 }
 
 /* ------------------ 3. a future instalment is unchanged ------------------ */

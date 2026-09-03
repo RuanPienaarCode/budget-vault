@@ -519,6 +519,20 @@ module.exports = function registerReport(ctx) {
       target: snap.target,
       savingsRatePct: H.savingsRate !== null ? H.savingsRate * 100 : null,
       interestSharePct: H.interestShare !== null ? H.interestShare * 100 : null,
+      /* ISSUE 57. What this score was computed WITHOUT. The screen says it —
+         the Score hero prints "N accounts in other currencies … are not in
+         these figures" — and this function dropped it on the floor, so the
+         exported copy stated a score with nothing at all to qualify it. That
+         copy is the one read by an advisor or a chat model, with no second
+         screen to check against.
+
+         Both lists, because they answer different questions and the report
+         states both kinds of figure: `otherCurrencies` is the accounts held
+         out of every RATIO, `worthOther` is the per-symbol net held out of the
+         net worth (accounts, assets, debts and receivables merged). See
+         health-data.js. */
+      otherCurrencies: (snap.otherCurrencies || []).map(([sym, v]) => ({ symbol: sym, amount: v })),
+      worthOther: (snap.worthOtherCurrencies || []).map(([sym, v]) => ({ symbol: sym, amount: v })),
     };
   }
 
@@ -536,6 +550,12 @@ module.exports = function registerReport(ctx) {
        spendByCategory's own merge (below) does not call categorySpendRows()
        a second time for figures already in hand. */
     let uncat = 0, netted = 0;
+    /* ISSUE 58. Rows dated later this period, which periodSummary stopped
+       counting when the running period gained its as-of boundary. The report's
+       Transaction Detail still lists them, so this document showed twelve rows
+       under totals covering six — R6 890 listed and not counted, with nothing
+       between the two saying why. */
+    let aheadSpend = 0, aheadIncome = 0, aheadCount = 0;
     /* ISSUE 41's omission, carried into the exported document. summaryInRange
        vetoes outgoings from an account the household has declared set aside, so
        `spend` below can be R4 700 on a period that moved R9 700 out of its
@@ -584,6 +604,8 @@ module.exports = function registerReport(ctx) {
       netted += notShown - uncatHere;
       const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
       fundedSpend += ff.spend || 0; fundedCount += ff.count || 0;
+      const sch = sum.scheduled || { income: 0, spend: 0, count: 0 };
+      aheadSpend += sch.spend || 0; aheadIncome += sch.income || 0; aheadCount += sch.count || 0;
     }
     /* H1 in the audit — typeRank order, same as renderBudgetTable's own sort
        (views/dashboard.js), off the SAME S.settings.groups this vault's
@@ -671,6 +693,7 @@ module.exports = function registerReport(ctx) {
       categories, spendByCategory,
       categoryGap: { uncat, netted },
       fundedFromSavings: { spend: fundedSpend, count: fundedCount },
+      scheduled: { income: aheadIncome, spend: aheadSpend, count: aheadCount },
       savings: savingsSummary(),
       debts: debtsSummary(w),
       netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },

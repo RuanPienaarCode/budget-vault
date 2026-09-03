@@ -106,7 +106,7 @@ function passthroughPairs(rows) {
   }
   return drop;
 }
-const { worth } = require('./worth');
+const { worth, otherCurrencyNet } = require('./worth');
 const { splitByCurrency, isForeign } = require('./currency');
 
 /* How far back the averages reach. Six months is long enough to absorb a bonus
@@ -397,6 +397,11 @@ module.exports = function registerHealthData(ctx) {
     const stated = active.filter(d => (d.payment || 0) > 0);
     const instalments = stated.length ? stated.reduce((t, d) => t + d.payment, 0) : null;
 
+    /* ISSUE 56/57. Kept whole rather than reduced to `.net` on the spot,
+       because the disclosure below is built out of the very ledgers it held
+       out. Same reason views/savings.js reads it high in its own function. */
+    const netWorthFull = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
+
     const metrics = healthMetrics({
       periods,
       monthsPerPeriod: (Number(S.settings.period_days) || 0) ? S.settings.period_days / DAYS_PER_MONTH : 1,
@@ -412,14 +417,30 @@ module.exports = function registerHealthData(ctx) {
          by income (netWorthMultiple), so a ledger missing from it here is a
          wrong RATIO, not just a wrong total — the shape health-data's own
          currency note calls the more dangerous of the two. */
-      netWorth: worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed).net,
+      netWorth: netWorthFull.net,
       hasFixed: fixedCats.size > 0,
     });
 
     return {
       /* Handed to the page so the Score can SAY what it left out, rather than
-         quietly scoring a household on part of its money. */
+         quietly scoring a household on part of its money.
+
+         ACCOUNTS ONLY, and that is what it is for: `homeRows` narrows every
+         period walk above by account, so this names what is missing from the
+         RATIOS. Every consumer that states a NET WORTH wants the other list. */
       otherCurrencies: scoreOthers,
+      /* ISSUE 56/57. What the net worth above left out, across all three of
+         the ledgers worth() reads — accounts, assets, debts and receivables
+         merged into one per-symbol net by otherCurrencyNet.
+
+         The Score printed "1 account in another currency (EUR) is not in these
+         figures", naming EUR 500, beside a net worth that had also silently
+         dropped a EUR 200 000 flat, a EUR 100 000 loan and EUR 500 lent out —
+         0.17% of what it excluded, on a figure the score divides by income.
+         The Dashboard, the Savings page and the Report were all moved onto
+         otherCurrencyNet when ISSUE 30 found exactly this; the Score and the
+         exported report were the two surfaces that never were. */
+      worthOtherCurrencies: otherCurrencyNet(netWorthFull, scoreOthers),
       metrics, earmarks, target, debtInterest,
       hasFixed: fixedCats.size > 0,
       /* Whether the debt score rests on anything the household actually wrote.

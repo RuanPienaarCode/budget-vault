@@ -283,6 +283,11 @@ const DATA = {
 
   eq(json.health_score, {
     score: 72, months: 3.4, target_months: 6, savings_rate_pct: 12.5, interest_share_pct: 2.1,
+    /* ISSUE 57. Present and EMPTY on a single-currency household — the point
+       of the field is that a machine reader is never handed a score with no
+       way to ask what it was measured without, and "no answer" and "nothing
+       excluded" must not look the same. */
+    other_currencies: [], net_worth_other_currencies: [],
     note: i18n.t('report.health.note'),
   });
   ok(md.includes('72'), 'the score appears in the Markdown too');

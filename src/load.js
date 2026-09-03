@@ -491,7 +491,22 @@ module.exports = function registerLoad(ctx) {
          Original is null when absent: a file written before the column
          existed, or a debt added without one. Fall back to the balance so
          the "paid off" bar reads 0% rather than dividing by zero. */
-      if (d.original === null) d.original = d.balance;
+      /* ISSUE 68. The fallback is for ARITHMETIC — the "paid off" bar divides
+         by it and would otherwise divide by null — and it must not reach the
+         file. Assigned to `original` alone, the serializer then stamped the
+         derived figure into the Debts row on the next save:
+
+             IN  : | Bond | ABSA | home | 480000.00 |           | 9.50 | …
+             OUT : | Bond | ABSA | home | 480000.00 | 480000.00 | 9.50 | …
+
+         and the household was permanently on record as having borrowed exactly
+         what they still owe, with the bar reading 0% forever and no way to
+         un-say it. The schema goes to real trouble to keep null ("not stated")
+         apart from 0 ("stated as nothing"); this threw that away one step
+         later. `originalStated` carries the distinction across the boundary so
+         the writer can put the cell back the way it found it — empty. */
+      if (d.original === null) { d.original = d.balance; d.originalStated = false; }
+      else { d.originalStated = true; }
       S.debts.push(d);
     }
 
@@ -535,6 +550,35 @@ module.exports = function registerLoad(ctx) {
       // balances do: a hand-typed "40 000,00" read as 40 would be written
       // straight back over a figure nobody was editing.
       const amt = v => normalizeAmount(v) ?? 0;
+      /* ISSUE 59/63. The contract table-schema.js's money() and vocab() give
+         every OTHER hand-editable table, applied here by hand because Plans
+         and Tax carry private loader/serializer pairs that ADR-0003's
+         migration has not reached yet.
+
+         Without it, `normalizeAmount(v) ?? 0` turned a cell nobody could read
+         into a real, stated 0.00 on the next save — "| Cot and pram | 12 000 R
+         |" became "| Cot and pram | 0.00 |", and a range like "8000 - 12000"
+         became 0.00 — which is the exact defect table-schema's own header
+         (lines 96-102) records having fixed for Assets, Debts, Owed and
+         Services. The status columns had the same shape one column over:
+         `pending` was coerced to `received` and WRITTEN BACK, flipping a plan
+         source from "expected" to "money in hand" and destroying the word that
+         said otherwise — the Services `weekly` incident again.
+
+         `<key>Raw` is set only when the cell was present AND unreadable, so a
+         blank stays blank and "not stated" never becomes "stated as nothing".
+         The serializers write the raw back verbatim when it is there. */
+      const cellMoney = (key, v) => {
+        const raw = String(v ?? '').trim();
+        const n = normalizeAmount(v);
+        return n === null && raw ? { [key]: 0, [`${key}Raw`]: raw } : { [key]: n ?? 0 };
+      };
+      const cellVocab = (key, v, allowed, fallback) => {
+        const raw = String(v ?? '').trim();
+        const hit = allowed.find(a => a === raw.toLowerCase());
+        return (!raw || hit) ? { [key]: hit || fallback } : { [key]: fallback, [`${key}Raw`]: raw };
+      };
+
       S.plans[f.basename] = {
         /* KEYED BY BASENAME, not by display name, and `file` carries it back
            out. The two differ on purpose: a plan can be called "Baby &
@@ -549,18 +593,19 @@ module.exports = function registerLoad(ctx) {
         started: (fm.started || '').toString().trim(),
         status: (fm.status || 'active').toString().trim(),
         sources: parseMdTable(section(body, 'money in')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), amount: amt(c[2]),
-          date: (c[3] || '').trim(), status: srcStatus(c[4]), notes: unescMd(c[5] || ''),
+          name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), ...cellMoney('amount', c[2]),
+          date: (c[3] || '').trim(), ...cellVocab('status', c[4], ['expected', 'received'], 'received'),
+          notes: unescMd(c[5] || ''),
         })),
         // Tint is written back verbatim so a hand-picked colour survives, and
         // an absent one renders as no wash rather than as the string "".
         envelopes: parseMdTable(section(body, 'envelopes')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), amount: amt(c[1]), note: unescMd(c[2] || ''),
+          name: unescMd(c[0]), ...cellMoney('amount', c[1]), note: unescMd(c[2] || ''),
           tint: (c[3] || '').trim(),
         })),
         items: parseMdTable(section(body, 'items')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), envelope: unescMd(c[1] || ''), amount: amt(c[2]),
-          spent: amt(c[3]), status: itemStatus(c[4]),
+          name: unescMd(c[0]), envelope: unescMd(c[1] || ''), ...cellMoney('amount', c[2]),
+          ...cellMoney('spent', c[3]), ...cellVocab('status', c[4], ['planned', 'part', 'done'], 'planned'),
           category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
         })),
       };
@@ -591,6 +636,35 @@ module.exports = function registerLoad(ctx) {
          private copy of that logic, with a test that asserted against its own
          mirror of it rather than against the shipped function. */
       const figAmount = s => normalizeAmount(s) ?? 0;
+      /* ISSUE 59/63 (Tax half). The contract table-schema.js's money() and vocab() give
+         every OTHER hand-editable table, applied here by hand because Plans
+         and Tax carry private loader/serializer pairs that ADR-0003's
+         migration has not reached yet.
+
+         Without it, `normalizeAmount(v) ?? 0` turned a cell nobody could read
+         into a real, stated 0.00 on the next save — "| Cot and pram | 12 000 R
+         |" became "| Cot and pram | 0.00 |", and a range like "8000 - 12000"
+         became 0.00 — which is the exact defect table-schema's own header
+         (lines 96-102) records having fixed for Assets, Debts, Owed and
+         Services. The status columns had the same shape one column over:
+         `pending` was coerced to `received` and WRITTEN BACK, flipping a plan
+         source from "expected" to "money in hand" and destroying the word that
+         said otherwise — the Services `weekly` incident again.
+
+         `<key>Raw` is set only when the cell was present AND unreadable, so a
+         blank stays blank and "not stated" never becomes "stated as nothing".
+         The serializers write the raw back verbatim when it is there. */
+      const cellMoney = (key, v) => {
+        const raw = String(v ?? '').trim();
+        const n = normalizeAmount(v);
+        return n === null && raw ? { [key]: 0, [`${key}Raw`]: raw } : { [key]: n ?? 0 };
+      };
+      const cellVocab = (key, v, allowed, fallback) => {
+        const raw = String(v ?? '').trim();
+        const hit = allowed.find(a => a === raw.toLowerCase());
+        return (!raw || hit) ? { [key]: hit || fallback } : { [key]: fallback, [`${key}Raw`]: raw };
+      };
+
       /* ISSUE 52. `normalizeAmount`, not a digit-scraper.
 
          This read `Number(String(v).replace(/[^\d.-]/g, ''))`, which DELETES
@@ -635,17 +709,19 @@ module.exports = function registerLoad(ctx) {
         assessment_income: assessIncome.value,
         assessment_incomeRaw: assessIncome.raw,
         steps: parseMdTable(section(body, 'progress')).slice(1).filter(c => c[0]).map(c => ({
-          step: unescMd(c[0]), status: stepStatus(c[1]), due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
+          step: unescMd(c[0]), ...cellVocab('status', c[1], ['todo', 'busy', 'done', 'n/a'], 'todo'),
+          due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
         })),
         docs: parseMdTable(section(body, 'documents')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), source: unescMd(c[1] || ''), status: docStatus(c[2]),
+          name: unescMd(c[0]), source: unescMd(c[1] || ''),
+          ...cellVocab('status', c[2], ['needed', 'uploaded', 'n/a'], 'needed'),
           file: unescMd(c[3] || ''), notes: unescMd(c[4] || ''),
         })),
         // Absent on every page written before the Figures table existed — an
         // empty list keeps those loading unchanged.
         figures: parseMdTable(section(body, 'figures')).slice(1).filter(c => c[0]).map(c => ({
           code: unescMd(c[0]), description: unescMd(c[1] || ''),
-          source: unescMd(c[2] || ''), amount: figAmount(c[3]),
+          source: unescMd(c[2] || ''), ...cellMoney('amount', c[3]),
         })),
       };
     }

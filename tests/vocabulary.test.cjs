@@ -237,7 +237,14 @@ function provenFalse(desc, exactShape, mangled) {
     'Net worth: and neither place adds unlike currencies together any more');
   ok(!live.savings.includes(HOME_WORTH_NO_OWED + ')'),
     'Net worth: and neither place drops the receivables ledger');
-  ok(live.healthData.includes(HOME_WORTH + '.net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
+  /* ISSUE 56 split the call in two lines — the whole result is kept because
+     the score's currency disclosure is built out of the very ledgers worth()
+     held out, so `.net` alone was not enough to state it. The EXPRESSION is
+     unchanged and still pinned; only where its result lands moved. */
+  ok(live.healthData.includes('const netWorthFull = ' + HOME_WORTH + ';'),
+    'Net worth: health-data.js (feeding the Score page) computes the same worth()');
+  ok(live.healthData.includes('netWorth: netWorthFull.net'),
+    'Net worth: and the score reads .net off exactly that call, not a second one');
 
   ok(live.accounts.includes('worth(primary, null, null)'),
     'Net worth: accounts.js\'s hero is the declared exception — worth() called with no debts/assets, on purpose');

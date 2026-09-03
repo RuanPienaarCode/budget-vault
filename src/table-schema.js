@@ -366,7 +366,14 @@ const SCHEMAS = {
           const v = Math.max(0, a.value || 0);
           return a.readable || !a.raw ? { original: v } : { original: v, originalRaw: a.raw };
         },
-        write: r => (r.originalRaw != null && !(r.original || 0) ? r.originalRaw : r.original.toFixed(2)),
+        /* ISSUE 68. A cell the household left EMPTY goes back empty. load.js's
+           post() fills `original` from the balance so the payoff maths has a
+           divisor; `originalStated: false` is how it says that figure was
+           derived rather than typed, and writing it would turn a blank into a
+           claim the household never made. */
+        write: r => (r.originalStated === false ? ''
+          : r.originalRaw != null && !(r.original || 0) ? r.originalRaw
+            : r.original.toFixed(2)),
       },
       money('rate', 'Rate', { floor: true }),
       money('payment', 'Payment', { floor: true }),

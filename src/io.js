@@ -215,6 +215,34 @@ function makeIo({ vault, plugin }) {
     try { path = guardedVaultPath(rel); } catch (e) { return null; }
     return vault.getFolderByPath(path);
   }
+  /* ISSUE 64. "Is this path already used?", asked the way the FILESYSTEM would
+     answer it rather than the way Obsidian's index does.
+
+     `fileAt` is vault.getFileByPath — an exact-key lookup. macOS, iOS and
+     iCloud Drive all resolve paths case-insensitively, so `IRP5.pdf` and
+     `irp5.pdf` are ONE file on disk and two keys in that index. Probing with
+     the exact key alone reports the second as free, and the write then either
+     lands on the first file or throws.
+
+     views/notes.js worked this out first and folds both sides in its own
+     `taken()`; three other guards did not, and one of them
+     (views/tax.js's certificate upload) protects a BINARY write whose own
+     comment promises "a re-upload never silently overwrites an earlier
+     certificate". load.js's txSegment comment records the repo paying for this
+     asymmetry once already.
+
+     Folds the FILENAME against the folder's own children, so it costs one
+     folder read rather than a vault walk. */
+  function pathTaken(rel) {
+    if (fileAt(rel)) return true;
+    const full = relPath(rel);
+    const cut = full.lastIndexOf('/');
+    if (cut < 0) return false;
+    const folder = vault.getFolderByPath(full.slice(0, cut));
+    if (!folder) return false;
+    const want = full.slice(cut + 1).toLowerCase();
+    return (folder.children || []).some(c => String(c.name || '').toLowerCase() === want);
+  }
   function mdFilesIn(rel) {
     const f = vault.getFolderByPath(relPath(rel));
     if (!f) return [];
@@ -252,7 +280,7 @@ function makeIo({ vault, plugin }) {
   }
 
   return {
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath,
     lastWriteAt: () => plugin._lastWrite || 0,
   };
