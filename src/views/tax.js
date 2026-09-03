@@ -13,7 +13,7 @@ const { askFields, confirmModal } = require('../modal');
 const { todayIso, daysUntil } = require('../dates');
 
 module.exports = function registerTax(ctx) {
-  const { S, $, app, toast, writeFile, writeBinary, fileAt, locale, money } = ctx;
+  const { S, $, app, toast, writeFile, writeBinary, fileAt, pathTaken, locale, money } = ctx;
 
   /* The tax year we'd be dealing with today, per the country profile. */
   function currentTaxYear() {
@@ -498,11 +498,13 @@ module.exports = function registerTax(ctx) {
 
     let name = taxSeg(file.name) || 'document';
     // Uniquify so a re-upload never silently overwrites an earlier certificate.
-    if (fileAt(`Tax/${S.taxYear}/${name}`)) {
+    // ISSUE 64: pathTaken, not fileAt. This one guards a BINARY write, and
+    // its promise is that a re-upload never overwrites an earlier certificate.
+    if (pathTaken(`Tax/${S.taxYear}/${name}`)) {
       const dot = name.lastIndexOf('.');
       const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
       let i = 2;
-      while (fileAt(`Tax/${S.taxYear}/${stem} (${i})${ext}`)) i++;
+      while (pathTaken(`Tax/${S.taxYear}/${stem} (${i})${ext}`)) i++;
       name = `${stem} (${i})${ext}`;
     }
     try {
@@ -614,10 +616,22 @@ module.exports = function registerTax(ctx) {
       deadline_provisional: t.deadline_provisional ? yamlStr(t.deadline_provisional) : null,
       assessment_date: t.assessment_date ? yamlStr(t.assessment_date) : null,
       assessment_ref: t.assessment_ref ? yamlStr(t.assessment_ref) : null,
-      assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result : null,
-      assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income : null,
+      /* ISSUE 52. A cell nobody could read is written back VERBATIM, never as
+         a number and never as a fabricated 0 — the same contract
+         table-schema.js's money() reader gives every other hand-editable
+         amount. `<key>Raw` is set only when the text was present and
+         unreadable, so a blank field still writes null. */
+      assessment_result: typeof t.assessment_result === 'number' ? t.assessment_result
+        : (t.assessment_resultRaw ? yamlStr(t.assessment_resultRaw) : null),
+      assessment_income: typeof t.assessment_income === 'number' ? t.assessment_income
+        : (t.assessment_incomeRaw ? yamlStr(t.assessment_incomeRaw) : null),
     });
     const loc = locale();
+    /* ISSUE 59/63 — see views/plan.js for the same pair and the same reason:
+       an unreadable cell goes back verbatim, never as 0.00 and never as a
+       coerced status word. */
+    const cash = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : Number(r[key] || 0).toFixed(2));
+    const word = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : r[key]);
     const lines = ['---', ...fm.split('\n'), '---', '', `# Tax Year ${year}`, '',
       `${loc.authority === 'Tax' ? 'Tax' : loc.authority} return tracking for the ${year} tax year (${loc.yearSpan(+year)}).`,
       'Step `status` is `todo`, `busy`, `done` or `n/a`; document `status` is `needed`, `uploaded` or `n/a`.',
@@ -625,18 +639,18 @@ module.exports = function registerTax(ctx) {
       '## Progress', '',
       '| Step | Status | Due | Notes |',
       '|------|--------|-----|-------|'];
-    for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${s.status} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
+    for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${word(s, 'status')} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
     lines.push('', '## Documents', '',
       '| Document | Source | Status | File | Notes |',
       '|----------|--------|--------|------|-------|');
-    for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${d.status} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+    for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${word(d, 'status')} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
     // Emit the header even when empty so the section is discoverable in the
     // raw file rather than appearing only once a figure is added.
     lines.push('', '## Figures', '',
       `| ${loc.figureCodeLabel} | Description | Source | Amount |`,
       '|------|-------------|--------|--------|');
     for (const f of (t.figures || [])) {
-      lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${Number(f.amount || 0).toFixed(2)} |`);
+      lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${cash(f, 'amount')} |`);
     }
     lines.push('');
     return lines.join('\n');

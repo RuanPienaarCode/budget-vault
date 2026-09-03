@@ -15,6 +15,7 @@
    figure — they just do not go first. */
 
 const { el, icoEl } = require('../dom');
+const { poolAccounts } = require('../vocabulary');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
@@ -29,7 +30,7 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodSpend, periodSummary, budgetTotals, catType, accountIndex,
+    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, declaredCatType, accountIndex,
     txInPeriod, locale,
   } = ctx;
 
@@ -86,6 +87,13 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
+    /* ISSUE 56. The net-worth disclosure, held for whereYouAre() rather than
+       threaded through buildScoreRing -> renderWork -> whereYouAre as a fifth
+       argument. Four signature changes to carry one string is how a fix
+       reaches three of four call sites; this page already computes exactly one
+       snapshot per render (see this file's header), so one variable holding it
+       cannot go stale between them. */
+    worthOthers = snap.worthOtherCurrencies || [];
     renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies);
     renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
@@ -185,6 +193,9 @@ module.exports = function registerScore(ctx) {
     const large = len / RING_R > Math.PI ? 1 : 0;
     return `M ${x0.toFixed(2)},${y0.toFixed(2)} A ${RING_R},${RING_R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
   }
+
+  /* Set once per render by renderScore, read by whereYouAre. See ISSUE 56. */
+  let worthOthers = [];
 
   function buildScoreRing(breakdown, M, target, earmarks) {
     const wrap = el('div', { class: 'score-ring-wrap' });
@@ -676,10 +687,23 @@ module.exports = function registerScore(ctx) {
       if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }
       return bits.length ? bits.join(' · ') : null;
     }
-    return M.netWorthMultiple === null ? null
-      : i18n.t('score.now.wealth', {
-        times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
-      });
+    if (M.netWorthMultiple === null) return null;
+    /* ISSUE 56. What this net worth left out, across all three ledgers worth()
+       reads — not the accounts-only list the hero sentence carries. The hero's
+       list is the right one for the RATIOS above (homeRows narrows those by
+       account); this figure also drops foreign assets, debts and receivables,
+       and named only the accounts it printed R500 for while EUR 300 500 of
+       property, loan and lending sat outside it. Same wording key the Accounts
+       hero and the Savings page use, so three screens cannot word one fact
+       three ways. */
+    const otherLine = worthOthers && worthOthers.length
+      ? ' ' + i18n.t('acct.hero.otherCurrencies', {
+        list: worthOthers.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · '),
+      })
+      : '';
+    return i18n.t('score.now.wealth', {
+      times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
+    }) + otherLine;
   }
 
   /* ------------------------- where the money went ------------------------ */
@@ -741,18 +765,23 @@ module.exports = function registerScore(ctx) {
        own `typeIs` — health-data.js and this file are siblings, not a shared
        module, and each carries this comment for a reader who lands in only one
        of them. */
-    const savers = S.accounts.filter(a =>
-      ['savings', 'investment'].includes(String((a && a.type) || '').trim().toLowerCase()));
+    const savers = poolAccounts(S.accounts);
     const saverLabels = new Map();
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
     /* ISSUE 32 — the same third argument health-data.js passes, so this card
        and the score it explains cannot pair rows differently. */
-    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, catType);
+    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, declaredCatType);
 
     return periodFlow({
-      income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,
+      /* ISSUE 40 follow-up. `budgetSetAside` passed, so the Score's "share of
+         income budgeted" is the WHOLE plan the Dashboard and the Budget page
+         state (41%), not the spend envelopes alone (30%). Its "budget used"
+         still divides by the spend envelopes — see periodFlow's header. */
+      income: summary.income, spentTotal: summary.spend, setAsideSpent: summary.setAside,
+      assumedSpent: budgetUsed(cur).assumed,
+      budgeted: budget.spend, budgetSetAside: budget.setAside,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
       /* The household's own symbol, so this card's "of which interest" holds
          foreign debts out exactly the way the breakdown beneath it (and the
@@ -1109,7 +1138,9 @@ module.exports = function registerScore(ctx) {
     if (bud.allocatedOfIncome !== null) {
       budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${sharePercentLabel(bud.allocatedOfIncome, locale().decimal)}%`]);
     }
-    budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spentTotal, 0)]);
+    /* ADR-0005: the rand figure beside "Budget used" is the same `spent` the
+       Dashboard hero and the Budget page print — not gross spend. */
+    budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spent, 0)]);
     if (bud.budgetUsed !== null) {
       budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${sharePercentLabel(bud.budgetUsed, locale().decimal)}%`]);
     }

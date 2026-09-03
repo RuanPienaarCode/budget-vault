@@ -15,7 +15,7 @@ const { normalizeAmount } = require('../amount');
    display-only by design (tests/currency.test.cjs's own §7 pins that), so the
    ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
    this view's arithmetic, not that module's. */
-const { symbolOf, splitByCurrency: splitAccounts } = require('../currency');
+const { symbolOf, splitByCurrency: splitAccounts, primaryTotal } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -78,7 +78,7 @@ const { worth, cardOverlap } = require('../worth');
 const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
+  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt, ledger, tally, LENSES,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName,
     periodRange, currentPeriod } = ctx;
 
@@ -110,7 +110,6 @@ module.exports = function registerAccounts(ctx) {
      the table's group-total rows) that worth.js itself never touches — it only
      ever sees the household-wide figure — so the same rule is repeated here
      rather than imported. */
-  const roundedSum = accts => (Math.round(accts.reduce((s, a) => s + a.balance, 0) * 100) / 100) || 0;
 
   /* ITEM 5, now module-level. The rule this page introduced — sum the
      household's own currency, state every other symbol beside it, convert
@@ -357,32 +356,22 @@ module.exports = function registerAccounts(ctx) {
      app does not remove a figure without naming it. A finished or future
      period is unclamped — there is no "today" inside it to split on, which is
      the same rule periodSummary() applies for the same reason. */
+  /* Phase 3 of ADR-0006: the ACCOUNT lens — every row moves the balance,
+     whatever the budget thinks of it; only a split's superseded parent is
+     not money. Two tallies, either side of the as-of day, so "so far" and
+     "ahead" are the same reading of the same rows. */
   function periodActivity(labels) {
-    let inAmt = 0, outAmt = 0, count = 0;
-    let aheadIn = 0, aheadOut = 0, aheadCount = 0;
     const { start, end } = periodRange(S.period);
     const now = todayIso();
     const asOf = (S.period === currentPeriod() && now >= start && now < end) ? now : end;
-    for (const t of txInPeriod(S.period)) {
-      if (!labels.has(t.label)) continue;
-      if (supersededBySplit(t)) continue;
-      if (t.date > asOf) {
-        aheadCount++;
-        if (t.amount >= 0) aheadIn += t.amount; else aheadOut += -t.amount;
-        continue;
-      }
-      count++;
-      if (t.amount >= 0) inAmt += t.amount; else outAmt += -t.amount;
-    }
-    return { inAmt, outAmt, count, asOf, ahead: { inAmt: aheadIn, outAmt: aheadOut, count: aheadCount } };
+    const mine = ledger(start, end).filter(s => labels.has(s.label));
+    const done = tally(mine.filter(s => s.date <= asOf), LENSES.ACCOUNT);
+    const ahead = tally(mine.filter(s => s.date > asOf), LENSES.ACCOUNT);
+    return {
+      inAmt: done.inflow, outAmt: -done.outflow, count: done.count, asOf,
+      ahead: { inAmt: ahead.inflow, outAmt: -ahead.outflow, count: ahead.count },
+    };
   }
-
-  /* ------------------------------ actions ------------------------------- */
-  /* Jump to Transactions filtered to this account. switchView renders the view
-     first, which is what rebuilds the account <select>'s options — so the label
-     is on the list by the time it is selected. The other two filters are reset
-     because a search left over from a previous visit would land the reader on
-     "0 rows" with no visible reason. */
   function openTransactions(label) {
     ctx.switchView('transactions');
     const sel = $('#txAccount');
@@ -813,6 +802,34 @@ module.exports = function registerAccounts(ctx) {
        back to — see unreadableBalance() above. It still appears in the table,
        flagged, so the reader can fix it; it just does not silently count as
        R0,00 toward what the household is worth. */
+    /* ISSUE 60. Account files the loader ignored because they sit in a
+       sub-folder, named on the page that owns accounts. Their money is in no
+       figure here — while their transactions, which are read by label, DO
+       reach the period totals. That split is exactly why silence was the wrong
+       answer: the vault looks internally inconsistent and nothing explains it. */
+    const ignored = S.accountsIgnored || [];
+    if (ignored.length) {
+      const el0 = $('#acctSummary');
+      if (el0) {
+        el0.append(el('div', { class: 'kpi-caveat-txt' },
+          i18n.t('acct.ignoredFiles', {
+            count: ignored.length,
+            names: ignored.map(p2 => p2.split('/').pop().replace(/\.md$/, '')).join(' · '),
+          })));
+      }
+    }
+    /* ISSUE 72. Two accounts, one transaction folder — see load.js. */
+    const dup = S.accountsDuplicated || [];
+    if (dup.length) {
+      const el0 = $('#acctSummary');
+      if (el0) {
+        el0.append(el('div', { class: 'kpi-caveat-txt' },
+          i18n.t('acct.duplicateFolders', {
+            count: dup.length,
+            names: dup.map(d => `${d.label}: ${d.first} · ${d.second}`).join(' — '),
+          })));
+      }
+    }
     const unreadable = S.accounts.filter(unreadableBalance);
     /* ITEM 5: the headline used to ADD every readable balance and disclose
        that the result mixed currencies. It now sums only the accounts stated
@@ -975,7 +992,7 @@ module.exports = function registerAccounts(ctx) {
     const rows = netByOwner(S.accounts, declaredOwners()).map(r => {
       const { primary, others } = splitByCurrency(
         S.accounts.filter(a => ownerKey(a.owner) === r.key));
-      return { ...r, net: roundedSum(primary), others };
+      return { ...r, net: primaryTotal(primary, S.settings.currency), others };
     });
     if (rows.length < 2) return null;
 
@@ -1033,7 +1050,7 @@ module.exports = function registerAccounts(ctx) {
       return {
         key,
         colour: GROUP_COLOUR[key] || 'var(--color-accent)',
-        total: roundedSum(primary),
+        total: primaryTotal(primary, S.settings.currency),
         others,
       };
       /* A group holding ONLY foreign money nets zero in the household's
@@ -1581,7 +1598,15 @@ module.exports = function registerAccounts(ctx) {
     const a = r.a, v = view();
     const open = v.open === a.name;
     const tr = el('tr', {
-      class: `acct-row${r.state === 'drift' ? ' is-drift' : wantsALook(r) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
+      /* A currency conflict flags the ROW as well as carrying a badge in the
+         drawer: it is a contradiction in the file, not a figure that has merely
+         aged, and a reader should not have to open an account to discover that
+         the app is reading it as a different currency from the one they wrote.
+         Deliberately NOT a new `state`: acct-status.js's own note says a sixth
+         one has to be understood by every consumer of the pill, the queue and
+         the mute aliases before it can ship, and this needs none of that — the
+         existing "look at me" styling says enough, and the badge says which. */
+      class: `acct-row${r.state === 'drift' ? ' is-drift' : (wantsALook(r) || r.a.currency_conflict) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
       tabindex: '0',
       'aria-expanded': String(open),
       'aria-label': i18n.t('acct.aria.row', { name: a.name }),
@@ -1725,6 +1750,11 @@ module.exports = function registerAccounts(ctx) {
        a question with a blank answer is itself the answer. Suppressed only in a
        vault that has no owner question at all. */
     if (ownerInPlay()) f(i18n.t('acct.field.owner'), ownerLabel(a.owner, declaredOwners()));
+    if (a.currency_conflict) {
+      f(i18n.t('acct.drawer.currencyClash'), i18n.t('acct.badge.currencyClash', {
+        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
+      }));
+    }
     f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
     f(i18n.t('acct.drawer.inBudget'), i18n.t(a.in_budget ? 'acct.drawer.yes' : 'acct.drawer.no'));
     box.append(grid);
@@ -1737,6 +1767,21 @@ module.exports = function registerAccounts(ctx) {
     if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
     if (a.balance_updated && r.days === null) {
       badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
+    }
+    /* The account's own two currency fields contradicting each other, said on
+       the row rather than left to be inferred from a total. `currency: R` with
+       `currency_code: USD` in a rand vault used to be HOME to currency.js and
+       FOREIGN to fx.js — R1 000 in the split headline against R17 985,61 on
+       the converted line. The app now takes the safe reading (foreign, named
+       by its code, never added at par), and this badge is the other half of
+       that: the reader is told which of the two words won, so they can correct
+       the file rather than wonder why their rand account is listed under USD.
+       Warning-toned, because it is a fact about the FILE and not about the
+       money — nothing here is stale or unconfirmed, it is contradictory. */
+    if (a.currency_conflict) {
+      badges.append(badge(i18n.t('acct.badge.currencyClash', {
+        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
+      }), 'warn'));
     }
     if (badges.childElementCount) box.append(badges);
 
@@ -2035,7 +2080,7 @@ module.exports = function registerAccounts(ctx) {
              currency in the group gets its own small side figure rather than
              being folded in and marked with an asterisk. */
           const { primary, others } = splitByCurrency(inGroup.map(r => r.a));
-          const total = roundedSum(primary);
+          const total = primaryTotal(primary, S.settings.currency);
           body.append(el('tr', { class: 'type-row' },
             el('td', { colspan: '8' },
               i18n.t(key),

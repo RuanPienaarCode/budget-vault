@@ -26,7 +26,7 @@ function parseFrontmatter(text) {
     if (i > 0) {
       const key = line.slice(0, i).trim();
       let val = line.slice(i + 1).trim();
-      if (/^".*"$/.test(val)) val = val.slice(1, -1);
+      if (/^".*"$/.test(val)) val = unquoteYaml(val);
       fm[key] = val;
     }
   }
@@ -145,6 +145,48 @@ function patchFrontmatter(raw, updates) {
 
    The reader half is unyaml() in note-file.js, which has to undo exactly these
    four or the app shows a literal backslash-n where Obsidian shows a break. */
+/* ISSUE 54. The READER half of yamlStr, and the reason this function had to
+   exist here rather than only in note-file.js.
+
+   parseFrontmatter stripped the surrounding quotes and stopped — it never
+   undid the escapes. So every field written by yamlStr and read back by
+   anything other than note-file.js came back still escaped, and the next save
+   escaped it AGAIN. Measured on an account's `institution`:
+
+       gen0  "O\"Reilly Bank"
+       gen1  "O\\\"Reilly Bank"
+       gen2  "O\\\\\\\"Reilly Bank"
+       gen3  "O\\\\\\\\\\\\\\\"Reilly Bank"
+
+   Doubling on every save, and visible to the reader from the first reload. It
+   reached `institution`, `account_number`, `owner`, `tx_label`, `household`,
+   `owners`, `groups`, the tax deadline and reference fields and a plan's own
+   name — everything with a yamlStr write site and no unyaml on the way back.
+
+   Fixed HERE, at the one boundary both halves already pass through, rather
+   than by adding unyaml() to nine call sites: an inverse that lives next to
+   the function it inverts cannot be forgotten at a tenth. note-file.js's own
+   unyaml() calls are dropped with this change — running both would eat a
+   legitimate backslash, which is the same defect one turn further on.
+
+   Gated on the value having been QUOTED, which is exactly when yamlStr wrote
+   it; an unquoted scalar is returned untouched. That also matches what YAML
+   itself says a double-quoted scalar means, so the app and Obsidian's own
+   property reader now agree about what is on the page. */
+function unquoteYaml(val) {
+  const s = val.slice(1, -1);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] !== '\\' || i === s.length - 1) { out += s[i]; continue; }
+    const next = s[++i];
+    out += next === 'n' ? '\n'
+      : next === 'r' ? '\r'
+        : next === 't' ? '\t'
+          : next;                    // \" and \\ — and anything else, verbatim
+  }
+  return out;
+}
+
 const yamlStr = v => `"${String(v ?? '')
   .replace(/\\/g, '\\\\')
   .replace(/"/g, '\\"')
@@ -152,4 +194,4 @@ const yamlStr = v => `"${String(v ?? '')
   .replace(/\n/g, '\\n')
   .replace(/\t/g, '\\t')}"`;
 
-module.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr };
+module.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr, unquoteYaml };

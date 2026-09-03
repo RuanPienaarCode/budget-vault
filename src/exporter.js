@@ -45,6 +45,7 @@
    exists. `money` further down is still injected, for a real reason: it is the
    view's own locale-aware formatter, not a fixed escaping rule. */
 const { csvCell } = require('./csv');
+const { stamp, tally, LENSES } = require('./ledger');
 /* splitRole only — this module reads it exactly the way serializeTxFile does
    (src/views/transactions.js's `roleOf`), never as a third hand-copy of
    `r.split === 'parent'`. See src/tx-role.js for why that string got its own
@@ -269,7 +270,12 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
      too, defaulting to that same stamped field so a caller that has not been
      updated is unchanged. */
   const sym = symbolFor || (r => (r && r._symbol) || '');
-  const included = rows.filter(r => !r.excluded);
+  /* Phase 2 of ADR-0006: the totals are a BUDGET-lens tally, the same rule
+     the Dashboard hero sums under, over the same env the caller's page uses
+     (meta.env, from ctx.ledgerEnv()). Without an env — a caller outside the
+     app — only the row's own Excluded cell can veto it, which is what this
+     function always did on its own. */
+  const kept = tally(stamp(rows, meta.env), LENSES.BUDGET).kept.map(s => s.row);
   /* Totals over the HOUSEHOLD-currency rows only. They used to add every
      amount whatever its account's currency and print the result as one
      figure — R and € summed and labelled R. A total across currencies is not
@@ -279,7 +285,7 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
   const foreignSymbols = [...new Set(rows
     .map(r => sym(r) || '')
     .filter(s => s && s !== (meta.household || '')))];
-  const counted = included.filter(r => !sym(r) || sym(r) === (meta.household || ''));
+  const counted = kept.filter(r => !sym(r) || sym(r) === (meta.household || ''));
   const inTotal = counted.filter(r => r.amount > 0).reduce((t, r) => t + r.amount, 0);
   const outTotal = counted.filter(r => r.amount < 0).reduce((t, r) => t + r.amount, 0);
 
@@ -300,8 +306,8 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
     '',
     /* Said plainly rather than left for the reader to work out from a column
        of blanks: a total that ignores some listed rows has to explain itself. */
-    ...(rows.length !== included.length
-      ? [`Totals cover ${included.length} of ${rows.length} rows — excluded rows are listed but not counted.`, '']
+    ...(rows.length !== kept.length
+      ? [`Totals cover ${kept.length} of ${rows.length} rows — excluded, transfer and non-budget rows are listed but not counted.`, '']
       : []),
     ...(foreignSymbols.length
       ? [`Rows in ${foreignSymbols.join(', ')} are listed in their own currency and are NOT included in the totals above — `

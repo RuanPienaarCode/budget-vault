@@ -17,7 +17,31 @@ function parseDelimited(text, delim) {
     if (inQ) {
       if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
       else field += ch;
-    } else if (ch === '"') inQ = true;
+    } else if (ch === '"' && field.trim() === '') {
+      /* ISSUE 51. A quote opens a quoted field only at the START of one.
+
+         This read `else if (ch === '"')` — a quote ANYWHERE entered quoting
+         mode, so in an otherwise unquoted export every delimiter and newline
+         after it was absorbed into that field until the next quote. RFC 4180
+         only opens a quoted field on the first character of the field, and
+         every lenient reader treats a mid-field quote as a literal.
+
+         Measured on a twelve-row statement carrying two ordinary South
+         African merchant names, `BUILDERS 15" HOSE` and `CASHBUILD 24" PIPE`:
+         thirteen lines parsed to SIX rows, seven transactions swallowed into
+         one merged field dated 2026-01-04. And because that merged row still
+         carried a date, a description and an amount, views/import.js's skip
+         counter reported "0 unparseable" — the loss was a hole in the middle
+         of an import that looked entirely normal. An inch mark is not an edge
+         case in hardware, tyres, plumbing or screens.
+
+         `field.trim() === ''` rather than `field === ''` on purpose: a bank
+         that writes `Date, "Description"` puts a space between the delimiter
+         and the quote, and that file has always been read as quoted. Keeping
+         the accumulated whitespace in `field` preserves what this function
+         already returned for it. */
+      inQ = true;
+    }
     else if (ch === delim) { row.push(field); field = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;

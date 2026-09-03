@@ -706,6 +706,8 @@ module.exports = {
   'acct.badge.notInBudget': 'not in budget',
   'acct.badge.noTx': 'no transactions',
   'acct.badge.asOf': 'as of {date}',
+  'acct.badge.currencyClash': 'reads as {code}, not {symbol}',
+  'acct.drawer.currencyClash': 'Currency conflict',
   'acct.badge.neverConfirmed': 'never confirmed',
   'acct.badge.unconfirmed': { one: 'unconfirmed {count} day', other: 'unconfirmed {count} days' },
 
@@ -770,6 +772,16 @@ module.exports = {
   'acct.hero.label': 'Net across your accounts',
   'acct.hero.sub': '{assets} in credit against {liabilities} overdrawn.',
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
+  'imp.dateReading.dayFirst': 'Dates in this file were read as day/month, because reading them the other way put them out of order.',
+  'imp.dateReading.monthFirst': 'Dates in this file were read as month/day, because reading them the other way put them out of order.',
+  'acct.duplicateFolders': {
+    one: '{count} transaction folder is claimed by two accounts ({names}); only the first is read. Give each account its own folder name.',
+    other: '{count} transaction folders are claimed by two accounts each ({names}); only the first is read. Give each account its own folder name.',
+  },
+  'acct.ignoredFiles': {
+    one: '{count} account file in a sub-folder of Accounts/ is not being read ({names}). Move it directly into Accounts/ to include it.',
+    other: '{count} account files in sub-folders of Accounts/ are not being read ({names}). Move them directly into Accounts/ to include them.',
+  },
   /* ITEM 5: the hero itself no longer does this — its own total now sums only
      the household's own currency (acct.hero.otherCurrencies, below, is what
      it says instead). This key stays live for the Ring and the "Whose it is"
@@ -779,9 +791,9 @@ module.exports = {
      refused conversion because "a rate is a fact about a day that this vault
      does not hold" — so the day travels with the number, and a rate old
      enough to matter says how old. */
-  'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
+  'acct.hero.converted': ' Plus {list} — converted on the line above at rates for {date}.',
   'acct.hero.convertedTotal': 'Converted total {amount}',
-  'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
+  'acct.hero.convertedStale': ' Plus {list} — converted on the line above at rates for {date}, {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   /* The liability-side twin, for the Report's Debt section. The line above
      says "held", which under a Debt heading reads as an asset — "Plus
@@ -1283,6 +1295,7 @@ module.exports = {
   },
   'dash.left.perDay': '{amount}/day',
   'dash.left.barAria': 'Of {cash}, {committed} is committed and {free} is free',
+  'dash.left.barAriaSetAside': 'Of {cash}, {earmarked} is set aside, {committed} is committed and {free} is free',
   /* The same bar when the commitments exceed the cash. The sighted reader sees
      a fully-amber bar and the figure above it labelled "short"; the neutral
      wording announced "{free} is free" for money that is not there, which is
@@ -1416,6 +1429,15 @@ module.exports = {
   'report.category.empty': 'No spending recorded for this period.',
   'report.category.uncat': '{amount} of spend this period is uncategorised and does not appear as a row above.',
   'report.category.netted': '{amount} in refunds is netted off inside its own category and does not appear as a separate row.',
+  'report.category.scheduled': {
+    one: '{count} transaction dated later in this period ({amount}) is listed below but not counted in the totals above.',
+    other: '{count} transactions dated later in this period ({amount}) are listed below but not counted in the totals above.',
+  },
+  'report.health.otherCurrencies': 'This score was measured without {list}.',
+  'report.category.fromFunds': {
+    one: '{amount} left an account you have set aside ({count} transaction) and is not counted above.',
+    other: '{amount} left accounts you have set aside ({count} transactions) and is not counted above.',
+  },
   'report.category.orphaned': 'Rows marked * use a category name no category file answers to, so nothing budgets or classifies them: {names}.',
   'report.category.renameCaveat': 'This report spans more than one period. A row marked * might be a category that was renamed partway through — this app cannot always tell a rename from a deleted category after the fact, so check before assuming the totals are two categories rather than one.',
   'report.category.percentNote': 'This table lists every category in full — the Dashboard\'s "Where it went" chart groups everything past the top {count} into "Other", so a percentage here may not exactly match the chart\'s for the same category.',

@@ -1,21 +1,10 @@
 'use strict';
-/* Financial-health arithmetic — the numbers behind the Dashboard's health card:
-   emergency-fund coverage, savings rate, the debt-interest share of income, and
-   the composite score built from the three.
-
-   Pure on purpose, per the house rule: no DOM, no `require('obsidian')`, and
-   every figure that depends on "when" arrives as an input. The view assembles
-   the per-period raw material (income, essential spend, contributions) from the
-   ctx helpers that already exist — periodSpend, periodSummary, splitFlows — and
-   this module only does arithmetic on it, so a guard test can drive every
-   branch from bare node.
-
-   Everything is normalised to MONTHLY scale before any ratio is taken. A vault
-   on a 14-day pay cycle measures its periods in fortnights, and "3.1 periods of
-   cover" is not a sentence anyone plans an emergency around — while a target of
-   "6 months" is how every reader already thinks about this. 30.44 is the mean
-   Gregorian month, the same constant trend-math.js uses to turn months into
-   periods, so the two modules cannot disagree about how long a month is. */
+/* Financial-health arithmetic — emergency-fund cover, savings rate, the
+   debt-interest share of income and the composite score built from them.
+   Pure on purpose: no DOM, no `require('obsidian')`, every "when" arrives as
+   an input, so a guard test drives every branch from bare node. Everything
+   is normalised to MONTHLY scale before any ratio is taken; DAYS_PER_MONTH
+   = 30.44 is trend-math.js's constant too. ADR-0007 · health-math.js — purpose. */
 
 const { monthlyInterest } = require('./debt-math');
 const { activeDebts } = require('./worth');
@@ -24,14 +13,12 @@ const { largestRemainder } = require('./share-percents');
 
 const DAYS_PER_MONTH = 30.44;
 
-/* Category types that fall OUT of "essential" spending. The emergency question
-   is what the household must keep paying with no income, and by then the
-   luxuries are cut, the giving pauses, and nobody is contributing to savings —
-   so counting those inflates the divisor and understates the cover the fund
-   really gives. Income and transfer never reach this filter (periodSpend drops
-   them upstream), but they are listed anyway so a caller with a different
-   upstream cannot quietly count a transfer as an essential bill. */
-const NON_ESSENTIAL_TYPES = new Set(['luxuries', 'giving', 'savings', 'investment', 'income', 'transfer']);
+/* ADR-0007 · Non-essential category types. Income and transfer are listed
+   although dropped upstream, so no other upstream can count a transfer as
+   an essential bill. */
+/* Owned by vocabulary.js since Phase 1 of ADR-0006; re-exported below because
+   settings-tab.js reads it from here. */
+const { NON_ESSENTIAL_TYPES } = require('./vocabulary');
 
 /* Sum the essential slice of one period's per-category spend map (the `whole`
    shape periodSpend returns). An unknown or blank type counts as essential
@@ -52,22 +39,9 @@ function essentialTotal(byCategory, typeOf, alsoNonEssential) {
   return sum;
 }
 
-/* Which money is the emergency fund, read off the accounts' own frontmatter.
-
-     emergency_fund: true      — this whole account is the fund
-     emergency_fund: 50000     — only this much of it is
-
-   The earmark that COUNTS is capped at what the account actually holds: a
-   claim of R50,000 on a balance of R30,000 is R30,000 of real cover, and
-   reporting the claim would inflate the one figure this card exists to keep
-   honest. The claim itself is not corrected or rewritten — the app argues, it
-   does not correct — so each capped account comes back on the `over` list for
-   the view to say so out loud.
-
-   `any` is separate from `total` because they answer different questions:
-   an earmarked account holding nothing is a fund at zero (show 0.0 months),
-   while NO earmark anywhere means the reader has never been asked (show the
-   setup hint, and keep the fund out of the score entirely). */
+/* ADR-0007 · Earmarks are capped at what the account holds. `true` is the
+   whole balance, a number is min(number, balance); capped accounts come back
+   on `over` for the view to say so; `any` is not `total`. */
 function resolveEarmarks(accounts) {
   let total = 0, any = false;
   const over = [];
@@ -87,72 +61,13 @@ function resolveEarmarks(accounts) {
    nothing" figure the Debts view leads with, summed across the book. Paid-off
    rows are skipped by the same activeDebts filter that view uses, so the two
    pages cannot disagree about which debts still cost anything. */
-/* Null — not zero — when debts ARE listed but not one of them states a rate.
-   This is the same null-vs-zero rule health-data.js already applies to
-   `payment`, and it was missing here for exactly as long: table-schema's
-   money() reader turns a blank `Rate` cell into 0, monthlyRate(0) is 0, and a
-   *measured* zero scored full marks on the debt pillar for a household
-   carrying R250 000. Some rates known and others blank still totals what IS
-   known, for the reason the payment rule gives: understating a burden is the
-   safe direction, and a partial figure moves the score toward the truth where
-   null leaves it untouched. An empty book stays 0 — no debts really is no
-   interest, and that is a claim about the household, not a gap in it. */
-/* ISSUE 28/30. `household` is the same OPTIONAL symbol worth() and
-   owedSummary() already take, with the same contract: absent means "add every
-   debt", which is exactly how this function always behaved and is the right
-   answer for a vault whose Debts.md states no currency — which is all of them
-   until someone sets one.
-
-   Supplied, foreign debts are held out, because this figure is a rand bill
-   and a euro mortgage's interest is not one. It had to be: worth() eight
-   lines below this function's own call site in health-data.js already filtered
-   them (worth.js's `fromDebts`), and so did views/debts.js's KPI — so a
-   household that recorded a euro bond saw the Debt page print R333,33 a month
-   while the Score page's debt pillar divided R1 000,00 by the same income,
-   moving interestShare from 0.83% to 2.5% off a liability net worth had
-   already declined to count. Three readers of one ledger, two rules — this
-   repository's most-repeated bug shape, and the third occurrence of it on
-   this exact figure.
-
-   Held out BEFORE the all-blank-rates test, so a book of one rand debt with
-   no rate and one euro debt with a rate still returns null rather than
-   reporting the foreign rate as the household's whole interest bill. */
-/* THE ONE DERIVATION. debtInterestMonthly() below is a wrapper over this
-   function's `monthly` field, and every other consumer of "what does this
-   month's interest cost" reads one or the other — never its own reduce().
-
-   That mattered: on 2026-09-02 a household with a R900 000 bond and R164 000
-   of car finance, both with a blank Rate cell, got TWO answers off one
-   ledger. This function said null (rates unknown, nothing to report), while
-   views/debts.js's "Interest this month" tile and views/report.js's
-   debtsSummary() each re-spelled the aggregate inline —
-   `list.reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0)` — and
-   printed R0,00. The two consumers were not slightly wrong; they made the
-   opposite claim to the score, on the two surfaces a person actually reads,
-   and one of them is the document that leaves the app. "Two figures derived
-   by different rules" is this repository's most-repeated bug shape, and
-   "unprovable is not disproved" is its standing rule against exactly this.
-
-   `shown` / `total` / `missing` exist so a caller can DISCLOSE the coverage
-   rather than silently deciding for the reader what a partial figure means.
-   A tile printing the interest on one of three debts with no word about the
-   other two is a smaller version of the same false claim: the number is
-   right and what it covers is not stated. Counted over the same narrowed
-   `active` list the total is summed from — never recomputed by a caller —
-   so a caption and the figure it captions cannot describe different books.
-
-   `shown` counts rates ABOVE zero, matching the `stated` predicate the
-   null-vs-zero rule below has always used. A Rate cell of 0 and a blank one
-   are indistinguishable after table-schema's money() reader, so an
-   interest-free store account counts as uncovered — the conservative
-   direction, and the only one the data supports. */
-/* Which debts this figure is about, and which of them state a rate — the one
-   place either question is answered, so the aggregate below and the coverage
-   counts beside it can never describe different books. Two callers recompute
-   this slice rather than sharing one call; over a household's handful of
-   debts that costs nothing, and the alternative (threading the slice through
-   a second parameter) is the coupling that makes a caller able to pass a
-   list the figure was not derived from. */
+/* ADR-0007 · Monthly debt interest is null when debts are listed but no rate
+   is stated (a measured zero once scored full marks on R250 000 of debt). */
+/* ADR-0007 · Foreign debts are held out of the interest bill (ISSUE 28/30),
+   BEFORE the all-blank-rates test. `household` absent means every debt. */
+/* ADR-0007 · One derivation of monthly interest, and one slice it is derived
+   from. Never re-spell the reduce in a view: on 2026-09-02 two pages printed
+   R0,00 beside this function's null. */
 function ratedDebtSlice(debts, household) {
   const active = activeDebts(debts).filter(d => !household || !isForeign(d, household));
   return { active, stated: active.filter(d => (Number(d.rate) || 0) > 0) };
@@ -160,31 +75,16 @@ function ratedDebtSlice(debts, household) {
 
 function debtInterestMonthly(debts, household) {
   const { active, stated } = ratedDebtSlice(debts, household);
-  /* KEEP THIS LINE EXACTLY AS IT READS. tests/degenerate-vaults.test.cjs's
-     NC2 negative control deletes it from a COPY of this file by literal text
-     match and asserts the result goes red — the proof that the guard is what
-     produces the null rather than something else in the chain. Re-spelling it
-     (a ternary, an early object return) leaves the guard working and the
-     proof of it silently unrun, which is the one failure mode a negative
-     control exists to rule out. */
+  /* KEEP THIS LINE EXACTLY AS IT READS — tests/degenerate-vaults.test.cjs's NC2
+     negative control deletes it from a copy by literal text match. ADR-0007 ·
+     The null guard line is a negative-control fixture. */
   if (active.length && !stated.length) { return null; }
   return active.reduce((sum, d) => sum + monthlyInterest(d.balance, d.rate), 0);
 }
 
-/* The same figure, plus how much of the book it actually covers.
-
-   `shown` / `total` / `missing` exist so a caller can DISCLOSE the coverage
-   rather than silently deciding for the reader what a partial figure means.
-   A tile printing the interest on one of three debts with no word about the
-   other two is a smaller version of the same false claim: the number is
-   right and what it covers is not stated. `monthly` is debtInterestMonthly's
-   own return, never a second reduce, so the caption and the figure it
-   captions cannot come apart.
-
-   `shown` counts rates ABOVE zero, matching the `stated` predicate above. A
-   Rate cell of 0 and a blank one are indistinguishable after table-schema's
-   money() reader, so an interest-free store account counts as uncovered —
-   the conservative direction, and the only one the data supports. */
+/* ADR-0007 · Interest coverage is disclosed, and a zero rate counts as
+   unknown. `monthly` is debtInterestMonthly's own return; `shown` counts
+   rates above zero. */
 function debtInterestCoverage(debts, household) {
   const { active, stated } = ratedDebtSlice(debts, household);
   return {
@@ -195,33 +95,16 @@ function debtInterestCoverage(debts, household) {
   };
 }
 
-/* Average a trailing window of per-period figures and restate them monthly.
-
-   `periods` is [{ income, essential, savings, counted }]. A period with
-   `counted: false` held no transactions at all — that is a window the vault
-   does not cover, not a month of spending nothing, and averaging it in would
-   halve every figure for a vault whose history starts mid-window (the same
-   rule compareTotals applies, for the same reason).
-
-   Returns nulls rather than zeroes when NOTHING was counted: a brand-new vault
-   has no history to average, and 0 would read as "this household earns and
-   spends nothing", which is a claim the data never made. */
+/* ADR-0007 · Trailing averages skip uncovered periods and return null when
+   nothing was counted. `periods` is [{ income, essential, savings,
+   consumption, fixed, budgeted, consumptionBudget, counted }]. */
 function monthlyAverages(periods, monthsPerPeriod) {
   const mpp = monthsPerPeriod > 0 ? monthsPerPeriod : 1;
   const KEYS = ['income', 'essential', 'savings', 'consumption', 'fixed'];
   const sums = {}; for (const k of KEYS) { sums[k] = 0; }
   let counted = 0;
-  /* `budgeted` — and the consumption figure PAIRED against it for budgetUsed —
-     average over a narrower, different denominator: periods that actually
-     carried a plan, not every counted period. Averaging budgeted spend the
-     same way as income or essential punished a household that only started
-     budgeting partway through the six-period window: six periods with a real
-     R22,000 plan in the last two divided that total by six instead of two,
-     "budget used" read 273% for a household that was 9% UNDER budget, and the
-     figure moved further from the truth the longer its budgeting history ran.
-     A period with no budget at all is not a period budgeted zero, for exactly
-     the reason an uncovered period above is not a month spent nothing — this
-     completes that same rule rather than inventing a new one. */
+  /* ADR-0007 · Budgeted spend averages over planned periods only ("budget
+     used" once read 273% for a household 9% under budget). */
   let planned = 0, plannedBudgeted = 0, plannedConsumption = 0;
   for (const p of periods || []) {
     if (!p || !p.counted) { continue; }
@@ -230,15 +113,8 @@ function monthlyAverages(periods, monthsPerPeriod) {
     if (p.budgeted > 0) {
       planned++;
       plannedBudgeted += p.budgeted;
-      /* `consumptionBudget`, not `consumption` — budget-scoped on both sides.
-         "Budget used" asks how the spending compared to THE PLAN, and the plan
-         only ever covered budget-scoped rows, so measuring a household-wide
-         numerator against it would report a household spending far more of its
-         budget than it agreed to simply because some of that spending was
-         never in the budget. Every other share health-data reports is
-         household-wide; this one figure is deliberately not, and takes its own
-         field so the difference is impossible to miss. Falls back to
-         `consumption` for a caller still passing the old shape. */
+      /* ADR-0007 · Budget used pairs consumptionBudget with budgeted over the same
+         window; falls back to `consumption` for a caller passing the old shape. */
       plannedConsumption += (p.consumptionBudget !== undefined
         ? p.consumptionBudget : p.consumption) || 0;
     }
@@ -246,12 +122,6 @@ function monthlyAverages(periods, monthsPerPeriod) {
   const out = { counted, planned };
   for (const k of KEYS) { out[k] = counted ? sums[k] / counted / mpp : null; }
   out.budgeted = planned ? plannedBudgeted / planned / mpp : null;
-  /* NOT the same figure as `out.consumption` above — that one is the
-     six-period trailing average the consumption PILLAR scores against income.
-     This one is paired to the same narrower window as `budgeted` so
-     budgetUsed compares consumption and its own plan over identical periods,
-     the way monthlyAverages already promises for every other pair it hands
-     back. */
   out.consumptionForBudget = planned ? plannedConsumption / planned / mpp : null;
   return out;
 }
@@ -264,51 +134,11 @@ const SCORE_BANDS = { strong: 80, steady: 50 };
 const scoreBand = value => (value >= SCORE_BANDS.strong ? 'strong'
   : value >= SCORE_BANDS.steady ? 'steady' : 'attention');
 
-/* ------------------------------ the score -------------------------------
-
-   FIVE PILLARS, not one flat list of measures.
-
-   The first version weighted three measures directly. Adding the rest of what a
-   household actually turns on — what it owns, what its fixed obligations eat,
-   whether it kept to its own budget — would have diluted every one of them: at
-   eight equal-ish weights, funding an empty emergency account barely moves the
-   number, and the one instruction the popup exists to give ("fix this first")
-   degenerates into eight near-ties.
-
-   Grouping fixes that. Each pillar keeps a weight worth caring about, and the
-   measures inside it share that weight between them — so `debt` is worth 20
-   whether the vault can see one aspect of it or both.
-
-   A household with NO DEBTS keeps the pillar and earns it. That is a deliberate
-   choice between two defensible readings of an empty Debt page: "unanswered",
-   which would drop the pillar and give a genuinely debt-free household no
-   credit for it, or "debt-free", which rewards them and flatters anyone whose
-   debts are simply unrecorded. The second is chosen because the vault is the
-   source of truth everywhere else in this app, and because refusing to credit
-   the one thing many households have actually achieved reads as the score being
-   broken. The assumption does not hide: healthSnapshot reports `debtsRecorded`
-   so the surfaces say the score assumes no debts, rather than quietly
-   asserting it. The app argues; it does not assume in silence.
-
-   Weights are a judgement, not a derivation, and they are here in one literal
-   so they can be argued with rather than hunted for. Reserves leads because
-   running out of money is the failure that ends households; wealth trails
-   because it is the slowest to move and the least actionable this month. */
-/* A score is only a summary if enough of the household is actually in it.
-   Renormalising over the live pillars is right when one genuinely does not
-   apply — a vault with no debts should not carry a silent zero for debt. It is
-   wrong when the pillar is dark because something is MISSING, and the two look
-   identical from inside financialScore.
-
-   The case that forced this: four of the five pillars are income-gated, so a
-   household with no income has only `reserves` left, and a big pot against a
-   small essential spend is full marks on it. The same household with the same
-   R500 000 pot and the same R14 000 rent scored 70 while earning R40 000 a
-   month and 100 while earning nothing. Losing your income raised your score.
-
-   Rather than special-case income, require the live pillars to carry half the
-   weight before any score is reported. No income leaves 25 of 100 live and
-   returns null; no debt leaves 80 and scores exactly as it did. */
+/* ADR-0007 · Five pillars, a debt-free household earns the debt pillar,
+   weights are one literal. Reserves leads, wealth trails; healthSnapshot's
+   debtsRecorded says when the debt pillar is an assumption. */
+/* ADR-0007 · A score needs half its weight live. Four pillars are
+   income-gated; without this bar, losing your income raised your score. */
 const PILLARS = [
   { key: 'reserves', weight: 25, parts: [{ key: 'cover', weight: 25 }] },
   { key: 'saving', weight: 20, parts: [{ key: 'rate', weight: 20 }] },
@@ -320,26 +150,9 @@ const TOTAL_WEIGHT = PILLARS.reduce((t, p) => t + p.weight, 0);
 /* Derived, not typed, so re-weighting the pillars cannot silently move the bar. */
 const MIN_LIVE_WEIGHT = TOTAL_WEIGHT / 2;
 
-/* Where each measure earns full marks, and where it earns nothing. Every one is
-   a documented convention rather than a derivation, so they live together where
-   a reader can disagree with them:
-
-     savings    20% of income is the long-standing planners' benchmark.
-     interest   nothing to interest is the goal; a tenth of income going to it
-                is a debt problem whatever else is true.
-     instalments 35% of income in debt repayments is the classic lending
-                ceiling — past it, lenders themselves stop saying yes.
-     fixed      35% of income committed before any decision is comfortable;
-                60% is a household one lost invoice from trouble.
-     consumption living costs under 70% of income leaves room to save AND
-                absorb a shock; at 100% every rand is already spent.
-     budget     spending your budget is full marks — a budget is a plan, not a
-                target to undercut. 20% over it is where the plan stopped
-                describing the household.
-     networth   three times annual income is a strong position; zero or
-                negative earns nothing. This is where a house lands: bond and
-                property arrive together, so the pillar moves as the bond is
-                paid down rather than jumping on the day of purchase.  */
+/* ADR-0007 · Where each measure earns full marks. Conventions, not
+   derivations: 20% saving, 35% instalment ceiling, 35–60% fixed, 70–100%
+   consumption, 120% of budget, 3× annual income. */
 const FULL_MARKS = {
   savingsRate: 0.20,
   interestShare: 0.10,
@@ -389,17 +202,8 @@ function scoreFractions(m, targetMonths) {
   };
 }
 
-/* The composite, and the structure behind it.
-
-   Two rounds of renormalisation, inner then outer: the measures a pillar can
-   see share that pillar's weight, and the pillars that have anything to say
-   share the whole 100. A vault with no debts is therefore scored out of 100 on
-   the four pillars it can answer, rather than carrying a silent zero for the
-   one it cannot — absence of a claim has never been a claim of nothing.
-
-   Returns null when too little is measurable for a score to be a summary
-   rather than a fabrication — see MIN_LIVE_WEIGHT. A score resting on one
-   pillar out of five is as much an invention as one resting on none. */
+/* ADR-0007 · Two rounds of renormalisation, inner then outer; null below
+   MIN_LIVE_WEIGHT — absence of a claim has never been a claim of nothing. */
 function financialScore(fractions) {
   const live = [];
   for (const pillar of PILLARS) {
@@ -428,20 +232,8 @@ function financialScore(fractions) {
   };
 }
 
-/* Every figure the card shows, from the raw material the view hands over.
-
-   Ratios only exist where their denominator does: an income of nothing (or no
-   history at all) makes "percent of income" a division by zero wearing a
-   percent sign, so those come back null and the card shows a dash with a reason
-   rather than a number.
-
-   CONSUMPTION IS NOT TOTAL SPEND, and the difference is the whole reason it is
-   passed in separately. Moving money into a savings account leaves the cheque
-   account as an ordinary debit, so a household saving a fifth of its income
-   reads as spending 110% of it. Measured that way this vault reported R55,744
-   going out against R50,435 coming in — a household "living beyond its means"
-   whose real crime was funding its own investments. Consumption therefore
-   excludes what was saved or invested; it is what living actually cost. */
+/* ADR-0007 · Ratios only where their denominator exists, and consumption is
+   not total spend (R55,744 out against R50,435 in once read as overspending). */
 function healthMetrics({
   periods, monthsPerPeriod, earmarks, targetMonths,
   debtInterest, debtInstalments, netWorth, hasFixed,
@@ -483,14 +275,8 @@ function healthMetrics({
     /* Budget adherence is the one ratio NOT taken against income — it is spend
        against the household's own plan. Null when nothing was budgeted, because
        dividing by an absent plan measures the absence, not the household. */
-    /* Gated on hasIncome like every sibling measure, and NOT because the
-       ratio needs income — it does not, it is spend against the household's
-       own plan. It is because this was the one measure that survived a vault
-       with no recognised income, and the outer renormalisation then handed it
-       the whole 100: a household with a typo'd income category, R20 000
-       overdrawn and no savings scored 100 and was told it was "Strong", off a
-       single 5-point measure. A score built on one surviving part is not a
-       summary of anything, and this was the part that let it happen. */
+    /* ADR-0007 · Budget used is gated on income like every sibling measure — it
+       was the one part that survived a no-income vault and scored it 100. */
     budgetUsed: (hasIncome && avg.budgeted > 0 && avg.consumptionForBudget !== null)
       ? avg.consumptionForBudget / avg.budgeted
       : null,
@@ -504,19 +290,9 @@ function healthMetrics({
   return m;
 }
 
-/* Where the score's points went, pillar by pillar, and what closing each
-   shortfall takes — the arithmetic behind the explanation popup.
-
-   Points are RENORMALISED exactly as financialScore renormalises, so the
-   figures in the popup always add up to the headline above them. A popup whose
-   parts sum to 67 beside a headline of 67 is the whole reason this is derived
-   from the score rather than re-weighted here.
-
-   `gap` is the one concrete number a reader can act on, and it is deliberately
-   a different quantity per pillar because the actions are different: money to
-   add to a fund, money per month to redirect, money per month going nowhere.
-   Null when a pillar is already at full marks — there is nothing to close, and
-   printing "add R0" reads as a broken sentence. */
+/* ADR-0007 · The breakdown is derived from the score, and each gap is a
+   different quantity. Points renormalised as financialScore renormalises;
+   gap is null at full marks. */
 function scoreBreakdown(m, targetMonths) {
   if (!m || !m.score) { return null; }
   const score = m.score;
@@ -528,16 +304,8 @@ function scoreBreakdown(m, targetMonths) {
       const need = targetMonths * (m.monthlyEssential || 0) - ((m.months || 0) * (m.monthlyEssential || 0));
       return need > 0 ? { kind: 'fund', amount: need } : null;
     }
-    /* `trim`, `monthly` and `build` all name a rand figure AS A SHARE OF
-       INCOME, so each starts by refusing to answer without one — belt and
-       suspenders alongside the pillars' own hasIncome gates upstream (every
-       measure behind saving/spending/wealth already comes back null without
-       income, which is what keeps this branch unreached today), rather than
-       trusting that chain to hold forever. Without it, `m.monthlyIncome || 0`
-       quietly turned "no income" into a target of R0 and reported the
-       household's entire living cost as the amount to trim off nothing —
-       "reserves" is deliberately exempt: it is earmarks over ESSENTIAL SPEND,
-       which has never been an income-relative question. */
+    /* ADR-0007 · Income-relative gaps refuse to answer without income;
+       `reserves` is exempt (earmarks over ESSENTIAL SPEND). */
     if (key === 'saving') {
       if (!m.monthlyIncome) { return null; }
       const need = FULL_MARKS.savingsRate * m.monthlyIncome - (m.monthlySavings || 0);
@@ -575,25 +343,9 @@ function scoreBreakdown(m, targetMonths) {
     parts: p.parts,
   }));
 
-  /* The INTEGERS the popup prints, allocated so they add up to what is on
-     screen above them — the exact figures already sum correctly, but rounding
-     each one alone does not: an earlier build printed 0 + 26 + 17 beside a
-     headline of 42. Largest-remainder is the same allocation the donut's
-     percentage column uses, shared from share-percents.js rather than
-     reimplemented.
-
-     shownMax is allocated FIRST, and shownPoints is then allocated over
-     `at * shownMax` — the pillar's own fraction of its OWN rounded ceiling —
-     rather than over the continuous `points` independently rounded against
-     100. Two independent largest-remainder allocations could round one
-     pillar's ceiling down while rounding that SAME pillar's points up, and
-     did: an ordinary vault with no `emergency_fund` set anywhere printed
-     "saving 27 of 26, lost -1" — a pillar earning more than its own maximum.
-     `at * shownMax[i]` can never exceed shownMax[i] (at is capped at 1), so
-     its floor is at most shownMax[i] and largestRemainder's own +1 step can
-     bring it to shownMax[i] exactly but never past it. `shownLost` is derived
-     from the two rounded figures rather than rounded itself, so "26 of 40"
-     and "costing you 14" cannot disagree. */
+  /* ADR-0007 · The popup's integers are allocated so they add up: shownMax
+     first, shownPoints over at * shownMax, shownLost derived — otherwise
+     "saving 27 of 26, lost -1". */
   const shownMax = largestRemainder(pillars.map(p => p.max), 100);
   const shownPoints = largestRemainder(pillars.map((p, i) => p.at * shownMax[i]), score.value);
   pillars.forEach((p, i) => {
@@ -602,16 +354,9 @@ function scoreBreakdown(m, targetMonths) {
     p.shownLost = shownMax[i] - shownPoints[i];
   });
 
-  /* NOW sort for display, biggest shortfall first — the popup leads with what
-     is costing the most, not with whichever pillar happens to be declared
-     first, and not with whichever pillar happens to be worst today either:
-     largestRemainder breaks a tied remainder by ORIGINAL INDEX (deliberately,
-     per share-percents.js), so allocating AFTER this sort let the rounding
-     point land on whichever pillar the shortfall order put first that day —
-     the same four live pillars allocated {saving 27, debt 27, spending 26} in
-     one order and {saving 26, debt 27, spending 27} in the reverse. Ties break
-     on the heavier pillar, so closing the one with more weight behind it comes
-     first: it moves the score further per rand. */
+  /* ADR-0007 · Allocate in declaration order, then sort by shortfall —
+     largestRemainder breaks ties by original index. Ties here go to the
+     heavier pillar. */
   pillars.sort((a, b) => b.lost - a.lost || b.max - a.max);
 
   return {

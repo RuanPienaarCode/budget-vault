@@ -3,7 +3,247 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.39.0 — 2026-09-03
+
+### Fixed
+
+The third audit batch — seven more, in the importer, the committed chain and
+the page's own speed.
+
+- **Statement dates are read the way the file itself supports.** A US-format
+  export on a day/month household read `01/03` as the 1st of March and spread a
+  three-month statement across five months. The file's own row order now
+  decides when the two readings disagree, and the review says which was used.
+- **A statement with no grouping evidence no longer imports a thousandfold
+  small.** `250.000` on a dot-grouping household is a quarter of a million, not
+  two hundred and fifty; your own country profile now breaks the tie.
+- **Short learned rules stopped eating unrelated merchants.** `CASH` no longer
+  categorises CASHBUILD, and `FEES` no longer catches COFFEES.
+- **Two accounts pointing at one transaction folder are now named on the
+  Accounts page.** Before, the second silently got no transactions and could
+  never be reconciled.
+- **Viewing next month no longer shows its money twice.** A period that has not
+  started reports nothing so far and everything as scheduled, and is no longer
+  treated as finished.
+- **A debt paid either side of a month end is due around the 1st, not the
+  16th.** Days of the month are a circle; the old median treated them as a
+  line, and on a fortnightly cycle the half holding the payment said nothing
+  was due.
+- **The Dashboard is much faster with many accounts** — the account index was
+  rebuilt with a scan that grew with the square of the account count.
+
+### Changed
+
+The calculation layer, rebuilt in four phases (ADR-0005, ADR-0006,
+ADR-0007). The arithmetic was never the problem; five separate loops over the
+same transaction rows each decided for themselves which rows count, and every
+audit since 1.34.0 found the next loop that had missed the last rule. There
+is now one ledger, three named lenses, and one owner per rule.
+
+- **"Budget used" is one figure.** It was computed four ways on three pages
+  — the Dashboard hero, the Score chip, the Score ring and the Budget page's
+  tile could all disagree about one month, and the chip's answer depended on
+  whether a savings account was flagged in-budget. One rule now: spend, less
+  what was set aside, plus the assume-spent provision, over the spend
+  envelopes. The Score chip prints the same rand figure the hero does.
+- **The Score no longer double-counts a split.** A split's parent row is
+  excluded by construction; the household walk kept excluded rows; so one
+  R900 purchase split 600/300 read R1 800 in consumption and essential
+  spend. Vaults that split transactions will see the Score's monthly figures
+  fall by exactly the parents they had been counting.
+- **The trend chart and comparison column now leave out fund-paid spending,
+  as the hero always did.** The 1.36.0 earmark rule had reached the hero and
+  never reached the trend.
+- **The exported Markdown's "money in / money out" uses the same rule as the
+  Dashboard hero.** It used to apply two of the five vetoes.
+- **The report's "unbudgeted" flag matches the Dashboard's.** An
+  assume-spent row could be flagged in the Markdown and on budget on screen.
+- **Every row-selection rule lives in one place.** `src/ledger.js` stamps
+  each row once with every reason it might be held out; a lens is data, not
+  a loop; the difference between two figures is a list of named rows. The
+  "savings or investment" set, spelled fifteen times under six names, has
+  one owner (`src/vocabulary.js`), and a grep gate forbids a second copy.
+- **The reasoning moved out of the code.** 208 rules the calculation modules
+  carried as comments are registered in ADR-0007 with their evidence; the
+  modules keep three-line pointers. Nothing but comments moved — the
+  comment-stripped source was byte-identical before and after.
+
+Every phase shipped against the same gate: all guard suites green and the
+numbers ledger byte-identical, except for the corrections named above.
+
+## 1.38.0 — 2026-09-03
+
+### Fixed
+
+The second batch from the audit — nine more defects, in the figures you act on
+and in the files the app writes.
+
+- **A debt payment dated later this month was read as already paid**, so the
+  instalment disappeared from "still committed" while the money was still in
+  your account. "Actually free" over-stated by the whole instalment.
+- **Your Score said it had left out one account when it had left out three
+  ledgers.** With a foreign savings account, an overseas property and a loan in
+  another currency, it named the account and silently dropped the rest from the
+  net worth it scores you on. It now names the lot, the way every other page
+  already did.
+- **The exported report stated a score with nothing at all to qualify it** —
+  the screen said which money was left out and the document said nothing. It
+  now carries the same caveat, in the Markdown and in the JSON.
+- **The exported report listed transactions it did not count.** Since totals
+  stop at today, a report could show twelve rows under figures covering six.
+  It now says so.
+- **Tax and Plan cells stopped being overwritten.** An amount the app cannot
+  read — `12 000 R`, or an estimate range like `8000 - 12000` — was replaced
+  with `0.00` on the next save, and a status word it did not recognise was
+  replaced too, turning a plan source marked `pending` into `received`. Both
+  now keep exactly what you typed.
+- **A blank "Original" on a debt is no longer filled in for you.** The app
+  needs a figure to draw the paid-off bar and was writing its guess into your
+  file, putting you on record as having borrowed exactly what you still owe.
+- **Uploading a certificate named `IRP5.pdf` where `irp5.pdf` exists no longer
+  risks overwriting it** — that check, and two others, now compare the way the
+  filesystem does.
+- **One mistyped transaction date no longer breaks a subscription's schedule.**
+  A single bad date became the anchor for the whole prediction, producing due
+  dates like `2026-14-05` that the app then offered to write into your
+  Services file.
+- **The screen-reader description of the money bar matches the screen.** It
+  said "R 24 500 is committed" where the bar showed R 23 000 set aside and
+  R 1 500 committed — a figure that appeared nowhere, and which counted your
+  emergency and baby funds as committed spending.
+- The Accounts hero no longer says a converted total is "included" in a figure
+  that excludes it.
+
+## 1.37.0 — 2026-09-03
+
+### Fixed
+
+Four defects found by an audit of the whole app, two of them destroying data
+you had typed. None came from the recent changes — all four have been shipping
+for some time.
+
+- **Importing a statement could silently swallow a block of transactions.** A
+  double quote anywhere in a field — an inch mark in a merchant name, like
+  `BUILDERS 15" HOSE` — made the reader treat everything after it as one long
+  field. On a twelve-row file, seven transactions disappeared into one merged
+  row, and the import screen still said "0 unparseable". Quotes now only open a
+  quoted field where a quote is supposed to: at the start of one.
+- **Tax assessment amounts were read 100× wrong.** A refund typed the way SARS
+  prints it, `-1 234,56`, was read as `-123456` — the reader deleted the
+  spacing instead of understanding it — and saved back in that form. It now
+  goes through the same amount reader everything else in the app uses, and a
+  figure it cannot read keeps your original text instead of being replaced with
+  `0.00`.
+- **Text with quotes or backslashes in it grew slashes on every save.** An
+  account at `O"Reilly Bank` became `O\"Reilly Bank`, then `O\\\"Reilly
+  Bank`, doubling each time you saved. It affected account names and numbers,
+  institution, owner, household name, plan names and the tax reference fields.
+- **Correcting the account on an import did not re-check the +/− signs.** If the
+  app could not tell which account a statement belonged to and you picked it
+  yourself, the sign check kept its original guess — so a credit-card statement
+  could import every purchase as income, under a green "amounts check out"
+  message.
+
+Also: an account file you have filed into a sub-folder of `Accounts/` is not
+read, which made its balance vanish from every total while its transactions
+still counted. The Accounts page now names any file it is skipping so you can
+move it back.
+
+## 1.36.4 — 2026-09-03
+
+### Fixed
+
+- **An account stating both a currency symbol and a currency code could have
+  them contradict each other,** and the app believed a different one depending
+  on which page you were looking at. `currency: R` with `currency_code: USD` in
+  a rand vault was counted as R 1 000 of your own money in the Accounts
+  headline and as R 17 985,61 of converted dollars on the line underneath it.
+  Such an account is now treated as foreign everywhere — held out of your
+  household total and listed under its code — and the account row is flagged
+  with a badge saying which of the two words the app is reading, so you can
+  correct the file. Nothing is rewritten for you.
+
+## 1.36.3 — 2026-09-03
+
+### Fixed
+
+- **Money spent out of a fund is now disclosed everywhere, not just on the
+  Dashboard.** When you buy something out of an account you have set aside, the
+  budget deliberately does not count it — so "Total spent" can read R4 700 in a
+  month where R9 700 left your accounts. The Dashboard said so; the Budget page
+  and the exported report did not. Both do now, and the report carries it in
+  its JSON as well, so whoever reads that file can reconcile it against a bank
+  statement without having seen either screen.
+- **A note could run onto the end of the sentence before it** on the Budget
+  page's "Total spent" tile — "45% of budget usedR 5 000,00 more went out of
+  your funds". Two of that note's fragments carried no separator of their own
+  and asked the wrong question about whether one was needed.
+- **Viewing a month that has not started yet** reported the whole month's
+  transfers into your funds as already moved.
+
+### Changed
+
+- Period figures now take the date they are measured against as a parameter
+  rather than reading the clock. Nothing you see changes; it means the app's
+  as-of behaviour can be tested by naming a day instead of by pretending it is
+  one, which is how the rest of this codebase already works.
+
+## 1.36.2 — 2026-09-03
+
+### Fixed
+
+Four more consequences of 1.36.0's budget split, found by an audit pass over
+that release. Splitting the budget into "spend" and "set aside" reached the
+Dashboard and not the three other places that state the same figures.
+
+- **The exported report contradicted its own table.** It stated your budget as
+  R10 500 directly above a Budget-vs-Actual table listing envelopes that add up
+  to R14 500 — in one file, with nothing to explain the gap. This is the
+  document that leaves the app, so it now states the whole plan its own table
+  shows.
+- **"Share of income budgeted" said 41% on two pages and 30% on the Score.**
+  Same household, same month. It is the whole plan everywhere now — a rand into
+  your emergency fund is as budgeted as a rand of groceries.
+- **"% of budget used" said 45% on the Dashboard and 32% on the Budget page.**
+  The Budget page was dividing by envelopes nothing can ever fill: savings
+  envelopes are funded by transfers, which the budget deliberately does not
+  count as spending. It divides by your spending budget now, like the
+  Dashboard.
+- **Saying `budget: true` on a savings account only half worked.** Your budget
+  started counting that account's spending, but "actually free" carried on
+  withholding the whole balance — one setting, two answers, on one screen.
+- **A weekly or fortnightly service could go silent without being noticed.**
+  The "is this still being charged" check still measured every non-annual
+  cycle as a month, so a weekly gym could stop for forty days — six missed
+  charges — and still read as active.
+
+## 1.36.1 — 2026-09-03
+
+### Fixed
+
+Two regressions introduced by 1.36.0 itself, found by a red-team pass over that
+release and reproduced before either was touched. Both had one cause: **a
+loader default was read as something the household had said.**
+
+- **A savings-typed everyday account stopped the budget measuring anything.**
+  1.36.0 took outgoings from savings and investment accounts out of budget
+  spending. But `type: savings` says what kind of account it is, not that its
+  money is spoken for — and a high-interest transactional account is an
+  ordinary product that carries that word. A household whose only account was
+  one saw every category read R0 spent and the whole budget still available,
+  with R4 250 already gone. Now only an account you have actually flagged —
+  `emergency_fund`, or a savings account with a goal on it — is treated as set
+  aside. A bare `type: savings` still comes out of "actually free", where the
+  deduction is a visible line you can disagree with, and its spending is still
+  labelled on the Dashboard; it no longer disappears from your budget.
+- **Money moved between two of your own funds could count as saving.** 1.36.0
+  used a transaction's category type to tell a purchase from a transfer. A
+  category note with no `type:` line loads as an expense, so an ordinary
+  internal transfer that took four days to clear was read as a purchase and
+  counted as new saving, inflating the savings rate on your score. Only a type
+  you have actually written now counts as you saying so.
+
+## 1.36.0 — 2026-09-03
 
 Everything below came out of a live audit of 1.35.1 run on 2 September 2026,
 and every item was reproduced against one seeded household before it was

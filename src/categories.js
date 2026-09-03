@@ -13,7 +13,7 @@ const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
 
 module.exports = function registerCategories(ctx) {
-  const { S, app, vault, toast, writeFile, fileAt, mdFilesIn } = ctx;
+  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn } = ctx;
 
   /* Bumped whenever the category list changes (create/delete). Selects built
      earlier compare against this on open and rebuild their options if stale —
@@ -71,7 +71,8 @@ module.exports = function registerCategories(ctx) {
     // "Kids:School"). The name check above compares display names, so probe
     // the resolved path too — otherwise the second write silently replaces
     // the first category file.
-    if (fileAt(`Categories/${safe}.md`)) { toast(`Categories/${safe}.md already exists`, true); return null; }
+    // ISSUE 64: pathTaken, not fileAt — the filesystem is case-insensitive.
+    if (pathTaken(`Categories/${safe}.md`)) { toast(`Categories/${safe}.md already exists`, true); return null; }
     const nameLine = safe !== realName ? `name: ${yamlStr(realName)}\n` : '';
     // Absent is `fixed`'s own default (load.js), so the key is only written
     // at all when it's true — mirrors toggleAssumeSpent's null-removes-the-key

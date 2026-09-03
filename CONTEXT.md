@@ -62,6 +62,28 @@ An account whose every transaction sits outside income and spend totals. The
 per-account counterpart to an excluded transaction.
 _Avoid_: off-budget, untracked, external
 
+**Set-aside**:
+Money that left a budget account under a savings- or investment-typed category
+in a period. Counted inside gross spend, and named separately so the one
+question it must not answer — "how much is left to spend" — can take it back
+out. The budget's own envelopes of those types are set-aside envelopes.
+_Avoid_: saved, contribution (that is the receiving account's word), transfer
+
+**Budget used**:
+`(spend − set-aside + assume-spent provision) / budgeted` for one period, where
+`budgeted` is the envelopes that are not set-aside and the provision is what an
+`assume_spent` category is treated as having consumed beyond what really moved.
+One rule (ADR-0005), read by every surface that prints the phrase; the Score
+averages it over its trailing window and says so.
+_Avoid_: adherence, consumption share, spent %
+
+**Lens**:
+A named set of row vetoes and a sign rule, under which a total is taken.
+Three exist — BUDGET, HOUSEHOLD, ACCOUNT (ADR-0006). A figure is a field of a
+tally under one lens, and two figures may differ only by the lens they were
+taken under.
+_Avoid_: filter, view (that is a page), scope
+
 ### Saving
 
 **Contribution**:

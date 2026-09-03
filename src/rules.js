@@ -62,12 +62,37 @@ function prepareRules(rules) {
    Returning the rule rather than the category is what lets the cleanup preview
    name the rule that covers a redundant one instead of merely asserting that
    one exists. */
+/* ISSUE 71. A four-letter stem is a WORD, not a substring.
+
+   learnPattern's floor is four characters, and `FEES 000123456` learns "fees",
+   `CASH 000000000` learns "cash". Matched by bare includes() those rules ate
+   COFFEES BY THE SEA (-> Bank charges) and CASHBUILD PAARL, PICK N PAY CASHIER
+   (-> Cash withdrawal) — and rule-cleanup.js can never remove them, because
+   the shorter rule is the survivor by design. Below eight characters a pattern
+   must land on word boundaries; a longer one is specific enough that a
+   substring is what the household meant ("woolworths" inside
+   "woolworths food v&a"). Punctuation and digits count as boundaries, so
+   "cash" still matches "CASH 000111" and "fees" still matches "FEES-000999". */
+const SHORT = 8;
+function hits(d, p) {
+  if (p.length >= SHORT) return d.includes(p);
+  let from = 0;
+  for (;;) {
+    const at = d.indexOf(p, from);
+    if (at < 0) return false;
+    const before = at === 0 ? '' : d[at - 1];
+    const after = d[at + p.length] || '';
+    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    from = at + 1;
+  }
+}
+
 function matchRule(desc, rules) {
   const d = (desc ?? '').toString().trim().toLowerCase();
   let best = null, bestLen = 0;
   for (const r of rules) {
     if (r.p === d) return r;
-    if (r.p.length > bestLen && d.includes(r.p)) { best = r; bestLen = r.p.length; }
+    if (r.p.length > bestLen && hits(d, r.p)) { best = r; bestLen = r.p.length; }
   }
   return best;
 }

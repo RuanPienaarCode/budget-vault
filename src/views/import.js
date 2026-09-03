@@ -12,6 +12,10 @@
    and both are deliberately confined to FOREIGN files — the app's own CSVs are
    read by parseCsv, which is comma-only. */
 
+/* ISSUE 62. The one translated string this otherwise English-only view
+   prints — the date-reading banner — reached through the namespace import
+   because `t` is already a local in several files. */
+const i18n = require('../i18n');
 const { el } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
@@ -21,6 +25,22 @@ const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { isCreditCard } = require('../committed');
 const { symbolOf, isForeign } = require('../currency');
+
+/* ISSUE 62 — see the call site. Returns the reading the file's own order
+   supports; the household default when the file is silent or both readings
+   fit (no ambiguous rows, or a single row). */
+function decideDayFirst(rawDates, householdDayFirst) {
+  const under = df => rawDates.map(d => parseStatementDate(d, df)).filter(Boolean);
+  const monotonic = ds => {
+    let asc = true, desc = true;
+    for (let i = 1; i < ds.length; i++) { if (ds[i] < ds[i - 1]) asc = false; if (ds[i] > ds[i - 1]) desc = false; }
+    return asc || desc;
+  };
+  const a = under(householdDayFirst), b = under(!householdDayFirst);
+  if (a.length < 2 || a.join() === b.join()) return householdDayFirst;
+  const ma = monotonic(a), mb = monotonic(b);
+  return (!ma && mb) ? !householdDayFirst : householdDayFirst;
+}
 
 module.exports = function registerImport(ctx) {
   const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
@@ -156,8 +176,31 @@ module.exports = function registerImport(ctx) {
         if (i !== -1 && r[i]) amountCells.push(r[i]);
       }
     }
-    const numOpts = { grouping: inferGrouping(amountCells) };
+    /* ISSUE 70. When the file offers no evidence — every amount a bare
+       "250.000", nothing with two groups — inferGrouping returns null and
+       every cell parses as it did before grouping detection existed, which on
+       an EU or Indonesian export reads 250.000 as two hundred and fifty. With
+       no balance column there is no reconcile banner either, so the review
+       showed an internally consistent set of numbers all off by a thousand.
+       Worse, the same account flipped scale the month one 1.500.000 row
+       appeared. The household's own profile already says which separator it
+       groups with (`loc.thousands`), and this file already reaches for
+       loc.dayFirst from the same object; it is the tie-breaker the file could
+       not provide. A space groups unambiguously and needs no verdict. */
+    const localeGrouping = loc.thousands === '.' ? 'dot' : loc.thousands === ',' ? 'comma' : null;
+    const numOpts = { grouping: inferGrouping(amountCells) ?? localeGrouping };
     const num = v => normalizeAmount(v, numOpts);
+    /* ISSUE 62. Which way round the day and month are is a property of the
+       FILE, and the file says so: a statement is written in date order, so the
+       reading under which its dates go backwards is the wrong reading. The
+       household profile decides only when the file cannot. A US export on a
+       South African household used to read 01/03 as the 1st of March, scatter
+       a three-month statement across five month files, and say nothing.
+       Ambiguous rows (both parts <= 12) are where the two readings differ; if
+       one ordering is monotonic and the other is not, the monotonic one wins
+       and the review says which was used. */
+    const dayFirst = decideDayFirst(dataRows.map(r => (iDate !== -1 ? r[iDate] : '')), loc.dayFirst);
+    const dateReading = dayFirst === loc.dayFirst ? null : (dayFirst ? 'day-first' : 'month-first');
     const showBar = dataRows.length > 1500;
     if (showBar) importProgress('start', 'Categorising transactions…');
     const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
@@ -211,7 +254,7 @@ module.exports = function registerImport(ctx) {
         if (f != null && f !== 0) amount = f;
       }
       if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: num(r[iBalance]) });
-      const date = rawDate ? parseStatementDate(rawDate, loc.dayFirst) : null;
+      const date = rawDate ? parseStatementDate(rawDate, dayFirst) : null;
       if (date && desc && amount != null && amount !== 0) {
         /* excluded/transferTo are filled in by applyCounterparties below, once
            for the whole file, because the account this statement is believed to
@@ -265,11 +308,12 @@ module.exports = function registerImport(ctx) {
        keeps the asset reading rather than guessing at a sign, which is the one
        thing this whole block exists to avoid. */
     const acct0 = label0 ? accountForLabel(label0) : null;
-    const rec = iBalance !== -1
-      ? reconcileAmounts(ledger, { liability: isCreditCard(acct0) })
-      : null;
-    const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
-    if (flipped) for (const it of items) it.amount = -it.amount;
+    /* ISSUE 53. The unflipped parsed amount, kept so the verdict can be
+       RE-decided. Everything below reads `amount0` and writes `amount`, so
+       applying the verdict twice, or after the reader corrects the account,
+       lands on the same numbers rather than negating them again. */
+    for (const it of items) it.amount0 = it.amount;
+    const rec = signVerdict(items, ledger, iBalance, iAmount, acct0);
     /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
        `verified && flip` means the file only reconciles with every amount
        negated — so the balance column has just proved that what the header calls
@@ -281,7 +325,7 @@ module.exports = function registerImport(ctx) {
        message, on the one file that had just failed. That is precisely the
        plausible-wrong-number outcome this whole reconciliation exists to
        prevent, arriving through the one branch that does not correct it. */
-    const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
+    const inverted = !!rec && rec.inverted;
     /* The file's own date span. The near-duplicate pass treats "this row is no
        longer in the statement" as evidence it settled and was rewritten, so it
        may only reason about vault rows the statement actually covers. */
@@ -294,7 +338,13 @@ module.exports = function registerImport(ctx) {
       // What the FILE says it is, kept beside what the user picked — the two
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
-      reconcile: rec ? { ...rec, flipped, inverted } : null,
+      reconcile: rec,
+      /* ISSUE 62. Non-null only when the file overruled the household's date
+         convention, so the review can say so. */
+      dateReading,
+      // Kept so the verdict can be recomputed when the reader corrects the
+      // account — see signVerdict() and the #impAccount handler.
+      ledger, iBalance, iAmount,
       // Kept so "Columns wrong?" can reopen the mapper on the SAME file without
       // asking the user to find and drop it again.
       rows, map, file };
@@ -464,6 +514,46 @@ module.exports = function registerImport(ctx) {
   const IMPORT_PAGE = 200;
   let importShown = IMPORT_PAGE;
 
+  /* ISSUE 53. THE ONE PLACE the sign verdict is decided, and the reason it is a
+     function rather than four lines inside runImport.
+
+     `rec`, `flipped` and `inverted` used to be computed ONCE, from
+     `accountForLabel(label0)` — the filename/preamble guess. renderImportReview
+     re-runs applyCounterparties on every account change and never recomputed
+     any of them. This file's own applyCounterparties header says the guess
+     failing is "the ordinary case for any hand-saved or renamed export, not an
+     edge one"; that reasoning reached transfers and not the sign.
+
+     What it cost: a credit-card export whose account the importer could not
+     identify keeps the ASSET reading (deliberately — guessing a sign is the one
+     thing that block avoids). The reader then picks the card in the account
+     select, and the verdict, the banner and every amount stay on the asset
+     reading straight through commitImport. R1 894,75 of card spending imports
+     as INCOME, under a green "Amounts check out against this statement's own
+     balance column" — the reassuring sentence, on the file that had just been
+     read backwards.
+
+     IDEMPOTENT BY CONSTRUCTION. It reads `amount0` (the unflipped parsed value,
+     stamped once at parse time) and writes `amount`, so calling it again — on
+     every account switch, however many times — cannot double-negate. The old
+     code negated `amount` in place, which is why recomputation was not simply a
+     matter of calling it twice. */
+  function signVerdict(items, ledger, iBalance, iAmount, account) {
+    const rec = iBalance !== -1
+      ? reconcileAmounts(ledger, { liability: isCreditCard(account) })
+      : null;
+    const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
+    /* `verified && flip` on a Debit/Credit PAIR, where it cannot be acted on:
+       the balance column has proved that what the header calls "money out" is
+       money in. Not auto-correcting is deliberate — the sign came from a column
+       NAME, so a disagreement means the mapping is wrong, not the arithmetic —
+       but the verdict must still reach the banner rather than falling through
+       to "amounts check out". */
+    const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
+    for (const it of items) it.amount = flipped ? -it.amount0 : it.amount0;
+    return rec ? { ...rec, flipped, inverted } : null;
+  }
+
   function renderImportReview() {
     const p = S.pendingImport;
     if (!p) return;
@@ -481,6 +571,15 @@ module.exports = function registerImport(ctx) {
        recomputed every render rather than left as parse-time guesswork; rows
        the reader has decided on carry manualExclude and are skipped. */
     applyCounterparties(p.items, S.accounts, p.label);
+
+    /* ISSUE 53. The account is settled by the line above, so the sign verdict
+       is re-decided here from the SAME account — not from the parse-time guess.
+       Idempotent (see signVerdict), so re-rendering for "show more" or a
+       category change costs nothing and changes nothing. */
+    if (p.ledger) {
+      p.reconcile = signVerdict(p.items, p.ledger, p.iBalance, p.iAmount,
+        p.label ? accountForLabel(p.label) : null);
+    }
 
     /* The statement is already parsed and on screen by the time anyone notices
        it belongs to an account this vault has never had — and on a fresh vault
@@ -538,6 +637,15 @@ module.exports = function registerImport(ctx) {
        one who should decide how much to trust it, and that decision needs the
        evidence, not silence. */
     const rec = p.reconcile;
+    /* ISSUE 62. Say which way the dates were read when the file overruled the
+       household profile — the parsed ISO date on screen hides the decision. */
+    if (p.dateReading) {
+      const noteEl = $('#impDateReading');
+      if (noteEl) {
+        noteEl.classList.remove('hidden');
+        noteEl.textContent = i18n.t(p.dateReading === 'day-first' ? 'imp.dateReading.dayFirst' : 'imp.dateReading.monthFirst');
+      }
+    }
     const recEl = $('#impReconcile');
     recEl.empty();
     recEl.classList.toggle('hidden', !rec);

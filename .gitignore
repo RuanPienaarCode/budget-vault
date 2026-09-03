@@ -22,3 +22,12 @@ _preview/
 
 # npm build deps — the bundle is committed, its inputs are not
 node_modules/
+
+# Numbers-ledger output harvested from a REAL household (scripts/figures.cjs
+# --vault). The committed ledger is tests/figures/ledger.txt, harvested from the
+# synthetic household in tests/figures/household.cjs; anything under this folder
+# came off someone's actual finances and this repo is public.
+tests/figures/live/
+
+# build tooling
+node_modules/

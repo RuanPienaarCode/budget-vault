@@ -1,95 +1,34 @@
 'use strict';
-/* What is still coming out before this period ends.
+/* What is still coming out before this period ends — how much money is
+   actually free once the charges already scheduled against it are taken off.
+   It invents no data: recurring.js knows what a service was last charged,
+   Debts.md carries the contracted instalment, reconcile.js knows what an
+   account should read now; this is the arithmetic that joins the three.
 
-   Every other page in this app answers what HAPPENED. The Dashboard's hero
-   answers "how much budget is left", which on day 3 of a period reads like a
-   fortune while the medical aid, the bond and four debit orders have not landed
-   yet. This module answers the other question — how much money is actually free
-   once the charges already scheduled against it are taken off.
-
-   It invents no data. Services already know what they were last charged and
-   when (recurring.js), Debts.md already carries a contracted instalment, and
-   reconcile.js already knows what an account should read right now. This is the
-   arithmetic that puts the three together.
-
-   SEVEN RULES, and the second one is the one the card lives or dies by.
-
-   1. Cash is the IMPLIED balance, never the stated one. A stated balance is a
-      claim with an age; the caller passes implied figures in. An account whose
-      balance has no readable date cannot be placed at all and is COUNTED AS
-      UNKNOWN rather than as zero — a missing figure must not read as an empty
-      account.
-
-   2. A commitment already charged is not a commitment. Medical aid that went
-      off on the 1st is SPENT, not still coming. Counting it would inflate the
-      committed figure every single period, and a reader who catches that once
-      will never trust the card again.
-
-   3. The amount is what was really charged, not what was typed. Services'
-      stated amounts were measured against the statements and disagreed on four
-      of six; `recent` (the median of the last three charges) is used wherever
-      there is a charge history, and the typed figure only where there is none.
-
-   4. Budget targets are NOT commitments. A budget is an intention. Folding
-      intentions in here would make free money vanish into a number the reader
-      never agreed to.
-
-   5. Every prediction is disclosed. `items` carries one entry per counted
-      charge with what it is, when it is expected and where the amount came
-      from, so the card can show its working. A figure nobody can check is how
-      the Services page died.
-
-   6. Nothing is asserted that cannot be placed. A charge whose date cannot be
-      worked out is not silently assumed to fall inside the window.
-
-   7. A card you settle in full is a commitment, not a debt. The money is
-      already spent; it just has not left the cheque account yet. Counting the
-      cheque account at face value while the card sits at -R8,874 reports money
-      that is already owed to Discovery. This is opt-in per account
-      (`settle_monthly`), because a card someone genuinely revolves at interest
-      is a Debt-page row and must keep behaving like one.
-
-   Pure — no DOM, no obsidian import — so tests/committed.test.cjs drives it in
-   bare node, and `today` is injected rather than read off the clock. */
+   Seven rules govern it (ADR-0007 · committed.js — purpose): implied cash,
+   never stated; a charge already taken is not a commitment; the amount is
+   what was really charged; budget targets are not commitments; every
+   prediction is disclosed in `items`; nothing unplaceable is asserted; a
+   card settled in full is a commitment, not a debt. Pure — `today` is
+   injected — so tests/committed.test.cjs drives it in bare node. */
 
 const { ISO_DATE, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
+const { isPoolAccount, accountType } = require('./vocabulary');
 const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
 
-/* A debt instalment can only be placed inside a window at least this long when
-   its usual payment day is unknown. A monthly instalment lands in every
-   payday month, so on a monthly cycle "not paid yet" is enough to know it is
-   still coming. On a 7- or 14-day cycle it plainly is not: three weeks out of
-   four would claim a bond payment that is not due, which is rule 6's whole
-   point. */
+/* ADR-0007 · Whole-month placement window. An instalment with no known
+   payment day is only claimed inside a window of 28 days or more. */
 const WHOLE_MONTH_DAYS = 28;
 
-/* THE ONE DEFINITION of a settle-monthly card. Three sites used to spell it
-   three ways — cardCommitments keyed on the flag alone, cardsOwed on the type
-   alone, the cycle guard on both — and money dropped out through the gaps: a
-   `settle_monthly: true` cheque account landed in cardDue (excluded from
-   `free`) while nothing measured its spending against settling income,
-   because its rows could never join cardRows and no cycle could form. One
-   predicate, used everywhere: the flag only means something ON A CREDIT CARD.
-   On anything else it is a no-op and the account keeps its ordinary
-   treatment (an overdrawn cheque account is already visible as the cash it
-   failed to contribute).
+/* ADR-0007 · One definition of a settle-monthly card. The flag (either
+   spelling) only means something on a credit card; three sites once spelled
+   it three ways and money fell through the gaps. */
 
-   Reads BOTH spellings of the flag deliberately: whatsLeft's callers hand in
-   a mapped shape (`settleMonthly`), while the dashboard resolves transaction
-   folders against the RAW vault account (`settle_monthly`). One function
-   answering both shapes is the point — a second spelling of the rule is how
-   the three definitions happened the first time. */
-
-/* THE ONE DEFINITION of "this account is a credit card", split out of
-   isSettleCard because the type test had grown spellings of its own:
-   cardOverlap (worth.js) and the importer's liability reading both compared
-   `a.type === 'credit_card'` strictly, while this file trimmed and
-   case-folded. `type:` is hand-typed frontmatter — load.js keeps it verbatim —
-   so an account typed `Credit_Card` was a card to the committed chain and not
-   a card to net worth or the import sign check: the same account, two
-   different answers, depending on which page asked. */
-const isCreditCard = a => !!a && String(a.type || '').trim().toLowerCase() === 'credit_card';
+/* ADR-0007 · One definition of a credit card. Trimmed and case-folded via
+   vocabulary.js; a strict `===` once made one account a card to one page and
+   not another. */
+const isCreditCard = a => !!a && accountType(a) === 'credit_card';
 
 const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) && isCreditCard(a);
 
@@ -99,6 +38,17 @@ const median = arr => {
   const a = [...arr].sort((x, y) => x - y);
   const m = a.length >> 1;
   return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
+};
+/* ADR-0007 · Days of the month are a circle (ISSUE 74). A cluster straddling
+   the month end is lifted, medianed and folded back; NaN days are dropped. */
+const usualDay = days => {
+  const ds = days.filter(d => Number.isFinite(d) && d >= 1 && d <= 31);
+  if (!ds.length) return 0;
+  const lo = Math.min(...ds), hi = Math.max(...ds);
+  if (hi - lo <= 15) return median(ds);
+  const lifted = ds.map(d => (d < 16 ? d + 31 : d));
+  const m = median(lifted);
+  return m > 31 ? m - 31 : m;
 };
 
 /* The first date on or after `from` that falls on day-of-month `d`, clamped to
@@ -117,75 +67,29 @@ function nextOnDay(from, d) {
 
 /* ------------------------------- cash ---------------------------------- */
 
-/* What the household can actually spend right now.
-
-   Only accounts that are IN the budget, and only positive balances. A credit
-   card sitting at −R8,874 is not negative cash — netting a liability against
-   cash here would report money the household does not have. When the card is
-   settled monthly it comes back as a COMMITMENT instead, which is where it
-   belongs; see cardCommitments below.
-
-   Long-term money is kept out by `budget: false` on the account, which is the
-   mechanism this app already has for it. There is deliberately no second,
-   type-based rule layered on top: two overlapping ways to exclude the same
-   account is how a reader ends up unable to explain their own total.
-
-   `implied` is what reconcile() worked out; `dated` says whether the stated
-   balance carried a date it could be measured from. Undated accounts are
-   counted as unknown and named, never folded in at zero.
-
-   `counted` is accounts that actually CONTRIBUTED to the figure. It used to
-   increment before the positive check, so a card at −R8,874 padded the "N
-   accounts counted" line printed under a cash total it formed no part of. The
-   line sits beneath the cash figure and so describes what that figure is made
-   of — an account holding nothing added nothing to it. */
-/* ISSUE 48. How much of that cash is SPOKEN FOR.
-
-   "Actually free" on the `BudgetAudit` household on 2026-09-02 was R41 800 —
-   the cheque account plus an emergency fund flagged `emergency_fund: true`
-   plus a baby fund of type `savings` — offered at R1 493 a day for the 28 days
-   left in the month. Four tiles along, the same dashboard's health card said
-   the household had 1.6 months of cover. One card was telling the reader to
-   spend the emergency fund and the other was telling them it was too small.
-
-   `cash` itself is not wrong and does not move: money in a savings account IS
-   money in your accounts, and a figure captioned "in your accounts" that
-   quietly omitted it would be a different lie. What is wrong is calling it
-   free. So the earmark is measured here, beside the cash it comes out of, and
-   subtracted from `free` alone.
-
-   TWO KINDS of earmark, and both are the household's own declaration rather
-   than a guess:
-
-     — `emergency_fund`, which is either `true` (the whole balance is the
-       fund) or a NUMBER (that much of it is). resolveEarmarks() in
-       health-math.js owns that reading for the score; this is the same rule,
-       kept here rather than imported because committed.js is the pure module
-       the "what's left" card is built from and health-math is the pure module
-       the score is built from — neither may require the other. The two are
-       held together by tests/earmarked-cash.test.cjs.
-     — an account whose TYPE is savings or investment. A baby fund is money
-       set aside by the act of putting it there; a per-day spending rate drawn
-       out of it is the card recommending the household raid it.
-
-   Case-folded and trimmed, because `load.js` only defaults `type` when the key
-   is ABSENT — `type: Savings` and `type: ' savings '` both reach here exactly
-   as written, and worth.js:122-141 documents that same trap costing a chart
-   R80 000.
-
-   A household that genuinely spends from its savings account has the mechanism
-   this app already gives them: `budget: false` keeps an account out of these
-   figures entirely. What they must not have is a card silently counting a
-   sinking fund as this week's spending money. */
-const EARMARKED_TYPES = new Set(['savings', 'investment']);
+/* ADR-0007 · Cash on hand. Positive implied balances of in-budget, dated
+   accounts; undated ones are named as unknown, a card at −R8,874 is not
+   negative cash, and `counted` is only the accounts that contributed. */
+/* ADR-0007 · Earmarked cash comes out of free (ISSUE 48). An emergency-fund
+   flag or a savings/investment type is the household's own declaration;
+   `cash` does not move, `free` does. */
 function earmarkOf(a) {
   const held = Math.max(0, a.implied || 0);
   if (!held) return 0;
+  /* ADR-0007 · A stated budget: key wins over the earmark, matching
+     period.js's isEarmarkedAccount, so one declaration is one rule. */
+  if (a.budgetStated) return 0;
   const ef = a.emergencyFund;
   if (ef === true) return held;
   if (typeof ef === 'number' && ef > 0) return Math.min(ef, held);
-  return EARMARKED_TYPES.has(String(a.type || '').trim().toLowerCase()) ? held : 0;
+  return isPoolAccount(a) ? held : 0;
 }
+
+/* A debt's monthly commitment: the instalment plus whatever extra the
+   household has chosen to pay. One owner (Phase 3 of ADR-0006) — the Debt
+   page's "Paying per month", its debt-to-income ratio, its amortisation and
+   the what's-left chain below all used to spell this themselves. */
+function debtMonthly(d) { return (Number(d && d.payment) || 0) + (Number(d && d.extra) || 0); }
 
 function cashOnHand(accounts) {
   let cash = 0, counted = 0, earmarked = 0;
@@ -218,45 +122,13 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
   for (const s of services || []) {
     if (!s || !s.active) continue;
     const m = matchCharges(s, history);
-    /* TWO stats, from two different groups, because two different questions are
-       being asked and only one of them is about price.
-
-       PRICE comes from the dominant description group: "Spotify" hits both the
-       R94.99 subscription and the R2.50 international-payment fee on it, and
-       averaging those is how the card would quote a price nobody pays.
-
-       WHEN — has it landed, and when is it next due — must come from EVERY
-       description the tokens hit. A merchant that renames its debit order is
-       still taking the money: this vault has eight distinct Vodacom
-       descriptions, and read through the dominant group alone Airtime's last
-       charge looked like 2026-02-07 when it had actually gone off on 2026-08-02.
-       The effect was silent and one-directional: a stale anchor puts the derived
-       due date months in the past, `due < from` drops the service, and a real
-       instalment vanishes from the committed figure — which is the number
-       telling the reader how much is safe to spend. Website Hosting was hidden
-       the same way while its R601 had already gone off.
-
-       views/services.js reached this conclusion first for its liveness pill
-       (see its `chargeStats(m.all)`); this is the same rule applied to the half
-       that moves money. */
+    /* ADR-0007 · Price from the dominant group, timing from every group. A
+       renamed debit order is still taking the money; a stale anchor silently
+       dropped Airtime and Website Hosting from the committed figure. */
     const stats = chargeStats(m.charges);        // price
-    /* CHARGED BY TODAY, not merely present in the ledger — `from` is today (see
-       whatsLeft). A row dated later this period is a charge that has not
-       happened: pre-recorded, imported from a statement carrying scheduled
-       debits, or typed ahead. Read as history it did two things at once, and
-       both suppressed the commitment it describes — it satisfied `landed`, and
-       it dragged the cadence ANCHOR forward so the next expected date fell
-       past the window. On the audit household the four gym rows dated the 3rd,
-       10th, 17th and 24th were all in the ledger on the 2nd, and every one of
-       them "proved" its own charge had gone.
-
-       This is the same as-of the rest of the app now takes (ISSUE 35 for the
-       period totals, 42 for the account pills, 44 for net worth) reaching the
-       last figure that had not had it.
-
-       PRICE is deliberately not filtered: `stats` above answers "what does this
-       merchant charge", and a scheduled debit states that as well as a settled
-       one does. Only WHEN is a question about what has already happened. */
+    /* ADR-0007 · Charged by today, not merely present. A row dated later this
+       period is not history (ISSUE 35/42/44's as-of, reaching the last
+       figure); price is deliberately not filtered. */
     const charged = (m.all || []).filter(c => c.date <= from);
     const seen = chargeStats(charged);           // liveness + cadence
 
@@ -268,26 +140,9 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
     const amount = derived ? stats.recent : Math.abs(s.amount || 0);
     if (!amount) continue;
 
-    /* ISSUE 47. HOW MANY CHARGES REMAIN, not "the next one, if it has not
-       landed yet".
-
-       The old rule was two lines — any charge inside the period and the whole
-       service is dropped for the rest of it — and for a monthly bill it is
-       right: the money has gone, once. For a WEEKLY one it is a lie of
-       omission. Measured on the `BudgetAudit` household on 2026-09-02: Virgin
-       Active at R250 a week, charges dated the 3rd, 10th, 17th and 24th
-       already in the ledger. The 3rd is inside the period, so the service was
-       skipped entirely and the card read "nothing scheduled" over R1 000 still
-       to leave the account — under the one figure on this page that tells a
-       reader how much is safe to spend, which is the direction it must never
-       be wrong in.
-
-       So a sub-monthly service is walked: every date the cadence produces
-       between the window's start and its end, minus the ones a charge in the
-       ledger already accounts for. Monthly and annual services keep the old
-       rule EXACTLY — one charge per period is what "landed" was always
-       measuring, and rewriting that path would put six years of correct
-       behaviour at risk to fix a case it never had. */
+    /* ADR-0007 · How many charges remain (ISSUE 47). Sub-monthly services are
+       walked date by date; monthly and annual keep the one-charge-per-period
+       rule exactly. */
     const step = STEP_DAYS[s.cycle];
     if (!step) {
       /* Unchanged since 1.20 apart from that window: at most one charge per
@@ -324,25 +179,9 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
   return out;
 }
 
-/* ISSUE 47. The dates a sub-monthly service still has to charge on, inside
-   [from, to].
-
-   The cadence is anchored on the merchant's own last charge where there is
-   one — the same "derived first, typed second" preference the amount takes,
-   and for the same reason: on the reference vault every hand-typed
-   `Next billing` was months in the past. Walked BACKWARDS from that anchor
-   first, so a service last charged before the window still lands on the right
-   days inside it.
-
-   A generated date is dropped when a real charge sits within
-   CHARGE_MATCH_DAYS of it: banks post a debit order a day or two either side
-   of its due day, and an exact-date match would claim every charge twice —
-   once as history and once as a commitment. Each charge can only account for
-   one date, so four charges cannot clear five expected ones.
-
-   Bounded at MAX_STEPS. A corrupt anchor (a date in 1970) against a weekly
-   cadence would otherwise walk a quarter of a million iterations to reach the
-   window, and this runs inside a render. */
+/* ADR-0007 · Remaining charges of a sub-monthly service (ISSUE 47). Anchored
+   on the last real charge, walked back then forward, each charge clearing one
+   date within CHARGE_MATCH_DAYS, bounded at MAX_STEPS. */
 const CHARGE_MATCH_DAYS = 3;
 const MAX_STEPS = 400;
 function remainingCharges({ anchor, next, step, from, to, charges }) {
@@ -366,60 +205,29 @@ function remainingCharges({ anchor, next, step, from, to, charges }) {
   return out;
 }
 
-/* Debt instalments expected between `from` and `to` inclusive.
-
-   The usual payment day comes from the payments actually seen on the debt's
-   linked category — the same link the Debt page already uses to pull real
-   payments. Falling back to the debt's start date is honest (that is the day
-   the agreement runs on); falling back to nothing means the instalment can only
-   be placed in a window of a whole month or more, per rule 6. */
-/* ISSUE 46. `from` is deliberately NOT used to place the due date, and that is
-   the whole of this fix.
-
-   whatsLeft starts its window at TODAY, on the argument that "a charge dated
-   earlier that never arrived is not still coming, it is missing". That reading
-   is right for a service, whose charge is somebody else's to make. It is wrong
-   for a contracted instalment, which does not stop being owed because its day
-   went by — and this function already knew that, because rule 2 above searches
-   [periodStart, to] for evidence the instalment was PAID. Two halves of one
-   rule, looking at two different windows: the half that decides "already
-   settled" looked back to the period start, and the half that decides "due at
-   all" started at today.
-
-   Measured on the `BudgetAudit` household on 2026-09-02: an FNB card, R500 a
-   month, due day 1, no September payment anywhere in the ledger. Rule 2 found
-   nothing and correctly did not skip it; nextOnDay(today=2 Sep, 1) then
-   returned 1 OCTOBER, past the period end, and the item was dropped. The card
-   read "nothing scheduled" and "actually free" was the entire cash pile — the
-   one direction this card must never be wrong in, on the one day of the month
-   the household most needs it to be right.
-
-   So the placement window is the PERIOD, matching the window rule 2 already
-   uses, and an instalment whose day has passed with no payment against it is
-   carried as `missed` rather than dropped. The view says "was due 1 Sep"
-   instead of "expected", because this app argues rather than corrects: the
-   claim, the date and the reason are all on the page and the reader decides
-   whether the vault or the bank is wrong.
-
-   The conservative direction is deliberate. A debt with no `category` can
-   never satisfy rule 2 — nothing links a payment row to it — so such a debt is
-   now claimed for the whole period rather than only up to its due day. That
-   over-states what is committed, which under-states what is free, which is the
-   only one of the two errors this card can afford. */
+/* ADR-0007 · Where a debt's usual payment day comes from: payments on the
+   linked category, then the start date, else only a whole-month window. */
+/* ADR-0007 · Debt placement window is the period (ISSUE 46). Placed from
+   periodStart, not today; a passed day with no payment is `missed`, not
+   dropped, and a debt with no category is claimed for the whole period. */
 function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today }) {
   const out = [];
   const history = (rows || []).filter(r => !isSplitPart(r));
   for (const d of debts || []) {
     if (!d || d.status === 'paid') continue;
-    const payment = (d.payment || 0) + (d.extra || 0);
+    const payment = debtMonthly(d);
     if (payment <= 0) continue;
 
     const paid = d.category
       ? history.filter(r => r.cat === d.category && r.amount < 0)
       : [];
-    if (paid.some(r => r.date >= periodStart && r.date <= to)) continue;   // rule 2
+    /* ADR-0007 · Rule 2 reads the ledger as of today (ISSUE 55). A payment
+       row dated later this period is still in cash, so it cannot settle the
+       instalment; `asOf` falls back to the period end for past periods. */
+    const asOf = ISO_DATE.test(today || '') && today < to ? today : to;
+    if (paid.some(r => r.date >= periodStart && r.date <= asOf)) continue;   // rule 2
 
-    const usual = paid.length ? median(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
+    const usual = paid.length ? usualDay(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
     let due = usual ? nextOnDay(periodStart, usual) : null;
 
     if (due) {
@@ -447,22 +255,9 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today
   return out;
 }
 
-/* Credit cards the household settles in full before interest (rule 7).
-
-   The amount is the card's own OUTSTANDING balance, which makes this
-   self-correcting in a way the other two commitments are not: there is no
-   prediction to get wrong and no rule-2 problem to solve. If the settlement has
-   already been paid, the implied balance is at or near zero and there is
-   nothing left to claim. If it has not, the balance IS what is still to leave
-   the cheque account. `implied` rather than stated, so a payment made since the
-   balance was last confirmed has already been taken off.
-
-   Deliberately NOT subject to the WHOLE_MONTH_DAYS guard that debts carry. That
-   guard exists because a monthly instalment cannot be placed inside a 7-day
-   window without inventing a date. This is not a prediction about a future
-   charge — the money is owed right now, today, in every window. `settle_day`
-   refines WHEN if the household has told us; its absence changes nothing about
-   whether. */
+/* ADR-0007 · Settle-monthly card as a commitment (rule 7). The outstanding
+   implied balance is owed now in every window, so no WHOLE_MONTH_DAYS guard;
+   `settle_day` only narrows the claim. */
 function cardCommitments({ accounts, from, to }) {
   const out = [];
   for (const a of accounts || []) {
@@ -482,15 +277,8 @@ function cardCommitments({ accounts, from, to }) {
       detail: a.institution || '',
       due,
       amount: owed,
-      /* ISSUE 30. A card commitment is denominated in ITS OWN account's
-         currency, and until now the item carried no way to say so — the
-         "What's counted" table printed a Rp 4 500 000 settlement as
-         "R 4 500 000". That table exists precisely so a reader can check a
-         figure, and a line item mislabelled by a factor of the exchange rate
-         fails at the one job it has. Services and debts are not stamped:
-         Services.md and Debts.md carry no currency column at all, so those
-         items ARE in the household's currency by construction (see issue #30
-         on the four ledgers). */
+      /* ADR-0007 · Card commitments carry their own currency (ISSUE 30);
+         services and debts are household money by construction. */
       currency: a.currency || '',
       basis: 'settled',
     });
@@ -498,24 +286,9 @@ function cardCommitments({ accounts, from, to }) {
   return out;
 }
 
-/* What is owed on credit cards — STATED, never folded in.
-
-   This is the third answer, and it exists because the other two are both wrong
-   on their own. Counting a card balance as negative cash reports money the
-   household does not have. Counting it as a commitment claims it leaves the
-   cheque account before the period ends, which for a card topped up several
-   times a month cannot be placed and so falls foul of rule 6. Saying nothing —
-   what this card did until now — reports "R53 actually free" beside R17,011 of
-   money already spent.
-
-   So it is reported next to the figures rather than inside them: a sentence,
-   not arithmetic. Nothing above it moves, the reader can still add up every
-   number on the card, and the one fact that was missing is on screen.
-
-   Cards only. An overdrawn cheque account is already visible as the cash it
-   failed to contribute; a card is invisible precisely because it is a separate
-   account nobody looks at. `implied`, so a settlement made since the balance
-   was last confirmed has already come off. */
+/* ADR-0007 · Cards owed are stated, never folded in. Neither negative cash
+   nor a placeable commitment; a sentence beside the figures, with per-card
+   entries so whatsLeft can disclose the unclaimed remainder. */
 function cardsOwed(accounts) {
   let owed = 0;
   const cards = [];
@@ -525,7 +298,7 @@ function cardsOwed(accounts) {
   const entries = [];
   for (const a of accounts || []) {
     if (!a || a.inBudget === false || !a.dated) continue;
-    if (String(a.type || '').trim().toLowerCase() !== 'credit_card') continue;
+    if (accountType(a) !== 'credit_card') continue;
     if (a.implied < 0) {
       owed += -a.implied; cards.push(a.name);
       entries.push({ name: a.name, amount: -a.implied });
@@ -536,26 +309,9 @@ function cardsOwed(accounts) {
 
 /* ------------------------------ the card -------------------------------- */
 
-/* Everything the "What's left" card renders.
-
-   `accounts`  [{ name, implied, dated, inBudget }] — implied balances from reconcile()
-   `services`  S.services            `debts`  S.debts
-   `rows`      every transaction row in the vault
-   `cardRows`  rows from the cards that are SETTLED MONTHLY, for the cycle
-               comparison — spending on those cards this period against the
-               income that will clear it.
-   `incomeRows` rows from IN-BUDGET accounts only, for the repeating-credit
-               search. Separate from `rows` on purpose: a monthly debit order
-               into a savings fund is a credit on that fund's statement, and
-               predicting it as household income would announce money arriving
-               that is only moving.
-   `periodStart` / `periodEnd`       the window the Dashboard is showing
-   `today`     injected
-
-   `free` may be negative; the caller renders that as "short", never as a
-   negative amount of free money. `perDay` is null on the last day of a period —
-   dividing the balance by zero days remaining, or printing a whole balance as a
-   daily rate, are both worse than saying nothing. */
+/* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
+   `cardRows` from settle-monthly cards, `incomeRows` from in-budget accounts
+   only; `free` may be negative, `perDay` is null on the last day. */
 function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
@@ -575,25 +331,14 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   ].sort((a, b) => (b.amount - a.amount));
 
   const committed = items.reduce((s, i) => s + i.amount, 0);
-  /* The card settlement, kept SEPARABLE from the debit orders even though both
-     are subtracted. They are different kinds of claim and the reader needs to
-     tell them apart: a debit order is a fixed instalment somebody else takes on
-     a known day, and a card settlement is this cycle's own spending coming home.
-     Folded into one "still committed" figure, seventeen thousand rand of card
-     hides ninety-five rand of Spotify and the reader cannot see either. */
+  /* ADR-0007 · Card settlement kept separable from debit orders: a different
+     kind of claim, and folded together R17 000 of card hides R95 of Spotify. */
   const cardDue = items.filter(i => i.kind === 'card').reduce((s, i) => s + i.amount, 0);
   const daysLeft = now ? Math.max(0, daysBetween(now, periodEnd)) : null;
   const committedOther = committed - cardDue;
 
-  /* The owed remainder: card balances the commitment chain did NOT claim.
-     `owed` states every card in full — that stays, per the both-places test.
-     But the VIEW's sentence used to gate on `owed > 0 && cardDue === 0`,
-     which is all-or-nothing where the data is per-card: one settle-monthly
-     card claimed in the chain (cardDue > 0) suppressed the sentence for a
-     SECOND, revolving card, and that card's balance appeared in no figure
-     and no sentence — the exact silent state this disclosure exists to end.
-     Derived from the actual claimed items, not from a second reading of the
-     account list, so the two cannot disagree about which cards were taken. */
+  /* ADR-0007 · The owed remainder is per card: balances the chain did not
+     claim, derived from the claimed items so the two cannot disagree. */
   const claimedCards = new Set(items.filter(i => i.kind === 'card').map(i => i.name));
   const owedElseEntries = owedEntries.filter(e => !claimedCards.has(e.name));
   const owedElse = owedElseEntries.reduce((s, e) => s + e.amount, 0);
@@ -606,44 +351,15 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   const credit = findRecurringCredit(incomeRows || [], now);
   const incoming = (credit && now && credit.next >= now && credit.next <= periodEnd) ? credit : null;
 
-  /* ------------------------- the settlement cycle -------------------------
-
-     A card settled every month is not a claim on the cash sitting in the cheque
-     account, and subtracting it from that cash answers a question nobody asks.
-
-     The household this was measured on runs its whole month through the card
-     and clears it on payday: the work month runs the 23rd to the 22nd, spending
-     happens on the card throughout, and the salary that lands on the 23rd — day
-     ONE of the next period — settles it. The cash left in the cheque account
-     mid-period is the tail of LAST month's salary after the non-card spending;
-     it was never going to pay the card. Measured against it the card reported
-     "R16 958 short" at the same point in every single cycle, which is a warning
-     that fires monthly and is therefore read by nobody.
-
-     The interest is what proves this is timing and not credit: 16.5% on R40 000
-     would cost about R550 a month, and the real card charged R0.02, R1.92 and
-     R23.62 across three of them. It is a conduit, not a loan.
-
-     So the honest comparison is card spending THIS CYCLE against the income
-     that will settle it — and `over` is the signal that actually matters,
-     because a cycle whose card spend exceeds its settling income is the one
-     case where the pattern really has stopped working.
-
-     `settling` is deliberately NOT gated on periodEnd the way `incoming` is.
-     Under a payday month anchored on payday the settling salary ALWAYS lands on
-     day one of the next period, so a period-end gate excludes the only income
-     that was ever going to clear the balance. That gate is right for "what else
-     arrives before this window shuts" and exactly backwards for this. */
+  /* ADR-0007 · The settlement cycle. Card spend this period against the
+     income that settles it (not gated on periodEnd); R16 958 "short" every
+     cycle and R0.02 of interest proved the card is a conduit, not a loan. */
   const cardSpend = (cardRows || []).reduce((s, r) => (
     r && typeof r.amount === 'number' && r.amount < 0 && !isSplitPart(r) &&
     r.date >= periodStart && r.date <= periodEnd ? s - r.amount : s), 0);
   const settling = (credit && now && credit.next >= now) ? credit : null;
-  /* The settle-monthly card is re-checked HERE rather than trusted from the
-     caller's filtering of `cardRows`. A revolving balance must never be read as
-     a settlement cycle — it is a real claim, and telling its holder they have
-     "headroom before the 23rd" would be the most dangerous sentence this card
-     could print. Leaving that guarantee in the caller is how the two drift:
-     whatsLeft would report a cycle for any rows it was handed. */
+  /* ADR-0007 · Settle-monthly re-checked inside whatsLeft, never trusted from
+     the caller: a revolving balance must never read as a cycle. */
   const settlesMonthly = (accounts || []).some(a => isSettleCard(a) && a.inBudget !== false);
   const cycle = (settlesMonthly && cardSpend > 0 && settling) ? {
     spend: cardSpend,
@@ -654,36 +370,15 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
     headroom: settling.amount - cardSpend,
   } : null;
 
-  /* THE ONE FREE FIGURE. Everything the card renders about "what's actually
-     free" — the headline, the per-day rate, the "this leaves you short/
-     covered" sentence and the bar's aria-label — must all read this same
-     number, or the card contradicts itself out loud (a screen-reader user
-     hearing one figure in the aria-label and a different one printed beside
-     it is exactly that).
-
-     While a settlement cycle is running the card has its OWN band below
-     (`cycle`) and is no longer a claim on this cash — see the settlement-
-     cycle comment above cardSpend. So `free` excludes cardDue exactly when
-     `cycle` says the card is being handled separately; committedOther alone
-     is what is still coming out of THIS cash. Outside a cycle, cardDue is a
-     real claim like any other and stays in. */
-  /* ISSUE 48. Earmarked money comes out of `free` and out of nothing else —
-     see cashOnHand's own note. Floored at the cash figure so a household whose
-     declared earmarks exceed what it actually holds gets "R0 free" rather than
-     a negative free figure that reads as a shortfall it does not have; the
-     over-earmark itself is the score card's finding (resolveEarmarks' `over`),
-     not this card's. */
+  /* ADR-0007 · One free figure. Every rendered "actually free" reads this;
+     cardDue leaves it exactly when `cycle` handles the card separately. */
+  /* ADR-0007 · Earmark floored at cash (ISSUE 48): "R0 free", never a
+     shortfall the household does not have. */
   const spokenFor = Math.min(cash, earmarked);
   const free = (cycle ? cash - committedOther : cash - committed) - spokenFor;
 
-  /* Compared in CENTS, never as a raw float difference. Summing floats that
-     were themselves fine (measured across 1,000 realistic amounts: no
-     drift) can still leave a difference of a few units in the 13th decimal
-     place — R4,001.60 confirmed against R1,000.70 + R3,000.90 committed
-     nets to -4.55e-13, not zero, in IEEE 754. Read as `free < 0` a household
-     that is exactly break-even is told it is short and shown "R -0,00".
-     Rounding to the cent before comparing is the fix; the sums themselves
-     are untouched. */
+  /* ADR-0007 · Compared in cents. A break-even sum nets to -4.55e-13 in IEEE
+     754 and read raw reports "short"; the sums themselves are untouched. */
   const freeCents = Math.round(free * 100);
 
   return {
@@ -703,15 +398,9 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
     earmarked: spokenFor,
     earmarkedFrom,
     incoming,
-    /* What `free` becomes once `incoming` lands — computed HERE, once, because
-       the view cannot safely do it. `incoming` and `cycle.settling` are the
-       SAME credit: inside a settlement cycle `free` already excludes cardDue
-       on the grounds that the card is handled by its own band below, and that
-       band is funded by exactly this salary. So `free + incoming.amount` spent
-       the same money twice and overstated the one figure on this card that
-       answers "what is safe to spend" — by the whole card balance. Null when
-       nothing is arriving, so the view renders no sentence rather than a
-       sentence about zero. */
+    /* ADR-0007 · afterIncoming counts the settling salary once: inside a
+       cycle `incoming` is the credit that funds the card band, so cardDue
+       comes back off. Null when nothing is arriving. */
     afterIncoming: incoming ? free + incoming.amount - (cycle ? cardDue : 0) : null,
     cardSpend,
     cycle,
@@ -748,5 +437,5 @@ function daysBetween(a, b) {
 
 module.exports = {
   WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
-  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft,
+  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft, debtMonthly,
 };

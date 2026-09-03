@@ -46,6 +46,8 @@
    document rather than leaving the two kinds of figure to look like one. */
 
 const { el } = require('../dom');
+const { poolAccounts } = require('../vocabulary');
+const { debtMonthly } = require('../committed');
 const { rangePills } = require('../chart');
 /* otherCurrencyNet: worth() has returned `otherCurrencies` — the foreign
    assets and foreign debts it filtered out — since ADR-0004, and this page
@@ -90,7 +92,7 @@ module.exports = function registerReport(ctx) {
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
     periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
     accountIndex, impliedAccounts, healthSnapshot, txInPeriod,
-    budgetVsActualRows, categorySpendRows,
+    budgetVsActualRows, categorySpendRows, categoryGap,
   } = ctx;
 
   /* -------------------------------- state --------------------------------
@@ -408,8 +410,7 @@ module.exports = function registerReport(ctx) {
      different rules" shape this codebase keeps repeating. */
   function savingsSummary() {
     const poolType = name => poolCatType(S.categories, name);
-    const typeIs = (a, t) => String((a && a.type) || '').trim().toLowerCase() === t;
-    const pool = S.accounts.filter(a => typeIs(a, 'savings') || typeIs(a, 'investment'));
+    const pool = poolAccounts(S.accounts);
     const idx = accountIndex();
     const entries = pool.map(a => ({ account: a, rows: (idx.get(a) || {}).rows || [] }));
     /* HOME-CURRENCY ENTRIES ONLY — the same predicate and the same name
@@ -492,7 +493,7 @@ module.exports = function registerReport(ctx) {
       count: S.debts.length,
       active: home.length,
       total: rows.reduce((t, r) => t + r.balance, 0),
-      perMonth: home.reduce((t, d) => t + (d.payment || 0) + (d.extra || 0), 0),
+      perMonth: home.reduce((t, d) => t + debtMonthly(d), 0),
       interest: cover.monthly,
       coverage: { shown: cover.shown, total: cover.total, missing: cover.missing },
       rows,
@@ -519,6 +520,20 @@ module.exports = function registerReport(ctx) {
       target: snap.target,
       savingsRatePct: H.savingsRate !== null ? H.savingsRate * 100 : null,
       interestSharePct: H.interestShare !== null ? H.interestShare * 100 : null,
+      /* ISSUE 57. What this score was computed WITHOUT. The screen says it —
+         the Score hero prints "N accounts in other currencies … are not in
+         these figures" — and this function dropped it on the floor, so the
+         exported copy stated a score with nothing at all to qualify it. That
+         copy is the one read by an advisor or a chat model, with no second
+         screen to check against.
+
+         Both lists, because they answer different questions and the report
+         states both kinds of figure: `otherCurrencies` is the accounts held
+         out of every RATIO, `worthOther` is the per-symbol net held out of the
+         net worth (accounts, assets, debts and receivables merged). See
+         health-data.js. */
+      otherCurrencies: (snap.otherCurrencies || []).map(([sym, v]) => ({ symbol: sym, amount: v })),
+      worthOther: (snap.worthOtherCurrencies || []).map(([sym, v]) => ({ symbol: sym, amount: v })),
     };
   }
 
@@ -536,6 +551,19 @@ module.exports = function registerReport(ctx) {
        spendByCategory's own merge (below) does not call categorySpendRows()
        a second time for figures already in hand. */
     let uncat = 0, netted = 0;
+    /* ISSUE 58. Rows dated later this period, which periodSummary stopped
+       counting when the running period gained its as-of boundary. The report's
+       Transaction Detail still lists them, so this document showed twelve rows
+       under totals covering six — R6 890 listed and not counted, with nothing
+       between the two saying why. */
+    let aheadSpend = 0, aheadIncome = 0, aheadCount = 0;
+    /* ISSUE 41's omission, carried into the exported document. summaryInRange
+       vetoes outgoings from an account the household has declared set aside, so
+       `spend` below can be R4 700 on a period that moved R9 700 out of its
+       accounts. The Dashboard hero says so and the Budget page now says so;
+       this is the copy that LEAVES the app, read by someone who cannot see
+       either screen. */
+    let fundedSpend = 0, fundedCount = 0;
     const spendRowsByPeriod = [];
     /* periodSummary() returns `foreign` WITH the figures rather than beside
        them, and period.js's own comment says every tile, table, chart and
@@ -561,15 +589,22 @@ module.exports = function registerReport(ctx) {
         if (!foreignSymbols.includes(sym)) foreignSymbols.push(sym);
       }
       const bt = budgetTotals(p);
-      budgetIncome += bt.income; budgetSpend += bt.spend;
+      /* ISSUE 40 follow-up, and this is the document that LEAVES the app.
+         `bt.spend` alone stated R10 500 as the budget directly above a
+         Budget-vs-Actual table listing rows that sum to R14 500 — the summary
+         and the table of one file, disagreeing, with no caveat between them.
+         The table lists every envelope, so the total states every envelope. */
+      budgetIncome += bt.income; budgetSpend += bt.spend + (bt.setAside || 0);
 
       const spendRows = categorySpendRows(p);
       spendRowsByPeriod.push(spendRows);
-      const total = spendRows.reduce((t, r) => t + r.amount, 0);
-      const notShown = Math.max(0, sum.spend - total);
-      const uncatHere = Math.min(sum.uncatSpend || 0, notShown);
-      uncat += uncatHere;
-      netted += notShown - uncatHere;
+      const gap = categoryGap(p);   // Phase 3 of ADR-0006: one owner for the split's gap
+      uncat += gap.uncat;
+      netted += gap.netted;
+      const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
+      fundedSpend += ff.spend || 0; fundedCount += ff.count || 0;
+      const sch = sum.scheduled || { income: 0, spend: 0, count: 0 };
+      aheadSpend += sch.spend || 0; aheadIncome += sch.income || 0; aheadCount += sch.count || 0;
     }
     /* H1 in the audit — typeRank order, same as renderBudgetTable's own sort
        (views/dashboard.js), off the SAME S.settings.groups this vault's
@@ -656,6 +691,8 @@ module.exports = function registerReport(ctx) {
       income, spend, net, budgetIncome, budgetSpend,
       categories, spendByCategory,
       categoryGap: { uncat, netted },
+      fundedFromSavings: { spend: fundedSpend, count: fundedCount },
+      scheduled: { income: aheadIncome, spend: aheadSpend, count: aheadCount },
       savings: savingsSummary(),
       debts: debtsSummary(w),
       netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },

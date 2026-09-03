@@ -55,8 +55,13 @@ const SEED = {
     '---\ntype: checking\ntx_label: "Cheque"\nbalance: 20000.00\nbalance_updated: 2026-09-01\n---\n',
   [`${B}/Accounts/Emergency fund.md`]:
     '---\ntype: savings\ntx_label: "Emergency fund"\nemergency_fund: true\nbalance: 15000.00\nbalance_updated: 2026-09-01\n---\n',
+  /* `goal_amount` is not decoration: a bare `type: savings` no longer removes an
+     account's spending from the budget, because that word is a classification
+     of the account and not a statement that its money is spoken for — a
+     high-interest transactional account carries it too. A GOAL is the
+     declaration. A real baby fund has one. */
   [`${B}/Accounts/Baby fund.md`]:
-    '---\ntype: savings\ntx_label: "Baby fund"\nbalance: 8000.00\nbalance_updated: 2026-09-01\n---\n',
+    '---\ntype: savings\ntx_label: "Baby fund"\ngoal_amount: 20000.00\nbalance: 8000.00\nbalance_updated: 2026-09-01\n---\n',
 
   [`${B}/Budgets/2026-09.md`]:
     '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n'

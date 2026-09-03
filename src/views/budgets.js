@@ -47,14 +47,10 @@ const i18n = require('../i18n');
 
    Pure, and takes both figures rather than reading them: no DOM, no ctx, so
    tests/dash-assumed-actual.test.cjs can drive both callers against it. */
-function assumedActual(budgeted, realSpend) {
-  const b = Number(budgeted) || 0;
-  const r = Number(realSpend) || 0;
-  return Math.max(b, r);
-}
+const { assumedActual } = require('../money-flow');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, assumedSpend, periodDeficit, catType, currentPeriod, locale } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -295,7 +291,7 @@ module.exports = function registerBudgets(ctx) {
   function budgetTotalsStrip() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    let income = 0, budgeted = 0, assumed = 0, namedNetSpend = 0, hasIncomeRow = false;
+    let income = 0, budgeted = 0, namedNetSpend = 0, hasIncomeRow = false;
     for (const d of draft) {
       /* The row's own stored Type cell (d.type, the Type column read out of
          Budgets/<period>.md) versus the category's CURRENT type (catType).
@@ -305,7 +301,7 @@ module.exports = function registerBudgets(ctx) {
          kept only as the fallback for a category with no file to ask, which
          is exactly what `?? ` (not `||`) buys: catType returns null for that
          case and the row's own amount for income can legitimately be 0. */
-      const type = catType(d.category) ?? d.type;
+      const type = budgetRowType(d);
       if (type === 'income') {
         income += d.amount || 0;
         // d.inFile, not "this row exists" — budgetDraft() seeds a ZERO row
@@ -320,6 +316,13 @@ module.exports = function registerBudgets(ctx) {
       }
       if (type === 'transfer') continue;
       budgeted += d.amount || 0;
+      /* ISSUE 40 follow-up. The spend half on its own. `budgeted` above stays
+         the WHOLE plan — that is what "Total budgeted" means and what
+         `allocPct` should be a share of — but "% of budget used" divides by
+         this, because nothing in its numerator can ever fill a savings
+         envelope: their funding is transfer-typed and summaryInRange drops it,
+         so a household that has funded every envelope read 32% used against
+         the Dashboard's 45% for the same period. */
       /* Real spend already inside sum.spend for THIS category — periodSummary
          doesn't know an assume-spent flag exists, but it knows every real
          transaction, including one in a category the flag was turned on for.
@@ -347,7 +350,6 @@ module.exports = function registerBudgets(ctx) {
          accounts for. Math.max(0, realSpend) is the same clamp namedNetSpend
          below applies — a refunded category contributes nothing to "how much
          was spent", never a negative slice of it. */
-      if (catAssumeSpent(d.category)) assumed += assumedActual(d.amount, realSpend) - Math.max(0, realSpend);
       // Net per-category spend, refunds folded in — the same figure each row
       // below reads as its own Actual. Summed here so "Total spent" (gross)
       // can disclose exactly how it differs from the table under it.
@@ -358,13 +360,21 @@ module.exports = function registerBudgets(ctx) {
        the row itself claimed R1 900 still to go. Added here, off the LIVE draft
        rather than the saved file, so the tile moves as the amount is typed,
        like every other figure on this strip. */
-    const spent = sum.spend + assumed;
+    /* ADR-0005: "spent" and "% used" are the Dashboard hero's figures, read
+       from the one rule. This tile used to add the assume-spent overlay into
+       the numerator and divide by envelopes that excluded set-aside while the
+       numerator included it — two rules on one tile. The overlay is still
+       disclosed in the note below and per row in the table, and is no part of
+       the percentage. */
+    const used = budgetUsed(S.period, { rows: draft });
+    const spent = used.spent;
+    const assumed = used.assumed;
     /* sharePercentLabel, not a bare Math.round: "100% of budgeted income" sat
        on this very strip beside a red "over-budgeted R 97,80" tile — 100.24%
        rounded onto the boundary the red tile says the plan has crossed. Same
        rule for "used": 100% is the same kind of boundary there. */
     const allocPct = income > 0 ? sharePercentLabel(budgeted / income, locale().decimal) : null;
-    const usedPct = budgeted > 0 ? sharePercentLabel(spent / budgeted, locale().decimal) : null;
+    const usedPct = used.used === null ? null : sharePercentLabel(used.used, locale().decimal);
 
     /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
        netted, uncategorised and unknown-name spend counted in full. Every row
@@ -381,7 +391,21 @@ module.exports = function registerBudgets(ctx) {
     const grossGap = Math.max(0, sum.spend - namedNetSpend);
     const gapUncat = Math.min((sum.uncatSpend || 0) + (sum.unknown.spend || 0), grossGap);
     const gapNetted = grossGap - gapUncat;
+    /* The tile's OWN sentence, computed here rather than at the return below,
+       because every separator decision under it needs to know whether anything
+       precedes it. It did not, and the two fragments that carry no leading
+       ' · ' of their own guarded on `gapNote` alone — so on a period whose
+       only disclosure was a foreign account, or (now) a fund purchase, the
+       fragment ran straight onto the end of the sentence:
+       "45% of budget usedR 5000,00 more went out of your funds". */
+    const spentNote = assumed > 0
+      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
+      : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '');
+
     let gapNote = '';
+    /* ' · ' exactly when something already stands to the left of this
+       fragment — the tile's own sentence, or an earlier fragment. */
+    const sep = () => ((spentNote || gapNote) ? ' · ' : '');
     if (gapUncat >= 1) gapNote += i18n.t('dash.split.uncatNote', { amount: money(gapUncat) });
     if (gapNetted >= 1) gapNote += i18n.t('dash.split.nettedNote', { amount: money(gapNetted) });
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
@@ -405,8 +429,31 @@ module.exports = function registerBudgets(ctx) {
          a stray bullet). On a period with a foreign account and no home
          spend or budget — gapNote still empty — an unconditional ' · ' opened
          the tile's note with a bullet. */
-      gapNote += (gapNote ? ' · ' : '') + i18n.t('dash.foreignExcluded', {
+      gapNote += sep() + i18n.t('dash.foreignExcluded', {
         count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
+      });
+    }
+    /* A THIRD omission, and the newest: money that left an account the
+       household has declared set aside (ISSUE 41). summaryInRange vetoes those
+       outgoings, so "Total spent" here is R4 700 on a household that moved
+       R9 700 out of its accounts this period — and until now the Dashboard
+       hero was the only surface that said so. Two screens, one figure, one of
+       them silent, which is the shape this whole audit keeps finding.
+
+       Same key as the hero's, so the two cannot word one fact differently, and
+       appended rather than substituted because all three omissions can be true
+       at once. */
+    /* ADR-0005: the tile no longer counts set-aside as spent, and says so the
+       way the Dashboard hero does. */
+    if (used.setAside > 0) {
+      gapNote += sep() + i18n.t('dash.stat.setAsideMoved', {
+        amount: money(used.setAside, 0), moved: money(movedToFunds(S.period), 0),
+      });
+    }
+    const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
+    if (fromFunds.count) {
+      gapNote += sep() + i18n.t('dash.fundedFromSavings', {
+        amount: money(fromFunds.spend), count: fromFunds.count,
       });
     }
 
@@ -425,7 +472,7 @@ module.exports = function registerBudgets(ctx) {
        is simply omitted. Once the period is FINISHED, actual income is a whole,
        settled figure and stands in, exactly as renderHero's incomeBase does. */
     const noIncomeInfo = income === 0 && !hasIncomeRow;
-    const periodFinished = S.period !== currentPeriod();
+    const periodFinished = S.period < currentPeriod();   // ISSUE 73: a future period is not finished
     let unallocatedTile = null;
     if (!noIncomeInfo) {
       const unallocated = income - budgeted;
@@ -451,9 +498,8 @@ module.exports = function registerBudgets(ctx) {
       { label: i18n.t('bud.total.budgeted'), value: money(budgeted),
         note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
       ...(unallocatedTile ? [unallocatedTile] : []),
-      { label: i18n.t('bud.total.spent'), value: money(spent), over: budgeted > 0 && spent > budgeted,
-        note: (assumed > 0 ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
-          : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '')) + gapNote },
+      { label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,
+        note: spentNote + gapNote },
     ];
   }
 
@@ -530,7 +576,7 @@ module.exports = function registerBudgets(ctx) {
          for the group it lands in, the sign of its Actual, and every other
          type-driven decision below, so all four can never disagree with each
          other about which group this row belongs to. */
-      const type = catType(d.category) ?? d.type;
+      const type = budgetRowType(d);
       if (!groups.has(type)) groups.set(type, []);
       groups.get(type).push(d);
     }

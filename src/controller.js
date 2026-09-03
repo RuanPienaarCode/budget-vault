@@ -22,6 +22,7 @@ const registerLoad = require('./load');
 const registerCategories = require('./categories');
 const registerTrendMath = require('./trend-math');
 const registerHealthData = require('./health-data');
+const registerFigures = require('./figures');
 const registerDashboard = require('./views/dashboard');
 const registerScore = require('./views/score');
 const registerTransactions = require('./views/transactions');
@@ -284,6 +285,8 @@ function mountApp(view) {
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]
     budgetMeta: {},
     txFiles: {},               // 'label/YYYY-MM' -> {label, month, rows, dirty}
+    accountsIgnored: [],       // ISSUE 60 — account .md paths below Accounts/ that mdFilesIn does not read
+    accountsDuplicated: [],    // ISSUE 72 — {label, first, second}: two accounts claiming one transaction folder
     txFolders: [],             // account names whose Transactions/ folder exists on disk
     rules: [],                 // {pattern, category}
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
@@ -441,6 +444,7 @@ function mountApp(view) {
   // After trend-math, whose periodsForMonths it uses, and before the two views
   // that read the snapshot it assembles.
   registerHealthData(ctx);  // healthSnapshot
+  registerFigures(ctx);     // periodFigures, budgetVsActualRows, categorySpendRows, categoryGap (ADR-0006 Phase 3)
   /* Before the views, because five of them render its noteButton() chip — they
      reach it through ctx at render time rather than by destructuring, so the
      order is belt-and-braces rather than load-bearing. loadVault calls

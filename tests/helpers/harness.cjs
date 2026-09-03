@@ -246,6 +246,7 @@ async function loadInto(ctx) {
      ctx, so a harness without it renders neither — and the card's own guard
      would swallow the reason. */
   require('../../src/health-data')(ctx);
+  require('../../src/figures')(ctx);
   require('../../src/load')(ctx);
   require('../../src/views/notes')(ctx);
   await ctx.loadVault();

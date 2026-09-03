@@ -60,6 +60,8 @@
 
 const { escMd } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
+const { budgetRowStatus } = require('./money-flow');
+const { growthRate } = require('./savings-math');
 const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
    reads it instead of a raw r.split test: see src/tx-role.js's own header
@@ -284,8 +286,9 @@ function budgetTable(rows, money) {
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
     '|---|---|---:|---:|---:|'];
   for (const r of rows) {
-    const remaining = r.budget - r.actual;
-    const unbudgeted = r.type !== 'income' && !r.budget && r.actual > 0;
+    /* Phase 3 of ADR-0006: the same rule the Dashboard's table reads, so an
+       assume-spent row cannot be "unbudgeted" here and budgeted there. */
+    const { remaining, unbudgeted } = budgetRowStatus(r);
     out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
   }
   return out;
@@ -386,7 +389,7 @@ function prepareReportData(data) {
   const spendByCategory = data.spendByCategory || [];
   const pct = sharePercents(spendByCategory.map(r => r.amount));
   const savings = data.savings
-    ? { ...data.savings, rate: data.savings.rateCapital > 0 ? (data.savings.rateGrowth / data.savings.rateCapital) * 100 : null }
+    ? { ...data.savings, rate: growthRate(data.savings) }
     : data.savings;
   return {
     ...data,
@@ -445,7 +448,7 @@ function financialReportMarkdown(data, money) {
   const {
     generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, fundedFromSavings, scheduled, savings, debts, netWorth, health, transactions,
     otherCurrencies, household, foreign,
   } = data;
 
@@ -548,6 +551,22 @@ function financialReportMarkdown(data, money) {
   if (gapStated) {
     if (categoryGap.uncat >= 1) out.push('', i18n.t('report.category.uncat', { amount: money(categoryGap.uncat) }));
     if (categoryGap.netted >= 1) out.push('', i18n.t('report.category.netted', { amount: money(categoryGap.netted) }));
+  }
+  /* ISSUE 41's omission, stated in the same block as the other two — a reader
+     reconciling this section's total against their own bank statement needs
+     all three reasons it can differ, not two of them. */
+  /* ISSUE 58. Rows this section LISTS but does not COUNT — the third reason
+     its total can differ from what the ledger below shows, and the one the
+     as-of boundary created. */
+  if (scheduled && scheduled.count) {
+    out.push('', i18n.t('report.category.scheduled', {
+      count: scheduled.count, amount: money((scheduled.spend || 0) + (scheduled.income || 0)),
+    }));
+  }
+  if (fundedFromSavings && fundedFromSavings.count) {
+    out.push('', i18n.t('report.category.fromFunds', {
+      amount: money(fundedFromSavings.spend), count: fundedFromSavings.count,
+    }));
   }
   const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMd(r.cat));
   if (orphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: orphanedNames.join(', ') }));
@@ -722,6 +741,29 @@ function financialReportMarkdown(data, money) {
        reader who did not build it and will reason from it confidently
        (an advisor, an AI chat). Said once, here, rather than assumed known
        from the score's own name. */
+    /* ISSUE 57. What the score was measured WITHOUT. The Score page says it on
+       screen and this document said nothing, so the copy that leaves the app
+       stated a number computed on part of a household's money with no way to
+       know it. Both lists, joined: the accounts held out of every ratio, and
+       the per-symbol net held out of the net worth. */
+    const hOther = [...(health.otherCurrencies || []), ...(health.worthOther || [])];
+    if (hOther.length) {
+      /* The LARGER magnitude per symbol, not the first seen. The two lists
+         answer different questions — accounts held out of the ratios, and the
+         per-symbol net held out of the net worth — and keeping whichever
+         happened to come first stated "measured without € 500" for a score
+         that was also missing a € 200 000 flat. One sentence has to carry the
+         bigger of the two or it understates the very thing it exists to
+         disclose. */
+      const bySym = new Map();
+      for (const o of hOther) {
+        const at = bySym.get(o.symbol);
+        if (at === undefined || Math.abs(o.amount) > Math.abs(at)) bySym.set(o.symbol, o.amount);
+      }
+      out.push('', i18n.t('report.health.otherCurrencies', {
+        list: [...bySym].map(([sym, v]) => `${sym} ${money(v).replace(/^\S+\s*/, '')}`).join(' · '),
+      }));
+    }
     out.push('', i18n.t('report.health.note'));
   }
 
@@ -822,7 +864,7 @@ function financialReportJson(data) {
   const {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
-    categories, spendByCategory, categoryGap, savings, debts, netWorth, health, transactions,
+    categories, spendByCategory, categoryGap, fundedFromSavings, scheduled, savings, debts, netWorth, health, transactions,
     otherCurrencies, foreign,
   } = data;
 
@@ -872,6 +914,20 @@ function financialReportJson(data) {
        float a consumer might reasonably expect but that would no longer sum
        to 100 either. */
     categories: spendByCategory.map(r => ({ category: r.cat, amount: r.amount, percent: r.pct, orphaned: !!r.orphaned })),
+    /* The THIRD reason this section's total can differ from what left the
+       household's accounts, in the same object as the other two so a machine
+       reader cannot get one without the others. */
+    /* ISSUE 58, the machine-readable half — a JSON consumer must not have to
+       infer from the transaction list that the totals stop before it does. */
+    scheduled: {
+      income: (scheduled && scheduled.income) || 0,
+      spend: (scheduled && scheduled.spend) || 0,
+      count: (scheduled && scheduled.count) || 0,
+    },
+    funded_from_savings: {
+      spend: (fundedFromSavings && fundedFromSavings.spend) || 0,
+      count: (fundedFromSavings && fundedFromSavings.count) || 0,
+    },
     category_gap: {
       uncategorised: (categoryGap && categoryGap.uncat) || 0,
       netted: (categoryGap && categoryGap.netted) || 0,
@@ -880,7 +936,7 @@ function financialReportJson(data) {
        already carries, added here too so the two arrays are equally
        interpretable (H1's own reasoning for carrying `type` in both). */
     budgets_vs_actuals: categories.map(r => ({
-      category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: r.budget - r.actual,
+      category: r.cat, type: r.type || null, budget: r.budget, actual: r.actual, remaining: budgetRowStatus(r).remaining,
       orphaned: !!r.orphaned,
     })),
     /* Present when there is a home-currency total OR a foreign pool held out
@@ -965,6 +1021,11 @@ function financialReportJson(data) {
       ? {
         score: health.score, months: health.months, target_months: health.target,
         savings_rate_pct: health.savingsRatePct, interest_share_pct: health.interestSharePct,
+        /* ISSUE 57. The same two exclusions the Markdown prose states, as data
+           — a machine reader must not be handed a score with no field saying
+           what it was measured without. */
+        other_currencies: health.otherCurrencies || [],
+        net_worth_other_currencies: health.worthOther || [],
         /* P2 — the same gloss the Markdown prints under this section
            (`report.health.note`), for the same reason `disclaimer` above
            rides along: a reader who never opens the Markdown still gets

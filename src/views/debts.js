@@ -6,6 +6,7 @@
    presentation and editing only. */
 
 const { el, kpiTiles, keepScroll, icoEl, caveatChip } = require('../dom');
+const { debtMonthly } = require('../committed');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -33,7 +34,7 @@ const {
 const DEBT_TYPES = ['credit card', 'personal loan', 'vehicle', 'home loan', 'student', 'store account', 'overdraft', 'other'];
 
 module.exports = function registerDebts(ctx) {
-  const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod } = ctx;
+  const { S, $, root, app, plugin, money, toast, writeFile, txInPeriod, periodRange, ledger, tally, LENSES } = ctx;
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('debtsDirty', '#debtSave');
 
@@ -54,10 +55,12 @@ module.exports = function registerDebts(ctx) {
      is assigned over the FULL active list before filtering, because
      debt-math keys its payoff months positionally and a key that shifted
      when a foreign debt was added would silently repoint every projection. */
-  const activeAll = () => S.debts.filter(d => d.status !== 'paid').map((d, i) => ({ ...d, key: i }));
+  /* `key` is the row's index in S.debts, which the editors need; which rows
+     are ACTIVE is worth.js's rule (Phase 3 of ADR-0006). */
+  const activeAll = () => activeDebts(S.debts.map((d, i) => ({ ...d, key: i })));
   const active = () => activeAll().filter(d => !isForeign(d, S.settings.currency));
   const activeForeign = () => activeAll().filter(d => isForeign(d, S.settings.currency));
-  const committed = d => (d.payment || 0) + (d.extra || 0);
+  const committed = debtMonthly;   // one owner: committed.js (Phase 3 of ADR-0006)
 
   /* The planner's two inputs live in the DOM rather than in S: they are a
      what-if, not household data, and persisting them would put a number in
@@ -357,16 +360,14 @@ module.exports = function registerDebts(ctx) {
        OUT of budget totals still fed these payment bars. Both filters applied
        here, and what they exclude is counted so the note below can say so
        rather than leaving a bar quietly short. */
-    const allTx = txInPeriod(S.period).filter(t => !t.excluded);
-    const txAccountOf = t => (typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(t.label) : null);
-    const tx = allTx.filter(t => {
-      const a = txAccountOf(t);
-      if (a && a.in_budget === false) return false;
-      return !isForeign(a, S.settings.currency);
-    });
-    const droppedForeign = new Set(allTx
-      .filter(t => isForeign(txAccountOf(t), S.settings.currency))
-      .map(t => symbolOf(txAccountOf(t), S.settings.currency)));
+    /* Phase 3 of ADR-0006: what was PAID under a debt's category is the
+       BUDGET lens's gross outgoing for that category — the same vetoes the
+       Dashboard hero applies (this walk used to apply three of its five:
+       excluded, non-budget and foreign, but neither the earmarked-fund nor
+       the transfer veto). The foreign disclosure comes off the same tally. */
+    const { start, end } = periodRange(S.period);
+    const paidTally = tally(ledger(start, end), LENSES.BUDGET);
+    const droppedForeign = new Set(paidTally.foreign.symbols);
     const linked = list.filter(d => d.category);
     const unlinked = list.filter(d => !d.category);
 
@@ -396,7 +397,7 @@ module.exports = function registerDebts(ctx) {
         const group = byCat[cat];
         // Money out only: a refund or a drawdown on the same category is not a
         // payment toward the balance, and counting it would flatter the row.
-        const paid = tx.filter(t => t.cat === cat && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+        const paid = paidTally.grossOutByCat[cat] || 0;
         const planned = group.reduce((s, d) => s + committed(d), 0);
         linkedPlanned += planned; linkedPaid += paid;
         const pct = planned > 0 ? Math.min(100, (paid / planned) * 100) : (paid > 0 ? 100 : 0);

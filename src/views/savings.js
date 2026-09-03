@@ -2,10 +2,11 @@
 /* Savings & Investments — net-worth KPIs, composition, goals, per-group tiles. */
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
-const { createChart, tip, parseColor, distinctColors } = require('../chart');
-const { isStale, isStaleValuation, stalenessSummary, reconcile } = require('../reconcile');
+const { accountsOfType, accountType } = require('../vocabulary');
+const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
+const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType } = require('../savings-math');
+const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate } = require('../savings-math');
 const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
@@ -30,7 +31,7 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, accountIndex, impliedAccounts } = ctx;
+  const { S, $, root, money, accountIndex, impliedAccounts, bookFigures } = ctx;
 
   /* ---------------------------- currency ----------------------------------
      This page was the pre-issue-#28 code verbatim, and an audit found every
@@ -89,11 +90,10 @@ module.exports = function registerSavings(ctx) {
      including the per-account `investment` checks further down, which read
      the same possibly-mixed-case field a second time — so the next reader
      cannot add a sixth raw `=== 'savings'`. */
-  const typeIs = (a, type) => String((a && a.type) || '').trim().toLowerCase() === type;
 
   function renderSavings() {
-    const savings = S.accounts.filter(a => typeIs(a, 'savings'));
-    const investments = S.accounts.filter(a => typeIs(a, 'investment'));
+    const savings = accountsOfType(S.accounts, 'savings');
+    const investments = accountsOfType(S.accounts, 'investment');
     /* Split BEFORE summing, and split BEFORE worth() — the same order
        views/accounts.js's hero uses. worth()'s arithmetic is shared with the
        Dashboard, the Report and the health score, so this view narrows the
@@ -227,7 +227,7 @@ module.exports = function registerSavings(ctx) {
         : 'no account has a Starting amount set — use "Add starting amount" on an account below');
     }
     const sub = [
-      g.rateCapital > 0 ? `${pct((g.rateGrowth / g.rateCapital) * 100)} on ${money(g.rateCapital, 0)} put in` : null,
+      growthRate(g) !== null ? `${pct(growthRate(g))} on ${money(g.rateCapital, 0)} put in` : null,
       g.unmeasured ? `${g.unmeasured} of ${g.total} missing a starting amount or date` : null,
       g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
       /* Named, never silently dropped — currency.js:14 is explicit that this
@@ -460,6 +460,8 @@ module.exports = function registerSavings(ctx) {
   }
 
   function renderSections(savings, investments, idx) {
+    /* Phase 3 of ADR-0006: one reconcile pass, shared with the Dashboard. */
+    const book = bookFigures();
     const wrap = $('#savingsSections'); wrap.empty();
     /* The loop below `continue`s past whichever of the two lists is empty —
        right when exactly one of them has accounts, so the page doesn't print
@@ -501,7 +503,7 @@ module.exports = function registerSavings(ctx) {
         const rows = (idx.get(a) || {}).rows || [];
         const flows = accountFlows(a, rows, poolType);
         const r = ret({ account: a, rows });
-        const rec = reconcile(a, rows);
+        const rec = book.reconciled.get(a);
 
         /* An account carrying nothing yet — R0 and no starting amount — is the
            mockup's third row: no flows, no match state, just the one action
@@ -642,7 +644,7 @@ module.exports = function registerSavings(ctx) {
              Only for investments, and only when no growth was recorded at all —
              a savings account crediting monthly interest has a real figure
              above and needs no explanation of one it does not have. */
-          if (typeIs(a, 'investment') && !g) {
+          if (accountType(a) === 'investment' && !g) {
             card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
               'no growth recorded — it is inside the balance, not measured here',
               'Growth only appears here when the account posts it as a transaction the vault can read. '
@@ -710,7 +712,7 @@ module.exports = function registerSavings(ctx) {
              transaction reconciles exactly, and taking the offer away from those
              accounts to protect the others helps nobody. What it gets is the one
              sentence that stops it reading as a correction. */
-          if (typeIs(a, 'investment')) {
+          if (accountType(a) === 'investment') {
             card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
               'added up from recorded movements only — growth is not in it',
               'The implied figure adds up recorded movements only. Growth that never posted a '
@@ -834,7 +836,7 @@ module.exports = function registerSavings(ctx) {
         'based on the account file, not transactions',
         'No transactions in the vault for this account, so this is the balance less what the '
           + 'account file records as put in. Import its statements and the split becomes real.')));
-    } else if (r.undatedGrowth && typeIs(a, 'investment')) {
+    } else if (r.undatedGrowth && accountType(a) === 'investment') {
       /* Named because the chart above cannot draw it. A fund's value moved every
          day for years and the vault holds one number — today's — so this growth
          is real, is in the balance, and has no date anywhere. */
