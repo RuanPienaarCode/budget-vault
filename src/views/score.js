@@ -29,7 +29,7 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodSpend, periodSummary, budgetTotals, catType, declaredCatType, accountIndex,
+    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, declaredCatType, accountIndex,
     txInPeriod, locale,
   } = ctx;
 
@@ -779,7 +779,8 @@ module.exports = function registerScore(ctx) {
          income budgeted" is the WHOLE plan the Dashboard and the Budget page
          state (41%), not the spend envelopes alone (30%). Its "budget used"
          still divides by the spend envelopes — see periodFlow's header. */
-      income: summary.income, spentTotal: summary.spend,
+      income: summary.income, spentTotal: summary.spend, setAsideSpent: summary.setAside,
+      assumedSpent: budgetUsed(cur).assumed,
       budgeted: budget.spend, budgetSetAside: budget.setAside,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
       /* The household's own symbol, so this card's "of which interest" holds
@@ -1091,7 +1092,9 @@ module.exports = function registerScore(ctx) {
     if (bud.allocatedOfIncome !== null) {
       budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${sharePercentLabel(bud.allocatedOfIncome, locale().decimal)}%`]);
     }
-    budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spentTotal, 0)]);
+    /* ADR-0005: the rand figure beside "Budget used" is the same `spent` the
+       Dashboard hero and the Budget page print — not gross spend. */
+    budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spent, 0)]);
     if (bud.budgetUsed !== null) {
       budgetRows.push([i18n.t('score.flow.chip.budgetUsed'), `${sharePercentLabel(bud.budgetUsed, locale().decimal)}%`]);
     }

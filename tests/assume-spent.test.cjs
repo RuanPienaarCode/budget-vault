@@ -157,7 +157,7 @@ async function mount(files = FILES, period = '2026-07') {
     const { ctx } = await mount();
     eq(ctx.periodDeficit('2026-06'), 2500,
       'June ran R2 500 in the red: 12 500 out less 10 000 in');
-    eq(ctx.assumedSpend('2026-07'), 2500, 'July provisions exactly that much');
+    eq(ctx.budgetUsed('2026-07').assumed, 2500, 'July provisions exactly that much');
     /* The load-bearing one. July's real position is 10 000 in, 3 000 out — a
        R7 000 SURPLUS. If periodDeficit counted the assume-spent provision it
        would report July as R4 500 short, and pulling that into August would

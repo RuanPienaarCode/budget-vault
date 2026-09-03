@@ -299,11 +299,18 @@ function provenFalse(desc, exactShape, mangled) {
     .test(live.dashboard),
     'Total spent (Dashboard): the hero\'s Spent stat is bound to periodSummary().spend, gross, no overlay');
 
-  const SPENT_LINE = 'const spent = sum.spend + assumed;';
+  /* 2026-09-03, ADR-0005: the tile is the ONE "budget used" numerator —
+     budgetUsed(p).spent, i.e. periodSummary().spend less set-aside plus the
+     assume-spent provision — the same figure the Dashboard hero's remaining
+     line and the Score chip are built from. It used to add the overlay to
+     GROSS spend, set-aside included, over envelopes that excluded set-aside. */
+  const SPENT_LINE = 'const used = budgetUsed(S.period, { rows: draft });';
   ok(live.budgets.includes(SPENT_LINE),
-    'Total spent (Budget): the tile is periodSummary().spend PLUS the documented assume-spent shortfall overlay, not a second reading of spend');
-  ok(live.budgets.includes("label: i18n.t('bud.total.spent'), value: money(spent), over: budgeted > 0 && spent > budgeted,"),
-    'Total spent (Budget): the tile actually renders that combined figure');
+    'Total spent (Budget): the tile reads the one rule, measured over the unsaved draft');
+  ok(live.budgets.includes('const spent = used.spent;'),
+    'Total spent (Budget): and prints that reading, not a second one');
+  ok(live.budgets.includes("label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,"),
+    'Total spent (Budget): the tile actually renders that figure, red against the same denominator the percentage uses');
   ok(live.budgets.includes('+ gapNote },'),
     'Total spent (Budget): the declared half — the tile\'s note discloses exactly how it differs from the per-category table under it (grossGap split into gapUncat/gapNetted), the same disclosure policy cross-page-consistency.test.cjs pins for the Dashboard\'s donut');
 
@@ -311,7 +318,7 @@ function provenFalse(desc, exactShape, mangled) {
   // the disclosure) would read as the Dashboard's own unqualified spend —
   // exactly the "two figures, one label, no explanation" shape this file
   // exists to catch.
-  provenFalse('Total spent (Budget)', SPENT_LINE, 'const spent = sum.spend;');
+  provenFalse('Total spent (Budget)', SPENT_LINE, 'const used = { spent: sum.spend, used: null, budgeted: 0, assumed: 0, setAside: 0 };');
 }
 
 /* ========================================================================
@@ -353,16 +360,26 @@ function provenFalse(desc, exactShape, mangled) {
    earlier terms in this file (Growth, Net worth) already do.
    ======================================================================= */
 {
+  /* 2026-09-03, ADR-0005: the rule moved out of the view and into the pure
+     module that owns "budget used" — money-flow.js — and the totals-strip
+     overlay is no longer a loop in the view at all: budgetUsed(p).assumed
+     (period.js) sums assumedProvision() over the same rows the denominator
+     is built from, so the tile, the hero and the Score chip carry one
+     provision. The view keeps the re-export so nothing downstream moves. */
   const RULE = 'function assumedActual(budgeted, realSpend) {';
-  const OVERLAY = 'if (catAssumeSpent(d.category)) assumed += assumedActual(d.amount, realSpend) - Math.max(0, realSpend);';
-  ok(live.budgets.includes(RULE) && live.budgets.includes('module.exports.assumedActual = assumedActual;'),
-    'Assume-spent: views/budgets.js declares the rule ONCE as a pure module-level function and exports it, so there is one implementation to be right rather than two to keep in step');
-  ok(live.budgets.includes(OVERLAY),
-    'Assume-spent (Budget): the totals-strip overlay is DERIVED from that same rule minus what really moved — never a second expression of the same idea, which is how the overlay and the row\'s own Actual cell drifted apart over a refund');
+  const OVERLAY = 'total += assumedActual(r.amount, real) - real;';
+  ok(live.moneyFlow.includes(RULE) && live.moneyFlow.includes('assumedActual, assumedProvision,'),
+    'Assume-spent: money-flow.js declares the rule ONCE as a pure module-level function and exports it, so there is one implementation to be right rather than two to keep in step');
+  ok(live.budgets.includes("const { assumedActual } = require('../money-flow');") && live.budgets.includes('module.exports.assumedActual = assumedActual;'),
+    'Assume-spent (Budget): the view imports that rule and re-exports it for its existing consumers');
+  ok(live.moneyFlow.includes(OVERLAY),
+    'Assume-spent (provision): assumedProvision() is DERIVED from that same rule minus what really moved — never a second expression of the same idea, which is how the overlay and the row\'s own Actual cell drifted apart over a refund');
+  ok(live.budgets.includes('const assumed = used.assumed;'),
+    'Assume-spent (Budget): the totals strip reads the provision off budgetUsed(), not a loop of its own');
   ok(live.budgets.includes('assumed ? assumedActual(d.amount, realSpend)'),
     'Assume-spent (Budget): and the row\'s Actual cell reads the rule directly');
 
-  ok(live.dashboard.includes("const { assumedActual } = require('./budgets');"),
+  ok(live.dashboard.includes("const { assumedActual } = require('../money-flow');"),
     'Assume-spent (Dashboard): reads the SAME function rather than re-deriving it — its own copy used to discard real spend, so a category over its budget read "on budget" here and over there');
   ok(live.dashboard.includes('actual: assumed ? assumedActual(b.amount, 0) : 0'),
     'Assume-spent (Dashboard): an assume-spent row is SEEDED through the rule, with nothing yet spent against it');
@@ -371,11 +388,11 @@ function provenFalse(desc, exactShape, mangled) {
 
   // Negative control 1: the pre-1.23.0 Budget-page line added the WHOLE
   // amount unconditionally — the double-count the changelog describes.
-  provenFalse('Assume-spent (Budget)', OVERLAY, 'if (catAssumeSpent(d.category)) assumed += d.amount || 0;');
+  provenFalse('Assume-spent (provision)', OVERLAY, 'total += r.amount || 0;');
   // Negative control 2: the shortfall shape WITHOUT the inner clamp — the
   // narrower refund-inflation defect the second round closed.
-  provenFalse('Assume-spent (Budget) — refund clamp', OVERLAY,
-    'if (catAssumeSpent(d.category)) assumed += Math.max(0, (d.amount || 0) - realSpend);');
+  provenFalse('Assume-spent (provision) — refund clamp', OVERLAY,
+    'total += Math.max(0, (r.amount || 0) - Number(realSpendOf(r)));');
   // Negative control 3: the Dashboard's own retired copy, which threw real
   // spend away — the third round's defect, and the one a text-match between
   // two hand-written expressions could never have caught, because both
@@ -480,11 +497,17 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.healthData.includes("if (type !== 'savings' && type !== 'investment') { consumption += amt; }"),
     'Budget used (Score ring): that consumption figure explicitly excludes savings/investment-typed spend');
 
-  const CONSUMPTION_LINE = 'const consumptionThisPeriod = Math.max(0, spent - savingsTypedSpend);';
-  ok(live.moneyFlow.includes(CONSUMPTION_LINE),
-    'Budget used (Flow chip): money-flow.js\'s numerator now excludes savings/investment-typed spend, the SAME adjustment `living` already applies — the unified half');
-  ok(live.moneyFlow.includes('const budgetUsed = bud > 0 ? consumptionThisPeriod / bud : null;'),
-    'Budget used (Flow chip): budgetUsed divides that adjusted figure, not the raw periodSummary().spend');
+  /* 2026-09-03, ADR-0005: the numerator is no longer inferred from the
+     category map at all. budgetUsedShare() is the ONE rule —
+     (spend − setAside) / budgeted — and periodFlow is handed `setAsideSpent`
+     by its caller (score.js passes periodSummary().setAside). The Dashboard
+     hero, the Budget page and health-data.js's per-period numerator read the
+     same function; tests/budget-used-one-rule.test.cjs pins all four. */
+  const BUDGET_USED_LINE = 'const budgetUsed = budgetUsedShare({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent, budgeted: bud });';
+  ok(live.moneyFlow.includes(BUDGET_USED_LINE),
+    'Budget used (Flow chip): money-flow.js\'s budgetUsed IS budgetUsedShare(), fed by the caller\'s setAsideSpent — the one rule of ADR-0005');
+  ok(live.healthData.includes('const consumptionBudget = budgetUsed(p).spent;'),
+    'Budget used (Score ring): health-data.js\'s per-period numerator is the same reading the Dashboard hero prints');
 
   ok(live.score.includes("if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }"),
     'Budget used (Score ring): the ring renders health-math\'s 6-period, savings-excluded figure under "budget used {pct}"');
@@ -498,7 +521,7 @@ function provenFalse(desc, exactShape, mangled) {
 
   // Negative control: the pre-fix flow-chip numerator, dividing the raw,
   // unadjusted spend — the exact numerator mismatch the audit found.
-  provenFalse('Budget used (Flow chip)', CONSUMPTION_LINE, 'const consumptionThisPeriod = spent;');
+  provenFalse('Budget used (Flow chip)', BUDGET_USED_LINE, 'const budgetUsed = bud > 0 ? spent / bud : null;');
 }
 
 /* ========================================================================

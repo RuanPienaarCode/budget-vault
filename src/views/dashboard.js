@@ -36,10 +36,10 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    a reader who is R1 500 over that they are fine, because budgetVsActualRows
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
-const { assumedActual } = require('./budgets');
+const { assumedActual } = require('../money-flow');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -1371,7 +1371,10 @@ module.exports = function registerDashboard(ctx) {
        two facts that had cancelled into a number that looked like headroom.
        Measured on spend alone the same household has R800 left and a grocery
        envelope already over, which is the thing worth knowing. */
-    const spent = sum.spend - (sum.setAside || 0);
+    /* ADR-0005: the one "budget used" reading. `spent` here is what the Score
+       chip, the Score ring's numerator and the Budget page's tile all print. */
+    const used = budgetUsed(S.period);
+    const spent = used.spent;
     const available = bud.spend - spent;
     const heroNegative = available < 0;
     const meterMax = Math.max(spent, bud.spend, 1);
@@ -1428,7 +1431,7 @@ module.exports = function registerDashboard(ctx) {
       periodFinished: S.period < currentPeriod(),
     });
     const baseDiffers = allocated !== null && Math.round((incomeBase - sum.income) * 100) !== 0;
-    const usedPct = bud.spend > 0 ? sharePercentLabel(spent / bud.spend, locale().decimal) : null;
+    const usedPct = used.used === null ? null : sharePercentLabel(used.used, locale().decimal);
     /* ISSUE 40. The stat column states the WHOLE plan (R14 500) while the hero
        above it now measures against the spend envelopes alone (R10 500). Both
        are right for their own question and the card must not leave a reader to

@@ -31,6 +31,7 @@ const { reconcile } = require('./reconcile');
    reused rather than re-spelled: a second answer to the same question is the
    defect this whole audit keeps finding. */
 const { savedFromOutside } = require('./savings-math');
+const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -546,29 +547,13 @@ module.exports = function registerPeriod(ctx) {
      written before the flag existed. */
   function catAssumeSpent(name) { return S.categories.find(c => c.name === name)?.assumeSpent === true; }
 
-  /* What the assume-spent rows come to in a period's budget. Kept separate from
-     periodSummary rather than folded into it: `spend` there means "money that
-     moved, according to the statements", and a dozen callers — the trend chart,
-     the donut, the Tax view, the deficit below — depend on it meaning exactly
-     that. This is a budgeting overlay on top, and only the two pages that show
-     a budget add it in. */
-  function assumedSpend(p) {
-    let total = 0;
-    for (const b of S.budgets[p] || []) {
-      const type = budgetRowType(b);
-      if (type === 'income' || type === 'transfer') continue;
-      if (catAssumeSpent(b.category)) total += b.amount || 0;
-    }
-    return total;
-  }
-
   /* THE type of a budget row: the category's live type, and only when no
      category file answers (catType null — no category named, or the file
      gone) the cell the row itself stored.
 
      One function because there were three readers of a budget row's type and
      the 2026-09-02 audit found them disagreeing: budgetTotals() had just been
-     taught to read the live type, while assumedSpend() above and the
+     taught to read the live type, while the Budget page's assumed overlay and the
      Dashboard's budgetVsActualRows still read `b.type` — the cell
      serializeBudgetFile writes back verbatim, so it never heals after a
      category is retyped. Measured through the real loader: a category file
@@ -584,7 +569,7 @@ module.exports = function registerPeriod(ctx) {
      actually came in. Positive means overspent by that much; zero or less means
      the period paid for itself and there is nothing to carry.
 
-     Real transactions only — deliberately NOT including assumedSpend(p). An
+     Real transactions only — deliberately NOT including the assume-spent overlay. An
      assume-spent row is this period's provision for an EARLIER period's hole;
      counting it here would carry the same overspend forward a second time, and
      then a third, growing by itself every month with no bank line anywhere
@@ -1032,10 +1017,12 @@ module.exports = function registerPeriod(ctx) {
      falls through to the row's own `type` cell, and a household that has typed
      neither gets exactly what it always got: the row counts as spend, because
      nothing it has written says otherwise. */
-  function budgetTotals(p) {
-    const budget = S.budgets[p] || [];
+  function budgetTotals(p) { return budgetTotalsOf(S.budgets[p] || []); }
+  /* The same bucketing over any set of budget rows — the Budget page hands in
+     its unsaved draft so its tiles move as the reader types. */
+  function budgetTotalsOf(budget) {
     let income = 0, spend = 0, setAside = 0;
-    for (const b of budget) {
+    for (const b of budget || []) {
       const type = budgetRowType(b);
       if (type === 'income') income += b.amount;
       else if (type === 'transfer') continue;
@@ -1043,6 +1030,32 @@ module.exports = function registerPeriod(ctx) {
       else spend += b.amount;
     }
     return { income, spend, setAside };
+  }
+
+  /* ADR-0005. "Budget used" for one period, by the one rule in
+     money-flow.js's budgetUsedShare(): (spend − setAside + assumed) / budgeted.
+     Returns the two operands with the share, because every surface that
+     prints the percentage prints the rand figure beside it, and the two must
+     be the same reading — the Dashboard hero's "spent", the Budget page's
+     "Total spent" tile and the Score ring's per-period numerator are all
+     `spent` here. `opts.today` passes through to periodSummary so an as-of
+     reading can be driven the way that function's own note describes;
+     `opts.rows` lets the Budget page measure its unsaved draft. */
+  function budgetUsed(p, opts) {
+    const { today, rows } = opts || {};
+    const sum = periodSummary(p, today);
+    const budget = rows || S.budgets[p] || [];
+    const budgeted = budgetTotalsOf(budget).spend;
+    /* The assume-spent provision, over the same rows the denominator was
+       built from, measured against this period's real spend per category. */
+    const assumedRows = budget.filter(b => {
+      const type = budgetRowType(b);
+      return type !== 'income' && type !== 'transfer' && catAssumeSpent(b.category);
+    });
+    const assumed = assumedProvision(assumedRows, b => -(sum.byCat[b.category] || 0));
+    const operands = { spend: sum.spend, setAside: sum.setAside, assumed };
+    return { spent: budgetSpent(operands), budgeted, assumed, setAside: sum.setAside || 0,
+      used: budgetUsedShare({ ...operands, budgeted }) };
   }
 
   ctx.provide({
@@ -1057,7 +1070,9 @@ module.exports = function registerPeriod(ctx) {
        oracle or a view that re-spells "which folders are set aside" is a second
        rule waiting to disagree with this one. */
     earmarkedLabels, movedToFunds, declaredCatType,
-    intervalDays, periodKeyValid, catAssumeSpent, catKnown, assumedSpend, periodDeficit,
+    intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
+    /* ADR-0005. The one period-level "budget used" reading. */
+    budgetUsed,
     /* The one reading of a budget row's type — views/dashboard.js's
        budgetVsActualRows reads it too, so the table, the hero and the Budget
        page cannot bucket one row three ways. */

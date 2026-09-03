@@ -696,10 +696,15 @@ async function mountBudget(files) {
     const tiles = findAllByClass(ctx.$('#budTotalsTop'), 'bud-total');
     const spentTileText = tiles[tiles.length - 1] && findByClass(tiles[tiles.length - 1], 'bud-total-v').textContent;
     const spentTileValue = moneyFrom(spentTileText);
-    const dashboardSpend = sum.spend;   // the hero's own figure, unmodified — see src/views/dashboard.js:908
+    /* ADR-0005: the tile is the hero's numerator — gross spend less set-aside
+       — plus the overlay. `setAside` restated from the summary, not asked of
+       budgetUsed(), for the same oracle policy as everything else here. */
+    const dashboardSpend = Math.max(0, sum.spend - (sum.setAside || 0));
 
     eqMoney(spentTileValue, dashboardSpend + realOverlay,
-      `budget round ${round}: Total spent === Dashboard's gross spend + the SHORTFALL-clamped overlay`);
+      `budget round ${round}: Total spent === the hero's spend-less-set-aside + the SHORTFALL-clamped overlay`);
+    eqMoney(ctx.budgetUsed('2026-08').spent, spentTileValue,
+      `budget round ${round}: and budgetUsed().spent is that same figure`);
 
     // ---- (b) the table's Actual column, clamped and decomposed ----
     const bodyRows = (ctx.$('#budTable').children[1] && ctx.$('#budTable').children[1].children) || [];

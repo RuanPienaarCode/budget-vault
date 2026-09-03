@@ -72,8 +72,8 @@ const B = 'Budget';
 
   eq(ctx.budgetTotals('2026-07'), { income: 15000, spend: 5500 , setAside: 0 },
     'budgetTotals: Carry (live expense) is spend, Bonus (live income) is income');
-  eq(ctx.assumedSpend('2026-07'), 2500,
-    'assumedSpend: the assume-spent row counts by its LIVE type — it read 0 while its stale cell said income');
+  eq(ctx.budgetUsed('2026-07').assumed, 2500,
+    'budgetUsed().assumed: the assume-spent row counts by its LIVE type — it read 0 while its stale cell said income');
 
   console.log(`PASS — audit residuals: one budget-row type rule across budgetTotals and assumedSpend (${checks} checks so far).`);
 })().then(() => {

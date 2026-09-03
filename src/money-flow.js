@@ -41,10 +41,10 @@
      saving is non-zero — see the comment on `lefts` below for why that is
      correct rather than a bug.
 
-     `budgetUsed` divides `consumptionThisPeriod` (spend minus every rand of
-     savings/investment-typed spend, THIS period) by `budgeted` — the same
-     numerator RULE health-math.js's score-facing budgetUsed applies to its
-     own six-period trailing average, so a rand excluded from one is excluded
+     `budgetUsed` is budgetUsedShare() — (spend − setAside) / budgeted, the one
+     rule ADR-0005 names, with `setAside` supplied by the caller from
+     periodSummary() — the same numerator health-data.js hands the Score
+     ring's six-period average, so a rand excluded from one is excluded
      from the other. The WINDOW still differs on purpose (this period here,
      six periods there) — see the comment on `budgetUsed` below for why that
      one difference is kept, and disclosed, rather than collapsed. */
@@ -147,8 +147,65 @@ function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished }
    Budget page against "30%" on the Score, and "45% used" against "32%" — the
    same phrase, the same period, one household. Optional and defaulting to 0,
    so a caller that has not been taught is unchanged. */
+/* "Budget used", the one rule (docs/adr/0005-budget-used-is-one-figure.md):
+
+       (spend − setAside + assumed) / budgeted
+
+   `spend` is a period's gross outgoings, `setAside` the part of them under a
+   savings- or investment-typed category, `assumed` the assume-spent provision
+   (assumedProvision below), `budgeted` the envelopes that are not set-aside. Money moved into the household's own funds is not spending, so it
+   leaves the numerator; the envelopes for it are not budget to spend, so they
+   were never in the denominator. Null when there is no plan to measure
+   against — dividing by an absent budget is not "0% used".
+   Every surface that prints the phrase reads this function, directly or
+   through period.js's budgetUsed(p): the Dashboard hero, the Budget page's
+   totals strip, periodFlow()'s chip figure below, and health-data.js's
+   per-period numerator that the Score ring averages. Four spellings became
+   one on 2026-09-03; tests/budget-used-one-rule.test.cjs keeps it that way. */
+function budgetUsedShare({ spend, setAside, assumed, budgeted } = {}) {
+  const bud = Number(budgeted) || 0;
+  if (!(bud > 0)) { return null; }
+  return budgetSpent({ spend, setAside, assumed }) / bud;
+}
+
+/* The numerator of that rule, on its own, because every surface prints the
+   rand figure beside the percentage and the two must be one reading:
+   gross spend, less set-aside, plus the assume-spent provision. */
+function budgetSpent({ spend, setAside, assumed } = {}) {
+  return Math.max(0, (Number(spend) || 0) - (Number(setAside) || 0)) + Math.max(0, Number(assumed) || 0);
+}
+
+/* An assume-spent row's Actual: the larger of what was budgeted and what
+   really moved. A category flagged `assume_spent` (a carried overspend, a
+   cash envelope) is treated as consumed at its budgeted amount even with no
+   transaction behind it this period; a real payment larger than the budget
+   still shows in full. One function for the Budget page's Actual column, the
+   Dashboard's Budget-vs-Actual table, the Report and both exports — it was
+   written twice before and the copies drifted (see the note above
+   budgetVsActualRows in views/dashboard.js). */
+function assumedActual(budgeted, realSpend) {
+  const b = Number(budgeted) || 0;
+  const r = Number(realSpend) || 0;
+  return Math.max(b, r);
+}
+
+/* What the assume-spent rows add to a period's spend over and above the
+   transactions that really landed: for each such row, its Actual less the
+   real spend it already covers, clamped so a refunded category contributes
+   nothing rather than a negative slice. `realSpendOf(row)` is supplied by the
+   caller because only it knows which ledger the rows were measured against
+   (the saved file, or the Budget page's unsaved draft). */
+function assumedProvision(rows, realSpendOf) {
+  let total = 0;
+  for (const r of rows || []) {
+    const real = Math.max(0, Number(realSpendOf(r)) || 0);
+    total += assumedActual(r.amount, real) - real;
+  }
+  return total;
+}
+
 function periodFlow({
-  income, spentTotal, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
+  income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
 } = {}) {
   const inc = Number(income) > 0 ? Number(income) : 0;
@@ -280,11 +337,10 @@ function periodFlow({
      disagree under one label ("Budget used", tests/vocabulary.test.cjs's
      GAP A) — a household funding an investment inside a budgeted category
      read as having blown its budget on THIS card while the ring above it,
-     reading the adjusted figure, said the opposite. `consumptionThisPeriod`
-     applies the SAME adjustment `living` already does — the full
-     `savingsTypedSpend`, committed or not, never just the non-committed
-     remainder `living` nets off — so the numerator answers "what did living
-     actually cost, against what was planned for it" on both surfaces.
+     reading the adjusted figure, said the opposite. Since ADR-0005 the
+     subtraction is periodSummary()'s own `setAside`, handed in as
+     `setAsideSpent`, so the numerator answers "what did living actually
+     cost, against what was planned for it" on every surface by one rule.
 
      What is DELIBERATELY still different is the WINDOW: this is one
      period's ratio, the ring above reads a six-period trailing average
@@ -297,8 +353,16 @@ function periodFlow({
      noise. The chip's own note (score.js's buildFlowChips) says so on
      screen, right under this row, rather than leaving two differently-timed
      numbers unexplained under one word. */
-  const consumptionThisPeriod = Math.max(0, spent - savingsTypedSpend);
-  const budgetUsed = bud > 0 ? consumptionThisPeriod / bud : null;
+  /* ADR-0005. ONE rule, fed by what the caller SAYS was set aside — never by
+     what this function can find for itself in `byCat`. That map is
+     periodSpend()'s NET reading, and a contribution into a fund that is inside
+     the budget has both legs in it and nets to zero, so the old scan here
+     subtracted nothing for it and this chip read 51% where the Dashboard hero,
+     subtracting periodSummary().setAside directly, read 38% on the same rows.
+     `savingsTypedSpend` above still shapes the `living` band; it does not
+     shape this figure. */
+  const budgetUsed = budgetUsedShare({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent, budgeted: bud });
+  const spentByRule = budgetSpent({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent });
 
   /* Percentages OF INCOME — which in a deficit period legitimately come to
      more than 100: living costs really can be 180% of what came in, and
@@ -371,7 +435,7 @@ function periodFlow({
       },
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
-    budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, allocatedOfIncome, budgetUsed },
+    budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, spent: spentByRule, allocatedOfIncome, budgetUsed },
     lefts: { leftInBudget, neverBudgeted, together, display: displayLefts },
   };
 }
@@ -414,6 +478,6 @@ function railSegments(breakdown) {
 }
 
 module.exports = {
-  periodFlow, railSegments, incomeBaseFor, allocatedShare,
+  periodFlow, railSegments, incomeBaseFor, allocatedShare, budgetUsedShare, budgetSpent, assumedActual, assumedProvision,
   HOUSING_TYPES, SUBSCRIPTION_TYPES,
 };

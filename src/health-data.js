@@ -116,7 +116,7 @@ const TRAILING_MONTHS = 6;
 
 module.exports = function registerHealthData(ctx) {
   const {
-    S, periodSpend, periodSummary, budgetTotals, accountIndex, impliedAccounts, catType, declaredCatType,
+    S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, impliedAccounts, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
     foreignLabels,
   } = ctx;
@@ -225,11 +225,12 @@ module.exports = function registerHealthData(ctx) {
          against a budget-only denominator would be the same mixing this whole
          block exists to end. Every other share below is household-wide, built
          from householdSpend further down. */
-      let consumptionBudget = 0;
-      for (const [cat, amt] of Object.entries(spend.whole)) {
-        const type = catType(cat);
-        if (type !== 'savings' && type !== 'investment') { consumptionBudget += amt; }
-      }
+      /* ADR-0005: the SAME numerator the Dashboard hero prints, so the ring's
+         six-period average is an average of the figure the reader has already
+         seen. This used to sum periodSpend()'s NET map with savings types
+         dropped — refunds netted, uncategorised gone — and so differed from
+         the hero even over a single counted period. */
+      const consumptionBudget = budgetUsed(p).spent;
       /* The emergency fund's DIVISOR, built from every account rather than
          periodSpend's budget-scoped map. `essential` answers "what must the
          HOUSEHOLD keep paying with no income", and periodSpend deliberately
