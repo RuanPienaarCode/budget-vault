@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.39.0 — 2026-09-03
 
 ### Fixed
 
@@ -31,6 +31,45 @@ the page's own speed.
   was due.
 - **The Dashboard is much faster with many accounts** — the account index was
   rebuilt with a scan that grew with the square of the account count.
+
+### Changed
+
+The calculation layer, rebuilt in four phases (ADR-0005, ADR-0006,
+ADR-0007). The arithmetic was never the problem; five separate loops over the
+same transaction rows each decided for themselves which rows count, and every
+audit since 1.34.0 found the next loop that had missed the last rule. There
+is now one ledger, three named lenses, and one owner per rule.
+
+- **"Budget used" is one figure.** It was computed four ways on three pages
+  — the Dashboard hero, the Score chip, the Score ring and the Budget page's
+  tile could all disagree about one month, and the chip's answer depended on
+  whether a savings account was flagged in-budget. One rule now: spend, less
+  what was set aside, plus the assume-spent provision, over the spend
+  envelopes. The Score chip prints the same rand figure the hero does.
+- **The Score no longer double-counts a split.** A split's parent row is
+  excluded by construction; the household walk kept excluded rows; so one
+  R900 purchase split 600/300 read R1 800 in consumption and essential
+  spend. Vaults that split transactions will see the Score's monthly figures
+  fall by exactly the parents they had been counting.
+- **The trend chart and comparison column now leave out fund-paid spending,
+  as the hero always did.** The 1.36.0 earmark rule had reached the hero and
+  never reached the trend.
+- **The exported Markdown's "money in / money out" uses the same rule as the
+  Dashboard hero.** It used to apply two of the five vetoes.
+- **The report's "unbudgeted" flag matches the Dashboard's.** An
+  assume-spent row could be flagged in the Markdown and on budget on screen.
+- **Every row-selection rule lives in one place.** `src/ledger.js` stamps
+  each row once with every reason it might be held out; a lens is data, not
+  a loop; the difference between two figures is a list of named rows. The
+  "savings or investment" set, spelled fifteen times under six names, has
+  one owner (`src/vocabulary.js`), and a grep gate forbids a second copy.
+- **The reasoning moved out of the code.** 208 rules the calculation modules
+  carried as comments are registered in ADR-0007 with their evidence; the
+  modules keep three-line pointers. Nothing but comments moved — the
+  comment-stripped source was byte-identical before and after.
+
+Every phase shipped against the same gate: all guard suites green and the
+numbers ledger byte-identical, except for the corrections named above.
 
 ## 1.38.0 — 2026-09-03
 

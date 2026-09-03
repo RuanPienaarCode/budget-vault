@@ -28,3 +28,6 @@ node_modules/
 # synthetic household in tests/figures/household.cjs; anything under this folder
 # came off someone's actual finances and this repo is public.
 tests/figures/live/
+
+# build tooling
+node_modules/
