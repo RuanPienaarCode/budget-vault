@@ -257,14 +257,19 @@ async function mount(files) {
   ctx.switchView = () => {};
   require('../src/views/savings')(ctx);
   ctx.renderSavings();
-  return { S, nodes };
+  return { S, nodes, ctx };
 }
 
 (async () => {
-  const { S, nodes } = await mount(FILES);
+  const { S, nodes, ctx } = await mount(FILES);
 
-  /* ---- 1. the tile and the chart state the SAME net worth ---- */
-  const w = worth(S.accounts, S.debts, S.assets);
+  /* ---- 1. the tile and the chart state the SAME net worth ----
+     ISSUE 39/44: the view's own arguments, not a narrower set. `S.owed` because
+     receivables are part of the balance sheet, and implied balances because
+     net worth is as-of TODAY like every other present-tense figure in this app
+     — a worth() call here with different inputs from the view's is not an
+     independent check of the view, it is a different question. */
+  const w = worth(ctx.impliedAccounts(), S.debts, S.assets, S.settings.currency, S.owed);
   const kpis = byCls(nodes.get('savingsKpis'), 'mini').map(flat);
   const netTile = kpis.find(t => t.startsWith('Net worth'));
   ok(netTile.includes(money(w.net)), `the tile states worth()'s net — got "${netTile}"`);

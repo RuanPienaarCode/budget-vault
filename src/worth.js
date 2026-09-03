@@ -18,6 +18,13 @@
    case-folded — the same account, a card to one page and not the other. */
 const { isCreditCard } = require('./committed');
 const { currenciesIn, isForeign, symbolOf } = require('./currency');
+/* owed-math.js owns what "still out" means — a row's amount less what has come
+   back, floored, with a hand-set `paid` status winning over the arithmetic. Net
+   worth reads it from there rather than summing `amount` itself, because a
+   part-recovered loan (R2 000 lent, R500 back) is R1 500 of receivable and any
+   second copy of that subtraction is one more place for the balance sheet and
+   the Owed page to disagree. */
+const { outstandingOf, isSettled } = require('./owed-math');
 
 /* Only `active` debts count. A debt marked paid is history; leaving it in
    reports a bond as still owed years after it was settled. */
@@ -39,6 +46,29 @@ function assetTotal(assets, household) {
        has not been taught about currencies is unchanged. */
     .filter(a => !household || !isForeign(a, household))
     .reduce((t, a) => t + Math.max(0, a.value || 0), 0);
+}
+
+/* What people still owe the household — the third OWNED ledger, and the one
+   net worth did not read until ISSUE 39.
+
+   Measured on the `BudgetAudit` fixture: R2 000 lent to Thabo on 2026-06-01,
+   still outstanding, absent from a R120 000 net worth on a card whose own copy
+   reads "owned · owed" — where that "owed" means liabilities, so the reader had
+   no word left for the money owed TO them and no line that counted it. The
+   Dashboard's position band already computed owedSummary() four lines from
+   worth()'s own call site and printed the receivable in its own tile: one card,
+   two ledgers, and the balance sheet only added one of them.
+
+   Same three rules the two ledgers beside it follow. Settled rows are
+   history (activeDebts' rule, one ledger over). Foreign rows are held out
+   and named through `otherCurrencies` rather than converted, because this
+   vault holds no rate — currency.js:10 and :14. And `household` absent means
+   "add them all", so every caller that has not been taught about currencies
+   behaves exactly as it did. */
+function owedTotal(owed, household) {
+  return (owed || [])
+    .filter(o => o && !isSettled(o) && (!household || !isForeign(o, household)))
+    .reduce((t, o) => t + outstandingOf(o), 0);
 }
 
 /* The other half of that filter, so a caller can NAME what was left out
@@ -88,11 +118,16 @@ function foreignTotals(rows, household, valueKey) {
    R-valued house and a €20 000 account are summed together either way (as
    documented above they always have been) and this only gives a caller
    something to name the mix with. */
-function worth(accounts, debts, assets, household) {
+function worth(accounts, debts, assets, household, owed) {
   const list = accounts || [];
   const ownedAccounts = list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
   const ownedAssets = assetTotal(assets, household);
-  const owned = ownedAccounts + ownedAssets;
+  /* ISSUE 39. Optional and LAST, so every existing three- and four-argument
+     caller is unchanged: absent means "this surface is not about receivables",
+     which is the honest reading for views/accounts.js's hero (bank money only)
+     and the wrong one for anything that prints the words "net worth". */
+  const ownedOwed = owedTotal(owed, household);
+  const owned = ownedAccounts + ownedAssets + ownedOwed;
   // `|| 0` collapses -0, which negating a sum of zero produces. Left alone it
   // reaches money() and renders a debt-free vault's liabilities as "-R0.00".
   const fromAccounts = -list.reduce((t, a) => t + Math.min(0, a.balance || 0), 0) || 0;
@@ -117,7 +152,7 @@ function worth(accounts, debts, assets, household) {
   // changes.
   const net = (Math.round((owned - liabilities) * 100) / 100) || 0;
   return {
-    assets: owned, ownedAccounts, ownedAssets,
+    assets: owned, ownedAccounts, ownedAssets, ownedOwed,
     liabilities, fromAccounts, fromDebts,
     net, active,
     currencies: currenciesIn(list, household),
@@ -127,6 +162,14 @@ function worth(accounts, debts, assets, household) {
     otherCurrencies: {
       assets: foreignTotals(assets, household, 'value'),
       debts: foreignTotals(active, household, 'balance'),
+      /* Keyed on `outstanding` rather than `amount` — the same figure the
+         home-currency side counts, so the total and the sentence naming what
+         is missing from it are one subtraction, not two. Unsettled rows only,
+         matching owedTotal: a foreign loan the reader marked paid is history
+         in every currency, and the Owed page's own pill says so. */
+      owed: foreignTotals(
+        (owed || []).filter(o => o && !isSettled(o)).map(o => ({ ...o, outstanding: outstandingOf(o) })),
+        household, 'outstanding'),
     },
   };
 }
@@ -280,11 +323,16 @@ function otherCurrencyNet(w, accountOthers) {
   add(accountOthers, 1);
   add(w && w.otherCurrencies && w.otherCurrencies.assets, 1);
   add(w && w.otherCurrencies && w.otherCurrencies.debts, -1);
+  /* ISSUE 39. Owned, so positive — and reached through the same merge as the
+     other two rather than named separately, because this list qualifies ONE
+     figure (a net worth) and a reader working out what is missing from it
+     should not have to add three sentences together themselves. */
+  add(w && w.otherCurrencies && w.otherCurrencies.owed, 1);
   return [...by]
     .map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0])
     .filter(([, v]) => v !== 0);
 }
 
 module.exports = {
-  worth, activeDebts, assetTotal, foreignTotals, otherCurrencyNet, cardOverlap, accountGroups, debtsByType, assetsByType,
+  worth, activeDebts, assetTotal, owedTotal, foreignTotals, otherCurrencyNet, cardOverlap, accountGroups, debtsByType, assetsByType,
 };

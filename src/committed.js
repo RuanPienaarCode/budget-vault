@@ -139,15 +139,70 @@ function nextOnDay(from, d) {
    accounts counted" line printed under a cash total it formed no part of. The
    line sits beneath the cash figure and so describes what that figure is made
    of — an account holding nothing added nothing to it. */
+/* ISSUE 48. How much of that cash is SPOKEN FOR.
+
+   "Actually free" on the `BudgetAudit` household on 2026-09-02 was R41 800 —
+   the cheque account plus an emergency fund flagged `emergency_fund: true`
+   plus a baby fund of type `savings` — offered at R1 493 a day for the 28 days
+   left in the month. Four tiles along, the same dashboard's health card said
+   the household had 1.6 months of cover. One card was telling the reader to
+   spend the emergency fund and the other was telling them it was too small.
+
+   `cash` itself is not wrong and does not move: money in a savings account IS
+   money in your accounts, and a figure captioned "in your accounts" that
+   quietly omitted it would be a different lie. What is wrong is calling it
+   free. So the earmark is measured here, beside the cash it comes out of, and
+   subtracted from `free` alone.
+
+   TWO KINDS of earmark, and both are the household's own declaration rather
+   than a guess:
+
+     — `emergency_fund`, which is either `true` (the whole balance is the
+       fund) or a NUMBER (that much of it is). resolveEarmarks() in
+       health-math.js owns that reading for the score; this is the same rule,
+       kept here rather than imported because committed.js is the pure module
+       the "what's left" card is built from and health-math is the pure module
+       the score is built from — neither may require the other. The two are
+       held together by tests/earmarked-cash.test.cjs.
+     — an account whose TYPE is savings or investment. A baby fund is money
+       set aside by the act of putting it there; a per-day spending rate drawn
+       out of it is the card recommending the household raid it.
+
+   Case-folded and trimmed, because `load.js` only defaults `type` when the key
+   is ABSENT — `type: Savings` and `type: ' savings '` both reach here exactly
+   as written, and worth.js:122-141 documents that same trap costing a chart
+   R80 000.
+
+   A household that genuinely spends from its savings account has the mechanism
+   this app already gives them: `budget: false` keeps an account out of these
+   figures entirely. What they must not have is a card silently counting a
+   sinking fund as this week's spending money. */
+const EARMARKED_TYPES = new Set(['savings', 'investment']);
+function earmarkOf(a) {
+  const held = Math.max(0, a.implied || 0);
+  if (!held) return 0;
+  const ef = a.emergencyFund;
+  if (ef === true) return held;
+  if (typeof ef === 'number' && ef > 0) return Math.min(ef, held);
+  return EARMARKED_TYPES.has(String(a.type || '').trim().toLowerCase()) ? held : 0;
+}
+
 function cashOnHand(accounts) {
-  let cash = 0, counted = 0;
+  let cash = 0, counted = 0, earmarked = 0;
   const unknown = [];
+  /* Named, not just totalled: a figure held back from "actually free" is an
+     exclusion, and this app does not exclude in silence. */
+  const earmarkedFrom = [];
   for (const a of accounts || []) {
     if (!a || a.inBudget === false) continue;
     if (!a.dated) { unknown.push(a.name); continue; }
-    if (a.implied > 0) { cash += a.implied; counted++; }
+    if (a.implied > 0) {
+      cash += a.implied; counted++;
+      const ear = earmarkOf(a);
+      if (ear > 0) { earmarked += ear; earmarkedFrom.push({ name: a.name, amount: ear }); }
+    }
   }
-  return { cash, counted, unknown };
+  return { cash, counted, unknown, earmarked, earmarkedFrom };
 }
 
 /* ---------------------------- commitments ------------------------------- */
@@ -222,7 +277,40 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
    payments. Falling back to the debt's start date is honest (that is the day
    the agreement runs on); falling back to nothing means the instalment can only
    be placed in a window of a whole month or more, per rule 6. */
-function debtCommitments({ debts, rows, from, to, periodStart, periodDays }) {
+/* ISSUE 46. `from` is deliberately NOT used to place the due date, and that is
+   the whole of this fix.
+
+   whatsLeft starts its window at TODAY, on the argument that "a charge dated
+   earlier that never arrived is not still coming, it is missing". That reading
+   is right for a service, whose charge is somebody else's to make. It is wrong
+   for a contracted instalment, which does not stop being owed because its day
+   went by — and this function already knew that, because rule 2 above searches
+   [periodStart, to] for evidence the instalment was PAID. Two halves of one
+   rule, looking at two different windows: the half that decides "already
+   settled" looked back to the period start, and the half that decides "due at
+   all" started at today.
+
+   Measured on the `BudgetAudit` household on 2026-09-02: an FNB card, R500 a
+   month, due day 1, no September payment anywhere in the ledger. Rule 2 found
+   nothing and correctly did not skip it; nextOnDay(today=2 Sep, 1) then
+   returned 1 OCTOBER, past the period end, and the item was dropped. The card
+   read "nothing scheduled" and "actually free" was the entire cash pile — the
+   one direction this card must never be wrong in, on the one day of the month
+   the household most needs it to be right.
+
+   So the placement window is the PERIOD, matching the window rule 2 already
+   uses, and an instalment whose day has passed with no payment against it is
+   carried as `missed` rather than dropped. The view says "was due 1 Sep"
+   instead of "expected", because this app argues rather than corrects: the
+   claim, the date and the reason are all on the page and the reader decides
+   whether the vault or the bank is wrong.
+
+   The conservative direction is deliberate. A debt with no `category` can
+   never satisfy rule 2 — nothing links a payment row to it — so such a debt is
+   now claimed for the whole period rather than only up to its due day. That
+   over-states what is committed, which under-states what is free, which is the
+   only one of the two errors this card can afford. */
+function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today }) {
   const out = [];
   const history = (rows || []).filter(r => !isSplitPart(r));
   for (const d of debts || []) {
@@ -236,7 +324,7 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays }) {
     if (paid.some(r => r.date >= periodStart && r.date <= to)) continue;   // rule 2
 
     const usual = paid.length ? median(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
-    let due = usual ? nextOnDay(from, usual) : null;
+    let due = usual ? nextOnDay(periodStart, usual) : null;
 
     if (due) {
       if (due > to) continue;
@@ -252,6 +340,10 @@ function debtCommitments({ debts, rows, from, to, periodStart, periodDays }) {
       name: d.name,
       detail: d.lender || '',
       due,
+      /* Its day has gone and rule 2 found no payment against it. Carried on
+         the item rather than re-derived in the view, so the figure and the
+         sentence explaining it cannot come from two different comparisons. */
+      missed: !!(due && ISO_DATE.test(today || '') && due < today),
       amount: payment,
       basis: 'contracted',
     });
@@ -376,13 +468,13 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
      not the place to argue about it. */
   const from = now && now > periodStart ? now : periodStart;
 
-  const { cash, counted, unknown } = cashOnHand(accounts);
+  const { cash, counted, unknown, earmarked, earmarkedFrom } = cashOnHand(accounts);
   const { owed, cards, entries: owedEntries } = cardsOwed(accounts);
 
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
   const items = [
     ...serviceCommitments({ services, rows, from, to, periodStart }),
-    ...debtCommitments({ debts, rows, from, to, periodStart, periodDays }),
+    ...debtCommitments({ debts, rows, from, to, periodStart, periodDays, today: now }),
     ...cardCommitments({ accounts, from, to }),
   ].sort((a, b) => (b.amount - a.amount));
 
@@ -479,7 +571,14 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
      `cycle` says the card is being handled separately; committedOther alone
      is what is still coming out of THIS cash. Outside a cycle, cardDue is a
      real claim like any other and stays in. */
-  const free = cycle ? cash - committedOther : cash - committed;
+  /* ISSUE 48. Earmarked money comes out of `free` and out of nothing else —
+     see cashOnHand's own note. Floored at the cash figure so a household whose
+     declared earmarks exceed what it actually holds gets "R0 free" rather than
+     a negative free figure that reads as a shortfall it does not have; the
+     over-earmark itself is the score card's finding (resolveEarmarks' `over`),
+     not this card's. */
+  const spokenFor = Math.min(cash, earmarked);
+  const free = (cycle ? cash - committedOther : cash - committed) - spokenFor;
 
   /* Compared in CENTS, never as a raw float difference. Summing floats that
      were themselves fine (measured across 1,000 realistic amounts: no
@@ -501,6 +600,12 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
        still add up: cash - committedOther - cardDue = free (outside a
        cycle; inside one, cash - committedOther = free directly). */
     committedOther,
+    /* ISSUE 48. Beside the figures AND inside `free`, unlike `owed` below —
+       the whole point is that this one changes the answer. `earmarkedFrom`
+       names which accounts, because "R23 000 is spoken for" with no way to
+       see where invites the reader to assume it is wrong. */
+    earmarked: spokenFor,
+    earmarkedFrom,
     incoming,
     /* What `free` becomes once `incoming` lands — computed HERE, once, because
        the view cannot safely do it. `incoming` and `cycle.settling` are the

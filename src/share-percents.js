@@ -46,30 +46,50 @@ function sharePercents(amounts) {
   return largestRemainder(amounts.map(v => (v / total) * 100), 100);
 }
 
-/* One share, printed as a percentage label — whole percents, except that a
-   share genuinely past (or short of) 100% must never round back ONTO the
-   boundary. "100% allocated" printed beside a red "over-budgeted R 97,80" was
-   the trap this closes: 100.24% rounds to 100, and the one thing that pair of
-   tiles exists to say — which SIDE of the line the plan is on — was exactly
-   what the rounding ate. The same masking runs the other way (99.7% printing
-   "100%" over a real amount still unallocated), so the guard is symmetric.
+/* One share, printed as a percentage label — whole percents, except at the two
+   boundaries where a whole percent would state the opposite of the truth.
 
-   Decimals appear only at that boundary and only as many as it takes (at most
-   two — a share within half a hundredth of a percent of 100 IS 100 at any
-   precision this app can render); everywhere else the label is the same whole
-   percent every caller printed before. `decimalSep` is the locale's own
-   separator, the one formatMoney already prints, so "100,2%" and "R 97,80"
+   100% was the first. "100% allocated" printed beside a red "over-budgeted
+   R 97,80" was the trap this closes: 100.24% rounds to 100, and the one thing
+   that pair of tiles exists to say — which SIDE of the line the plan is on —
+   was exactly what the rounding ate. The same masking runs the other way (99.7%
+   printing "100%" over a real amount still unallocated), so the guard is
+   symmetric.
+
+   0% is the same trap one boundary down, and ISSUE 37 is what it cost. A
+   household with an FNB card at 22.25% on R8 000 pays R148 a month of interest;
+   against a R35 000 income that is 0.42%, and Math.round takes it to 0. The
+   Dashboard's debt tile printed "0%" directly above its own meta line reading
+   "R 148 a month" — one tile, two opposite claims, and "0%" is the one that
+   reads as a verdict. It is also the exact claim health-math.js's null-vs-zero
+   rule exists to prevent ("a debt whose rate nobody has typed is not a debt at
+   0%"), defeated at the last step by the formatter rather than by the maths.
+
+   So the guard is not "the 100 boundary", it is "the whole percent this label
+   would land on, when landing there is itself a claim". Small is not none, and
+   over is not exactly.
+
+   Decimals appear only at those boundaries and only as many as it takes (at
+   most two — a share within half a hundredth of a percent of a boundary IS that
+   boundary at any precision this app can render, which is also what keeps a
+   true 0 printing "0" rather than "0,00"); everywhere else the label is the
+   same whole percent every caller printed before. `decimalSep` is the locale's
+   own separator, the one formatMoney already prints, so "100,2%" and "R 97,80"
    agree on what a decimal looks like. */
+const GUARDED = new Set([0, 100]);
 function sharePercentLabel(share, decimalSep) {
   const pct = share * 100;
   if (!Number.isFinite(pct)) { return '0'; }
   const whole = Math.round(pct);
-  if (whole !== 100 || Math.abs(pct - 100) < 0.005) { return String(whole); }
+  /* `whole` is what String() would print, so -0 (from any pct in [-0.5, 0))
+     compares equal to 0 here and prints "0" — the same rule formatMoney
+     applies to a minus that outlived its digits. */
+  if (!GUARDED.has(Math.abs(whole)) || Math.abs(pct - whole) < 0.005) { return String(whole); }
   for (let d = 1; d <= 2; d++) {
     const s = pct.toFixed(d);
-    if (Number(s) !== 100) { return s.replace('.', decimalSep || '.'); }
+    if (Number(s) !== whole) { return s.replace('.', decimalSep || '.'); }
   }
-  return '100';
+  return String(whole);
 }
 
 module.exports = { sharePercents, largestRemainder, sharePercentLabel };

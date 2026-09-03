@@ -193,17 +193,50 @@ function reconcile(a, rows, today) {
      with the verdict and acct-status refuses to call the account settled
      while one exists: the app argues, it never silently corrects. */
   let unreadable = 0;
+  /* ISSUE 45. Rows dated exactly ON the confirmation day, counted rather than
+     merely skipped.
+
+     The skip itself is right and must not change. views/accounts.js's accept
+     handler stamps `balance_updated` to the LAST row it counted, so a row
+     sharing that date has already been folded into the figure on file — read
+     with `<` instead, every accept would count its own boundary rows a second
+     time on the next pass. That handler's own comment names this: day-
+     granularity dates "cannot distinguish [these] from the ones already
+     counted".
+
+     What was wrong was the silence. On the `BudgetAudit` household on
+     2026-09-02, every account was confirmed 2026-09-01 and the cheque account
+     had three rows on that date netting +R29 500 — a R35 000 salary among them
+     — which "money you have right now" treated as already inside R20 000 and
+     said nothing about. The reader saw R41 800 available with payday nowhere
+     in it and no way to tell whether the app had missed it or the balance had
+     already absorbed it. A confirmation date that lands on payday is a silent
+     footgun, and silence is the part this app does not get to keep:
+     currency.js:14 forbids excluding money without naming it, and this module
+     already has the shape for saying so — `unreadable` is a COUNT travelling
+     with the verdict rather than a sixth state, for exactly the reason a sixth
+     state would have to be understood by every caller first.
+
+     `net` as well as `count`, because the two answer different halves. Three
+     rows netting nothing is a formality; three rows netting R29 500 is the
+     whole of what the reader is being asked to take on trust. */
+  let sameDayCount = 0, sameDayNet = 0;
   for (const r of rows) {
     if (supersededBySplit(r)) continue;   // its parts are in this same list
     if (!isRealIsoDate(r.date)) { unreadable++; continue; }
-    if (r.date <= a.balance_updated) continue;
+    if (r.date < a.balance_updated) continue;
+    if (r.date === a.balance_updated) { sameDayCount++; sameDayNet += r.amount; continue; }
     (r.date > now ? ahead : since).push(r);
   }
+  /* Cent precision, and `|| 0` to collapse the -0 a sum of signed floats
+     leaves behind — the same two steps formatMoney applies, so a disclosure
+     that says "R -0,00 was already counted" cannot happen. */
+  const sameDay = { count: sameDayCount, net: (Math.round(sameDayNet * 100) / 100) || 0 };
   const delta = since.reduce((s, r) => s + r.amount, 0);
   if (!since.length) {
     return ahead.length
-      ? { state: 'pending', ahead: ahead.length, unreadable }
-      : { state: 'clean', unreadable };
+      ? { state: 'pending', ahead: ahead.length, unreadable, sameDay }
+      : { state: 'clean', unreadable, sameDay };
   }
   /* Rows that NET TO NOTHING have not moved the balance, so there is nothing
      to disagree about. Read as a drift, R2 000 out to savings and R2 000
@@ -213,12 +246,12 @@ function reconcile(a, rows, today) {
      offer to move the confirmation date forward. Cent precision, because the
      rows are money and float noise is not a disagreement either. */
   if (Math.round(delta * 100) === 0) {
-    return { state: 'clean', count: since.length, ahead: ahead.length, unreadable, since };
+    return { state: 'clean', count: since.length, ahead: ahead.length, unreadable, sameDay, since };
   }
   /* `since` travels with the verdict so the view can show WHICH rows moved the
      figure. Reporting a delta and then making the reader hunt for its cause is
      most of the work of reconciling left undone. */
-  return { state: 'drift', count: since.length, ahead: ahead.length, unreadable, delta, implied: a.balance + delta, since };
+  return { state: 'drift', count: since.length, ahead: ahead.length, unreadable, sameDay, delta, implied: a.balance + delta, since };
 }
 
 /* How many of a set of accounts are carrying an unconfirmed balance, and the

@@ -252,7 +252,13 @@ function sectionText(md, heading) {
          worth.js's otherCurrencyNet. Before this fix the document disclosed
          the accounts half only, when it disclosed anything at all — which it
          did not, because the line was built and never emitted. */
-      ok(sectionText(mixed, H).includes(i18n.t('acct.hero.otherCurrencies', { list: '€ 210000' }).trim()),
+      /* ISSUE 44: the accounts half is now their IMPLIED balances, the same
+         as-of the rest of the app uses — Euro Current confirmed at €20 000 on
+         2026-07-01 and carrying +€30 000 and −€900 since reads €49 100. So
+         49 100 + 90 000 fund + 200 000 flat − 100 000 bond = €239 100. The
+         point of the assertion is unchanged and is not the literal: all FOUR
+         euro ledgers reach the sentence, not the accounts alone. */
+      ok(sectionText(mixed, H).includes(i18n.t('acct.hero.otherCurrencies', { list: '€ 239100' }).trim()),
         'and the section states the euro net it held out — accounts AND the flat AND the bond, not the accounts alone');
       ok(!sectionText(home, H).includes('held in other currencies'), 'silent on a rand-only vault');
     }

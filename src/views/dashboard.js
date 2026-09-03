@@ -10,7 +10,7 @@ const { stalenessSummary, reconcile, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso } = require('../dates');
-const { allocatedShare } = require('../money-flow');
+const { allocatedShare, incomeBaseFor } = require('../money-flow');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency, primaryTotal } = require('../currency');
@@ -39,7 +39,7 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
 const { assumedActual } = require('./budgets');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -158,7 +158,11 @@ module.exports = function registerDashboard(ctx) {
           el('button', { type: 'button', class: 'health-fig-btn', onclick: () => ctx.switchView(to) }, ...kids))
         : el('div', { class: `health-fig ${cls}` }, ...kids);
     };
-    const pct = r => `${Math.round(r * 100)}%`;
+    /* sharePercentLabel, not a bare Math.round — ISSUE 37. The debt tile's own
+       meta line prints the rand figure this share is OF ("R 148 a month"), so a
+       share that rounds to "0%" puts two opposite claims on one tile. The same
+       helper the budget tiles below already use for the 100% boundary. */
+    const pct = r => `${sharePercentLabel(r, locale().decimal)}%`;
 
     /* Emergency cover. The meter fills toward the target and re-tones at the
        halfway mark — under half a fund is a different fact from nearly-there,
@@ -439,12 +443,35 @@ module.exports = function registerDashboard(ctx) {
        See unreadableNote() above for why the sentence may still come out
        empty even when this count is not. */
     const unplacedBy = new Map();
+    /* ISSUE 45. The same shape, one row along: activity dated ON an account's
+       own confirmation day, which reconcile() treats as already inside the
+       stated balance (correctly — see its own note) and which nothing on this
+       card admitted to.
+
+       Measured on the `BudgetAudit` household on 2026-09-02: three cheque rows
+       dated 2026-09-01, the day every balance was confirmed, netting +R29 500
+       with a R35 000 salary among them. "Money you have right now" read
+       R41 800 with payday nowhere in it, and the reader had no way to tell
+       whether the app had missed the salary or the balance had already
+       absorbed it. Those are opposite conclusions and only one of them is a
+       reason to act.
+
+       Same per-currency keying and same in-budget test as `unplacedBy`, for
+       the identical reason: an account the reader opted out of contributes to
+       no figure here, so a caveat drawn from it would qualify a total it
+       cannot have affected. */
+    const confirmDayBy = new Map();
     const accounts = S.accounts.map(a => {
       const rows = (idx.get(a) || {}).rows || [];
       const rec = reconcile(a, rows);
       if (rec.unreadable && a.in_budget !== false) {
         const sym = symbolOf(a, S.settings.currency);
         unplacedBy.set(sym, (unplacedBy.get(sym) || 0) + rec.unreadable);
+      }
+      if (rec.sameDay && rec.sameDay.count && a.in_budget !== false) {
+        const sym = symbolOf(a, S.settings.currency);
+        const at = confirmDayBy.get(sym) || { count: 0, net: 0 };
+        confirmDayBy.set(sym, { count: at.count + rec.sameDay.count, net: at.net + rec.sameDay.net });
       }
       return {
         name: a.name,
@@ -455,6 +482,13 @@ module.exports = function registerDashboard(ctx) {
            this only hands over what they need to decide with. */
         type: a.type,
         settleMonthly: !!a.settle_monthly,
+        /* ISSUE 48. The household's own two declarations that this money is
+           spoken for — the earmark flag and the account's type. Passed as data
+           the way `type` and `settleDay` already are, so committed.js decides
+           what they mean and this view only hands over what it reads off the
+           file. `emergency_fund` is `true` or a NUMBER; both survive the
+           handover unconverted because both mean different things. */
+        emergencyFund: a.emergency_fund,
         settleDay: a.settle_day || 0,
         institution: a.institution || '',
         /* ISSUE 30. One field, added at the one place this list is built.
@@ -646,6 +680,15 @@ module.exports = function registerDashboard(ctx) {
        Silent when the sentence has no translation yet; see unreadableNote(). */
     const cashUnplaced = unreadableNote(unplacedBy.get(home) || 0);
     if (cashUnplaced) cashParts.push(cashUnplaced);
+    /* ISSUE 45. Home group only, matching the arithmetic `L` was handed —
+       each foreign band carries its own below. `count` is passed as well as
+       `amount` because i18n.t() selects the plural form off `count` alone. */
+    const cashConfirmDay = confirmDayBy.get(home);
+    if (cashConfirmDay && cashConfirmDay.count) {
+      cashParts.push(i18n.t('dash.left.confirmDay', {
+        count: cashConfirmDay.count, amount: money(cashConfirmDay.net, 0),
+      }));
+    }
     /* NO "adds more than one currency" caveat on this figure, deliberately.
 
        One was printed here until 2026-09-02. It was written when cashOnHand()
@@ -704,12 +747,43 @@ module.exports = function registerDashboard(ctx) {
     const dCash = L.cashKnown ? Math.round(L.cash) : null;
     const dCommitted = Math.round(L.committedOther);
     const dCard = showCardTerm ? Math.round(L.cardDue) : 0;
-    const dFree = dCash === null ? null : dCash - dCommitted - dCard;
+    /* ISSUE 48. A TERM in the strip, not a subtraction hidden inside `free`.
+
+       This chain is the one place on the page whose arithmetic has to survive
+       being re-added by eye — that is why dFree is rebuilt from the ROUNDED
+       terms rather than taken from L.free. An earmark deducted silently would
+       have broken that in the same edit that fixed the figure: the reader
+       would have seen R41 800 − R500 = R18 300 and been right to distrust the
+       card. Shown only when there IS one, so a household with no declared
+       funds sees the same three-term strip it always did. */
+    const showEarmark = (L.earmarked || 0) >= 1;
+    const dEarmarked = showEarmark ? Math.round(L.earmarked) : 0;
+    const dFree = dCash === null ? null : dCash - dEarmarked - dCommitted - dCard;
     const op = () => el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−');
-    const grid = el('div', { class: `left-grid${showCardTerm ? ' left-grid--card' : ''}` },
+    /* ISSUE 48. The strip can now hold three, four or five terms — cash, an
+       optional earmark, committed, an optional card settlement, free — so the
+       column count is derived rather than named after whichever optional term
+       happened to exist first. `left-grid--card` is kept alongside it: it is
+       still true (there IS a card term) and something may yet key off it, but
+       the WIDTH now comes from the count. */
+    const terms = 3 + (showEarmark ? 1 : 0) + (showCardTerm ? 1 : 0);
+    const grid = el('div', {
+      class: `left-grid left-grid--n${terms}${showCardTerm ? ' left-grid--card' : ''}`,
+    },
       fig('is-cash', dCash !== null ? money(dCash, 0) : '—',
-        i18n.t('dash.left.cash'), cashParts.join(' · ')),
-      op(),
+        i18n.t('dash.left.cash'), cashParts.join(' · ')));
+    if (showEarmark) {
+      /* Named down to the accounts in the sub-line: "R23 000 is spoken for"
+         with no way to see where invites the reader to assume it is wrong,
+         and the whole point of this term is that they should be able to
+         disagree with it. */
+      grid.append(op(), fig('is-earmarked', money(dEarmarked, 0),
+        i18n.t('dash.left.earmarked'),
+        (L.earmarkedFrom || []).length <= 2
+          ? (L.earmarkedFrom || []).map(e => e.name).join(' · ')
+          : i18n.t('dash.left.earmarkedFrom', { count: L.earmarkedFrom.length })));
+    }
+    grid.append(op(),
       fig('is-committed', money(dCommitted, 0),
         i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')));
     if (showCardTerm) {
@@ -753,6 +827,14 @@ module.exports = function registerDashboard(ctx) {
            nobody can date qualifies the euro figure and nothing else, which is
            the whole reason unplacedBy is keyed by symbol. */
         unreadableNote(unplacedBy.get(g.sym) || 0) || null,
+        /* ISSUE 45, per foreign band — same reason the line above is keyed by
+           symbol: this band states its own cash figure, so it must state its
+           own confirmation-day caveat rather than borrow the household's. */
+        (confirmDayBy.get(g.sym) && confirmDayBy.get(g.sym).count)
+          ? i18n.t('dash.left.confirmDay', {
+            count: confirmDayBy.get(g.sym).count,
+            amount: ctx.moneyIn(g.sym, confirmDayBy.get(g.sym).net, 0),
+          }) : null,
       ].filter(Boolean);
       body.append(el('div', { class: 'left-fx' },
         el('span', { class: 'left-fx-sym' }, g.sym),
@@ -886,8 +968,15 @@ module.exports = function registerDashboard(ctx) {
     if (L.items.length) {
       const list = el('table', { class: 'left-disc' });
       for (const it of L.items) {
+        /* ISSUE 46. "expected 1 Sep" printed on the 2nd is the app telling
+           the reader to wait for something that has already not happened. An
+           instalment whose day has gone with no payment against it is still
+           claimed — that is the fix — so the row has to SAY that rather than
+           quietly mis-tense it. `missed` is stamped in committed.js where the
+           comparison is made, so the claim and the sentence explaining it come
+           from one reading of the date. */
         const when = it.due
-          ? i18n.t('dash.left.expected', { date: it.due })
+          ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: it.due })
           : i18n.t('dash.left.thisPeriod');
         const src = it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
           : it.basis === 'stated' ? i18n.t('dash.left.asListed')
@@ -971,7 +1060,14 @@ module.exports = function registerDashboard(ctx) {
 
        Same rule as the Accounts hero and the Savings page now: split first,
        sum the household's own currency, name every other symbol beside it. */
-    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(S.accounts, S.settings.currency);
+    /* ISSUE 44. IMPLIED balances, not stated ones — the same figures the
+       "money you have right now" card is built from. Two as-of dates on one
+       Dashboard printed R41 800 of cash (a 2 September Checkers shop inside
+       it) beside a R120 000 net worth built on a cash pile still reading as
+       of 1 September. Net worth genuinely does not move with the PERIOD, and
+       its caption says so; that was never a reason for it not to move with
+       the DAY. */
+    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(impliedAccounts(), S.settings.currency);
     /* The same sentence the Accounts hero carries, from the same key — so the
        two screens cannot word the same fact differently. */
     const otherLine = others => (others.length
@@ -983,7 +1079,11 @@ module.exports = function registerDashboard(ctx) {
        caller dropped it — and, called with three arguments, computed it
        against a fallback household of "R", so an Rp vault got a list naming a
        currency it has never held. */
-    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
+    /* ISSUE 39. S.owed passed: this card already computed owedSummary() a
+       few lines down and printed the receivable in its own tile, so before
+       this the balance sheet and the tile beside it read the same ledger and
+       only one of them counted it. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     /* The NET-WORTH tile's disclosure is the accounts' `others` merged with
        the two ledgers worth() reads directly — see otherCurrencyNet's own
        header in worth.js. Before this it named the accounts alone, so a
@@ -1234,10 +1334,23 @@ module.exports = function registerDashboard(ctx) {
   function renderHero() {
     const sum = periodSummary(S.period);
     const bud = budgetTotals(S.period);
-    const available = bud.spend - sum.spend;
+    /* ISSUE 40. SPEND against SPEND. `bud.spend` no longer holds the
+       savings/investment envelopes and `spent` no longer holds the outgoings
+       that fill them — both halves moved together, because a remaining figure
+       built from a narrowed budget and an unnarrowed actual would be a new
+       version of the same defect rather than a fix for it.
+
+       The audit household: R14 500 budgeted against R11 590 spent left R2 910
+       under a hero reading "Budget remaining this period". That R2 910 was
+       R4 000 of unfilled savings envelopes less R1 090 of grocery overspend —
+       two facts that had cancelled into a number that looked like headroom.
+       Measured on spend alone the same household has R800 left and a grocery
+       envelope already over, which is the thing worth knowing. */
+    const spent = sum.spend - (sum.setAside || 0);
+    const available = bud.spend - spent;
     const heroNegative = available < 0;
-    const meterMax = Math.max(sum.spend, bud.spend, 1);
-    const fillPct = Math.min(100, (sum.spend / meterMax) * 100).toFixed(2);
+    const meterMax = Math.max(spent, bud.spend, 1);
+    const fillPct = Math.min(100, (spent / meterMax) * 100).toFixed(2);
     const markPct = bud.spend > 0 ? ((bud.spend / meterMax) * 100).toFixed(2) : null;
     /* Against the income the BUDGET states, not the income that happens to
        have landed so far — see incomeBaseFor() in money-flow.js, which now
@@ -1247,8 +1360,14 @@ module.exports = function registerDashboard(ctx) {
 
        Five of this vault's eight budget files carry no income row, so the
        no-percentage branch is the normal one here, not the corner. */
+    /* Both envelopes here, deliberately, where the remaining figure above takes
+       only one. "How much of my income have I allocated" is a question about
+       the whole plan — a rand into the emergency fund is every bit as
+       allocated as a rand of groceries — and answering it off the spend
+       envelopes alone would report a household that saves a fifth of its
+       income as having planned for nothing. */
     const allocated = allocatedShare({
-      budgeted: bud.spend, budgetIncome: bud.income, actualIncome: sum.income,
+      budgeted: bud.spend + (bud.setAside || 0), budgetIncome: bud.income, actualIncome: sum.income,
       periodFinished: S.period !== currentPeriod(),
     });
     /* sharePercentLabel, not a bare Math.round: 100.24% allocated rounding to
@@ -1257,7 +1376,49 @@ module.exports = function registerDashboard(ctx) {
        side of the line the plan is on. Same rule for "used", where 100% is
        the same kind of boundary. */
     const budgetedPct = allocated === null ? null : sharePercentLabel(allocated, locale().decimal);
-    const usedPct = bud.spend > 0 ? sharePercentLabel(sum.spend / bud.spend, locale().decimal) : null;
+    /* ISSUE 36. WHICH income that percentage is of, when it is not the one
+       printed six inches to the left.
+
+       The denominator choice is deliberate and stays: "of income budgeted"
+       measures the plan against the income the plan was built on, which is
+       why incomeBaseFor prefers `budgetIncome`. What was wrong was that the
+       hero states BOTH numbers and named neither. On the `BudgetAudit`
+       household on 2026-09-02 the income line read R40 000 — a R35 000 salary
+       plus a R5 000 family gift — and the line under "Budgeted" read "41% of
+       income budgeted", which is 14 500 / 35 000. One card, one word "income",
+       two figures, and no way for a reader to work out that the two were
+       answering different questions.
+
+       Named only when the two actually differ. On the common vault, where the
+       budget's income row and the period's income agree, the extra clause
+       would be noise qualifying nothing. */
+    const incomeBase = incomeBaseFor({
+      budgetIncome: bud.income, actualIncome: sum.income,
+      periodFinished: S.period !== currentPeriod(),
+    });
+    const baseDiffers = allocated !== null && Math.round((incomeBase - sum.income) * 100) !== 0;
+    const usedPct = bud.spend > 0 ? sharePercentLabel(spent / bud.spend, locale().decimal) : null;
+    /* ISSUE 40. The stat column states the WHOLE plan (R14 500) while the hero
+       above it now measures against the spend envelopes alone (R10 500). Both
+       are right for their own question and the card must not leave a reader to
+       discover the R4 000 gap by subtraction — that is the shape this whole
+       audit keeps finding. Named only when there IS a set-aside envelope. */
+    /* ISSUE 43. Budgeted BESIDE moved. The envelopes' own actuals are R0 and
+       will stay R0 while the funding rows are categorised Transfer — there is
+       no link from a transfer row to a budget category, and this repo does not
+       guess at free text (worth.js's cardOverlap says why). What can be
+       answered honestly is the aggregate, so the reader compares two totals
+       instead of being shown a per-envelope zero that is not true.
+
+       movedToFunds() pairs the legs, so money shuffled between two funds is
+       not counted as fresh saving — the same reading the score's own saving
+       rate takes, from the same function. */
+    const moved = (bud.setAside || 0) > 0 ? movedToFunds(S.period) : 0;
+    const setAsideNote = (bud.setAside || 0) > 0
+      ? i18n.t('dash.stat.setAsideMoved', {
+        amount: money(bud.setAside, 0), moved: money(moved, 0),
+      })
+      : '';
 
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
@@ -1279,6 +1440,9 @@ module.exports = function registerDashboard(ctx) {
        category, already netted off that category's own actual, and calling
        them uncounted income would be the noise that stops people reading the
        line at all. Silent under a currency unit, where only rounding lives. */
+    const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
+    const sched = sum.scheduled || { income: 0, spend: 0 };
+    const scheduledAhead = (sched.income || 0) + (sched.spend || 0);
     const inUncounted = (sum.uncatIncome || 0) + ((sum.unknown && sum.unknown.income) || 0);
     /* ISSUE 28. Every figure on this hero — available, income, budgeted, spent
        and the meter — is built from periodSummary, which now holds foreign
@@ -1298,8 +1462,15 @@ module.exports = function registerDashboard(ctx) {
           inUncounted >= 1 ? el('div', { class: 'st' }, i18n.t('dash.stat.notIncome', { amount: money(inUncounted) })) : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.budgeted'))),
-        el('div', {}, el('div', { class: 'sv' }, money(bud.spend)),
-          budgetedPct !== null ? el('div', { class: 'st' }, i18n.t('dash.stat.allocated', { pct: budgetedPct })) : '')),
+        el('div', {}, el('div', { class: 'sv' }, money(bud.spend + (bud.setAside || 0))),
+          (budgetedPct !== null || setAsideNote)
+            ? el('div', { class: 'st' }, [
+              budgetedPct === null ? '' : baseDiffers
+                ? i18n.t('dash.stat.allocatedOf', { pct: budgetedPct, amount: money(incomeBase, 0) })
+                : i18n.t('dash.stat.allocated', { pct: budgetedPct }),
+              setAsideNote,
+            ].filter(Boolean).join(' · '))
+            : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
         el('div', {}, el('div', { class: 'sv' }, money(sum.spend)),
@@ -1389,6 +1560,34 @@ module.exports = function registerDashboard(ctx) {
         el('div', { class: 'hero-lbl' }, i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
         heroNum,
         el('div', { class: 'hero-sub' }, i18n.t('dash.hero.sub', { spent: money(sum.spend), budgeted: money(bud.spend) })),
+        /* ISSUE 35. The window this card's figures stop at, and what is on the
+           other side of it.
+
+           periodSummary now closes at today rather than at the month's end,
+           because a gift dated the 28th and three gym charges dated the 10th,
+           17th and 24th were being counted on the 2nd as money that had moved.
+           Narrowing a figure is an exclusion like any other, so it is named:
+           the rows are still in the ledger, still in the period, and still
+           coming. `income + spend`, as one gross figure — the reader is being
+           told how much of the month is not yet in these numbers, not asked to
+           reconcile a second net. Silent on a finished period, where there is
+           no other side. */
+        scheduledAhead > 0
+          ? el('div', { class: 'hero-sub hero-sub--ahead' },
+            i18n.t('dash.scheduledAhead', { amount: money(scheduledAhead, 0) }))
+          : '',
+        /* ISSUE 41. Money that left an earmarked fund. Held out of the budget
+           comparison above — a pram bought from the baby fund is not the
+           grocery envelope being blown — and therefore said out loud, because
+           a figure this card stopped counting is an exclusion like any other.
+           `count` is passed as well as `amount`: i18n.t() picks its plural off
+           `count` alone. */
+        fromFunds.count > 0
+          ? el('div', { class: 'hero-sub hero-sub--ahead' },
+            i18n.t('dash.fundedFromSavings', {
+              amount: money(fromFunds.spend, 0), count: fromFunds.count,
+            }))
+          : '',
         meter),
       statCol));
   }

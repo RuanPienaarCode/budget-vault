@@ -1069,7 +1069,16 @@ class OnboardingWizard extends Modal {
     };
     new Setting(c)
       .setName(i18n.t('wiz.folder.name'))
-      .setDesc(i18n.t('wiz.folder.desc'))
+      /* ISSUE 38. Said HERE because this is the one screen where the reader is
+         typing the folder path, and the trap is that the path looks like a
+         place they could open on its own. Obsidian loads plugins from
+         `<vault root>/.obsidian/plugins/`, so "Open folder as vault" on
+         `Finances/` produces no wallet icon, no command and no error — an
+         install that looks failed and is not. There is no code fix available:
+         in that state this plugin is not running to say anything. Opening the
+         inner folder also creates a second `.obsidian` inside it, which is
+         what makes the mistake stick. */
+      .setDesc(`${i18n.t('wiz.folder.desc')} ${i18n.t('wiz.folder.notVault')}`)
       .addText(t => t
         .setPlaceholder('Finances/Budget')
         .setValue(this.data.folder)

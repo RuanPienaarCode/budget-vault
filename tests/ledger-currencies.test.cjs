@@ -95,11 +95,23 @@ const LEDGERS = ['assets', 'owed', 'services', 'debts'];
     'and with NO household symbol it adds everything — exactly as it always did, so every caller not yet taught about currencies is unchanged');
   eq(foreignTotals(assets, 'R', 'value'), [['€', 250000]], 'what it held out is named, in its own symbol');
 
-  const w = worth(accounts, debts, assets, 'R');
-  eq(w.assets, 1520000, 'net worth counts R20 000 cash + the R1.5m house, and NOT the €250k flat');
+  /* ISSUE 39 added a THIRD owned ledger, and it takes the same rule: a euro
+     loan out to a relative is held out of the rand total and named beside it,
+     never converted. Passed here so the case is exercised rather than assumed
+     — an `owed` argument left off would have tested the empty list. */
+  const owed = [{ person: 'Thabo', amount: 2000, status: 'outstanding' },
+    { person: 'Elena', amount: 500, status: 'outstanding', currency: '€' }];
+  const w = worth(accounts, debts, assets, 'R', owed);
+  eq(w.assets, 1522000, 'net worth counts R20 000 cash + the R1.5m house + the R2 000 lent, and NOT the €250k flat or the €500 loan');
+  eq(w.ownedOwed, 2000, 'the receivable half is the rand loan alone');
   eq(w.liabilities, 900000, 'liabilities count the bond and NOT the euro loan');
-  eq(w.otherCurrencies, { assets: [['€', 250000]], debts: [['€', 100000]] },
-    'and BOTH are handed back per ledger, so no page can drop them quietly');
+  eq(w.otherCurrencies, { assets: [['€', 250000]], debts: [['€', 100000]], owed: [['€', 500]] },
+    'and ALL THREE are handed back per ledger, so no page can drop them quietly');
+
+  /* The three-argument contract is untouched: no `owed` means "this surface is
+     not about receivables", which is what views/accounts.js's hero says. */
+  eq(worth(accounts, debts, assets, 'R').assets, 1520000,
+    'and a caller that passes no owed list gets exactly the total it always got');
 
   const blind = worth(accounts, debts, assets);
   eq([blind.assets, blind.liabilities], [1770000, 1000000],

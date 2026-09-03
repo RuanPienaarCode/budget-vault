@@ -519,15 +519,27 @@ async function mount(files, period = '2026-07') {
     ctx.renderDashboard();
     const txt = nodes.get('dashPositionKpis').textContent;
 
-    const w = require('../src/worth').worth(S.accounts, S.debts, S.assets);
+    /* ISSUE 39: S.owed is passed, because the tile passes it. A worth() call
+       here with one argument fewer than the view's is not an independent check
+       of the view — it is a different question, and the answer it gives is the
+       R777 100 this card printed while the tile two along from it said R1 500
+       was still out on loan. */
+    const w = require('../src/worth').worth(S.accounts, S.debts, S.assets, 'R', S.owed);
     const o = require('../src/owed-math').owedSummary(S.owed);
-    // 100 cheque + 5 000 savings + 12 000 investment + 800 000 house = 817 100
-    // owed: 40 000 bond + 0 overdrawn = 40 000  →  net 777 100
-    eq(w.assets, 817100, 'fixture owns 817 100');
+    // 100 cheque + 5 000 savings + 12 000 investment + 800 000 house = 817 100,
+    // plus 1 500 still owed to the household = 818 600
+    // owed: 40 000 bond + 0 overdrawn = 40 000  →  net 778 600
+    eq(w.assets, 818600, 'fixture owns 818 600, receivables included');
+    eq(w.ownedOwed, 1500, 'of which 1 500 is money lent out and not yet back');
     eq(w.liabilities, 40000, 'and owes 40 000');
     eq(o.outstanding, 1500, 'with 1 500 still lent out (2 000 less a 500 repayment)');
+    eq(w.net, 778600, 'net worth counts the receivable');
 
-    ok(txt.includes('R 777100'), `net worth tile carries worth().net — got: ${txt}`);
+    ok(txt.includes('R 778600'), `net worth tile carries worth().net — got: ${txt}`);
+    /* The two tiles are one ledger read once: the receivable in the "owed to
+       you" tile is the same 1 500 inside the net-worth figure beside it. */
+    eq(w.ownedOwed, o.outstanding,
+      'and the receivable in net worth is the same figure the owed tile prints');
     ok(txt.includes('R -40000'), 'the debt tile is negated for display, like the Savings page');
     ok(txt.includes('R 1500'), 'and owed-to-you is net of the part-payment, not the 2 000 lent');
     ok(txt.includes('R 17000'), 'savings + investments are summed into one tile');
@@ -1003,8 +1015,16 @@ async function mount(files, period = '2026-07') {
     };
     const { ctx, nodes } = await mount(WITH_INCOME);
     ctx.renderDashboard();
-    ok(/50% of income budgeted/.test(nodes.get('heroCard').textContent),
-      'budgeted income is the denominator, so day 1 reads the same as day 31');
+    const hero = nodes.get('heroCard').textContent;
+    /* ISSUE 36. Still 50%, and still off budgeted income — that rule is what
+       this case was written to pin and it has not moved. What is new is the
+       clause naming the R10 000, because the income line beside it reads
+       R255: this is exactly the card that sent a reader looking for the
+       arithmetic that turns 255 into 50%. */
+    ok(/50% of the R 10000 income this budget plans for/.test(hero),
+      `budgeted income is the denominator, so day 1 reads the same as day 31 — and the card says which income — got: ${hero}`);
+    ok(!/50% of income budgeted/.test(hero),
+      'and the bare form is not printed beside an income figure it is not taken against');
   });
 
   /* ---- 17. "old" carries a size, not only an age ----------------------- *
