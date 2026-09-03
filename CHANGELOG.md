@@ -3,6 +3,33 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.40.0 — 2026-09-03
+
+### Changed
+
+- **Eight screens redrawn for the phone.** Plan: the plan's name is the title,
+  the hero is "Left to place", sources are compact ledger rows with an edit
+  sheet, buckets are an accordion with delete in the header, and the whole
+  view keeps one gutter. Savings: Investments and Growth sit as a pair, the
+  staleness note is a banner with its button inside, the composition strips
+  carry no text and are read from a ranked, tappable list, and each account
+  is a row that opens an action sheet with Delete fenced below a divider.
+  Assets: one hero with items and largest on a strip and valuation health as
+  a badge. Score: an "Overspent" row replaces "Not yet spent" when spending
+  exceeds income, and nothing prints with a minus sign. Accounts: the
+  decision deck is a one-line banner, the reason prints once per group and
+  on each flagged row, and the filter chips scroll instead of clipping.
+- Action and chip rows across the plugin scroll sideways on a narrow screen
+  instead of being pushed off the left edge.
+
+### Added
+
+- **Ignore on a flagged account row.** Beside Review and the one-tap fix, it
+  appends that row's own reason to `ignore_warnings` and saves only that
+  key; the pill still states the fact. Never offered for an unreadable date.
+- Fifty-two new interface strings in all twelve languages; the Plan page is
+  now translated.
+
 ## 1.39.1 — 2026-09-03
 
 ### Changed
