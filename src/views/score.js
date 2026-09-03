@@ -621,7 +621,9 @@ module.exports = function registerScore(ctx) {
   /* The reader's current standing on one pillar, or null where the vault has
      nothing to state. Deliberately the SAME figures the Dashboard tiles carry. */
   function whereYouAre(key, M, target, earmarks) {
-    const pct = v => `${Math.round(v * 100)}%`;
+    /* sharePercentLabel, not a bare Math.round — ISSUE 37, and the same rule
+       the flow chips further down already take. */
+    const pct = v => `${sharePercentLabel(v, locale().decimal)}%`;
     if (key === 'reserves') {
       if (M.months === null) { return null; }
       const base = i18n.t('score.now.reserves', {
@@ -745,7 +747,9 @@ module.exports = function registerScore(ctx) {
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
-    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels);
+    /* ISSUE 32 — the same third argument health-data.js passes, so this card
+       and the score it explains cannot pair rows differently. */
+    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, catType);
 
     return periodFlow({
       income: summary.income, spentTotal: summary.spend, budgeted: budget.spend,

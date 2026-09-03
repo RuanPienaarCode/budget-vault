@@ -197,6 +197,7 @@ module.exports = {
   'wiz.folder.willCreate': '"{folder}" doesn\'t exist yet — it will be created for you.',
   'wiz.folder.name': 'Budget folder',
   'wiz.folder.desc': 'Where the categories, accounts, budgets and transactions are kept.',
+  'wiz.folder.notVault': 'A folder inside this vault — not a vault of its own. Opening it with “Open folder as vault” hides the plugin.',
   'wiz.folder.connected': 'Found an existing budget in "{folder}" — connecting to it instead of creating new files. Your categories, accounts and transactions are left exactly as they are; only the settings on this screen are written into its Settings.md.',
   'wiz.how.name': 'How will you add your spending?',
   'wiz.how.desc': 'You can change this later in Settings.',
@@ -776,6 +777,7 @@ module.exports = {
      does not hold" — so the day travels with the number, and a rate old
      enough to matter says how old. */
   'acct.hero.converted': ' Includes {list}, converted at rates for {date}.',
+  'acct.hero.convertedTotal': 'Converted total {amount}',
   'acct.hero.convertedStale': ' Includes {list}, converted at rates for {date} — {days} days old.',
   'acct.hero.otherCurrencies': ' Plus {list} held in other currencies, not converted.',
   /* The liability-side twin, for the Report's Debt section. The line above
@@ -912,6 +914,8 @@ module.exports = {
   'acct.drawer.monthly': 'Monthly',
   'acct.drawer.flow': 'This period',
   'acct.drawer.rows': { one: '{count} transaction', other: '{count} transactions' },
+  'acct.drawer.ahead': 'Still to come',
+  'acct.drawer.aheadRows': { one: '{count} transaction dated later this period', other: '{count} transactions dated later this period', },
   'acct.drawer.folder': 'Transactions folder',
   'acct.drawer.noFolder': 'none linked',
   'acct.drawer.inBudget': 'Counts toward the budget',
@@ -956,6 +960,14 @@ module.exports = {
   'dash.stat.spent': 'Total spent',
   'dash.stat.uncategorised': 'Uncategorised',
   'dash.stat.allocated': '{pct}% of income budgeted',
+  'dash.stat.allocatedOf': '{pct}% of the {amount} income this budget plans for',
+  'dash.stat.setAside': '{amount} set aside',
+  'dash.stat.setAsideMoved': '{amount} set aside, {moved} moved so far',
+  'dash.scheduledAhead': 'Up to today · {amount} more is dated later this period',
+  'dash.fundedFromSavings': {
+    one: '{amount} more went out of your funds ({count} transaction), which this budget does not count',
+    other: '{amount} more went out of your funds ({count} transactions), which this budget does not count',
+  },
   'dash.stat.used': '{pct}% used',
   'dash.stat.review': 'review in Transactions',
   'dash.stat.notIncome': '{amount} came in without a category — not counted here',
@@ -1215,6 +1227,8 @@ module.exports = {
   'dash.left.notNow': 'This card measures the money you have right now, so it only reads true for the period you are in. Switch to {period} to see it.',
   'dash.left.cash': 'in your accounts',
   'dash.left.committed': 'still committed',
+  'dash.left.earmarked': 'set aside',
+  'dash.left.earmarkedFrom': { one: '{count} fund', other: '{count} funds', },
   'dash.left.free': 'actually free',
   'dash.left.short': 'short',
   'dash.left.counted': {
@@ -1223,6 +1237,10 @@ module.exports = {
   },
   'dash.left.unconfirmed': '{count} unconfirmed',
   'dash.left.undated': '{count} with no balance date',
+  'dash.left.confirmDay': {
+    one: '{count} row on a confirmation day ({amount}) is already inside these balances',
+    other: '{count} rows on a confirmation day ({amount}) are already inside these balances',
+  },
   'dash.left.orders': {
     one: '{count} debit order',
     other: '{count} debit orders',
@@ -1259,8 +1277,10 @@ module.exports = {
   'dash.left.owedCards': '{amount} is owed across {count} credit cards — already spent, and not taken off any figure above.',
   'dash.left.whatsCounted': 'What\'s counted as committed',
   'dash.left.expected': 'expected {date}',
+  'dash.left.overdue': 'was due {date}',
   'dash.left.thisPeriod': 'due this period',
   'dash.left.lastCharged': 'last charged {amount}',
+  'dash.left.times': '{count} × {amount}',
   'dash.left.asListed': 'as listed, no charge history',
   'dash.left.contracted': 'contracted instalment',
   'dash.left.settledInFull': 'settled in full, current balance',

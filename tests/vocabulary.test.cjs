@@ -204,10 +204,25 @@ function provenFalse(desc, exactShape, mangled) {
      FULL_WORTH is kept as a negative control: the old three-argument call
      summed unlike currencies and derived its own disclosure against a
      fallback household of "R", naming a currency an Rp vault never held. */
+  /* ISSUE 39 (2026-09-02 audit): a fifth argument, S.owed. Money people owe
+     the household is the third OWNED ledger and net worth did not read it —
+     R2 000 out on loan absent from a R120 000 figure on a card that printed
+     "1 outstanding · oldest out 93 days" in the tile beside it. The term is
+     still one definition of net worth, shared; what changed is that the
+     definition now covers every ledger the balance sheet has, so the literal
+     moved with the call exactly the way ITEM 5 and ISSUE 28 moved it before.
+
+     HOME_WORTH_NO_OWED is kept as a negative control alongside FULL_WORTH: the
+     four-argument call is not wrong arithmetic the way the three-argument one
+     was, it is an INCOMPLETE balance sheet, and a page that quietly reverts to
+     it would disagree with its three siblings while every per-module test
+     stayed green. */
   const FULL_WORTH = 'worth(S.accounts, S.debts, S.assets)';
-  const HOME_WORTH = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency)';
+  const HOME_WORTH_NO_OWED = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency)';
+  const HOME_WORTH = 'worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed)';
   ok(live.dashboard.includes(HOME_WORTH), 'Net worth: dashboard.js computes it via worth(homeAccounts, debts, assets, household)');
   ok(!live.dashboard.includes(FULL_WORTH), 'Net worth: and no longer adds unlike currencies to get there');
+  ok(!live.dashboard.includes(HOME_WORTH_NO_OWED + ')'), 'Net worth: and never falls back to the balance sheet that leaves out money owed to the household');
   /* ISSUE 28 (2026-08-29 audit): savings.js's two call sites narrowed to the
      household-currency accounts and started passing the household symbol —
      `worth(homeAccounts, S.debts, S.assets, S.settings.currency)`. The term
@@ -220,6 +235,8 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.savings.split(HOME_WORTH).length - 1 >= 2, 'Net worth: savings.js computes it the same way in both places that show it (KPI tile and composition chart)');
   ok(!live.savings.includes(FULL_WORTH),
     'Net worth: and neither place adds unlike currencies together any more');
+  ok(!live.savings.includes(HOME_WORTH_NO_OWED + ')'),
+    'Net worth: and neither place drops the receivables ledger');
   ok(live.healthData.includes(HOME_WORTH + '.net'), 'Net worth: health-data.js (feeding the Score page) reads the same worth().net');
 
   ok(live.accounts.includes('worth(primary, null, null)'),

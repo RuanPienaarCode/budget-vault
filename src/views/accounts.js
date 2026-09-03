@@ -79,7 +79,8 @@ const { sharePercents } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt,
-    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName } = ctx;
+    txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName,
+    periodRange, currentPeriod } = ctx;
 
   /* ITEM 2: the SAME wrapper views/savings.js builds for its own totalReturn()
      calls — see savings-math.js's poolCatType() header for why the raw
@@ -331,15 +332,49 @@ module.exports = function registerAccounts(ctx) {
      a month that did not occur. Which is exactly why a split parent has to go
      — its parts are in the same list, so it would be counted, and counted
      twice. */
+  /* ISSUE 42. Split at TODAY, because the figure this feeds sits next to a
+     balance that stopped moving days ago.
+
+     Measured on the `BudgetAudit` household on 2026-09-02. Every account
+     showed its last confirmed balance — cheque R20 000 as at 1 September —
+     with a green pill beside it reading +R26 410: the whole of September's
+     signed net, gym charges dated the 10th, 17th and 24th included, and a
+     R5 000 family gift dated the 28th sitting in the emergency fund's +R7 000.
+     Read together the two say cheque will be R46 410, which is a claim about
+     the end of the month wearing the colours of a change that has happened.
+     Rolled only through today the same account is R48 300 — a bigger number
+     than either, because the pill was ALSO missing the salary the balance had
+     already absorbed. Not one error but two, pointing opposite ways, on one
+     row.
+
+     The BALANCE staying at the last confirmed figure is right and is not
+     touched here: this page's whole job is to show a claim with its age and
+     offer to reconcile it, and the drift is already on screen with a button
+     that accepts it. What was wrong is a delta measured over a different
+     window from the one anything else on the page uses.
+
+     `ahead` rather than a drop: the rows are real and still coming, and this
+     app does not remove a figure without naming it. A finished or future
+     period is unclamped — there is no "today" inside it to split on, which is
+     the same rule periodSummary() applies for the same reason. */
   function periodActivity(labels) {
     let inAmt = 0, outAmt = 0, count = 0;
+    let aheadIn = 0, aheadOut = 0, aheadCount = 0;
+    const { start, end } = periodRange(S.period);
+    const now = todayIso();
+    const asOf = (S.period === currentPeriod() && now >= start && now < end) ? now : end;
     for (const t of txInPeriod(S.period)) {
       if (!labels.has(t.label)) continue;
       if (supersededBySplit(t)) continue;
+      if (t.date > asOf) {
+        aheadCount++;
+        if (t.amount >= 0) aheadIn += t.amount; else aheadOut += -t.amount;
+        continue;
+      }
       count++;
       if (t.amount >= 0) inAmt += t.amount; else outAmt += -t.amount;
     }
-    return { inAmt, outAmt, count };
+    return { inAmt, outAmt, count, asOf, ahead: { inAmt: aheadIn, outAmt: aheadOut, count: aheadCount } };
   }
 
   /* ------------------------------ actions ------------------------------- */
@@ -841,8 +876,35 @@ module.exports = function registerAccounts(ctx) {
 
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
-      el('div', { class: `hero-num${(conv ? conv.total : net) < 0 ? ' hero-num--negative' : ''}` },
-        money(conv ? conv.total : net)),
+      /* ISSUE 31. THE HEADLINE IS THE SPLIT, always — home currency summed,
+         every other symbol named beside it. The converted figure moves to a
+         line of its own below.
+
+         It was the headline until now, and that made this page the only
+         surface in the app running a different rule from every other. Measured
+         on 2026-09-02 with rates on: a R20 000 cheque account and a US$1 000
+         broker account gave a hero of 37 985.61, its OWN subtitle "R20 000
+         credit" (worth() is home-currency only), the Dashboard's net-worth
+         tile R20 000, and the Savings page R0 invested. One card disagreeing
+         with itself, and the page disagreeing with two others in the same
+         session — which is the exact ISSUE 28 symptom the Dashboard's comment
+         says was closed, true only while rates were off.
+
+         The arithmetic was never wrong; the rule was inconsistent. currency.js
+         has one ("sum home currency and name the rest") and ADR-0004 records
+         it, so the fix is the headline joining it rather than four other
+         surfaces leaving it — a conversion is a DERIVED view of a total, and a
+         derived view does not get to be the number a reader acts on while its
+         own subtitle describes a different one.
+
+         Nothing is lost: `convLine` below still lists what each foreign
+         holding converts to and when its rates are from, and the converted
+         total now says out loud that that is what it is. */
+      el('div', { class: `hero-num${net < 0 ? ' hero-num--negative' : ''}` }, money(net)),
+      conv
+        ? el('div', { class: 'acct-hero-converted' },
+          i18n.t('acct.hero.convertedTotal', { amount: money(conv.total) }))
+        : '',
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
@@ -1597,6 +1659,15 @@ module.exports = function registerAccounts(ctx) {
       f(i18n.t('acct.drawer.flow'),
         `+${acctMoney(a, r.act.inAmt, 0)} · −${acctMoney(a, r.act.outAmt, 0)}`);
       f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
+    }
+    /* ISSUE 42. What the pill stops short of. The pill is now as-of today, so
+       the rest of the period has to be somewhere a reader can find it — this
+       drawer is where this page says what it knows about an account, and
+       "nothing here" would read as "nothing coming". */
+    if (r.act.ahead && r.act.ahead.count) {
+      f(i18n.t('acct.drawer.ahead'),
+        `+${acctMoney(a, r.act.ahead.inAmt, 0)} · −${acctMoney(a, r.act.ahead.outAmt, 0)}`);
+      f(i18n.t('acct.drawer.aheadRows', { count: r.act.ahead.count }), periodMonthName(S.period));
     }
     /* Stated even when unset, unlike the row subtitle above: the drawer is
        where a reader goes to find out what this app knows about an account, and

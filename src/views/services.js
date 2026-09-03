@@ -4,7 +4,7 @@
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { SCHEMAS, mdTableFile } = require('../table-schema');
+const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
@@ -16,8 +16,15 @@ const i18n = require('../i18n');
 
 module.exports = function registerServices(ctx) {
   const { S, $, app, money, moneyIn, toast, writeFile } = ctx;
+  const CYCLE_NOUN = { weekly: 'week', fortnightly: 'fortnight', monthly: 'month', annual: 'year' };
 
-  function monthlyEquiv(s) { return s.cycle === 'annual' ? s.amount / 12 : s.amount; }
+  /* ISSUE 33. Four cycles now, so this is a lookup rather than one ternary —
+     and the weekly factor is 365.25/12/7, not 4. A weekly R250 gym costs
+     R1 087 a month, not R1 000: four-week months are a convention, not a
+     calendar, and the difference is a month's worth of it every year on a page
+     whose whole job is a monthly total. */
+  const PER_MONTH = { weekly: 365.25 / 12 / 7, fortnightly: 365.25 / 12 / 14, monthly: 1, annual: 1 / 12 };
+  function monthlyEquiv(s) { return s.amount * (PER_MONTH[s.cycle] ?? 1); }
 
   /* ---------------------- what a total may add up -------------------------
 
@@ -249,7 +256,7 @@ module.exports = function registerServices(ctx) {
   function svcNextHint(s, c) {
     const stale = !s.next || s.next < todayIso();
     const btn = el('button', { type: 'button', class: 'svc-next-hint',
-      title: `Billed around day ${c.stats.day} each ${s.cycle === 'annual' ? 'year' : 'month'}; last charged ${c.stats.last}.`,
+      title: `Billed around day ${c.stats.day} each ${CYCLE_NOUN[s.cycle] || 'month'}; last charged ${c.stats.last}.`,
       'aria-label': `Set next billing for ${s.name} to ${c.next}` },
     icoEl(['calendar-check', 'calendar']), stale ? `due ${c.next}` : c.next);
     btn.addEventListener('click', () => { s.next = c.next; mark(); renderServices(); });
@@ -282,10 +289,14 @@ module.exports = function registerServices(ctx) {
               /* amountRaw = null: a number typed here supersedes the verbatim
                  text table-schema.js keeps for a cell it could not read. */
               onchange: e => { s.amount = parseFloat(e.target.value) || 0; s.amountRaw = null; refresh(); } })),
+            /* ISSUE 33. Driven off table-schema's CYCLES, so the picker can
+               never offer a value the reader's file cannot hold — or fail to
+               offer one it can. The old two-option list was the visible half of
+               a schema that only had two; a household with a weekly debit
+               order had nowhere to say so. */
             el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
-              onchange: e => { s.cycle = e.target.value === 'annual' ? 'annual' : 'monthly'; refresh(); } },
-              el('option', { value: 'monthly', ...(s.cycle === 'monthly' ? { selected: '' } : {}) }, 'monthly'),
-              el('option', { value: 'annual', ...(s.cycle === 'annual' ? { selected: '' } : {}) }, 'annual'))),
+              onchange: e => { s.cycle = CYCLES.includes(e.target.value) ? e.target.value : 'monthly'; refresh(); } },
+              ...CYCLES.map(c => el('option', { value: c, ...(s.cycle === c ? { selected: '' } : {}) }, c)))),
             // dateInput, not a bare type="date": a hand-edited "end of month"
             // renders blank in a date input, hiding a value that is still on disk.
             el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm', style: 'width:140px',
@@ -314,7 +325,7 @@ module.exports = function registerServices(ctx) {
   function serializeServices() {
     return mdTableFile({
       fm: S.servicesFm, fallback: 'kind: services', title: 'Services & Subscriptions',
-      prose: ['Recurring services and subscriptions. `cycle` is `monthly` or `annual`.'],
+      prose: [`Recurring services and subscriptions. \`cycle\` is one of: ${CYCLES.join(', ')}.`],
       schema: SCHEMAS.services, rows: S.services,
     });
   }
@@ -342,8 +353,8 @@ module.exports = function registerServices(ctx) {
       { key: 'name', label: 'Service name', type: 'text' },
       { key: 'provider', label: 'Provider', type: 'text' },
       { key: 'amount', label: 'Amount per billing cycle', type: 'number', value: '0' },
-      { key: 'cycle', label: 'Billing cycle', type: 'select', value: 'monthly', options: [
-        { value: 'monthly', label: 'Monthly' }, { value: 'annual', label: 'Annual' }] },
+      { key: 'cycle', label: 'Billing cycle', type: 'select', value: 'monthly',
+        options: CYCLES.map(c => ({ value: c, label: c[0].toUpperCase() + c.slice(1) })) },
       { key: 'next', label: 'Next billing (optional)', type: 'date' },
       { key: 'category', label: 'Budget category', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
       /* ISSUE 30 — see views/assets.js for the reasoning. Blank means the
@@ -359,7 +370,7 @@ module.exports = function registerServices(ctx) {
     if (amount === null) return toast('Not a number', true);
     const next = ISO_DATE.test((r.next || '').trim()) ? r.next.trim() : '';
     S.services.push({ name: r.name.trim(), provider: (r.provider || '').trim(), amount,
-      cycle: r.cycle === 'annual' ? 'annual' : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '',
+      cycle: CYCLES.includes(r.cycle) ? r.cycle : 'monthly', next, category: (r.category || '').trim(), active: true, notes: '',
       // '' when it merely restates the household symbol — see usedColumns().
       currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim() });
     mark(); renderServices();

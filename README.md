@@ -30,6 +30,14 @@ Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your bud
 
 A setup wizard runs on first launch. On mobile, repeat step 2 once — Restricted mode is per-device.
 
+> **Open the vault, not the budget folder.** Obsidian loads plugins from
+> `<vault root>/.obsidian/plugins/`, so Budget Vault only exists in the vault
+> you installed it into. If you use *Open folder as vault* on `Finances/` —
+> the folder holding your budget — the plugin is simply not there: no wallet
+> icon, no command, no error. It looks like a failed install and is not one.
+> Opening that inner folder also creates a second `.obsidian` inside it, so
+> the mistake sticks until you delete that folder and reopen the outer vault.
+
 ## Where your data lives
 
 One folder you choose, default `Finances/Budget`:
@@ -50,6 +58,11 @@ Finances/Budget/
 ```
 
 Ordinary markdown tables and frontmatter. Open them in any editor, diff them in git, keep them forever.
+
+Note the two levels: `Finances/` is an ordinary folder *inside* your vault, and
+`Finances/Budget/` is what the plugin reads. Neither of them is the vault —
+that is the folder above them, the one holding `.obsidian/`. See the note under
+[Install](#install) for what happens if you open one of them as a vault instead.
 
 Two folders sit **outside** the budget folder, at the top of your vault, because what they hold isn't household data to load back in — it's something you asked the plugin to write out: `Exports/` (CSV/Markdown transaction exports) and `Reports/` (the one-note financial report, Markdown and/or JSON). Both default to those names but are yours to rename or relocate from the Transactions and Report pages, and both show you the exact path before anything is written.
 

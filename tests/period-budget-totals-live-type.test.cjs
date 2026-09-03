@@ -75,7 +75,7 @@ const FILES = {
     ['expense', 'income', 'expense', 'transfer', 'expense'],
     'the Type cells on disk still say what they said — nothing rewrites them');
 
-  eq(ctx.budgetTotals('2026-07'), { income: 15000, spend: 3800 },
+  eq(ctx.budgetTotals('2026-07'), { income: 15000, spend: 3800 , setAside: 0 },
     'a retyped category counts as income wherever budgetTotals is read — ' +
     'Bonus joins Salary, transfers stay out of spend, and only Ghost (no ' +
     'category file) is still bucketed by its own stored cell');
@@ -93,12 +93,12 @@ const FILES = {
   const ctx2 = makeCtx({ ...FILES, [`${B}/Categories/Bonus.md`]: '---\ntype: expense\ncolor: "#33aa66"\n---\n' });
   const S2 = await loadInto(ctx2);
   S2.period = '2026-07';
-  eq(ctx2.budgetTotals('2026-07'), { income: 10000, spend: 8800 },
+  eq(ctx2.budgetTotals('2026-07'), { income: 10000, spend: 8800 , setAside: 0 },
     'the live type is followed in BOTH directions — the category file is the answer, every render');
 
   /* A period with no budget file at all still totals to zeros rather than
      throwing on `undefined.filter` — the shape every caller assumes. */
-  eq(ctx.budgetTotals('2026-06'), { income: 0, spend: 0 },
+  eq(ctx.budgetTotals('2026-06'), { income: 0, spend: 0 , setAside: 0 },
     'a period with no budget file totals to zeros');
 
   console.log(`period-budget-totals-live-type.test.cjs — ${checks} checks OK`);

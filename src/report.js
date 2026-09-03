@@ -60,7 +60,7 @@
 
 const { escMd } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
-const { sharePercents } = require('./share-percents');
+const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
    reads it instead of a raw r.split test: see src/tx-role.js's own header
    and exporter.js's "3b" test for the parent/transfer distinction a plain
@@ -707,8 +707,14 @@ function financialReportMarkdown(data, money) {
     out.push('', `## ${i18n.t('report.section.health')}`, i18n.t('report.asOf'));
     const rows = [[i18n.t('report.health.score'), health.score !== null ? String(health.score) : '—']];
     if (health.months !== null) rows.push([i18n.t('report.health.months'), `${health.months.toFixed(1)} / ${health.target}`]);
-    if (health.savingsRatePct !== null) rows.push([i18n.t('report.health.savingsRate'), `${Math.round(health.savingsRatePct)}%`]);
-    if (health.interestSharePct !== null) rows.push([i18n.t('report.health.interestShare'), `${Math.round(health.interestSharePct)}%`]);
+    /* ISSUE 37, and the reason it belongs in the exported document too: the
+       report is the copy that leaves the app, so a debt cost rounded away to
+       "0%" here is the claim an advisor or a chat model reasons from with
+       nothing on the page to contradict it. `.` rather than the locale's
+       separator because every other percentage this file prints already uses
+       it (the savings rate row above). */
+    if (health.savingsRatePct !== null) rows.push([i18n.t('report.health.savingsRate'), `${sharePercentLabel(health.savingsRatePct / 100, '.')}%`]);
+    if (health.interestSharePct !== null) rows.push([i18n.t('report.health.interestShare'), `${sharePercentLabel(health.interestSharePct / 100, '.')}%`]);
     out.push(...kvTable(rows));
     /* P2, 2026-08-29 audit — a single number that combines emergency-fund
        months, saving rate and debt interest share ships into this document

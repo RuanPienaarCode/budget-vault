@@ -116,7 +116,7 @@ const TRAILING_MONTHS = 6;
 
 module.exports = function registerHealthData(ctx) {
   const {
-    S, periodSpend, periodSummary, budgetTotals, accountIndex, catType,
+    S, periodSpend, periodSummary, budgetTotals, accountIndex, impliedAccounts, catType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
     foreignLabels,
   } = ctx;
@@ -210,7 +210,9 @@ module.exports = function registerHealthData(ctx) {
       for (const a of savers) {
         for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
       }
-      savings = savedFromOutside(householdRows, saverLabels);
+      /* ISSUE 32 — catType, so a fund purchase can no longer be paired away
+         as the leg of an internal move. */
+      savings = savedFromOutside(householdRows, saverLabels, catType);
       /* Three slices of one period, because they answer three questions.
          `essential` is what must be paid with no income — the emergency
          divisor. `consumption` is what living cost: everything except money
@@ -357,7 +359,7 @@ module.exports = function registerHealthData(ctx) {
        currency.js:14 forbids excluding an account silently, and "left out of
        a score" is an exclusion however good the reason. */
     const { primary: homeAccounts, others: scoreOthers } =
-      splitByCurrency(S.accounts, S.settings.currency);
+      splitByCurrency(impliedAccounts(), S.settings.currency);   // ISSUE 44 — one as-of across every net worth
     const earmarks = resolveEarmarks(homeAccounts);
     const target = S.settings.emergency_target_months || 6;
     /* Once, not per consumer: the score, the debt tile's own figure and the
@@ -405,7 +407,12 @@ module.exports = function registerHealthData(ctx) {
          never listed a debt has not declared it has none, and full marks for
          an unanswered question is the one thing this must not hand out. */
       debtInstalments: instalments,
-      netWorth: worth(homeAccounts, S.debts, S.assets, S.settings.currency).net,
+      /* ISSUE 39. Receivables passed, so the score's net worth is the same
+         figure the Dashboard tile and the report print. The score divides this
+         by income (netWorthMultiple), so a ledger missing from it here is a
+         wrong RATIO, not just a wrong total — the shape health-data's own
+         currency note calls the more dangerous of the two. */
+      netWorth: worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed).net,
       hasFixed: fixedCats.size > 0,
     });
 

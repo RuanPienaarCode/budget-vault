@@ -70,7 +70,7 @@ const B = 'Budget';
   eq(ctx.budgetRowType(S.budgets['2026-07'][0]), 'expense', 'budgetRowType: the live category type wins over the stale cell');
   eq(ctx.budgetRowType({ category: 'Ghost', type: 'housing' }), 'housing', 'budgetRowType: only a category with no file falls back to the stored cell');
 
-  eq(ctx.budgetTotals('2026-07'), { income: 15000, spend: 5500 },
+  eq(ctx.budgetTotals('2026-07'), { income: 15000, spend: 5500 , setAside: 0 },
     'budgetTotals: Carry (live expense) is spend, Bonus (live income) is income');
   eq(ctx.assumedSpend('2026-07'), 2500,
     'assumedSpend: the assume-spent row counts by its LIVE type — it read 0 while its stale cell said income');

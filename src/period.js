@@ -23,7 +23,14 @@ const { MONTHS } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { safeSeg } = require('./vault-path');
 const { isForeign, symbolOf } = require('./currency');
-const { ISO_DATE: DATE_KEY, isoOf, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require('./dates');
+const { ISO_DATE: DATE_KEY, isoOf, todayIso, isoDayNumber: dayNum, isoFromDayNumber: isoFromDayNum, isRealIsoDate } = require('./dates');
+const { reconcile } = require('./reconcile');
+/* ISSUE 43. The score already answers "how much did this household actually
+   put aside" and it does it by PAIRING the two legs of a movement, so money
+   shuffled between two funds is not counted as fresh saving. That reading is
+   reused rather than re-spelled: a second answer to the same question is the
+   defect this whole audit keeps finding. */
+const { savedFromOutside } = require('./savings-math');
 
 /* The pay cycle is stored as its own length in days rather than a named type.
    A word would have to pick a dialect — "fortnightly" is idiomatic in za/uk/au
@@ -256,6 +263,35 @@ module.exports = function registerPeriod(ctx) {
     return idx;
   }
 
+  /* Every account with the balance it should read RIGHT NOW, rather than the
+     one last confirmed — ISSUE 44.
+
+     The Dashboard held two as-of dates at once and said so in its own copy.
+     "Money you have right now" ran every account through reconcile(), so a
+     R1 200 Checkers shop on 2 September was inside its R41 800. Net worth,
+     four tiles along, called worth() on the raw `balance` fields and printed
+     R120 000 built on a R43 000 cash pile that still read as of 1 September.
+     One card, one household, two answers to "as of when" — and the second one
+     was captioned "these do not move with the period", which is true and does
+     not mean "these do not move".
+
+     `reconcile()` is the app's one definition of "what this account should
+     read now" and it is not restated here: a drift verdict carries `implied`
+     and every other verdict means nothing readable has moved since the
+     confirmation, in which case the stated figure IS the current one.
+
+     Returns NEW objects rather than mutating S.accounts. The account files are
+     the source of truth and a stated balance is "a claim with an age, never a
+     fact" — writing a derived figure back onto the model would make the claim
+     unrecoverable and the next save would persist a number nobody typed. */
+  function impliedAccounts() {
+    const idx = accountIndex();
+    return (S.accounts || []).map(a => {
+      const rec = reconcile(a, (idx.get(a) || {}).rows || []);
+      return rec.state === 'drift' ? { ...a, balance: rec.implied } : a;
+    });
+  }
+
   /* The accounts a Transactions/ folder resolves to, EMPTY FOLDERS INCLUDED.
 
      accountIndex() cannot answer this and never could: it is built from
@@ -284,6 +320,90 @@ module.exports = function registerPeriod(ctx) {
     for (const f of Object.values(S.txFiles)) {
       const a = accountForLabel(f.label);
       if (a && !a.in_budget) out.add(f.label);
+    }
+    return out;
+  }
+
+  /* ISSUE 41. Transaction folders belonging to money the household has already
+     said is set aside — a savings or investment account, or one carrying an
+     `emergency_fund` earmark.
+
+     On the `BudgetAudit` vault the baby fund (type savings, opening R8 000)
+     held `Pram | Groceries | -5000`. That R5 000 went into Total Spent, into
+     the Groceries envelope and therefore into "budget remaining", so buying a
+     pram out of an earmarked fund read on screen exactly like blowing the
+     grocery budget at Checkers — and the same R8 000 was simultaneously being
+     counted as emergency cover by the health card. One fund, spent twice, in
+     two directions.
+
+     OUTGOINGS ONLY, and the asymmetry is deliberate. Money LEAVING a fund was
+     funded by an earlier period's income and is not this period's household
+     spending; money ARRIVING in one is arriving now and is income like any
+     other — a bonus paid straight into savings would otherwise vanish from the
+     figure it belongs in. The three vetoes above this one are whole-row
+     because their subject is the ROW (a per-row veto, an opted-out account, an
+     unconvertible currency); this one's subject is a DIRECTION.
+
+     `in_budget_stated` is the opt-out's opt-out. A household that genuinely
+     runs its spending through an account it has typed savings writes
+     `budget: true` on it and is taken at its word — an absent key is not
+     consent, which is why load.js records whether the question was answered
+     rather than only what the answer was. */
+  const EARMARKED_ACCOUNT_TYPES = new Set(['savings', 'investment']);
+  function isEarmarkedAccount(a) {
+    if (!a || a.in_budget_stated) return false;
+    const ef = a.emergency_fund;
+    if (ef === true || (typeof ef === 'number' && ef > 0)) return true;
+    return EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase());
+  }
+  /* ISSUE 43. What the household ACTUALLY moved into its own funds this
+     period — the figure the budget could not see.
+
+     On the `BudgetAudit` vault, Emergency and Investing are budgeted R2 000
+     each. The funding is a matched pair of rows, `To emergency fund` out of the
+     cheque account and `From cheque` into the fund, and BOTH are categorised
+     Transfer. summaryInRange skips transfer-typed rows entirely — correctly:
+     a transfer is money moving between the reader's own pockets and folding it
+     into income or spend would count one rand twice. So the envelopes' actuals
+     stayed at R0 and the budget went on reporting R4 000 still to set aside
+     after the household had already moved half of it. Not a wrong total: a
+     figure that says you have not done the thing you did this morning.
+
+     There is no link from a transfer row to a budget CATEGORY — the cheque leg
+     says "Transfer", the envelope says "Emergency", and matching them on the
+     description would mean guessing at free text, which this repo refuses to
+     do for the reason worth.js's cardOverlap sets out. What CAN be answered
+     without guessing is the aggregate: how much arrived in the household's own
+     funds from outside them. That is what this returns, and the Dashboard
+     states it beside the budgeted figure so the reader compares two totals
+     rather than being told a false zero per envelope.
+
+     savedFromOutside() pairs the legs, so a shuffle between two funds is not
+     counted as fresh saving — the same reading the score's own saving rate
+     takes, from the same function. */
+  function movedToFunds(p) {
+    const { start, end } = periodRange(p);
+    const labels = new Map();
+    for (const f of Object.values(S.txFiles)) {
+      const a = accountForLabel(f.label);
+      if (isEarmarkedAccount(a) || (a && EARMARKED_ACCOUNT_TYPES.has(String(a.type || '').trim().toLowerCase()))) {
+        labels.set(f.label, a);
+      }
+    }
+    if (!labels.size) return 0;
+    const today = todayIso();
+    /* Windowed the way periodSummary is (ISSUE 35), so "budgeted R4 000,
+       moved R2 000" cannot be a comparison against a figure that includes next
+       week's standing order. */
+    const stop = (today >= start && today < end) ? today : end;
+    return savedFromOutside(txInRange(start, stop), labels, catType);
+  }
+
+  function earmarkedLabels() {
+    const out = new Set();
+    for (const f of Object.values(S.txFiles)) {
+      const a = accountForLabel(f.label);
+      if (isEarmarkedAccount(a)) out.add(f.label);
     }
     return out;
   }
@@ -427,18 +547,103 @@ module.exports = function registerPeriod(ctx) {
     return 0 - periodSummary(p).net;
   }
 
+  /* ISSUE 35. "What has happened", not "what this calendar month contains".
+
+     On 2026-09-02 the `BudgetAudit` household's Dashboard read Income R40 000
+     and Spent R11 590 for September. Inside those figures were a family gift
+     dated 28 SEPTEMBER and three gym charges dated the 10th, 17th and 24th —
+     money that had not moved, on a card whose every other figure is present
+     tense. The arithmetic was right for the question "what does this month's
+     ledger add up to"; nobody reading a dashboard on the 2nd is asking that
+     one. On the 2nd, the month was already padded with future money and
+     future bills, and the reader had no way to see it.
+
+     So the window closes at TODAY whenever the period contains today, and the
+     rest of the period is handed back separately as `scheduled` rather than
+     dropped — the money is real, it is just not yet spent, and this app does
+     not remove a figure without naming it.
+
+     Done HERE rather than in each card, and that is the load-bearing part.
+     Every period figure on the Dashboard — the hero, the donut, the budget
+     table's actuals — comes through this one function, and
+     tests/cross-page-consistency.test.cjs pins an exact identity between
+     them. Narrowing the window in the hero alone would have satisfied this
+     issue and broken that identity in the same edit, which is how "two
+     figures derived by different rules" gets to eight-plus occurrences.
+
+     A FINISHED period is untouched: `end` is already behind today, so the
+     clamp is a no-op and `scheduled` comes back empty. A period in the FUTURE
+     is untouched for the opposite reason — clamping it to today would empty
+     it, so a window that starts after today keeps its own range and reports
+     the whole of itself as scheduled, which is exactly what it is. */
   function periodSummary(p) {
     const { start, end } = periodRange(p);
-    return summaryInRange(start, end);
+    const today = todayIso();
+    if (today < start || today >= end) {
+      /* Behind us, or entirely ahead of us. Either way there is no "so far"
+         boundary inside this window to draw. */
+      const whole = summaryInRange(start, end);
+      whole.asOf = end;
+      whole.scheduled = today < start
+        ? { income: whole.income, spend: whole.spend, count: whole.count, from: start }
+        : EMPTY_SCHEDULED;
+      return whole;
+    }
+    const soFar = summaryInRange(start, today);
+    /* The remainder, measured by the same function over the complementary
+       window rather than by subtracting two totals. Subtraction would be
+       arithmetically identical for `income` and `spend` and quietly wrong for
+       `count`, which counts ROWS the two windows classify independently — and
+       a disclosure that miscounts what it is disclosing is worse than none. */
+    const rest = summaryInRange(nextDay(today), end);
+    soFar.asOf = today;
+    soFar.scheduled = {
+      income: rest.income, spend: rest.spend, count: rest.count, from: nextDay(today),
+    };
+    return soFar;
   }
+  /* ISSUE 40. The two category types that mean "moved, not consumed". One
+     copy, read by both halves of the ratio — the budgeted envelopes and the
+     actual outgoings — because a set of types that drifted between the two
+     would produce exactly the mismatch this issue is about, one level down.
+     health-data.js's own `consumption` walk excludes the same pair for the
+     same reason, and states it there for a reader who lands only in that
+     file. */
+  const SET_ASIDE_TYPES = new Set(['savings', 'investment']);
+
+  /* Frozen so every caller that reads `scheduled` off a finished period gets
+     the same object shape rather than a fresh literal each render — and so
+     nothing downstream can mutate one period's disclosure into another's. */
+  const EMPTY_SCHEDULED = Object.freeze({ income: 0, spend: 0, count: 0, from: null });
+  /* One day on, as an ISO string. Day arithmetic goes through dates.js's day
+     numbering rather than through Date: a `new Date(iso)` here parses as UTC
+     while periodRange's own boundaries are built from LOCAL getters, and the
+     two disagree by a day either side of midnight in half the world. */
+  const nextDay = iso => isoFromDayNum(dayNum(iso) + 1);
+
   function summaryInRange(start, end) {
     // Excluded rows are the user's per-row veto; the non-budget set is the
     // per-account one. Both drop out of income/spend here and nowhere else —
     // Transactions still lists every row, so nothing goes invisible.
     const skip = nonBudgetLabels();
     const foreignBy = foreignLabels();
+    /* ISSUE 41. The fourth veto, and the only one that reads a row's SIGN —
+       see earmarkedLabels() for why. Counted on the way past rather than
+       silently dropped: `fundedFromSavings` is what the Dashboard names, so a
+       R5 000 pram that stopped burning the grocery envelope does not simply
+       cease to exist on screen. */
+    const earmarked = earmarkedLabels();
+    const fundedOut = t => t.amount < 0 && earmarked.has(t.label);
+    const fundedFromSavings = { spend: 0, count: 0 };
+    for (const t of txInRange(start, end)) {
+      if (t.excluded || skip.has(t.label) || foreignBy.has(t.label)) continue;
+      if (!fundedOut(t)) continue;
+      if (catType(t.cat) === 'transfer') continue;
+      fundedFromSavings.spend += -t.amount;
+      fundedFromSavings.count++;
+    }
     const tx = txInRange(start, end).filter(t =>
-      !t.excluded && !skip.has(t.label) && !foreignBy.has(t.label));
+      !t.excluded && !skip.has(t.label) && !foreignBy.has(t.label) && !fundedOut(t));
     /* Only the folders that actually CONTRIBUTED rows in this window — a
        foreign account with nothing in the period is not something to warn
        about, and a disclosure that fires on every period regardless of the
@@ -450,6 +655,17 @@ module.exports = function registerPeriod(ctx) {
       }
     }
     let income = 0, spend = 0, net = 0, uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
+    /* ISSUE 40. The part of `spend` that is money the household MOVED rather
+       than money it consumed — outgoings under a category the household has
+       typed savings or investment.
+
+       Kept INSIDE `spend` rather than taken out of it, so every existing
+       consumer, the conservation identity in
+       tests/summary-conservation.test.cjs and the donut's own gap note are all
+       unchanged. It is a second reading of the same rows, offered to the one
+       caller that has to answer "how much is left to SPEND" — a question
+       funding your own emergency fund is not an answer to. */
+    let setAside = 0;
     /* Consumer map, so no half of this object reads as orphaned on a cold
        read: `count`/`names` drive the Dashboard's "Missing categories" stat,
        and `income` its Income-tile disclosure — a deposit under a missing name
@@ -491,6 +707,7 @@ module.exports = function registerPeriod(ctx) {
          so a future branch that swallows a row breaks arithmetic rather than
          quietly shrinking a total. */
       net += t.amount;
+      if (t.amount < 0 && SET_ASIDE_TYPES.has(type)) { setAside += -t.amount; }
       byCat[t.cat || ''] = (byCat[t.cat || ''] || 0) + t.amount;
 
       /* THREE states, not two. "" is a row nobody has categorised yet. A name
@@ -539,6 +756,7 @@ module.exports = function registerPeriod(ctx) {
        say something when `foreign.count` is non-zero. */
     return {
       income, spend, net, uncategorised, uncatSpend, uncatIncome, unknown, byCat,
+      setAside, fundedFromSavings,
       count: tx.length,
       foreign: {
         count: foreignHere.size,
@@ -682,25 +900,53 @@ module.exports = function registerPeriod(ctx) {
      file", and only then may the row's own stored cell stand in. One predicate,
      computed once per row, so income and spend can never bucket the same row
      two different ways — which a pair of independent filters could. */
+  /* ISSUE 40. "Budget remaining" was counting envelopes the household never
+     meant to spend.
+
+     On the `BudgetAudit` vault, September budgeted R14 500 — Groceries 6 000,
+     Gym 1 000, Medical 3 500, and Emergency 2 000 + Investing 2 000. Against
+     R11 590 of spending that left R2 910 under a hero reading "Budget
+     remaining this period". It was not money left to spend: it was R4 000 of
+     unfilled savings envelopes less R1 090 of grocery overspend, and the two
+     had cancelled each other into a number that looked like headroom. A
+     household reading that figure spends the emergency fund's allocation on
+     groceries and the card calls it fine.
+
+     So a budget row typed savings or investment is `setAside`, not `spend`.
+     Both are budgeted and both are shown; only one of them answers "how much
+     is left to spend".
+
+     `budgetRowType` is the ONE reading of a row's type — the same one
+     views/dashboard.js's budgetVsActualRows takes — so the hero, the table and
+     the Budget page cannot bucket one row three ways. A category with no file
+     falls through to the row's own `type` cell, and a household that has typed
+     neither gets exactly what it always got: the row counts as spend, because
+     nothing it has written says otherwise. */
   function budgetTotals(p) {
     const budget = S.budgets[p] || [];
-    let income = 0, spend = 0;
+    let income = 0, spend = 0, setAside = 0;
     for (const b of budget) {
       const type = budgetRowType(b);
       if (type === 'income') income += b.amount;
-      else if (type !== 'transfer') spend += b.amount;
+      else if (type === 'transfer') continue;
+      else if (SET_ASIDE_TYPES.has(type)) setAside += b.amount;
+      else spend += b.amount;
     }
-    return { income, spend };
+    return { income, spend, setAside };
   }
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
-    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, accountsWithFolder, nonBudgetLabels,
+    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, impliedAccounts, accountsWithFolder, nonBudgetLabels,
     /* Published so the score's household walk (health-data.js) narrows rows by
        the SAME predicate summaryInRange does — a second spelling of "which
        folders are foreign" is how the ISSUE 28 fix reached the numerators and
        missed the divisors. */
     foreignLabels,
+    /* ISSUE 41. Published for the same reason foreignLabels above it is: an
+       oracle or a view that re-spells "which folders are set aside" is a second
+       rule waiting to disagree with this one. */
+    earmarkedLabels, movedToFunds,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, assumedSpend, periodDeficit,
     /* The one reading of a budget row's type — views/dashboard.js's
        budgetVsActualRows reads it too, so the table, the hero and the Budget

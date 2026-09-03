@@ -213,28 +213,61 @@ const tx = (date, label, amount) => ({ date, label, amount, cat: 'Saving' });
   eq(savedFromOutside(rows, POOL), 10000, 'a leg outside the pool is not a leg');
 }
 
-/* ---- 7. THE LIMIT, pinned rather than left to be rediscovered ----
-   The mirror of the pram — a fund purchase EARLY in the month, an equal and
-   unrelated deposit LATER — is still matched, and cannot be told from a slow
-   transfer by dates alone. This assertion records the current answer so the
-   day it changes is a decision somebody made rather than a surprise: closing
-   it needs the outflow's CATEGORY (a real expense, against the savings-typed
-   category a transfer leg carries), which savedFromOutside cannot reach — it
-   takes rows and a label map, and both health-data.js and views/score.js
-   depend on that signature.
+/* ---- 7. THE LIMIT, now CLOSED — ISSUE 32 ----
+   The mirror of the pram: a fund purchase EARLY in the month and an equal,
+   unrelated deposit LATER. By dates alone it is indistinguishable from a slow
+   transfer, which is why this section stood as a pinned limit rather than a
+   fix. What settles it is the outflow's CATEGORY — a real expense, against the
+   transfer- or savings-typed category a transfer leg carries — and
+   savedFromOutside now takes an optional `catType` third argument to reach it.
 
-   Left OPEN rather than closed with a symmetric window, because the window
-   that would close it re-opens the settlement-lag cliff
-   tests/household-shapes.test.cjs exists to keep shut — and that one moves the
-   score on every household with a slow bank, where this one needs a
-   coincidence to the cent in the less common order. */
+   CONSULTED ONLY WHERE THE DATES HAVE RUN OUT, and that narrowing is the
+   whole design. tests/health-data.test.cjs pins a household moving R5 000
+   between two savings accounts every month and labelling it `Move`, a category
+   it has typed `expense` — an internal move, mislabelled, with both legs on
+   the SAME DAY. On category alone this fix would refuse to pair those and
+   credit R5 000 a month of saving that never happened, which is the 1.23.0
+   overstatement the pairing exists to end. Inside the settlement window the
+   dates are evidence enough and the label adds nothing; weeks apart they have
+   stopped being evidence, and the label is all that is left.
+
+   Still no symmetric window: the cliff tests/household-shapes.test.cjs keeps
+   shut stays shut, because nothing here widened what counts as "the same
+   movement" — it narrowed what counts as a leg. */
 {
-  const mirrored = [
-    tx('2026-08-01', 'Baby fund', -5000),      // the pram, bought first
-    tx('2026-08-28', 'Emergency fund', 5000),  // an unrelated deposit later
-  ];
+  /* The pram carries a real expense category, because that IS the signal —
+     `tx` above stamps every row `Saving`, which is the transfer-leg label and
+     would leave this case exactly as unresolvable as it was. */
+  const pram = { date: '2026-08-01', label: 'Baby fund', amount: -5000, cat: 'Groceries' };
+  const mirrored = [pram, tx('2026-08-28', 'Emergency fund', 5000)];
+  const catType = c => ({ Groceries: 'expense', Move: 'expense', Saving: 'savings', Transfer: 'transfer', Investing: 'investment' }[c] || null);
+
   eq(savedFromOutside(mirrored, POOL), 0,
-    'KNOWN LIMIT: an outflow BEFORE an equal inflow is indistinguishable from a slow transfer');
+    'without a category table the old answer is unchanged — every existing caller keeps the behaviour it had');
+  eq(savedFromOutside(mirrored, POOL, catType), 5000,
+    'ISSUE 32: with one, a pram bought from a fund can no longer be paired away against a later deposit');
+
+  /* The three cases the narrowing exists to protect. */
+  const sameDayMislabelled = [
+    { date: '2026-08-15', label: 'Baby fund', amount: -5000, cat: 'Move' },
+    { date: '2026-08-15', label: 'Emergency fund', amount: 5000, cat: 'Move' },
+  ];
+  eq(savedFromOutside(sameDayMislabelled, POOL, catType), 0,
+    'an internal move labelled with an expense category still pairs while its legs are days apart — the dates are the evidence there, not the label');
+
+  const slowTransfer = [
+    tx('2026-08-01', 'Baby fund', -5000),
+    tx('2026-08-04', 'Emergency fund', 5000),
+  ];
+  eq(savedFromOutside(slowTransfer, POOL, catType), 0,
+    'and a genuinely slow settlement is untouched, whatever it is called');
+
+  const unknownCat = [
+    { date: '2026-08-01', label: 'Baby fund', amount: -5000, cat: 'Whatever' },
+    { date: '2026-08-28', label: 'Emergency fund', amount: 5000, cat: 'Transfer' },
+  ];
+  eq(savedFromOutside(unknownCat, POOL, catType), 0,
+    'a category no file answers to stays matchable — "unclassified" is not "definitely a purchase"');
 }
 
 console.log(`savings-paired-legs-window.test.cjs — ${checks} checks OK`);

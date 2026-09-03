@@ -87,3 +87,36 @@ positional, so its position must survive.
   euro account must still land somewhere.
 - A foreign debt keeps its positional `key` from the full active list, so payoff
   projections do not repoint when one is added.
+
+## Amendment, 2026-09-03 — where a converted total may appear (ISSUE 31)
+
+Exchange rates arrived as an opt-in after this ADR was written, and for one
+release the Accounts hero's **headline** was the converted total while the
+Dashboard's net-worth tile, the Savings page, the Report and the health score
+all still split. Measured on 2026-09-02: a R20 000 cheque account and a
+US$1 000 broker account gave a hero of `37 985.61`, that hero's own subtitle
+`20 000 credit` (it comes from `worth()`, which is home-currency only),
+Dashboard net worth `20 000`, and Savings investments `0`. One card
+disagreeing with itself, and the page disagreeing with three others in the
+same session.
+
+The arithmetic was never in question — `rateBetween` cross-rates correctly.
+The rule was.
+
+**Decided: split first, everywhere. A converted total is a DERIVED VIEW and is
+labelled as one.** The headline figure on every surface is the household
+currency summed with every other symbol named beside it, which is what the rest
+of this ADR says and what `src/currency.js` has always said. Where rates are on
+and fresh, the converted total appears as its own line, under its own label,
+carrying the date its rates are from.
+
+The alternative — teaching `splitByCurrency` the rate table so every page
+converts through one door — was rejected for now, not on principle but on
+scope: it makes a rate table load-bearing for the health score and the exported
+report, and a stale table would then move a figure that has no way to say so.
+Nothing here forecloses it; it would be its own ADR.
+
+**Still open:** `currency` and `currency_code` can contradict each other on one
+account (`currency: R` with `currency_code: USD` is *home* to `isForeign` and
+*foreign* to `fx.codeOf`). Nothing validates the pair. It only bites together
+with conversion, and is recorded here rather than fixed.

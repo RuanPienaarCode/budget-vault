@@ -182,6 +182,48 @@ const money = (key, header, { floor = false, guarded = false } = {}) => {
    header), the raw keeps it escaped, and the write puts those same bytes back
    — so preserving a cell cannot shear the row, and a second load reads the
    identical raw. Precisely what money() does with parseNum's raw. */
+/* ISSUE 33. The same reader as vocab() below, over a SET rather than a pair.
+
+   `vocab` was written for genuinely two-valued cells — paid/active,
+   paid/outstanding — where "anything that is not the match is the other" is
+   the whole of the rule. Services.md's Cycle is not one of those and never
+   was: it was declared `vocab('cycle', 'Cycle', 'annual', 'monthly')`, so a
+   household that typed `weekly` got `monthly` and a `cycleRaw` nobody read.
+   A weekly gym debit order and a fortnightly insurance premium could not be
+   expressed at all — not "expressed badly", not stored — and every figure
+   built on the cycle then answered a question about a bill that does not
+   exist.
+
+   `fallback` is what an unrecognised cell reads as, and `<key>Raw` preserves
+   the reader's own text so the next save writes back what they typed rather
+   than the app's guess — the same contract money() and vocab() carry, for the
+   same reason. Widening the SET is therefore backward-compatible in both
+   directions: a cell that used to fall through to the fallback and be
+   preserved verbatim is now recognised and written as itself, byte for byte
+   the same. */
+/* The billing cycles a service can state, in ascending length. Exported so the
+   Services page's picker and recurring.js's date arithmetic read one list —
+   a picker offering a value the maths cannot step is how "weekly" got stored
+   and then silently ignored in the first place. */
+const CYCLES = ['weekly', 'fortnightly', 'monthly', 'annual'];
+
+const vocabSet = (key, header, allowed, fallback) => {
+  const rawKey = key + 'Raw';
+  const set = new Set(allowed);
+  return {
+    key, header, align: 'left',
+    read: c => {
+      const raw = (c || '').trim();
+      const folded = raw.toLowerCase();
+      const known = set.has(folded);
+      return !raw || known
+        ? { [key]: known ? folded : fallback }
+        : { [key]: fallback, [rawKey]: raw };
+    },
+    write: r => (r[rawKey] != null && r[key] === fallback ? r[rawKey] : r[key]),
+  };
+};
+
 const vocab = (key, header, match, other) => {
   const rawKey = key + 'Raw';
   return {
@@ -273,7 +315,9 @@ const SCHEMAS = {
       text('name', 'Name'),
       text('provider', 'Provider'),
       money('amount', 'Amount'),
-      vocab('cycle', 'Cycle', 'annual', 'monthly'),
+      /* ISSUE 33. Four cycles, not two. `monthly` stays the fallback, so every
+         Services.md already on disk means exactly what it always meant. */
+      vocabSet('cycle', 'Cycle', CYCLES, 'monthly'),
       verbatim('next', 'Next billing'),
       text('category', 'Category'),
       {
@@ -428,4 +472,4 @@ function mdTableFile({ fm, fallback, title, prose, schema, rows }) {
   return lines.join('\n');
 }
 
-module.exports = { SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns };
+module.exports = { SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,};

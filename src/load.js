@@ -288,6 +288,14 @@ module.exports = function registerLoad(ctx) {
         // the cheque account is budgeted as normal; only the arriving leg here
         // is suppressed, which is what stops it being counted twice.
         in_budget: !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()),
+        /* ISSUE 41. Whether the household ANSWERED the budget question, as
+           distinct from the answer. `in_budget` cannot tell an explicit
+           `budget: true` from a file that never mentions it — both are true —
+           and the earmark rule in period.js needs exactly that difference: a
+           savings account is held out of the budget's spend totals BY DEFAULT,
+           and only a household that has written `budget: true` on it has said
+           otherwise. An absent key is not consent. */
+        in_budget_stated: String(fm.budget ?? '').trim() !== '',
         /* A card the household clears in full before interest. Its outstanding
            balance is money already spent that has not left the cheque account
            yet, so it counts as committed rather than as negative cash.

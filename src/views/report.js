@@ -89,7 +89,7 @@ module.exports = function registerReport(ctx) {
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
     periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
-    accountIndex, healthSnapshot, txInPeriod,
+    accountIndex, impliedAccounts, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows,
   } = ctx;
 
@@ -611,8 +611,9 @@ module.exports = function registerReport(ctx) {
        twins did. Same rule as those twins now, and `otherCurrencies` travels
        into the document so the section can say what it holds. */
     const { primary: homeAccounts, others: reportOthers } =
-      splitByCurrency(S.accounts, S.settings.currency);
-    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
+      splitByCurrency(impliedAccounts(), S.settings.currency);   // ISSUE 44 — the exported net worth is the on-screen one
+    /* ISSUE 39 — receivables, so the exported net worth is the on-screen one. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     return {
       /* M3, 2026-08-29 audit — this was `new Date().toISOString().slice(0,
          16).replace('T', ' ')`, UTC, while todayIso() a few lines up (and

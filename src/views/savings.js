@@ -30,7 +30,7 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, accountIndex } = ctx;
+  const { S, $, root, money, accountIndex, impliedAccounts } = ctx;
 
   /* ---------------------------- currency ----------------------------------
      This page was the pre-issue-#28 code verbatim, and an audit found every
@@ -102,13 +102,16 @@ module.exports = function registerSavings(ctx) {
     const sPlit = split(savings), iPlit = split(investments);
     const totalSavings = homeOnly(savings);
     const totalInvest = homeOnly(investments);
-    const { primary: homeAccounts, others: worthOthers } = split(S.accounts);
+    /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card. */
+    const { primary: homeAccounts, others: worthOthers } = split(impliedAccounts());
     /* The household symbol, passed at last: worth() has always computed a
        `currencies` disclosure for its caller and every caller in this app
        dropped it — and, calling with three arguments, computed it against a
        fallback household of "R", so on an Rp vault it named a currency the
        household has never held. */
-    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
+    /* ISSUE 39 — receivables, so this tile and the Dashboard's own net-worth
+       tile cannot state different totals for one household. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     const netWorth = w.net;
 
     /* Built once and threaded through the tile, the chart and the cards. Each
@@ -1083,7 +1086,8 @@ module.exports = function registerSavings(ctx) {
        disclosure inside a bar. So the bar is drawn in one currency and the
        rest is NAMED underneath it (see the note appended at the end of this
        function), which is the same trade the Accounts ring makes. */
-    const { primary: homeAccounts, others: worthOthers } = split(S.accounts);
+    /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card. */
+    const { primary: homeAccounts, others: worthOthers } = split(impliedAccounts());
     /* worth.js is the one place net worth is computed — see its own header —
        and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
        the very same grouped arrays instead of reading it, which meant it also
@@ -1097,7 +1101,11 @@ module.exports = function registerSavings(ctx) {
        Read HERE rather than three-quarters of the way down the function,
        where it used to sit, because the disclosure note below is built out of
        the very ledgers it held out. */
-    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency);
+    /* ISSUE 39 — receivables, and this bar is the one place the addition has to
+       be VISIBLE: `totalAssets` below is w.assets, so a ledger that reaches the
+       total without reaching a segment draws a bar that does not fill its own
+       track. The segment is pushed with the Assets-page rows further down. */
+    const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     const groups = accountGroups(homeAccounts, WORTH_TYPES.map(([type]) => type));
     const assets = groups.owned.map(segFor);
     const debts = groups.owed.map(segFor);
@@ -1137,6 +1145,22 @@ module.exports = function registerSavings(ctx) {
         || ASSET_FALLBACKS[i % ASSET_FALLBACKS.length];
       assets.push({ label: a.type, amount: a.amount, color, fromAssetPage: true });
     });
+
+    /* ISSUE 39 — money lent out, drawn LAST in the owned bar and as one block.
+       Last because the bar already reads most-liquid-first (bank money, then
+       possessions) and a loan to a friend is the least certain rand on it;
+       one block because the Owed page's rows are people, not kinds of thing,
+       and a legend naming them would put someone's name on a chart the
+       household may well show to someone else.
+
+       Read off w.ownedOwed rather than re-summed here: the total above this
+       chart is worth()'s, so a second reduce over S.owed is exactly the
+       "two figures derived by different rules" shape that would let the bar
+       and its own heading disagree. */
+    if (w.ownedOwed > 0) {
+      const color = (css.getPropertyValue('--color-info') || '').trim() || '#0ea5e9';
+      assets.push({ label: 'Owed to you', amount: w.ownedOwed, color, fromOwedPage: true });
+    }
 
     /* Debt-page rows, grouped by their own type so a bond and a car loan are
        tellable apart rather than merged into one anonymous block. Colours walk
@@ -1206,6 +1230,7 @@ module.exports = function registerSavings(ctx) {
        the other way. */
     const ledgers = ['your accounts',
       ...(assetSegs.length ? ['the Assets page'] : []),
+      ...(w.ownedOwed > 0 ? ['money owed to you'] : []),
       ...(debtSegs.length ? ['the Debt page'] : [])];
     const across = ledgers.length > 1
       ? `Across ${ledgers.slice(0, -1).join(', ')} and ${ledgers[ledgers.length - 1]}`

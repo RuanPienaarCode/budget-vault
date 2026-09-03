@@ -9,6 +9,16 @@
 
    What it explicitly does NOT do is convert, and it does not exclude.
 
+   ISSUE 31, and the one nuance that has been added since: exchange rates are
+   an opt-in feature now, and where they are on and fresh a CONVERTED TOTAL may
+   be shown — but never as the headline figure, and never without the date its
+   rates are from. The headline on every surface is the split this module
+   describes; a conversion is a derived view of it, labelled as one. For one
+   release the Accounts hero had it the other way round and was the only page
+   in the app running a different rule from its neighbours — it printed a
+   converted number over its own home-currency subtitle. ADR-0004's 2026-09-03
+   amendment records the decision.
+
    No conversion, because a rate is a fact about a day that this vault does not
    hold. Storing one would mean every figure derived from it silently ages, and
    a household total that was right last month is the worst kind of wrong —
