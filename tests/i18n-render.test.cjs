@@ -151,7 +151,7 @@ ok(LANGS.includes('en') && LANGS.length >= 7, `at least the 7 shipped languages 
    same name, but declared independently: this file must not import from an
    owner file it isn't allowed to touch, and a divergence between the two
    copies is itself a signal worth seeing rather than silently inheriting. */
-const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets', 'accounts', 'report']);
+const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets', 'accounts', 'report', 'plan', 'assets']);
 
 /* ---- EXPECTED_ENGLISH_ONLY — the ratchet. Declared here as the definition
    of "not yet translated", so a view that gains real i18n.t() usage without
@@ -165,8 +165,8 @@ const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets
    view returns 0 for exactly these ten and only these ten). Reported as a
    finding, not silently folded in without comment — see the dispatch
    summary. */
-const EXPECTED_ENGLISH_ONLY = ['plan', 'notes', 'savings', 'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
-eq(EXPECTED_ENGLISH_ONLY.length, 10, 'the declared English-only backlog is exactly 10 views — translating one shrinks this list');
+const EXPECTED_ENGLISH_ONLY = ['notes', 'savings', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
+eq(EXPECTED_ENGLISH_ONLY.length, 8, 'the declared English-only backlog is exactly 8 views (plan and assets were translated in the 3 Sep 2026 mobile redesign) — translating one shrinks this list');
 for (const v of EXPECTED_ENGLISH_ONLY) {
   ok(!TRANSLATED_VIEWS.has(v), `'${v}' cannot be in both TRANSLATED_VIEWS and EXPECTED_ENGLISH_ONLY`);
 }

@@ -28,18 +28,49 @@
    is the one piece of honesty this page owes: a plan that lets you allocate an
    unpaid refund into a purchase you make today is a plan that overdraws you. */
 
-const { el, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { planSummary, barSegments, SOURCE_KINDS, sharePct,
   envelopeOverState } = require('../plan-math');
+const i18n = require('../i18n');
 
 module.exports = function registerPlan(ctx) {
   const { S, $, app, money, toast, writeFile, fileAt, pathTaken } = ctx;
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('planDirty', '#planSave');
+
+  /* Which spending bucket is open in the accordion — collapsed-list-with-one-
+     open, per the redesign. Lives here (not on the plan object) because it is
+     purely a view-state choice, never written to disk; reset whenever the
+     open bucket stops existing (deleted, or a different plan switched in). */
+  let expandedEnvelope = null;
+
+  /* Built once, by re-parenting the SAME button elements shell.js/controller.js
+     already wired up (so their listeners and the dirtyFlag-driven disabled
+     state on #planSave keep working untouched) into the rail the redesign
+     calls for: Save primary beside New, Delete demoted to a quiet icon-only
+     affordance off to the side rather than sitting red beside Save. Idempotent
+     — safe to call on every renderPlan(). */
+  function ensureActionsRailV2() {
+    if (ctx.root.querySelector('.plan-actions-v2')) return;
+    const saveBtn = $('#planSave'), newBtn = $('#planNew'), delBtn = $('#planDelete');
+    const oldRow = saveBtn && saveBtn.parentElement;
+    if (!saveBtn || !newBtn || !delBtn || !oldRow) return;
+    saveBtn.classList.add('btn-sm');
+    newBtn.classList.add('btn-sm');
+    delBtn.classList.add('plan-del-ico');
+    delBtn.setAttribute('aria-label', i18n.t('plan.actions.deleteAria'));
+    // Drop the button's own text node ("Delete plan"), keeping its icon span —
+    // the aria-label just set carries the same words for a screen reader.
+    for (const n of [...delBtn.childNodes]) if (n.nodeType === 3) n.remove();
+    const rail = el('div', { class: 'plan-actions-v2', id: 'planActionsV2' },
+      el('div', { class: 'plan-actions-rail' }, saveBtn, newBtn),
+      delBtn);
+    oldRow.replaceWith(rail);
+  }
 
   /* The plan currently on screen. S.planName holds the FILE key (the basename
      under Plans/), not the display name — see the note in load.js on why those
@@ -53,6 +84,8 @@ module.exports = function registerPlan(ctx) {
   function renderPlan() {
     const p = P();
     const has = !!p;
+    ensureActionsRailV2();
+    updateHeaderTitle(p);
     $('#planEmptyCard').classList.toggle('hidden', has);
     $('#planContent').classList.toggle('hidden', !has);
     renderPlanPicker();
@@ -62,6 +95,18 @@ module.exports = function registerPlan(ctx) {
     renderSources(p, sum);
     renderEnvelopes(p, sum);
     renderFree(p, sum);
+  }
+
+  /* The plan's own name becomes the page title, per the redesign — the static
+     "Plan" banner is a fine label for the empty state, but once a plan is open
+     its name is the only thing on screen worth calling the title. Reverts to
+     the i18n-driven default the moment there is no plan, so it never sticks a
+     stale name on the empty-state banner. */
+  function updateHeaderTitle(p) {
+    const h1 = $('#view-plan .financial-period-banner-title');
+    if (!h1) return;
+    if (p) { h1.removeAttribute('data-i18n'); h1.textContent = p.name; }
+    else { h1.setAttribute('data-i18n', 'nav.plan'); h1.textContent = i18n.t('nav.plan'); }
   }
 
   /* The plan switcher. A segmented control rather than a <select> because the
@@ -82,7 +127,16 @@ module.exports = function registerPlan(ctx) {
     $('#planPickerWrap').classList.toggle('hidden', keys.length < 2);
   }
 
-  /* ---- the pot: one number and the bar that says what happened to it ---- */
+  /* ---- the pot: one sentence, one bar (redesign variant B) ----
+
+     The hero used to lead with the pot itself ("In this plan · R X") and
+     restate it a moment later as "Still left" — the same number twice on a
+     fresh plan, before anything has been spent. This leads with the only
+     question that is actually live: how much of the pot is not yet spoken
+     for. The pot becomes context in the sentence beneath it, and the old
+     "Still left" subtotal is kept ONLY for the one case where it genuinely
+     differs from "not spoken for" — an overspent plan, where spoken-for has
+     run past the pot and `left` (committed+free) and `free` disagree. */
   function renderPot(p, sum) {
     const host = $('#planPot');
     host.empty();
@@ -93,17 +147,20 @@ module.exports = function registerPlan(ctx) {
        card at the bottom of the page states in words. */
     const seg = barSegments(sum);
     const pct = v => (sum.pot > 0 ? (v / sum.pot) * 100 : 0);
+    const over = sum.free < 0;
+
+    const statusLine = sum.sources === 0 ? null
+      : sum.expected <= 0.005 ? i18n.t('plan.hero.allIn')
+      : sum.received <= 0.005 ? i18n.t('plan.hero.noneIn')
+      : i18n.t('plan.hero.partial', { received: money(sum.received), expected: money(sum.expected) });
+
     host.append(
-      el('div', { class: 'pot-eyebrow' }, 'In this plan'),
-      el('div', { class: 'pot-fig num' }, money(sum.pot)),
+      el('div', { class: 'pot-eyebrow' }, over ? i18n.t('plan.hero.overPlaced') : i18n.t('plan.hero.leftToPlace')),
+      el('div', { class: `pot-fig num ${over ? 'text-danger' : 'plan-free-fig'}` }, money(Math.abs(sum.free))),
       el('div', { class: 'pot-sub' },
         sum.sources === 0
-          ? 'No sources yet — add what funds this plan.'
-          : `From ${sum.sources} source${sum.sources === 1 ? '' : 's'} · `,
-        ...(sum.sources
-          ? [el('b', {}, money(sum.received)), ' is in the account today, ',
-             el('b', {}, money(sum.expected)), ' is still expected']
-          : [])),
+          ? i18n.t('plan.hero.noSources')
+          : [i18n.t('plan.hero.ofPot', { pot: money(sum.pot) }), statusLine ? ` · ${statusLine}` : '']),
       /* One bar, three states of the same rand. role=img with the figures in
          the label: a screen reader gets the split as a sentence rather than
          three unlabelled divs, and the visual key below repeats it in text.
@@ -116,83 +173,164 @@ module.exports = function registerPlan(ctx) {
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
         el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
-      el('div', { class: 'split-key' },
-        splitKey('Already spent', sum.spent, 'var(--color-primary)'),
-        splitKey('Spoken for', sum.committed, 'var(--color-accent)'),
-        splitKey('Not spoken for', sum.free, 'var(--color-gold)',
+      el('div', { class: 'split-key2' },
+        splitRow2(i18n.t('plan.split.spokenFor'), sum.committed, 'var(--color-accent)'),
+        splitRow2(i18n.t('plan.split.notSpokenFor'), sum.free, 'var(--color-gold)',
           sum.free < 0 ? 'text-danger' : 'plan-free-fig'),
-        /* A SUBTOTAL, not a fourth band: `left` equals spoken-for + not-spoken-
-           for in the normal case, so it gets no swatch and reads as the sum of
-           the three above it rather than a fourth slice of the bar — the
-           border-inline-start is the only thing that sets it apart. */
-        el('div', { class: 'sk-left' },
-          el('div', { class: 'sk-top' }, 'Still left'),
-          el('div', { class: `sk-fig num ${sum.left < 0 ? 'text-danger' : ''}` }, money(sum.left)))));
+        splitRow2(i18n.t('plan.split.alreadySpent'), sum.spent, 'var(--color-primary)'),
+        /* A SUBTOTAL, not a fourth band, and shown only when it earns its
+           place — see the note above. */
+        ...(Math.abs(sum.left - sum.free) >= 0.005
+          ? [el('div', { class: 'sk2-row sk2-left' },
+              el('span', { class: 'sk2-label' }, i18n.t('plan.split.stillLeft')),
+              el('span', { class: `sk2-fig num ${sum.left < 0 ? 'text-danger' : ''}` }, money(sum.left)))]
+          : [])));
   }
 
-  const splitKey = (label, value, swatch, cls = '') => el('div', {},
-    el('div', { class: 'sk-top' }, el('i', { style: `background:${swatch}` }), label),
-    el('div', { class: `sk-fig num ${cls}` }, money(value)));
+  const splitRow2 = (label, value, swatch, cls = '') => el('div', { class: 'sk2-row' },
+    el('span', { class: 'sk2-label' }, el('i', { style: `background:${swatch}` }), label),
+    el('span', { class: `sk2-fig num ${cls}` }, money(value)));
 
-  /* ---- money in: any source you like, and when it actually lands ---- */
+  /* ---- money in: a compact read-only ledger, tap a row to edit (variant B) ----
+
+     A source is read far more often than it is edited — the old design gave
+     every row three live input fields whether or not the reader wanted to
+     touch a single one. This renders each as one ~62px line (name + kind,
+     date + status as ink on the same line, amount on the right) and moves
+     editing behind a tap into the same field-sheet pattern editItem() below
+     already uses, so a source's status can still be flipped by hand exactly
+     as before — see the note in addSource() on why that stays tappable. */
   function renderSources(p, sum) {
     const host = $('#planSources');
     keepScroll(host, () => {
       host.empty();
-      for (const s of p.sources) {
-        const received = s.status === 'received';
-        const pill = el('button', {
-          class: `status-pill status-${received ? 'paid' : 'outstanding'}`,
-          type: 'button',
-          'aria-label': `${s.name}: ${received ? 'in the account' : 'not yet paid'} — click to change`,
-        }, icoEl(received ? ['circle-check', 'check-circle'] : ['hourglass']),
-           received ? 'in the account' : 'expected');
-        pill.addEventListener('click', () => {
-          s.status = received ? 'expected' : 'received';
-          mark(); renderPlan();
-        });
-        host.append(el('div', { class: 'src-row' },
-          el('div', { class: 'src-main' },
-            el('div', { class: 'src-name' },
-              el('input', { type: 'text', class: 'src-name-input', value: s.name,
-                'aria-label': `Name of source ${s.name}`,
-                onchange: e => { s.name = e.target.value; mark(); } }),
-              el('span', { class: 'kind' }, s.kind || 'Other')),
-            el('div', { class: 'src-when' },
-              dateInput(s.date, { class: 'form-control form-control-sm src-date',
-                'aria-label': `Date for ${s.name}` },
-                v => { s.date = v; mark(); renderPlan(); }),
-              s.notes ? el('span', { class: 'src-note' }, s.notes) : '')),
-          pill,
-          el('div', { class: 'src-amt num' },
-            el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm',
-              value: s.amount || '', 'aria-label': `Amount for ${s.name}`,
-              onchange: e => { s.amount = parseFloat(e.target.value) || 0; mark(); renderPlan(); } })),
-          el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button',
-            'aria-label': `Remove source ${s.name}`,
-            onclick: () => { p.sources.splice(p.sources.indexOf(s), 1); mark(); renderPlan(); } }, '✕')));
-      }
       if (!p.sources.length) {
         host.append(el('div', { class: 'text-muted plan-empty-row' },
           'Nothing funds this plan yet. Add a payout, a refund, a salary surplus — anything.'));
+        return;
+      }
+      const list = el('div', { class: 'src2-list' });
+      for (const s of p.sources) {
+        const received = s.status === 'received';
+        list.append(el('div', { class: 'src2-row' },
+          el('button', { class: 'src2-main', type: 'button',
+            'aria-label': i18n.t('plan.source.editAria', { name: s.name }),
+            onclick: () => editSource(p, s) },
+            el('div', { class: 'src2-line1' },
+              el('span', { class: 'src2-name' }, s.name),
+              el('span', { class: 'kind' }, s.kind || 'Other')),
+            el('div', { class: 'src2-line2' },
+              el('span', {}, formatSrcDate(s.date)), ' · ',
+              el('span', { class: received ? 'src2-status-in' : 'src2-status-exp' },
+                received ? i18n.t('plan.source.inAccount') : i18n.t('plan.source.expected')))),
+          el('div', { class: `src2-amt num${received ? '' : ' src2-amt-muted'}` }, money(s.amount)),
+          el('button', { class: 'btn-ghost btn-ghost-sm src2-del', type: 'button',
+            'aria-label': i18n.t('plan.source.removeAria', { name: s.name }),
+            onclick: () => removeSource(p, s) }, '✕')));
+      }
+      host.append(list);
+    });
+  }
+
+  const SRC_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // Plain char scan against an ISO date, not a lookbehind: free-text dates
+  // (see dateInput's note) fall through to being shown verbatim.
+  function formatSrcDate(iso) {
+    const s = (iso || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s || i18n.t('plan.source.noDate');
+    const y = s.slice(0, 4), mi = Number(s.slice(5, 7)) - 1, d = Number(s.slice(8, 10));
+    return `${d} ${SRC_MONTHS[mi] || s.slice(5, 7)} ${y}`;
+  }
+
+  function removeSource(p, s) {
+    p.sources.splice(p.sources.indexOf(s), 1);
+    mark(); renderPlan();
+  }
+
+  /* The edit sheet a tap on a source row opens. Status is its own field
+     rather than re-derived from the date on every save, because the pill this
+     replaces let a reader flip received/expected by hand independent of the
+     date — "the money arrives early or late", per addSource()'s note — and
+     silently recomputing it here would take that back. */
+  async function editSource(p, s) {
+    const r = await askFields(app, s.name, [
+      { key: 'name', label: i18n.t('plan.source.fieldName'), type: 'text', value: s.name },
+      { key: 'kind', label: i18n.t('plan.source.fieldKind'), type: 'select', value: s.kind || 'Other',
+        options: SOURCE_KINDS, desc: i18n.t('plan.source.fieldKindDesc') },
+      { key: 'amount', label: i18n.t('plan.source.fieldAmount'), type: 'number', value: (s.amount || 0).toFixed(2) },
+      { key: 'date', label: i18n.t('plan.source.fieldDate'), type: 'date', value: s.date || '',
+        desc: i18n.t('plan.source.fieldDateDesc') },
+      { key: 'status', label: i18n.t('plan.source.fieldStatus'), type: 'select', value: s.status || 'received',
+        options: [
+          { value: 'received', label: i18n.t('plan.source.statusReceived') },
+          { value: 'expected', label: i18n.t('plan.source.statusExpected') },
+        ] },
+      { key: 'notes', label: i18n.t('plan.source.fieldNotes'), type: 'text', value: s.notes || '' },
+      { key: 'remove', label: i18n.t('plan.source.fieldRemove'), type: 'toggles',
+        options: [{ value: 'yes', label: i18n.t('plan.source.fieldRemoveYes') }] },
+    ]);
+    if (!r) return;
+    if ((r.remove || []).includes('yes')) return removeSource(p, s);
+    const amount = normalizeAmount(r.amount);
+    if (amount === null) return toast('Not a number', true);
+    s.name = (r.name || '').trim() || s.name;
+    s.kind = r.kind || 'Other';
+    s.amount = amount;
+    s.date = (r.date || '').trim();
+    s.status = r.status === 'expected' ? 'expected' : 'received';
+    s.notes = (r.notes || '').trim();
+    mark(); renderPlan();
+  }
+
+  /* ---- the envelopes: an accordion, one bucket open at a time (variant B) ----
+
+     Five tall cards used to mean five screens of scrolling to see the whole
+     allocation at once. Every OTHER bucket collapses to a ~44px summary row
+     (name, amount, share); the open one gets the full card — slider, items,
+     the lot. expandedEnvelope is pure view state (declared at the top of this
+     module) so switching plans or deleting the open bucket can never leave it
+     pointing at something that no longer exists — the guard below resets it
+     to the first bucket whenever that happens. */
+  function renderEnvelopes(p, sum) {
+    $('#planEnvSub').textContent = p.envelopes.length
+      ? `${p.envelopes.length} spending bucket${p.envelopes.length === 1 ? '' : 's'} · ${money(sum.allocated)} placed of ${money(sum.pot)}`
+      : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
+    const host = $('#planEnvelopes');
+    host.classList.add('plan-env-accordion');
+    keepScroll(host, () => {
+      host.empty();
+      if (!p.envelopes.length) {
+        host.append(el('div', { class: 'text-muted plan-empty-row' },
+          'No spending buckets yet.'));
+        return;
+      }
+      if (expandedEnvelope && !p.envelopes.some(e => e.name === expandedEnvelope)) expandedEnvelope = null;
+      if (!expandedEnvelope) expandedEnvelope = p.envelopes[0].name;
+      for (const e of p.envelopes) {
+        host.append(e.name === expandedEnvelope ? envelopeCard(p, e, sum) : envelopeSummaryRow(p, e, sum));
       }
     });
   }
 
-  /* ---- the envelopes: the act of dividing, made draggable ---- */
-  function renderEnvelopes(p, sum) {
-    $('#planEnvSub').textContent = p.envelopes.length
-      ? `Drag a slider to move money in or out · ${p.envelopes.length} spending bucket${p.envelopes.length === 1 ? '' : 's'}, ${money(sum.allocated)} placed`
-      : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
-    const host = $('#planEnvelopes');
-    keepScroll(host, () => {
-      host.empty();
-      for (const e of p.envelopes) host.append(envelopeCard(p, e, sum));
-      if (!p.envelopes.length) {
-        host.append(el('div', { class: 'text-muted plan-empty-row' },
-          'No spending buckets yet.'));
-      }
-    });
+  /* The ~44px collapsed row. Shares envelopeOverState with the expanded card
+     below so an overspent/overcommitted bucket reads as such even collapsed
+     — a reader scanning the accordion for what needs attention should not
+     have to open every row to find it. */
+  function envelopeSummaryRow(p, env, sum) {
+    const items = p.items.filter(i => i.envelope === env.name);
+    const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
+    const state = envelopeOverState(env.amount, items, spent);
+    return el('button', {
+      class: `env-sum${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
+      type: 'button',
+      style: `--tint:${env.tint || 'transparent'}`,
+      'aria-label': i18n.t('plan.env.expandAria', { name: env.name }),
+      onclick: () => { expandedEnvelope = env.name; renderPlan(); },
+    },
+      el('span', { class: 'env-sum-swatch' }),
+      el('span', { class: 'env-sum-name' }, env.name),
+      el('span', { class: 'env-sum-amt num' }, money(env.amount)),
+      el('span', { class: 'env-sum-pct num' }, `${sharePct(env.amount, sum.pot)}%`));
   }
 
   /* Right-hand side of the rail note: up to two status flags rather than one
@@ -299,16 +437,36 @@ module.exports = function registerPlan(ctx) {
 
     flagsHost = el('div', { class: 'env-rail-flags' }, ...railFlags(state, spent));
 
+    /* A 3px accent rule stands in for the old radial-gradient tint wash on
+       the expanded card only (plan-env-accordion in styles.css switches the
+       wash off there) — the wash bled past its own card's rounded corner in
+       the accordion's tighter layout, reading as a rendering fault rather
+       than a colour cue. Collapsed rows keep the wash-free swatch dot
+       instead, so the tint is legible at both sizes without the bleed. */
+    const accent = el('div', { class: 'env-accent', style: `background:${env.tint || 'var(--color-primary)'}` });
+
+    /* Delete moves out of the footer into the expanded header's own overflow
+       spot — the redesign's rule that a destructive action never sits beside
+       an everyday one (Save/rename here). Collapse is the header's other new
+       control: tapping it (or another row) is how the accordion closes. */
     card = el('div', {
       class: `env${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       style: `--tint:${env.tint || 'transparent'}`,
     },
+      accent,
       el('div', { class: 'env-top' },
+        el('button', { class: 'env-collapse', type: 'button',
+          'aria-label': i18n.t('plan.env.collapseAria', { name: env.name }),
+          onclick: () => { expandedEnvelope = null; renderPlan(); } },
+          icoEl(['chevron-down', 'chevron-up'])),
         el('button', { class: 'env-name', type: 'button',
           'aria-label': `Rename spending bucket ${env.name}`,
           onclick: () => renameEnvelope(p, env) },
           env.name, icoEl(['pencil', 'square-pen', 'pen-line'], 'env-name-ico')),
-        shareEl),
+        shareEl,
+        el('button', { class: 'env-del-ico', type: 'button',
+          'aria-label': i18n.t('plan.env.deleteAria', { name: env.name }),
+          onclick: () => removeEnvelope(p, env) }, icoEl(['trash-2', 'trash']))),
       amtBtn,
       el('div', { class: 'env-rail' },
         slider,
@@ -324,10 +482,7 @@ module.exports = function registerPlan(ctx) {
         el('span', { class: 'env-count' },
           items.length
             ? `${items.filter(i => i.status === 'done').length} of ${items.length} done`
-            : 'no items yet'),
-        el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button',
-          'aria-label': `Remove spending bucket ${env.name}`,
-          onclick: () => removeEnvelope(p, env) }, '✕')));
+            : 'no items yet')));
 
     return card;
   }
@@ -433,6 +588,9 @@ module.exports = function registerPlan(ctx) {
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     p.envelopes.push({ name, amount, note: (r.note || '').trim(), tint: nextTint(p) });
+    // Open the one you just made, rather than leaving the reader to find its
+    // collapsed row among the others in the accordion.
+    expandedEnvelope = name;
     mark(); renderPlan();
   }
 
@@ -606,6 +764,7 @@ module.exports = function registerPlan(ctx) {
   function changePlan(key) {
     if (S.planDirty) return toast('Save this plan first', true);
     S.planName = key;
+    expandedEnvelope = null; // a different plan's buckets — the accordion guard re-opens the first one
     renderPlan();
   }
 

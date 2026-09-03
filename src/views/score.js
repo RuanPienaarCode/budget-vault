@@ -800,6 +800,25 @@ module.exports = function registerScore(ctx) {
      and the phone's stacked-bar fallback — the exact figures they show can
      never drift apart because there is only one place either of them reads
      from. */
+  /* Variant A honesty rule (redesign, ui/mobile-redesign): a NEGATIVE
+     "still inside the budget" figure is arithmetically correct (leftInBudget
+     = budgeted - spent) but reads as nonsense printed as a rand amount with a
+     minus sign in front of it — the mockup's fix is to say the same fact the
+     other way round, "R X over budget", never a negative rand. Only the
+     WORDING changes; `lefts.leftInBudget`/`lefts.display` themselves are
+     money-flow's own figures, untouched. */
+  function flowASub(lefts) {
+    if (lefts.leftInBudget < -0.005) {
+      return i18n.t('score.flow.subA.overBudget', {
+        amount: money(Math.abs(lefts.display.leftInBudget), 0),
+        neverBudgeted: money(lefts.display.neverBudgeted, 0),
+      });
+    }
+    return i18n.t('score.flow.sub.notYetSpent', {
+      inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
+    });
+  }
+
   function buildFlowRows(flow) {
     const b = flow.bands, d = flow.committedDetail, lefts = flow.lefts;
     const pct = v => `${v}%`;
@@ -809,7 +828,7 @@ module.exports = function registerScore(ctx) {
        already do — see the note on displayBands in money-flow.js. Same split
        for the sub-line's two lefts, whose printed pair must add up to the
        "Together" row on the chip below. */
-    return [
+    const rows = [
       {
         key: 'committed', cls: 'is-committed',
         name: i18n.t('score.flow.committed'), amount: b.committed, display: b.display.committed, pct: b.percents.committed,
@@ -832,11 +851,28 @@ module.exports = function registerScore(ctx) {
       {
         key: 'notYetSpent', cls: 'is-notYetSpent',
         name: i18n.t('score.flow.notYetSpent'), amount: b.notYetSpent, display: b.display.notYetSpent, pct: b.percents.notYetSpent,
-        sub: i18n.t('score.flow.sub.notYetSpent', {
-          inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
-        }),
+        sub: flowASub(lefts),
       },
     ];
+
+    /* Variant A's honest-overspend row (redesign): when this period actually
+       spent more than came in — `lefts.together` is money-flow's own
+       `income - spentTotal` identity, always exact — "Not yet spent" is
+       replaced outright rather than shown reading zero next to a positive
+       "money in" figure that implies there is still something left. Nothing
+       here recomputes the deficit: `overspend` is just `-together`, the
+       same figure `periodDeficit` already argues about elsewhere in the app. */
+    const overspend = -lefts.together;
+    if (overspend > 0.005) {
+      const overspendDisplay = -lefts.display.together;
+      const overPct = flow.income > 0 ? Math.round((overspendDisplay / flow.income) * 100) : 0;
+      rows[rows.length - 1] = {
+        key: 'overspent', cls: 'is-overspent', capBar: true,
+        name: i18n.t('score.flow.overspent.name'), amount: overspend, display: overspendDisplay, pct: overPct,
+        sub: i18n.t('score.flow.overspent.sub', { amount: money(overspendDisplay, 0) }),
+      };
+    }
+    return rows;
   }
 
   function buildFlowCard(flow) {
@@ -1016,13 +1052,23 @@ module.exports = function registerScore(ctx) {
     const pctSpan = Math.max(100, rows.reduce((s, r) => s + Math.max(0, r.pct), 0));
     for (const r of rows) {
       const zero = Math.abs(r.amount) < 0.005;
-      const row = el('div', { class: `score-flow-m-row${zero ? ' is-zero' : ''}` });
+      const row = el('div', { class: `score-flow-m-row${zero ? ' is-zero' : ''}${r.capBar ? ' is-overspent' : ''}` });
       row.append(el('div', { class: 'score-flow-m-head' },
         el('span', { class: 'score-flow-m-name' }, r.name),
         el('span', { class: 'score-flow-m-amt num' }, money(r.display, 0))));
+      /* Variant A's overspend row is drawn CAPPED at 100% of the track with a
+         striped cap (`.is-overcap`, styles.css) rather than scaled down by
+         pctSpan like the other bands — the point of this row is "this went
+         past what came in", and a bar quietly shrunk to fit alongside the
+         others would say the opposite. This is deliberately narrower than
+         the general pctSpan scaling above (still used by every other band,
+         see that comment): it only ever applies to this one row. */
       row.append(zero
         ? el('div', { class: 'score-flow-m-bar is-empty' })
-        : el('div', { class: 'score-flow-m-bar' }, el('i', { class: r.cls, style: `width:${(Math.max(0, r.pct) / pctSpan) * 100}%` })));
+        : el('div', { class: 'score-flow-m-bar' }, el('i', {
+          class: r.capBar ? `${r.cls} is-overcap` : r.cls,
+          style: `width:${r.capBar ? 100 : (Math.max(0, r.pct) / pctSpan) * 100}%`,
+        })));
       row.append(el('div', { class: 'score-flow-m-sub' }, r.sub));
       wrap.append(row);
     }

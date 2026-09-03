@@ -262,12 +262,12 @@ money	R 11 000,00	11000	budTotalsBottom/div.bud-total[3]/div.bud-total-v[1]
 percent	73%	-	budTotalsBottom/div.bud-total[3]/div.bud-total-n[2]
 
 ## plan
+number	2026	-	view-plan .financial-period-banner-title/
 number	2026	-	planPicker/button.plan-seg
 money	R 0,00	0	planPot/div.pot-fig[1]
-money	R 0,00	0	planPot/div.split-key[4]/div[0]/div.sk-fig[1]
-money	R 0,00	0	planPot/div.split-key[4]/div[1]/div.sk-fig[1]
-money	R 0,00	0	planPot/div.split-key[4]/div[2]/div.sk-fig[1]
-money	R 0,00	0	planPot/div.split-key[4]/div.sk-left[3]/div.sk-fig[1]
+money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[0]/span.sk2-fig[1]
+money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[1]/span.sk2-fig[1]
+money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[2]/span.sk2-fig[1]
 
 ## notes
 
@@ -286,7 +286,7 @@ money	R 4 000,00	4000	savingsKpis/div.mini[3]/div.v[1]
 percent	36.4%	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 11 000	11000	savingsKpis/div.mini[3]/div.s[2]
 number	1	-	savingsKpis/div.mini[3]/div.s[2]
-money	R 80 000	80000	savingsStale/div.kpi-caveat-txt
+money	R 80 000	80000	savingsStale/div.sav-banner/div.kpi-caveat-txt
 money	R 114 500	114500	savingsWorth/svg.worth-svg/text[1]
 money	R 16 000,00	16000	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
 percent	14%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[0]/rect/title
@@ -299,11 +299,16 @@ percent	1%	-	savingsWorth/svg.worth-svg/g[0]/g.worth-seg[3]/rect/title
 money	R 8 000	8000	savingsWorth/svg.worth-svg/text[3]
 money	R 8 000,00	8000	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
 percent	100%	-	savingsWorth/svg.worth-svg/g[1]/g.worth-seg/rect/title
-money	R 16 000	16000	savingsWorth/ul.donut-legend/li[0]/span.dl-val[1]
-money	R 17 000	17000	savingsWorth/ul.donut-legend/li[1]/span.dl-val[1]
-money	R 80 000	80000	savingsWorth/ul.donut-legend/li[2]/span.dl-val[1]
-money	R 1 500	1500	savingsWorth/ul.donut-legend/li[3]/span.dl-val[1]
-money	R 8 000	8000	savingsWorth/ul.donut-legend/li[4]/span.dl-val[1]
+percent	70%	-	savingsWorth/ul.sav-worth-list/li.sav-worth-row[0]/button.sav-worth-btn/span.sav-worth-end[1]/span.sav-worth-share[0]
+money	R 80 000	80000	savingsWorth/ul.sav-worth-list/li.sav-worth-row[0]/button.sav-worth-btn/span.sav-worth-end[1]/span.num[1]
+percent	15%	-	savingsWorth/ul.sav-worth-list/li.sav-worth-row[1]/button.sav-worth-btn/span.sav-worth-end[1]/span.sav-worth-share[0]
+money	R 17 000	17000	savingsWorth/ul.sav-worth-list/li.sav-worth-row[1]/button.sav-worth-btn/span.sav-worth-end[1]/span.num[1]
+percent	14%	-	savingsWorth/ul.sav-worth-list/li.sav-worth-row[2]/button.sav-worth-btn/span.sav-worth-end[1]/span.sav-worth-share[0]
+money	R 16 000	16000	savingsWorth/ul.sav-worth-list/li.sav-worth-row[2]/button.sav-worth-btn/span.sav-worth-end[1]/span.num[1]
+percent	100%	-	savingsWorth/ul.sav-worth-list/li.sav-worth-row[3]/button.sav-worth-btn/span.sav-worth-end[1]/span.sav-worth-share[0]
+money	R 8 000	8000	savingsWorth/ul.sav-worth-list/li.sav-worth-row[3]/button.sav-worth-btn/span.sav-worth-end[1]/span.num[1]
+percent	1%	-	savingsWorth/ul.sav-worth-list/li.sav-worth-row[4]/button.sav-worth-btn/span.sav-worth-end[1]/span.sav-worth-share[0]
+money	R 1 500	1500	savingsWorth/ul.sav-worth-list/li.sav-worth-row[4]/button.sav-worth-btn/span.sav-worth-end[1]/span.num[1]
 money	$ 1 000	1000	savingsWorthSub/
 money	R 11 000,00	11000	savingsGrowth/svg.growth-svg/g/path[0]/title
 money	R 4 000,00	4000	savingsGrowth/svg.growth-svg/g/rect/title
@@ -317,14 +322,18 @@ money	R 15 000,00	15000	savingsGrowthTotal/span/b.num
 number	2	-	savingsSections/div.card/div.card-h[0]/div[0]/div.sub
 money	R 15 000,00	15000	savingsSections/div.card/div.card-h[0]/div.legend[1]/span/b.num
 money	$ 1 000	1000	savingsSections/div.card/div.card-h[0]/div.legend[1]/span/span.acct-group-other
-money	$ 1 000,00	1000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[0]/button.v
-money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/button.v
-money	R 11 000	11000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]
-money	R 4 000	4000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[2]/span.num
-percent	36.4%	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[3]
-number	244	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.s2[4]/span.caveat-chip/button.caveat-chip-btn
-number	1	-	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt
-money	R 16 000,00	16000	savingsSections/div.card/div.body-pad[1]/div.mini-grid/div.mini[1]/div.acct-recon[5]/div.acct-recon-txt/b.num
+money	$ 1 000,00	1000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[0]/button.sav-row/div.sav-row-end[1]/div.num[0]
+money	$ 1 000,00	1000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[0]/div.sav-detail/button.v[0]
+money	R 4 000	4000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/button.sav-row/div.sav-row-main[0]/div.sav-row-sub[1]/span.num[1]
+money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/button.sav-row/div.sav-row-end[1]/div.num[0]
+number	1	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/button.sav-row/div.sav-row-end[1]/div.sav-row-status[1]
+money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/button.v[0]
+money	R 11 000	11000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.s2[1]
+money	R 4 000	4000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.s2[1]/span.num
+percent	36.4%	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.s2[2]
+number	244	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.s2[3]/span.caveat-chip/button.caveat-chip-btn
+number	1	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.acct-recon[4]/div.acct-recon-txt
+money	R 16 000,00	16000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item[1]/div.sav-detail/div.acct-recon[4]/div.acct-recon-txt/b.num
 
 ## accounts
 money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-num[1]
@@ -346,15 +355,7 @@ percent	57%	-	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[0]/span
 money	R 15 000	15000	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-val[1]
 money	$ 1 000	1000	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-val[1]/span.acct-group-other
 percent	43%	-	acctSummary/div.card[1]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-pct[2]
-number	3	-	acctDeck/div.acct-deck-h[0]/h2
-number	2	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 17 000,00	17000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 20 000,00	20000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 17 000,00	17000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[0]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
-number	1	-	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 16 000,00	16000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 15 000,00	15000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-txt[0]/div.acct-deck-why[1]
-money	R 16 000,00	16000	acctDeck/div.acct-deck-list[2]/div.acct-deck-item[1]/div.acct-deck-acts[1]/button.acct-deck-btn[1]
+number	3	-	acctDeck/div.acct-deck-banner/span.acct-deck-banner-txt[1]
 number	3	-	acctFilters/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[1]/span.acct-seg-n
 number	2	-	acctFilters/button.acct-seg[2]/span.acct-seg-n
@@ -363,20 +364,28 @@ number	2026	-	acctTable/thead/tr/th.acct-col-drop[2]/button
 money	R 20 000,00	20000	acctTable/tbody/tr.type-row[0]/td/span.acct-group-total
 money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.num[1]/button.acct-bal
 money	R 18 000	18000	acctTable/tbody/tr.acct-row[1]/td.num[2]/span.acct-chip
+number	2	-	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 17 000,00	17000	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 17 000,00	17000	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/button.acct-deck-btn[1]
 money	R 15 000,00	15000	acctTable/tbody/tr.type-row[2]/td/span.acct-group-total
 money	$ 1 000	1000	acctTable/tbody/tr.type-row[2]/td/span.acct-group-total/span.acct-group-other
 money	R 15 000,00	15000	acctTable/tbody/tr.acct-row[3]/td.num[1]/button.acct-bal
 money	R 1 000	1000	acctTable/tbody/tr.acct-row[3]/td.num[2]/span.acct-chip
 percent	36%	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
 money	R 11 000	11000	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
+number	1	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 16 000,00	16000	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 15 000,00	15000	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
+money	R 16 000,00	16000	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/button.acct-deck-btn[1]
 money	$ 1 000,00	1000	acctTable/tbody/tr.acct-row[4]/td.num[1]/button.acct-bal
 number	3	-	acctTblSub/
 
 ## assets
-money	R 80 000,00	80000	assetKpis/div.mini[0]/div.v[1]
-number	1	-	assetKpis/div.mini[1]/div.v[1]
-money	R 80 000	80000	assetKpis/div.mini[2]/div.v[1]
-number	1	-	assetKpis/div.mini[3]/div.v[1]
+money	R 80 000,00	80000	assetKpis/div.card/div.assets-hero-top[0]/div/div.assets-hero-num[1]
+number	1	-	assetKpis/div.card/div.assets-hero-top[0]/span.assets-hero-badge
+number	1	-	assetKpis/div.card/div.assets-hero-strip[2]/span[0]
+money	R 80 000	80000	assetKpis/div.card/div.assets-hero-strip[2]/span.assets-hero-largest[1]/b.num-sm
 percent	100%	-	assetStale/div.kpi-caveat-txt
 number	2	-	assetTable/tbody/tr/td[0]/div.asset-age
 
