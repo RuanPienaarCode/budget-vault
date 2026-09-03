@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.39.1 — 2026-09-03
+
+### Changed
+
+- **The numbers ledger now pins the rules 1.39.0 settled.** The committed
+  fixture household gained a set-aside envelope with its contribution, an
+  assume-spent category with no transaction behind it, a split, and an outflow
+  from the earmarked emergency fund. It held none of these before, which is
+  why the 1.39.0 refactor could leave the ledger byte-identical at every step.
+  705 pinned figures became 745. No behaviour changed.
+
 ## 1.39.0 — 2026-09-03
 
 ### Fixed
