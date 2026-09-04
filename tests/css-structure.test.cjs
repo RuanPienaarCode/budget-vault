@@ -114,4 +114,25 @@ for (const rel of ['src/styles.css', 'styles.css']) {
     'and it clips the mark, which is deliberately taller than the bar (top/bottom: -2px)');
 }
 
+/* ---- 3. comment delimiters pair up ----
+   1.40.0 shipped a line reading `(…) *\/` after a comment had already closed.
+   Braces balanced, no declaration was orphaned, and the directory review's
+   real parser rejected the file ("CSS parse error"). A `*\/` with no open
+   comment, or a `/*` never closed, is the same class of hand-edit as the
+   orphaned body above, so it is pinned here the same way. */
+for (const rel of ['src/styles.css', 'styles.css']) {
+  const file = path.join(ROOT, rel);
+  const css = fs.readFileSync(file, 'utf8');
+  let open = false, line = 1;
+  for (let i = 0; i < css.length; i++) {
+    if (css[i] === '\n') line++;
+    if (!open && css.startsWith('/*', i)) { open = true; i++; continue; }
+    if (open && css.startsWith('*/', i)) { open = false; i++; continue; }
+    if (!open && css.startsWith('*/', i)) {
+      assert.fail(`${path.relative(ROOT, file)}: a '*/' at line ${line} closes a comment that was never opened`);
+    }
+  }
+  eq(open, false, `${path.relative(ROOT, file)}: a comment is never closed`);
+}
+
 console.log(`PASS — stylesheets are well-formed: braces balance, no rule body is orphaned (${checks} assertions).`);

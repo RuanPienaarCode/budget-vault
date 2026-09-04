@@ -3,6 +3,17 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.40.1 — 2026-09-04
+
+### Fixed
+
+- **styles.css did not parse.** 1.40.0 shipped a stray comment closer at line
+  4402, left behind when two comments were merged by hand. Browsers recover
+  from it, but the directory review's parser does not, and it is exactly the
+  class of hand-edit `tests/css-structure.test.cjs` exists to catch, so that
+  test now also pins comment delimiters: every `*/` closes an open comment
+  and every comment closes.
+
 ## 1.40.0 — 2026-09-03
 
 ### Changed

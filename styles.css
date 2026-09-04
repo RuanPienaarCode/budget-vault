@@ -4398,8 +4398,9 @@
    row's focus ring on those versions. Guarded the same way every other
    :focus-visible rule in styles.css is guarded (see that file's own
    @supports block, ~line 2921); kept local here rather than added to that
-   block because this class is owned by this file, not styles.css. */
-   (Merged into that block on 3 Sep 2026: the parity guard only reads the first one.) */
+   block because this class is owned by this file, not styles.css.
+   Merged into that block on 3 Sep 2026: the parity guard only reads the
+   first one. */
 
 /* ---- mobile redesign: assets view ---- */
 /* Assets page — redesign variant B ("hero plus a stat strip").
