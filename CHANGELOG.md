@@ -3,6 +3,26 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.41.1 — 2026-09-07
+
+### Fixed
+
+- **The money-flow chart clipped its last row.** Each row's label was placed at
+  its own band, and a band is proportional — a real one can be a three-unit
+  sliver while the text beside it is 13px tall whatever the band does. A
+  household with two large bands and two small ones therefore stacked its last
+  two labels on top of each other and drew the final one below the plot, where
+  it was cut off by the edge of the card. Measured on a real household: "Saving"
+  at y=262 and "Overspent" at y=284 inside a plot 280 units tall.
+
+  The chart's own history records this defect once already, from 1.22.0, where
+  four labels piled up eight pixels apart; that fix only rescued a plot whose
+  bands were *all* zero, and this shape takes the proportional path instead. So
+  the bands keep their honest proportions and the labels now get a floor: each
+  sits at its band or one line below the label above it, whichever is lower, and
+  the plot grows to hold them. A guard pins the invariant for any proportions
+  rather than for this one household.
+
 ## 1.41.0 — 2026-09-07
 
 ### Changed

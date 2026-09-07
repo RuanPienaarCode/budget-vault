@@ -979,6 +979,31 @@ module.exports = function registerScore(ctx) {
     });
     const plotTop = laid[0].top, plotBottom = laid[laid.length - 1].bottom;
 
+    /* Where each row's TEXT goes, which is not where its band goes. The bands
+       are proportional and a real one may be a 3-unit sliver; the label beside
+       it is 13px tall whatever the band does. Laid out from the band and no
+       further, two slivers in a row put two labels within 3 units of each
+       other and pushed the last one past the viewBox: measured on a 53/47/1/0
+       household, "Overspent" drew at y=284 inside a 280-tall plot and was
+       clipped away, with "Saving" overlapping it just above.
+
+       That is the 1.22.0 defect this function's own header describes, in the
+       case its fix did not cover — that one only rescued the ALL-zero plot,
+       and a plot with two real bands and two slivers takes the proportional
+       branch. So the geometry stays honest and the TEXT gets a floor: each
+       label sits at its band, or one line below the label above it, whichever
+       is lower, and the viewBox grows to hold whatever that comes to. */
+    const LABEL_LINE = 22;
+    let prevLabelY = -Infinity;
+    for (const r of laid) {
+      const atBand = Math.abs(r.amount) < 0.005 ? (r.top + r.bottom) / 2 + 4 : r.top + 18;
+      r.labelY = Math.max(atBand, prevLabelY + LABEL_LINE);
+      r.showSub = r.h >= 34;
+      prevLabelY = r.labelY + (r.showSub ? 16 : 0);
+    }
+    const contentBottom = laid.reduce((m, r) => Math.max(m, r.labelY + (r.showSub ? 16 : 0)), 0);
+    const svgH = Math.max(H, Math.ceil(contentBottom + PAD_B));
+
     /* The reconciled display figures, not the raw bands — the aria-label is
        the whole chart for a screen-reader user, and four figures that sum one
        rand past the income they follow is the donut aria-label defect
@@ -991,7 +1016,7 @@ module.exports = function registerScore(ctx) {
       notYetSpent: money(flow.bands.display.notYetSpent, 0),
     });
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('viewBox', `0 0 ${W} ${svgH}`);
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', label);
     svg.setAttribute('class', 'score-flow-sankey');
@@ -1023,17 +1048,17 @@ module.exports = function registerScore(ctx) {
       if (Math.abs(r.amount) < 0.005) {
         const midY = (r.top + r.bottom) / 2;
         add('line', { x1: RIB_X0, x2: DEST_X + DEST_W, y1: midY, y2: midY, class: 'score-flow-zero' });
-        add('text', { x: LABEL_X, y: midY + 4, class: 'score-flow-name' }).textContent = r.name;
-        add('text', { x: W - 8, y: midY + 4, 'text-anchor': 'end', class: 'score-flow-amt is-zero' }).textContent =
+        add('text', { x: LABEL_X, y: r.labelY, class: 'score-flow-name' }).textContent = r.name;
+        add('text', { x: W - 8, y: r.labelY, 'text-anchor': 'end', class: 'score-flow-amt is-zero' }).textContent =
           i18n.t('score.flow.amountPct', { amount: money(r.display, 0), pct: `${r.pct}%` });
         continue;
       }
       add('rect', { x: RIB_X0, y: r.top, width: DEST_X + DEST_W - RIB_X0, height: r.h, rx: 4, class: `score-flow-rib ${r.cls}` });
-      add('text', { x: LABEL_X, y: r.top + 18, class: 'score-flow-name' }).textContent = r.name;
-      add('text', { x: W - 8, y: r.top + 18, 'text-anchor': 'end', class: 'score-flow-amt' }).textContent =
+      add('text', { x: LABEL_X, y: r.labelY, class: 'score-flow-name' }).textContent = r.name;
+      add('text', { x: W - 8, y: r.labelY, 'text-anchor': 'end', class: 'score-flow-amt' }).textContent =
         i18n.t('score.flow.amountPct', { amount: money(r.display, 0), pct: `${r.pct}%` });
-      if (r.h >= 34) {
-        add('text', { x: LABEL_X, y: r.top + 34, class: 'score-flow-caption' }).textContent = r.sub;
+      if (r.showSub) {
+        add('text', { x: LABEL_X, y: r.labelY + 16, class: 'score-flow-caption' }).textContent = r.sub;
       }
     }
     return svg;
