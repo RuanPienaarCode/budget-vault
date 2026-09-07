@@ -3,6 +3,65 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.41.0 — 2026-09-07
+
+### Changed
+
+- **The summary card states one "spent" figure, not two.** ADR-0005 settled that
+  "budget used" has a single rule — outgoings, less what you moved into your own
+  funds, plus what an assume-spent category has already consumed — and moved the
+  card's headline, meter and "% used" tag onto it. The two rand figures printed
+  between them stayed on gross spend, so the card could say "R 3 400 remaining"
+  above a line reading "R 13 600,00 spent of R 15 500,00 budgeted", which
+  subtracts to R 1 900. On a real household it read "Over budget R 6 161" above
+  "R 47 054,27 spent of R 36 814,00 budgeted", which implies R 10 240. Both
+  figures now read the one rule, and a new line under them names what makes that
+  figure differ from every rand that left: the amount set aside, the assume-spent
+  provision, and any refunds netted off inside the period.
+
+- **Interest a fund earns is no longer counted as money you saved.** "How much
+  did you save" means what crossed into your funds from outside them, and a fund
+  paying itself interest crossed nothing. An inflow under a category you have
+  typed `income` and flagged `interest: true` is now treated as growth: it leaves
+  the saving rate, the score's saving pillar and the "moved so far" figure beside
+  your set-aside envelopes. Only a category you have flagged yourself is affected
+  — nothing is inferred from a description or an amount — so a vault that has not
+  flagged its interest categories sees no change. Households that have will see
+  their saving rate fall slightly, to the truer number.
+
+### Fixed
+
+- **"Left in the budget" on the Score page was a second answer to a question the
+  summary card already answered.** It subtracted gross spend where the card
+  subtracted the one rule, so the two disagreed by exactly the amount set aside:
+  R 1 900 against R 3 400 on the test household, R −10 240 against R 6 161 on a
+  real one. It now reads the same numerator, and the sentence about spending more
+  than came in is measured the same way.
+
+- **The spending trend compared unlike things.** Each bar plotted gross spend
+  against the spend envelopes alone, then passed an "over budget"/"under budget"
+  verdict on the gap — a narrowed budget against an unnarrowed actual, the shape
+  the summary card was corrected for two releases ago. The spend line now carries
+  the same figure the card prints.
+
+- **"Savings & investments" summed stated balances beside a net worth built from
+  implied ones.** One account could appear twice on one card, at two amounts,
+  under a caption reading "as things stand today". Both that tile and the Savings
+  page's own tiles now roll balances forward the way every figure around them
+  does.
+
+- **The exported report could not be reconciled to the app.** It paired gross
+  spend with the whole plan, a third pairing that appeared on no screen, and
+  printed no "% used" at all. It now states the app's own pair beside the totals,
+  in the same words the summary card and the budget totals strip use.
+
+- **Figures held out of a total are now named where they were silently dropped.**
+  The spending split discloses the set-aside slice inside "categorised spending";
+  a foreign-currency band names the money it holds back as set aside, instead of
+  losing it between "in your accounts" and "actually free"; and the count of
+  unconfirmed balances stops counting accounts in another currency, or accounts
+  with no balance date at all, which were already reported separately.
+
 ## 1.40.1 — 2026-09-04
 
 ### Fixed

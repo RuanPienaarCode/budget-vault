@@ -167,10 +167,11 @@ function periodFlow({
   const living = Math.max(0, spent - committed - nonCommittedSavingsTyped);
   const notYetSpent = Math.max(0, inc - committed - living - saving);
 
-  /* ADR-0007 · The two lefts. leftInBudget + neverBudgeted is always exactly
-     income − spentTotal, and may read larger than the notYetSpent band
-     whenever saving is non-zero — correct, not a bug. */
-  const leftInBudget = bud - spent;
+  /* ADR-0007 · The two lefts. Against the ONE numerator (ADR-0005): built on
+     gross, this chip answered a different question from the Dashboard hero's
+     remaining line — R1 900 against R3 400 on one household. */
+  const spentByRule = budgetSpent({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent });
+  const leftInBudget = bud - spentByRule;
   const neverBudgeted = inc - bud;
   const together = leftInBudget + neverBudgeted;
 
@@ -191,7 +192,6 @@ function periodFlow({
   /* ADR-0007 · Set-aside comes from the caller, not byCat (ADR-0005): the net
      map hides an in-budget fund contribution — 51% here vs 38% on the hero. */
   const budgetUsed = budgetUsedShare({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent, budgeted: bud });
-  const spentByRule = budgetSpent({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent });
 
   /* ADR-0007 · Percentages of income past 100. largestRemainder only while the
      bands share one whole; in a deficit period each band rounds alone. */

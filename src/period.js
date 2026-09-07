@@ -22,7 +22,7 @@ const { reconcile } = require('./reconcile');
    shuffled between two funds is not counted as fresh saving. That reading is
    reused rather than re-spelled: a second answer to the same question is the
    defect this whole audit keeps finding. */
-const { savedFromOutside } = require('./savings-math');
+const { savedFromOutside, poolCatType } = require('./savings-math');
 const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
 const { stamp, tally, LENSES } = require('./ledger');
@@ -258,10 +258,11 @@ module.exports = function registerPeriod(ctx) {
   }
 
   /* ADR-0007 · Declared category type is null when unstated. A default is not
-     evidence of intent for savedFromOutside's ISSUE 32 rule. */
+     evidence of intent for savedFromOutside's ISSUE 32 rule; the pool fold is
+     poolCatType's, so `interest: true` reaches the saving rule too. */
   function declaredCatType(name) {
     const c = (S.categories || []).find(x => x.name === name);
-    return c && c.type_stated ? c.type : null;
+    return c && c.type_stated ? poolCatType(S.categories, name) : null;
   }
   /* ADR-0007 · Moved-to-funds is an aggregate, not per envelope. ISSUE 43 — no
      link exists from a transfer row to a category, and free text is not guessed. */

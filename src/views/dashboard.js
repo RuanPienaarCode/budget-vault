@@ -657,7 +657,12 @@ module.exports = function registerDashboard(ctx) {
        counted at all because their balance has no date to measure from, and
        how many transaction rows the implied balances behind it could not
        place because their own dates name no day. */
-    const staleCount = S.accounts.filter(a => a.in_budget !== false && isStale(a.balance_updated)).length;
+    /* ADR-0007 · Unconfirmed counts only accounts this chain summed: same
+       currency, and dated at all — an undated one is reported by its own
+       fragment below and was being caveated twice. */
+    const staleCount = S.accounts.filter(a => a.in_budget !== false
+      && symbolOf(a, home) === home
+      && a.balance_updated && isStale(a.balance_updated)).length;
     const cashParts = [];
     /* whatsLeft's own count, not a second one computed here. The old local
        recount said "in budget AND dated" while the figure above it summed only
@@ -813,6 +818,10 @@ module.exports = function registerDashboard(ctx) {
       const gm = (v) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(g.sym, v, 0) : `${g.sym} ${Math.round(v)}`);
       const parts = [
         g.L.cashKnown ? i18n.t('dash.left.cash') + ' ' + gm(g.L.cash) : null,
+        /* Named for the same reason the home chain names it: this band's cash
+           less its committed does not reach its free figure without it, and a
+           term that moves a total silently is the exclusion currency.js forbids. */
+        g.L.earmarked >= 1 ? i18n.t('dash.left.earmarked') + ' ' + gm(g.L.earmarked) : null,
         g.L.committedOther || g.L.cardDue
           ? i18n.t('dash.left.committed') + ' ' + gm(g.L.committedOther + g.L.cardDue) : null,
         g.L.cashKnown
@@ -1044,8 +1053,10 @@ module.exports = function registerDashboard(ctx) {
      Savings composition chart R80 000 in an account of an unrecognised type;
      it was never applied here, so a household holding R85 000 saw this tile
      read R5 000 while net worth beside it counted the full amount. */
-  const accountsOfType = type => vocabAccountsOfType(S.accounts, type);
-  const balanceOf = type => accountsOfType(type).reduce((t, a) => t + (a.balance || 0), 0);
+  /* ADR-0007 · Position tiles read implied balances, like the net worth beside
+     them. Summing stated ones here was one account with two totals on one card
+     captioned "as things stand today". `balanceOf` went with it, unused. */
+  const accountsOfType = (type, from) => vocabAccountsOfType(from || S.accounts, type);
 
   /* A tile whose value is a button into the page that owns it. kpiTiles() is
      not used here because its tiles are inert by design — these are summaries
@@ -1084,7 +1095,8 @@ module.exports = function registerDashboard(ctx) {
        of 1 September. Net worth genuinely does not move with the PERIOD, and
        its caption says so; that was never a reason for it not to move with
        the DAY. */
-    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(impliedAccounts(), S.settings.currency);
+    const positionAccounts = impliedAccounts();
+    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(positionAccounts, S.settings.currency);
     /* The same sentence the Accounts hero carries, from the same key — so the
        two screens cannot word the same fact differently. */
     const otherLine = others => (others.length
@@ -1115,10 +1127,10 @@ module.exports = function registerDashboard(ctx) {
        of. */
     const worthOtherNet = otherCurrencyNet(w, worthOthers);
     const owed = owedSummary(S.owed, undefined, S.settings.currency);
-    const savingsAccounts = poolAccounts(S.accounts);
+    const savingsAccounts = poolAccounts(positionAccounts);
     const { others: savingsOthers } = splitByCurrency(savingsAccounts, S.settings.currency);
-    const savings = primaryTotal(accountsOfType('savings'), S.settings.currency);
-    const invest = primaryTotal(accountsOfType('investment'), S.settings.currency);
+    const savings = primaryTotal(accountsOfType('savings', positionAccounts), S.settings.currency);
+    const invest = primaryTotal(accountsOfType('investment', positionAccounts), S.settings.currency);
 
     /* A vault that has none of this yet gets no band at all. Four tiles reading
        R0.00 is not an empty state, it is a balance sheet asserting that the
@@ -1405,6 +1417,15 @@ module.exports = function registerDashboard(ctx) {
     });
     const baseDiffers = allocated !== null && Math.round((incomeBase - sum.income) * 100) !== 0;
     const usedPct = used.used === null ? null : sharePercentLabel(used.used, locale().decimal);
+    /* ADR-0007 · Hero spent is the one numerator. Headline, meter and tag read
+       budgetUsed().spent; the sub-line and stat printed GROSS beside them.
+       The three adjustments that make them differ are named, not subtracted. */
+    const { netted: nettedRefunds } = categoryGap(S.period);
+    const spentNoteParts = [
+      used.setAside >= 1 ? i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }) : '',
+      used.assumed >= 1 ? i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }) : '',
+      nettedRefunds >= 1 ? i18n.t('dash.hero.nettedOff', { amount: money(nettedRefunds, 0) }) : '',
+    ].filter(Boolean);
     /* ISSUE 40. The stat column states the WHOLE plan (R14 500) while the hero
        above it now measures against the spend envelopes alone (R10 500). Both
        are right for their own question and the card must not leave a reader to
@@ -1480,7 +1501,7 @@ module.exports = function registerDashboard(ctx) {
             : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
-        el('div', {}, el('div', { class: 'sv' }, money(sum.spend)),
+        el('div', {}, el('div', { class: 'sv' }, money(used.spent)),
           usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
     if (foreignNote) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
     /* A real <button>, not a plain <div> — this is the app's clearest
@@ -1566,7 +1587,10 @@ module.exports = function registerDashboard(ctx) {
         S.settings.household ? el('div', { class: 'hero-greet' }, i18n.t('dash.greet.line', { greeting, name: S.settings.household })) : '',
         el('div', { class: 'hero-lbl' }, i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
         heroNum,
-        el('div', { class: 'hero-sub' }, i18n.t('dash.hero.sub', { spent: money(sum.spend), budgeted: money(bud.spend) })),
+        el('div', { class: 'hero-sub' }, i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
+        spentNoteParts.length
+          ? el('div', { class: 'hero-sub hero-sub--ahead' }, spentNoteParts.join(' · '))
+          : '',
         /* ISSUE 35. The window this card's figures stop at, and what is on the
            other side of it.
 
@@ -1678,7 +1702,10 @@ module.exports = function registerDashboard(ctx) {
     const data = periods.map(p => {
       const sum = periodSummary(p);
       return {
-        p, spent: sum.spend, income: sum.income, budget: budgetTotals(p).spend, label: periodShortLabel(p),
+        /* ADR-0007 · Trend spend is the one numerator: a gross figure against
+           spend-only envelopes made every bar's over/under verdict a different
+           question from the hero's above it. */
+        p, spent: budgetUsed(p).spent, income: sum.income, budget: budgetTotals(p).spend, label: periodShortLabel(p),
         /* Whether the vault covers this period AT ALL — periodSpend's own
            count, uncapped, the same test compareTotals already relies on to
            keep a never-imported month out of its own baseline. A period that
@@ -2229,6 +2256,10 @@ module.exports = function registerDashboard(ctx) {
     const parts = [];
     if (uncat >= 1) parts.push(i18n.t('dash.split.uncatNote', { amount: money(uncat) }));
     if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted) }));
+    /* The slices are gross, so a set-aside contribution draws one — correct for
+       a spending SPLIT, and the reason this total differs from the hero's. */
+    const splitSetAside = budgetUsed(S.period).setAside;
+    if (splitSetAside >= 1) parts.push(i18n.t('dash.split.setAsideNote', { amount: money(splitSetAside) }));
     const gapNote = parts.join('');
 
     // Was hand-built English plural surgery on the word "category" (an 'y'

@@ -85,7 +85,11 @@ module.exports = function registerReport(ctx) {
      is the exact bug that shipped in 1.28.0 — the write landed at the real
      `Reports/…`, the read looked for `<budget folder>/Reports/…`, found
      nothing, and silently cleared the `result` the write had just set. Every
-     lookup below stays on the vault-root side of that line. */
+     lookup below stays on the vault-root side of that line.
+
+     budgetUsed/movedToFunds — ADR-0005's one period-level reading and the
+     funds aggregate the Dashboard hero and the Budget page print beside their
+     own set-aside sentence, so this document states the same pair they do. */
   const {
     S, $, app, plugin, money, toast,
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
@@ -93,6 +97,7 @@ module.exports = function registerReport(ctx) {
     periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
     accountIndex, impliedAccounts, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows, categoryGap,
+    budgetUsed, movedToFunds,
   } = ctx;
 
   /* -------------------------------- state --------------------------------
@@ -542,6 +547,10 @@ module.exports = function registerReport(ctx) {
   function buildReportData() {
     const periods = selectedPeriods();
     let income = 0, spend = 0, net = 0, budgetIncome = 0, budgetSpend = 0;
+    /* ADR-0007 · The exported report states the app's own budget-used pair.
+       ADR-0005's operands, summed per period the additive way every figure
+       here is; the share is derived once, in prepareReportData. */
+    let setAsideSpend = 0, assumedSpend = 0, budgetSpendOnly = 0, movedSoFar = 0;
     /* C2 in the 2026-08-29 audit — the exact three-line gap
        views/dashboard.js's own donut discloses beside itself
        (dashboard.js:1717-1719, "what this donut does NOT show"), run once
@@ -595,6 +604,13 @@ module.exports = function registerReport(ctx) {
          and the table of one file, disagreeing, with no caveat between them.
          The table lists every envelope, so the total states every envelope. */
       budgetIncome += bt.income; budgetSpend += bt.spend + (bt.setAside || 0);
+      /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
+         numerator and its denominator can never come from two calls. */
+      const bu = budgetUsed(p);
+      setAsideSpend += bu.setAside || 0;
+      assumedSpend += bu.assumed || 0;
+      budgetSpendOnly += bu.budgeted || 0;
+      movedSoFar += movedToFunds(p) || 0;
 
       const spendRows = categorySpendRows(p);
       spendRowsByPeriod.push(spendRows);
@@ -689,6 +705,13 @@ module.exports = function registerReport(ctx) {
       foreign: { count: foreignLabels.size, symbols: foreignSymbols },
       household: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
+      /* ADR-0005's OPERANDS, not its answers — prepareReportData derives
+         `spent` and `used` from exactly these, so the percentage and the rand
+         figure beside it are one reading. See ADR-0007's src/report.js entry. */
+      budgetUsed: {
+        spend, setAside: setAsideSpend, assumed: assumedSpend,
+        budgeted: budgetSpendOnly, moved: movedSoFar,
+      },
       categories, spendByCategory,
       categoryGap: { uncat, netted },
       fundedFromSavings: { spend: fundedSpend, count: fundedCount },

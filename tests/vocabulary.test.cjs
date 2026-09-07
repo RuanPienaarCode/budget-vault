@@ -287,21 +287,34 @@ function provenFalse(desc, exactShape, mangled) {
 }
 
 /* ========================================================================
-   TERM 4 — "Total spent" (Dashboard) vs "Total spent" (Budget)
-   status: declared
+   TERM 4 — "Total spent" (Dashboard) and "Total spent" (Budget)
+   status: unified
    ------------------------------------------------------------------------
-   Dashboard hero: gross periodSummary().spend, no overlay. Budget page:
-   THAT SAME figure plus the assume-spent shortfall overlay (a category whose
-   money left in an earlier period and has no transaction here to be counted
-   by periodSummary at all) — never a second, competing reading of the same
-   raw spend. Declared via the tile's own gapNote, built from grossGap /
-   gapUncat / gapNetted the same way the donut's own "not shown" note already
-   works (dashboard.js), so the difference is accounted for by construction
-   rather than asserted. ======================================================================= */
+   One rule on both tiles: budgetUsed(p).spent — gross outgoings less what was
+   set aside, plus the assume-spent provision (ADR-0005).
+
+   This term was DECLARED rather than unified until 2026-09-06, and by then the
+   declaration was false. It read "Dashboard hero: gross periodSummary().spend,
+   no overlay", which described the stat but not the card around it: the
+   headline, the meter and the "% used" tag beside that stat were already built
+   from budgetUsed(), so the hero printed R 13 600 spent, R 15 500 budgeted and
+   R 3 400 remaining at once, and the 78% tag agreed with the wrong figure only
+   because 12 100/15 500 and 13 600/17 500 both round to 78. On a real vault the
+   same card read "Over budget R 6 161" above "R 47 054,27 spent of R 36 814,00
+   budgeted", which subtracts to R 10 240.
+
+   A declaration is worth something only while what it declares is true. This
+   one outlived the rule it described and then pinned it in place, which is why
+   the gap survived ADR-0005 and two releases.
+   ======================================================================= */
 {
-  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.spent'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv' \}, money\(sum\.spend\)\)/
+  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.spent'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv' \}, money\(used\.spent\)\)/
     .test(live.dashboard),
-    'Total spent (Dashboard): the hero\'s Spent stat is bound to periodSummary().spend, gross, no overlay');
+    'Total spent (Dashboard): the hero\'s Spent stat is bound to budgetUsed().spent, the one rule');
+  ok(live.dashboard.includes("i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })"),
+    'Total spent (Dashboard): and so is the sub-line above it, measured against the spend envelopes');
+  ok(live.dashboard.includes('const spentNoteParts = ['),
+    'Total spent (Dashboard): the declared half — set-aside, the assume-spent provision and netted refunds are named beside the figure rather than left to subtraction');
 
   /* 2026-09-03, ADR-0005: the tile is the ONE "budget used" numerator —
      budgetUsed(p).spent, i.e. periodSummary().spend less set-aside plus the
@@ -574,7 +587,11 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.vocabulary.includes("const POOL_ACCOUNT_TYPES = SET_ASIDE_TYPES;"),
     'Account type: the pool set IS the set-aside set — one object, seen from the account side');
 
-  ok(live.dashboard.includes("const accountsOfType = type => vocabAccountsOfType(S.accounts, type);"),
+  /* 2026-09-06: the list this filter reads became a parameter so the position
+     tiles can pass implied balances (they were summing stated ones beside an
+     implied net worth). The fold still goes through the owner, which is what
+     this term is about — the source list is the caller's business. */
+  ok(live.dashboard.includes("const accountsOfType = (type, from) => vocabAccountsOfType(from || S.accounts, type);"),
     'Account type (Dashboard): accountsOfType() is the owner\'s filter');
   ok(live.savings.includes("const { accountsOfType, accountType } = require('../vocabulary');")
     && !/typeIs/.test(live.savings.replace(/\/\*[\s\S]*?\*\//g, '')),

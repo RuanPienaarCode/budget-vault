@@ -60,7 +60,9 @@
 
 const { escMd } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
-const { budgetRowStatus } = require('./money-flow');
+/* budgetSpent/budgetUsedShare — ADR-0005's one rule, reached rather than
+   re-spelled. See ADR-0007's entry for this file. */
+const { budgetRowStatus, budgetSpent, budgetUsedShare } = require('./money-flow');
 const { growthRate } = require('./savings-math');
 const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
@@ -391,10 +393,21 @@ function prepareReportData(data) {
   const savings = data.savings
     ? { ...data.savings, rate: growthRate(data.savings) }
     : data.savings;
+  /* ADR-0007 · The exported report states the app's own budget-used pair: the
+     rule applied ONCE here, to the merged operands, so both serialisers print
+     one numerator and one share. Absent operands leave the fact absent. */
+  const budgetUsed = data.budgetUsed
+    ? {
+      ...data.budgetUsed,
+      spent: budgetSpent(data.budgetUsed),
+      used: budgetUsedShare(data.budgetUsed),
+    }
+    : data.budgetUsed;
   return {
     ...data,
     spendByCategory: spendByCategory.map((r, i) => ({ ...r, pct: pct[i] })),
     savings,
+    budgetUsed,
   };
 }
 
@@ -410,7 +423,14 @@ function prepareReportData(data) {
      periodCount: number,              // R5 — how many periods were merged; the rename
                                         // caveat below only ever prints when this is > 1
      income, spend, net: number,       // periodSummary(), summed across the selection
-     budgetIncome, budgetSpend: number,// budgetTotals(), summed the same way
+     budgetIncome, budgetSpend: number,// budgetTotals(), summed the same way; budgetSpend
+                                        // is the WHOLE plan (spend + set-aside envelopes)
+     budgetUsed: { spend, setAside, assumed, budgeted, moved },  // F10 — ADR-0005's
+                                        // OPERANDS, summed per period off ctx.budgetUsed(p)
+                                        // and ctx.movedToFunds(p). `spent` and `used` are
+                                        // NOT the caller's to supply: prepareReportData
+                                        // below derives both through money-flow.js's one
+                                        // rule, the way it already owns `pct` and `rate`.
      categories: [{ cat, budget, actual, type, orphaned }],  // budgetVsActualRows(),
                                                      // merged, typeRank-sorted (see
                                                      // budgetTable); orphaned = !catKnown(cat)
@@ -449,7 +469,7 @@ function financialReportMarkdown(data, money) {
     generated, periodLabel, rangeNote, detail, periodCount,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, fundedFromSavings, scheduled, savings, debts, netWorth, health, transactions,
-    otherCurrencies, household, foreign,
+    otherCurrencies, household, foreign, budgetUsed,
   } = data;
 
   /* ISSUE 28. This document LEAVES the app: it is saved, shared, and read
@@ -521,6 +541,20 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.budgetIncome'), money(budgetIncome)],
       [i18n.t('report.col.budgetSpend'), money(budgetSpend)],
     ]));
+  /* ADR-0007 · The exported report states the app's own budget-used pair. The
+     whole-plan rows above stay; ADR-0005's pair joins them in the hero's and
+     the Budget tile's own sentences, every held-out amount named. */
+  const bu = budgetUsed;
+  if (bu && ((bu.spent || 0) > 0 || (bu.budgeted || 0) > 0)) {
+    const usedPct = bu.used === null || bu.used === undefined ? null : sharePercentLabel(bu.used, '.');
+    const parts = [i18n.t('dash.hero.sub', { spent: money(bu.spent), budgeted: money(bu.budgeted) })];
+    if ((bu.assumed || 0) > 0) parts.push(i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(bu.assumed) }));
+    else if (usedPct !== null) parts.push(i18n.t('bud.total.spentNote', { pct: usedPct }));
+    if ((bu.setAside || 0) > 0) {
+      parts.push(i18n.t('dash.stat.setAsideMoved', { amount: money(bu.setAside, 0), moved: money(bu.moved || 0, 0) }));
+    }
+    out.push('', parts.join(' · '));
+  }
   /* period.js's periodSummary() returns `foreign` WITH the figures rather
      than beside them, and says in its own comment that every tile, table,
      chart and aria-label built from this object is expected to say something
@@ -839,6 +873,21 @@ function jsonTransactionRow(r) {
   };
 }
 
+/* ADR-0007 · The exported report states the app's own budget-used pair — the
+   Markdown sentence's figures as data. `used_pct` is null exactly where the
+   Markdown prints no percentage; the rest are zeroed, never absent. */
+function budgetUsedFact(bu) {
+  const used = bu && bu.used !== null && bu.used !== undefined ? bu.used * 100 : null;
+  return {
+    spent: (bu && bu.spent) || 0,
+    budgeted: (bu && bu.budgeted) || 0,
+    used_pct: used,
+    set_aside: (bu && bu.setAside) || 0,
+    set_aside_moved: (bu && bu.moved) || 0,
+    assumed: (bu && bu.assumed) || 0,
+  };
+}
+
 /* The JSON shape of a "held out of these figures" fact — one spelling for
    the two sections that carry one, so a consumer writes one reader. Always
    an object with both keys, never null or absent: see income_vs_spend's own
@@ -865,7 +914,7 @@ function financialReportJson(data) {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, fundedFromSavings, scheduled, savings, debts, netWorth, health, transactions,
-    otherCurrencies, foreign,
+    otherCurrencies, foreign, budgetUsed,
   } = data;
 
   const shape = {
@@ -892,6 +941,9 @@ function financialReportJson(data) {
     income_vs_spend: {
       income, spend, net,
       budget_income: budgetIncome, budget_spend: budgetSpend,
+      /* ADR-0007 · The exported report states the app's own budget-used pair.
+         Added beside the whole-plan figures above, never swapped for them. */
+      budget_used: budgetUsedFact(budgetUsed),
       /* ISSUE 28 — the same fact the Markdown sibling states in prose
          (dash.foreignExcluded), as raw data. Always present and zeroed on a
          single-currency vault rather than absent, matching every other count

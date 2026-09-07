@@ -412,6 +412,10 @@ const couldBeAnInternalLeg = (outRow, inRow) => {
   if (gap === null || gap <= BACKSTAMP_DAYS) return true;
   return !looksLikeSpending(outRow);
 };
+/* ADR-0007 · Interest credited inside the pool is growth, not saving. The
+   declared 'interest' fold only (poolCatType); an interest credit has no other
+   leg, so it never enters the pairing. */
+const isPoolGrowth = r => (typeof catType === 'function' ? catType(r.cat) : null) === 'interest';
 const inflows = [], outflows = [];
 {
   for (const r of householdRows) {
@@ -419,9 +423,10 @@ const inflows = [], outflows = [];
     if (supersededBySplit(r)) { continue; }   // its parts are in this same list
     const a = labels.get(r.label);
     if (!a) { continue; }                     // not a savings or investment account
+    if (r.amount > 0 && isPoolGrowth(r)) { continue; }
     /* ADR-0007 · Nothing is skipped on the strength of a row's own flags; the
-       pool boundary is the only test (the R40 000 UIF is in the income base,
-       so it is in the saving too). */
+       pool boundary and the household's own declaration are the only tests
+       (the R40 000 UIF is in the income base, so it is in the saving too). */
     (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
   }
 }

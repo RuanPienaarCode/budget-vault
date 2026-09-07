@@ -88,3 +88,47 @@ the as-of boundary. Every surface reads one of those two:
   fixture household has no set-aside envelope and no assume-spent category, so
   every figure it pins is unchanged. Giving that fixture one of each is a
   follow-up worth doing, so the ledger guards this rule too.
+
+## Second pass (2026-09-06): the rand figures beside the rule
+
+The decision above moved the Dashboard hero's *headline*, its meter and its
+"% used" tag onto `budgetUsed()`. It did not move the two rand figures printed
+between them, and an audit six weeks later measured what that left on screen.
+
+On the fixture household the hero read "R 3 400 remaining" above "R 13 600,00
+spent of R 15 500,00 budgeted" — a sub-line that subtracts to R 1 900 — with a
+"Total spent" stat of R 13 600 beside a "78% used" tag whose numerator was
+R 12 100. The percentage agreed with the wrong rand figure only by arithmetic
+accident: 12 100/15 500 and 13 600/17 500 both round to 78. On a real vault the
+same card read "Over budget R 6 161" above "R 47 054,27 spent of R 36 814,00
+budgeted", which subtracts to R 10 240; the difference was exactly the R 4 079
+of set-aside named two lines to its right.
+
+Three further surfaces were still on the old numerator:
+
+- **the Score page's "Left in the budget"** was `budgeted − spentTotal`, a
+  second answer to the question the hero's headline already answers (R 1 900
+  against R 3 400 on the fixture; R −10 240 against R 6 161 on the real vault);
+- **the trend chart** plotted gross spend against the spend-only envelopes and
+  passed an "R X over/under budget" verdict on that pair, which is the mixed
+  comparison ISSUE 40 exists to forbid;
+- **the Report export** paired gross spend with the whole plan, a third
+  pairing that no reader could reconcile to either screen.
+
+All four now read `budgetUsed(p).spent`. What makes them differ from gross is
+named rather than left to subtraction: the hero prints a line under its
+sub-line carrying the set-aside held out, the assume-spent provision added in,
+and any refunds netted off inside the period — the last of these because a
+refunded purchase counted gross is the single largest reason a real household's
+"over budget" figure is not the one they would compute themselves.
+
+The donut keeps gross slices, because a spending *split* is about where money
+went, and it now says so: the set-aside amount is disclosed in its note beside
+the uncategorised and netted figures it already declared.
+
+Pinned by `tests/one-spent-rule-on-screen.test.cjs`, which asserts the rendered
+card rather than the seam — the gap above survived `tests/budget-used-one-rule.test.cjs`
+for two releases because that file never read a rendered hero. Term 4 of
+`tests/vocabulary.test.cjs`, which had *declared* the hero's gross stat as
+correct, is now a unified term; a declaration is worth something only while
+what it declares is still true.

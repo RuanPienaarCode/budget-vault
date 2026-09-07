@@ -928,6 +928,8 @@ module.exports = {
   'dash.hero.remaining': 'Okusele kulesi sikhathi',
   'dash.hero.overspent': 'Okuchithwe ngokweqile kulesi sikhathi',
   'dash.hero.sub': '{spent} okuchithiwe ku-{budgeted} okwabelwe',
+  'dash.hero.assumedIncluded': 'kufaka {amount} esivele ichithiwe',
+  'dash.hero.nettedOff': '{amount} kwimbuyiselo ekhishiwe',
   'dash.stat.income': 'Umholo uwonke',
   'dash.stat.budgeted': 'Okwabelwe',
   'dash.stat.spent': 'Okuchithiwe sekukonke',
@@ -1020,6 +1022,7 @@ module.exports = {
 
   'dash.split.uncatNote': ' · {amount} engakabelwa sigaba, ayikhonjiswanga',
   'dash.split.nettedNote': ' · {amount} kwimbuyiselo ekhishiwe',
+  'dash.split.setAsideNote': ' · i-{amount} ibekelwe eceleni',
   'dash.split.onlyUncat': '{amount} iphumile kulesi sikhathi, kodwa akukho namunye kuyo osuwabelwe isigaba — misa izigaba kwiMisebenzi yemali bese ukuhlukaniswa kuvela lapha.',
   'dash.split.empty': 'Akukho lutho olwabelwe njengokuchitha kulesi sikhathi okwamanje.',
   'dash.split.aria': 'Ukuhlukaniswa kokuchitha kuka-{month}: ',

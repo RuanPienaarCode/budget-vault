@@ -979,6 +979,8 @@ module.exports = {
   'dash.hero.remaining': 'Budget remaining this period',
   'dash.hero.overspent': 'Over budget this period',
   'dash.hero.sub': '{spent} spent of {budgeted} budgeted',
+  'dash.hero.assumedIncluded': 'includes {amount} already spent',
+  'dash.hero.nettedOff': '{amount} in refunds netted off',
   'dash.stat.income': 'Total income',
   'dash.stat.budgeted': 'Budgeted',
   'dash.stat.spent': 'Total spent',
@@ -1084,6 +1086,7 @@ module.exports = {
   /* The other half of the difference between this donut and "Total Spent":
      refunds and credits that shrank a slice instead of drawing one. */
   'dash.split.nettedNote': ' · {amount} in refunds netted off',
+  'dash.split.setAsideNote': ' · {amount} set aside',
   'dash.split.onlyUncat': '{amount} went out this period, but none of it is categorised yet — set categories in Transactions and the split appears here.',
   'dash.split.empty': 'Nothing categorised as spending in this period yet.',
   'dash.split.aria': 'Spending split for {month}: ',
