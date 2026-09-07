@@ -592,6 +592,22 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
       files[`FNB/${m}`] = files[`FNB/${m}`] || { label: 'FNB', month: m, dirty: false, rows: [] };
       files[`FNB/${m}`].rows.push({ date, desc: 'x', cat: 'Salary', amount: 100, excluded: false, note: '' });
     }
+    /* And one row in every calendar month the window can reach, which seeding
+       by PERIOD alone does not guarantee: a 31-day cycle steps OVER a short
+       month — 31 Jan + 31d = 3 Mar, so February holds no period start at all —
+       and monthlyIncome then trims that month correctly, because it really is
+       empty. This assertion is about the window rule, not about whether a
+       31-day step happens to land in every month, so the fixture states the
+       precondition the rule is about instead of depending on today's date for
+       it. Before this the 31-day case returned 2 on roughly half the calendar,
+       which is how it passed for months and went red on 2026-09-07. */
+    const [ey, em] = ctx.periodRange(p).end.split('-').map(Number);
+    for (let k = 0; k <= 6; k++) {
+      const t = new Date(Date.UTC(ey, em - 1 - k, 15));
+      const m = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}`;
+      files[`FNB/${m}`] = files[`FNB/${m}`] || { label: 'FNB', month: m, dirty: false, rows: [] };
+      files[`FNB/${m}`].rows.push({ date: `${m}-15`, desc: 'x', cat: 'Salary', amount: 100, excluded: false, note: '' });
+    }
     ctx.S.txFiles = files;
     ctx.S.categories = [{ name: 'Salary', type: 'income', color: '#888' }];
     return ctx.monthlyIncome(p).months;
