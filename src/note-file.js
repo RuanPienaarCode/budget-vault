@@ -238,9 +238,23 @@ function parseNote(text, path = '') {
      absent, which covers a note a user wired up by hand with a wikilink and no
      subject key. Reading them the other way round would let a stale wikilink
      win over the key the plugin maintains. */
-  /* ISSUE 54. No unyaml() — parseFrontmatter is now the inverse of yamlStr at
-     the boundary, so the value arriving here is already unescaped. Running
-     both would eat a legitimate backslash. */
+  /* ISSUE 54. The value arriving here is ALREADY unescaped. parseFrontmatter
+     runs unquoteYaml — the reader half of yamlStr — over every quoted scalar as
+     it comes off the page, so this module holds no decoder of its own and must
+     not grow one. It held one until #54, and running both un-escaped twice: the
+     backslash vanished out of `Back\slash`, and the two literal characters of
+     `path a\nb` became a real newline, which is worse than it looks because the
+     subject then no longer EQUALS the debt it names and every note about it
+     reads as unmatched. tests/notes.test.cjs check 10 round-trips both of those
+     subjects and is what pins it.
+
+     The lesson that removed decoder paid for, now carried by unquoteYaml in
+     markdown.js: un-escape in ONE left-to-right pass, never a chain of
+     .replace() calls. A chain un-escapes in stages, so a value holding a
+     literal backslash-then-n — the two characters, written by yamlStr as `\\n`
+     — comes out of the `\n` stage as a real newline that the `\\` stage has
+     already walked past. Reading each escape once, where it occurs, is the only
+     shape that is a true inverse. */
   const subject = (fm.note_subject || '').toString().trim() || unwrapLink(fm.note_for);
   const base = (path.split('/').pop() || '').replace(/\.md$/, '');
   const h1 = /^#\s+(.+)$/m.exec(body || '');
@@ -251,42 +265,6 @@ function parseNote(text, path = '') {
     title: (h1 ? h1[1].trim() : base.replace(/^\d{4}-\d{2}-\d{2}\s+/, '')) || 'Untitled note',
     excerpt: noteExcerpt(body),
   };
-}
-
-/* The other half of yamlStr. parseFrontmatter already takes the outer quotes
-   off a "…" scalar, but it leaves the ESCAPES inside — so a note about
-   `Fee "query"`, written correctly as "Fee \"query\"", reads back with the
-   backslashes still in it and renders them on the page.
-
-   Applied unconditionally rather than only to values that arrived quoted,
-   because parseFrontmatter does not report which those were. The cost is that
-   a literal backslash-quote in an UNQUOTED hand-written value loses its
-   backslash; YAML gives that sequence no meaning unquoted anyway, and the
-   alternative is showing escape characters to everyone who ever types an
-   apostrophe-free quotation mark. */
-/* Now also undoes \n, \r and \t, because yamlStr escapes them — a subject
-   carrying a newline (a table-cell name wrapped with `<br>`) would otherwise
-   read back with a literal backslash-n on the card where Obsidian shows a
-   break, and, worse, would no longer EQUAL the debt it names, so every note
-   about it would show as unmatched.
-
-   One pass, left to right, rather than a chain of .replace() calls. A chain
-   un-escapes in stages, so a value holding a literal backslash-then-n — the
-   two characters, escaped by yamlStr as `\\n` — comes out of the `\n` stage as
-   a real newline that the `\\` stage has already walked past. Reading each
-   escape once, where it occurs, is the only shape that is a true inverse. */
-function unyaml(v) {
-  const s = (v ?? '').toString().trim();
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] !== '\\' || i === s.length - 1) { out += s[i]; continue; }
-    const next = s[++i];
-    out += next === 'n' ? '\n'
-      : next === 'r' ? '\r'
-        : next === 't' ? '\t'
-          : next;                    // \" and \\ — and anything else, verbatim
-  }
-  return out;
 }
 
 const ISO_PREFIX = /^(\d{4}-\d{2}-\d{2})/;

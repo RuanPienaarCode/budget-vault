@@ -378,10 +378,27 @@ const SCHEMAS = {
            post() fills `original` from the balance so the payoff maths has a
            divisor; `originalStated: false` is how it says that figure was
            derived rather than typed, and writing it would turn a blank into a
-           claim the household never made. */
+           claim the household never made.
+
+           The `== null` arm is that same sentence for a row that never met
+           post(). null is this column's DECLARED state for an absent-or-empty
+           cell — the read above mints it and the comment there calls it
+           legitimate — so the write has to reverse it, and '' is the cell that
+           reads back as null. Without the arm such a row reached `.toFixed` on
+           null and threw; and because rowLine() maps over EVERY column the
+           throw escaped rowLine and then mdTableFile, so the failure was not
+           one wrong cell but no document at all — Debts.md never written and
+           the healthy rows beside it lost with it. usedColumns() already wraps
+           this identical call in `catch (e) { return true; }`; rowLine does
+           not, and a write that is total for every state its own read produces
+           should not need it to. Nothing in the app reaches this today —
+           S.debts is filled in exactly two places, load.js's post() and
+           addDebt(), and both leave a number behind — so this is the guard
+           for the third writer, not a fix for a live crash. */
         write: r => (r.originalStated === false ? ''
           : r.originalRaw != null && !(r.original || 0) ? r.originalRaw
-            : r.original.toFixed(2)),
+            : r.original == null ? ''
+              : r.original.toFixed(2)),
       },
       money('rate', 'Rate', { floor: true }),
       money('payment', 'Payment', { floor: true }),

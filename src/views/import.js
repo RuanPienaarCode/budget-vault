@@ -125,7 +125,19 @@ module.exports = function registerImport(ctx) {
     // Nothing resolved — but the file is readable, so ask instead of refusing.
     // This is what makes a bank nobody has tested importable at all.
     if (!map) return showColumnMapper(rows, file, null);
-    await runImport(rows, map, file);
+    /* `finally`, not a bare await. importProgress('done') is the LAST line of
+       runImport, so a throw anywhere after the bar went up left it on screen
+       forever. Reproduced on a 1600-row CSV whose review render threw: the bar
+       stopped at "Preparing review… 95%" and stayed there — the screen still
+       claiming to be working on an import that had already given up, which is
+       what made a failed drop read as a hung one. Hiding a bar that was never
+       shown is a no-op (importProgress('done') only adds a class), so the
+       small-file path that never starts one is unaffected.
+
+       The throw itself still propagates: src/controller.js's wireDropZone is
+       the seam that reports it, and swallowing it here would trade a frozen
+       bar for a silent one. */
+    try { await runImport(rows, map, file); } finally { importProgress('done'); }
   }
 
   /* Parse the rows under a column map (auto-detected or chosen by hand) and put
@@ -489,7 +501,11 @@ module.exports = function registerImport(ctx) {
         return ($('#impMapWarn').textContent = 'Date and Description are the same column — pick different ones.');
       if (map.iAmount === -1 && (map.iDebit === -1 || map.iCredit === -1))
         return ($('#impMapWarn').textContent = 'Pick an Amount column, or both Money out and Money in.');
-      await runImport(rows, map, file);
+      // Same `finally` as handleStatementFile's, for the same reason and with
+      // the same caveat — see the comment there. Both entries to runImport
+      // carry it, because "present in one and easy to lose in the other" is
+      // precisely how this file's drop-zone wiring went wrong before.
+      try { await runImport(rows, map, file); } finally { importProgress('done'); }
       if (!S.pendingImport || !S.pendingImport.items.length) {
         $('#importMap').classList.remove('hidden');
         $('#impMapWarn').textContent = 'That mapping produced no transactions — check the Date column especially.';

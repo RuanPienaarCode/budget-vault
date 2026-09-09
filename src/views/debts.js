@@ -817,6 +817,14 @@ module.exports = function registerDebts(ctx) {
       // so the "paid off" bar still has a baseline from day one — see
       // refreshRow(), which now also names that baseline on screen.
       original: originalTyped !== null ? Math.max(0, originalTyped) : Math.max(0, balance),
+      /* ISSUE 68's flag, set HERE as well as in load.js's post() step. A debt
+         loaded from disk gets it there; one added through this form did not, so
+         a blank Original — the expected case — seeded `original` from the
+         balance and then wrote that derived figure into Debts.md as though the
+         household had typed it. The next load read it back as stated and the
+         distinction was gone for good. `false` is what makes the serializer
+         write an empty cell instead of a claim nobody made. */
+      originalStated: originalTyped !== null,
       rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
       start: todayIso(),
       category: (r.category || '').trim(), status: 'active', notes: '',

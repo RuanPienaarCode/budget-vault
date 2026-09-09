@@ -785,9 +785,24 @@ module.exports = function registerPlan(ctx) {
     /* ISSUE 59/63. A cell nobody could read goes back exactly as it was
        typed, never as a fabricated 0.00 and never as a coerced status word.
        load.js sets `<key>Raw` only when the cell was present and unreadable —
-       the same contract table-schema.js gives every other table. */
-    const cash = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : Number(r[key] || 0).toFixed(2));
-    const word = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : r[key]);
+       the same contract table-schema.js gives every other table, and both
+       halves of that contract are load-bearing here for the reasons its
+       money()/vocab() comments spell out.
+
+       NOT through escMd: the raw arrives from parseMdTable still \|-escaped
+       and load.js never unescapes it, so escaping it again added a backslash
+       on every save — `R400 \| ish`, `R400 \\| ish`, `R400 \\\| ish` — until
+       a cell that was merely unparseable became unreadable.
+
+       And preferred only while the row still HOLDS the value that raw
+       produced. The editors on this page assign `amount`/`spent`/`status` in
+       place and cannot clear a sibling key they have never heard of, so an
+       unconditional preference discarded the reader's own correction on the
+       next save. */
+    const cash = (r, key) => (r[`${key}Raw`] != null && !(r[key] || 0)
+      ? r[`${key}Raw`] : Number(r[key] || 0).toFixed(2));
+    const word = (r, key, fallback) => (r[`${key}Raw`] != null && r[key] === fallback
+      ? r[`${key}Raw`] : r[key]);
     const lines = ['---', ...fm.split('\n'), '---', '', `# ${p.name}`, '',
       'Money that arrives once, divided on purpose.',
       'Source `status` is `received` or `expected`; item `status` is `planned`, `part` or `done`.',
@@ -796,7 +811,7 @@ module.exports = function registerPlan(ctx) {
       '| Source | Kind | Amount | Date | Status | Notes |',
       '|--------|------|-------:|------|--------|-------|'];
     for (const s of p.sources) {
-      lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${cash(s, 'amount')} | ${escMd(s.date || '')} | ${word(s, 'status')} | ${escMd(s.notes || '')} |`);
+      lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${cash(s, 'amount')} | ${escMd(s.date || '')} | ${word(s, 'status', 'received')} | ${escMd(s.notes || '')} |`);
     }
     lines.push('', '## Envelopes', '',
       '| Envelope | Amount | Note | Tint |',
@@ -808,7 +823,7 @@ module.exports = function registerPlan(ctx) {
       '| Item | Envelope | Amount | Spent | Status | Category | Notes |',
       '|------|----------|-------:|------:|--------|----------|-------|');
     for (const i of p.items) {
-      lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${cash(i, 'amount')} | ${cash(i, 'spent')} | ${word(i, 'status')} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
+      lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${cash(i, 'amount')} | ${cash(i, 'spent')} | ${word(i, 'status', 'planned')} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
     }
     lines.push('');
     return lines.join('\n');

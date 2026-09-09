@@ -167,6 +167,69 @@ function applyInputMode(root, mode) {
   return manual;
 }
 
+/* A drop target and its hidden <input type="file">, wired as one unit: click
+   the zone to open the picker, drag onto it to drop, and either way the file
+   goes to `handle`. Written out twice before — for the statement importer and
+   the tax-document uploader — with the input's value reset present in both
+   but easy to lose, and without it re-picking the SAME file fires no change
+   event at all, so the second attempt silently does nothing.
+
+   Standalone and exported for the same reason applyInputMode above is: as a
+   closure inside mountApp the only way to reach it would be a full DOMParser
+   shell mount, which no bare-node suite performs — so this seam could break
+   and ship with every suite green.
+
+   AWAITED AND CAUGHT — the whole point of `accept` below. Every `handle` this
+   is called with is async (ctx.handleStatementFile, ctx.handleTaxFile), and
+   both listeners used to fire it bare: a DOM listener awaits nothing and
+   returns nowhere, so a throw ANYWHERE inside became a rejected promise with
+   no owner. That is the same failure views/report.js's createReport documents
+   at length and tests/save-failure.test.cjs pins for nine save paths, reached
+   through a different door — invisible on iOS, invisible on desktop unless the
+   console happens to be open, and indistinguishable from a drop zone that
+   simply does nothing.
+
+   What made it worse here than on a Save button is that neither handler is
+   quick. On a 1600-row CSV with the review render made to throw, the observed
+   result was the progress bar stopped dead at "Preparing review… 95%" with no
+   toast and no console line — the screen still claiming to be working on an
+   import that had already given up. (views/import.js now tears its own bar
+   down in a `finally`; this seam is what says a word about it.)
+
+   REPORTS, IT DOES NOT REPAIR. One seam cannot know what half-finished state
+   an arbitrary handler left behind, so it touches no dirty flag and no Save
+   button — leaving whatever the handler already lit still lit, which is the
+   rule save-failure.test.cjs holds everywhere else: a failure the reader can
+   see is a failure the reader can retry.
+
+   ONE arrival path for both entry points, deliberately. The input-value reset
+   below is already the cautionary tale about what happens when the picker and
+   the drop each carry their own copy of a step. */
+function wireDropZone($, toast, zoneSel, inputSel, handle) {
+  const zone = $(zoneSel);
+  const input = $(inputSel);
+  const accept = async f => {
+    try {
+      await handle(f);
+    } catch (e) {
+      console.error(`Budget: the ${zoneSel} drop-zone handler failed`, e);
+      toast(`Could not process "${(f && f.name) || 'that file'}" (${(e && e.message) || e})`, true);
+    }
+  };
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', e => {
+    if (e.target.files[0]) accept(e.target.files[0]);
+    e.target.value = '';
+  });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) accept(e.dataTransfer.files[0]);
+  });
+}
+
 /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
    reset — it replaces S.budgets, S.owed, S.services and S.tax and clears
    their dirty flags — so everything holding a pre-reload draft or snapshot
@@ -794,29 +857,6 @@ function mountApp(view) {
     app.setting.openTabById('budget-app');
   }
 
-  /* A drop target and its hidden <input type="file">, wired as one unit: click
-     the zone to open the picker, drag onto it to drop, and either way the file
-     goes to `handle`. Written out twice before — for the statement importer and
-     the tax-document uploader — with the input's value reset present in both
-     but easy to lose, and without it re-picking the SAME file fires no change
-     event at all, so the second attempt silently does nothing. */
-  function wireDropZone(zoneSel, inputSel, handle) {
-    const zone = $(zoneSel);
-    const input = $(inputSel);
-    zone.addEventListener('click', () => input.click());
-    input.addEventListener('change', e => {
-      if (e.target.files[0]) handle(e.target.files[0]);
-      e.target.value = '';
-    });
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-    zone.addEventListener('drop', e => {
-      e.preventDefault();
-      zone.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
-    });
-  }
-
   $('#openSettingsBtn').addEventListener('click', openPluginSettings);
   // Logo doubles as "home" — no-op until the vault has loaded, same guard the
   // drawer links use (there is no dashboard to show on the connect screen).
@@ -993,11 +1033,11 @@ function mountApp(view) {
   $('#taxDeleteYear').addEventListener('click', ctx.deleteTaxYear);
   $('#taxStart').addEventListener('click', ctx.startTax);
   $('#taxYearSel').addEventListener('change', e => ctx.changeTaxYear(e.target.value));
-  wireDropZone('#taxDrop', '#taxFileInput', f => ctx.handleTaxFile(f));
+  wireDropZone($, toast, '#taxDrop', '#taxFileInput', f => ctx.handleTaxFile(f));
   $('#impCommit').addEventListener('click', ctx.commitImport);
   $('#impRemap').addEventListener('click', ctx.remapImport);
   $('#impCancel').addEventListener('click', ctx.cancelImport);
-  wireDropZone('#drop', '#fileInput', f => ctx.handleStatementFile(f));
+  wireDropZone($, toast, '#drop', '#fileInput', f => ctx.handleStatementFile(f));
 
   return {
     start: async () => {
@@ -1093,4 +1133,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk, applyInputMode };
+module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk, applyInputMode, wireDropZone };

@@ -143,8 +143,12 @@ function patchFrontmatter(raw, updates) {
    name wrapped for width — "Standard Bank<br>Access Bond", no colon, nothing
    clever — breaks the block just as thoroughly.
 
-   The reader half is unyaml() in note-file.js, which has to undo exactly these
-   four or the app shows a literal backslash-n where Obsidian shows a break. */
+   The reader half is unquoteYaml() below, called by parseFrontmatter, which has
+   to undo exactly these four or the app shows a literal backslash-n where
+   Obsidian shows a break. It reads left to right in ONE pass for the reason
+   given there — a chain of .replace() calls turns a literal `\n` back into a
+   real newline. note-file.js used to carry a second decoder of its own; it was
+   dead by the time it was removed, and running both ate a backslash. */
 /* ISSUE 54. The READER half of yamlStr, and the reason this function had to
    exist here rather than only in note-file.js.
 
