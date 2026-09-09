@@ -110,14 +110,22 @@ const verbatim = (key, header) => ({
    yielded no number at all is preserved (src/amount.js's `readable`).
 
    The write prefers the raw only while the row still HOLDS the 0 that raw
-   produced. views/assets.js and views/debts.js edit these fields in place
-   (`d.balance = Math.max(0, parseFloat(e.target.value) || 0)`) and — unlike
-   views/budgets.js with amountRaw — have no way to clear a sibling key they
-   have never heard of. Preferring the raw unconditionally would make an edit to
-   a previously-unreadable cell vanish on save: the same bug one step to the
-   left. A reader who deliberately types 0 into such a cell sees no change and
-   the raw stands; the app cannot tell that from "never touched", and leaving
-   the reader's own text alone is the honest side to be wrong on. */
+   produced. Preferring it unconditionally would make an edit to a
+   previously-unreadable cell vanish on save: the same bug one step to the left.
+   A reader who deliberately types 0 into such a cell sees no change and the raw
+   stands; the app cannot tell that from "never touched", and leaving the
+   reader's own text alone is the honest side to be wrong on.
+
+   Every in-place editor of these fields clears its own `<key>Raw` and parses
+   through normalizeAmount — assets, debts, owed, services, budgets. That
+   pairing is load-bearing in BOTH directions and the two halves must move
+   together: this comment used to describe the editors as parsing with
+   `parseFloat(e.target.value) || 0`, and while they did, an empty field (which
+   is what a plain number input reports when an SA-locale keypad writes
+   "15 000 000,00" into it) read as 0 AND cleared the raw beside it — so the
+   preserved text this whole contract exists to protect went to 0.00 on disk
+   with nothing said about it. A cell that yields no number must leave the
+   stored figure alone; see the editMoney comment in views/debts.js. */
 const money = (key, header, { floor = false, guarded = false } = {}) => {
   const rawKey = key + 'Raw';
   return {

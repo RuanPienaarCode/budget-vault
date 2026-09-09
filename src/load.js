@@ -251,7 +251,10 @@ module.exports = function registerLoad(ctx) {
       const rows = parseMdTable(text);
       S.budgets[period] = rows.slice(1).map(c => {
         const amt = parseNum(c[2]);
-        return { category: unescMd(c[0]), type: c[1] || '', amount: amt.value, amountRaw: amt.ok ? null : amt.raw, notes: unescMd(c[3] || '') };
+        // type is unescMd'd for the same reason category and notes are: the
+        // serializer escapes it, so a household group named with a pipe must
+        // come back as the name the user typed, not as `needs\|wants`.
+        return { category: unescMd(c[0]), type: unescMd(c[1] || ''), amount: amt.value, amountRaw: amt.ok ? null : amt.raw, notes: unescMd(c[3] || '') };
       });
     }
 

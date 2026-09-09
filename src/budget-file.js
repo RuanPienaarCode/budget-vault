@@ -133,7 +133,17 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
     rangeNote, '',
     BUDGET_HEADER, BUDGET_SEPARATOR];
   for (const r of sorted) {
-    lines.push(`| ${escMd(r.category)} | ${r.type} | ${amountCell(r)} | ${escMd(r.notes)} |`);
+    /* Type goes through escMd like every other text cell. It was the one that
+       did not, and a type is as hand-typed as a category name — it comes off a
+       category's `type:` frontmatter, and groups.js lets a household name its
+       own. A `|` in one sheared the row into five cells: the reader then took
+       `wants` as the amount (R4 500 → R0, the strict parser rejecting it into
+       amountRaw) and `4500.00` as the note. The next save wrote that back, so
+       the amount column permanently held the word `wants`. Escaping only
+       changes bytes for a type that actually holds a pipe or a newline —
+       parseMdTable already trims every cell, so `expense` writes identically
+       and no vault gets a churn diff out of this. */
+    lines.push(`| ${escMd(r.category)} | ${escMd(r.type)} | ${amountCell(r)} | ${escMd(r.notes)} |`);
   }
   lines.push('');
   return lines.join('\n');

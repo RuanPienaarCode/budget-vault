@@ -288,7 +288,15 @@ module.exports = function registerServices(ctx) {
               'aria-label': `Amount for ${s.name}`,
               /* amountRaw = null: a number typed here supersedes the verbatim
                  text table-schema.js keeps for a cell it could not read. */
-              onchange: e => { s.amount = parseFloat(e.target.value) || 0; s.amountRaw = null; refresh(); } })),
+              /* normalizeAmount, not `parseFloat(...) || 0` — see the comment
+                 on the same input in views/assets.js. Clearing amountRaw beside
+                 a fabricated 0 is what turned an unreadable cell into 0.00 on
+                 disk with nothing said about it. */
+              onchange: e => {
+                const v = normalizeAmount(e.target.value);
+                if (v === null) { toast('Amount must be a number', true); refresh(); return; }
+                s.amount = v; s.amountRaw = null; refresh();
+              } })),
             /* ISSUE 33. Driven off table-schema's CYCLES, so the picker can
                never offer a value the reader's file cannot hold — or fail to
                offer one it can. The old two-option list was the visible half of
