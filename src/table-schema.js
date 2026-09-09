@@ -77,11 +77,29 @@ const text = (key, header, fallback = '') => ({
   write: r => escMd(r[key]),
 });
 
-// A date or other verbatim string: trimmed, never escaped by the reader
-// today, but written through escMd like every free cell.
+/* A date or other verbatim string. Written through escMd like every free cell,
+   and — since 2026-09-09 — READ back through unescMd, which is the half that
+   was missing.
+
+   This module's own contract at the top says the escape pair lives in one
+   declaration so the two cannot drift apart. Here they had: write escaped, read
+   did not, so every save re-escaped an already-escaped cell. A hand-typed date
+   holding a pipe — "June | maybe", the kind of thing that lands in these cells
+   precisely because they accept text a date parser rejects — gained one
+   backslash per save, forever:
+
+     June \| maybe  ->  June \\| maybe  ->  June \\\| maybe  ->  …
+
+   until a cell that was merely unparseable was unreadable. Five columns carried
+   it: assets `valued`, owed `due` and `lent`, services `next`, debts `start`.
+
+   unescMd also unwinds ONE level per load, so a cell already doubled by an
+   older build heals on successive saves rather than needing a migration. A
+   normal date has nothing to unescape, so no vault gets a churn diff — the
+   golden gate pins those bytes. */
 const verbatim = (key, header) => ({
   key, header, align: 'left',
-  read: c => ({ [key]: (c || '').trim() }),
+  read: c => ({ [key]: unescMd(c || '') }),
   write: r => escMd(r[key]),
 });
 
@@ -270,9 +288,13 @@ const vocab = (key, header, match, other) => {
    exchange-rate lookup needs one; these four tables have no rate lookup
    behind them yet, and a column nothing reads is the thing this comment
    just described. It can be appended the day conversion reaches them. */
+/* Same escape pair as verbatim() above, and it was missing the same half —
+   ISSUE 76 named this column alongside those five. A symbol is the least likely
+   cell in the file to hold a pipe, which is exactly why it would have been the
+   last one anyone noticed drifting. Five tables carry it. */
 const currency = () => ({
   key: 'currency', header: 'Currency', align: 'left',
-  read: c => ({ currency: (c || '').trim() }),
+  read: c => ({ currency: unescMd(c || '') }),
   write: r => escMd(r.currency || ''),
 });
 

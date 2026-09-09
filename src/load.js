@@ -390,14 +390,18 @@ module.exports = function registerLoad(ctx) {
         status: (fm.status || 'active').toString().trim(),
         sources: parseMdTable(section(body, 'money in')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), ...cellMoney('amount', c[2]),
-          date: (c[3] || '').trim(), ...cellVocab('status', c[4], ['expected', 'received'], 'received'),
+          // unescMd, not a bare trim: plan.js writes this through escMd, and a
+          // read that does not reverse it re-escapes the cell on every save —
+          // the same pair table-schema.js's verbatim() carries.
+          date: unescMd(c[3] || ''), ...cellVocab('status', c[4], ['expected', 'received'], 'received'),
           notes: unescMd(c[5] || ''),
         })),
         // Tint is written back verbatim so a hand-picked colour survives, and
         // an absent one renders as no wash rather than as the string "".
+        // unescMd for the same reason `date` above carries it.
         envelopes: parseMdTable(section(body, 'envelopes')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), ...cellMoney('amount', c[1]), note: unescMd(c[2] || ''),
-          tint: (c[3] || '').trim(),
+          tint: unescMd(c[3] || ''),
         })),
         items: parseMdTable(section(body, 'items')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), envelope: unescMd(c[1] || ''), ...cellMoney('amount', c[2]),
