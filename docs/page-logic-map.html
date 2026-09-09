@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budget Vault — Page &amp; Logic Map</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel-2:#1d212b; --line:#2a2f3a;
+    --ink:#e7eaf0; --muted:#9aa3b2; --muted-2:#6f81a3;
+    --accent:#5b9dff; --accent-2:#7c5cff;
+    --crit:#f06464; --warn:#f5a524; --ok:#3ecf8e; --info:#5bb8ff;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --radius:12px; --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0c0e12,var(--bg) 240px);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:16px;padding-bottom:4rem}
+  main{max-width:var(--maxw);margin:0 auto;padding:48px 24px 96px}
+  a{color:var(--accent)}
+  header.hero{padding:8px 0 28px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:34px;line-height:1.15;margin:10px 0 8px;letter-spacing:-.02em}
+  h1 .accent{color:var(--accent-2)}
+  .lede{color:var(--muted);font-size:17px;max-width:70ch;margin:0}
+  h2{font-size:23px;margin:46px 0 14px;letter-spacing:-.01em;border-left:3px solid var(--accent);padding-left:.6rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h3{font-size:17px;margin:26px 0 8px;color:var(--muted)}
+  h3 code{font-size:.85em}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px} li{margin:5px 0}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;list-style:none;padding:0}
+  .toc a{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:5px 11px;border-radius:999px}
+  .toc a:hover{color:var(--ink);border-color:var(--accent)}
+  .toc .grp{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);padding:6px 4px 0 0;width:100%}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  code{font-family:var(--mono);font-size:.88em;background:#10131a;border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+  pre{background:#10131a;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow:auto;margin:12px 0;font-size:13.5px;line-height:1.55}
+  pre code{background:none;border:none;padding:0;font-size:inherit}
+  .tbl{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted-2);font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+  td code{white-space:nowrap}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .muted{color:var(--muted)}
+  svg{display:block}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted-2);font-size:13px}
+  /* components */
+  .callout{border-left:3px solid var(--accent);background:var(--panel-2);border-radius:0 var(--radius) var(--radius) 0;padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--warn)} .callout.ok{border-left-color:var(--ok)} .callout.crit{border-left-color:var(--crit)}
+  .callout .t{font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .badge{display:inline-block;font-size:.62rem;font-weight:700;padding:.12rem .5rem;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;vertical-align:middle}
+  .b-crit{background:rgba(240,100,100,.16);color:var(--crit);border:1px solid rgba(240,100,100,.4)}
+  .b-warn{background:rgba(245,165,36,.15);color:var(--warn);border:1px solid rgba(245,165,36,.4)}
+  .b-ok{background:rgba(62,207,142,.13);color:var(--ok);border:1px solid rgba(62,207,142,.4)}
+  .b-info{background:rgba(91,184,255,.13);color:var(--info);border:1px solid rgba(91,184,255,.4)}
+  /* page meta block */
+  .meta dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:0}
+  .meta dt{color:var(--muted-2);font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;padding-top:3px}
+  .meta dd{margin:0}
+  @media(max-width:600px){.meta dl{grid-template-columns:1fr}.meta dt{padding-top:8px}}
+  section.page{margin-top:56px;padding-top:8px;border-top:1px dashed var(--line)}
+  /* sticky page-jump */
+  .jump{position:sticky;top:0;z-index:5;background:rgba(15,17,21,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:8px 0;margin:0 -24px 0;padding-left:24px;padding-right:24px;display:flex;gap:6px;overflow-x:auto;white-space:nowrap}
+  .jump a{font-size:12px;color:var(--muted);text-decoration:none;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+  .jump a:hover{color:var(--ink);border-color:var(--line)}
+  .flow{width:100%;height:auto;max-width:100%}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">Budget Vault · Obsidian plugin · Reference</div>
+    <h1>Budget Vault <span class="accent">Page &amp; Logic Map</span></h1>
+    <p class="lede">Every page in the plugin, what it displays, which function computes each figure, which vault file feeds it, and what each action writes back. For tracing why a number reads the way it does.</p>
+    <nav aria-label="Contents">
+      <ul class="toc">
+        <li class="grp">Global</li>
+        <li><a href="#overview">Overview &amp; shared seams</a></li>
+        <li><a href="#boot">Boot &amp; data load</a></li>
+        <li><a href="#period">Period model &amp; shell</a></li>
+        <li><a href="#settings">Settings &amp; onboarding</a></li>
+        <li><a href="#modules">Pure modules</a></li>
+        <li><a href="#writes">Write paths</a></li>
+        <li class="grp">Budget</li>
+        <li><a href="#page-dashboard">Dashboard</a></li>
+        <li><a href="#page-transactions">Transactions</a></li>
+        <li><a href="#page-budgets">Budget</a></li>
+        <li><a href="#page-services">Services</a></li>
+        <li><a href="#page-score">Score</a></li>
+        <li><a href="#page-plan">Plan</a></li>
+        <li><a href="#page-notes">Notes</a></li>
+        <li class="grp">Accounts</li>
+        <li><a href="#page-accounts">Accounts</a></li>
+        <li><a href="#page-savings">Savings &amp; Investments</a></li>
+        <li><a href="#page-assets">Assets</a></li>
+        <li><a href="#page-owed">Owed Money</a></li>
+        <li><a href="#page-debts">Debt</a></li>
+        <li class="grp">Tools</li>
+        <li><a href="#page-import">Import CSV</a></li>
+        <li><a href="#page-report">Report</a></li>
+        <li><a href="#page-loans">Loan Calculators</a></li>
+        <li><a href="#page-tax">Tax</a></li>
+      </ul>
+    </nav>
+  </header>
+  <nav class="jump" aria-label="Page jump">
+    <a href="#overview">Top</a><a href="#page-dashboard">Dashboard</a><a href="#page-transactions">Transactions</a><a href="#page-budgets">Budget</a><a href="#page-services">Services</a><a href="#page-score">Score</a><a href="#page-plan">Plan</a><a href="#page-notes">Notes</a><a href="#page-accounts">Accounts</a><a href="#page-savings">Savings</a><a href="#page-assets">Assets</a><a href="#page-owed">Owed</a><a href="#page-debts">Debt</a><a href="#page-import">Import</a><a href="#page-report">Report</a><a href="#page-loans">Loans</a><a href="#page-tax">Tax</a>
+  </nav>
+
+  <section id="dataflow">
+    <h2>Data flow at a glance</h2>
+    <svg class="flow" viewBox="0 0 1040 400" role="img" aria-label="Data flow: vault markdown files are read by load.js into the S state object; period.js and the pure calculation modules derive figures; the views render them and write back through the serializers in io.js. Reports and Exports go to the vault root.">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5 0 10z" fill="#5b9dff"/></marker></defs>
+      <g font-family="ui-sans-serif,system-ui" font-size="13" fill="#e7eaf0">
+        <rect x="20" y="40" width="200" height="320" rx="12" fill="#171a21" stroke="#2a2f3a"/>
+        <text x="120" y="66" text-anchor="middle" font-weight="700" fill="#9aa3b2">Vault (budget folder)</text>
+        <text x="36" y="96" fill="#9aa3b2">Settings.md</text>
+        <text x="36" y="118" fill="#9aa3b2">Categories/*.md</text>
+        <text x="36" y="140" fill="#9aa3b2">Accounts/*.md</text>
+        <text x="36" y="162" fill="#9aa3b2">Budgets/&lt;period&gt;.md</text>
+        <text x="36" y="184" fill="#9aa3b2">Transactions/&lt;f&gt;/YYYY-MM.md</text>
+        <text x="36" y="206" fill="#9aa3b2">Debts · Assets · Owed · Services</text>
+        <text x="36" y="228" fill="#9aa3b2">Plans/ · Tax/ · Notes/</text>
+        <text x="36" y="250" fill="#9aa3b2">Data/Categorisation Rules.csv</text>
+        <text x="36" y="272" fill="#9aa3b2">Exchange Rates.md</text>
+        <text x="36" y="330" fill="#6f81a3" font-size="12">table-schema.js declares the flat tables</text>
+
+        <rect x="280" y="120" width="150" height="70" rx="12" fill="#1d212b" stroke="#5b9dff"/>
+        <text x="355" y="150" text-anchor="middle" font-weight="700">load.js</text>
+        <text x="355" y="170" text-anchor="middle" fill="#9aa3b2" font-size="12">→ S (controller.js:279)</text>
+
+        <rect x="490" y="40" width="210" height="320" rx="12" fill="#171a21" stroke="#2a2f3a"/>
+        <text x="595" y="66" text-anchor="middle" font-weight="700" fill="#9aa3b2">Pure derivation</text>
+        <text x="506" y="96" fill="#e7eaf0">period.js  periodSummary · budgetTotals</text>
+        <text x="506" y="118" fill="#e7eaf0">tx-role · reconcile · currency</text>
+        <text x="506" y="140" fill="#e7eaf0">money-flow · committed · recurring</text>
+        <text x="506" y="162" fill="#e7eaf0">savings-math · worth · owed-math</text>
+        <text x="506" y="184" fill="#e7eaf0">health-math · health-data · trend-math</text>
+        <text x="506" y="206" fill="#e7eaf0">debt-math · loan-math · plan-math</text>
+        <text x="506" y="228" fill="#e7eaf0">statement · dedupe · rules</text>
+        <text x="506" y="250" fill="#e7eaf0">report · exporter · chart</text>
+        <text x="506" y="330" fill="#6f81a3" font-size="12">no DOM, today injected, node-testable</text>
+
+        <rect x="760" y="40" width="260" height="200" rx="12" fill="#171a21" stroke="#7c5cff"/>
+        <text x="890" y="66" text-anchor="middle" font-weight="700" fill="#9aa3b2">Views (src/views/*.js) + ctx</text>
+        <text x="776" y="96" fill="#e7eaf0">render*() per page, one at a time</text>
+        <text x="776" y="118" fill="#e7eaf0">ctx.provide() publishes helpers</text>
+        <text x="776" y="140" fill="#e7eaf0">S.period pill → render() current page</text>
+        <text x="776" y="162" fill="#e7eaf0">Save buttons → serialize* → io.writeFile</text>
+        <text x="776" y="184" fill="#e7eaf0">patchFile keeps bodies; trashFile only deletes</text>
+        <text x="776" y="220" fill="#6f81a3" font-size="12">shell.js markup · controller.js wiring</text>
+
+        <rect x="760" y="270" width="260" height="90" rx="12" fill="#171a21" stroke="#f5a524"/>
+        <text x="890" y="296" text-anchor="middle" font-weight="700" fill="#9aa3b2">Vault root (user-named)</text>
+        <text x="776" y="322" fill="#e7eaf0">Reports/ · Exports/</text>
+        <text x="776" y="344" fill="#9aa3b2" font-size="12">writeVaultFile / fileAtVaultPath only</text>
+
+        <path d="M220 155 H278" stroke="#5b9dff" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M430 155 H488" stroke="#5b9dff" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M700 140 H758" stroke="#5b9dff" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M760 200 C 600 380, 300 380, 222 300" stroke="#f5a524" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+        <text x="470" y="382" text-anchor="middle" fill="#f5a524" font-size="12">writes back (budget-relative)</text>
+        <path d="M890 240 V268" stroke="#f5a524" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M120 360 V380 H470" stroke="#6f81a3" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+        <text x="300" y="396" text-anchor="middle" fill="#6f81a3" font-size="12">vault watcher → reload (deferred while dirty or editing)</text>
+      </g>
+    </svg>
+  </section>
+<section id="overview">
+  <h2>How to read this map</h2>
+  <p>Every figure the plugin shows is derived from a markdown file the user could have written by hand. This document walks each page in nav order and, for every number, chart or badge on it, names the function chain that produced it and the file it came from. Line numbers are as of the working tree on 8 September 2026; another session edits this repo concurrently, so search by function name if a number has drifted.</p>
+  <div class="grid2">
+    <div class="panel">
+      <h3 style="margin-top:0">Which pages move with the period pill</h3>
+      <p class="muted" style="margin:0"><b>Period-scoped:</b> Dashboard (hero, trend, donut, budget table), Transactions, Budget, Debt (payments card only), Accounts (flow column, sparkline, drawer period fields only).<br><br><b>Anchored on today, ignore the pill:</b> Dashboard health / money-left / position cards, Score, Savings, Assets, Owed, Services, Notes, Plan, Tax, Loans, Report (it hides the pill and has its own), Import.</p>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Where money gets filtered</h3>
+      <p class="muted" style="margin:0">Only <code>period.js:summaryInRange</code> (:668) applies the four vetoes: row <code>excluded</code>, non-budget account, foreign-currency account, and outflows from an earmarked account (reported as "funded from savings"). Transfers are skipped entirely (:731). <code>net</code> is accumulated before any classification (:753), so a classification bug mislabels money rather than losing it. The Transactions table applies none of these; everything measuring an <em>account</em> rather than the budget (reconcile, periodActivity, splitFlows, chargeIndex, buildIndex) deliberately keeps excluded rows.</p>
+    </div>
+  </div>
+  <h3>One rule, many surfaces: the shared seams</h3>
+  <table>
+    <thead><tr><th>Seam</th><th>Lives at</th><th>Rule</th><th>Read by</th></tr></thead>
+    <tbody>
+      <tr><td><code>periodSummary(p)</code></td><td>period.js:623</td><td>The period totals. Clamps a running period at today and returns the rest as <code>scheduled</code>, measured by the same function over the complementary window</td><td>Dashboard, Budget, Score, Report, Debt, trend-math, health-data</td></tr>
+      <tr><td><code>budgetRowType(b)</code></td><td>period.js:538</td><td><code>catType(category) ?? b.type</code>: the category's live type, the stored Type cell only when no file answers</td><td><code>budgetTotals</code>, <code>assumedSpend</code>, Dashboard budget-vs-actual</td></tr>
+      <tr><td><code>assumedActual(b, r)</code></td><td>views/budgets.js:50</td><td><code>max(budgeted, real)</code> for an assume-spent category, never the sum</td><td>Budget actual column and totals overlay, Dashboard table, Report, both exports</td></tr>
+      <tr><td><code>foreignLabels()</code></td><td>period.js:477</td><td>Folder labels whose account is stated in another currency; held out of totals and named in <code>foreign</code></td><td>summaryInRange, trend-math, health-data</td></tr>
+      <tr><td><code>worth(...)</code></td><td>worth.js:121</td><td>Net worth: positive balances + assets + owed − negative balances − active debts; foreign residue returned, never converted</td><td>Dashboard position, Savings tile and chart, Accounts hero (accounts only), Report</td></tr>
+      <tr><td><code>otherCurrencyNet(w, others)</code></td><td>worth.js:318</td><td>Per-symbol net across accounts + assets + owed − debts for the disclosure line</td><td>Dashboard, Savings, Report</td></tr>
+      <tr><td><code>debtInterestCoverage()</code></td><td>health-math.js:188</td><td>Monthly interest plus how many debts it covers; <code>null</code> when no rate is stated</td><td>Debt KPI, health score, Report</td></tr>
+      <tr><td><code>healthSnapshot()</code></td><td>health-data.js:124</td><td>The one input bundle for the score, anchored on completed periods</td><td>Dashboard health card, Score, Report</td></tr>
+      <tr><td><code>reconcile(a, rows)</code></td><td>reconcile.js:142</td><td>Stated vs implied balance; state ok / drift / stale / nodate / unreadable; never overwrites</td><td>Accounts, Savings, Dashboard money-left and stale note, <code>impliedAccounts</code></td></tr>
+      <tr><td><code>isStaleValuation(v, today, days)</code></td><td>reconcile.js:97</td><td>Valuation age; <code>null</code> date is not stale; the 365-day constant lives only in views/assets.js</td><td>Assets, Savings</td></tr>
+      <tr><td><code>splitShortfall(parent, parts)</code></td><td>tx-role.js:168</td><td>Money a half-deleted split drops from every total, computed in cents</td><td>Transactions split chip</td></tr>
+      <tr><td><code>supersededBySplit(row)</code></td><td>tx-role.js:74</td><td>The predicate every raw-row reader must apply: a parent whose parts are also present</td><td>exporter, dedupe, committed, health-data, reconcile, report, savings-math, Transactions, Services, Accounts</td></tr>
+      <tr><td><code>savedFromOutside(rows, saverLabels, catType)</code></td><td>savings-math.js:725</td><td>Money that crossed into the savings pool from outside it, pairing legs so a fund shuffle is not saving</td><td>health-data saving rate, Score flow, <code>movedToFunds</code></td></tr>
+      <tr><td><code>sharePercents(amounts)</code></td><td>share-percents.js:43</td><td>Largest-remainder so a column sums to exactly 100</td><td>Dashboard donut, Accounts donut, Savings, Budget, Score, Report</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <div class="t">A seam that does not exist</div>
+    <p class="muted" style="margin:0">No <code>opts.observed</code> exists anywhere in src or tests. The vocabulary in play is the <code>basis</code> discriminator: <code>charged</code> / <code>stated</code> / <code>contracted</code> / <code>settled</code> in committed.js and <code>derived</code> / <code>stated</code> / <code>none</code> / <code>measured</code> in savings-math.js. "Charged" and "derived" are the observed-from-transactions cases.</p>
+  </div>
+</section>
+
+<section id="boot">
+  <h2>Boot, data load and state</h2>
+  <h3>Open sequence</h3>
+  <ol>
+    <li><code>main.js:22</code> loads plugin data.json settings, registers the view, ribbon, four commands (open, setup wizard, tidy rules, import) and the settings tab; opens on startup if set; runs the onboarding wizard on first run unless <code>hasBudgetData()</code> (main.js:97) adopts an existing vault silently.</li>
+    <li><code>view.js:16</code> <code>onOpen</code> → <code>controller.js:239 mountApp</code>: parses <code>SHELL_HTML</code> with DOMParser (never innerHTML), runs the i18n pass and the lucide icon pass, builds <code>S</code> (:279) and <code>ctx</code> (:370).</li>
+    <li>Register chain (:432-465), order load-bearing: io → period → load → fxLive → categories → trendMath → healthData → notes → dashboard → report → score → transactions → budgets → plan → accounts → savings → assets → debts → owed → services → tax → loans → import. Notes before the five views that render its chip; transactions before import (serializeTxFile); dashboard before report.</li>
+    <li>Event wiring: vault modify/create/delete/rename → <code>onFsChange</code> (:737, ignores our own writes within 2 s, debounces 800 ms, defers while dirty or editing); a second rename handler → <code>classifyRename</code> (:92) → <code>repointNotes</code>; css-change → <code>applyTheme</code>.</li>
+    <li><code>start()</code> (:999): theme, then either the privacy splash gate (nothing read until "Enter budget") or <code>connectVault()</code> (:592) → <code>reloadFromDisk</code> (:202, invalidates the budget draft, clears pending import, <code>loadVault</code> with Save buttons disabled in a finally) → connect screen if no categories and no transactions, else <code>S.loaded</code>, identity, input mode, <code>switchView</code>, fire-and-forget FX refresh.</li>
+  </ol>
+  <h3>What <code>load.js</code> reads (all budget-folder-relative, parallel reads, serial parse)</h3>
+  <table>
+    <thead><tr><th>File</th><th>Read as</th><th>Lands on</th><th>Line</th></tr></thead>
+    <tbody>
+      <tr><td>Settings.md</td><td>frontmatter: month_start_day (1-28), period_days + period_anchor (dropped together if the anchor is not a real date), currency, currency_code, exchange_rates, rate_refresh, country, language, input_mode, household, owners, groups, nonessential_groups, overspend_lag, emergency_target_months</td><td><code>S.settings</code></td><td>:100-190</td></tr>
+      <tr><td>Categories/*.md</td><td>name (preferred over basename), type, color, assume_spent, fixed, interest, type_stated</td><td><code>S.categories</code></td><td>:191-254</td></tr>
+      <tr><td>Accounts/*.md</td><td>frontmatter + body + verbatim raw; name is the filename; balance via strict parseNum keeping balanceRaw; budget → in_budget; emergency_fund tri-state; goal, invested, starting_amount, inception_date, settle_*, credit_limit, tx_label, owner, currency</td><td><code>S.accounts</code></td><td>:256-349</td></tr>
+      <tr><td>Budgets/YYYY-MM.md and YYYY-MM-DD.md</td><td>first table Category | Type | Amount | Notes; frontmatter kept</td><td><code>S.budgets</code>, <code>S.budgetMeta</code></td><td>:351-366</td></tr>
+      <tr><td>Transactions/&lt;folder&gt;/YYYY-MM.md</td><td>first table via <code>SCHEMAS.transactions</code>; every folder name recorded even when empty</td><td><code>S.txFiles</code>, <code>S.txFolders</code></td><td>:368-411</td></tr>
+      <tr><td>Data/Categorisation Rules.csv</td><td>pattern, category</td><td><code>S.rules</code></td><td>:413</td></tr>
+      <tr><td>Owed Money.md · Debts.md · Assets.md · Services.md</td><td>verbatim frontmatter + first table via the matching <code>SCHEMAS</code> entry; Debts fix-up <code>original ??= balance</code></td><td><code>S.owed</code>, <code>S.debts</code>, <code>S.assets</code>, <code>S.services</code> + <code>*Fm</code></td><td>:419-459</td></tr>
+      <tr><td>Plans/*.md</td><td>frontmatter + three tables sliced by heading (money in, envelopes, items), keyed by basename</td><td><code>S.plans</code>, <code>S.planName</code></td><td>:460-514</td></tr>
+      <tr><td>Tax/YYYY.md and Tax/YYYY/ folders</td><td>frontmatter + progress / documents / figures tables; folders with no file become orphan years</td><td><code>S.tax</code>, <code>S.taxYear</code>, <code>S.taxOrphanYears</code></td><td>:516-576</td></tr>
+      <tr><td>Notes/**/*.md (recursive)</td><td><code>note-file.js:parseNote</code>, one unreadable note does not fail the load</td><td><code>S.notes</code></td><td>:608</td></tr>
+      <tr><td>Exchange Rates.md</td><td>outside loadVault, via fx-fetch.js:38</td><td>FX table</td><td></td></tr>
+    </tbody>
+  </table>
+  <p class="muted"><code>S</code> (controller.js:279-331) is declared as the schema: tests/shell-contract.test.cjs fails on any unlisted <code>S.key</code>. Above the fence at :325 everything is vault state refilled by <code>loadVault</code>; below it (<code>acctView</code>, <code>noteFilter</code>, three debounce handles) survives a reload. <code>S.lastImport</code> holds actual row objects and is cleared on load. <code>S.period</code> is re-validated against the current period shape on every load (load.js:581).</p>
+  <h3>Two storage rules</h3>
+  <ul>
+    <li><b>table-schema.js</b> is the one column declaration per flat table (ADR-0003): <code>rowToObject</code> for reads, <code>headerLines</code> / <code>rowLine</code> / <code>mdTableFile</code> for writes, <code>usedColumns</code> drops an unused trailing optional column so a single-currency vault never grows a Currency column. Order is frozen history, guarded by tests.</li>
+    <li><b>io.js</b> has two roots. Budget-relative (<code>readFile</code>, <code>writeFile</code>, <code>patchFile</code>, <code>fileAt</code>, <code>mdFilesIn</code> …) prefixes the budget folder and refuses escaping it. Vault-root (<code>writeVaultFile</code>, <code>fileAtVaultPath</code>, <code>readVaultFile</code>, <code>ensureVaultFolder</code> …) is for destinations the user names: Reports/ and Exports/. Mixing them is the 1.28.0 dead-button bug. <code>patchFile</code> is the only body-preserving write; <code>trashFile</code> the only deletion (vault .trash).</li>
+  </ul>
+</section>
+
+<section id="period">
+  <h2>Period model and the shell</h2>
+  <p>Two period shapes (period.js:1-20, ADR-0001). <b>YYYY-MM</b> is a payday month running from <code>month_start_day</code> of the previous calendar month; the name is stable however the boundary is tuned. <b>YYYY-MM-DD</b> is an interval period named for its first day, derived from <code>period_anchor</code> + <code>period_days</code>; the anchor matters only modulo the interval. Whole-day arithmetic is in UTC day numbers so DST cannot add or lose a day.</p>
+  <table>
+    <thead><tr><th>Function</th><th>Line</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td><code>periodRange(p)</code></td><td>:119</td><td>{start, end}</td></tr>
+      <tr><td><code>currentPeriod()</code></td><td>:133</td><td>the key containing today</td></tr>
+      <tr><td><code>shiftPeriod(p, n)</code></td><td>:145</td><td>neighbour key</td></tr>
+      <tr><td><code>periodTitle</code> / <code>periodMonthName</code> / <code>periodShortLabel</code> / <code>dayLabel</code></td><td>:194 / :159 / :177 / :192</td><td>"Jul 23 – Aug 22, 2026" / "August 2026" / axis label / "Aug 22"</td></tr>
+      <tr><td><code>txInPeriod(p)</code></td><td>:201</td><td>every row in the window stamped with label, file and row index, unfiltered</td></tr>
+      <tr><td><code>periodSummary(p)</code></td><td>:623</td><td>income, spend, net, uncategorised, unknown, byCat, setAside, fundedFromSavings, count, foreign, scheduled, asOf</td></tr>
+      <tr><td><code>budgetTotals(p)</code></td><td>:969</td><td>{income, spend, setAside} from the budget file, typed by <code>budgetRowType</code></td></tr>
+      <tr><td><code>monthlyIncome(p)</code></td><td>:889</td><td>monthly-scaled income over complete calendar months (Debt DTI)</td></tr>
+      <tr><td><code>accountForLabel</code> / <code>accountIndex</code> / <code>impliedAccounts</code> / <code>accountsWithFolder</code></td><td>:237 / :253 / :287 / :306</td><td>folder ↔ account resolution (three names, case-folded); reconciled balances (never mutates S.accounts)</td></tr>
+      <tr><td><code>nonBudgetLabels</code> / <code>foreignLabels</code> / <code>earmarkedLabels</code></td><td>:318 / :477 / :446</td><td>the three label sets the vetoes use</td></tr>
+      <tr><td><code>catType</code> / <code>declaredCatType</code> / <code>catKnown</code> / <code>catAssumeSpent</code></td><td>:485 / :399 / :500 / :506</td><td>category lookups; "no category" and "category no file answers to" are different answers</td></tr>
+      <tr><td><code>periodDeficit(p)</code> / <code>movedToFunds(p)</code> / <code>assumedSpend(p)</code></td><td>:586 / :428 / :514</td><td>overspend to pull forward; money moved into own funds; assume-spent budget total</td></tr>
+      <tr><td><code>periodKeyValid(p)</code> / <code>intervalDays()</code></td><td>:100 / :81</td><td>can current settings address this key (phase check :117); cycle length or 0</td></tr>
+    </tbody>
+  </table>
+  <h3>Banner, picker and re-render</h3>
+  <p class="muted"><code>#periodPill</code> (shell.js:125) holds <code>#prevPeriod</code>, <code>#periodLabel</code>, <code>#currentPeriod</code>, <code>#nextPeriod</code>, wired at controller.js:849. <code>changePeriod</code> (:836) confirms a discard only when Budget is open and dirty, then sets <code>S.period</code> and calls <code>render()</code> (:495), which refreshes the label and dispatches to exactly one renderer by <code>S.view</code>. <b>A period change re-renders only the page you are on.</b> <code>switchView</code> (:468) toggles sections, hides the pill on Report, closes the drawer, renders, and focuses the page h1. <code>applyTheme</code> (:544) toggles <code>bud-dark</code> and one palette class, then redraws only the current page's SVG charts.</p>
+  <h3>Drawer and top bar</h3>
+  <p class="muted">Drawer <code>#appDrawer</code> (shell.js:38), sections Budget (dashboard, transactions, budgets, services, score, plan, notes), Accounts (accounts, savings, assets, owed, debts), Tools (import, report, loans, tax), then <code>#reloadLink</code> and <code>#pluginSettingsLink</code>. Top bar: <code>#menuBtn</code>, <code>#brandHome</code> (→ dashboard) with <code>#brandSub</code> from <code>household</code>, the period pill, <code>#topbarImport</code> (switches view and clicks the file picker in the same gesture for iOS; hidden in manual input mode), <code>#topbarReport</code>, <code>#topbarAvatar</code> (initials, opens plugin settings). <code>#toast</code> is the only global status; there is no global dirty badge, only per-page Save buttons plus a Notice on close.</p>
+</section>
+
+<section id="settings">
+  <h2>Settings tab and onboarding wizard</h2>
+  <p class="muted"><code>settings-tab.js</code> renders twice: imperative <code>display()</code> for Obsidian &lt; 1.13 and declarative <code>getSettingDefinitions()</code> (:860) for 1.13+; tests/settings-parity.test.cjs keeps them equal.</p>
+  <table>
+    <thead><tr><th>Group</th><th>Setting</th><th>Persists to</th><th>Controls</th></tr></thead>
+    <tbody>
+      <tr><td>Plugin</td><td>Budget folder · Theme · Colour palette · Setup wizard button · Open on startup · Privacy splash · Feedback · Support</td><td>plugin data.json (also holds acctColWidths, onboarded, exportFolder, reportFolder, chartTrendRange, chartDebtRange, splitCompareRange)</td><td>folder root, dark/light, palette class, first-run wizard, gate</td></tr>
+      <tr><td>Budget data</td><td>Name · Household members · Category groups · Non-essential groups · Month start day · Overspend lag · Emergency fund target · Period length · Last payday · Country · How you add transactions · Language · Currency symbol · Currency code · Exchange rates · Rate refresh</td><td><code>Settings.md</code> via <code>plugin.updateBudgetSettingsMd</code> (main.js:133), one key per change</td><td>greeting and avatar; owner filters; extra category types; essential total; period boundaries (warns when budgets re-slice); pull-overspend lookback; cover meter target; payday month vs cycle; cycle phase; formatting, date order, tax rules; hides Import; UI language; symbol; rate lookup; opt-in FX</td></tr>
+    </tbody>
+  </table>
+  <h3>Onboarding wizard (<code>onboarding.js:190</code>), one question per screen</h3>
+  <p class="muted">Screens: welcome → name (with country, language, currency beneath) → period → how (the csv | manual branch) → rates → then <b>connect</b> mode goes to finish; <b>manual</b> adds firstBudget (five fixed lines) → finish → celebrate; <b>csv</b> adds categories (starter set) → account → finish. The folder question is last. Nothing is written until finish. <code>apply()</code> (:1348): connect mode patches Settings.md keys only (FX keys only when on, household only when non-empty); create mode uses <code>createVaultFileIfAbsent</code> for Settings.md, Categories/*.md, Accounts/&lt;name&gt;.md + folder, Budgets/&lt;period&gt;.md via the same <code>serializeBudgetFile</code> the Budget page uses, empty Owed Money / Debts / Services tables and the rules CSV. Re-runs from the command palette, the settings button, or first run; closing on the welcome screen is not a decision.</p>
+</section>
+
+<section id="modules">
+  <h2>Pure-module inventory</h2>
+  <p class="muted">Pure means no DOM, no <code>require('obsidian')</code>, <code>today</code> injected. Consumers are from grepping <code>require('./x')</code>.</p>
+  <table>
+    <thead><tr><th>Module</th><th>Purpose and main exports</th><th>Consumers</th></tr></thead>
+    <tbody>
+      <tr><td>dates.js</td><td>Local calendar days as YYYY-MM-DD, never instants. <code>todayIso</code> :42, <code>isRealIsoDate</code> :127, <code>daysBetween</code> :89, <code>daysUntil</code> :103, <code>isoDayNumber</code> :73, <code>nowLocalMinute</code> :58, <code>periodDaysOrZero</code> :145</td><td>almost everything</td></tr>
+      <tr><td>amount.js</td><td>The one reader for human or bank money. <code>normalizeAmount</code> :67 (R 1 234.56, 1.234,56, (123.45), Cr/Dr), <code>inferGrouping</code> :49 per file, <code>parseNum</code> :225 strict with raw kept</td><td>load, statement, modal, table-schema, most editable views</td></tr>
+      <tr><td>markdown.js</td><td>Storage layer. <code>parseFrontmatter</code> :21, <code>parseMdTable</code> :55 (first table, tolerant of a missing trailing pipe), <code>patchFrontmatter</code> :88 (only the keys handed in), <code>yamlStr</code> :148, <code>escMd</code>/<code>unescMd</code></td><td>io, load, note-file, budget-file, table-schema, report, views</td></tr>
+      <tr><td>csv.js</td><td><code>parseDelimited</code> :13, <code>parseCsv</code> :36, <code>sniffDelimiter</code> :54, <code>csvCell</code> :77</td><td>exporter, statement, categories, load, transactions</td></tr>
+      <tr><td>currency.js</td><td>Per-row currency as a symbol, never converting. <code>symbolOf</code> :42, <code>isForeign</code> :50, <code>splitByCurrency</code> :98, <code>primaryTotal</code> :127 (collapses −0), <code>formatAmount</code> :168 (twin of controller formatMoney)</td><td>worth, period, owed-math, health-data, most views</td></tr>
+      <tr><td>fx.js / fx-fetch.js / fx-live.js</td><td>Opt-in rate table: <code>canConvert</code>, <code>convertAccounts</code> fx.js:244; cache in Exchange Rates.md (fx-fetch.js:38, write :140); <code>fxTable</code>, <code>fxState</code>, <code>refreshRates</code>, <code>fxConvert</code> on ctx (fx-live.js:96)</td><td>Accounts hero converted total</td></tr>
+      <tr><td>locale.js</td><td>Country profiles: formatting, bank list, dayFirst, tax rules (<code>figureChecks</code>, <code>seedSteps</code>, <code>seedDeadlines</code>, <code>activeDeadline</code>, <code>currentTaxYear</code>, <code>yearSpan</code>). za is the full profile; generic returns no checks</td><td>controller, import, tax, loans</td></tr>
+      <tr><td>money-flow.js</td><td>Where income went. <code>periodFlow</code> :130 (committed / living / saving / not yet spent bands with largest-remainder display), <code>allocatedShare</code> :114, <code>incomeBaseFor</code> :98, <code>railSegments</code> :378</td><td>Dashboard, Score</td></tr>
+      <tr><td>committed.js</td><td>What is still coming out before period end. <code>whatsLeft</code> :559, <code>cashOnHand</code> :190 (implied balances, undated = unknown not zero), <code>serviceCommitments</code> :215, <code>debtCommitments</code> :409, <code>cardCommitments</code> :466, <code>cardsOwed</code> :519, <code>isCreditCard</code> :92, <code>isSettleCard</code> :94, <code>earmarkOf</code> :181; <code>basis</code> = charged / stated / contracted / settled</td><td>worth, Import, Accounts, Dashboard</td></tr>
+      <tr><td>recurring.js</td><td>Matching a listed service to real charges by merchant token. <code>matchCharges</code> :121, <code>chargeStats</code> :57, <code>nextExpected</code> :163, <code>chargeStatus</code> :196, <code>comparePrice</code> :206, <code>findRecurringCredit</code> :266, <code>STEP_DAYS</code> shared with committed</td><td>committed, Services</td></tr>
+      <tr><td>groups.js / owners.js / share-percents.js</td><td>Custom category groups (<code>parseGroups</code> :55, <code>typeOrder</code> :62, <code>typeRank</code> :69, unknown sorts last); owners (<code>parseOwners</code> :54, <code>netByOwner</code> :139, <code>ownerLabel</code> :96); largest-remainder percentages (<code>largestRemainder</code> :32, <code>sharePercents</code> :43, <code>sharePercentLabel</code> :80)</td><td>load, settings, Accounts, Budget, Dashboard, Report</td></tr>
+      <tr><td>tx-role.js</td><td>Split roles. <code>splitRole</code> :48, <code>supersededBySplit</code> :74, <code>isSplitPart</code> :85, <code>applySplit</code> :105, <code>splitShortfall</code> :168</td><td>every raw-row reader</td></tr>
+      <tr><td>reconcile.js</td><td>Stated vs implied. <code>reconcile</code> :142, <code>daysSince</code> :42, <code>isStale</code> :63, <code>isStaleValuation</code> :97, <code>stalenessSummary</code> :261, <code>STALE_DAYS</code> = 30</td><td>acct-status, period, owed-math, Accounts, Savings, Dashboard, Assets, Owed</td></tr>
+      <tr><td>acct-status.js</td><td>Account state and queue order. <code>statusOf</code> :82, <code>URGENCY</code> :76, <code>mutedWarnings</code> :169, <code>wantsALook</code> :200, <code>queueOrder</code> :205, <code>staleRank</code></td><td>Accounts</td></tr>
+      <tr><td>statement.js / dedupe.js / rules.js / rule-cleanup.js</td><td>Bank statement reading (<code>decodeStatement</code> :34, <code>detectStatementColumns</code> :411, <code>detectHeaderlessColumns</code> :275, <code>reconcileAmounts</code> :222, <code>applyCounterparties</code> :189, <code>statementAccountNumber</code> :483); two-layer dedupe (<code>txKey</code> :103, <code>flagItems</code> :232, <code>findNearDuplicate</code> :205, NEAR_DAYS 4); rules (<code>learnPattern</code> :19, <code>prepareRules</code> :47, <code>matchRule</code> :65 longest wins); <code>analyseRules</code> :44 replays real descriptions</td><td>Import, categories</td></tr>
+      <tr><td>reslice.js / budget-file.js</td><td><code>resliceBudget</code> :72 re-slices stranded amounts onto the new period length; <code>serializeBudgetFile</code> :124 and <code>budgetRangeNote</code> :81, the one Budgets/ serializer</td><td>Budget, onboarding</td></tr>
+      <tr><td>health-math.js / health-data.js</td><td>Score arithmetic at monthly scale: <code>essentialTotal</code> :41, <code>resolveEarmarks</code> :71, <code>debtInterestMonthly</code> :161, <code>debtInterestCoverage</code> :188, <code>monthlyAverages</code> :209, <code>scoreBand</code> :264, <code>scoreFractions</code> :373, <code>financialScore</code> :403, <code>healthMetrics</code> :445, <code>scoreBreakdown</code> :520; PILLARS reserves 25 / saving 20 / debt 20 / spending 20 / wealth 15; <code>healthSnapshot</code> (health-data.js:124) assembles inputs once</td><td>money-flow, Report, Debt, Score, Dashboard</td></tr>
+      <tr><td>savings-math.js</td><td>Opening + contributions + growth − withdrawals = closing, derived from transactions. <code>poolCatType</code> :107, <code>classifyRow</code> :130, <code>splitFlows</code> :139, <code>accountFlows</code> :189, <code>totalReturn</code> :306, <code>chartable</code> :498, <code>growthTotals</code> :523, <code>growthSeries</code> :536, <code>savedFromOutside</code> :725</td><td>health-data, period, Accounts, Report, Score, Savings</td></tr>
+      <tr><td>debt-math.js / loan-math.js / owed-math.js / plan-math.js / worth.js</td><td>Iterative amortisation and payoff simulation (<code>amortise</code> :36, <code>simulate</code> :95, <code>priorityOrder</code> :63, <code>expectedBalance</code> :187); loan maths with ZA tariffs as defaults (<code>totalsFor</code> :121, <code>zaTransferDuty</code> :167, <code>loanProfileFor</code> :353); owed (<code>outstandingOf</code> :22, <code>isSettled</code> :41, <code>owedSummary</code> :68); plan sums (<code>planSummary</code> :49, <code>barSegments</code> :105, <code>envelopeOverState</code> :148); net worth (<code>worth</code> :121, <code>activeDebts</code> :31, <code>assetTotal</code> :40, <code>cardOverlap</code> :187, <code>accountGroups</code> :258, <code>otherCurrencyNet</code> :318)</td><td>Debt, Loans, Owed, Plan, Dashboard, Savings, Accounts, Report</td></tr>
+      <tr><td>trend-math.js</td><td>ctx module for the trend chart: <code>periodsForMonths</code> :26, <code>earliestDataMonth</code> :36, <code>trendPeriods</code> :48, <code>historySpan</code> :74, <code>elapsedDays</code> :97, <code>periodSpend</code> :157, <code>compareTotals</code> :201</td><td>Dashboard, Score, Report, health-data</td></tr>
+      <tr><td>facts.js</td><td>Outside-world numbers with provenance: <code>fact</code> :238, <code>limitsFor</code> :229 (TFSA by year), <code>staleFacts</code> :248, <code>unverifiedFacts</code> :263</td><td>loan-math, locale, Loans</td></tr>
+      <tr><td>note-file.js / exporter.js / report.js / chart.js / vault-path.js / constants.js / table-schema.js</td><td>Notes pure half (body written once, never rebuilt); CSV and Markdown exports with vault-root paths (<code>exportPaths</code> :352, traversal segments dropped); one report data object, two serialisers (<code>prepareReportData</code> :385, <code>financialReportMarkdown</code> :443, <code>financialReportJson</code> :820); hand-rolled SVG primitives reading live CSS variables (<code>createChart</code> :177, <code>distinctColors</code> :151, <code>trackPoints</code> :323, <code>rangePills</code> :450); <code>safeSeg</code> :30 the one path canonicaliser; shared constants and normalisers (<code>inputMode</code>, <code>overspendLag</code>, <code>emergencyTarget</code>, palette ids); the flat-table schemas</td><td>see the page sections</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="writes">
+  <h2>Write paths</h2>
+  <table>
+    <thead><tr><th>File written</th><th>Root</th><th>Serializer</th><th>Callers</th></tr></thead>
+    <tbody>
+      <tr><td>Settings.md</td><td>budget</td><td><code>patchFrontmatter</code> + <code>yamlStr</code></td><td><code>main.js:168 updateBudgetSettingsMd</code> from the settings tab and the wizard's connect branch</td></tr>
+      <tr><td>Categories/&lt;name&gt;.md</td><td>budget</td><td>literal on create; <code>patchFile</code> for assume_spent / fixed</td><td>categories.js:80; Budget :786, :813; wizard :1425</td></tr>
+      <tr><td>Accounts/&lt;name&gt;.md</td><td>budget</td><td><code>patchFile</code> key by key, or a full rebuild for a file the loader never saw</td><td>Accounts <code>saveAccount</code> :2097 / :2141; Import (account_number); wizard :1435</td></tr>
+      <tr><td>Budgets/&lt;period&gt;.md</td><td>budget</td><td><code>budget-file.js:serializeBudgetFile</code></td><td>Budget :759; wizard :1447</td></tr>
+      <tr><td>Transactions/&lt;label&gt;/&lt;YYYY-MM&gt;.md</td><td>budget</td><td><code>serializeTxFile</code> (transactions.js:793, SCHEMAS.transactions + usedColumns)</td><td>Transactions :775, :866, :893; Import :751, :867</td></tr>
+      <tr><td>Data/Categorisation Rules.csv</td><td>budget</td><td><code>rulesCsv</code> categories.js:319</td><td>learnRules, correctRule, cleanupRules (backup at :367); wizard</td></tr>
+      <tr><td>Data/Deleted transactions.csv</td><td>budget</td><td>appended CSV</td><td>Transactions bulk delete :756</td></tr>
+      <tr><td>Owed Money.md · Debts.md · Assets.md · Services.md</td><td>budget</td><td><code>mdTableFile(SCHEMAS.x)</code> via each view's serialize*</td><td>Owed :198, Debt :744, Assets :342, Services :343; wizard creates the empty tables</td></tr>
+      <tr><td>Plans/&lt;file&gt;.md · Tax/&lt;year&gt;.md</td><td>budget</td><td>hand-built three-section documents (<code>serializePlan</code> plan.js:617, <code>serializeTax</code> tax.js:605)</td><td>Plan :665, Tax :659</td></tr>
+      <tr><td>Tax/&lt;year&gt;/&lt;file&gt;</td><td>budget</td><td>raw bytes via <code>writeBinary</code></td><td>Tax :509</td></tr>
+      <tr><td>Notes/**/&lt;name&gt;.md</td><td>budget</td><td><code>serializeNote</code> on create; <code>patchFile</code> frontmatter only afterwards</td><td>Notes :320, :359</td></tr>
+      <tr><td>Exchange Rates.md</td><td>budget</td><td><code>fx-fetch.js:serializeRates</code></td><td>fx-live refreshRates</td></tr>
+      <tr><td>&lt;exportFolder&gt;/Transactions &lt;range&gt;.csv/.md, Categories.csv/.md</td><td><b>vault</b></td><td>exporter.js</td><td>Transactions export :968-978</td></tr>
+      <tr><td>&lt;reportFolder&gt;/&lt;label&gt; Financial Report.md/.json</td><td><b>vault</b></td><td>report.js</td><td>Report :731, :737</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Deletions all go to the vault .trash: plan files (plan.js:588), tax year files (tax.js:793), account files and optionally their folder (accounts.js:2341). Two calls bypass <code>io.trashFile</code> and call <code>vault.trash</code> directly (categories.js:226, notes.js:423); same flag today, flagged for consolidation.</p>
+  <h3>Global open questions</h3>
+  <ul>
+    <li><code>S.settings</code> carries four keys the schema block does not list (exchange_rates, rate_refresh, currency_code, household); the shell-contract test does not descend into <code>S.settings</code>.</li>
+    <li><code>views/dashboard.js:39</code> requires a sibling view for <code>assumedActual</code>; the only view-to-view require, and it depends on <code>module.exports.assumedActual</code> being set after the register function.</li>
+    <li>Import depends on Transactions' <code>serializeTxFile</code> through register order alone; a reorder fails a screen away from the cause.</li>
+  </ul>
+</section>
+<section id="page-dashboard" class="page">
+  <h2>Dashboard <span class="badge b-info">nav: dashboard</span> <span class="badge b-ok">read-only</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/dashboard.js</code> (2 582 lines) · mounted by <code>registerDashboard</code> at <code>controller.js:449</code></dd>
+      <dt>Renders when</dt><dd><code>switchView('dashboard')</code>, period pills (<code>changePeriod</code> at <code>controller.js:836</code>), Reload, any post-save re-render, and a theme flip (which re-runs only the trend and donut, <code>controller.js:571</code>).</dd>
+      <dt>Render order</dt><dd><code>renderDashboard</code> (:89) runs each card inside <code>guard()</code> (:57) so one card throwing paints an error into that card only: Hero → Health → Money left → Trend → Where it went → Budget vs Actual → Position → Overlap note → Stale note. Position must run before the two notes because it decides whether the card is shown (:96-99).</dd>
+      <dt>Reads</dt><dd><code>S.period</code>, <code>S.settings</code> (Settings.md), <code>S.categories</code> (Categories/*.md), <code>S.accounts</code> (Accounts/*.md), <code>S.budgets</code> (Budgets/&lt;period&gt;.md), <code>S.txFiles</code> (Transactions/&lt;folder&gt;/&lt;YYYY-MM&gt;.md), <code>S.debts</code> (Debts.md), <code>S.assets</code> (Assets.md), <code>S.owed</code> (Owed Money.md), <code>S.services</code> (Services.md), plus plugin <code>data.json</code> for the two chart ranges. Never reads plans, tax, notes or rules.</dd>
+      <dt>Writes</dt><dd>Nothing in the vault. The only persistence is the two chart-range pills, saved to plugin <code>data.json</code>.</dd>
+    </dl>
+  </div>
+
+  <h3>1 · Hero card <code>#heroCard</code></h3>
+  <p class="muted">Flow figures for <code>S.period</code>. Both inputs come from one call each: <code>period.js:periodSummary</code> (:623) and <code>period.js:budgetTotals</code> (:969).</p>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Filters / caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Greeting <code>.hero-greet</code></td><td>"{greeting}, {household}"</td><td>:1563 time-of-day branch, <code>S.settings.household</code></td><td></td></tr>
+      <tr><td><b>Hero number</b> <code>.hero-num</code></td><td>Budget remaining / Over budget this period</td><td><code>renderHero</code> :1357 → <code>bud.spend − (sum.spend − sum.setAside)</code></td><td>Savings/investment-typed budget rows are <em>set aside</em> and excluded from both sides via <code>period.js:budgetRowType</code> (:538). Label flips on sign (:1358).</td></tr>
+      <tr><td>Sub-line <code>.hero-sub</code></td><td>"{spent} spent of {budgeted} budgeted"</td><td><code>sum.spend</code> gross, <code>bud.spend</code></td><td></td></tr>
+      <tr><td>Meter + tick <code>.hero-meter</code></td><td>fill = spent / max(spent, budget); tick at budget</td><td>:1360, :1435</td><td></td></tr>
+      <tr><td>Caveat "scheduled ahead"</td><td><code>dash.scheduledAhead</code></td><td><code>periodSummary</code> today-clamp (period.js:623-640)</td><td>Only when scheduled income + spend &gt; 0 (:1583)</td></tr>
+      <tr><td>Caveat "funded from savings"</td><td>amount + count</td><td><code>sum.fundedFromSavings</code></td><td>count &gt; 0 (:1593)</td></tr>
+      <tr><td>Stat: Total income</td><td><code>sum.income</code></td><td><code>periodSummary</code></td><td>Sub-note <code>dash.stat.notIncome</code> when uncategorised or unknown income ≥ 1 (:1454)</td></tr>
+      <tr><td>Stat: Budgeted</td><td><code>bud.spend + bud.setAside</code></td><td><code>budgetTotals</code>; share tag via <code>money-flow.js:allocatedShare</code> (:114) + <code>incomeBaseFor</code> (:98), printed by <code>share-percents.js:sharePercentLabel</code> (:80)</td><td>Second clause "set aside moved" from <code>period.js:movedToFunds</code> (:428)</td></tr>
+      <tr><td>Stat: Total spent</td><td><code>sum.spend</code> gross</td><td>tag = spent / bud.spend (:1408)</td><td></td></tr>
+      <tr><td>Caveat "foreign excluded"</td><td>count + symbols</td><td><code>sum.foreign</code>; folders dropped by <code>period.js:foreignLabels</code> (:477)</td><td>Shown when count &gt; 0 (:1461)</td></tr>
+      <tr><td>Stat button: Uncategorised</td><td>count</td><td><code>sum.uncategorised</code></td><td>Click → <code>openUncategorised</code> (:2541) filters Transactions to <code>__none__</code></td></tr>
+      <tr><td>Stat button: Missing categories</td><td>orphaned category names (first 3 + "+N")</td><td><code>sum.unknown</code></td><td>Click → <code>openCategory(names[0])</code> (:1557)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2 · Financial health <code>#healthCard</code></h3>
+  <p class="muted">One input: <code>ctx.healthSnapshot()</code> = <code>health-data.js:healthSnapshot</code> (:124). <b>Anchored on <code>currentPeriod()</code>, never <code>S.period</code></b>: trailing completed periods only, six of them. Card hides when the snapshot is empty (:134). Each tile is a button that routes to another page.</p>
+  <table>
+    <thead><tr><th>Tile</th><th>Value</th><th>Computed by</th><th>Caveats / routes</th></tr></thead>
+    <tbody>
+      <tr><td>Score</td><td><code>H.score.value</code> + band word</td><td><code>health-data.js:400</code> → <code>health-math.js:healthMetrics</code> (:445) → <code>financialScore</code> (:403); band from <code>scoreBand</code> (:264), thresholds strong 80 / steady 50 (:263)</td><td>→ Score page</td></tr>
+      <tr><td>Emergency cover</td><td>months to 1 dp, meter to target</td><td><code>health-math.js:resolveEarmarks</code> (:71) over implied home-currency balances ÷ <code>essentialTotal</code> (:41) averaged by <code>monthlyAverages</code> (:209)</td><td>"over" warning when an <code>emergency_fund:</code> claim exceeds the balance (:245); meta falls to setup / noEssential / needHistory (:212). → Accounts</td></tr>
+      <tr><td>Saving rate</td><td>%</td><td><code>savings-math.js:savedFromOutside</code> (:725) per period ÷ income (health-data.js:215)</td><td>Shows 0% + "saving down" when drawing down. → Savings</td></tr>
+      <tr><td>Debt interest share</td><td>%</td><td><code>health-math.js:debtInterestMonthly</code> (:161) over <code>S.debts</code>; foreign debts dropped by <code>currency.js:isForeign</code> (:50)</td><td>Meta: perMonth / debtNoRate / debtFree / debtNone (:278). → Debt</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3 · Money left this period <code>#leftCard</code></h3>
+  <p class="muted"><b>Running period only.</b> If <code>S.period !== currentPeriod()</code> the body prints "not now" and returns (:417). Implied balances per account come from <code>period.js:accountIndex</code> (:253) + <code>reconcile.js:reconcile</code> (:142); accounts and rows are partitioned per currency symbol (:560) and <code>committed.js:whatsLeft</code> (:559) runs once for the household currency and once per foreign symbol.</p>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Equation strip <code>.left-grid</code></td><td>cash − [set aside] − committed − [card] = free / short</td><td>All terms rounded once at :747-761; "free" is derived from the rounded integers so the printed sum balances</td><td></td></tr>
+      <tr><td>· cash</td><td>"in your accounts"</td><td><code>committed.js:cashOnHand</code> (:190) over implied balances</td><td>Sub-line joins: counted accounts, unconfirmed (<code>reconcile.js:isStale</code> :63), undated, unreadable rows, confirm-day rows (:665-691)</td></tr>
+      <tr><td>· set aside</td><td>earmarked</td><td><code>committed.js:earmarkOf</code> (:181)</td><td>Only when ≥ 1 (:759)</td></tr>
+      <tr><td>· committed</td><td>still committed</td><td><code>committed.js:serviceCommitments</code> (:215) + <code>debtCommitments</code> (:409)</td><td></td></tr>
+      <tr><td>· card</td><td>card to settle</td><td><code>committed.js:cardCommitments</code> (:466)</td><td>Only when cardDue &gt; 0 and no cycle (:733)</td></tr>
+      <tr><td>· free / short</td><td>actually free</td><td>sign from <code>L.short</code>; sub-line days + per-day</td><td></td></tr>
+      <tr><td>Foreign bands <code>.left-fx</code></td><td>cash · committed · free per foreign symbol</td><td>:817-842</td><td>Never converted, never summed</td></tr>
+      <tr><td>Settlement cycle <code>.left-cycle</code></td><td>spend vs settling, % bar</td><td><code>L.cycle</code> from <code>whatsLeft</code> (:848)</td><td></td></tr>
+      <tr><td>Incoming <code>.left-incoming</code></td><td>amount + date, covers / short</td><td><code>L.incoming</code>, <code>L.afterIncoming</code> (:872)</td><td></td></tr>
+      <tr><td>Split bar <code>.left-bar</code></td><td>committed vs free</td><td>derived as cash − free (:925) so it cannot disagree with the strip</td><td></td></tr>
+      <tr><td>Caveat "cards owed"</td><td>cards not already in the chain</td><td><code>L.owedElse</code> (:957)</td><td></td></tr>
+      <tr><td>Disclosure "what's counted"</td><td>per item: name, due/overdue, basis, amount</td><td><code>L.items</code> (:968-1011)</td><td>Foreign items printed in their own symbol</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4 · Spending trend <code>#trendChart</code></h3>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Range pills <code>#trendRange</code></td><td>history ranges</td><td><code>chart.js:historicalRanges</code> (:438) sized by <code>trend-math.js:historySpan</code> (:74); active from plugin setting <code>chartTrendRange</code></td><td>Pick saves to data.json and re-renders (:1783)</td></tr>
+      <tr><td>Series</td><td>spend area, income line, budget line per period</td><td><code>trend-math.js:trendPeriods</code> (:48) → per period <code>periodSummary(p).spend/.income</code> and <code>budgetTotals(p).spend</code> (:1755)</td><td>A never-imported period draws nothing (<code>trend-math.js:periodSpend</code> :157 count = 0); the running period is a dashed leg. Runs are broken at gaps, never bridged (:1837-1906)</td></tr>
+      <tr><td>Sub-line</td><td>count + "clamped" note</td><td>:1803</td><td>Empty state below 2 points (:1813), manual-mode variant</td></tr>
+      <tr><td>Focus readout <code>.trend-tip</code></td><td>spent / budget / income + over/under/in-progress delta</td><td><code>focusAt</code> (:1996) via <code>chart.js:trackPoints</code> (:323)</td><td>Native title fallback without pointer events (:2086)</td></tr>
+      <tr><td>Footnote</td><td>"in progress"</td><td>:2115</td><td>Only when the last point is the running period</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5 · Where it went (donut) <code>#dashSplit</code></h3>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Slices</td><td>categorised spend by category</td><td><code>categorySpendRows(S.period)</code> (:2251) → <code>periodSummary(p).byCat</code>; drops income/transfer types (<code>period.js:catType</code> :485) and categories that netted positive</td><td>Beyond 8 slices collapse into an inert "Other (N)" wedge (:2359). Colours de-collided by <code>chart.js:distinctColors</code> (:151)</td></tr>
+      <tr><td>Percent + money columns</td><td>share, amount</td><td><code>share-percents.js:sharePercents</code> (:43) and <code>largestRemainder</code> (:32)</td><td></td></tr>
+      <tr><td>Sub-line gap note</td><td>uncategorised + netted amounts</td><td><code>notShown = sum.spend − total</code>, split into uncat and netted (:2315-2330)</td><td>Explains why the donut is smaller than the hero's "Total spent"</td></tr>
+      <tr><td>Centre text</td><td>"Categorised spending" + total</td><td>:2415</td><td>Deliberately not the hero's gross figure</td></tr>
+      <tr><td>Comparison column</td><td>Δ vs previous range</td><td><code>compareBaseline</code> (:2185) → <code>trend-math.js:compareTotals</code> (:201) capped at <code>elapsedDays</code> (:97); <code>compareCell</code> (:2217) with a deadband of 0.25 % of period spend or 3 % of the category average (:2236)</td><td>The "now" side is re-windowed with <code>periodSpend(S.period, base.days).part</code> (:2446). Footnote "like for like" while running (:2506)</td></tr>
+      <tr><td>Split range pills</td><td>Last month / N months</td><td>local table <code>splitRanges</code> (:2161); saved to plugin setting <code>splitCompareRange</code></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>6 · Budget vs Actual <code>#dashBudget</code></h3>
+  <p class="muted">Rows from <code>budgetVsActualRows(p)</code> (:1611), also consumed by the Report page. Every budget row is typed by the <em>live</em> category type (<code>period.js:budgetRowType</code> :538), not the stored cell. An assume-spent row is seeded with <code>budgets.js:assumedActual</code> (:50) at :1630 and replaced on the transaction pass (:1656). Transfers are skipped (:1635); an orphaned category with no budget row is dropped (:1675). Sorted by <code>groups.js:typeOrder</code> against <code>S.settings.groups</code> (:1680). Bar turns red when over or unbudgeted, amber at 85 % (:1711). Columns: category · budget · spent · bar · remaining.</p>
+
+  <h3>7 · Where you stand <code>#dashPositionCard</code></h3>
+  <p class="muted"><b>Position, not flow.</b> Nothing here moves with <code>S.period</code>. Hidden when there is neither a ledger nor a caveat (:1122). Each tile value is a button.</p>
+  <table>
+    <thead><tr><th>Tile</th><th>Value</th><th>Computed by</th><th>Sub-line / route</th></tr></thead>
+    <tbody>
+      <tr><td>Net worth</td><td><code>w.net</code></td><td><code>worth.js:worth</code> (:121) over implied accounts split by <code>currency.js:splitByCurrency</code> (:98), plus debts, assets, owed</td><td>owned / owed split + other-currency line from <code>worth.js:otherCurrencyNet</code> (:318). → Savings</td></tr>
+      <tr><td>Debt</td><td><code>−w.liabilities</code></td><td>same <code>worth()</code> call; negative balances (<code>fromAccounts</code>) vs Debts.md rows (<code>fromDebts</code>)</td><td>Count always matches the ledger the figure came from (:1164-1181). → Debt</td></tr>
+      <tr><td>Owed to you</td><td><code>owed.outstanding</code></td><td><code>owed-math.js:owedSummary</code> (:68)</td><td>open count + oldest days, else recovered / none. → Owed Money</td></tr>
+      <tr><td>Savings &amp; investments</td><td>savings + invest</td><td><code>accountsOfType</code> (:1038, case-folded) → <code>currency.js:primaryTotal</code> (:127)</td><td>Accounts-only other-currency line. → Savings</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <div class="t">Two caveats live inside this card</div>
+    <p class="muted" style="margin:0"><b>Overlap note</b> <code>#dashPositionNote</code> (:1224) prints when <code>worth.js:cardOverlap</code> (:187) finds a credit card tracked as both an account and a Debts.md row, with a button to Debt. <b>Stale note</b> <code>#dashStale</code> (:1251) prints when <code>reconcile.js:stalenessSummary</code> (:261) reports stale accounts: all/some + oldest age, then home-currency drift up/down (only at ≥ 1 unit, :1307), the count of foreign accounts held out of that drift (:1313), and unreadable-date rows (:1328). Button to Accounts.</p>
+  </div>
+
+  <h3>Actions</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Effect</th><th>Writes</th></tr></thead>
+    <tbody>
+      <tr><td>Health tiles (4)</td><td><code>ctx.switchView</code> to score / accounts / savings / debts (:151-159)</td><td>none</td></tr>
+      <tr><td>Trend and split range pills</td><td>save the pick, re-render that card (:1779, :2273)</td><td>plugin data.json</td></tr>
+      <tr><td>Donut wedge / legend row</td><td><code>openCategory(cat)</code> (:2523) → Transactions filtered to that category</td><td>none</td></tr>
+      <tr><td>Legend note button <code>.dl-note</code></td><td><code>openCategoryFile</code> (:2555) opens Categories/&lt;cat&gt;.md in a new tab; toast if missing</td><td>none</td></tr>
+      <tr><td>Uncategorised stat</td><td><code>openUncategorised</code> (:2541): Transactions, category <code>__none__</code>, account and search cleared, whole-history unticked</td><td>none</td></tr>
+      <tr><td>Overlap / stale buttons</td><td>→ Debt / → Accounts</td><td>none</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Publishes on ctx (:2574)</h3>
+  <ul>
+    <li><code>renderDashboard</code>, <code>renderTrend</code>, <code>renderSplit</code> — controller render map and theme flip.</li>
+    <li><code>budgetVsActualRows</code>, <code>categorySpendRows</code> — consumed by <code>views/report.js</code> (:93, :566, :592).</li>
+    <li><code>unreadableNote</code> — published, no consumer today.</li>
+  </ul>
+
+  <h3>Open questions</h3>
+  <ul>
+    <li><code>dash.trend.tip.noImport</code> is a TODO at :2029 and never rendered; a gap period simply hides both readout rows.</li>
+    <li><code>unreadableNote()</code> returns an empty string when <code>acct.deck.why.unreadable</code> is missing from a language table. Present in en.js; the other eleven were not checked.</li>
+    <li>The stale note counts unreadable rows on <code>in_budget: false</code> accounts; the money-left card excludes them (:467). Plausibly deliberate (net worth counts opted-out accounts, money-left does not) but unstated.</li>
+  </ul>
+</section>
+<section id="page-transactions" class="page">
+  <h2>Transactions <span class="badge b-info">nav: transactions</span> <span class="badge b-warn">writes Transactions/**</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/transactions.js</code> (1 013 lines) · shell <code>shell.js:275-310</code></dd>
+      <dt>Renders when</dt><dd><code>renderTransactions</code> (:218) on switchView, period change, any filter change (<code>controller.js:902</code>), search input debounced 200 ms (:903), after every mutating action, and from drill-ins: Accounts <code>openTransactions</code>, Dashboard <code>openCategory</code> / <code>openUncategorised</code>.</dd>
+      <dt>Reads</dt><dd><code>S.txFiles</code> (Transactions/&lt;label&gt;/&lt;YYYY-MM&gt;.md), <code>S.categories</code>, <code>S.accounts</code> (labels and per-row currency), <code>S.period</code>, <code>S.lastImport</code> (in-memory import receipt), plugin <code>exportFolder</code>, rules via <code>ctx.governingRule</code> / <code>learnRules</code> / <code>correctRule</code> (Data/Categorisation Rules.csv).</dd>
+      <dt>Writes</dt><dd>Transaction month files via <code>serializeTxFile</code> (:793) on Save; Add transaction writes immediately (:866); bulk delete appends to <code>Data/Deleted transactions.csv</code> first (:639); export writes four files under the chosen folder; category learning and corrections rewrite the rules CSV.</dd>
+    </dl>
+  </div>
+  <div class="callout">
+    <div class="t">This table filters nothing out</div>
+    <p class="muted" style="margin:0">Excluded rows, non-budget accounts, foreign accounts and split parents are all still listed. Only <code>period.js:summaryInRange</code> (:668) applies the four vetoes (excluded, non-budget label, foreign label, earmarked outflow) and skips transfers (:731). Every other page's money figure inherits those vetoes; this page shows the raw ledger so nothing silently disappears.</p>
+  </div>
+  <h3>Sections</h3>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Sub-note <code>#txSubNote</code></td><td>"Whole history" or period month · day range</td><td><code>period.js:periodMonthName</code> (:159), <code>periodTitle</code> (:194)</td><td></td></tr>
+      <tr><td>Undo bar <code>#txUndoBar</code></td><td>"Imported N rows into label at time" + filename</td><td><code>renderUndoBar</code> (:195) off <code>S.lastImport</code></td><td>Undo → <code>ctx.undoImport</code>; dismiss drops the receipt (:214)</td></tr>
+      <tr><td>Filters</td><td>account, category (with "Uncategorised" = <code>__none__</code>), search, whole-history checkbox</td><td><code>syncOptions</code> (:175) rebuilds selects from txFiles labels and category names</td><td></td></tr>
+      <tr><td>Row count <code>#txCount</code></td><td>"shown of total rows" or "N rows"</td><td>:236; total is after filters, before the 100-row page (<code>PAGE</code> :99)</td><td></td></tr>
+      <tr><td>Row selection</td><td>the visible rows</td><td><code>filteredRows</code> (:116): <code>period.js:txInPeriod</code> (:201) or every row; re-sorted date-descending only (:137); account / category / search filters (:139); page window reset when the filter token changes (:149)</td><td>Same function feeds export, bulk delete and bulk categorise</td></tr>
+      <tr><td>Empty / show more</td><td>"No transactions match." / "Show N more of M"</td><td>:315, :316</td><td></td></tr>
+    </tbody>
+  </table>
+  <h3>Table columns (positional order is the file's column order)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Column</th><th>Cell</th><th>Shows / writes</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Date</td><td>text</td><td><code>r.date</code> verbatim ISO</td></tr>
+      <tr><td>2</td><td>Description</td><td>text</td><td><code>r.desc</code></td></tr>
+      <tr><td>3</td><td>Account</td><td>text</td><td>the folder label, not the account file name</td></tr>
+      <tr><td>4</td><td>Category</td><td>deferred select</td><td><code>categories.js:deferredCatSelect</code> (:157). Change writes <code>r.cat</code>; an uncategorised row records a pending learn (flushed on Save via <code>learnRules</code> :248); a correction calls <code>offerRuleCorrection</code> (:76) → <code>correctRule</code> (categories.js:308)</td></tr>
+      <tr><td>5</td><td>Amount</td><td>number, green ≥ 0</td><td><code>rowMoney</code> (:44): household <code>money()</code> or <code>moneyIn(sym)</code> with symbol from <code>currency.js:symbolOf</code> (:42)</td></tr>
+      <tr><td>6</td><td>Excl. budget</td><td>checkbox or chip</td><td><code>excludedCell</code> (:443) writes <code>r.excluded</code>. A split parent shows a chip "split into N · amount unaccounted" from <code>splitPartsOf</code> (:580) and <code>tx-role.js:splitShortfall</code> (:168); its only action is un-split</td></tr>
+      <tr><td>7</td><td>Note</td><td>text input</td><td><code>r.note</code></td></tr>
+      <tr><td>8</td><td>Actions</td><td>Split + Delete icons</td><td>see below</td></tr>
+    </tbody>
+  </table>
+  <h3>Actions</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Function</th><th>Effect / writes</th></tr></thead>
+    <tbody>
+      <tr><td>Split</td><td><code>splitTransaction</code> (:352) → <code>modal.js:askSplit</code> (:303) → <code>tx-role.js:applySplit</code> (:105)</td><td>Parent gets <code>excluded = true</code>, <code>split = parent</code>, note marker; parts pushed into the same file. Refuses zero, excluded, or already-split rows</td></tr>
+      <tr><td>Un-split</td><td><code>unsplitTransaction</code> (:499)</td><td>Removes parts, clears <code>split</code> and <code>excluded</code>, leaves the note marker (:522)</td></tr>
+      <tr><td>Delete row</td><td><code>deleteTransaction</code> (:585)</td><td>Confirm text varies by role (parent takes parts; a part's money leaves the account totals, see <code>tx-role.js:supersededBySplit</code> :74). Memory only until Save</td></tr>
+      <tr><td>Set category (injected button)</td><td><code>categoriseFilteredTransactions</code> (:669)</td><td>Needs at least one filter; sets <code>cat</code> on every filtered row, marks dirty</td></tr>
+      <tr><td>Delete these rows <code>#txDeleteFiltered</code></td><td><code>deleteFilteredTransactions</code> (:730)</td><td>Appends to Data/Deleted transactions.csv first, abandons on failure, then rewrites the month files; clears the import receipt</td></tr>
+      <tr><td>Add transaction <code>#txAdd</code></td><td><code>addTransaction</code> (:825)</td><td>Validates ISO date, description, non-zero amount; writes the month file immediately; folder from <code>ctx.txSegment</code></td></tr>
+      <tr><td>Save <code>#txSave</code></td><td><code>saveTransactions</code> (:888)</td><td>Rewrites every dirty file, then flushes pending learns; a throw stops the loop and keeps the button lit</td></tr>
+      <tr><td>Export <code>#txExport</code></td><td><code>exportTransactions</code> (:929) → <code>exporter.js:exportPaths</code> (:352)</td><td>Transactions &lt;range&gt;.csv/.md and Categories.csv/.md under the chosen folder; refuses while dirty; folder remembered only after success</td></tr>
+      <tr><td>Report / New account</td><td><code>switchView('report')</code>; <code>ctx.addAccount({type:'checking'})</code></td><td></td></tr>
+    </tbody>
+  </table>
+  <h3>Publishes on ctx (:1010)</h3>
+  <p><code>renderTransactions</code>, <code>serializeTxFile</code> (used by Import commit and undo, import.js:751/:868), <code>saveTransactions</code>, <code>addTransaction</code>, <code>splitTransaction</code>, <code>unsplitTransaction</code>, <code>deleteTransaction</code>, <code>deleteFilteredTransactions</code>, <code>categoriseFilteredTransactions</code>, <code>exportTransactions</code>, <code>syncOptions</code>, <code>filteredRows</code>. The last six have test consumers only.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li>Search debounce state <code>S._q</code> is created implicitly rather than declared in the state block.</li>
+    <li>Rule-correction prompt, bulk categorise, the split "still need a category" clause and the add-transaction toast are hardcoded English.</li>
+    <li>An orphan-folder row in a foreign currency prints with the household symbol because <code>rowSymbol</code> falls back when no account resolves.</li>
+  </ul>
+</section>
+<section id="page-budgets" class="page">
+  <h2>Budget <span class="badge b-info">nav: budgets</span> <span class="badge b-warn">writes Budgets/&lt;period&gt;.md + Categories/*.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/budgets.js</code> (908 lines) · shell <code>shell.js:316-335</code></dd>
+      <dt>Renders when</dt><dd><code>renderBudgets</code> (:494) on switchView, period change (after a discard confirm when dirty, <code>controller.js:836</code>), and after every edit. The draft (<code>budgetDraft</code> :267) is rebuilt lazily when the period changes and seeds a zero row for every category not in the file; <code>invalidateBudgetDraft</code> (:283) runs on reload and on discard.</dd>
+      <dt>Reads</dt><dd><code>S.budgets[period]</code> + <code>S.budgetMeta[period].raw</code> (Budgets/&lt;period&gt;.md), <code>S.categories</code> (type, assumeSpent, fixed), <code>periodSummary(S.period)</code> for actuals, <code>S.settings</code> (period shape, overspend_lag, groups), locale decimal.</dd>
+      <dt>Writes</dt><dd>Budgets/&lt;period&gt;.md via <code>saveBudget</code> (:720) → <code>budget-file.js:serializeBudgetFile</code> (:124); Categories/&lt;name&gt;.md immediately for the assume-spent and fixed toggles and for new/deleted categories.</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Shape note <code>#budShapeNote</code></td><td>"New period, nothing budgeted yet" with copy-previous, or "Your other budgets are still here" with bring-over / reslice</td><td><code>renderShapeNote</code> (:96); <code>freshPeriodNote</code> (:86); <code>otherShapeBudgets</code> (:65) = keys failing <code>period.js:periodKeyValid</code> (:100)</td><td>Only when the period file is empty (:100)</td></tr>
+      <tr><td>Totals strip (top and bottom)</td><td>Total income · Total budgeted (% of income) · Left to budget / Over-budgeted · Total spent (% used)</td><td><code>budgetTotalsStrip</code> (:295) off the <b>live draft</b>. Income = Σ income-typed rows; budgeted = Σ non-income non-transfer rows; spent = <code>sum.spend + assumed</code> where assumed = Σ over assume-spent rows of <code>assumedActual(amount, real) − max(0, real)</code> (:350)</td><td>Left/Over tile omitted while running with no income (:427). Spent tile appends: uncategorised not shown, refunds netted off, foreign excluded (:381-411)</td></tr>
+      <tr><td>Group bars</td><td>type label + rows</td><td>bucket by <code>catType(d.category) ?? d.type</code> (period.js:485), ordered by <code>groups.js:typeRank</code> (:62)</td><td>Label via <code>typeGroupLabel</code> (:488)</td></tr>
+      <tr><td>Col 1 Category</td><td>name + "already spent" tag</td><td><code>period.js:catAssumeSpent</code> (:506)</td><td></td></tr>
+      <tr><td>Col 2 Type</td><td>badge of the <b>raw stored cell</b></td><td>:620</td><td>A mismatch against the group heading is the visible signal of a stale Type cell</td></tr>
+      <tr><td>Col 3 Amount</td><td>input + remaining line + "Fill from overspend" on assume-spent rows</td><td><code>updateRemaining</code> (:576): left / over / already spent</td><td>Zero amount with actual &gt; 0 prints "over" (:577)</td></tr>
+      <tr><td>Col 4 Actual so far</td><td>assume-spent → <code>assumedActual(amount, real)</code>; income → raw; else −raw</td><td><code>sum.byCat[category]</code> from <code>periodSummary</code> (period.js:727, net per category, transfers skipped)</td><td>"no transaction expected" only when assumed and real ≤ 0 (:616)</td></tr>
+      <tr><td>Col 5 Notes</td><td>text</td><td></td><td></td></tr>
+      <tr><td>Col 6 Actions</td><td>assume-spent toggle, fixed toggle, clear this period, delete everywhere</td><td>see actions</td><td></td></tr>
+    </tbody>
+  </table>
+  <p class="muted"><code>assumedActual(budgeted, real) = max(budgeted, real)</code> (:50) is exported off the module and required directly by <code>dashboard.js:39</code>; it is the single authority for what an assume-spent row's Actual reads, and the strip's overlay is its exact complement.</p>
+  <h3>Actions</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Function</th><th>Effect / writes</th></tr></thead>
+    <tbody>
+      <tr><td>Copy previous <code>#budCopyPrev</code></td><td><code>copyPreviousBudget</code> (:861)</td><td>Fills draft from the previous period, never overwrites a set row. Draft only</td></tr>
+      <tr><td>New category <code>#budAddCat</code></td><td><code>addNewCategory</code> (:881) → <code>categories.js:promptCreateCategory</code> (:41)</td><td>Writes Categories/&lt;name&gt;.md, adds a zero row</td></tr>
+      <tr><td>Save <code>#budSave</code></td><td><code>saveBudget</code> (:720)</td><td>Keeps rows that are inFile or have amount/notes; preserves frontmatter; range note from <code>budget-file.js:budgetRangeNote</code> (:81)</td></tr>
+      <tr><td>Fill from overspend</td><td><code>pullPreviousOverspend</code> (:831) → <code>period.js:periodDeficit</code> (:586) for the period <code>overspend_lag</code> back</td><td>Sets the amount after confirm. Draft only</td></tr>
+      <tr><td>Assume-spent / Fixed toggles</td><td><code>toggleAssumeSpent</code> (:776), <code>toggleFixed</code> (:806)</td><td><code>ctx.patchFile</code> on the category file immediately; the fixed toggle is the only UI for that flag</td></tr>
+      <tr><td>Clear / Delete</td><td>clear sets inFile=false (:700); <code>categories.js:promptDeleteCategory</code> (:201)</td><td>Clear removes the row on next Save; delete trashes the category file everywhere</td></tr>
+      <tr><td>Bring over / Reslice</td><td><code>bringOverFrom</code> (:245) → <code>carryStructure</code> (:229); <code>resliceFrom</code> (:187) → <code>reslice.js:resliceBudget</code> (:72) with <code>strandedPeriodDays</code> (:174), accepted per row in <code>modal.js:askBudgetReslice</code> (:504)</td><td>Draft only</td></tr>
+    </tbody>
+  </table>
+  <h3>Publishes on ctx (:888)</h3>
+  <p><code>renderBudgets</code>, <code>saveBudget</code>, <code>copyPreviousBudget</code>, <code>addNewCategory</code>, <code>invalidateBudgetDraft</code>, <code>budgetDirty</code> (gates the file watcher and period switch), plus <code>otherShapeBudgets</code>, <code>carryStructure</code>, <code>strandedPeriodDays</code>, <code>freshPeriodNote</code>, <code>typeGroupLabel</code> (test-facing).</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li><code>copyPreviousBudget</code> enables the Save button but does not set <code>budDirty</code>; <code>budgetDirty()</code> still reads true via the DOM fallback (:257-261).</li>
+    <li><code>bud-fixed-on</code> has no CSS rule yet, so the fixed toggle's on-state is unstyled (:665).</li>
+    <li>There is no UI to re-type a category; a stale Type cell is written straight back on save (:301).</li>
+  </ul>
+</section>
+<section id="page-services" class="page">
+  <h2>Services <span class="badge b-info">nav: services</span> <span class="badge b-warn">writes Services.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/services.js</code> (380 lines) + pure <code>src/recurring.js</code> · shell <code>shell.js:758-773</code> · English-only strings</dd>
+      <dt>Renders when</dt><dd><code>renderServices</code> (:266) on switchView and after add / toggle / remove / hint; an amount edit refreshes only KPIs and subtotals (:282) so the input is not rebuilt.</dd>
+      <dt>Reads</dt><dd><code>S.services</code> + <code>S.servicesFm</code> (Services.md via <code>SCHEMAS.services</code>), every row of <code>S.txFiles</code> for charge matching, account currency via <code>accountForLabel</code>, <code>S.categories</code>, notes.</dd>
+      <dt>Writes</dt><dd>Services.md via <code>saveServices</code> (:341) → <code>serializeServices</code> (:325) → <code>table-schema.js:mdTableFile</code>. Dirty flag <code>servicesDirty</code> on <code>#svcSave</code> (:185).</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>KPI Per month</td><td>Σ monthly equivalents of active services, household currency</td><td><code>monthlySplit</code> (:49) → <code>monthlyEquiv</code> (:27) = amount × <code>PER_MONTH[cycle]</code> (weekly 365.25/12/7, fortnightly 365.25/12/14, monthly 1, annual 1/12)</td><td>Foreign rows never converted, listed beside as "plus …"</td></tr>
+      <tr><td>KPI Per year</td><td>× 12</td><td>same, scale 12</td><td></td></tr>
+      <tr><td>KPI Active / Total</td><td>counts</td><td>currency-blind (:197)</td><td></td></tr>
+      <tr><td>Group bars</td><td>category + subtotal /mo</td><td><code>serviceGroups</code> (:84) by category; <code>subtotalText</code> (:98) over active rows only</td><td></td></tr>
+      <tr><td>Row badges</td><td>"not seen", "last charged N mo ago", "varies", "really {amount}", "billed in {symbols}"</td><td><code>svcFlags</code> (:218) off <code>chargeIndex</code> (:117): <code>recurring.js:matchCharges</code> (:121, outflows only, largest description group wins), <code>chargeStats</code> (:57, spread of last three &gt; 15 % = varies), <code>chargeStatus</code> (:196, overdue after two silent cycles), <code>comparePrice</code> (:206, median of last three, tolerance max(2, 4 %))</td><td>Split parts skipped, parents kept (<code>tx-role.js:isSplitPart</code>). Price verdict uses home-currency rows only; liveness and next-due use every matched row</td></tr>
+      <tr><td>Next billing hint</td><td>"due {date}" button</td><td><code>svcNextHint</code> (:256) from <code>recurring.js:nextExpected</code> (:163) over all matched descriptions</td><td>Click writes <code>s.next</code></td></tr>
+      <tr><td>Columns</td><td>Service (name + note chip + badges) · Provider · Amount · Cycle (from <code>CYCLES</code> in table-schema) · Next billing · Active · ✕</td><td></td><td>Remove has no confirm</td></tr>
+    </tbody>
+  </table>
+  <h3>Actions</h3>
+  <p>New service <code>#svcAdd</code> → <code>addService</code> (:351) form (name, provider, amount, cycle, next, category, currency); Save <code>#svcSave</code>; per-row amount / cycle / date / active / remove edits are in memory until Save; note chip → Notes.</p>
+  <h3>Publishes on ctx (:379)</h3>
+  <p><code>renderServices</code>, <code>saveServices</code>, <code>addService</code>, <code>serializeServices</code>. The data flows outward: <code>committed.js:serviceCommitments</code> (:215) and <code>whatsLeft</code> (:559) read <code>S.services</code> for the Dashboard's money-left card.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li>Un-internationalised apart from three borrowed currency keys.</li>
+    <li>The per-row currency can be set on creation but not edited afterwards from this page.</li>
+    <li><code>svcNextHint</code> reads <code>c.stats</code> fields; a row where <code>c.next</code> is set but <code>c.stats</code> is null could throw, and that case could not be ruled out from the code.</li>
+  </ul>
+</section>
+<section id="page-score" class="page">
+  <h2>Score <span class="badge b-info">nav: score</span> <span class="badge b-ok">read-only</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/score.js</code> (1 203 lines) · <code>registerScore</code> at <code>controller.js:453</code> · shell markup <code>shell.js:255-273</code></dd>
+      <dt>Renders when</dt><dd><code>renderScore</code> (:36) on switchView, period change and reload. <b>No figure depends on <code>S.period</code></b>; everything anchors on <code>currentPeriod()</code>, so a period change redraws identical numbers. No per-card guard: one throw takes the whole page.</dd>
+      <dt>Reads</dt><dd><code>ctx.healthSnapshot()</code> (the same assembly as the Dashboard health card) plus <code>S.settings</code>, <code>S.categories</code> (<code>fixed</code> flag), <code>S.accounts</code>, <code>S.debts</code>, <code>S.assets</code>, <code>S.owed</code>, and via ctx: <code>periodSummary</code>, <code>periodSpend</code>, <code>budgetTotals</code>, <code>accountIndex</code>, <code>txInPeriod</code>, <code>declaredCatType</code>.</dd>
+      <dt>Writes</dt><dd>Nothing. No dirty flag, no save button, no modal.</dd>
+    </dl>
+  </div>
+
+  <h3>1 · Hero: the score ring <code>#scoreHero</code></h3>
+  <p class="muted">Empty branches (:71-87): "no data" when no periods are counted, "unmeasured" when live weight is below <code>health-math.js:MIN_LIVE_WEIGHT</code> (:321). Both other cards hide in those states.</p>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Ring <code>.score-ring</code></td><td>five weighted arcs</td><td><code>buildScoreRing</code> (:189) → <code>money-flow.js:railSegments</code> (:378) → <code>health-math.js:scoreBreakdown</code> (:520) → <code>financialScore</code> (:403)</td><td>Pillar weights (<code>PILLARS</code> :312): reserves 25, saving 20, debt 20, spending 20, wealth 15. Fill arc uses the unrounded ratio (:278)</td></tr>
+      <tr><td>Ring centre</td><td>total / 100 + band word</td><td><code>showTotal</code> (:398); a focused pillar swaps in its own points via <code>showPart</code> (:404)</td><td></td></tr>
+      <tr><td>Legend rows (5)</td><td>pillar name, "Now:" line, how-it-works, points/max</td><td><code>whereYouAre</code> (:623) per pillar; percentages via <code>share-percents.js:sharePercentLabel</code></td><td>"Completed" tag when the pillar is full</td></tr>
+      <tr><td>Meter <code>.score-meter</code></td><td>total %</td><td>:106</td><td></td></tr>
+      <tr><td>Caveat "foreign excluded"</td><td>count + symbols</td><td><code>snap.otherCurrencies</code> from <code>currency.js:splitByCurrency</code> in health-data.js:361</td><td>:124-130</td></tr>
+      <tr><td>Verdict + footnotes</td><td>strong / steady / attention; band thresholds; "unanswerable parts are left out and the rest share the weight"</td><td><code>SCORE_BANDS</code> health-math.js:263; :152</td><td></td></tr>
+      <tr><td>Confetti</td><td>12-36 deterministic pieces for 2.6 s</td><td><code>celebrate</code> (:1149)</td><td>Only on band strong, ≥ 1 pillar ≥ 0.9, and no reduced-motion preference</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">"Now:" lines by pillar: reserves = months vs target + essentials amount; saving = % + amount (the "saving down" branch is documented unreachable, :651); debt = interest share %; spending = fixed · living · budget; wealth = multiple of essentials + amount.</p>
+
+  <h3>2 · What is going well <code>#scoreGood</code></h3>
+  <p class="muted"><code>renderGood</code> (:482). Hidden unless at least one pillar reaches <code>GOOD_ENOUGH = 0.9</code> (:27). Rows sorted best first; a maxed pillar gets a crown icon and "full marks". Debt has two overrides: "no debts recorded" and "no rate given" (:515).</p>
+
+  <h3>3 · What would move it most <code>#scoreWork</code></h3>
+  <p class="muted"><code>renderWork</code> (:524). Hidden when nothing is below 0.9. Rows arrive pre-sorted biggest-shortfall first from <code>scoreBreakdown</code> (health-math.js:614). Each row: points to gain, a solid/hatched rail (<code>buildGapRail</code> :609), the "Now:" line, an action figure chosen by <code>gap.kind</code> (fund / monthly / interest / trim / build, using <code>FULL_MARKS</code> health-math.js:343: savings rate 20 %, consumption floor 70 %, net-worth multiple 3), guidance prose, and a destination button.</p>
+
+  <h3>4 · Where the money went <code>.score-flow-card</code></h3>
+  <p class="muted">Built first in code (:49) but appended last in the DOM, so it is the bottom card. Data from <code>buildFlow</code> (:713) → <code>money-flow.js:periodFlow</code> (:130) for <code>currentPeriod()</code> only: income and spent from <code>periodSummary</code>, spend by category from <code>periodSpend(cur).whole</code>, budget from <code>budgetTotals</code>, fixed categories from <code>S.categories</code>, saving contribution from <code>savings-math.js:savedFromOutside</code> (:725), debts from <code>S.debts</code>.</p>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Money in</td><td>income this period</td><td><code>flow.income</code></td><td></td></tr>
+      <tr><td>Sankey (desktop) / bars (mobile)</td><td>committed · living · saving · not yet spent, each amount + %</td><td><code>buildFlowSankey</code> (:868) / <code>buildFlowMobile</code> (:981) from <code>buildFlowRows</code> (:774), using <code>flow.bands.display</code> (largest-remainder reconciled)</td><td>Scaled to max(100, Σ%) so a deficit is not clipped (:896); bands under 1.3 % get a floor, true zero gets a hairline (:958)</td></tr>
+      <tr><td>Chip: inside committed</td><td>debt repayments, of which interest, housing, subscriptions, other</td><td><code>flow.committedDetail</code>; interest via <code>health-math.js:debtInterestMonthly</code></td><td>Empty variant when no category has <code>fixed: true</code>; hidden when committed ≈ 0 (:1026)</td></tr>
+      <tr><td>Chip: against the budget</td><td>budgeted, allocated % of income, spent, budget used</td><td><code>money-flow.js:allocatedShare</code> (:114)</td><td>Caveat "this period only; the score uses a six-period average" (:1084)</td></tr>
+      <tr><td>Chip: money left, two kinds</td><td>left in budget, never budgeted, together</td><td><code>flow.lefts.display</code>; "together" sums the two printed rows (:1096)</td><td>Hidden when all ≈ 0 (:1090)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Actions</h3>
+  <ul>
+    <li>Legend row buttons (5) and ring centre: <code>applyFocus(key|null)</code> dims other segments and swaps the centre figure (:459, :415).</li>
+    <li>Gap "go" buttons: <code>ctx.switchView(GAP_DESTS[key])</code> with reserves → accounts, saving → accounts, debt → debts, spending → services, wealth → savings (:583).</li>
+  </ul>
+  <h3>Publishes on ctx (:1202)</h3>
+  <p><code>renderScore</code> only.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li><code>score.gap.goto</code> is a TODO at :586; the destination button reads a bare page name.</li>
+    <li>"Saving down" branches in Score and Dashboard are dead code today because <code>savedFromOutside</code> cannot return a negative.</li>
+    <li>The period pill still shows and still triggers a redraw on this page even though nothing moves with it. Report hides the pill (<code>controller.js:486</code>); Score does not.</li>
+  </ul>
+</section>
+<section id="page-plan" class="page">
+  <h2>Plan <span class="badge b-info">nav: plan</span> <span class="badge b-warn">writes Plans/*.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/plan.js</code> (689 lines) + pure <code>src/plan-math.js</code> · <code>registerPlan</code> at <code>controller.js:456</code> · shell markup <code>shell.js:342-420</code></dd>
+      <dt>Renders when</dt><dd><code>renderPlan</code> (:53) on switchView and after every mutation. Sub-renders: picker (:70), pot (:86), sources (:138), envelopes (:183), free (:370).</dd>
+      <dt>Reads</dt><dd><code>S.plans</code> only, keyed by file basename from <code>Plans/&lt;name&gt;.md</code> (<code>load.js:468-511</code>), sliced on the headings <code>## Money in</code>, <code>## Envelopes</code>, <code>## Items</code> (heading text is load-bearing). <b>Period-independent: no transaction, account or budget feeds any figure here.</b></dd>
+      <dt>Writes</dt><dd><code>Plans/&lt;p.file&gt;.md</code> via <code>savePlan</code> (:659) → <code>serializePlan</code> (:617) → <code>ctx.writeFile</code>; delete moves the file to trash via <code>ctx.trashFile</code>. Dirty flag <code>planDirty</code> bound to <code>#planSave</code> (:42) blocks the vault watcher from reloading over unsaved edits.</dd>
+    </dl>
+  </div>
+  <div class="callout">
+    <div class="t">The arithmetic (plan-math.js, nothing stored)</div>
+    <pre style="margin:0"><code>pot       = Σ source.amount                       (:54)
+received  = Σ source.amount where status ≠ expected (:47, :55)   stored status wins over the date
+expected  = pot − received                          (:62)
+allocated = Σ envelope.amount                       (:56)
+spent     = Σ item.spent                            (:57)
+committed = max(0, allocated − spent)               (:70)
+free      = pot − allocated                         (:71)   may be negative
+left      = pot − spent                             (:80)</code></pre>
+  </div>
+  <table>
+    <thead><tr><th>Section</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Empty state <code>#planEmptyCard</code></td><td>"No plan yet" + start button</td><td>:56</td><td></td></tr>
+      <tr><td>Plan strip <code>#planPicker</code></td><td>segmented buttons, one per plan</td><td>:70</td><td>Hidden below 2 plans (:82). Switching is refused while dirty (:605)</td></tr>
+      <tr><td>The pot <code>#planPot</code></td><td>hero pot figure; "from N sources · received / expected"; three-band split bar; key with "Still left" subtotal</td><td><code>plan-math.js:planSummary</code> (:49); bar widths from <code>barSegments</code> (:105), clamped so spent + committed + free = pot exactly</td><td>"Not spoken for" and "Still left" turn red when negative</td></tr>
+      <tr><td>Money in <code>#planSources</code></td><td>one row per source: name, kind label, date, status pill (received/expected), amount, remove</td><td>:138; kind is a label only (<code>SOURCE_KINDS</code> plan-math.js:31), no arithmetic branches on it</td><td>Status of a new source is concluded from its date, never asked (:399)</td></tr>
+      <tr><td>Spending buckets <code>#planEnvelopes</code></td><td>per envelope: name, share % of pot, amount button, slider, overshoot fill, rail flags, item list, "N of M done"</td><td><code>envelopeCard</code> (:238); share from <code>plan-math.js:sharePct</code> (:127); flags from <code>envelopeOverState</code> (:148): over (spent &gt; amount), over-committed (Σ items &gt; amount), unassigned, spent</td><td>Slider max = the most the bucket could hold without the plan going negative (:247). An envelope's amount is deliberately not the sum of its items (:19-24)</td></tr>
+      <tr><td>Not spoken for <code>#planFree</code></td><td>"{free} is not spoken for" or "{−free} more is placed than the plan holds"; % of plan; two buttons</td><td>:370</td><td>Hidden when |free| &lt; 0.005 (:375)</td></tr>
+    </tbody>
+  </table>
+  <h3>Actions</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Function</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>#planStart</code> / <code>#planNew</code></td><td><code>newPlan</code> (:533)</td><td>asks a name, refuses an existing file, creates in memory, marks dirty</td></tr>
+      <tr><td><code>#planDelete</code></td><td><code>deletePlan</code> (:569)</td><td>confirm, then trash the file; falls to the first remaining plan</td></tr>
+      <tr><td><code>#planSave</code></td><td><code>savePlan</code> (:659)</td><td>writes frontmatter (kind, plan, started, status via <code>markdown.js:patchFrontmatter</code>) + the three tables; leaves dirty set on failure so the same click retries</td></tr>
+      <tr><td><code>#planAddSource</code>, <code>#planAddEnvelope</code>, "+ item"</td><td><code>addSource</code> (:399), <code>addEnvelope</code> (:422, rejects duplicate names), <code>addItem</code> (:484)</td><td>in memory + dirty</td></tr>
+      <tr><td>Envelope name / amount / slider / remove</td><td><code>renameEnvelope</code> (:439, re-keys every item), <code>editEnvelopeAmount</code> (:458), slider change (:288), <code>removeEnvelope</code> (:469, confirms and deletes its items)</td><td>in memory + dirty</td></tr>
+      <tr><td>Item tick / name</td><td>cycles planned → part → done (:347, syncing <code>spent</code>); <code>editItem</code> (:499) re-derives status from the money (:529)</td><td>in memory + dirty</td></tr>
+    </tbody>
+  </table>
+  <h3>Publishes on ctx (:688)</h3>
+  <p><code>renderPlan</code>, <code>savePlan</code>, <code>newPlan</code>, <code>deletePlan</code>, <code>addSource</code>, <code>addEnvelope</code> (all wired in <code>controller.js:972-979</code>), and <code>serializePlan</code>, which has no consumer.</p>
+  <h3>Navigates to</h3>
+  <p>Nothing, and nothing links in. The Dashboard does not yet read <code>S.plans</code> despite the note in plan-math.js:1-6.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li>Every string on this page is hardcoded English; all other pages go through <code>src/lang/</code>.</li>
+    <li><code>serializePlan</code> is published with no consumer; <code>envelopeGap</code> and <code>ITEM_STATUSES</code> are exported from plan-math.js but the view never imports them directly.</li>
+  </ul>
+</section>
+<section id="page-notes" class="page">
+  <h2>Notes <span class="badge b-info">nav: notes</span> <span class="badge b-warn">writes Notes/**</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/notes.js</code> (467 lines) + pure <code>src/note-file.js</code> · shell <code>shell.js:422-443</code> · registered first (<code>controller.js:448</code>) because five other views render its note chip · English-only strings</dd>
+      <dt>Renders when</dt><dd><code>renderNotes</code> (:212) on switchView, About change, search (200 ms), the vault rename watcher (<code>controller.js:778</code>), and after add / repoint / delete. <b>No dirty flag by design</b>: every edit writes to disk in the same interaction (:48).</dd>
+      <dt>Reads</dt><dd><code>S.notes</code> (Notes/**/*.md recursively, <code>load.js:608</code> → <code>note-file.js:parseNote</code> :234), the subject lists from accounts, categories, debts, assets, services, owed and the current + 11 previous periods.</dd>
+      <dt>Writes</dt><dd>New note file via <code>note-file.js:uniqueNotePath</code> (:141, case-folded collision probe) + <code>serializeNote</code> (:198); frontmatter-only patches via <code>writeSubject</code> (:347) → <code>ctx.patchFile</code> (note_kind, note_subject, note_for); trash via <code>vault.trash</code>. Bodies are never rebuilt.</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>KPI Notes / Subjects / Unmatched</td><td>count; distinct kind+subject; orphans</td><td><code>renderNotesKpis</code> (:161); <code>note-file.js:isOrphan</code> (:320) over <code>TRACKED_KINDS</code> only</td><td>Period and general notes can never be orphans</td></tr>
+      <tr><td>About filter <code>#noteAbout</code></td><td>Everything · General · every live subject · missing subjects "(missing)"</td><td><code>aboutOptions</code> (:97); values packed with a U+001F separator (:43)</td><td>Missing subjects keyed folded to avoid phantom duplicates</td></tr>
+      <tr><td>List <code>#notesList</code></td><td>card: title button, date, kind·subject badge, "unmatched" chip, excerpt, Open / Change subject / Delete</td><td><code>visibleNotes</code> (:149) → <code>note-file.js:notesFor</code> (:302), search over title/excerpt/subject, <code>sortNotes</code> (:310); excerpt from <code>noteExcerpt</code> (:214)</td><td></td></tr>
+    </tbody>
+  </table>
+  <h3>Actions</h3>
+  <ul>
+    <li><b>New note</b> <code>#noteAdd</code> → <code>addNote</code> (:292): title, About, body; then <code>ctx.loadNotes()</code> re-reads from disk.</li>
+    <li><b>Open</b> → <code>openNote</code> (:334) in a new Obsidian tab.</li>
+    <li><b>Change subject</b> / unmatched chip → <code>repointOne</code> (:368) → <code>writeSubject</code>; <code>note_for</code> becomes <code>[[subject]]</code> only for kinds with their own note (account, category) and is removed otherwise.</li>
+    <li><b>Delete</b> → <code>deleteNote</code> (:403), TFile resolved before the confirm, vault-local trash.</li>
+    <li><b>Rename watcher</b> → <code>repointNotes</code> (:394) called from <code>controller.js:773</code> after <code>classifyRename</code>.</li>
+  </ul>
+  <h3>Publishes on ctx (:466)</h3>
+  <p><code>renderNotes</code>, <code>addNote</code>, <code>openNote</code>, <code>deleteNote</code>, <code>repointNotes</code>, <code>writeNoteSubject</code>, <b><code>noteButton(kind, subject)</code></b> (:437, rendered by Accounts :1599, Debt :664, Owed :104, Assets :246, Services :285) and <code>showNotesFor</code> (:454) which sets the filter and switches view.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li><code>periodChoices</code> (:83) offers only the current and 11 previous periods.</li>
+    <li><code>S.noteFilter</code> is not persisted across reloads.</li>
+  </ul>
+</section>
+<section id="page-accounts" class="page">
+  <h2>Accounts <span class="badge b-info">nav: accounts</span> <span class="badge b-warn">writes Accounts/*.md immediately</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/accounts.js</code> (2 395 lines) · shell <code>shell.js:633-660</code></dd>
+      <dt>Renders when</dt><dd><code>renderAccounts</code> (:2017) on switchView, period change, the vault watcher, search (200 ms) and group toggle. Order is load-bearing: <code>model()</code> (:766) once, then owner chips (:1350, first so a stale owner filter clears), summary (:791), deck (:1242), filters (:1376), table (:1882). Edits reachable from Savings call <code>ctx.render()</code> rather than this page's render.</dd>
+      <dt>Reads</dt><dd><code>S.accounts</code> (Accounts/*.md frontmatter, <code>load.js:295-349</code>), <code>S.txFiles</code> + <code>S.txFolders</code>, <code>S.debts</code> and <code>S.assets</code> (hero caveat and overlap only), <code>S.settings</code> (currency, owners, exchange_rates), <code>S.categories</code> via <code>poolType</code>, <code>S.period</code> (flow column), UI state <code>S.acctView</code> (:719), plugin <code>acctColWidths</code>, FX via <code>ctx.fxConvert</code> (fx-live.js:90).</dd>
+      <dt>Writes</dt><dd>No Save button and no dirty flag (:90-95): every edit writes through. <code>saveAccount</code> (:2075) patches frontmatter key by key through <code>FM_WRITERS</code> (:258) + <code>ctx.patchFile</code>, or rebuilds the block for a file the loader never saw (:2106). Delete trashes the account file and optionally its transaction folder.</dd>
+    </dl>
+  </div>
+  <p class="muted"><code>model()</code> computes per account: labels via <code>period.js:accountIndex</code> (:253) and <code>accountForLabel</code> (:237, three-name match: tx_label, name, cleaned name); state via <code>acct-status.js:statusOf</code> (:82) → <code>reconcile.js:reconcile</code> (:142), <code>daysSince</code> (:42), <code>isStale</code> (:63), <code>mutedWarnings</code> (:169); period activity via <code>periodActivity</code> (:360) with split parents skipped and <b>excluded rows deliberately counted</b>; growth via <code>savings-math.js:totalReturn</code> (:306).</p>
+
+  <h3>1 · Summary <code>#acctSummary</code></h3>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Hero "Net across your accounts"</td><td><code>w.net</code></td><td>drop unreadable balances (:155) → <code>currency.js:splitByCurrency</code> (:98) household only → <code>worth.js:worth(primary, null, null)</code> (:121), split by balance sign</td><td>Accounts only, no debts or assets</td></tr>
+      <tr><td>Converted total</td><td>FX total</td><td><code>fx-live.js:fxConvert</code> → <code>fx.js:convertAccounts</code> (:244)</td><td>Only when <code>exchange_rates: true</code> and a usable rate table</td></tr>
+      <tr><td>Hero sub-line</td><td>credit vs overdrawn; then caveats</td><td>:908-914</td><td>"assets and debts on their own pages are not counted" when any asset or active debt exists (:874); "held in other currencies, not converted" or the converted line with rate age; "N balances could not be read"</td></tr>
+      <tr><td>Fact strip</td><td>Accounts · Needs attention · Warnings ignored (only if &gt; 0) · Oldest balance check</td><td><code>acct-status.js:wantsALook</code> (:203); max <code>daysSince</code></td><td></td></tr>
+      <tr><td>Whose it is</td><td>per owner: net, bar, count</td><td><code>owners.js:netByOwner</code> (:139) decides rows; figure re-derived per owner via <code>splitByCurrency</code> + <code>roundedSum</code> (:975)</td><td>Only when owners are in play and ≥ 2 buckets (:980). Row click sets the owner filter</td></tr>
+      <tr><td>Where it sits (donut)</td><td>Bank · Savings · Investments · Other shares</td><td><code>ACCT_GROUPS</code> (:162); positive-total groups only (:1046); centre = sum of drawn groups; % via <code>share-percents.js:sharePercents</code></td><td>Notes for negative groups ("excluded from the total above"), foreign-only groups listed at 0 %, empty state</td></tr>
+      <tr><td>Card-overlap caveat</td><td>credit cards counted twice</td><td><code>worth.js:cardOverlap</code> (:187)</td><td>Button → Debt</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2 · Decision deck <code>#acctDeck</code></h3>
+  <p class="muted">Queue from <code>acct-status.js:queueOrder</code> (:205) by urgency (drift 0, stale 1, unreadable 2, nodate 3, notx 4, nofolder 5) then oldest first. Max 4 items (<code>DECK_MAX</code> :1171); the rest becomes a "N more, show them all" button that sets the "Needs a look" filter. Each item has a why line (<code>deckWhy</code> :1173, e.g. "N transactions since you last confirmed imply X, not Y" from <code>reconcile()</code>) and an action (<code>deckAction</code> :1211): drift → Use amount (<code>acceptImplied</code>), stale/nodate → Confirm balance / Set the date (<code>editBalance</code>), notx → Import, unreadable → See transactions, nofolder → Link a folder (<code>editAccount</code>), plus Review → <code>openRow</code> (:2004).</p>
+
+  <h3>3 · Filters and table <code>#acctTable</code></h3>
+  <p class="muted">Rows from <code>visibleRows</code> (:1324): kind chip → owner → search over name/institution/type/owner → sort by <code>SORTERS</code> (:1311: name, balance, flow, stale). Chip counts are within the current owner filter (:1384).</p>
+  <table>
+    <thead><tr><th>#</th><th>Column</th><th>Shows</th><th>Computed by</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Account</td><td>name button + type dot + type · institution · owner</td><td><code>TYPE_COLOUR</code> (:746), <code>owners.js:ownerLabel</code></td></tr>
+      <tr><td>2</td><td>Balance</td><td>button in the account's own symbol; "Could not read … click to fix" when unreadable</td><td><code>acctMoney</code> (:102); :1554</td></tr>
+      <tr><td>3</td><td>&lt;period name&gt;</td><td>net flow chip</td><td><code>periodActivity</code> in − out; rows after today held out as "ahead"</td></tr>
+      <tr><td>4</td><td>Period sparkline</td><td>cumulative running sum, shape only</td><td><code>sparkline</code> (:1414), nothing below 2 rows</td></tr>
+      <tr><td>5</td><td>Progress</td><td>card utilisation (over at 100 %, near at 85 %) · goal % · growth % on capital · —</td><td><code>goalCell</code> (:1448); <code>utilisationOf</code> (:2036); <code>totalReturn</code>. Dash when <code>returnPct</code> is null</td></tr>
+      <tr><td>6</td><td>Confirmed</td><td>date or "no date"</td><td><code>balance_updated</code></td></tr>
+      <tr><td>7</td><td>State</td><td>pill: agrees / doesn't match / date unreadable / N days old / never confirmed / nothing imported / no folder linked; muted keeps the label, loses the colour, gains an "ignored" chip</td><td><code>statePill</code> (:1502)</td></tr>
+      <tr><td>8</td><td>Notes</td><td>note chip</td><td><code>notes.js:noteButton</code></td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Group rows (when grouped) print the group subtotal with a "plus …" foreign tag. Column widths resize by grip (:1822) and persist to plugin data.json; disabled under 761 px.</p>
+
+  <h3>4 · Drawer (opens under a clicked row) <code>drawerRow</code> :1615</h3>
+  <p class="muted">Fields shown conditionally: credit limit + available; savings goal + to go; total invested + growth; monthly contribution; this period in/out + row count; still to come (rows after today); owner; transactions folder; counts toward budget. Badges: not in budget, no transactions, "as of {date}" when the date cannot be parsed. Reconciliation line (<code>reconLine</code> :1727): on drift "N transactions since {date} imply X, {diff} lower/higher" + pending + undatable rows + <b>Use this</b>; otherwise the state's sentence, green only in state ok. The undatable fragment is appended on every branch (:1743).</p>
+
+  <h3>Actions</h3>
+  <table>
+    <thead><tr><th>Control</th><th>Function</th><th>Effect / writes</th></tr></thead>
+    <tbody>
+      <tr><td>Balance button, Confirm balance, Set the date</td><td><code>editBalance</code> (:403)</td><td>Modal: new balance + as-at date (capped at today). Reconciles before for the hint and after the write so a created drift is toasted</td></tr>
+      <tr><td>Use amount / Use this</td><td><code>acceptImplied</code> (:504)</td><td>Balance = implied; <code>balance_updated</code> = last absorbed row's date; rolls back on failed write</td></tr>
+      <tr><td>Edit</td><td><code>editAccount</code> (:547)</td><td>Type, institution, owner, account number, folder, currency, in-budget, type-dependent fields (<code>TYPE_FIELDS</code> :216), mute-warnings toggles (<code>acct-status.js:WARNINGS</code> :143). Only shown fields are read back</td></tr>
+      <tr><td>Exclude / Include</td><td><code>toggleBudget</code> (:684)</td><td>writes or removes <code>budget: false</code></td></tr>
+      <tr><td>See transactions / name button</td><td><code>openTransactions</code> (:386)</td><td>→ Transactions with account filter set</td></tr>
+      <tr><td>Open note</td><td><code>openAccountFile</code> (:395)</td><td>opens the account markdown in a new tab</td></tr>
+      <tr><td>Delete</td><td><code>deleteAccount</code> (:2291)</td><td>Two dialogs (keep or drop the folder, quoting row and month counts; then confirm); trashes to vault trash</td></tr>
+      <tr><td>New account <code>#acctAdd</code> (also Savings <code>#savAdd</code>, Transactions <code>#txNewAccount</code>, Import review)</td><td><code>addAccount</code> (:2167)</td><td>Name via <code>vault-path.js:safeSeg</code>, duplicates rejected; writes the file then ensures Transactions/&lt;name&gt;</td></tr>
+      <tr><td>Chips, sort headers, search, group toggle, grips, row open</td><td>:1338, :1398, :1867, :2378, :2379, :1822, :2004</td><td>UI state only (grips persist to data.json)</td></tr>
+    </tbody>
+  </table>
+  <h3>Publishes on ctx (:2386)</h3>
+  <p><code>renderAccounts</code>, <code>addAccount</code> (controller :909/:921/:927, import.js:494), <code>saveAccount</code> (import.js:706 writes the account number), <code>editAccount</code>, <code>editBalance</code>, <code>acceptImplied</code>, <code>deleteAccount</code>, <code>openAccountFile</code>, <code>openAccountTransactions</code> (all used by Savings), <code>acctSearch</code>, <code>acctToggleGroup</code>, and the test seams <code>accountReconcile</code>, <code>accountUtilisation</code>, <code>ACCOUNT_FM_KEYS</code>.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li>The hero's attention count covers all rows while the "Needs a look" chip counts within the owner filter; nothing on screen says so.</li>
+    <li><code>acct.hero.mixed</code> and <code>acct.mixedTitle</code> look like dead keys.</li>
+    <li><code>settle_monthly</code> / <code>settle_day</code> survive the rebuild branch (:2122) but have no UI; hand-edit only.</li>
+  </ul>
+</section>
+<section id="page-savings" class="page">
+  <h2>Savings &amp; Investments <span class="badge b-info">nav: savings</span> <span class="badge b-ok">no page-level save</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/savings.js</code> (1 437 lines) + pure <code>src/savings-math.js</code>, <code>src/worth.js</code> · shell <code>shell.js:583-631</code> · English-only strings</dd>
+      <dt>Renders when</dt><dd><code>renderSavings</code> (:94) on switchView, period change and reload; <code>renderWorth</code> (:1044) alone on a theme flip (<code>controller.js:572</code>). <b>Nothing here reads <code>S.period</code></b>: every figure is all-time as of today.</dd>
+      <dt>Reads</dt><dd><code>S.accounts</code> raw and as <code>ctx.impliedAccounts()</code> (period.js:287, reconciled), transactions only through <code>accountIndex</code> (orphan folders dropped), <code>S.debts</code>, <code>S.assets</code>, <code>S.owed</code>, <code>S.categories</code> via <code>poolCatType</code> (savings-math.js:107), <code>S.settings.currency</code>, <code>ctx.VALUED_STALE_DAYS</code> (365, from assets.js:46).</dd>
+      <dt>Writes</dt><dd>Nothing directly. Balance, edit, accept-implied, add and delete all call the Accounts page's helpers, which write Accounts/*.md.</dd>
+    </dl>
+  </div>
+  <h3>1 · KPI strip <code>#savingsKpis</code></h3>
+  <table>
+    <thead><tr><th>Tile</th><th>Value</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Net worth</td><td><code>w.net</code></td><td>implied accounts → <code>splitByCurrency</code> → <code>worth.js:worth</code> (:121): positive balances + <code>assetTotal</code> (:40) + <code>owedTotal</code> (:68) − negative balances − active non-foreign debts (<code>activeDebts</code> :31)</td><td>"what you own minus what you owe" + "Plus … held in other currencies, not converted" from <code>worth.js:otherCurrencyNet</code> (:318), merging all three ledgers' foreign residue per symbol</td></tr>
+      <tr><td>Savings / Investments</td><td>type totals</td><td><code>currency.js:primaryTotal</code> (:127) over case-folded <code>type</code> (:92)</td><td>"plus …" foreign tag</td></tr>
+      <tr><td>Growth</td><td>▲/▼ amount</td><td>home-currency entries only (:182) → <code>savings-math.js:growthTotals</code> (:523) → <code>totalReturn</code> (:306) → <code>splitFlows</code> (:139) → <code>classifyRow</code> (:130): negative = withdrawal, positive = growth only when the category type is <code>interest</code>, otherwise contribution; split parents dropped; capital windowed from <code>inception_date</code></td><td>No tile at all when nothing to show (:217); "—" with a reason when unmeasured; sub joins rate on capital, N missing a starting amount, N took out more than put in, N in another currency</td></tr>
+    </tbody>
+  </table>
+  <h3>2 · Caveat block <code>#savingsStale</code></h3>
+  <p class="muted"><code>renderStaleNote</code> (:343): asset caveat first, "R X of what you own was last valued over a year ago" via <code>staleAssets</code> (:307) using <code>reconcile.js:isStaleValuation</code> (:97) at 365 days, with Review valuations → Assets; then "Built from N of M balances nobody has confirmed recently, oldest D days ago" via <code>reconcile.js:stalenessSummary</code> (:261), with Review balances → Accounts.</p>
+  <h3>3 · What net worth is made of <code>#savingsWorthCard</code></h3>
+  <p class="muted"><code>renderWorth</code> (:1044). Two horizontal stacked bars on one shared scale (max of own, owe, 1 at :1252), deliberately not a donut. Segments: accounts by balance sign via <code>worth.js:accountGroups</code> (:258) with sealed colours from <code>WORTH_TYPES</code>; assets via <code>assetsByType</code> (:294); "Owed to you" as one block; debts via <code>debtsByType</code> (:230). One <code>chart.js:distinctColors</code> pass; tooltip % via <code>sharePercents</code>. Headline figures are read off <code>worth()</code>, never re-summed from segments (:1215). Sub-line names only the ledgers that contributed, adds the card-overlap warning (<code>worth.js:cardOverlap</code>) and "held in other currencies is not drawn here".</p>
+  <h3>4 · What built this balance <code>#savingsGrowthCard</code></h3>
+  <p class="muted"><code>renderGrowth</code> (:812); hidden below 2 points (:829). Two stacked bands over up to 60 months from <code>savings-math.js:growthSeries</code> (:536): capital put in and growth posted, plus a detached dashed "growth with no date" column at the right, never spread back across months (:940). Y-scale over the whole series with a negative-capable floor (:880). Legend total = closing balance. Sub-line: all N have a starting amount and date or N of M missing; "from YYYY-MM" when truncated; N in another currency not drawn. Caveat under the chart for accounts left out because their growth carries no date (:998).</p>
+  <h3>5 · Goals <code>#savingsGoals</code></h3>
+  <p class="muted"><code>renderGoals</code> (:400). Every account with <code>goal_amount &gt; 0</code> (strictly, :405; not limited to savings types). Bar = balance / goal clamped; caption "Goal reached" or floor(pct) capped at 99 + target date; stale marker + "balance unconfirmed" via <code>reconcile.js:isStale</code>. Header button New account → <code>ctx.addAccount</code>.</p>
+  <h3>6 · Savings and Investments cards <code>#savingsSections</code></h3>
+  <p class="muted"><code>renderSections</code> (:452). Per account tile: name, balance button (→ <code>editBalance</code>), type · institution · monthly contribution, then one of four composition branches (:519-586): measured return → <code>renderReturn</code> (:647); derived flows → "put in X" + ▲/▼ growth chip only when non-zero + "taken out"; stated → balance vs <code>total_invested</code> with "based on the account file" chip; else "since inception". Reconciliation line via <code>reconcile()</code>: drift with Use this → <code>acceptImplied</code> (investment adds "growth is not in it"); clean with unreadable rows stays amber; clean = "Matches your transactions". Actions: Add starting amount (only when no basis), Edit, Transactions, Open note, Delete.</p>
+  <p class="muted"><code>renderReturn</code> prints put in / taken out / ▲▼ growth, a capital-vs-growth bar where a loss is drawn as surviving capital (:746), "+X % total", "≈ Y % a year" only after a year with the approximation caveat, and trust caveats for <code>history-gap</code> and <code>pre-inception</code> (:691, :706).</p>
+  <h3>Publishes on ctx (:1436)</h3>
+  <p><code>renderSavings</code>, <code>renderWorth</code>.</p>
+  <h3>Open questions</h3>
+  <ul>
+    <li><code>#savingsKpis</code> is a five-column grid that never holds more than four tiles.</li>
+    <li><code>chartable</code>, <code>currenciesIn</code> and the i18n import are unused in this file.</li>
+    <li>Goals include a cheque account with a goal while the empty-state copy says savings or investment.</li>
+    <li><code>renderWorth</code> reconciles every account a second time (:1090) instead of reusing the pass from <code>renderSavings</code> (:106).</li>
+  </ul>
+</section>
+<section id="page-assets" class="page">
+  <h2>Assets <span class="badge b-info">nav: assets</span> <span class="badge b-warn">writes Assets.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/assets.js</code> (387 lines) · shell <code>shell.js:665-684</code> · English-only strings · no period, transactions or accounts</dd>
+      <dt>Renders when</dt><dd><code>renderAssets</code> (:229) on switchView and after kind/date edits; a value edit re-renders KPIs only (:285). Dirty flag <code>assetsDirty</code> on <code>#assetSave</code> (:61).</dd>
+      <dt>Reads / writes</dt><dd><code>S.assets</code> + <code>S.assetsFm</code> from Assets.md via <code>SCHEMAS.assets</code> (table-schema.js:274: Item, Kind, Value, Valued, Notes, optional Currency). Save → <code>serializeAssets</code> (:320) → <code>mdTableFile</code>.</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>KPI Total value</td><td>household-currency sum</td><td><code>worth.js:assetTotal</code> (:40): negatives floored at 0, foreign rows excluded</td><td>"plus … held abroad, not converted" from <code>foreignTotals</code> (:78)</td></tr>
+      <tr><td>KPI Items</td><td>count incl. foreign</td><td></td><td></td></tr>
+      <tr><td>KPI Largest</td><td>largest household row + name</td><td>:142</td><td>"largest abroad …" is the largest per symbol, not a sum</td></tr>
+      <tr><td>KPI Needs a new valuation</td><td>count</td><td><code>needsRevaluation</code> (:98) = unreadable date or <code>reconcile.js:isStaleValuation</code> at 365 days (<code>VALUED_STALE_DAYS</code> :46)</td><td></td></tr>
+      <tr><td>Stale block <code>#assetStale</code></td><td>"N of M values are over a year old, X % of the total" (share only when &gt; 50 %) and "N never valued, N unreadable date"</td><td><code>renderAssetStale</code> (:193)</td><td></td></tr>
+      <tr><td>Table</td><td>Item (name + note chip + symbol when foreign + age caption from <code>valuedAge</code> :103) · Kind select (<code>ASSET_TYPES</code> :31, unknown values preserved) · Value input (via <code>normalizeAmount</code>, floored at 0, unparseable toasts without overwriting :277) · Last valued date (not stamped by a value edit :287) · Notes · ✕</td><td>:235</td><td></td></tr>
+    </tbody>
+  </table>
+  <p>Actions: New asset <code>#assetAdd</code> → <code>addAsset</code> (:350) modal (what, kind, value, valued date default today, currency); Save <code>#assetSave</code> → <code>saveAssets</code> (:340), keeps the dirty flag on failure. Publishes <code>renderAssets</code>, <code>saveAssets</code>, <code>addAsset</code>, <code>serializeAssets</code>, <code>VALUED_STALE_DAYS</code> (read late by savings.js:322). Open questions: the comment at :372 mentions a chart this page does not have; an unreadable Value cell reads as 0 in the input with no warning, unlike Accounts' balance.</p>
+</section>
+<section id="page-owed" class="page">
+  <h2>Owed Money <span class="badge b-info">nav: owed</span> <span class="badge b-warn">writes Owed Money.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/owed.js</code> + pure <code>src/owed-math.js</code> · shell <code>shell.js:738-753</code> · English-only · no period, transactions or accounts</dd>
+      <dt>Renders when</dt><dd><code>renderOwed(focusRow)</code> (:68) on switchView and after toggles / edits; amount edits refresh KPIs only (:124). Focus is by row index because two rows can share a person. Dirty flag <code>owedDirty</code> on <code>#owedSave</code>.</dd>
+      <dt>Reads / writes</dt><dd><code>S.owed</code> + <code>S.owedFm</code> from Owed Money.md via <code>SCHEMAS.owed</code> (table-schema.js:291). Save → <code>serializeOwed</code> (:177).</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>KPI Outstanding</td><td>Σ <code>max(0, amount − repaid)</code> over unsettled household rows</td><td><code>owed-math.js:owedSummary</code> (:68) → <code>outstandingOf</code> (:22), <code>isSettled</code> (:41, status paid or ≤ 0.005)</td><td>"plus … owed in other currencies"</td></tr>
+      <tr><td>KPI Recovered</td><td>capped repayments + full amount of hand-flagged paid rows with no repayment</td><td>:147</td><td>"plus … recovered in other currencies"</td></tr>
+      <tr><td>KPI Entries</td><td>raw count</td><td></td><td><code>open</code> and <code>oldestDays</code> are computed but shown only on the Dashboard</td></tr>
+      <tr><td>Table</td><td>Person (+ note chip + "out N days" via <code>daysSince(lent)</code> while unsettled) · Description · Amount · Lent · Due · Status pill ("Paid", "{money} left", "Outstanding"; tooltip lent / back / outstanding) · ➕ repayment · ✕</td><td>:73</td><td>No currency symbol on rows</td></tr>
+    </tbody>
+  </table>
+  <p>Actions: status pill toggles paid/outstanding; ➕ → <code>recordRepayment</code> (:154) adds to <code>repaid</code> and closes via <code>isSettled</code>; New entry <code>#owedAdd</code> → <code>addOwed</code> (:206, lent defaults today, due left blank); Save <code>#owedSave</code> → <code>saveOwed</code> (:196). Publishes <code>renderOwed</code>, <code>saveOwed</code>, <code>addOwed</code>, <code>serializeOwed</code>. Open questions: per-row currency is invisible in the table; the in-table amount handler uses raw <code>parseFloat</code> (:124) where every other path uses <code>normalizeAmount</code>, so a locale-formatted entry can silently zero.</p>
+</section>
+<section id="page-debts" class="page">
+  <h2>Debt <span class="badge b-info">nav: debts</span> <span class="badge b-warn">writes Debts.md</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/debts.js</code> (925 lines) + pure <code>src/debt-math.js</code> · shell <code>shell.js:689-746</code> · English-only apart from two interest keys</dd>
+      <dt>Renders when</dt><dd><code>renderDebts</code> (:536) on switchView, period change, reload; cell edits call <code>refreshAll</code> (:661) which re-runs KPIs, plan and payments without rebuilding the row; <code>replan</code> (:921) on the extra / strategy / range controls and on theme flip. Dirty flag <code>debtsDirty</code> on <code>#debtSave</code> (:38).</dd>
+      <dt>Reads</dt><dd><code>S.debts</code> (Debts.md, twelve positional columns); working lists <code>active()</code> = unpaid non-foreign, <code>activeForeign()</code> (:57); <code>S.accounts</code> (overlap, payment filter), <code>txInPeriod(S.period)</code> for payments, <code>S.categories</code>, <code>ctx.monthlyIncome(S.period)</code> (period.js:889), plugin <code>chartDebtRange</code>.</dd>
+      <dt>Writes</dt><dd>Debts.md via <code>saveDebts</code> (:742) → <code>serializeDebts</code> (:722) → <code>mdTableFile(SCHEMAS.debts)</code>; keeps the dirty flag on failure.</dd>
+    </dl>
+  </div>
+  <h3>1 · KPI strip <code>#debtKpis</code></h3>
+  <table>
+    <thead><tr><th>Tile</th><th>Value</th><th>Computed by</th><th>Caveats</th></tr></thead>
+    <tbody>
+      <tr><td>Total debt</td><td>Σ active balances</td><td>:144</td><td>"N active · M tracked · K in another currency, not in these figures"</td></tr>
+      <tr><td>Paying per month</td><td>Σ payment + extra</td><td><code>committed</code> (:60)</td><td>× 12 a year</td></tr>
+      <tr><td>Interest this month</td><td>monthly interest</td><td><code>health-math.js:debtInterestCoverage</code> (:188), the same rule the score and the report use</td><td>"add a rate to any debt" when none rated; "covers N of M debts · K have no rate" when partial; else "% of your payments"</td></tr>
+      <tr><td>Debt-free</td><td>month label</td><td><code>debt-math.js:simulate</code> (:95) with strategy minimum: recorded payments only, no pooled extra, no rollover (:186)</td><td>"at your recorded payments and extras, no what-if". The planner controls do not move this tile</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Two empty shapes: no debts at all (:98) and every debt paid (:120, <code>worth.js:activeDebts</code>).</p>
+  <h3>2 · Payoff plan</h3>
+  <p class="muted">Controls <code>#debtExtra</code>, <code>#debtStrategy</code> (avalanche / snowball), <code>#debtRange</code>. Chart <code>#debtCurve</code> (<code>renderDebtCurve</code> :840) draws three lines from the <b>same three <code>simulate</code> runs</b> the cards use (:850), Y-scaled to the tallest plotted point so a growing debt stays visible (:874). Projected headline "With this extra: debt-free {month}" (:248) follows the controls live. Three plan cards (minimum / snowball / avalanche) with date, duration, total interest, "Saves R X · N sooner" against the minimum baseline (:268) and "includes your extra" footnote. Unconditional disclaimer (:292). Stalled warning when the contracted payments never clear (:299). Attack order <code>#debtOrder</code> from <code>debt-math.js:priorityOrder</code> (:63) with "clear {month}" from <code>plan.payoff</code>.</p>
+  <h3>3 · Payments this period <code>#debtPayments</code></h3>
+  <p class="muted"><code>renderDebtPayments</code> (:339). Pool = <code>txInPeriod</code> minus excluded, minus non-budget accounts, minus foreign accounts (symbols collected). One bar per <em>category</em> (:385): paid = money-out only for that category; planned = Σ payment + extra of debts sharing it; caption none budgeted / R X short / paid in full + extra. DTI line (:435): <code>committedAll</code> (every active debt, linked or not) ÷ <code>ctx.monthlyIncome</code> averaged over complete calendar months, deliberately no colour or threshold (:450). Caveats: foreign payments not counted (:475), "R A paid of the R B you track by category" (:483), "N debts have no category linked" (:487).</p>
+  <h3>4 · Overlap caveat and Debts table <code>#debtTable</code></h3>
+  <p class="muted">Overlap (:510) when <code>worth.js:cardOverlap</code> finds a credit card as both account and debt, with Review accounts. Table columns: Debt (name + note chip, lender · type) · Balance · Rate % · Payment · Extra · Category select (a missing category keeps a "(missing)" option) · Paid off bar (header becomes "since you added it" when every original = balance, :552) · Clear by · Interest still to pay · Status pill · ✕. <code>refreshRow</code> (:587) recomputes derived cells in place: paid-off %, a schedule-disagreement chip via <code>debt-math.js:expectedBalance</code> (:187) shown only when |balance − expected| &gt; max(50, 2 % of original) (:604), and clear-by + interest via <code>amortise</code> (:36, 600-month cap) with "not in 50 yrs" / "no payment" in red.</p>
+  <h3>Actions</h3>
+  <p>New debt <code>#debtAdd</code> → <code>addDebt</code> (:752) modal (name, lender, kind from <code>DEBT_TYPES</code> :33, balance, original borrowed, rate, payment, category, currency; amounts via <code>normalizeAmount</code>, start = today). Save <code>#debtSave</code>. Row inputs mutate <code>S.debts</code> and clear the matching <code>*Raw</code> cell. Status pill flips active/paid. ✕ removes with <b>no confirm</b>. Publishes <code>renderDebts</code>, <code>saveDebts</code>, <code>addDebt</code>, <code>serializeDebts</code>, <code>replan</code>, <code>DEBT_TYPES</code> (no src consumer). Open question: an orphan-folder row is treated as home currency by the payments filter (<code>isForeign(null)</code>).</p>
+</section>
+<section id="page-import" class="page">
+  <h2>Import CSV <span class="badge b-info">nav: import</span> <span class="badge b-warn">writes Transactions/**, Accounts/*.md, rules CSV</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/import.js</code> (931 lines) + pure <code>statement.js</code>, <code>csv.js</code>, <code>amount.js</code>, <code>dedupe.js</code>, <code>rules.js</code> · shell <code>shell.js:848-922</code></dd>
+      <dt>Renders when</dt><dd><code>renderImport</code> (:36) only refreshes the sub-note and drop hint. The review table is drawn by <code>renderImportReview</code> (:467) at the end of <code>runImport</code> and on account change, new account, show-more and retry. Entry is a drop or pick on <code>#drop</code>/<code>#fileInput</code> (<code>controller.js:996</code>) or the top-bar shortcut (<code>controller.js:825</code>).</dd>
+      <dt>Reads</dt><dd><code>S.txFiles</code> (dedupe index and account list), <code>S.accounts</code> (account_number, tx_label, in_budget, type, currency), <code>S.rules</code> (Data/Categorisation Rules.csv), <code>S.categories</code>, locale profile (banks, hint, dayFirst, stripDescSuffix), <code>currentPeriod()</code> for the legend. All writes go through the budget-relative <code>writeFile</code>.</dd>
+    </dl>
+  </div>
+  <h3>Parse chain (<code>handleStatementFile</code> :76 → <code>runImport</code> :115)</h3>
+  <ol>
+    <li>Extension check <code>STATEMENT_EXT</code> (:74), then bytes → text via <code>statement.js:decodeStatement</code> (:34, sniffs BOM/encoding).</li>
+    <li>Delimiter sniff + parse: <code>statement.js:parseStatement</code> (:22) = <code>csv.js:parseDelimited</code> with <code>sniffDelimiter</code> (:54) scoring comma/semicolon/tab/pipe over the first 64 KB.</li>
+    <li>Column detection <code>statement.js:detectStatementColumns</code> (:411): header path by exact then substring name; headerless path <code>detectHeaderlessColumns</code> (:275) reads the shape and uses <code>reconcileAmounts</code> to tell amount from balance. Null means ask the user, never guess.</li>
+    <li>Thousands grouping inferred once per file with <code>amount.js:inferGrouping</code> (:49), then <code>normalizeAmount</code> per cell (:67).</li>
+    <li>Per-row build (:159-241): description + optional extra column, locale suffix stripped, amount precedence signed Amount → Credit → Debit (negated) → Fee; date via <code>parseStatementDate</code> (:81); category via <code>rules.js:prepareRules</code> (:47) + <code>matchRule</code> (:65, exact wins, else longest substring), keeping the winning pattern for the review hint.</li>
+    <li>Self-transfer suggestion <code>statement.js:applyCounterparties</code> (:189): a 4+ digit run matching another account's number marks the row excluded with <code>transferTo</code>; re-run whenever the account changes.</li>
+    <li>Sign proof <code>statement.js:reconcileAmounts</code> (:222) against the balance column (≥ 4 pairs, ≥ 80 % agreement): <code>flipped</code> corrects a single signed column; <code>inverted</code> only reports a swapped Debit/Credit pair.</li>
+    <li>Account guess from filename or preamble (<code>detectAccountLabel</code> :49); account identity via <code>statementAccountNumber</code> (:483).</li>
+  </ol>
+  <h3>Review card <code>#importReview</code></h3>
+  <table>
+    <thead><tr><th>Element</th><th>Shows</th><th>Computed by</th></tr></thead>
+    <tbody>
+      <tr><td>Stats <code>#impStats</code></td><td>N rows · N new · N duplicates skipped · N likely re-dated (unticked) · N pending (unticked) · N auto-categorised · N unparseable · caveats "already in the vault" and "showing N, all M will import"</td><td>exact dups by <code>dedupe.js:flagItems</code> (:232) with <code>txKey</code> (:103) = date|desc|amount|label, split parts never indexed; near dups by <code>findNearDuplicate</code> (:205) within <code>NEAR_DAYS</code> = 4 and similar descriptions; pending by <code>isPendingDesc</code> (:84); page cap <code>IMPORT_PAGE</code> = 200</td></tr>
+      <tr><td>Legend <code>#impLegend</code></td><td>"N in the current period"</td><td>dates inside <code>periodRange(currentPeriod())</code></td></tr>
+      <tr><td>Reconcile banner <code>#impReconcile</code></td><td>flipped / inverted / verified / could not check</td><td>:535; hidden without a balance column</td></tr>
+      <tr><td>Non-budget banner <code>#impNonBudget</code></td><td>account excluded from the budget</td><td><code>in_budget</code> falsy (:562)</td></tr>
+      <tr><td>Identity banner <code>#impAcctCheck</code></td><td>number mismatch (disables Import) or adopt</td><td><code>acctIdentity</code> (:329) → <code>statement.js:sameAccountNumber</code> (:528)</td></tr>
+      <tr><td>Preview table <code>#impTable</code></td><td>Import tick · Date · Description · Amount (per-row currency via <code>isForeign</code>) · Category (deferred select + "matched pattern" hint) · Excl.; badges dup / likely dup (with the colliding row named) / pending / transfer</td><td>:582-666; sticky flags <code>manual</code>, <code>manualExclude</code>, <code>nearAuto</code>, <code>pendingAuto</code>, <code>autoExcluded</code> survive re-render</td></tr>
+      <tr><td>Column mapper <code>#importMap</code></td><td>one select per <code>MAP_FIELDS</code> (:343): Date, Description, Extra, Amount, Money out, Money in, Fee, Balance; 5-row preview; warnings for same column, missing amount, empty result</td><td><code>showColumnMapper</code> (:354); "Use these columns" re-enters <code>runImport</code></td></tr>
+    </tbody>
+  </table>
+  <h3><code>commitImport</code> (:665) writes, in order</h3>
+  <ol>
+    <li>Folder name via <code>ctx.txSegment</code> (load.js:643) matching on-disk casing.</li>
+    <li>Identity gate: mismatch aborts; adopt prompts and writes <code>account_number</code> via <code>ctx.saveAccount</code>.</li>
+    <li>Rows grouped by month → <code>Transactions/&lt;label&gt;/&lt;YYYY-MM&gt;.md</code> via <code>serializeTxFile</code>, one file at a time, updating the dedupe index per file so a partial failure retries without re-appending (:745). Excluded rows get the note "Excluded during import".</li>
+    <li>If "remember" is ticked, <code>categories.js:learnRules</code> (:248) appends to Data/Categorisation Rules.csv.</li>
+    <li><code>S.lastImport</code> receipt (:810) for the Transactions undo bar; navigate to Transactions (:781).</li>
+  </ol>
+  <p><code>undoImport</code> (:820) rewrites each touched month file from a filtered model and keeps learned rules. Publishes <code>handleStatementFile</code>, <code>commitImport</code>, <code>renderImport</code>, <code>renderImportReview</code>, <code>remapImport</code>, <code>cancelImport</code>, <code>undoImport</code>. Open questions: a vault reload while a review is on screen does not rebuild <code>p.index</code>, so dedupe counts can go stale; answering the adopt prompt either way blanks <code>p.acctNumber</code>, disabling the mismatch block for the rest of that file.</p>
+</section>
+<section id="page-report" class="page">
+  <h2>Report <span class="badge b-info">nav: report</span> <span class="badge b-warn">writes Reports/ (vault root)</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/report.js</code> (880 lines) + pure <code>src/report.js</code> (983 lines) and <code>src/exporter.js</code> · shell <code>shell.js:448</code></dd>
+      <dt>Renders when</dt><dd><code>renderReport</code> (:257) on switchView, period pill, reload and after every option change. The global period pill is hidden on this page (<code>controller.js:485</code>): all three period options anchor on <code>currentPeriod()</code>, never <code>S.period</code>.</dd>
+      <dt>Reads</dt><dd>Everything: <code>periodSummary</code>, <code>budgetTotals</code>, the Dashboard's <code>budgetVsActualRows</code> and <code>categorySpendRows</code>, <code>impliedAccounts</code>, debts, assets, owed, categories, <code>healthSnapshot</code>, <code>txInPeriod</code> for detail mode, plugin <code>reportFolder</code>.</dd>
+      <dt>Writes</dt><dd><code>Reports/&lt;label&gt; Financial Report.md</code> and/or <code>.json</code> via <code>writeVaultFile</code> (vault-root). Reads back must use <code>fileAtVaultPath</code> / <code>readVaultFile</code>, not the budget-relative <code>fileAt</code> (the 1.28.0 dead-button bug, comment at :79-89).</dd>
+    </dl>
+  </div>
+  <h3>Options card</h3>
+  <p class="muted">Period pills (current / last 3 / last 12, <code>selectedPeriods</code> :135 → <code>periodsFromAnchor</code> :159 stopping at <code>trend-math.js:earliestDataMonth</code>), Detail pills (summary / include transactions), Format pills (multi-select Markdown / JSON, never empty), Folder input (default <code>report.js:REPORT_DIR</code> "Reports"; refuses a managed subfolder via <code>managedFolderMatch</code> :141 over Categories, Accounts, Budgets, Plans, Tax, Transactions, Notes), path preview from <code>report.js:reportPaths</code> (:170, <code>exporter.js:safeName</code>), "exists" note that flips the button to Re-create, contents list, disclaimer. The filename uses a literal "to" (:201) while the heading is translated (:170) so a language change cannot move the path.</p>
+  <h3><code>buildReportData</code> (:527), built once and handed to both serialisers</h3>
+  <table>
+    <thead><tr><th>Field</th><th>Computed by</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>income, spend, net, budgetIncome, budgetSpend</td><td><code>periodSummary</code> and <code>budgetTotals</code> summed per selected period (:566)</td><td>foreign labels unioned, not counted per period (:557)</td></tr>
+      <tr><td>categories (Budget vs Actual)</td><td><code>dashboard.js:budgetVsActualRows</code> per period → <code>report.js:mergeCategoryRows</code> (:190) → <code>groups.js:typeRank</code> → orphaned = !<code>catKnown</code></td><td></td></tr>
+      <tr><td>spendByCategory + categoryGap</td><td><code>dashboard.js:categorySpendRows</code> merged; gap = notShown split into uncat and netted (:572), the same disclosure as the donut</td><td>% added by <code>report.js:prepareReportData</code> (:385) via largest remainder</td></tr>
+      <tr><td>savings</td><td><code>savingsSummary</code> (:409) → <code>savings-math.js:growthTotals</code> over home-currency savings/investment accounts</td><td>as of today</td></tr>
+      <tr><td>debts</td><td><code>debtsSummary</code> (:451): rows via <code>debt-math.js:monthlyInterest</code> (:54); total interest via <code>health-math.js:debtInterestCoverage</code> (:188), null when no rate</td><td>as of today</td></tr>
+      <tr><td>netWorth, otherCurrencies</td><td><code>splitByCurrency(impliedAccounts())</code> → <code>worth.js:worth</code>; <code>otherCurrencyNet</code> (:318)</td><td>as of today</td></tr>
+      <tr><td>health</td><td><code>health-data.js:healthSnapshot</code>; null when empty</td><td>as of today</td></tr>
+      <tr><td>transactions (detail only)</td><td><code>txInPeriod</code> flat-mapped, each stamped with its account symbol</td><td>excluded rows included and marked</td></tr>
+    </tbody>
+  </table>
+  <h3>Markdown document (<code>report.js:financialReportMarkdown</code> :443)</h3>
+  <ol>
+    <li>Frontmatter generated / period / detail (stripped from clipboard copies by <code>copyBody</code> :771).</li>
+    <li>Title, generated line, the excluded-rows rule, disclaimer.</li>
+    <li>Income &amp; Spend key-value table + foreign caveat.</li>
+    <li>Spend by Category table (orphans starred) + caveats: uncategorised, netted, empty only when no rows and no gap, orphaned names, percent note when rows exceed <code>REPORT_SPLIT_SLICES</code> = 8.</li>
+    <li>Budget vs Actual (remaining = budget − actual, unbudgeted rows included) + rename caveat when more than one period is merged.</li>
+    <li>Savings growth (none / unmeasured / total + rate) + partial, drawn-down and foreign caveats.</li>
+    <li>Debt: totals with the interest row dropped, not zeroed, when unknowable; per-debt table with dashes for unrated rows.</li>
+    <li>Net worth + other currencies.</li>
+    <li>Financial health (score, emergency months vs target, saving rate, interest share) via <code>sharePercentLabel</code>.</li>
+    <li>Transaction detail using <code>exporter.js:txHeaderLines</code> (:107) and <code>transactionRow</code> (:249), nine columns.</li>
+  </ol>
+  <p class="muted">JSON (<code>financialReportJson</code> :820) carries the same data with nulls where a figure is unknowable; <code>loans</code> is deliberately absent.</p>
+  <h3>Actions</h3>
+  <p>Create <code>#reportCreate</code> → <code>createReport</code> (:689) writes each selected format independently and saves the folder setting on success; Copy report <code>#reportCopyNow</code> (:850) builds and copies without writing; Open (:772), Open folder via Obsidian's file explorer (:796), Copy for AI (:841, strips frontmatter), Copy JSON (:842). Publishes ten helpers consumed only by the controller. Open question: the result note can flip from "generated" to "found" for a file this session wrote after a folder edit and edit-back.</p>
+</section>
+<section id="page-loans" class="page">
+  <h2>Loan Calculators <span class="badge b-info">nav: loans</span> <span class="badge b-ok">read-only scratchpad</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/loans.js</code> (509 lines) + pure <code>src/loan-math.js</code>, constants in <code>src/facts.js</code> · shell <code>shell.js:778-843</code></dd>
+      <dt>Renders when</dt><dd><code>renderLoans</code> (:488) on switchView and tab switch; forms are built once per mount (<code>buildHome</code> :261, <code>buildCar</code> :352) so a slider is never replaced under a finger; <code>recalcHome</code> (:291) / <code>recalcCar</code> (:412) on every input. State lives in two closure objects (:69) and dies on reload. Nothing is read from or written to the vault.</dd>
+      <dt>Reads</dt><dd><code>S.settings.country</code> → <code>loan-math.js:loanProfileFor</code> (:353): <code>za</code> gets the full profile, anything else <code>GENERIC_LOAN_PROFILE</code> (:321). <code>S.settings.currency</code> only to decide whether statutory tariffs print in their own symbol (<code>tariffMoney</code> :42). Facts: prime rate, transfer duty table, VAT, NCA initiation caps, service fee, vehicle insurance rate.</dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Panel</th><th>Inputs</th><th>Outputs and computation</th></tr></thead>
+    <tbody>
+      <tr><td>Home loan <code>#loanHome</code></td><td>price, deposit (amount + % slider on one state), rate (null = country default), term 5-30 years</td><td><code>loan = max(0, price − deposit)</code>; <code>loan-math.js:totalsFor</code> (:121) → <code>monthlyPayment</code> (:24) → <code>amortise</code> (:44). Rows: monthly repayment, service fee (ZA), total per month via <code>homeServiceFeeFold</code> (:224), loan amount, total interest, total repaid, deposit, once-off costs, service fees over term, cash needed upfront, disclaimer. Once-off costs card (ZA only): transfer duty <code>zaTransferDuty</code> (:167), bond and transfer costs interpolated (:260-278), initiation fee <code>zaMortgageInitiationFee</code> (:213). Year-by-year amortisation via <code>byYear</code> (:73)</td></tr>
+      <tr><td>Vehicle finance <code>#loanCar</code></td><td>price, deposit, rate, term select (12-72 months), balloon 0-40 % of price clamped to the financed amount (:404), insurance checkbox</td><td>same chain with a balloon; rows add insurance estimate <code>max(450, price × rate)</code> (:85), balloon due at the end with note, initiation fee <code>zaVehicleInitiationFee</code> (:228), total cost of ownership = deposit + repaid + init + service fees (:450). Finance fees card (ZA only). Amortisation table</td></tr>
+    </tbody>
+  </table>
+  <p>Publishes <code>renderLoans</code>, <code>homeServiceFeeFold</code> (pinned by tests/loan-math.test.cjs). Navigates nowhere. Open questions: <code>LOAN_PROFILES</code> holds only <code>za</code>; the car amortisation is labelled by year even for a 12-month term; the insurance floor of 450 is a bare literal, not a fact.</p>
+</section>
+<section id="page-tax" class="page">
+  <h2>Tax <span class="badge b-info">nav: tax</span> <span class="badge b-warn">writes Tax/&lt;year&gt;.md and Tax/&lt;year&gt;/</span></h2>
+  <div class="panel meta">
+    <dl>
+      <dt>File</dt><dd><code>src/views/tax.js</code> (849 lines); rules live in <code>src/locale.js</code> per country and rates in <code>src/facts.js</code> · shell <code>shell.js:507-628</code></dd>
+      <dt>Renders when</dt><dd><code>renderTax</code> (:35) on switchView and after add / delete / year switch. Discipline at :120: a handler may rebuild any subtree with no focusable controls, never the one holding the control that fired it. <code>refreshDerived</code> (:136) covers KPIs, checks and the figure totals. Dirty flag <code>taxDirty</code> on <code>#taxSave</code>.</dd>
+      <dt>Reads</dt><dd><code>S.tax[year]</code> from Tax/&lt;YYYY&gt;.md (<code>load.js:516-570</code>), <code>S.taxYear</code>, <code>S.taxOrphanYears</code> (folders without a file), locale profile, household currency for the mismatch caveat only. <b>Reads no transaction, budget or account data.</b></dd>
+    </dl>
+  </div>
+  <table>
+    <thead><tr><th>Section</th><th>Shows</th><th>Computed by</th></tr></thead>
+    <tbody>
+      <tr><td>Sub-note</td><td>"Tax year Y (span) · saved to Tax/Y.md" + orphan-year buttons</td><td><code>loc.yearSpan</code> (ZA: 1 Mar to end Feb); <code>renderOrphanYears</code> (:67)</td></tr>
+      <tr><td>Empty state <code>#taxEmptyCard</code></td><td>intro, country hint, disclaimer, "Start tracking &lt;year&gt;"</td><td><code>currentTaxYear()</code> = <code>loc.currentTaxYear</code> (ZA: month ≥ 3 ? year : year − 1)</td></tr>
+      <tr><td>KPIs <code>#taxKpis</code></td><td>Deadline (days or overdue) · Steps done · Documents in · Figures · Taxpayer</td><td><code>daysTo</code> (:102) → <code>dates.js:daysUntil</code>; <code>activeDeadline</code> (:96) → <code>loc.activeDeadline</code> (ZA picks standard vs provisional by taxpayer type); n/a rows excluded from both counts</td></tr>
+      <tr><td>Season card</td><td>taxpayer type, assessment, two deadline dates (ZA seeds 23 Oct and 22 Jan), outcome fields when assessed, season message, checks box, safety note, disclaimer</td><td><code>renderSeason</code> (:138); <code>loc.seedDeadlines</code>, <code>loc.seasonMsgs</code></td></tr>
+      <tr><td>Checks (<code>renderChecks</code> :195)</td><td>currency mismatch caveat; then per-country rules as green/amber lines</td><td><code>loc.figureChecks</code> (ZA locale.js:218): local interest 4201 vs <code>fact('za.interest.exemption.under65')</code> R23 800; foreign interest 4218 informational; TFSA 4219 vs <code>facts.js:limitsFor</code> (R36 000 to 2026, R46 000 from 2027) with 40 % penalty on excess; CGT 4250 vs R40 000 exclusion × inclusion 0.4; assessment reconciliation over <code>ZA_INCOME_CODES</code> (<code>reconcileAssessed</code> locale.js:91). Amounts always in rand. US/UK/generic return no checks</td></tr>
+      <tr><td>Progress <code>#taxStepsTable</code></td><td>Step · Status pill (todo → busy → done → n/a) · Due (overdue class) · Notes · ✕</td><td><code>renderSteps</code> (:327); ZA seeds 15 steps with year-derived dates; the TFSA note is built from facts.js so seeded prose cannot go stale</td></tr>
+      <tr><td>Figures <code>#taxFiguresTable</code></td><td>Source code · Description · Source · Amount · ✕, plus a totals footer grouped by code</td><td><code>renderFigures</code> (:219), <code>renderFigureTotals</code> (:296) via <code>figureMoney</code> (:289) in the profile currency</td></tr>
+      <tr><td>Documents <code>#taxDocsTable</code></td><td>Document · Source · Status (needed ↔ n/a, uploaded → needed) · File list (";"-separated, paperclip opens) · Notes · ✕; drop zone</td><td><code>renderDocs</code> (:369); <code>handleTaxFile</code> (:450): SHA-256 content dedupe (<code>findDuplicate</code> :544), attach-to modal keyed by row index, filename via <code>taxSeg</code> uniquified, <code>ctx.writeBinary</code> to Tax/&lt;year&gt;/, encrypted-PDF detection (:596), then <code>saveTax</code></td></tr>
+    </tbody>
+  </table>
+  <p><code>serializeTax</code> (:605) rebuilds the file: patched frontmatter with quoted free text, legend, and the three tables Progress / Documents / Figures that <code>load.js:543-568</code> reads back. Actions: Start (:720, backs out on failed write), year picker (:840, via <code>confirmDiscard</code>), New year (:734), Delete year (:769, trashes the .md and leaves the folder, which becomes an orphan year), Save (:656), Add step / doc / figure (:670-690, memory only), status pills, row deletes. Publishes eleven helpers consumed only by the controller. Open questions: figure inputs carry no per-row currency; nothing cross-checks captured interest against vault transactions, plausibly deliberate but unstated.</p>
+</section>  <footer>
+    <p>Generated 8 September 2026 from <code>~/Github/budget-vault</code> at commit 30a67fc plus uncommitted working-tree edits, by six read-only source mappers. Self-contained, no network at runtime. Line numbers drift; search by function name.</p>
+  </footer>
+</main>
+</body>
+</html>
