@@ -11,7 +11,7 @@ const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
-const { symbolOf, isForeign, splitByCurrency, primaryTotal, currenciesIn } = require('../currency');
+const { symbolOf, isForeign, splitByCurrency, currenciesIn } = require('../currency');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -31,7 +31,7 @@ module.exports = function registerSavings(ctx) {
      away from the cause. Every other cross-view call (ctx.editBalance,
      ctx.editAccount, ctx.noteButton) is late-bound through ctx at call time;
      these now are too. */
-  const { S, $, root, money, accountIndex, impliedAccounts, bookFigures } = ctx;
+  const { S, $, root, money, accountIndex, bookFigures } = ctx;
 
   /* ---------------------------- currency ----------------------------------
      This page was the pre-issue-#28 code verbatim, and an audit found every
@@ -56,7 +56,8 @@ module.exports = function registerSavings(ctx) {
   const acctMoney = (a, v, decimals = 2) =>
     ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
   const split = accts => splitByCurrency(accts, S.settings.currency);
-  const homeOnly = accts => primaryTotal(accts, S.settings.currency);
+  /* homeOnly used to live here; the totals it produced are now read off
+     bookFigures().balances, where stated and implied are summed once. */
   /* "plus ¥ 3 956 · $ 1 200" — zero decimals, because this is always a side
      note beside a figure that already carries its own full precision. This
      page is on the English-only backlog (EXPECTED_ENGLISH_ONLY in
@@ -100,10 +101,24 @@ module.exports = function registerSavings(ctx) {
        account list it hands over rather than teaching worth() a rule those
        callers never asked for. */
     const sPlit = split(savings), iPlit = split(investments);
-    const totalSavings = homeOnly(savings);
-    const totalInvest = homeOnly(investments);
-    /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card. */
-    const { primary: homeAccounts, others: worthOthers } = split(impliedAccounts());
+    /* The balance book (figures.js): the two KPIs print the STATED base —
+       the balance the reader typed — and the chart below prints the IMPLIED
+       one, the same as-of the Dashboard's cash card (ISSUE 44). Both are
+       summed once, there; what this page adds is the sentence between them,
+       because on the vault this was built against the two read R 674 463,50
+       and R 691 357,55 on one screen with nothing to say why. */
+    const { balances } = bookFigures();
+    const totalSavings = balances.stated.byType.savings || 0;
+    const totalInvest = balances.stated.byType.investment || 0;
+    const homeAccounts = balances.implied.accounts, worthOthers = balances.implied.others;
+    /* The same sentence the Dashboard's stale note prints (dash.stale.driftUp),
+       inline because this page is on the English-only backlog. Rounded to the
+       rand, as there; under a rand there is nothing to say. */
+    const driftLine = type => {
+      const d = balances.driftByType[type] || 0;
+      return Math.abs(d) >= 1 ? `Transactions since then add up to ${money(Math.abs(d), 0)} ${d > 0 ? 'more' : 'less'}.` : '';
+    };
+    const kpiNote = (others, type) => [otherTag(others), driftLine(type)].filter(Boolean).join(' · ');
     /* The household symbol, passed at last: worth() has always computed a
        `currencies` disclosure for its caller and every caller in this app
        dropped it — and, calling with three arguments, computed it against a
@@ -145,8 +160,8 @@ module.exports = function registerSavings(ctx) {
        whole of what they hold out. */
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
       'what you own minus what you owe' + otherLine(otherCurrencyNet(w, worthOthers)));
-    tile('Savings', money(totalSavings), '', otherTag(sPlit.others));
-    tile('Investments', money(totalInvest), '', otherTag(iPlit.others));
+    tile('Savings', money(totalSavings), '', kpiNote(sPlit.others, 'savings'));
+    tile('Investments', money(totalInvest), '', kpiNote(iPlit.others, 'investment'));
     growthTile(tile, entries);
     /* NO DEBT TILE HERE, deliberately — it was removed rather than lost.
        This page is about what the household is putting away and what that has
@@ -497,7 +512,7 @@ module.exports = function registerSavings(ctx) {
          "Rp 1 003 956" at the head of a card whose own Accounts-page twin
          reads "Rp 1 000 000 plus ¥ 3 956". */
       const { others: listOthers } = split(list);
-      const total = homeOnly(list);
+      const total = book.balances.stated.byType[accountType(list[0])] || 0;
       for (const a of list) {
         const kind = [a.type.replace('_', ' '), a.institution].filter(Boolean).join(' · ');
         const rows = (idx.get(a) || {}).rows || [];
@@ -1210,8 +1225,9 @@ module.exports = function registerSavings(ctx) {
        disclosure inside a bar. So the bar is drawn in one currency and the
        rest is NAMED underneath it (see the note appended at the end of this
        function), which is the same trade the Accounts ring makes. */
-    /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card. */
-    const { primary: homeAccounts, others: worthOthers } = split(impliedAccounts());
+    /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card,
+       read off the balance book (figures.js) the KPIs above also read. */
+    const { accounts: homeAccounts, others: worthOthers } = bookFigures().balances.implied;
     /* worth.js is the one place net worth is computed — see its own header —
        and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
        the very same grouped arrays instead of reading it, which meant it also

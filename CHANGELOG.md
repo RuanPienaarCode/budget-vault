@@ -3,6 +3,47 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.42.0 — 2026-09-09
+
+### Changed
+
+- **Balances are summed once, on both bases, and the Savings page says what
+  moved.** The Savings KPIs and the Accounts page sum *stated* balances (the
+  figure you typed); the Dashboard's position tile, the Savings worth chart,
+  the Score and the Report sum *implied* ones (that figure rolled forward by
+  the rows since). Each surface used to do its own summing, so on the
+  household this was measured against the Savings page printed
+  "Investments R 674 463,50" above a chart segment reading R 691 357,55 with
+  nothing to say why. `bookFigures().balances` now carries both bases and the
+  drift between them, and the Savings and Investments tiles print
+  "Transactions since then add up to R 16 894 more" under the stated figure —
+  the same sentence the Dashboard's stale note already used.
+- **The plan is one snapshot.** "Total budgeted", "% of income budgeted",
+  "left to budget" and the income each is measured against were assembled
+  separately on the Dashboard hero, the Budget page's totals strip and the
+  Report. `periodFigures(p).plan` assembles them once; the Budget strip reads
+  it over its unsaved draft. One visible consequence: a finished period with
+  no income row now states its "% of budgeted income" on the Budget strip,
+  by the hero's rule, where the strip alone left it blank.
+
+### Fixed
+
+- **The Score's flow card counted a foreign fund's deposit as rand saving.**
+  The card rebuilt the saver pool itself from every account, where the ring
+  beside it counted household-currency accounts only — so a €200 deposit into
+  a euro fund read as R 200 saved on the card and as nothing on the ring, on
+  one screen. Both now read `savingContribution(p)` from health-data.js.
+
+### Internal
+
+- `scripts/reconcile-page.cjs` renders every view over a real vault, harvests
+  each figure the page put on screen and checks it against the ledger's
+  lenses, the seams and an independent re-adding of the raw rows. Its output
+  is gitignored (it embeds real balances). Three new suites pin the seams
+  (`book-balances`, `plan-figures`, `saving-contribution`); ADR-0007 gains
+  a figures.js section. Every rendered figure on the reference vault is
+  unchanged by this release except the new drift sentence.
+
 ## 1.41.1 — 2026-09-07
 
 ### Fixed

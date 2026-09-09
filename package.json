@@ -1,6 +1,6 @@
 {
   "name": "budget-vault",
-  "version": "1.41.1",
+  "version": "1.42.0",
   "description": "Track your budget, spending, debt and savings as plain files in your own vault.",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -8,7 +8,8 @@
     "build": "node esbuild.config.mjs",
     "test": "node scripts/run-tests.mjs",
     "figures": "node scripts/figures.cjs",
-    "figures:bless": "node tests/figures-ledger.test.cjs --bless"
+    "figures:bless": "node tests/figures-ledger.test.cjs --bless",
+    "reconcile": "node scripts/reconcile-page.cjs"
   },
   "devDependencies": {
     "esbuild": "0.25.10"

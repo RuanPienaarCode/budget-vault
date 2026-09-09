@@ -10,10 +10,9 @@ const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso } = require('../dates');
-const { allocatedShare, incomeBaseFor } = require('../money-flow');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
-const { currenciesIn, symbolOf, isForeign, splitByCurrency, primaryTotal } = require('../currency');
+const { currenciesIn, symbolOf, isForeign, splitByCurrency } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
@@ -37,10 +36,10 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
-const { accountsOfType: vocabAccountsOfType, poolAccounts } = require('../vocabulary');
+const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, impliedAccounts, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -1056,7 +1055,6 @@ module.exports = function registerDashboard(ctx) {
   /* ADR-0007 · Position tiles read implied balances, like the net worth beside
      them. Summing stated ones here was one account with two totals on one card
      captioned "as things stand today". `balanceOf` went with it, unused. */
-  const accountsOfType = (type, from) => vocabAccountsOfType(from || S.accounts, type);
 
   /* A tile whose value is a button into the page that owns it. kpiTiles() is
      not used here because its tiles are inert by design — these are summaries
@@ -1095,8 +1093,10 @@ module.exports = function registerDashboard(ctx) {
        of 1 September. Net worth genuinely does not move with the PERIOD, and
        its caption says so; that was never a reason for it not to move with
        the DAY. */
-    const positionAccounts = impliedAccounts();
-    const { primary: homeAccounts, others: worthOthers } = splitByCurrency(positionAccounts, S.settings.currency);
+    /* The balance book (figures.js): implied balances, home currency, the
+       foreign accounts named beside it. Summed once there, read here. */
+    const { balances } = bookFigures();
+    const homeAccounts = balances.implied.accounts, worthOthers = balances.implied.others;
     /* The same sentence the Accounts hero carries, from the same key — so the
        two screens cannot word the same fact differently. */
     const otherLine = others => (others.length
@@ -1127,10 +1127,10 @@ module.exports = function registerDashboard(ctx) {
        of. */
     const worthOtherNet = otherCurrencyNet(w, worthOthers);
     const owed = owedSummary(S.owed, undefined, S.settings.currency);
-    const savingsAccounts = poolAccounts(positionAccounts);
+    const savingsAccounts = poolAccounts(balances.implied.foreignAccounts);
     const { others: savingsOthers } = splitByCurrency(savingsAccounts, S.settings.currency);
-    const savings = primaryTotal(accountsOfType('savings', positionAccounts), S.settings.currency);
-    const invest = primaryTotal(accountsOfType('investment', positionAccounts), S.settings.currency);
+    const savings = balances.implied.byType.savings || 0;
+    const invest = balances.implied.byType.investment || 0;
 
     /* A vault that has none of this yet gets no band at all. Four tiles reading
        R0.00 is not an empty state, it is a balance sheet asserting that the
@@ -1379,13 +1379,11 @@ module.exports = function registerDashboard(ctx) {
        allocated as a rand of groceries — and answering it off the spend
        envelopes alone would report a household that saves a fifth of its
        income as having planned for nothing. */
-    const allocated = allocatedShare({
-      budgeted: bud.spend + (bud.setAside || 0), budgetIncome: bud.income, actualIncome: sum.income,
-      /* ISSUE 73: BEFORE today's period, not merely different from it — a
-         future period has not finished, and treating it as finished let
-         incomeBaseFor fall back to income that has not arrived. */
-      periodFinished: S.period < currentPeriod(),
-    });
+    /* The plan snapshot (figures.js planFigures): the whole plan, the share
+       and the base it was measured against, assembled once for this hero,
+       the Budget page's strip and the Report. */
+    const plan = planFigures(S.period);
+    const allocated = plan.allocated;
     /* sharePercentLabel, not a bare Math.round: 100.24% allocated rounding to
        "100%" sat beside the Budget page's red "over-budgeted R 97,80" tile,
        and the rounding ate the only fact the two figures disagreed on — which
@@ -1408,14 +1406,8 @@ module.exports = function registerDashboard(ctx) {
        Named only when the two actually differ. On the common vault, where the
        budget's income row and the period's income agree, the extra clause
        would be noise qualifying nothing. */
-    const incomeBase = incomeBaseFor({
-      budgetIncome: bud.income, actualIncome: sum.income,
-      /* ISSUE 73: BEFORE today's period, not merely different from it — a
-         future period has not finished, and treating it as finished let
-         incomeBaseFor fall back to income that has not arrived. */
-      periodFinished: S.period < currentPeriod(),
-    });
-    const baseDiffers = allocated !== null && Math.round((incomeBase - sum.income) * 100) !== 0;
+    const incomeBase = plan.incomeBase;
+    const baseDiffers = plan.baseDiffers;
     const usedPct = used.used === null ? null : sharePercentLabel(used.used, locale().decimal);
     /* ADR-0007 · Hero spent is the one numerator. Headline, meter and tag read
        budgetUsed().spent; the sub-line and stat printed GROSS beside them.
@@ -1490,7 +1482,7 @@ module.exports = function registerDashboard(ctx) {
           inUncounted >= 1 ? el('div', { class: 'st' }, i18n.t('dash.stat.notIncome', { amount: money(inUncounted) })) : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.budgeted'))),
-        el('div', {}, el('div', { class: 'sv' }, money(bud.spend + (bud.setAside || 0))),
+        el('div', {}, el('div', { class: 'sv' }, money(plan.total)),
           (budgetedPct !== null || setAsideNote)
             ? el('div', { class: 'st' }, [
               budgetedPct === null ? '' : baseDiffers

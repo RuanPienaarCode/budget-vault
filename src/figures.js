@@ -18,11 +18,14 @@
 
 const { typeOrder, typeRank } = require('./groups');
 const { reconcile, stalenessSummary } = require('./reconcile');
-const { isForeign, symbolOf } = require('./currency');
-const { assumedActual, budgetRowStatus, categoryGap: gapOf } = require('./money-flow');
+const { isForeign, symbolOf, splitByCurrency } = require('./currency');
+const { assumedActual, budgetRowStatus, categoryGap: gapOf, incomeBaseFor, allocatedShare } = require('./money-flow');
+const { accountType } = require('./vocabulary');
+const { netByOwner } = require('./owners');
+const { normalizeAmount } = require('./amount');
 
 module.exports = function registerFigures(ctx) {
-  const { S, periodSummary, budgetTotals, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex } = ctx;
+  const { S, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
 
   /* Budget vs actual, one row per category that is either budgeted or
      spent, the type read live (budgetRowType), and an assume-spent row's
@@ -85,6 +88,50 @@ module.exports = function registerFigures(ctx) {
     return gapOf({ spend: sum.spend, uncatSpend: sum.uncatSpend, rows });
   }
 
+  /* The plan: what this period's budget file promises, and how it measures
+     against income. The RULES are money-flow.js's (incomeBaseFor,
+     allocatedShare); what lives here is the one assembly of their operands.
+     On 1.41.1 the Dashboard hero, the Budget page's totals strip and the
+     Report each gathered these themselves, and the strip carried a comment
+     admitting it mirrored the hero's denominator logic by hand.
+
+     `rows` is the Budget page's: its strip moves with the unsaved draft, so
+     it hands the draft in the way budgetUsed(p, { rows }) already takes it.
+     Every other reader takes the saved file.
+
+       total        the WHOLE plan — spend and set-aside envelopes, a rand
+                    into the emergency fund being as allocated as a rand of
+                    groceries (ISSUE 40)
+       hasIncomeRow a row that came from the file or was deliberately touched
+                    (inFile), never a zero row the draft seeded for a category
+                    nobody has budgeted
+       incomeBase   the plan's own income; a finished period's actual income
+                    stands in when the plan names none (ISSUE 73: finished
+                    means BEFORE today's period, a future one has not)
+       allocated    total / incomeBase, null with nothing honest to divide by
+       baseDiffers  the base is not the income that arrived — the hero names
+                    which one it divided by only then (ISSUE 36)
+       unallocated  income − total when the plan states an income row, the
+                    settled actual income − total once the period is
+                    finished, and null mid-period with no income row: a
+                    part-period income is not a base to budget against */
+  function planFigures(p, opts) {
+    const rows = (opts && opts.rows) || S.budgets[p] || [];
+    const totals = budgetTotalsOf(rows);
+    const total = totals.spend + totals.setAside;
+    const hasIncomeRow = rows.some(r => budgetRowType(r) === 'income' && r.inFile !== false);
+    const actualIncome = periodSummary(p).income;
+    const periodFinished = p < currentPeriod();
+    const args = { budgetIncome: totals.income, actualIncome, periodFinished };
+    const incomeBase = incomeBaseFor(args);
+    const allocated = allocatedShare({ budgeted: total, ...args });
+    const baseDiffers = allocated !== null && Math.round((incomeBase - actualIncome) * 100) !== 0;
+    const unallocated = (hasIncomeRow || totals.income > 0) ? totals.income - total
+      : (periodFinished ? actualIncome - total : null);
+    return { total, spend: totals.spend, setAside: totals.setAside, income: totals.income, hasIncomeRow,
+      actualIncome, periodFinished, incomeBase, allocated, baseDiffers, unallocated };
+  }
+
   /* The snapshot. Everything a period page prints about the period, built
      once per call, with its caveats riding along. */
   function periodFigures(p) {
@@ -95,6 +142,7 @@ module.exports = function registerFigures(ctx) {
       range: periodRange(p),
       summary,
       budget,
+      plan: planFigures(p),
       used: budgetUsed(p),
       trend: periodSpend(p, null),
       rows: budgetVsActualRows(p),
@@ -139,8 +187,72 @@ module.exports = function registerFigures(ctx) {
       drift: { drift, driftForeign, driftUnplaced },
       stale: stalenessSummary(S.accounts),
       overdrawn: S.accounts.filter(a => (a.balance || 0) < 0).length,
+      balances: balanceBook(),
     };
   }
 
-  ctx.provide({ budgetVsActualRows, categorySpendRows, categoryGap, periodFigures, bookFigures });
+  /* The balance book: the household's accounts summed ONCE on each of the
+     two bases a page may print, with the difference between them named.
+
+     `stated` is the balance: line of each account file — a claim with an
+     age. `implied` is that claim rolled forward by the rows dated after it
+     (impliedAccounts, one as-of across the app — ISSUE 44). On 1.41.1 the
+     Savings KPIs and the Accounts page summed the first and the Dashboard
+     tile, the Savings chart, the Score and the Report summed the second, each
+     in its own loop; on the vault this was built against the Savings page
+     printed R 674 463,50 invested above a chart segment reading
+     R 691 357,55, and nothing on that page said the R 16 894,05 between
+     them was rows nobody had confirmed yet. Both bases live here so a page
+     that prints one is handed the other, and the drift, with it.
+
+     Home currency only, the way every total in this app is (currency.js);
+     the foreign accounts are `others`, named beside the book and never
+     summed into it. An unreadable balance — "about 300" — is held out of
+     BOTH bases, matching the Accounts hero's own rule: a figure that cannot
+     be read cannot be added. Types are case-folded through accountType();
+     owners through netByOwner(), the Accounts page's own rule. */
+  function balanceBook() {
+    const cur = S.settings.currency;
+    const readable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
+    const declared = Array.isArray(S.settings.owners) ? S.settings.owners : [];
+    const summarise = (accounts, all) => {
+      const byType = {};
+      let positive = 0, negative = 0;
+      for (const a of accounts) {
+        const bal = Number(a.balance) || 0;
+        const t = accountType(a) || 'other';
+        byType[t] = (byType[t] || 0) + bal;
+        if (bal > 0) positive += bal; else negative -= bal;
+      }
+      for (const t of Object.keys(byType)) byType[t] = Math.round(byType[t] * 100) / 100 || 0;
+      return {
+        accounts, byType, byOwner: netByOwner(accounts, declared),
+        /* The foreign accounts on the same base, named (pairs of symbol and
+           total) and listed, for the disclosures a page prints beside a
+           home-currency figure — never summed into it. */
+        others: splitByCurrency(all, cur).others,
+        foreignAccounts: all.filter(a => isForeign(a, cur)),
+        positive: Math.round(positive * 100) / 100 || 0,
+        negative: Math.round(negative * 100) / 100 || 0,
+        net: Math.round((positive - negative) * 100) / 100 || 0,
+      };
+    };
+    const statedAll = S.accounts.filter(readable);
+    const impliedAll = impliedAccounts().filter(readable);
+    const stated = summarise(splitByCurrency(statedAll, cur).primary, statedAll);
+    const implied = summarise(splitByCurrency(impliedAll, cur).primary, impliedAll);
+    const driftByType = {};
+    for (const t of new Set([...Object.keys(stated.byType), ...Object.keys(implied.byType)])) {
+      const d = Math.round(((implied.byType[t] || 0) - (stated.byType[t] || 0)) * 100) / 100;
+      if (d) driftByType[t] = d;
+    }
+    return {
+      stated, implied,
+      drift: Math.round((implied.net - stated.net) * 100) / 100 || 0,
+      driftByType,
+      others: stated.others,
+    };
+  }
+
+  ctx.provide({ budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };

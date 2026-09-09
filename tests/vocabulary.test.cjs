@@ -252,8 +252,16 @@ function provenFalse(desc, exactShape, mangled) {
 
   ok(live.accounts.includes('worth(primary, null, null)'),
     'Net worth: accounts.js\'s hero is the declared exception — worth() called with no debts/assets, on purpose');
-  ok(live.accounts.includes('splitByCurrency(S.accounts.filter(a => !unreadableBalance(a)))'),
-    'Net worth: and `primary` is still built from the same readable-accounts filter this term always pinned, now split by currency first (ITEM 5)');
+  /* 2026-09-09: the readable-accounts filter and the currency split moved
+     into figures.js's balance book (one book, two bases), so the hero reads
+     the stated home-currency list off it. The term is unchanged — the same
+     filter, applied ONCE — and both halves are pinned: the hero reads the
+     book, and the book applies the filter this term always pinned. */
+  ok(live.accounts.includes('const primary = balances.stated.accounts, others = balances.stated.others;'),
+    'Net worth: and `primary` is the balance book\'s stated home-currency account list (ITEM 5, applied once in figures.js)');
+  ok(live.figures.includes('const readable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);')
+    && live.figures.includes('const statedAll = S.accounts.filter(readable);'),
+    'Net worth: and the book builds that list from the same readable-accounts filter this term always pinned');
   ok(!live.accounts.includes("i18n.t('dash.pos.netWorth')") && !live.accounts.includes("'Net worth'"),
     'Net worth: accounts.js never borrows the "Net worth" word for its narrower figure — its own label key is distinct');
   ok(live.accounts.includes("i18n.t('acct.hero.elsewhere')"),
@@ -589,10 +597,15 @@ function provenFalse(desc, exactShape, mangled) {
 
   /* 2026-09-06: the list this filter reads became a parameter so the position
      tiles can pass implied balances (they were summing stated ones beside an
-     implied net worth). The fold still goes through the owner, which is what
-     this term is about — the source list is the caller's business. */
-  ok(live.dashboard.includes("const accountsOfType = (type, from) => vocabAccountsOfType(from || S.accounts, type);"),
-    'Account type (Dashboard): accountsOfType() is the owner\'s filter');
+     implied net worth). 2026-09-09: the Dashboard stopped filtering at all —
+     the per-type sums it printed now come off figures.js's balance book,
+     where the fold goes through the owner (accountType) exactly once. The
+     term is the same: no page reads `type` raw to sum a balance. */
+  ok(!/accountsOfType\(/.test(live.dashboard) && live.dashboard.includes('balances.implied.byType.savings'),
+    'Account type (Dashboard): the position tile reads the balance book, and never filters account types itself');
+  ok(live.figures.includes("const { accountType } = require('./vocabulary');")
+    && live.figures.includes("const t = accountType(a) || 'other';"),
+    'Account type (balance book): figures.js sums by the owner\'s fold');
   ok(live.savings.includes("const { accountsOfType, accountType } = require('../vocabulary');")
     && !/typeIs/.test(live.savings.replace(/\/\*[\s\S]*?\*\//g, '')),
     'Account type (Savings page): every type test on this page goes through the owner; the local typeIs() is gone');

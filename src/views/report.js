@@ -94,8 +94,8 @@ module.exports = function registerReport(ctx) {
     S, $, app, plugin, money, toast,
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
-    periodsForMonths, earliestDataMonth, periodSummary, budgetTotals, catKnown,
-    accountIndex, impliedAccounts, healthSnapshot, txInPeriod,
+    periodsForMonths, earliestDataMonth, periodSummary, catKnown,
+    accountIndex, planFigures, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows, categoryGap,
     budgetUsed, movedToFunds,
   } = ctx;
@@ -597,13 +597,13 @@ module.exports = function registerReport(ctx) {
       for (const sym of (sum.foreign && sum.foreign.symbols) || []) {
         if (!foreignSymbols.includes(sym)) foreignSymbols.push(sym);
       }
-      const bt = budgetTotals(p);
       /* ISSUE 40 follow-up, and this is the document that LEAVES the app.
          `bt.spend` alone stated R10 500 as the budget directly above a
          Budget-vs-Actual table listing rows that sum to R14 500 — the summary
          and the table of one file, disagreeing, with no caveat between them.
          The table lists every envelope, so the total states every envelope. */
-      budgetIncome += bt.income; budgetSpend += bt.spend + (bt.setAside || 0);
+      const plan = planFigures(p);
+      budgetIncome += plan.income; budgetSpend += plan.total;
       /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
          numerator and its denominator can never come from two calls. */
       const bu = budgetUsed(p);
@@ -661,8 +661,8 @@ module.exports = function registerReport(ctx) {
        handed to somebody else carried no caveat, while both of its on-screen
        twins did. Same rule as those twins now, and `otherCurrencies` travels
        into the document so the section can say what it holds. */
-    const { primary: homeAccounts, others: reportOthers } =
-      splitByCurrency(impliedAccounts(), S.settings.currency);   // ISSUE 44 — the exported net worth is the on-screen one
+    // ISSUE 44 — the exported net worth is the on-screen one: the implied balance book.
+    const { accounts: homeAccounts, others: reportOthers } = ctx.bookFigures().balances.implied;
     /* ISSUE 39 — receivables, so the exported net worth is the on-screen one. */
     const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     return {

@@ -503,7 +503,7 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
-    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, accountForLabel, accountIndex, impliedAccounts, accountsWithFolder, nonBudgetLabels,
+    txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, budgetTotalsOf, accountForLabel, accountIndex, impliedAccounts, accountsWithFolder, nonBudgetLabels,
     /* Published so the score's household walk (health-data.js) narrows rows by
        the SAME predicate summaryInRange does — a second spelling of "which
        folders are foreign" is how the ISSUE 28 fix reached the numerators and
