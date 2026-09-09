@@ -15,12 +15,10 @@
    figure — they just do not go first. */
 
 const { el, icoEl } = require('../dom');
-const { poolAccounts } = require('../vocabulary');
 const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
 const { sharePercentLabel } = require('../share-percents');
-const { savedFromOutside } = require('../savings-math');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -30,8 +28,7 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, declaredCatType, accountIndex,
-    txInPeriod, locale,
+    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, locale,
   } = ctx;
 
   function renderScore() {
@@ -753,26 +750,11 @@ module.exports = function registerScore(ctx) {
        while the score's ring on the very same screen counted that as nothing.
        The window differs on purpose — this card is one period, the ring is six
        — but the MEASURE must not, or the two are not comparable at all. */
-    const idx = accountIndex();
-    /* Case-folded and trimmed against the account's own type, not compared
-       raw — the exact trap health-data.js:147-148 (POOL_TYPES) already names:
-       `load.js` only defaults `type` when the key is ABSENT, so a hand-typed
-       `type: Savings` reached here exactly as written and dropped out of this
-       card's saver pool while the score ring two lines below (buildFlow calls
-       into health-data.js) kept counting the same account — the flow card and
-       the ring disagreeing about the same period on the same screen. Kept as
-       its own copy here rather than a shared helper, same as views/savings.js's
-       own `typeIs` — health-data.js and this file are siblings, not a shared
-       module, and each carries this comment for a reader who lands in only one
-       of them. */
-    const savers = poolAccounts(S.accounts);
-    const saverLabels = new Map();
-    for (const a of savers) {
-      for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
-    }
-    /* ISSUE 32 — the same third argument health-data.js passes, so this card
-       and the score it explains cannot pair rows differently. */
-    const savingContribution = savedFromOutside(txInPeriod(cur), saverLabels, declaredCatType);
+    /* Read off health-data.js's savingContribution(p) — household-currency
+       rows, household-currency pool, the same pairing — rather than a second
+       assembly here. This card is one period, the ring is six; the window
+       differs on purpose and the measure must not. */
+    const savingContribution = ctx.savingContribution(cur);
 
     return periodFlow({
       /* ISSUE 40 follow-up. `budgetSetAside` passed, so the Score's "share of

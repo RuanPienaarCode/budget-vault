@@ -50,7 +50,7 @@ const i18n = require('../i18n');
 const { assumedActual } = require('../money-flow');
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -291,7 +291,12 @@ module.exports = function registerBudgets(ctx) {
   function budgetTotalsStrip() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    let income = 0, budgeted = 0, namedNetSpend = 0, hasIncomeRow = false;
+    /* The plan snapshot (figures.js planFigures) over the DRAFT, so the
+       strip moves as an amount is typed: the whole plan, its income, the
+       share and what is left — the same assembly the Dashboard hero reads. */
+    const plan = planFigures(S.period, { rows: draft });
+    const income = plan.income, budgeted = plan.total;
+    let namedNetSpend = 0;
     for (const d of draft) {
       /* The row's own stored Type cell (d.type, the Type column read out of
          Budgets/<period>.md) versus the category's CURRENT type (catType).
@@ -302,20 +307,7 @@ module.exports = function registerBudgets(ctx) {
          is exactly what `?? ` (not `||`) buys: catType returns null for that
          case and the row's own amount for income can legitimately be 0. */
       const type = budgetRowType(d);
-      if (type === 'income') {
-        income += d.amount || 0;
-        // d.inFile, not "this row exists" — budgetDraft() seeds a ZERO row
-        // for every category the vault has, income-typed ones included, so
-        // "exists" is true on nearly every vault regardless of whether income
-        // was ever actually budgeted for THIS period. inFile is true only for
-        // a row that came from the saved file (or was deliberately touched
-        // this session) — an income category that has never been asked about
-        // in this period's file must not silently stand in for one that was.
-        if (d.inFile) hasIncomeRow = true;
-        continue;
-      }
-      if (type === 'transfer') continue;
-      budgeted += d.amount || 0;
+      if (type === 'income' || type === 'transfer') continue;
       /* ISSUE 40 follow-up. The spend half on its own. `budgeted` above stays
          the WHOLE plan — that is what "Total budgeted" means and what
          `allocPct` should be a share of — but "% of budget used" divides by
@@ -373,7 +365,7 @@ module.exports = function registerBudgets(ctx) {
        on this very strip beside a red "over-budgeted R 97,80" tile — 100.24%
        rounded onto the boundary the red tile says the plan has crossed. Same
        rule for "used": 100% is the same kind of boundary there. */
-    const allocPct = income > 0 ? sharePercentLabel(budgeted / income, locale().decimal) : null;
+    const allocPct = plan.allocated === null ? null : sharePercentLabel(plan.allocated, locale().decimal);
     const usedPct = used.used === null ? null : sharePercentLabel(used.used, locale().decimal);
 
     /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
@@ -471,25 +463,16 @@ module.exports = function registerBudgets(ctx) {
        in-progress period's actual income is a part-period figure — so the tile
        is simply omitted. Once the period is FINISHED, actual income is a whole,
        settled figure and stands in, exactly as renderHero's incomeBase does. */
-    const noIncomeInfo = income === 0 && !hasIncomeRow;
-    const periodFinished = S.period < currentPeriod();   // ISSUE 73: a future period is not finished
+    /* `plan.unallocated` is null exactly when this tile has nothing honest
+       to say: a running period whose plan names no income row. */
     let unallocatedTile = null;
-    if (!noIncomeInfo) {
-      const unallocated = income - budgeted;
+    if (plan.unallocated !== null) {
+      const unallocated = plan.unallocated;
       unallocatedTile = {
         label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
         over: unallocated < 0,
         note: unallocated < 0 ? i18n.t('bud.total.overNote')
-          : (income > 0 ? i18n.t('bud.total.leftNote') : ''),
-      };
-    } else if (periodFinished) {
-      const fallbackIncome = sum.income;
-      const unallocated = fallbackIncome - budgeted;
-      unallocatedTile = {
-        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
-        over: unallocated < 0,
-        note: unallocated < 0 ? i18n.t('bud.total.overNote')
-          : (fallbackIncome > 0 ? i18n.t('bud.total.leftNote') : ''),
+          : (plan.incomeBase > 0 ? i18n.t('bud.total.leftNote') : ''),
       };
     }
     return [

@@ -43,7 +43,7 @@ const { daysBetween } = require('./dates');
 /* ADR-0007 · The pairing window is the period, not three days. No day window
    and no description test — both were tried on a real vault and rejected. */
 const { worth, otherCurrencyNet } = require('./worth');
-const { splitByCurrency, isForeign } = require('./currency');
+const { isForeign } = require('./currency');
 
 /* How far back the averages reach. Six months is long enough to absorb a bonus
    month or a double rent payment, and short enough that a household still
@@ -52,10 +52,29 @@ const TRAILING_MONTHS = 6;
 
 module.exports = function registerHealthData(ctx) {
   const {
-    S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, impliedAccounts, catType, declaredCatType,
+    S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
     foreignLabels,
   } = ctx;
+
+  /* ADR-0007 · One measure of saved, assembled once. What crossed into the
+     savings pool from OUTSIDE it this period: savedFromOutside does the
+     pairing; this is the one assembly of its inputs, read by the ring six
+     times and by the Score's flow card once. ADR-0007 · Household walks read
+     household-currency rows only. ADR-0007 · The savings pool: savings and
+     investment accounts, household currency only. ADR-0007 · Pool rows are
+     household rows filtered by label. */
+  function savingContribution(p) {
+    const foreign = foreignLabels();
+    const idx = accountIndex();
+    const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));
+    const saverLabels = new Map();
+    for (const a of savers) {
+      for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
+    }
+    const rows = txInPeriod(p).filter(t => !foreign.has(t.label));
+    return savedFromOutside(rows, saverLabels, declaredCatType);
+  }
 
   function healthSnapshot() {
     /* Which categories the household has declared it cannot stop paying. A Set
@@ -70,36 +89,15 @@ module.exports = function registerHealthData(ctx) {
 
     /* ADR-0007 · Household walks read household-currency rows only (ISSUE 28,
        second pass). Every ratio below divides rand by rand; what is held out is
-       named on the page by otherCurrencies. */
-    const foreign = foreignLabels();
-    const homeRows = p => txInPeriod(p).filter(t => !foreign.has(t.label));
-    /* ADR-0007 · The savings pool: savings and investment accounts, household
-       currency only — the same boundary homeRows draws, so both legs of a
-       transfer are seen. Type is case-folded inside poolAccounts. */
-    const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));
+       named on the page by otherCurrencies. The rows and the pool are drawn
+       inside savingContribution() above, once, for the ring and the flow card. */
 
     const periods = [];
     for (let i = 1; i <= want; i++) {
       const p = shiftPeriod(cur, -i);
       const spend = periodSpend(p, null);
       const { start, end } = periodRange(p);
-      let savings = 0;
-      /* Pass-throughs are found across the WHOLE HOUSEHOLD, not just the pool:
-         the R40 000 UIF landed in a savings account but its matching leg left
-         a cheque account, so a pool-only search would never have seen it. */
-      const householdRows = homeRows(p);
-      /* Gathered across the WHOLE pool before anything is counted, because an
-         internal transfer is only recognisable from both of its legs at once —
-         see the matching step below. */
-      /* ADR-0007 · Pool rows are household rows filtered by label. accountIndex's
-         raw file rows carry no `label`, so a key built from one never matched. */
-      const saverLabels = new Map();
-      for (const a of savers) {
-        for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
-      }
-      /* ISSUE 32 — catType, so a fund purchase can no longer be paired away
-         as the leg of an internal move. */
-      savings = savedFromOutside(householdRows, saverLabels, declaredCatType);
+      const savings = savingContribution(p);
       /* ADR-0007 · Three spend slices per period, and one of them budget-scoped.
          essential / consumption / fixed are household-wide; consumptionBudget is
          budget-scoped and feeds "budget used" alone. */
@@ -130,8 +128,8 @@ module.exports = function registerHealthData(ctx) {
     /* ADR-0007 · Net worth and earmarks are measured on household-currency
        accounts, and the rest is named (ISSUE 28): a ratio over mixed currencies
        inverts the verdict — "0.0 months" printed where 6.7 was true. */
-    const { primary: homeAccounts, others: scoreOthers } =
-      splitByCurrency(impliedAccounts(), S.settings.currency);   // ISSUE 44 — one as-of across every net worth
+    // ISSUE 44 — one as-of across every net worth: the implied balance book.
+    const { accounts: homeAccounts, others: scoreOthers } = ctx.bookFigures().balances.implied;
     const earmarks = resolveEarmarks(homeAccounts);
     const target = S.settings.emergency_target_months || 6;
     /* Once, not per consumer: the score, the debt tile's own figure and the
@@ -191,5 +189,5 @@ module.exports = function registerHealthData(ctx) {
     };
   }
 
-  ctx.provide({ healthSnapshot });
+  ctx.provide({ healthSnapshot, savingContribution });
 };

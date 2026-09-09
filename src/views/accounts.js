@@ -840,7 +840,11 @@ module.exports = function registerAccounts(ctx) {
        with the Dashboard, Savings and the health score, so this view feeds it
        a narrower account list rather than teaching it a new rule those pages
        never asked for. */
-    const { primary, others } = splitByCurrency(S.accounts.filter(a => !unreadableBalance(a)));
+    /* The balance book (figures.js): stated balances, readable ones only,
+       home currency summed and every other symbol named — the same rule
+       this hero always applied, applied once. */
+    const { balances } = ctx.bookFigures();
+    const primary = balances.stated.accounts, others = balances.stated.others;
 
     /* ISSUE 30 — the opt-in conversion, finally reaching a screen.
 
@@ -859,7 +863,7 @@ module.exports = function registerAccounts(ctx) {
        An account the rate table cannot convert is still named, not folded in
        at par and not dropped: that is `unconvertible`, and it prints as the
        same "held in other currencies" sentence the un-converted view uses. */
-    const conv = ctx.fxConvert ? ctx.fxConvert(S.accounts.filter(a => !unreadableBalance(a))) : null;
+    const conv = ctx.fxConvert ? ctx.fxConvert([...balances.stated.accounts, ...balances.stated.foreignAccounts]) : null;
     const convLine = conv ? (() => {
       const parts = conv.converted.map(c =>
         `${ctx.moneyIn(symbolOf({ currency_code: c.code }, S.settings.currency), c.amount, 0)}`);

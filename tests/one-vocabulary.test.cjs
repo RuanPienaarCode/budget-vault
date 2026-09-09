@@ -99,7 +99,10 @@ const allowed = (file, line) => ALLOWED.some(a => a.file === file && a.line.test
 {
   const consumers = [
     'period.js', 'committed.js', 'health-data.js', 'health-math.js', 'savings-math.js', 'money-flow.js',
-    'onboarding.js', 'views/score.js', 'views/report.js', 'views/savings.js', 'views/dashboard.js',
+    'onboarding.js', 'views/report.js', 'views/savings.js', 'views/dashboard.js',
+    /* views/score.js left this list on 2026-09-09: its one use of the owner
+       (poolAccounts, for the flow card's saver pool) moved into
+       health-data.js's savingContribution(), which the card now reads. */
   ];
   for (const c of consumers) {
     const s = read(path.join(SRC, c));

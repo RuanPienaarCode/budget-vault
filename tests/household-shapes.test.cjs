@@ -356,11 +356,17 @@ function invariants(label, snap) {
     + 'two cards disagree in the first place');
 
   const fsMod = require('fs');
-  for (const view of ['dashboard', 'score']) {
+  /* 2026-09-09: the Dashboard no longer calls the rule directly — it reads
+     the plan snapshot (figures.js planFigures), which is the ONE place the
+     rule's operands are assembled; the Score still reaches it through
+     periodFlow. Either way no view computes "allocated" itself. */
+  for (const [view, re] of [['dashboard', /planFigures\(/], ['score', /periodFlow/]]) {
     const src = fsMod.readFileSync(`${__dirname}/../src/views/${view}.js`, 'utf8');
-    ok(/allocatedShare|periodFlow/.test(src),
+    ok(re.test(src) && !/allocatedShare\(/.test(src),
       `views/${view}.js reads the shared rule rather than computing "allocated" itself`);
   }
+  ok(/allocatedShare\(/.test(fsMod.readFileSync(`${__dirname}/../src/figures.js`, 'utf8')),
+    'and figures.js is where the shared rule is applied to the plan');
 
   /* ---- 5. "SAVED" MEANS ONE THING, ON BOTH CARDS THAT SAY IT ----
      The Score page's ring and the "Where the money went" card beside it used

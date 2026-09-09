@@ -89,10 +89,20 @@ const VIEW_MODULES = ['dashboard', 'report', 'score', 'transactions', 'budgets',
    against a deliberately-reverted single file, rather than a hand-mirrored
    copy of what that view does. Omitted, it resolves to this repo's own
    src/views — every existing call site keeps working unchanged. */
-async function mount(files, period, viewsDir) {
+async function mount(files, period, viewsDir, figuresDir) {
   const ctx = makeCtx(files);
   const S = await loadInto(ctx);
   if (period) S.period = period;
+  /* A negative control that reverts figures.js registers the scratch copy
+     OVER the real one before any view binds to it: views destructure
+     bookFigures at register time, so swapping it afterwards would test
+     nothing. The proxy inherits every seam the module destructures and
+     writes its provide() straight onto the real ctx. */
+  if (figuresDir) {
+    const proxy = Object.create(ctx);
+    proxy.provide = obj => Object.assign(ctx, obj);
+    require(path.join(figuresDir, 'figures.js'))(proxy);
+  }
   const { $, nodes } = makeDom();
   ctx.$ = $;
   ctx.$$ = () => [];
@@ -726,31 +736,34 @@ async function runNegativeControls() {
     fs.rmSync(dir5, { recursive: true, force: true });
   }
 
-  /* NC6 — views/savings.js's typeIs() case/whitespace fold. Reverting the ONE
-     function reproduces the bug everywhere it was scattered — the file's own
-     header names this as the point of extracting it. Checked through the
-     SAVINGS tile specifically (tileValue), not the card's whole text: the
-     "Net worth" tile beside it states the same figure whether or not the fold
-     works, because worth() sums by balance sign and never reads `type` at
-     all — a whole-card substring match would pass even on the reverted code. */
+  /* NC6 — the account-type case/whitespace fold under the Savings KPI.
+     Reverting the ONE fold reproduces the bug everywhere it was scattered.
+     Checked through the SAVINGS tile specifically (tileValue), not the
+     card's whole text: the "Net worth" tile beside it states the same figure
+     whether or not the fold works, because worth() sums by balance sign and
+     never reads `type` at all — a whole-card substring match would pass even
+     on the reverted code.
+
+     The sum the tile prints moved from views/savings.js into figures.js's
+     balance book (one book, two bases), so the fold that decides it is the
+     accountType() import THERE; the scratch copy's figures.js is registered
+     over the real one (see mount) with that import swapped for a raw read —
+     the exact pre-fix shape, reproduced where the sum now lives. */
   {
     const dir6 = scratchCopy();
     const f = files(['Budget/Settings.md', settings()],
       account('Pot', 'type: Savings\nbalance: 55000.00\nbalance_updated: 2026-01-01\n'));
 
-    const sane = await mount(f, undefined, path.join(dir6, 'views'));
+    const sane = await mount(f, undefined, path.join(dir6, 'views'), dir6);
     sane.ctx.renderSavings();
     eq(tileValue(sane.nodes.get('#savingsKpis'), 'Savings'), 'R 55000.00',
       'NC6 sanity: the unmodified scratch copy still agrees with main before the revert');
 
-    /* Phase 1 of ADR-0006 moved the fold into src/vocabulary.js; the scratch
-       copy only holds views/, so the revert swaps the view's import for a raw
-       local pair — the exact pre-fix shape, reproduced where it used to live. */
-    revert(dir6, 'views/savings.js',
-      "const { accountsOfType, accountType } = require('../vocabulary');",
-      'const accountsOfType = (accounts, type) => (accounts || []).filter(a => a && a.type === type); const accountType = a => a && a.type;');
-    delete require.cache[require.resolve(path.join(dir6, 'views', 'savings.js'))];
-    const red = await mount(f, undefined, path.join(dir6, 'views'));
+    revert(dir6, 'figures.js',
+      "const { accountType } = require('./vocabulary');",
+      'const accountType = a => a && a.type;');
+    delete require.cache[require.resolve(path.join(dir6, 'figures.js'))];
+    const red = await mount(f, undefined, path.join(dir6, 'views'), dir6);
     red.ctx.renderSavings();
     const redVal = tileValue(red.nodes.get('#savingsKpis'), 'Savings');
     ok(redVal !== 'R 55000.00', `NC6 RED as expected: without the fold, the savings tile reads "${redVal}" `
