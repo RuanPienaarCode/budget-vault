@@ -1021,8 +1021,8 @@ module.exports = function registerAccounts(ctx) {
         'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) + (tag ? ` ${tag}` : '') }) },
       el('div', { class: 'acct-owner-top' },
         el('span', { class: 'acct-owner-name' }, r.label),
-        el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}` }, money(r.net),
-          ...(tag ? [el('span', { class: 'acct-group-other' }, ` ${tag}`)] : []))),
+        el('span', { class: `acct-owner-net num${r.net < 0 ? ' text-danger' : ''}`, 'data-fig': 'acct-owner-net' }, money(r.net),
+          ...(tag ? [el('span', { class: 'acct-group-other', 'data-fig': 'acct-owner-other' }, ` ${tag}`)] : []))),
       el('span', { class: 'acct-mbar' },
         el('i', { class: r.net < 0 ? 'bg-danger' : '', style: `width:${pct.toFixed(1)}%` })),
       el('div', { class: 'acct-owner-sub' }, i18n.t('acct.group.count', { count: r.count })));
@@ -1638,12 +1638,19 @@ module.exports = function registerAccounts(ctx) {
       : acctMoney(a, a.balance);
     const balBtn = el('button', { type: 'button',
       class: `acct-bal num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}`,
+      'data-fig': 'acct-bal',
       'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: balLabel }) },
       balLabel);
     balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
 
+    /* The sign is a separate glyph and the magnitude alone goes through
+       money(), so a harvest reads +500 where the ledger holds -500. The
+       direction goes in the NAME rather than the number: a reconciliation can
+       then assert that an `acct-flow-out` chip matches a negative activity and
+       an `acct-flow-in` a positive one, which comparing magnitudes cannot. */
     const flowCell = r.act.count
-      ? el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}` },
+      ? el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}`,
+        'data-fig': r.flow >= 0 ? 'acct-flow-in' : 'acct-flow-out' },
         `${r.flow >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(r.flow), 0)}`)
       : el('span', { class: 'acct-dash' }, '—');
 
@@ -2088,8 +2095,12 @@ module.exports = function registerAccounts(ctx) {
           body.append(el('tr', { class: 'type-row' },
             el('td', { colspan: '8' },
               i18n.t(key),
-              el('span', { class: 'acct-group-total num' }, money(total),
-                ...(others.length ? [el('span', { class: 'acct-group-other' },
+              /* Both named. The foreign tag is a CHILD of the total, so an
+                 unanchored match on the total swept the tag in as a second
+                 group total — "sum the home currency and name the rest" puts a
+                 second money figure inside the first, by design. */
+              el('span', { class: 'acct-group-total num', 'data-fig': 'acct-group-total' }, money(total),
+                ...(others.length ? [el('span', { class: 'acct-group-other', 'data-fig': 'acct-group-other' },
                   otherCurrenciesTag(others))] : [])))));
           for (const r of inGroup) emit(r);
         }

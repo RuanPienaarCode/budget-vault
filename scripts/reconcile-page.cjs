@@ -52,6 +52,26 @@ function readVault(root) {
   return out;
 }
 
+/* --household: the committed synthetic household instead of a real vault.
+
+   This script was written for a real household and could only ever run on one,
+   which is why it was in no gate — the vault it needs cannot be committed to a
+   public repo. tests/figures/household.cjs is already a full vault in exactly
+   the shape readVault() returns ({ 'Budget/Settings.md': text, … }), built to
+   light up all sixteen views, so the reconciliation can run over it with no
+   private data anywhere near it.
+
+   It is not the same subject. The real vault is broader; this fixture is
+   deliberately NARROW and deliberately exotic — one of each row shape the
+   ADR-0005/0006 refactor settled (set-aside, assume-spent, a split, an
+   earmarked outflow), which is more of that per row than a real household
+   carries. Expect it to reconcile differently, and read tests/reconcile-gate
+   for what is currently unexplained. */
+function householdVault() {
+  const { SEED, B, TODAY, PERIOD } = require('../tests/figures/household.cjs');
+  return { files: { ...SEED }, budgetFolder: B, today: TODAY, period: PERIOD };
+}
+
 function resolveBudgetFolder() {
   const v = flag('vault');
   if (v && v !== true) return path.resolve(String(v));
@@ -64,8 +84,27 @@ function resolveBudgetFolder() {
     if (!settings.budgetFolder) { console.error('data.json names no budgetFolder'); process.exit(1); }
     return path.join(root, settings.budgetFolder);
   }
-  console.error('Usage: node scripts/reconcile-page.cjs --vault "<budget folder>" | --obsidian-vault "<vault root>" [--today YYYY-MM-DD] [--period YYYY-MM] [--out file.html]');
+  console.error('Usage: node scripts/reconcile-page.cjs --household | --vault "<budget folder>" | --obsidian-vault "<vault root>" [--today YYYY-MM-DD] [--period YYYY-MM] [--out file.html]');
   process.exit(1);
+}
+
+/* The run itself, with no argv, no filesystem and no HTML — so a guard test can
+   call it. main() below is this plus the page and the console summary.
+
+   `files` is the vault as { path: text }; everything else is optional. Returns
+   the three readings the page compares (rendered / seams / oracle) and the
+   checks over them. */
+async function reconcile({ files, budgetFolder, today, period: wantPeriod }) {
+  const unpin = pinClock(today);
+  try {
+    const M = await mountFor(files, { budgetFolder });
+    const period = String(wantPeriod || M.ctx.currentPeriod());
+    M.S.period = period;
+    const G = globals(M.ctx, M.S, period, today);
+    M.restore();
+    const pages = await harvestPages(files, { period, budgetFolder });
+    return { G, pages, checks: runChecks(G, pages), matrix: presenceMatrix(G, pages), period, today };
+  } finally { unpin(); }
 }
 
 const pad = n => String(n).padStart(2, '0');
@@ -232,9 +271,23 @@ function globals(ctx, S, period, today) {
     for (const a of list) { const t = accountType(a) || 'other'; m[t] = (m[t] || 0) + (a.balance || 0); }
     return m;
   };
-  const byOwner = list => {
+  /* Bucketed over EVERY account but valued in home currency only, because that
+     is what the page does: netByOwner() opens a bucket for each owner it finds
+     and prints its home-currency net, so an owner holding nothing but a foreign
+     account gets a row reading R 0,00 with the foreign amount named beside it.
+     Bucketing over home accounts alone dropped that row from the seam and made
+     a correct page look one row long.
+
+     A blank owner keys on '' — src/owners.js labels it Unassigned. NOT 'joint':
+     that is a reserved value a household can declare, and folding the two
+     together would hide a real owner behind an absent one. */
+  const byOwner = (list, valued) => {
     const m = {};
-    for (const a of list) { const o = String(a.owner || 'joint').trim().toLowerCase(); m[o] = (m[o] || 0) + (a.balance || 0); }
+    const inHome = new Set((valued || list).map(a => a.file || a.name));
+    for (const a of list) {
+      const o = String(a.owner || '').trim().toLowerCase();
+      m[o] = (m[o] || 0) + (inHome.has(a.file || a.name) ? (a.balance || 0) : 0);
+    }
     return m;
   };
 
@@ -284,11 +337,18 @@ function globals(ctx, S, period, today) {
       trend: { whole: sortedPairs(spend.whole), wholeTotal: Object.values(spend.whole).reduce((a, b) => a + b, 0), count: spend.count },
       planTotal: budget.spend + budget.setAside,
       allocated: budget.income > 0 ? (budget.spend + budget.setAside) / budget.income : null,
+      /* periodFigures' OWN plan snapshot, carried through rather than
+         re-derived. ADR-0007 registers `unallocated` as income − total; this
+         script had spelled it total − income by hand a few lines away and so
+         disagreed with the page by exactly twice itself. An instrument built
+         to catch "two figures derived by different rules" is the last place
+         that rule should be spelled twice. */
+      plan: fig.plan,
     },
     lenses, oracle, lensDiff, droppedByBudget,
     worth: { implied: primitives(W), stated: primitives(Wstated), naive, driftSum,
       otherCurrencies: W.otherCurrencies,
-      byTypeStated: byType(statedHome), byTypeImplied: byType(impliedHome), byOwnerStated: byOwner(statedHome) },
+      byTypeStated: byType(statedHome), byTypeImplied: byType(impliedHome), byOwnerStated: byOwner(stated, statedHome) },
     book: { drift: book.drift, stale: primitives(book.stale), overdrawn: book.overdrawn,
       unplaced: [...book.unplacedBy.entries()], confirmDay: [...book.confirmDayBy.entries()].map(([k, v]) => [k, v]) },
     accounts,
@@ -467,10 +527,13 @@ function runChecks(G, pages) {
     re: /^heroCard\/.*stat-col.*\/div\.stat\[2\]\/.*div\.sv/, globalValue: U.spent, globalSource: 'budgetUsed(p).spent' });
   dom({ page: D, name: 'Hero: budget used %', formula: 'budgetUsed.used × 100', kind: 'percent',
     re: /^heroCard\/.*stat-col.*\/div\.stat\[2\]\//, globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed(p).used' });
+  /* @hero-budget, not a sibling index: the greeting above this line renders
+     only when Settings.md carries `household:`, so every index below it moved
+     on a vault without one and these two read the set-aside note instead. */
   dom({ page: D, name: 'Hero sub: "spent X"', formula: 'dash.hero.sub {spent: used.spent}',
-    re: /^heroCard\/div\.hero-grid\/div\[0\]\/div\.hero-sub\[3\]/, globalValue: U.spent, globalSource: 'budgetUsed(p).spent', index: 0 });
+    re: /^heroCard\/@hero-budget$/, globalValue: U.spent, globalSource: 'budgetUsed(p).spent', index: 0 });
   dom({ page: D, name: 'Hero sub: "of budgeted Y"', formula: 'dash.hero.sub {budgeted: budgetTotals.spend}',
-    re: /^heroCard\/div\.hero-grid\/div\[0\]\/div\.hero-sub\[3\]/, globalValue: B.spend, globalSource: 'budgetTotals(p).spend', index: 1 });
+    re: /^heroCard\/@hero-budget$/, globalValue: B.spend, globalSource: 'budgetTotals(p).spend', index: 1 });
   dom({ page: D, name: 'Donut: total', formula: 'Σ categorySpendRows (named, non-income, non-transfer, net outflow)',
     re: /^dashSplit\/svg\.donut\/text\[1\]/, globalValue: splitTotal, globalSource: 'Σ periodFigures.split' });
   dom({ page: D, name: 'Donut note: total', formula: 'the note under the donut restates the total',
@@ -517,13 +580,17 @@ function runChecks(G, pages) {
   }
   const poolsImplied = (W.byTypeImplied.savings || 0) + (W.byTypeImplied.investment || 0);
   dom({ page: D, name: 'Position: net worth', formula: 'worth(impliedAccounts, debts, assets, owed).net',
-    re: /^dashPositionKpis\/div\.mini\[0\]\/button\.v/, globalValue: W.implied.net, globalSource: 'worth().net' });
-  dom({ page: D, name: 'Position: debts', formula: 'worth().fromDebts',
-    re: /^dashPositionKpis\/div\.mini\[1\]\/button\.v/, globalValue: W.implied.fromDebts, globalSource: 'worth().fromDebts' });
+    re: /^dashPositionKpis\/@pos-net$/, globalValue: W.implied.net, globalSource: 'worth().net' });
+  /* The tile prints −liabilities (a liability shown as a reduction of net
+     worth, in red, deliberately) and liabilities is fromAccounts + fromDebts.
+     This named fromDebts and dropped the sign: indistinguishable on a household
+     with no overdrawn account, wrong on every household with one. */
+  dom({ page: D, name: 'Position: debts', formula: '−worth().liabilities, as the tile prints it',
+    re: /^dashPositionKpis\/@pos-debt$/, globalValue: -W.implied.liabilities, globalSource: '−worth().liabilities' });
   dom({ page: D, name: 'Position: owed to you', formula: 'worth().ownedOwed',
-    re: /^dashPositionKpis\/div\.mini\[2\]\/button\.v/, globalValue: W.implied.ownedOwed, globalSource: 'worth().ownedOwed' });
+    re: /^dashPositionKpis\/@pos-owed$/, globalValue: W.implied.ownedOwed, globalSource: 'worth().ownedOwed' });
   dom({ page: D, name: 'Position: savings & investments (implied)', formula: 'Σ implied balances of savings- and investment-typed home accounts',
-    re: /^dashPositionKpis\/div\.mini\[3\]\/button\.v/, globalValue: poolsImplied, globalSource: 'byTypeImplied.savings + investment' });
+    re: /^dashPositionKpis\/@pos-savings$/, globalValue: poolsImplied, globalSource: 'byTypeImplied.savings + investment' });
   dom({ page: D, name: 'Position sub: savings (implied)', formula: 'Σ implied, type savings',
     re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: W.byTypeImplied.savings || 0, globalSource: 'byTypeImplied.savings', index: 0 });
   dom({ page: D, name: 'Position sub: invested (implied)', formula: 'Σ implied, type investment',
@@ -543,11 +610,28 @@ function runChecks(G, pages) {
      a lens over rows; its own arithmetic is checked, and its cash figure is
      shown beside the implied bank balances it is a subset of. */
   {
-    const cash = C.fig(D, /^leftBody\/div\.left-grid\[0\]\/div\.left-fig\[0\]\/div\.lv/);
-    const committed = C.fig(D, /^leftBody\/div\.left-grid\[0\]\/div\.left-fig\[2\]\/div\.lv/);
-    const free = C.fig(D, /^leftBody\/div\.left-grid\[0\]\/div\.left-fig\[4\]\/div\.lv/);
-    if (cash && free) C.add({ page: D, name: "What's left: free = cash − committed", formula: 'whatsLeft().free', pageValue: figValue(free), pageSource: free.address,
-      globalValue: figValue(cash) - (committed ? figValue(committed) : 0), globalSource: 'cash − committed, as the card prints them', tol: 1.01 });
+    /* Every term by name. The strip is three to five tiles — the earmark and
+       card terms are each conditional — and `left-op` separators are siblings
+       too, so indexing tiles positionally read "still committed" as "actually
+       free" the moment a household had an earmarked fund. The identity the
+       card actually prints is cash − earmarked − committed − cardDue = free,
+       not cash − committed; the old check's name was wrong as well as its
+       addresses. A short household prints @left-short, and it is the same
+       identity with the sign the label already carries. */
+    const cash = C.fig(D, /^leftBody\/@left-cash$/);
+    const earmarked = C.fig(D, /^leftBody\/@left-earmarked$/);
+    const committed = C.fig(D, /^leftBody\/@left-committed$/);
+    const cardDue = C.fig(D, /^leftBody\/@left-card$/);
+    const freeFig = C.fig(D, /^leftBody\/@left-free$/);
+    const shortFig = C.fig(D, /^leftBody\/@left-short$/);
+    const free = freeFig || shortFig;
+    const term = f => (f ? figValue(f) : 0);
+    if (cash && free) C.add({
+      page: D, name: "What's left: free = cash − earmarked − committed − card",
+      formula: 'the equation the card prints, term by term',
+      pageValue: shortFig ? -figValue(shortFig) : figValue(free), pageSource: free.address,
+      globalValue: term(cash) - term(earmarked) - term(committed) - term(cardDue),
+      globalSource: 'cash − earmarked − committed − cardDue, as the card prints them', tol: 1.01 });
     const bank = Object.entries(W.byTypeImplied).filter(([t]) => !['savings', 'investment'].includes(t)).reduce((t, [, v]) => t + v, 0);
     if (cash) C.add({ page: D, name: "What's left: cash in your accounts vs implied bank balances", formula: 'cashOnHand() counts confirmed, in-budget, non-pool accounts; the implied bank total counts every bank-type account', pageValue: figValue(cash), pageSource: cash.address,
       globalValue: bank, globalSource: 'Σ implied, non-pool types', tol: figTol(cash), expectDiff: true });
@@ -561,17 +645,41 @@ function runChecks(G, pages) {
     re: /^budTable\/tbody\/tr\[\d+\]\/td\.num\[2\]\/div\.bud-amt-wrap\/div\.bud-remaining$/, seam: drawnBudgetPage, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows', allowExtraZero: true });
   /* The totals strip, drawn twice (top and bottom) from one set of operands. */
   for (const strip of ['budTotalsTop', 'budTotalsBottom']) {
+    /* Kept for any tile that has not earned a name yet; every check below
+       addresses a data-fig instead, because the unallocated tile is omitted on
+       a running period with no income row and every index after it moved. */
     const at = (i, cls) => new RegExp(`^${strip}/div\\.bud-total\\[${i}\\]/div\\.${cls}`);
-    dom({ page: BP, name: `${strip}: total income (budgeted)`, formula: 'budgetTotals(p).income', re: at(0, 'bud-total-v'), globalValue: B.income, globalSource: 'budgetTotals.income' });
-    dom({ page: BP, name: `${strip}: income received so far`, formula: 'periodSummary.income', re: at(0, 'bud-total-n'), globalValue: S.income, globalSource: 'periodSummary.income' });
-    dom({ page: BP, name: `${strip}: total budgeted (whole plan)`, formula: 'budgetTotals.spend + setAside', re: at(1, 'bud-total-v'), globalValue: F.planTotal, globalSource: 'whole plan' });
-    dom({ page: BP, name: `${strip}: % of budgeted income`, formula: 'whole plan / budget income', kind: 'percent', re: at(1, 'bud-total-n'), globalValue: F.allocated == null ? null : F.allocated * 100, globalSource: 'allocated share' });
-    dom({ page: BP, name: `${strip}: over-budgeted`, formula: 'whole plan − budget income', re: at(2, 'bud-total-v'), globalValue: F.planTotal - B.income, globalSource: 'planTotal − budgetTotals.income' });
-    dom({ page: BP, name: `${strip}: total spent`, formula: 'budgetUsed(p).spent', re: at(3, 'bud-total-v'), globalValue: U.spent, globalSource: 'budgetUsed.spent' });
-    dom({ page: BP, name: `${strip}: % of budget used`, formula: 'budgetUsed(p).used', kind: 'percent', re: at(3, 'bud-total-n'), globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed.used' });
-    dom({ page: BP, name: `${strip}: gap note (netted + uncategorised)`, formula: 'categoryGap.notShown = gross spend − Σ split', re: at(3, 'bud-total-n'), globalValue: F.gap.notShown, globalSource: 'periodFigures.gap.notShown', index: 0 });
-    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: at(3, 'bud-total-n'), globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 1 });
-    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: at(3, 'bud-total-n'), globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 2 });
+    dom({ page: BP, name: `${strip}: total income (budgeted)`, formula: 'budgetTotals(p).income', re: new RegExp(`^${strip}/@bud-income$`), globalValue: B.income, globalSource: 'budgetTotals.income' });
+    dom({ page: BP, name: `${strip}: income received so far`, formula: 'periodSummary.income', re: new RegExp(`^${strip}/@bud-income-note$`), globalValue: S.income, globalSource: 'periodSummary.income' });
+    dom({ page: BP, name: `${strip}: total budgeted (whole plan)`, formula: 'budgetTotals.spend + setAside', re: new RegExp(`^${strip}/@bud-budgeted$`), globalValue: F.planTotal, globalSource: 'whole plan' });
+    dom({ page: BP, name: `${strip}: % of budgeted income`, formula: 'whole plan / budget income', kind: 'percent', re: new RegExp(`^${strip}/@bud-budgeted-note$`), globalValue: F.allocated == null ? null : F.allocated * 100, globalSource: 'allocated share' });
+    /* The tile prints a MAGNITUDE and its label carries the direction
+       ("Left to budget" / "Over-budgeted"), so it is compared to |unallocated|
+       off the registered seam. Named, too: this tile is omitted entirely on a
+       running period with no income row, which silently shifted every index
+       after it. */
+    dom({ page: BP, name: `${strip}: unallocated (left to budget / over-budgeted)`, formula: '|periodFigures.plan.unallocated| = |income − whole plan|',
+      re: new RegExp(`^${strip}/@bud-unallocated$`),
+      globalValue: F.plan && F.plan.unallocated != null ? Math.abs(F.plan.unallocated) : null, globalSource: '|periodFigures.plan.unallocated|' });
+    dom({ page: BP, name: `${strip}: total spent`, formula: 'budgetUsed(p).spent', re: new RegExp(`^${strip}/@bud-spent$`), globalValue: U.spent, globalSource: 'budgetUsed.spent' });
+    dom({ page: BP, name: `${strip}: % of budget used`, formula: 'budgetUsed(p).used', kind: 'percent', re: new RegExp(`^${strip}/@bud-note-spent$`), globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed.used' });
+    /* WITHDRAWN, not pinned. This compared the Budget strip's gap against
+       `periodFigures.gap.notShown`, which is the DONUT's gap: it sums
+       categorySpendRows, which iterates sum.byCat and so includes categories
+       with no .md file, while the strip sums budgetDraft(), which seeds a row
+       only for declared categories and so excludes them. Two honest gaps, two
+       different numbers, one check conflating them — and the strip's gap has
+       no seam in the register at all (views/budgets.js recomputes grossGap by
+       hand), so there is nothing correct to compare it to yet. A check with no
+       right answer is worse than no check: it trains a reader to ignore a red
+       line. Restore it when the strip's gap gets a seam — see ISSUE 95. */
+    /* Both figures live in ONE named fragment ("R2 000 set aside, R1 000 moved
+       so far"), so they are index 0 and 1 WITHIN it — stable however many other
+       fragments the note carries. Addressed by ordinal across the whole note
+       before, which is why both were passing by coincidence. */
+    const setAsideNote = new RegExp(`^${strip}/@bud-note-setaside$`);
+    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 0 });
+    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 1 });
   }
 
   /* ---- score ---------------------------------------------------------- */
@@ -624,11 +732,34 @@ function runChecks(G, pages) {
   dom({ page: V, name: 'KPI: net worth', formula: 'worth(impliedAccounts…).net', re: /^savingsKpis\/div\.mini\[0\]\/div\.v/, globalValue: W.implied.net, globalSource: 'worth().net' });
   dom({ page: V, name: 'KPI "Savings" (stated balances)', formula: 'Σ stated balance of savings-type home accounts (views/savings.js homeOnly(accountsOfType savings))', re: /^savingsKpis\/div\.mini\[1\]\/div\.v/, globalValue: W.byTypeStated.savings || 0, globalSource: 'Σ stated, type savings' });
   dom({ page: V, name: 'KPI "Investments" (stated balances)', formula: 'Σ stated balance of investment-type home accounts', re: /^savingsKpis\/div\.mini\[2\]\/div\.v/, globalValue: W.byTypeStated.investment || 0, globalSource: 'Σ stated, type investment' });
-  dom({ page: V, name: 'Worth chart: total', formula: 'worth().net', re: /^savingsWorth\/svg\.worth-svg\/text\[1\]/, globalValue: W.implied.net, globalSource: 'worth().net' });
+  /* The chart is TWO partitions, and neither of its bar totals is the net.
+     This read the OWNED bar's total and compared it to worth().net, so it was
+     always short by exactly the liabilities — which is the definition of net,
+     not a disagreement. Each bar is now checked against its own total, and the
+     net is checked as the identity between them. */
+  dom({ page: V, name: 'Worth chart: "What you own" total', formula: 'worth().assets', re: /^savingsWorth\/@worth-owned-total$/, globalValue: W.implied.assets, globalSource: 'worth().assets' });
+  dom({ page: V, name: 'Worth chart: "What you owe" total', formula: 'worth().liabilities', re: /^savingsWorth\/@worth-owed-total$/, globalValue: W.implied.liabilities, globalSource: 'worth().liabilities' });
   {
-    const segFigs = C.figs(V, /^savingsWorth\/svg\.worth-svg\/g\/g\.worth-seg\[\d+\]\/rect\/title/, 'money');
-    const segs = segFigs.map(figValue);
-    C.add({ page: V, name: 'Worth chart: Σ segments = total', formula: 'the bar is a partition of the net', pageValue: segs.reduce((a, b) => a + b, 0), pageSource: `Σ ${segs.length} segments`, globalValue: W.implied.net, globalSource: 'worth().net' });
+    const owned = C.fig(V, /^savingsWorth\/@worth-owned-total$/);
+    const owed = C.fig(V, /^savingsWorth\/@worth-owed-total$/);
+    if (owned) C.add({ page: V, name: 'Worth chart: own − owe = net worth', formula: 'the two bars the chart prints, subtracted', kind: 'money',
+      pageValue: figValue(owned) - (owed ? figValue(owed) : 0), pageSource: 'owned bar − owed bar',
+      globalValue: W.implied.net, globalSource: 'worth().net' });
+  }
+  {
+    /* The old selector required an UNINDEXED band `g` and an INDEXED segment,
+       which together describe exactly one shape: a vault with one bar and two
+       or more segments in it — i.e. a household with no debts. Anywhere else it
+       matched nothing, and Σ of nothing is 0, which the check then compared to
+       the net as though the page had said zero. Named per bar now, and each bar
+       is a partition of its OWN total; Σ of all segments across both bars
+       equals no figure the page prints. */
+    const ownedSegs = C.figs(V, /^savingsWorth\/@worth-owned-seg$/, 'money');
+    const owedSegs = C.figs(V, /^savingsWorth\/@worth-owed-seg$/, 'money');
+    const segFigs = [...ownedSegs, ...owedSegs];
+    const sumOf = fs_ => fs_.map(figValue).reduce((a, b) => a + b, 0);
+    if (ownedSegs.length) C.add({ page: V, name: 'Worth chart: Σ owned segments = "What you own"', formula: 'the owned bar is a partition of its own total', pageValue: sumOf(ownedSegs), pageSource: `Σ ${ownedSegs.length} segments`, globalValue: W.implied.assets, globalSource: 'worth().assets' });
+    if (owedSegs.length) C.add({ page: V, name: 'Worth chart: Σ owed segments = "What you owe"', formula: 'the owed bar is a partition of its own total', pageValue: sumOf(owedSegs), pageSource: `Σ ${owedSegs.length} segments`, globalValue: W.implied.liabilities, globalSource: 'worth().liabilities' });
     /* Segments are named in their titles ("Investments: R …"), so each can be
        matched to the implied per-type total it is drawn from. */
     const segNamed = name => segFigs.find(f => new RegExp(`^${name}:`, 'i').test(f.context.parent || ''));
@@ -651,28 +782,42 @@ function runChecks(G, pages) {
   const statedNet = W.naive.statedPositive - W.naive.statedNegative;
   dom({ page: A, name: 'Hero: accounts total (stated, home currency)', formula: 'worth(stated home accounts, null, null).net', re: /^acctSummary\/div\.card\[0\]\/div\.hero-num/, globalValue: statedNet, globalSource: 'Σ stated home balances' });
   {
-    const owners = C.figs(A, /acct-owner-net/, 'money').map(figValue);
+    /* @acct-owner-net exactly: the foreign "plus $ 1 000" tag is a CHILD of
+       this span, and an unanchored match summed it in as another owner. */
+    const owners = C.figs(A, /^acctSummary\/@acct-owner-net$/, 'money').map(figValue);
     C.add({ page: A, name: 'Owner rows sum to the hero', formula: 'Σ per-owner net = accounts total', pageValue: owners.reduce((a, b) => a + b, 0), pageSource: `Σ ${owners.length} owner rows`, globalValue: statedNet, globalSource: 'Σ stated home balances' });
-    column({ page: A, name: 'Owner rows = Σ by owner', formula: 'a.owner, "joint" when blank', re: /acct-owner-net/, seam: Object.values(W.byOwnerStated), globalSource: 'Σ stated by owner (this script)' });
+    column({ page: A, name: 'Owner rows = Σ by owner', formula: 'a.owner; a blank owner buckets under Unassigned, never "joint"', re: /^acctSummary\/@acct-owner-net$/, seam: Object.values(W.byOwnerStated), globalSource: 'Σ stated by owner (this script)' });
   }
   dom({ page: A, name: 'Donut: total', formula: 'Σ stated home balances', re: /^acctSummary\/div\.card\[2\]\/.*svg\.donut\/text/, globalValue: statedNet, globalSource: 'Σ stated home balances' });
   {
     /* The table groups every non-pool type under one "Bank accounts" header. */
     const groups = { bank: 0 };
     for (const [t, v] of Object.entries(W.byTypeStated)) { if (t === 'savings' || t === 'investment') groups[t] = v; else groups.bank += v; }
-    column({ page: A, name: 'Group totals = Σ by group (bank / savings / investments)', formula: 'type-row totals; bank = every non-pool type', re: /acct-group-total/, seam: Object.values(groups).filter(v => Math.abs(v) >= 0.005), globalSource: 'Σ stated by group (this script)' });
+    column({ page: A, name: 'Group totals = Σ by group (bank / savings / investments)', formula: 'type-row totals; bank = every non-pool type', re: /^acctTable\/@acct-group-total$/, seam: Object.values(groups).filter(v => Math.abs(v) >= 0.005), globalSource: 'Σ stated by group (this script)' });
     for (const [label, type] of [['Savings', 'savings'], ['Investments', 'investment']]) {
-      const f = C.figs(A, /acct-group-total/, 'money').find(x => new RegExp(`^${label}`).test(x.context.parent || ''));
+      const f = C.figs(A, /^acctTable\/@acct-group-total$/, 'money').find(x => new RegExp(`^${label}`).test(x.context.parent || ''));
       C.add({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones', pageValue: figValue(f), pageSource: f ? f.address : `no ${label} group`,
         globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, tol: figTol(f), expectDiff: true });
     }
   }
-  column({ page: A, name: 'Balance column = stated balances', formula: 'button.acct-bal per row', re: /acct-row\[\d+\]\/td\.num\[1\]\/button\.acct-bal/, seam: G.accounts.filter(a => !a.foreign && a.statedRaw == null).map(a => a.stated), globalSource: 'S.accounts[].balance (home, readable)' });
+  /* No `!a.foreign` on the seam: the column renders every account in its OWN
+     symbol, converting and summing nothing, so narrowing the seam to home
+     accounts left the foreign row with no counterpart. `statedRaw == null`
+     stays — an unreadable balance renders as prose, not as a money figure. */
+  column({ page: A, name: 'Balance column = stated balances', formula: 'button.acct-bal per row, each in its own currency', re: /^acctTable\/@acct-bal$/, seam: G.accounts.filter(a => a.statedRaw == null).map(a => a.stated), globalSource: 'S.accounts[].balance (readable)' });
   {
-    const chips = C.figs(A, /acct-chip/, 'money');
+    /* The chip renders its sign as a separate glyph, so the harvested number is
+       a magnitude and a naive compare accepted +500 for a −500. The direction
+       is in the data-fig name instead, and the sign is rebuilt from it — so a
+       chip that printed the wrong way round now fails, which is the whole
+       point of checking it. */
+    const inChips = C.figs(A, /^acctTable\/@acct-flow-in$/, 'money').map(f => ({ f, v: figValue(f) }));
+    const outChips = C.figs(A, /^acctTable\/@acct-flow-out$/, 'money').map(f => ({ f, v: -figValue(f) }));
+    const chips = [...inChips, ...outChips].map(x => x.f);
+    const signed = [...inChips, ...outChips];
     const acts = G.accounts.flatMap(a => [a.activity.net, a.activity.inAmt, a.activity.outAmt]);
     let matched = 0; const miss = [];
-    for (const f of chips) { const v = figValue(f); if (acts.some(x => near(x, v, figTol(f)))) matched++; else miss.push(f.text); }
+    for (const { f, v } of signed) { if (acts.some(x => near(x, v, figTol(f)))) matched++; else miss.push(`${f.text} (as ${v})`); }
     C.add({ page: A, name: 'Flow chips = ACCOUNT-lens activity', formula: 'each chip equals one of net / in / out under tally(rows of that account, ACCOUNT), start..asOf', kind: 'count',
       pageValue: matched, pageSource: `${matched} of ${chips.length} chips matched${miss.length ? ` · unmatched: ${miss.join(', ')}` : ''}`, globalValue: chips.length, globalSource: 'chips on the page', tol: 0 });
   }
@@ -1042,27 +1187,33 @@ function html({ G, pages, checks, matrix, vaultLabel, version, generated, cmd })
 }
 
 /* ---- main --------------------------------------------------------------- */
-(async () => {
-  const abs = resolveBudgetFolder();
-  if (!fs.existsSync(abs)) { console.error(`No such budget folder: ${abs}`); process.exit(1); }
-  const budgetFolder = path.basename(abs);
-  const files = {};
-  for (const [k, v] of Object.entries(readVault(abs))) files[`${budgetFolder}/${k}`] = v;
-  const today = String(flag('today') || localToday());
-  const out = path.resolve(String(flag('out') || path.join(__dirname, '..', 'tests', 'figures', 'live', 'reconcile.html')));
+/* Guarded so `require()`ing this file gives you reconcile() without running a
+   whole reconciliation and writing a page — tests/reconcile-gate.test.cjs
+   imports it. */
+if (require.main === module) (async () => {
+  /* --household runs over the committed fixture; everything else reads a real
+     vault off disk. The fixture path writes its output beside the live one but
+     under a different name, because only the live page holds real balances. */
+  const useHousehold = !!flag('household');
+  const H = useHousehold ? householdVault() : null;
+  const abs = useHousehold ? 'tests/figures/household.cjs (synthetic)' : resolveBudgetFolder();
+  if (!useHousehold && !fs.existsSync(abs)) { console.error(`No such budget folder: ${abs}`); process.exit(1); }
+  const budgetFolder = useHousehold ? H.budgetFolder : path.basename(abs);
+  let files;
+  if (useHousehold) files = H.files;
+  else {
+    files = {};
+    for (const [k, v] of Object.entries(readVault(abs))) files[`${budgetFolder}/${k}`] = v;
+  }
+  const today = String(flag('today') || (useHousehold ? H.today : localToday()));
+  const defaultOut = useHousehold ? 'reconcile-household.html' : 'reconcile.html';
+  const out = path.resolve(String(flag('out') || path.join(__dirname, '..', 'tests', 'figures', 'live', defaultOut)));
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8')).version;
 
-  const unpin = pinClock(today);
-  try {
+  {
     const t0 = Date.now();
-    const M = await mountFor(files, { budgetFolder });
-    const period = String(flag('period') || M.ctx.currentPeriod());
-    M.S.period = period;
-    const G = globals(M.ctx, M.S, period, today);
-    M.restore();
-    const pages = await harvestPages(files, { period, budgetFolder });
-    const checks = runChecks(G, pages);
-    const matrix = presenceMatrix(G, pages);
+    const wantPeriod = flag('period') || (useHousehold ? H.period : null);
+    const { G, pages, checks, matrix, period } = await reconcile({ files, budgetFolder, today, period: wantPeriod });
     const generated = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' (pinned clock)';
     const page = html({ G, pages, checks, matrix, vaultLabel: abs, version, generated, cmd: `node scripts/reconcile-page.cjs ${argv.join(' ')}` });
     fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -1078,5 +1229,9 @@ function html({ G, pages, checks, matrix, vaultLabel, version, generated, cmd })
       console.log(`${k.status.toUpperCase().padEnd(10)} ${k.page.padEnd(12)} ${k.name}: page=${k.pageValue} global=${k.globalValue}${k.delta != null ? ` Δ=${k.delta}` : ''}${k.why && k.why.length ? `  [Δ = ${k.why.join(' | ')}]` : ''}`);
     }
     console.log(`\n→ ${out}`);
-  } finally { unpin(); }
+  }
 })().catch(e => { console.error(e); process.exit(1); });
+
+/* The reconciliation as a function, and the fixture it can run over without a
+   real vault — see tests/reconcile-gate.test.cjs. */
+module.exports = { reconcile, householdVault };

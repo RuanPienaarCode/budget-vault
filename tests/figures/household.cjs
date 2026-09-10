@@ -40,8 +40,13 @@ const tx = rows => TX_HEAD + rows.map(
   r => `| ${r[0]} | ${r[1]} | ${r[2] || ''} | ${r[3].toFixed(2)} | ${r[4] || ''} |  | ${r[5] || ''} |\n`).join('');
 
 const SEED = {
+  /* Two owners, because the Accounts page's owner card is gated on
+     `ownerInPlay()` AND on there being at least two rows — a household that
+     names none, or names one, renders no card at all, and the reconciliation
+     could not see that section on this fixture. */
   [`${B}/Settings.md`]:
-    '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n---\n',
+    '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n'
+    + 'owners: Alex, Sam\n---\n',
 
   [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#33aa66"\n---\n',
   [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\n---\n',
@@ -55,9 +60,9 @@ const SEED = {
   [`${B}/Categories/Carry.md`]: '---\ntype: expense\ncolor: "#aa6633"\nassume_spent: true\n---\n',
 
   [`${B}/Accounts/Cheque.md`]:
-    '---\ntype: checking\ntx_label: "Cheque"\nbalance: 20000.00\nbalance_updated: 2026-09-01\n---\n',
+    '---\ntype: checking\ntx_label: "Cheque"\nowner: Alex\nbalance: 20000.00\nbalance_updated: 2026-09-01\n---\n',
   [`${B}/Accounts/Emergency fund.md`]:
-    '---\ntype: savings\ntx_label: "Emergency fund"\nemergency_fund: true\nbalance: 15000.00\n'
+    '---\ntype: savings\ntx_label: "Emergency fund"\nowner: Sam\nemergency_fund: true\nbalance: 15000.00\n'
     + 'balance_updated: 2026-09-01\ninception_date: 2026-01-01\nstarting_amount: 10000.00\n---\n',
   /* The foreign account. Every multi-currency bug this repo has had needed one
      account the household total must NAME rather than SUM — the hero, the

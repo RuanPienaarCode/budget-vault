@@ -9,7 +9,8 @@
     "test": "node scripts/run-tests.mjs",
     "figures": "node scripts/figures.cjs",
     "figures:bless": "node tests/figures-ledger.test.cjs --bless",
-    "reconcile": "node scripts/reconcile-page.cjs"
+    "reconcile": "node scripts/reconcile-page.cjs",
+    "reconcile:household": "node scripts/reconcile-page.cjs --household"
   },
   "devDependencies": {
     "esbuild": "0.25.10"

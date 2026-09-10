@@ -660,8 +660,15 @@ module.exports = function registerDashboard(ctx) {
     const sub = $('#leftSub');
     if (sub) sub.textContent = i18n.t('dash.left.sub', { date: dayLabel(end) });
 
+    /* The strip is three to five terms — the earmark and card terms are each
+       conditional — and the `left-op` separators sit between them as siblings,
+       so a tile's index among its siblings depends on the shape of the whole
+       card. The reconciliation addressed them that way and read "still
+       committed" as "actually free" on any household with an earmarked fund.
+       Each tile carries its own name now, derived from the class that already
+       distinguishes it: is-cash → left-cash, is-short → left-short. */
     const fig = (cls, value, label, meta) => el('div', { class: `left-fig ${cls}` },
-      el('div', { class: 'lv num' }, value),
+      el('div', { class: 'lv num', 'data-fig': `left-${cls.replace(/^is-/, '')}` }, value),
       el('div', { class: 'll' }, label),
       meta ? el('div', { class: 'lm' }, meta) : '');
 
@@ -1076,9 +1083,17 @@ module.exports = function registerDashboard(ctx) {
      of pages, and the summary has to be the way in. The aria-label carries the
      whole sentence: read as-is a screen reader gets "Debt R124 000", then a
      sub-line it has no way to connect back. */
-  function posTile(grid, { label, value, cls, sub, view, say }) {
+  /* `fig` is a stable name for the reconciliation's harvest — see
+     tests/helpers/figures.cjs's addressOf, which stops walking the moment it
+     finds a data-fig. Without one these tiles were addressed by their sibling
+     index, and the index moves whenever a tile above is conditional: the
+     reconciler compared the Debt tile against a household that had no greeting
+     line and read the wrong node for it. A name costs nothing at runtime and
+     survives a reordered card. */
+  function posTile(grid, { label, value, cls, sub, view, say, fig }) {
     const btn = el('button', {
       type: 'button', class: `v num ${cls || ''}`,
+      ...(fig ? { 'data-fig': fig } : {}),
       'aria-label': say, onclick: () => ctx.switchView(view),
     }, value);
     const t = el('div', { class: 'mini' }, el('div', { class: 'l' }, label), btn);
@@ -1164,7 +1179,7 @@ module.exports = function registerDashboard(ctx) {
     if (!hasLedger) return;
 
     posTile(grid, {
-      label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0),
+      label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0), fig: 'pos-net',
       cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
       sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) })
         + otherLine(worthOtherNet),
@@ -1208,7 +1223,7 @@ module.exports = function registerDashboard(ctx) {
        owedAccounts line above already follows, missed one line further down. */
     const homeActive = w.active.filter(d => !isForeign(d, S.settings.currency)).length;
     posTile(grid, {
-      label: i18n.t('dash.pos.debt'), value: money(-w.liabilities, 0),
+      label: i18n.t('dash.pos.debt'), value: money(-w.liabilities, 0), fig: 'pos-debt',
       cls: w.liabilities > 0 ? 'text-danger' : '',
       sub: w.fromDebts && w.fromAccounts
         ? i18n.t('dash.pos.debtSplit', { accounts: money(w.fromAccounts, 0), debts: money(w.fromDebts, 0) })
@@ -1225,7 +1240,7 @@ module.exports = function registerDashboard(ctx) {
        so it is never red — outstanding is a warning at most. Age rather than a
        due date, for the reason owed-math.js sets out. */
     posTile(grid, {
-      label: i18n.t('dash.pos.owed'), value: money(owed.outstanding, 0),
+      label: i18n.t('dash.pos.owed'), value: money(owed.outstanding, 0), fig: 'pos-owed',
       cls: owed.outstanding > 0 ? 'text-warning' : '',
       sub: owed.outstanding > 0
         ? i18n.t('dash.pos.owedOpen', { count: owed.open })
@@ -1243,7 +1258,7 @@ module.exports = function registerDashboard(ctx) {
        way. Given green it becomes a second green number beside the gradient one,
        and the eye stops being able to tell which of the four is the headline. */
     posTile(grid, {
-      label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0),
+      label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0), fig: 'pos-savings',
       sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
         + otherLine(savingsOthers),
       view: 'savings',
@@ -1594,7 +1609,11 @@ module.exports = function registerDashboard(ctx) {
         S.settings.household ? el('div', { class: 'hero-greet' }, i18n.t('dash.greet.line', { greeting, name: S.settings.household })) : '',
         el('div', { class: 'hero-lbl' }, i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
         heroNum,
-        el('div', { class: 'hero-sub' }, i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
+        /* Named for the harvest: the greeting above is conditional on
+           `household:` being set, so addressing this line by sibling index read
+           the set-aside note instead on any vault without one. */
+        el('div', { class: 'hero-sub', 'data-fig': 'hero-budget' },
+          i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
         spentNoteParts.length
           ? el('div', { class: 'hero-sub hero-sub--ahead' }, spentNoteParts.join(' · '))
           : '',

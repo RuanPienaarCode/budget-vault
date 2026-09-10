@@ -44,6 +44,20 @@ const textOf = node => {
   return out;
 };
 
+/* The same walk with nothing inserted between nodes — the sentence a reader
+   actually sees. The tile's note is assembled from NAMED fragments now (each
+   carries a data-fig so the reconciliation can address "the set-aside figure"
+   rather than "the second money figure in the note"), so it is several element
+   nodes where it used to be one. textOf's ' | ' delimiter lands between them
+   and would report a separator bug that is purely its own. The separator
+   assertions below are about what the reader reads, so they read it flat. */
+const flatOf = node => {
+  let out = '';
+  const walk = n => { if (n._text) out += n._text; for (const c of (n.children || [])) walk(c); };
+  walk(node);
+  return out;
+};
+
 atAuditDate(async () => {
   /* ---------------- the Budget page ---------------- */
   {
@@ -66,9 +80,10 @@ atAuditDate(async () => {
     /* The same key the Dashboard uses, so the two screens cannot word one fact
        differently — asserted by the shared key above, not by a copy of the
        sentence. And the separator: no digit may butt onto a word. */
-    ok(/used · R 5000\.00 more/.test(txt),
-      `the fragment is separated from the sentence it follows — got: ${txt}`);
-    ok(!/usedR /.test(txt), 'and never runs onto the end of it');
+    const flat = flatOf($('#budTotalsTop'));
+    ok(/used · R 5000\.00 more/.test(flat),
+      `the fragment is separated from the sentence it follows — got: ${flat}`);
+    ok(!/usedR /.test(flat), 'and never runs onto the end of it');
   }
 
   /* ---------------- the exported report ---------------- */

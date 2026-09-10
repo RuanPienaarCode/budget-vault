@@ -45,6 +45,26 @@ them.
 of the loader's column mapping stays green while `load.js` changes and every
 subsequent save corrupts data — that file's own header explains why.
 
+**A figure that appears on two pages is guarded by the reconciliation**, not by
+a unit test. `tests/reconcile-gate.test.cjs` renders all sixteen views over the
+committed synthetic household and compares three readings of the same money —
+what the page printed, what the seams hand back, and an independent oracle
+spelled without `ledger.js`. It is a ratchet: a NEW disagreement fails the
+suite, and the pinned baseline can only shrink on purpose. This is the only
+gate that can catch "two figures derived by different rules" in a place nobody
+has looked yet; the regex pins elsewhere only catch the ones already found.
+
+Before a release, run it against a real vault too — the fixture is narrower and
+more exotic than a household:
+
+```
+npm run reconcile -- --obsidian-vault "<vault root>"   # writes a page, real data
+npm run reconcile:household                            # same, no private data
+```
+
+Never commit the output of the first: `tests/figures/live/` is gitignored
+because the page embeds real balances and rows.
+
 ## Two traps that have each cost a release
 
 **Transaction columns are POSITIONAL:**
