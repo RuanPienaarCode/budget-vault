@@ -672,7 +672,7 @@ function runChecks(G, pages) {
        no seam in the register at all (views/budgets.js recomputes grossGap by
        hand), so there is nothing correct to compare it to yet. A check with no
        right answer is worse than no check: it trains a reader to ignore a red
-       line. Restore it when the strip's gap gets a seam — see ISSUE 95. */
+       line. Restore it when the strip's gap gets a seam — see ISSUE 96. */
     /* Both figures live in ONE named fragment ("R2 000 set aside, R1 000 moved
        so far"), so they are index 0 and 1 WITHIN it — stable however many other
        fragments the note carries. Addressed by ordinal across the whole note
