@@ -121,7 +121,17 @@ module.exports = function registerOwed(ctx) {
             /* amountRaw = null: a number typed here supersedes the verbatim text
                table-schema.js keeps for a cell it could not read (see money()
                there) — same as views/budgets.js clearing amountRaw on edit. */
-            onchange: e => { o.amount = Math.max(0, parseFloat(e.target.value) || 0); o.amountRaw = null; mark(); renderOwedKpis(); } })),
+            /* normalizeAmount, not `parseFloat(...) || 0` — the same guard
+               views/assets.js documents. An empty field (which is what a plain
+               number input reports when an SA-locale keypad writes
+               "15 000 000,00" into it) used to read as 0 and, with amountRaw
+               cleared beside it, erase the reader's own text on the next save.
+               addOwed above already parses this way. */
+            onchange: e => {
+              const v = normalizeAmount(e.target.value);
+              if (v === null) { toast('Amount must be a number', true); renderOwedKpis(); return; }
+              o.amount = Math.max(0, v); o.amountRaw = null; mark(); renderOwedKpis();
+            } })),
           /* The age caption under the person's name is derived from this, so
              editing it re-renders the row rather than only marking dirty —
              unlike the amount field, whose figure is read by the KPI tiles and

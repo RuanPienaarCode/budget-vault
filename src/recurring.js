@@ -86,8 +86,31 @@ function chargeStats(charges) {
       varies: med ? (Math.max(...recent3) - Math.min(...recent3)) / med > 0.15 : false,
       first: '', last: '', day: 0, drift: null, undatable: charges.length };
   }
-  /* Amounts come from EVERY charge; only the dates are narrowed. */
+  /* Two amount lists, because two different questions are being asked of them.
+
+     `amounts` is EVERY charge in the order the caller handed them over. That is
+     all the all-time median needs — where a charge sits in the list cannot move
+     a median — and an undatable row is still money that left the account, so it
+     belongs in the price even though it cannot be placed in the history.
+
+     `orderedAmounts` is the datable charges IN DATE ORDER, and every SLICE below
+     — early, late, the last three — must come from it. Rows reach this function
+     account-major, one transaction file at a time (`Object.values(S.txFiles)` in
+     views/services.js, the whole-vault list in committed.js), so a merchant
+     billed from two accounts interleaves and the caller's order is not the
+     merchant's history. On the vault this was built against, a subscription that
+     rose from R699 to R899 when it moved onto the newer card had the R899 rows
+     FIRST: slicing `amounts` read R699 off the tail and called it the current
+     price, so a correctly-listed R899 was reported R200 too high, a +29% rise
+     printed as a -22% fall, and committed.js carried the service R200 light —
+     which inflates "actually free" on the Dashboard hero. `lastAmount` below,
+     which already read from `sorted`, printed R899 on that same card, so the two
+     figures on one row disagreed with each other.
+
+     It also keeps the window honest: W is measured off `sorted.length`, so
+     slicing anything longer than `sorted` reached past the charges W counted. */
   const amounts = charges.map(c => Math.abs(c.amount));
+  const orderedAmounts = sorted.map(c => Math.abs(c.amount));
   const months = [...new Set(sorted.map(c => c.date.slice(0, 7)))];
   const days = sorted.map(c => Number(c.date.slice(8, 10)));
 
@@ -96,8 +119,8 @@ function chargeStats(charges) {
      first bill, a double charge — would otherwise read as a permanent price
      change. Needs enough history on both sides to mean anything. */
   const W = Math.min(6, Math.floor(sorted.length / 2));
-  const early = W >= 2 ? median(amounts.slice(0, W)) : null;
-  const late = W >= 2 ? median(amounts.slice(-W)) : null;
+  const early = W >= 2 ? median(orderedAmounts.slice(0, W)) : null;
+  const late = W >= 2 ? median(orderedAmounts.slice(-W)) : null;
 
   /* The CURRENT price is the median of the last three charges, not the median
      of all of them. A subscription that has been running for four years has an
@@ -108,7 +131,7 @@ function chargeStats(charges) {
      and calling the difference an error is worse than not comparing at all.
 
      Three, not one: a single charge can be a double-bill or a pro-rata. */
-  const recentAmounts = amounts.slice(-3);
+  const recentAmounts = orderedAmounts.slice(-3);
   const recent = median(recentAmounts);
 
   /* Do the recent charges even agree with each other? Two cases produce a

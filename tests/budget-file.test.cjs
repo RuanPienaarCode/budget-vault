@@ -113,6 +113,39 @@ const text = serializeBudgetFile({
   eq(S2.budgets['2026-09'].map(r => r.category), ['Pay', 'Boat', 'Other'],
     'a custom group sorts where the vault says it does — before `expense`, after income');
 
+  /* ---- 2b: a pipe in the TYPE, and the save AFTER it ---------------------
+     Type was the one text cell written without escMd, and it is as hand-typed
+     as the others: groups.js lets a household name its own, and the value is
+     read off a category's `type:` frontmatter. `needs | wants` sheared the row
+     into five cells, and the damage was not what it looked like — the reader
+     took `wants` as the amount (R4 500 → R0, the strict parser handing it to
+     amountRaw) and `4500.00` as the note. Harmless on screen for one render;
+     permanent on the next save, because amountRaw goes back out VERBATIM, so
+     the amount column ends up literally holding the word `wants`.
+
+     Asserted through TWO saves rather than one. A single round trip is green
+     the moment the escape lands, but the figure this bug destroys is destroyed
+     by the second write, and that is the one worth pinning. */
+  const piped = { category: 'Groceries', type: 'needs | wants', amount: 4500, amountRaw: null, notes: 'monthly' };
+  const ctx3 = makeCtx({
+    [`${B}/Settings.md`]: '---\nmonth_start_day: 1\n---\n',
+    [`${B}/Budgets/2026-10.md`]: serializeBudgetFile({ period: '2026-10', rows: [piped] }),
+  });
+  const S3 = await loadInto(ctx3);
+  const backPiped = S3.budgets['2026-10'][0];
+  eq(backPiped.type, 'needs | wants', 'a pipe in the type survives the round trip');
+  eq(backPiped.amount, 4500, 'and the amount is still the amount, not the far side of the shear');
+  eq(backPiped.amountRaw, null, 'the strict parser was never handed a word to reject');
+  eq(backPiped.notes, 'monthly', 'and the note is the note');
+
+  const ctx4 = makeCtx({
+    [`${B}/Settings.md`]: '---\nmonth_start_day: 1\n---\n',
+    [`${B}/Budgets/2026-10.md`]: serializeBudgetFile({ period: '2026-10', rows: S3.budgets['2026-10'] }),
+  });
+  const S4 = await loadInto(ctx4);
+  eq(S4.budgets['2026-10'][0].amount, 4500,
+    'and it is STILL 4500 after a second save — the write-back is where the figure used to be lost');
+
   /* ---- range notes: three shapes, none of them invented ---- */
   ok(/month_start_day: 25/.test(budgetRangeNote({ monthStartDay: 25 })),
     'the monthly note quotes the key it was derived from');

@@ -266,10 +266,17 @@ module.exports = function registerPeriod(ctx) {
   }
   /* ADR-0007 · Moved-to-funds is an aggregate, not per envelope. ISSUE 43 — no
      link exists from a transfer row to a category, and free text is not guessed. */
+  /* ADR-0007 · Moved-to-funds is household currency, both directions. The way
+     savingContribution() does it: a euro fund is not in the pool and a euro row
+     is not in the window, so EUR 5 000 arriving cannot print as R 5 000 and
+     EUR 2 000 leaving cannot cancel a real R 2 000. Every surface printing this
+     figure already carries foreignLabels()' own disclosure beside it. */
   function movedToFunds(p, todayArg) {
     const { start, end } = periodRange(p);
+    const foreign = foreignLabels();
     const labels = new Map();
     for (const f of Object.values(S.txFiles)) {
+      if (foreign.has(f.label)) continue;
       const a = accountForLabel(f.label);
       if (isEarmarkedAccount(a) || isPoolAccount(a)) {
         labels.set(f.label, a);
@@ -282,7 +289,8 @@ module.exports = function registerPeriod(ctx) {
        not yet started moves nothing, and this figure has nowhere to put a caveat. */
     if (today < start) { return 0; }
     const stop = today < end ? today : end;
-    return savedFromOutside(txInRange(start, stop), labels, declaredCatType);
+    const rows = txInRange(start, stop).filter(t => !foreign.has(t.label));
+    return savedFromOutside(rows, labels, declaredCatType);
   }
 
   function earmarkedLabels() {

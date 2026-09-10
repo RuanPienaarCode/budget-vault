@@ -13,6 +13,8 @@ const { serializeBudgetFile, budgetRangeNote } = require('../budget-file');
    indexOf() over the built-in order cannot express that — it returns -1 for
    a custom group, which sorted it above income on this page alone. */
 const { typeOrder, typeRank } = require('../groups');
+/* The one parser for a hand-typed money cell — see the amount input below. */
+const { normalizeAmount } = require('../amount');
 const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
@@ -654,7 +656,19 @@ module.exports = function registerBudgets(ctx) {
           el('td', {}, typeBadge(d.type)),
           el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
             el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
-              'aria-label': i18n.t('bud.aria.amount', { category: d.category }), onchange: e => { d.amount = parseFloat(e.target.value) || 0; d.amountRaw = null; mark(); renderBudgets(); } }),
+              'aria-label': i18n.t('bud.aria.amount', { category: d.category }),
+              /* normalizeAmount, not `parseFloat(...) || 0` — the guard
+                 views/assets.js documents. An empty field is what a plain
+                 number input reports when an SA-locale keypad writes
+                 "15 000 000,00" into it, and reading that as 0 while clearing
+                 amountRaw beside it erases the reader's own text on save.
+                 Two existing keys composed rather than a thirteenth invented:
+                 both already carry all twelve translations. */
+              onchange: e => {
+                const v = normalizeAmount(e.target.value);
+                if (v === null) { toast(i18n.t('acct.err.notNumber', { field: i18n.t('bud.col.amount') }), true); renderBudgets(); return; }
+                d.amount = v; d.amountRaw = null; mark(); renderBudgets();
+              } }),
             remainingEl,
             // Only offered where it means something. On an ordinary row the
             // figure would be written into a budget that transactions will then

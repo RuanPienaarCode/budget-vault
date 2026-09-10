@@ -210,9 +210,13 @@ function remainingCharges({ anchor, next, step, from, to, charges }) {
 /* ADR-0007 · Debt placement window is the period (ISSUE 46). Placed from
    periodStart, not today; a passed day with no payment is `missed`, not
    dropped, and a debt with no category is claimed for the whole period. */
-function debtCommitments({ debts, rows, from, to, periodStart, periodDays, today }) {
+/* ADR-0007 · Rule 2 asks the BUDGET lens. `settleRows` is the rows the lens
+   kept — a narrower question than `rows`, and asking it of `rows` is what made
+   this function disagree with the Debts page. Falls back to `rows` for the
+   Dashboard's foreign bands, which have no BUDGET lens to ask. */
+function debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today }) {
   const out = [];
-  const history = (rows || []).filter(r => !isSplitPart(r));
+  const history = (settleRows || rows || []).filter(r => !isSplitPart(r));
   for (const d of debts || []) {
     if (!d || d.status === 'paid') continue;
     const payment = debtMonthly(d);
@@ -312,7 +316,7 @@ function cardsOwed(accounts) {
 /* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
    `cardRows` from settle-monthly cards, `incomeRows` from in-budget accounts
    only; `free` may be negative, `perDay` is null on the last day. */
-function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, periodStart, periodEnd, today }) {
+function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
   /* The window starts today, not at the period start: a charge dated earlier
@@ -326,7 +330,7 @@ function whatsLeft({ accounts, services, debts, rows, incomeRows, cardRows, peri
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
   const items = [
     ...serviceCommitments({ services, rows, from, to, periodStart }),
-    ...debtCommitments({ debts, rows, from, to, periodStart, periodDays, today: now }),
+    ...debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today: now }),
     ...cardCommitments({ accounts, from, to }),
   ].sort((a, b) => (b.amount - a.amount));
 

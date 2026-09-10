@@ -38,6 +38,27 @@ module.exports = function registerDebts(ctx) {
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('debtsDirty', '#debtSave');
 
+  /* The four money cells on a debt row route through normalizeAmount, the same
+     way views/assets.js does — and for the same reason its comment gives.
+
+     `parseFloat(e.target.value) || 0` reads an empty field as 0, and an empty
+     field is what a plain number input reports when an SA-locale numeric keypad
+     writes "15 000 000,00" into it. It also reads "R4 000" as 0 and
+     "15 000 000,00" as 15. Paired with `<key>Raw = null` — which clears the
+     verbatim text table-schema.js's money() preserved for a cell it could not
+     read — that turned a balance of "1 234 567,89" into 0.00 on disk, with no
+     toast and nothing to undo it. The reader had typed NOTHING.
+
+     null from normalizeAmount means "no number in there": leave the stored
+     figure alone, say so, and redraw so the field shows what is actually saved
+     rather than the text the browser could not parse. A reader who genuinely
+     means nought still types 0, and 0 parses. */
+  const editMoney = (row, key, label, e, after) => {
+    const v = normalizeAmount(e.target.value);
+    if (v === null) { toast(`${label} must be a number`, true); after(); return; }
+    row[key] = Math.max(0, v); row[key + 'Raw'] = null; after();
+  };
+
   /* Copies, each stamped with a stable `key`, because two debts can share a
      name — "Credit card" once per bank is the normal case, not an edge one —
      and debt-math keys its payoff months by `key` for exactly that reason.
@@ -667,21 +688,18 @@ module.exports = function registerDebts(ctx) {
               [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.balance || '',
             style: 'width:120px', 'aria-label': `Balance owed on ${d.name}`,
-            /* Each `<key>Raw = null` clears the verbatim text table-schema.js's
-               money() keeps for a cell it could not read; the writer prefers
-               that text over the fabricated 0 so a save cannot erase it. A
-               number typed here supersedes it — same as views/budgets.js
-               clearing amountRaw on edit. */
-            onchange: e => { d.balance = Math.max(0, parseFloat(e.target.value) || 0); d.balanceRaw = null; refreshAll(); } })),
+            /* All four money cells go through editMoney — see its comment for
+               why the parse and the `<key>Raw` clearing belong together. */
+            onchange: e => editMoney(d, 'balance', 'Balance', e, refreshAll) })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.rate || '',
             style: 'width:84px', 'aria-label': `Annual interest rate on ${d.name}`,
-            onchange: e => { d.rate = Math.max(0, parseFloat(e.target.value) || 0); d.rateRaw = null; refreshAll(); } })),
+            onchange: e => editMoney(d, 'rate', 'Rate', e, refreshAll) })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.payment || '',
             style: 'width:110px', 'aria-label': `Monthly payment on ${d.name}`,
-            onchange: e => { d.payment = Math.max(0, parseFloat(e.target.value) || 0); d.paymentRaw = null; refreshAll(); } })),
+            onchange: e => editMoney(d, 'payment', 'Payment', e, refreshAll) })),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.extra || '',
             style: 'width:100px', 'aria-label': `Extra paid each month on ${d.name}`,
-            onchange: e => { d.extra = Math.max(0, parseFloat(e.target.value) || 0); d.extraRaw = null; refreshAll(); } })),
+            onchange: e => editMoney(d, 'extra', 'Extra', e, refreshAll) })),
           // A category that no longer exists in Categories/ (renamed, or a
           // hand-edited Debts.md) still gets an option of its own. Without it
           // the select falls back to "— none —" and shows a link that IS on
@@ -799,6 +817,14 @@ module.exports = function registerDebts(ctx) {
       // so the "paid off" bar still has a baseline from day one — see
       // refreshRow(), which now also names that baseline on screen.
       original: originalTyped !== null ? Math.max(0, originalTyped) : Math.max(0, balance),
+      /* ISSUE 68's flag, set HERE as well as in load.js's post() step. A debt
+         loaded from disk gets it there; one added through this form did not, so
+         a blank Original — the expected case — seeded `original` from the
+         balance and then wrote that derived figure into Debts.md as though the
+         household had typed it. The next load read it back as stated and the
+         distinction was gone for good. `false` is what makes the serializer
+         write an empty cell instead of a claim nobody made. */
+      originalStated: originalTyped !== null,
       rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
       start: todayIso(),
       category: (r.category || '').trim(), status: 'active', notes: '',

@@ -221,6 +221,48 @@ const svc = (name, provider, amount, cycle, category) =>
     'which the single-description view would have got wrong');
 }
 
+/* ---- 12. the price is read off the DATES, not off the order the rows arrived in ----
+   Rows reach chargeStats() ACCOUNT-MAJOR — views/services.js walks
+   `Object.values(S.txFiles)` one transaction file at a time — so a merchant
+   billed from two accounts interleaves, and the caller's order is not the
+   merchant's history. A subscription that rose R699 -> R899 when it moved onto
+   the newer card had its R899 rows FIRST: slicing the caller's order read R699
+   off the tail and called it the current price. A correctly-listed R899 was
+   reported R200 too high, a +29% rise printed as a -22% fall, and committed.js
+   carried the service R200 light — which inflates "actually free" on the
+   Dashboard hero. `lastAmount` printed R899 on that same card, so the two
+   figures on one row disagreed with each other. */
+{
+  const newer = [chg('2026-05-15', 899, 'NETFLIX ZA'), chg('2026-06-15', 899, 'NETFLIX ZA'),
+    chg('2026-07-15', 899, 'NETFLIX ZA')];
+  const older = [chg('2026-01-15', 699, 'NETFLIX ZA'), chg('2026-02-15', 699, 'NETFLIX ZA'),
+    chg('2026-03-15', 699, 'NETFLIX ZA')];
+
+  const s = chargeStats([...newer, ...older]);   // the order the vault hands them over
+  eq(s.recent, 899, 'the current price is the latest three charges BY DATE, whatever order they arrived in');
+  eq(s.lastAmount, 899, 'and agrees with the last charge, which has always read from the sorted list');
+  near(s.drift, 0.2861, 0.001, 'a price rise reads as a rise, not as the same fall backwards');
+  ok(s.early < s.late, 'early is early because it is earlier, not because it came first in the array');
+  ok(comparePrice(svc('Netflix', 'Netflix', 899), s).agrees,
+    'so a reader who listed the new price is told they are right, not that they are R200 out');
+
+  // The contract underneath all of that: for charges which all carry a date, the
+  // statistics cannot depend on the order the caller happened to hold them in.
+  eq(s, chargeStats([...older, ...newer]),
+    'account-major and date-ordered rows give identical statistics');
+
+  // One stale row arriving LAST is enough to make a steady merchant look
+  // unstable, and `varies` then withholds the price verdict altogether.
+  const jumbled = chargeStats([
+    chg('2026-02-15', 699, 'GYM'), chg('2026-05-15', 899, 'GYM'),
+    chg('2026-06-15', 899, 'GYM'), chg('2026-07-15', 899, 'GYM'),
+    chg('2026-01-15', 699, 'GYM'),
+  ]);
+  eq(jumbled.recent, 899, 'the last three by date are all 899');
+  ok(!jumbled.varies, 'so the price is steady, and a verdict can be offered instead of "varies"');
+  ok(jumbled.drift > 0.2, 'and the rise between the two cards is still visible');
+}
+
 /* ---- a billing day is a whole day ----
    `median` averages the two middle values on an even count, which is right for
    an amount and wrong for a date: charges on the 10th and the 21st gave day

@@ -36,10 +36,13 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
+/* `keeps` is the lens row test — ledger()/LENSES come off ctx (period.js
+   provides them), but the predicate itself is a pure module export. */
+const { keeps } = require('../ledger');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -628,10 +631,22 @@ module.exports = function registerDashboard(ctx) {
        longer holds unconditionally — it holds for the ones that say nothing,
        which is still nearly all of them. A euro subscription belongs to the
        euro band, not the household chain that subtracts it from rand cash. */
+    /* The rows that may SETTLE an instalment, asked of the same lens the Debts
+       page asks — `tally(ledger(start, end), LENSES.BUDGET)` there, the rows
+       behind that tally here. The walk above builds `rows` with no vetoes at
+       all, so rule 2 in committed.js used to let an Excluded row, or one from a
+       `budget: false` account, settle a debt that the Debts page still showed
+       as short: the hero dropped the instalment from "still committed" and
+       added it to "actually free" while the Debts page read R9 000 outstanding.
+       Home band only — see debtCommitments' comment for why a foreign band
+       cannot ask a lens that drops every foreign row. */
+    const settleRows = ledger(start, end).filter(s => keeps(LENSES.BUDGET, s)).map(s => s.row);
+
     const L = whatsLeft({
       accounts: byCurrency.get(home) || [],
       services: homeish(S.services), debts: homeish(S.debts),
       ...txOf(home),
+      settleRows,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 

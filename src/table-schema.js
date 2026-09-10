@@ -77,11 +77,29 @@ const text = (key, header, fallback = '') => ({
   write: r => escMd(r[key]),
 });
 
-// A date or other verbatim string: trimmed, never escaped by the reader
-// today, but written through escMd like every free cell.
+/* A date or other verbatim string. Written through escMd like every free cell,
+   and — since 2026-09-09 — READ back through unescMd, which is the half that
+   was missing.
+
+   This module's own contract at the top says the escape pair lives in one
+   declaration so the two cannot drift apart. Here they had: write escaped, read
+   did not, so every save re-escaped an already-escaped cell. A hand-typed date
+   holding a pipe — "June | maybe", the kind of thing that lands in these cells
+   precisely because they accept text a date parser rejects — gained one
+   backslash per save, forever:
+
+     June \| maybe  ->  June \\| maybe  ->  June \\\| maybe  ->  …
+
+   until a cell that was merely unparseable was unreadable. Five columns carried
+   it: assets `valued`, owed `due` and `lent`, services `next`, debts `start`.
+
+   unescMd also unwinds ONE level per load, so a cell already doubled by an
+   older build heals on successive saves rather than needing a migration. A
+   normal date has nothing to unescape, so no vault gets a churn diff — the
+   golden gate pins those bytes. */
 const verbatim = (key, header) => ({
   key, header, align: 'left',
-  read: c => ({ [key]: (c || '').trim() }),
+  read: c => ({ [key]: unescMd(c || '') }),
   write: r => escMd(r[key]),
 });
 
@@ -110,14 +128,22 @@ const verbatim = (key, header) => ({
    yielded no number at all is preserved (src/amount.js's `readable`).
 
    The write prefers the raw only while the row still HOLDS the 0 that raw
-   produced. views/assets.js and views/debts.js edit these fields in place
-   (`d.balance = Math.max(0, parseFloat(e.target.value) || 0)`) and — unlike
-   views/budgets.js with amountRaw — have no way to clear a sibling key they
-   have never heard of. Preferring the raw unconditionally would make an edit to
-   a previously-unreadable cell vanish on save: the same bug one step to the
-   left. A reader who deliberately types 0 into such a cell sees no change and
-   the raw stands; the app cannot tell that from "never touched", and leaving
-   the reader's own text alone is the honest side to be wrong on. */
+   produced. Preferring it unconditionally would make an edit to a
+   previously-unreadable cell vanish on save: the same bug one step to the left.
+   A reader who deliberately types 0 into such a cell sees no change and the raw
+   stands; the app cannot tell that from "never touched", and leaving the
+   reader's own text alone is the honest side to be wrong on.
+
+   Every in-place editor of these fields clears its own `<key>Raw` and parses
+   through normalizeAmount — assets, debts, owed, services, budgets. That
+   pairing is load-bearing in BOTH directions and the two halves must move
+   together: this comment used to describe the editors as parsing with
+   `parseFloat(e.target.value) || 0`, and while they did, an empty field (which
+   is what a plain number input reports when an SA-locale keypad writes
+   "15 000 000,00" into it) read as 0 AND cleared the raw beside it — so the
+   preserved text this whole contract exists to protect went to 0.00 on disk
+   with nothing said about it. A cell that yields no number must leave the
+   stored figure alone; see the editMoney comment in views/debts.js. */
 const money = (key, header, { floor = false, guarded = false } = {}) => {
   const rawKey = key + 'Raw';
   return {
@@ -262,9 +288,13 @@ const vocab = (key, header, match, other) => {
    exchange-rate lookup needs one; these four tables have no rate lookup
    behind them yet, and a column nothing reads is the thing this comment
    just described. It can be appended the day conversion reaches them. */
+/* Same escape pair as verbatim() above, and it was missing the same half —
+   ISSUE 76 named this column alongside those five. A symbol is the least likely
+   cell in the file to hold a pipe, which is exactly why it would have been the
+   last one anyone noticed drifting. Five tables carry it. */
 const currency = () => ({
   key: 'currency', header: 'Currency', align: 'left',
-  read: c => ({ currency: (c || '').trim() }),
+  read: c => ({ currency: unescMd(c || '') }),
   write: r => escMd(r.currency || ''),
 });
 
@@ -370,10 +400,27 @@ const SCHEMAS = {
            post() fills `original` from the balance so the payoff maths has a
            divisor; `originalStated: false` is how it says that figure was
            derived rather than typed, and writing it would turn a blank into a
-           claim the household never made. */
+           claim the household never made.
+
+           The `== null` arm is that same sentence for a row that never met
+           post(). null is this column's DECLARED state for an absent-or-empty
+           cell — the read above mints it and the comment there calls it
+           legitimate — so the write has to reverse it, and '' is the cell that
+           reads back as null. Without the arm such a row reached `.toFixed` on
+           null and threw; and because rowLine() maps over EVERY column the
+           throw escaped rowLine and then mdTableFile, so the failure was not
+           one wrong cell but no document at all — Debts.md never written and
+           the healthy rows beside it lost with it. usedColumns() already wraps
+           this identical call in `catch (e) { return true; }`; rowLine does
+           not, and a write that is total for every state its own read produces
+           should not need it to. Nothing in the app reaches this today —
+           S.debts is filled in exactly two places, load.js's post() and
+           addDebt(), and both leave a number behind — so this is the guard
+           for the third writer, not a fix for a live crash. */
         write: r => (r.originalStated === false ? ''
           : r.originalRaw != null && !(r.original || 0) ? r.originalRaw
-            : r.original.toFixed(2)),
+            : r.original == null ? ''
+              : r.original.toFixed(2)),
       },
       money('rate', 'Rate', { floor: true }),
       money('payment', 'Payment', { floor: true }),
