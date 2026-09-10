@@ -250,16 +250,21 @@ function makeIo({ vault, plugin }) {
   }
   /* Every .md at or below `rel`, depth-first.
 
-     mdFilesIn reads one level, which is right for Categories/ and Accounts/ —
-     those are flat by construction, because the plugin names the files itself
-     and a nested one would not be found by the writer either. Notes/ is the
-     opposite: the files are the USER'S, and filing a year of them into
-     Notes/2026/ is an ordinary thing to do with a folder full of markdown. Read
-     one level deep, that tidy-up silently emptied the page while every note was
-     still on disk.
+     mdFilesIn reads one level, and the reason is the WRITERS, not the folder.
+     No folder in this vault is flat by construction — it is user-writable
+     markdown, and filing dormant accounts into Accounts/Closed/ or a year of
+     notes into Notes/2026/ is an ordinary tidy-up. Notes/ is read with this
+     function because every note writer addresses `n.rel`, the path the note
+     was read from. Accounts/ joined it once its writers learned `a.rel` too
+     (ISSUE 60) — before that, a recursing loader plus one balance edit left
+     R88 000 nested and R90 000 flat, one account in two files. Categories/,
+     Budgets/, Plans/ and Tax/ are still read one level, because their writers
+     ASSEMBLE `<Folder>/<name>.md` and would fork a nested file the same way.
+     Switching a folder to this function means teaching its writers the path
+     FIRST; tests/account-file-paths.test.cjs holds that order.
 
-     Walks the Notes tree rather than filtering vault.getMarkdownFiles(), so the
-     cost stays proportional to the folder rather than to the vault. */
+     Walks the tree rather than filtering vault.getMarkdownFiles(), so the cost
+     stays proportional to the folder rather than to the vault. */
   function mdFilesUnder(rel) {
     const root = vault.getFolderByPath(relPath(rel));
     if (!root) return [];

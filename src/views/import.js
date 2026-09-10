@@ -488,27 +488,47 @@ module.exports = function registerImport(ctx) {
       $('#importMap').classList.add('hidden');
       if (S.pendingImport) $('#importReview').classList.remove('hidden');
     };
+    /* ISSUE 91. THE SECOND SEAM. `onclick` is a DOM property: it awaits
+       nothing and returns nowhere, so a throw in here became a rejected
+       promise with no owner — invisible on iOS, invisible on desktop unless
+       the console is open, and indistinguishable from a button that does
+       nothing. src/controller.js's wireDropZone already holds this for the two
+       drop targets; this entry is reached through a BUTTON instead of a drop
+       and so never passed through it. Same rule, spelled here:
+
+       REPORTS, IT DOES NOT REPAIR. runImport hides #importMap before it
+       renders, so a failure mid-render leaves the screen half-changed and
+       nothing here can know how far it got — S.pendingImport is left exactly
+       as the failure left it, the same discipline save-failure.test.cjs holds
+       for the nine Save paths. What it must NOT do is fall through to the
+       "produced no transactions" sentence below: telling a reader to check the
+       Date column when the render threw is a confident wrong diagnosis. */
     $('#impMapApply').onclick = async () => {
-      // Clear first: a warning left over from the previous press outlives the
-      // problem it described, so a successful mapping would still be sitting
-      // under a sentence telling the user it failed.
-      $('#impMapWarn').textContent = '';
-      const map = { headerIdx, dataStart: start, iExtra: -1 };
-      for (const f of MAP_FIELDS) map[f.key] = parseInt(selects[f.key].value, 10);
-      // Refuse the two combinations that can't produce a transaction, and say
-      // which — an empty review table is a far worse answer than a sentence.
-      if (map.iDate === map.iDesc)
-        return ($('#impMapWarn').textContent = 'Date and Description are the same column — pick different ones.');
-      if (map.iAmount === -1 && (map.iDebit === -1 || map.iCredit === -1))
-        return ($('#impMapWarn').textContent = 'Pick an Amount column, or both Money out and Money in.');
-      // Same `finally` as handleStatementFile's, for the same reason and with
-      // the same caveat — see the comment there. Both entries to runImport
-      // carry it, because "present in one and easy to lose in the other" is
-      // precisely how this file's drop-zone wiring went wrong before.
-      try { await runImport(rows, map, file); } finally { importProgress('done'); }
-      if (!S.pendingImport || !S.pendingImport.items.length) {
-        $('#importMap').classList.remove('hidden');
-        $('#impMapWarn').textContent = 'That mapping produced no transactions — check the Date column especially.';
+      try {
+        // Clear first: a warning left over from the previous press outlives the
+        // problem it described, so a successful mapping would still be sitting
+        // under a sentence telling the user it failed.
+        $('#impMapWarn').textContent = '';
+        const map = { headerIdx, dataStart: start, iExtra: -1 };
+        for (const f of MAP_FIELDS) map[f.key] = parseInt(selects[f.key].value, 10);
+        // Refuse the two combinations that can't produce a transaction, and say
+        // which — an empty review table is a far worse answer than a sentence.
+        if (map.iDate === map.iDesc)
+          return ($('#impMapWarn').textContent = 'Date and Description are the same column — pick different ones.');
+        if (map.iAmount === -1 && (map.iDebit === -1 || map.iCredit === -1))
+          return ($('#impMapWarn').textContent = 'Pick an Amount column, or both Money out and Money in.');
+        // Same `finally` as handleStatementFile's, for the same reason and with
+        // the same caveat — see the comment there. Both entries to runImport
+        // carry it, because "present in one and easy to lose in the other" is
+        // precisely how this file's drop-zone wiring went wrong before.
+        try { await runImport(rows, map, file); } finally { importProgress('done'); }
+        if (!S.pendingImport || !S.pendingImport.items.length) {
+          $('#importMap').classList.remove('hidden');
+          $('#impMapWarn').textContent = 'That mapping produced no transactions — check the Date column especially.';
+        }
+      } catch (e) {
+        console.error('Budget: the column mapper\'s Apply handler failed', e);
+        toast(`Could not read "${(file && file.name) || 'that file'}" with those columns (${(e && e.message) || e})`, true);
       }
     };
   }

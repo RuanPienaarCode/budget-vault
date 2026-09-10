@@ -452,7 +452,41 @@ function detectStatementColumns(rows, dayFirst = true) {
        column is headed "Fee" is a fee schedule, not a statement. So iFee is
        resolved here but the required-columns test below is unchanged. */
     let iFee = col(FEE_COLS);
-    if (iFee === iAmount || iFee === iDebit || iFee === iCredit) iFee = -1;
+    /* One column, one role — the rule the fee line has always been a single
+       instance of, now spelled once instead of guarding one of four.
+
+       Date, description, amount, debit, credit and balance ALL fall back to a
+       substring match when no alias matches exactly, so two roles can land on
+       the same index: "Credit Balance" answers both `includes('credit')` and
+       `includes('balance')`. A collision means one of those two names was read
+       off a column that does not hold that thing.
+
+       What the collision COSTS differs by role, so the remedy does too. iFee is
+       only ever an extra — never required, read last — and the collision that
+       actually occurs is a lone "Fee Amount" column, where the amount reading
+       is the right one and dropping the fee loses nothing. That is why it has
+       always been a silent -1, and it stays one.
+
+       iBalance is not an extra. It is the column the importer CHECKS ITSELF
+       against (see reconcileAmounts), so a collision there fails twice over:
+       the amount column is wrong, AND the only thing that would have caught it
+       is gone. On the header "Transaction Date,Narrative,Debits,Credit
+       Balance" the credit column resolves to the balance, and since credit is
+       read before debit (views/import.js), every row imports as the running
+       balance — 9750, 8850, 8805, 8185 for a file whose transactions are
+       +9750, -900, -45, -620 — under a banner that blames the balances for not
+       lining up. Neither heading is an exact match there, so nothing here can
+       say which of the two the column meant, and quietly dropping one would be
+       the importer correcting a file it cannot read. null is the honest
+       answer: views/import.js opens the manual column mapper on it, which is
+       this app's door for "ask the user".
+
+       The `i !== -1` test is tidiness on the fee line and load-bearing on the
+       balance one — a Debit/Credit statement carries iAmount === -1, and
+       -1 === -1 would send every one of them to the mapper. */
+    const collides = (i, ...roles) => i !== -1 && roles.some(r => r === i);
+    if (collides(iFee, iAmount, iDebit, iCredit)) iFee = -1;
+    if (collides(iBalance, iAmount, iDebit, iCredit)) return null;
     if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1))) return null;
     return { iDate, iDesc, iAmount, iDebit, iCredit, iFee, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
   }

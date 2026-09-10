@@ -12,7 +12,7 @@
    card settled in full is a commitment, not a debt. Pure — `today` is
    injected — so tests/committed.test.cjs drives it in bare node. */
 
-const { ISO_DATE, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
+const { ISO_DATE, isRealIsoDate, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
 const { isPoolAccount, accountType } = require('./vocabulary');
 const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
 const { isSplitPart } = require('./tx-role');
@@ -128,8 +128,16 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
     const stats = chargeStats(m.charges);        // price
     /* ADR-0007 · Charged by today, not merely present. A row dated later this
        period is not history (ISSUE 35/42/44's as-of, reaching the last
-       figure); price is deliberately not filtered. */
-    const charged = (m.all || []).filter(c => c.date <= from);
+       figure); price is deliberately not filtered.
+
+       ISSUE 91. `isRealIsoDate` FIRST, because `<=` on a date column load.js
+       never validated is a string comparison: `2026-02-30` — reconcile.js's
+       own month-length slip — sits inside a period straddling the month end,
+       so it landed in `charged`, satisfied the landed test below, and dropped
+       R2 500 of medical aid out of "still committed" into "actually free".
+       chargeStats already refuses the row (ISSUE 75); this is the half that
+       decides whether the charge HAPPENED. */
+    const charged = (m.all || []).filter(c => isRealIsoDate(c.date) && c.date <= from);
     const seen = chargeStats(charged);           // liveness + cadence
 
     /* Derived first, typed second. Every next-billing date in the reference
@@ -229,7 +237,11 @@ function debtCommitments({ debts, rows, settleRows, from, to, periodStart, perio
        row dated later this period is still in cash, so it cannot settle the
        instalment; `asOf` falls back to the period end for past periods. */
     const asOf = ISO_DATE.test(today || '') && today < to ? today : to;
-    if (paid.some(r => r.date >= periodStart && r.date <= asOf)) continue;   // rule 2
+    /* ISSUE 91, same guard as `charged` above and for the same reason: a
+       date-SHAPED cell that names no day (`2026-02-30`) passes ISO_DATE, sorts
+       exactly where a real February date would, and would prove an instalment
+       paid that never was. */
+    if (paid.some(r => isRealIsoDate(r.date) && r.date >= periodStart && r.date <= asOf)) continue;   // rule 2
 
     const usual = paid.length ? usualDay(paid.map(r => day(r.date))) : (d.start ? day(d.start) : 0);
     let due = usual ? nextOnDay(periodStart, usual) : null;
@@ -358,9 +370,11 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
   /* ADR-0007 · The settlement cycle. Card spend this period against the
      income that settles it (not gated on periodEnd); R16 958 "short" every
      cycle and R0.02 of interest proved the card is a conduit, not a loan. */
+  /* ISSUE 91's guard, third of three. Junk sorting into this window inflates
+     card spend and can distort the settlement `cycle` derived from it. */
   const cardSpend = (cardRows || []).reduce((s, r) => (
     r && typeof r.amount === 'number' && r.amount < 0 && !isSplitPart(r) &&
-    r.date >= periodStart && r.date <= periodEnd ? s - r.amount : s), 0);
+    isRealIsoDate(r.date) && r.date >= periodStart && r.date <= periodEnd ? s - r.amount : s), 0);
   const settling = (credit && now && credit.next >= now) ? credit : null;
   /* ADR-0007 · Settle-monthly re-checked inside whatsLeft, never trusted from
      the caller: a revolving balance must never read as a cycle. */
