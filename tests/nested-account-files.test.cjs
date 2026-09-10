@@ -57,10 +57,17 @@ const BASE = {
       [`${B}/Accounts/Closed/2019/Older.md`]: '---\ntype: savings\ntx_label: "Older"\nbalance: 100\n---\n',
     }, { settings: { month_start_day: 1 } });
     const S = await loadInto(ctx);
-    eq(S.accounts.map(a => a.name), ['Cheque'], 'the nested files are still not loaded — this fix does not change that');
-    eq(S.accountsIgnored.sort(),
-      ['Budget/Accounts/Closed/2019/Older.md', 'Budget/Accounts/Closed/Old Savings.md'],
-      'but they are counted and named, at any depth');
+    /* ISSUE 60 closed: they are LOADED now, at any depth, because the writers
+       learned to address the path each account was read from before the loader
+       began recursing (tests/account-file-paths.test.cjs holds that order).
+       This file's own subject — the disclosure — survives by retiring itself:
+       `accountsIgnored` is found-minus-read, so it names nothing once nothing
+       is skipped. A caveat that outlives the thing it qualifies is how a real
+       one stops being believed. */
+    eq(S.accounts.map(a => a.name).sort(), ['Cheque', 'Older', 'Old Savings'].sort(),
+      'the nested files are loaded, at any depth');
+    eq(S.accountsIgnored, [],
+      'and nothing is named as skipped, because nothing is');
   }
 
   /* ---- 2. and NOT reported when there is nothing to report ---- */
@@ -101,9 +108,22 @@ const BASE = {
     let txt = '';
     const walk = n => { if (n._text) txt += n._text + ' '; for (const c of (n.children || [])) walk(c); };
     walk($('#acctSummary'));
-    const want = i18n.t('acct.ignoredFiles', { count: 1, names: 'Old Savings' });
-    ok(txt.includes(want),
-      `the Accounts page names the file it is not reading — wanted "${want}", got: ${txt.slice(0, 400)}`);
+    /* The banner used to be the point of this file: name the file we are not
+       reading. We read it now (ISSUE 60), so the honest assertion is the
+       opposite one — no caveat, and the nested account's money in the totals.
+       The banner is now UNREACHABLE, and saying so plainly matters: its only
+       call site reads `S.accountsIgnored`, which is found-minus-read over
+       Accounts/ alone, and that list is now always empty. Categories/,
+       Budgets/, Plans/ and Tax/ are still read one level and drop a nested
+       file with NO disclosure at all — they have no equivalent of this list.
+       The machinery is kept rather than deleted because it is exactly what
+       those folders need pointed at them (ISSUE 97); it retires itself here
+       instead of naming a file the loader has started reading. */
+    const stale = i18n.t('acct.ignoredFiles', { count: 1, names: 'Old Savings' });
+    ok(!txt.includes(stale),
+      `the page no longer says it is skipping a file it now reads — got: ${txt.slice(0, 200)}`);
+    ok(/R 100000\.00/.test(txt),
+      `and the nested account's R88 000 is in the total — got: ${txt.slice(0, 200)}`);
   }
 
   console.log(`PASS nested-account-files (${checks} checks)`);

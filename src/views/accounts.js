@@ -82,6 +82,20 @@ module.exports = function registerAccounts(ctx) {
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName,
     periodRange, currentPeriod } = ctx;
 
+  /* ISSUE 60. The file an account lives in, addressed rather than guessed.
+     `Accounts/${a.name}.md` is a guess about where the file sits, and it is
+     wrong for a household that files dormant accounts into a subfolder —
+     load.js now carries the path each account was actually read from. The
+     fallback covers a record minted in this session before its first write,
+     and equals the guess for every account at the top level, so no vault
+     moves until the loader starts recursing.
+
+     Measured on the vault in the issue: without this, reading a nested account
+     and saving it writes a SECOND file at the assembled path and leaves the
+     original stale — one account, two files, R178 000 on the next load. That
+     is why the writers adopt the path BEFORE the loader recurses. */
+  const acctPath = a => (a && a.rel) || `Accounts/${a.name}.md`;
+
   /* ITEM 2: the SAME wrapper views/savings.js builds for its own totalReturn()
      calls — see savings-math.js's poolCatType() header for why the raw
      ctx.catType must never reach totalReturn() directly here. */
@@ -382,7 +396,7 @@ module.exports = function registerAccounts(ctx) {
   }
 
   async function openAccountFile(a) {
-    const f = fileAt(`Accounts/${a.name}.md`);
+    const f = fileAt(acctPath(a));
     if (!f) return toast(i18n.t('acct.noteMissing', { name: a.name }), true);
     // A new tab, not this one: the budget view is a workspace leaf like any
     // other, and opening in place would close the app the reader is using.
@@ -2221,7 +2235,7 @@ module.exports = function registerAccounts(ctx) {
          opened. Our own writes are deliberately not re-read by the file
          watcher, so nothing else would put this back in step. */
       try {
-        a.fmRaw = await ctx.patchFile(`Accounts/${a.name}.md`, a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
+        a.fmRaw = await ctx.patchFile(acctPath(a), a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
       } catch (e) {
         toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
         return false;
@@ -2265,7 +2279,7 @@ module.exports = function registerAccounts(ctx) {
     // (there is no raw block to patch), but the trailing `a.body ||` still
     // preserves the body, same invariant as the patch branch above.
     try {
-      await writeFile(`Accounts/${a.name}.md`, lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
+      await writeFile(acctPath(a), lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
     } catch (e) {
       toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
       return false;
@@ -2355,6 +2369,10 @@ module.exports = function registerAccounts(ctx) {
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),
+      /* ISSUE 60. Set here as well as in load.js, so an account created in this
+         session addresses the same file on its first save as on every later
+         one — a record without it falls through to the assembled guess. */
+      rel: `Accounts/${name}.md`,
       // '' when the form never asked — saveAccount's FM_WRITERS then writes no
       // owner line at all, which is what a one-person vault should produce.
       owner: (r.owner || '').trim(),
@@ -2416,7 +2434,7 @@ module.exports = function registerAccounts(ctx) {
      delete then reports a success it did not have — or now points at something
      else, which it would trash instead. notes.js paid for that lesson once. */
   async function deleteAccount(a) {
-    const file = fileAt(`Accounts/${a.name}.md`);
+    const file = fileAt(acctPath(a));
     if (!file) return toast(i18n.t('acct.delete.gone', { name: a.name }), true);
 
     /* Every folder that resolves to THIS account, not just `a.name`: tx_label

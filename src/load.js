@@ -46,7 +46,7 @@ function fmBool(v) {
 }
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid, relPath } = ctx;
+  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
 
   /* ADR-0007 · Reads in parallel, parsing serial. The wait is I/O round trips, not work.
      ADR-0007 · read() is declared where loadNotes can reach it. Not inside loadVault. */
@@ -156,16 +156,33 @@ module.exports = function registerLoad(ctx) {
     S.accounts = [];
     /* ADR-0007 · Nested account files are named, not loaded. ISSUE 60: every write site
        addresses Accounts/<name>.md, so loading them would fork the file on the next save. */
-    const nested = mdFilesUnder('Accounts')
-      .filter(f => f.path.slice(0, f.path.lastIndexOf('/')) !== relPath('Accounts'));
-    S.accountsIgnored = nested.map(f => f.path);
+    /* Found minus read, not "deeper than one level": the disclosure then states
+       what this loader actually skipped rather than a second guess at it, and
+       empties itself the day the read below recurses — a caveat that outlives
+       the thing it qualifies is how a real one stops being believed. */
+    /* ISSUE 60, closed: the writers address `a.rel` now (views/accounts.js's
+       acctPath), so a file found deeper is edited in place instead of being
+       forked to a second copy at the top level. That order was the whole
+       blocker — tests/account-file-paths.test.cjs holds it. */
+    const acctFiles = mdFilesUnder('Accounts');
+    const acctRead = new Set(acctFiles.map(f => f.path));
+    S.accountsIgnored = mdFilesUnder('Accounts').filter(f => !acctRead.has(f.path)).map(f => f.path);
     /* ADR-0007 · Two accounts claiming one transaction folder. ISSUE 72: keyed the way
        accountForLabel keys; filled after the accounts loop below. */
     S.accountsDuplicated = [];
-    for (const { file: f, text: acctText } of await read(mdFilesIn('Accounts'))) {
+    const acctBase = ctx.basePath();
+    for (const { file: f, text: acctText } of await read(acctFiles)) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       S.accounts.push({
         name: f.basename,
+        /* The file this account WAS read from, from its own path — loadNotes'
+           rule below, and categories' `rel`. `Accounts/<name>.md` is a guess
+           about where the file sits, and ISSUE 60 is that guess being wrong;
+           an account save must address the file, not the guess. Equal to the
+           assembled path for every account loaded today, so nothing moves —
+           see the ADR-0007 register, "An account carries the path it was read
+           from", for why the writers must adopt it before the loader recurses. */
+        rel: f.path.slice(acctBase.length + 1),
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
