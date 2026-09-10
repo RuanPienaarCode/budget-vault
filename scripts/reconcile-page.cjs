@@ -52,6 +52,26 @@ function readVault(root) {
   return out;
 }
 
+/* --household: the committed synthetic household instead of a real vault.
+
+   This script was written for a real household and could only ever run on one,
+   which is why it was in no gate — the vault it needs cannot be committed to a
+   public repo. tests/figures/household.cjs is already a full vault in exactly
+   the shape readVault() returns ({ 'Budget/Settings.md': text, … }), built to
+   light up all sixteen views, so the reconciliation can run over it with no
+   private data anywhere near it.
+
+   It is not the same subject. The real vault is broader; this fixture is
+   deliberately NARROW and deliberately exotic — one of each row shape the
+   ADR-0005/0006 refactor settled (set-aside, assume-spent, a split, an
+   earmarked outflow), which is more of that per row than a real household
+   carries. Expect it to reconcile differently, and read tests/reconcile-gate
+   for what is currently unexplained. */
+function householdVault() {
+  const { SEED, B, TODAY, PERIOD } = require('../tests/figures/household.cjs');
+  return { files: { ...SEED }, budgetFolder: B, today: TODAY, period: PERIOD };
+}
+
 function resolveBudgetFolder() {
   const v = flag('vault');
   if (v && v !== true) return path.resolve(String(v));
@@ -64,8 +84,27 @@ function resolveBudgetFolder() {
     if (!settings.budgetFolder) { console.error('data.json names no budgetFolder'); process.exit(1); }
     return path.join(root, settings.budgetFolder);
   }
-  console.error('Usage: node scripts/reconcile-page.cjs --vault "<budget folder>" | --obsidian-vault "<vault root>" [--today YYYY-MM-DD] [--period YYYY-MM] [--out file.html]');
+  console.error('Usage: node scripts/reconcile-page.cjs --household | --vault "<budget folder>" | --obsidian-vault "<vault root>" [--today YYYY-MM-DD] [--period YYYY-MM] [--out file.html]');
   process.exit(1);
+}
+
+/* The run itself, with no argv, no filesystem and no HTML — so a guard test can
+   call it. main() below is this plus the page and the console summary.
+
+   `files` is the vault as { path: text }; everything else is optional. Returns
+   the three readings the page compares (rendered / seams / oracle) and the
+   checks over them. */
+async function reconcile({ files, budgetFolder, today, period: wantPeriod }) {
+  const unpin = pinClock(today);
+  try {
+    const M = await mountFor(files, { budgetFolder });
+    const period = String(wantPeriod || M.ctx.currentPeriod());
+    M.S.period = period;
+    const G = globals(M.ctx, M.S, period, today);
+    M.restore();
+    const pages = await harvestPages(files, { period, budgetFolder });
+    return { G, pages, checks: runChecks(G, pages), matrix: presenceMatrix(G, pages), period, today };
+  } finally { unpin(); }
 }
 
 const pad = n => String(n).padStart(2, '0');
@@ -1042,27 +1081,33 @@ function html({ G, pages, checks, matrix, vaultLabel, version, generated, cmd })
 }
 
 /* ---- main --------------------------------------------------------------- */
-(async () => {
-  const abs = resolveBudgetFolder();
-  if (!fs.existsSync(abs)) { console.error(`No such budget folder: ${abs}`); process.exit(1); }
-  const budgetFolder = path.basename(abs);
-  const files = {};
-  for (const [k, v] of Object.entries(readVault(abs))) files[`${budgetFolder}/${k}`] = v;
-  const today = String(flag('today') || localToday());
-  const out = path.resolve(String(flag('out') || path.join(__dirname, '..', 'tests', 'figures', 'live', 'reconcile.html')));
+/* Guarded so `require()`ing this file gives you reconcile() without running a
+   whole reconciliation and writing a page — tests/reconcile-gate.test.cjs
+   imports it. */
+if (require.main === module) (async () => {
+  /* --household runs over the committed fixture; everything else reads a real
+     vault off disk. The fixture path writes its output beside the live one but
+     under a different name, because only the live page holds real balances. */
+  const useHousehold = !!flag('household');
+  const H = useHousehold ? householdVault() : null;
+  const abs = useHousehold ? 'tests/figures/household.cjs (synthetic)' : resolveBudgetFolder();
+  if (!useHousehold && !fs.existsSync(abs)) { console.error(`No such budget folder: ${abs}`); process.exit(1); }
+  const budgetFolder = useHousehold ? H.budgetFolder : path.basename(abs);
+  let files;
+  if (useHousehold) files = H.files;
+  else {
+    files = {};
+    for (const [k, v] of Object.entries(readVault(abs))) files[`${budgetFolder}/${k}`] = v;
+  }
+  const today = String(flag('today') || (useHousehold ? H.today : localToday()));
+  const defaultOut = useHousehold ? 'reconcile-household.html' : 'reconcile.html';
+  const out = path.resolve(String(flag('out') || path.join(__dirname, '..', 'tests', 'figures', 'live', defaultOut)));
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8')).version;
 
-  const unpin = pinClock(today);
-  try {
+  {
     const t0 = Date.now();
-    const M = await mountFor(files, { budgetFolder });
-    const period = String(flag('period') || M.ctx.currentPeriod());
-    M.S.period = period;
-    const G = globals(M.ctx, M.S, period, today);
-    M.restore();
-    const pages = await harvestPages(files, { period, budgetFolder });
-    const checks = runChecks(G, pages);
-    const matrix = presenceMatrix(G, pages);
+    const wantPeriod = flag('period') || (useHousehold ? H.period : null);
+    const { G, pages, checks, matrix, period } = await reconcile({ files, budgetFolder, today, period: wantPeriod });
     const generated = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' (pinned clock)';
     const page = html({ G, pages, checks, matrix, vaultLabel: abs, version, generated, cmd: `node scripts/reconcile-page.cjs ${argv.join(' ')}` });
     fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -1078,5 +1123,9 @@ function html({ G, pages, checks, matrix, vaultLabel, version, generated, cmd })
       console.log(`${k.status.toUpperCase().padEnd(10)} ${k.page.padEnd(12)} ${k.name}: page=${k.pageValue} global=${k.globalValue}${k.delta != null ? ` Δ=${k.delta}` : ''}${k.why && k.why.length ? `  [Δ = ${k.why.join(' | ')}]` : ''}`);
     }
     console.log(`\n→ ${out}`);
-  } finally { unpin(); }
+  }
 })().catch(e => { console.error(e); process.exit(1); });
+
+/* The reconciliation as a function, and the fixture it can run over without a
+   real vault — see tests/reconcile-gate.test.cjs. */
+module.exports = { reconcile, householdVault };
