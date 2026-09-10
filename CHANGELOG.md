@@ -3,6 +3,94 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.43.0 — 2026-09-10
+
+### Fixed
+
+- **A pipe in a category's type sheared its budget row, and the next save made
+  it permanent.** `Type` was the one text cell written without escaping, and it
+  is as hand-typed as the others — it comes off a category's `type:`
+  frontmatter, and a household can name its own groups. `needs | wants` split
+  the row into five cells: the reader took `wants` as the amount (R4 500 → R0)
+  and `4500.00` as the note. Harmless for one render; permanent on the *next*
+  save, because an unreadable amount is written back verbatim — so the amount
+  column ended up literally holding the word `wants`.
+
+- **Five money fields zeroed a real figure when the box was left empty.** On the
+  Debts page (balance, rate, payment, extra), Owed, Services and Budget, an
+  empty field read as 0 while clearing the verbatim text kept for a cell that
+  could not be read — so a balance of "1 234 567,89" went to 0.00 on disk with
+  no message and nothing to undo. An empty box is not hypothetical: it is what a
+  plain number input reports when a phone's numeric keypad writes
+  "15 000 000,00" into it. The Assets page had this fixed already; the other
+  five now use the same guard, which leaves the stored figure alone and says so.
+
+- **One instalment, two answers.** The Debts page asked whether a debt had been
+  paid this period using the budget's own rules; the Dashboard asked by walking
+  the rows directly. An instalment paid on an excluded row, from an account
+  marked out of the budget, or out of an earmarked fund therefore settled on one
+  screen and stayed outstanding on the other — the hero dropping it from "still
+  committed" and adding it to "actually free" while the Debts page read R9 000
+  short, both on screen at once.
+
+- **A subscription billed from two accounts reported its oldest charges as its
+  current price.** The price history was sorted by date and then read in the
+  order the rows happened to arrive, which is account by account. A service that
+  rose from R699 to R899 when it moved card reported R699 as current against a
+  correctly listed R899, printed a +29% rise as a −22% fall, and carried R200
+  too little into "still committed".
+
+- **Money moved into a foreign fund was counted as rands, and a foreign
+  withdrawal could delete a real contribution.** "Moved to funds" had no currency
+  filter in either direction, while the same question asked elsewhere did. €5 000
+  arriving printed as R 12 000 moved; a €2 000 withdrawal, equal and opposite as
+  a bare number, cancelled a genuine R 2 000 — both beside a card already saying
+  an account in another currency was not in the figures.
+
+- **A statement column can only hold one role.** `Debit Amount` / `Credit
+  Amount` — a heading real banks ship — was read as a signed amount column, so
+  every expense imported as **income**: the spending vanished from the budget and
+  the income inflated by the same rand, under a green "amounts check out"
+  banner. `Withdrawal Amount` / `Deposit Amount` matched nothing at all, so the
+  salary vanished. `Paid Out (ZAR)` / `Paid In (ZAR)` was not recognised as a
+  statement at all. And a file with no balance column now says its amounts could
+  not be checked, instead of hiding the message entirely.
+
+- **An account filed in a sub-folder is read.** A household filing dormant
+  accounts into `Accounts/Closed/` had a vault that contradicted itself: the
+  transactions counted, the balance did not — R12 000 of net worth against
+  R100 000 on disk. An account is now addressed by the file it came from, which
+  is what makes reading it safe: doing it the obvious way round writes a second
+  copy at the top level and leaves the original stale.
+
+- **A date that names no day cannot prove a charge went off.** A typo like
+  `2026-02-30` is date-shaped, sorts where a real February date would, and was
+  allowed into the comparison that decides whether a debit order has already
+  been paid — so R2 500 of medical aid moved out of "still committed" and into
+  "actually free". Three separate places asked that question; all three now
+  check the date is real.
+
+- **A failed import looked like a hung one.** A drop or a column-mapper Apply
+  that threw reported nothing at all and left the progress bar frozen at 95%.
+  Both now say what failed and leave everything needed to retry.
+
+- **A date or currency cell holding a pipe gained a backslash on every save**,
+  across eight columns in six tables, until a cell that was merely unparseable
+  became unreadable. Cells already damaged by an older build heal themselves as
+  they are saved.
+
+- **The Plan file's own tests were checking a copy of the reader**, not the
+  reader — so two defects hid behind them: an unreadable cell gained a backslash
+  per save, and retyping one was discarded on the next.
+
+### Changed
+
+- Every figure the app prints now has a stable name, and a reconciliation runs
+  over all sixteen pages on every test run — three readings of the same money
+  side by side, one of them derived without the shared calculation code, so a
+  figure that disagrees with itself fails the build. Internal, but it is what
+  found several of the fixes above.
+
 ## 1.42.0 — 2026-09-09
 
 ### Changed
