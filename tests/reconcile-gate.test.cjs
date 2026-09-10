@@ -21,29 +21,55 @@
    reads, so the reconciliation now runs over it with no private data — that is
    the `--household` mode this test drives.
 
-   WHAT THIS TEST IS, AND IS NOT
+   WHAT THIS TEST IS
 
-   It is a RATCHET, not a clean-zero gate. The fixture currently reconciles with
-   fourteen `fail` checks, and they are pinned below UNTRIAGED. I have not
-   established whether they are defects, fixture gaps, or checks whose DOM
-   selectors do not survive a narrow household — and pinning them as "expected"
-   would be worth nothing if I am wrong about which.
+   A GATE, with a clean baseline: every check the fixture can make agrees. It
+   did not start that way — the first run had fourteen `fail` checks, and all
+   fourteen were triaged (2026-09-10) as faults in the CHECKS, not the app.
+   Thirteen were addressing faults of one shape: a figure located by its position
+   among its siblings, on a page where something above it is conditional. A
+   greeting that renders only with `household:` set, an earmark term that appears
+   only when a fund is earmarked, a second chart bar that exists only with debts,
+   a foreign-currency tag nested INSIDE the total it qualifies — each shifts every
+   index below or around it, and the check then reads its neighbour's figure and
+   reports a disagreement that is entirely its own. The fourteenth was a fixture
+   gap: the household declared no owners, so the Accounts owner card never
+   rendered at all.
 
-   What it does buy, today: a NEW disagreement — an eighth duplication, on any
-   of sixteen pages — makes a name appear in the fail set that is not in this
-   list, and the suite goes red. That is the thing the regexes cannot do.
+   The fix was to give the figures NAMES. `data-fig` on a node stops addressOf's
+   walk (tests/helpers/figures.cjs), so the address is `root/@name` and survives
+   any reordering. The views name their own figures now, and the checks address
+   them by name.
 
-   It also fails when a pinned name DISAPPEARS. That is deliberate: if one of
-   the fourteen is fixed, the list must be updated in the same commit, so the
-   baseline can only ever shrink on purpose. A silently-shrinking allowlist is
-   how a gate stops meaning anything.
+   Two checks changed meaning rather than address, and both were the repo's own
+   signature defect sitting inside the instrument built to catch it:
 
-   The fixture is NOT the real vault and does not replace running this against
-   one before a release (`npm run reconcile -- --obsidian-vault "<root>"`). It
-   is narrower and deliberately more exotic — one of each row shape ADR-0005 and
-   ADR-0006 settled, which is more per row than a household carries. See
-   docs/adr/0007 and ISSUE 89 (a second golden household), which is the work
-   that would let the fourteen be triaged properly.
+     - the unallocated tile was compared against `planTotal − income`, spelled by
+       hand here, where ADR-0007 registers `unallocated` as `income − total`. Two
+       rules for one figure, disagreeing by exactly twice itself.
+     - the worth chart's owned bar was compared against `worth().net`. It is
+       always short by the liabilities, because that is what net MEANS.
+
+   One check was WITHDRAWN rather than fixed: the Budget strip's gap note had no
+   correct global to compare against — `gap.notShown` is the donut's gap over a
+   different row population — and the strip's own gap has no seam in the register
+   at all. A check with no right answer is worse than no check.
+
+   WHAT IT ASSERTS
+
+   `fail` must be EMPTY. Not a pinned list — empty. A new disagreement on any of
+   sixteen pages fails the suite, which is the thing the seven anti-duplication
+   regexes elsewhere cannot do: they match the literal text of duplications
+   already found.
+
+   `info` and `unverified` are pinned in BOTH directions. `info` is a difference
+   the script could attribute to a documented gap, so a new one is a new place
+   the app prints two bases of one figure (ISSUE 88). `unverified` is pinned
+   because it is where a broken check hides: add() downgrades to `unverified`
+   whenever either side is not a number, so a selector that stops matching looks
+   exactly like a fixture that cannot exercise the check. Four of the original
+   fourteen unverified were that, not fixture gaps. Pinning the set means a check
+   going quiet has to be acknowledged.
 
      node tests/reconcile-gate.test.cjs
 */
@@ -58,22 +84,6 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 /* Identity is `page :: name`, because a check's name is unique only within its
    page and a duplication that moves from one page to another is a new finding,
    not the same one. */
-const UNTRIAGED_FAILURES = [
-  'accounts :: Balance column = stated balances',
-  'accounts :: Flow chips = ACCOUNT-lens activity',
-  'accounts :: Group totals = Σ by group (bank / savings / investments)',
-  'accounts :: Owner rows sum to the hero',
-  'budgets :: budTotalsBottom: gap note (netted + uncategorised)',
-  'budgets :: budTotalsBottom: over-budgeted',
-  'budgets :: budTotalsTop: gap note (netted + uncategorised)',
-  'budgets :: budTotalsTop: over-budgeted',
-  'dashboard :: Hero sub: "of budgeted Y"',
-  'dashboard :: Hero sub: "spent X"',
-  'dashboard :: Position: debts',
-  "dashboard :: What's left: free = cash − committed",
-  'savings :: Worth chart: total',
-  'savings :: Worth chart: Σ segments = total',
-];
 
 /* `info` is a difference the script could ATTRIBUTE to a documented gap —
    two rules printing two readings on purpose. Pinned for the same reason: a new
@@ -84,12 +94,33 @@ const EXPLAINED_DIFFERENCES = [
   "dashboard :: What's left: cash in your accounts vs implied bank balances",
 ];
 
-/* A floor, not a pin. Checks move between `pass` and `unverified` as the
-   fixture grows a figure a page could not previously render, and pinning the
-   exact number would make this test fail on work that improved coverage. But it
-   must not silently COLLAPSE: a check that stops being made stops guarding, and
-   a run where most checks went unverified would otherwise look like a pass. */
-const MIN_PASSING = 90;
+/* Every check the fixture cannot make, pinned in both directions. Ten are
+   honest fixture gaps — no investment account, no fixed-bill category, no prior
+   period to average, a Plans file holding budget-shaped rows rather than plan
+   sources, no stale balance to disclose a drift against. Two are the
+   stated-vs-implied KPI pairs whose partner segment is one of those gaps.
+
+   Growing the fixture is how these come off the list, and #89 is that work. A
+   check leaving this list is good news that still has to be written down. */
+const CANNOT_BE_MADE = [
+  'accounts :: Group "Investments" (stated) vs Dashboard tile (implied)',
+  'dashboard :: Stale note: drift',
+  'plan :: \u03a3 envelopes + free = pot',
+  'plan :: \u03a3 sources = pot',
+  'savings :: KPI "Investments" (stated) vs chart "Investments" segment (implied)',
+  'savings :: KPI "Savings" (stated) vs chart "Savings" segment (implied)',
+  'savings :: Worth chart: "Investments" segment (implied)',
+  'savings :: Worth chart: "Savings" segment (implied)',
+  'score :: Budget chip "budget used" (this period) vs ring (six-period average)',
+  'score :: Ring: budget used (six-period average)',
+  'score :: Ring: fixed bills % of income',
+  'score :: Ring: living costs % of income',
+];
+
+/* A floor under the passing count as well, so a wholesale collapse into
+   `unverified` cannot read as a pass even if someone updates the list above
+   without thinking about why it grew. */
+const MIN_PASSING = 100;
 
 (async () => {
   const H = householdVault();
@@ -116,17 +147,21 @@ const MIN_PASSING = 90;
   /* ---- the ratchet ------------------------------------------------------ */
 
   const failures = idsOf('fail');
-  const appeared = failures.filter(f => !UNTRIAGED_FAILURES.includes(f));
-  const cleared = UNTRIAGED_FAILURES.filter(f => !failures.includes(f));
+  eq(failures, [],
+    'a figure disagrees with the global total it is checked against — this is the '
+    + '"two figures derived by different rules" shape, and every one of these was a real '
+    + 'finding or a broken check. Run `npm run reconcile:household` and read the page it '
+    + 'writes. Do NOT pin it here: this list is empty on purpose.');
 
-  eq(appeared, [],
-    'a NEW figure disagrees with the global total it is checked against — this is the '
-    + '"two figures derived by different rules" shape. Run `npm run reconcile:household` '
-    + 'and read the page it writes.');
-
-  eq(cleared, [],
-    'a pinned disagreement is GONE — good, but remove it from UNTRIAGED_FAILURES in this '
-    + 'commit. The baseline must only ever shrink on purpose.');
+  const quiet = idsOf('unverified');
+  eq(quiet.filter(f => !CANNOT_BE_MADE.includes(f)), [],
+    'a check went QUIET. add() downgrades to unverified whenever either side is not a '
+    + 'number, so this is either a selector that stopped matching — the failure mode that '
+    + 'makes a gate look green while guarding nothing — or a figure that legitimately '
+    + 'cannot be measured on this household. Find out which, then fix it or pin it.');
+  eq(CANNOT_BE_MADE.filter(f => !quiet.includes(f)), [],
+    'a check that could not be made now can — the fixture grew. Remove it from '
+    + 'CANNOT_BE_MADE in this commit.');
 
   const explained = idsOf('info');
   eq(explained.filter(f => !EXPLAINED_DIFFERENCES.includes(f)), [],
@@ -166,6 +201,6 @@ const MIN_PASSING = 90;
     + 'ever disagree, one of them is wrong about what the household spent');
 
   console.log(`PASS — the reconciliation runs as a gate: ${figures} figures, ${result.length} checks, `
-    + `${passing} agree, ${failures.length} pinned untriaged, ${explained.length} explained `
+    + `${passing} agree, ${failures.length} disagree, ${explained.length} explained, ${quiet.length} not measurable `
     + `(${Date.now() - t0}ms, ${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

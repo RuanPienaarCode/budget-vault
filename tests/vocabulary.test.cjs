@@ -336,8 +336,16 @@ function provenFalse(desc, exactShape, mangled) {
     'Total spent (Budget): and prints that reading, not a second one');
   ok(live.budgets.includes("label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,"),
     'Total spent (Budget): the tile actually renders that figure, red against the same denominator the percentage uses');
-  ok(live.budgets.includes('+ gapNote },'),
+  /* The note is assembled as named fragments now — each carries a data-fig so
+     the reconciliation can address "the set-aside figure" rather than "the
+     second money figure in the note" — so the disclosure is `gapText()`, the
+     fragments concatenated, where it used to be the `gapNote` string. Same
+     claim, same rendered sentence; this pin follows the spelling because it is
+     a source grep and that is its known cost. */
+  ok(live.budgets.includes('note: spentNote + gapText(),'),
     'Total spent (Budget): the declared half — the tile\'s note discloses exactly how it differs from the per-category table under it (grossGap split into gapUncat/gapNetted), the same disclosure policy cross-page-consistency.test.cjs pins for the Dashboard\'s donut');
+  ok(/gapParts\.push\(\{ fig, text \}\)/.test(live.budgets) && live.budgets.includes("addPart('bud-note-uncat'") && live.budgets.includes("addPart('bud-note-netted'"),
+    'Total spent (Budget): and the uncategorised and netted halves are still the fragments that make it up, each named');
 
   // Negative control: a Budget tile that silently dropped the overlay (or
   // the disclosure) would read as the Dashboard's own unqualified spend —

@@ -396,12 +396,22 @@ module.exports = function registerBudgets(ctx) {
       ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
       : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '');
 
-    let gapNote = '';
+    /* The note is assembled as NAMED fragments rather than one string. The
+       rendered sentence is unchanged — they are concatenated in order, each
+       still carrying its own leading separator — but each fragment gets a
+       data-fig, so a reconciliation can address "the set-aside figure" instead
+       of "the second money figure in the note". It addressed them by ordinal
+       before, and the ordinals move with the fragments that happen to fire:
+       three checks on this note were passing only because an assume-spent row
+       occupied slot 0 on the household they were written against. */
+    const gapParts = [];
+    const gapText = () => gapParts.map(x => x.text).join('');
+    const addPart = (fig, text) => { if (text) gapParts.push({ fig, text }); };
     /* ' · ' exactly when something already stands to the left of this
        fragment — the tile's own sentence, or an earlier fragment. */
-    const sep = () => ((spentNote || gapNote) ? ' · ' : '');
-    if (gapUncat >= 1) gapNote += i18n.t('dash.split.uncatNote', { amount: money(gapUncat) });
-    if (gapNetted >= 1) gapNote += i18n.t('dash.split.nettedNote', { amount: money(gapNetted) });
+    const sep = () => ((spentNote || gapParts.length) ? ' · ' : '');
+    if (gapUncat >= 1) addPart('bud-note-uncat', i18n.t('dash.split.uncatNote', { amount: money(gapUncat) }));
+    if (gapNetted >= 1) addPart('bud-note-netted', i18n.t('dash.split.nettedNote', { amount: money(gapNetted) }));
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
        accounts for what this tile's gross figure holds that the table below it
        nets away, and this accounts for what periodSummary never counted at
@@ -423,9 +433,9 @@ module.exports = function registerBudgets(ctx) {
          a stray bullet). On a period with a foreign account and no home
          spend or budget — gapNote still empty — an unconditional ' · ' opened
          the tile's note with a bullet. */
-      gapNote += sep() + i18n.t('dash.foreignExcluded', {
+      addPart('bud-note-foreign', sep() + i18n.t('dash.foreignExcluded', {
         count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
-      });
+      }));
     }
     /* A THIRD omission, and the newest: money that left an account the
        household has declared set aside (ISSUE 41). summaryInRange vetoes those
@@ -440,15 +450,15 @@ module.exports = function registerBudgets(ctx) {
     /* ADR-0005: the tile no longer counts set-aside as spent, and says so the
        way the Dashboard hero does. */
     if (used.setAside > 0) {
-      gapNote += sep() + i18n.t('dash.stat.setAsideMoved', {
+      addPart('bud-note-setaside', sep() + i18n.t('dash.stat.setAsideMoved', {
         amount: money(used.setAside, 0), moved: money(movedToFunds(S.period), 0),
-      });
+      }));
     }
     const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
     if (fromFunds.count) {
-      gapNote += sep() + i18n.t('dash.fundedFromSavings', {
+      addPart('bud-note-funds', sep() + i18n.t('dash.fundedFromSavings', {
         amount: money(fromFunds.spend), count: fromFunds.count,
-      });
+      }));
     }
 
     /* Income minus what's been budgeted — the number that answers "have I given
@@ -472,19 +482,29 @@ module.exports = function registerBudgets(ctx) {
       const unallocated = plan.unallocated;
       unallocatedTile = {
         label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
+        /* One name for both branches. The tile prints a MAGNITUDE and the
+           label carries the direction, so a reconciliation must compare it to
+           |unallocated| — reading it as a signed figure is how the check on
+           this tile came to disagree with the page by exactly twice itself. */
+        fig: 'bud-unallocated',
         over: unallocated < 0,
         note: unallocated < 0 ? i18n.t('bud.total.overNote')
           : (plan.incomeBase > 0 ? i18n.t('bud.total.leftNote') : ''),
       };
     }
+    /* Every tile names itself. The unallocated one is conditional (a running
+       period with no income row omits it), so addressing any of these by
+       position means the tile after it is read as the tile before it the
+       moment a household differs from the one the reader had in mind. */
     return [
-      { label: i18n.t('bud.total.income'), value: money(income), grad: true,
+      { label: i18n.t('bud.total.income'), value: money(income), grad: true, fig: 'bud-income',
         note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },
-      { label: i18n.t('bud.total.budgeted'), value: money(budgeted),
+      { label: i18n.t('bud.total.budgeted'), value: money(budgeted), fig: 'bud-budgeted',
         note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
       ...(unallocatedTile ? [unallocatedTile] : []),
       { label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,
-        note: spentNote + gapNote },
+        fig: 'bud-spent', note: spentNote + gapText(),
+        noteParts: [...(spentNote ? [{ fig: 'bud-note-spent', text: spentNote }] : []), ...gapParts] },
     ];
   }
 
@@ -499,8 +519,15 @@ module.exports = function registerBudgets(ctx) {
       for (const t of tiles) {
         host.append(el('div', { class: 'bud-total' },
           el('div', { class: 'bud-total-l' }, t.label),
-          el('div', { class: `bud-total-v${t.grad ? ' grad-txt' : ''}${t.over ? ' over' : ''}` }, t.value),
-          t.note ? el('div', { class: 'bud-total-n' }, t.note) : ''));
+          el('div', { class: `bud-total-v${t.grad ? ' grad-txt' : ''}${t.over ? ' over' : ''}`,
+            ...(t.fig ? { 'data-fig': t.fig } : {}) }, t.value),
+          /* A tile whose note is one plain sentence names the note itself; the
+             spent tile's note is many fragments and names each of them. */
+          t.note ? el('div', { class: 'bud-total-n',
+            ...(t.fig && !(t.noteParts && t.noteParts.length) ? { 'data-fig': `${t.fig}-note` } : {}) },
+            ...(t.noteParts && t.noteParts.length
+              ? t.noteParts.map(pt => el('span', { 'data-fig': pt.fig }, pt.text))
+              : [t.note])) : ''));
       }
     }
   }

@@ -1447,7 +1447,14 @@ module.exports = function registerSavings(ctx) {
       tipBox.classList.remove('is-on');
     };
 
-    const row = (y, segs, total, heading, idx) => {
+    /* `fig` names this bar for the reconciliation. The chart is TWO partitions
+       — owned and owed — and the harvest could address neither: the band <g>
+       carries a sibling index only when both bars draw, so a selector written
+       against a debt-free vault matched nothing here, and the bar totals were
+       four unlabelled <text> nodes in document order. Naming them lets a check
+       assert each bar sums to its own total, which is the identity that
+       actually holds; Σ of all segments equals no figure on the page. */
+    const row = (y, segs, total, heading, idx, fig) => {
       add('text', {
         x: padL, y: y - 10, 'font-size': '13', 'font-weight': '600',
         fill: 'currentColor', 'fill-opacity': '0.55', 'font-family': 'inherit',
@@ -1455,6 +1462,7 @@ module.exports = function registerSavings(ctx) {
       add('text', {
         x: W - padR, y: y - 10, 'text-anchor': 'end', 'font-size': '13', 'font-weight': '700',
         fill: 'currentColor', 'fill-opacity': '0.8', 'font-family': 'inherit',
+        'data-fig': `${fig}-total`,
       }).textContent = money(total, 0);
       // The track shows how far short of the longer bar this one falls.
       // rx capped at half of the new thin barH, not the old bar's 10 — a
@@ -1506,7 +1514,7 @@ module.exports = function registerSavings(ctx) {
            gets no glow rather than an invented one. */
         const rgb = parseColor(seg.color);
         const g = add('g', {
-          class: 'worth-seg',
+          class: 'worth-seg', 'data-fig': `${fig}-seg`,
           style: rgb
             ? `--seg-soft:rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.28);` +
               `--seg-glow:rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.6)`
@@ -1551,8 +1559,8 @@ module.exports = function registerSavings(ctx) {
       }, band);
     };
 
-    row(30, assets, totalAssets, 'What you own', 0);
-    row(86, debts, totalDebts, 'What you owe', 1);
+    row(30, assets, totalAssets, 'What you own', 0, 'worth-owned');
+    row(86, debts, totalDebts, 'What you owe', 1, 'worth-owed');
 
     if (hoverable) {
       /* Positioned from the pointer rather than from the segment: a segment can
