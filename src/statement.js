@@ -413,9 +413,18 @@ function detectStatementColumns(rows, dayFirst = true) {
     const low = r.map(c => c.trim().toLowerCase());
     const has = names => names.some(n => low.includes(n));
     return (has(DATE_COLS) || low.some(c => c.includes('date'))) &&
+           /* ISSUE 95. The pair test searches the whole vocabulary as
+              substrings, the same way the resolution below does. Testing the
+              single words "debit"/"credit" meant `Paid Out (ZAR)` / `Paid In
+              (ZAR)` was not DETECTED AS A STATEMENT at all — the aliases are
+              listed, but only as exact matches, so a currency suffix took the
+              file to "this doesn't look like a statement". Requiring BOTH
+              sides keeps it a strong signal: one column mentioning "deposit"
+              does not make a file a statement. */
            (has(AMOUNT_COLS) || low.some(c => c.includes('amount'))
              || (has(DEBIT_COLS) && has(CREDIT_COLS))
-             || (low.some(c => c.includes('debit')) && low.some(c => c.includes('credit'))));
+             || (low.some(c => DEBIT_COLS.some(n => c.includes(n)))
+               && low.some(c => CREDIT_COLS.some(n => c.includes(n)))));
   });
   if (headerIdx !== -1) {
     const low = rows[headerIdx].map(c => c.trim().toLowerCase());
@@ -443,10 +452,19 @@ function detectStatementColumns(rows, dayFirst = true) {
        matched nothing at all and threw a perfectly ordinary two-column
        statement to the manual mapper. A currency in a heading is a label on
        the column, not a different column. */
+    /* ISSUE 95. The fallback searches the WHOLE vocabulary as substrings, not
+       the single word "debit"/"credit". `Withdrawal Amount` / `Deposit Amount`
+       is an ordinary heading and matched nothing: DEBIT_COLS carries
+       "withdrawal" but not "withdrawal amount", and `includes('debit')` is
+       false for it. No pair resolved, iAmount grabbed the withdrawal column,
+       and the deposit column was never read — the salary vanished and every
+       expense booked as income. Every alias already listed now works as a
+       substring too, which is what "a currency in a heading is a label on the
+       column" was already saying one line up. */
     let iDebit = col(DEBIT_COLS);
-    if (iDebit === -1) iDebit = low.findIndex(c => c.includes('debit'));
+    if (iDebit === -1) iDebit = low.findIndex(c => DEBIT_COLS.some(n => c.includes(n)));
     let iCredit = col(CREDIT_COLS);
-    if (iCredit === -1) iCredit = low.findIndex(c => c.includes('credit'));
+    if (iCredit === -1) iCredit = low.findIndex(c => CREDIT_COLS.some(n => c.includes(n)));
     /* Only ever an EXTRA column beside a pair or a signed amount, never the
        thing that makes a file importable on its own: a file whose only numeric
        column is headed "Fee" is a fee schedule, not a statement. So iFee is
@@ -487,6 +505,30 @@ function detectStatementColumns(rows, dayFirst = true) {
     const collides = (i, ...roles) => i !== -1 && roles.some(r => r === i);
     if (collides(iFee, iAmount, iDebit, iCredit)) iFee = -1;
     if (collides(iBalance, iAmount, iDebit, iCredit)) return null;
+    /* ISSUE 95. When the generic amount lands on a column the PAIR already
+       named, the pair wins and iAmount steps aside.
+
+       `Debit Amount` / `Credit Amount` is a heading real banks ship. DEBIT_COLS
+       matches "debit amount" exactly; AMOUNT_COLS does not, so iAmount falls to
+       its substring and lands on the same column. views/import.js reads iAmount
+       FIRST and UNNEGATED, so the debit cell was taken as a signed amount:
+
+         Date,Narrative,Debit Amount,Credit Amount,Balance
+         imported: 9750, 900, 45          truth: +9750, -900, -45
+
+       Every expense booked as INCOME — the spending gone from the budget and
+       the income inflated by the same rand. Worse, `reconcileAmounts` then
+       CONFIRMS the reading (the file genuinely reconciles under flip:true), so
+       the reader gets the green "amounts check out" banner over it.
+
+       The pair wins because it is the stronger claim: two columns whose
+       headings name their directions, against one substring match on a word
+       that appears in both of them. Dropping iAmount is safe precisely because
+       the pair is complete — the credit branch honours the cell's own sign and
+       the debit branch negates, which is how a bare Debit/Credit file has
+       always been read. A collision with only ONE side of the pair leaves that
+       side to the same rule; nothing is guessed. */
+    if (collides(iAmount, iDebit, iCredit)) iAmount = -1;
     if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1))) return null;
     return { iDate, iDesc, iAmount, iDebit, iCredit, iFee, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
   }

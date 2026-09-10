@@ -587,7 +587,24 @@ module.exports = function registerImport(ctx) {
        to "amounts check out". */
     const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
     for (const it of items) it.amount = flipped ? -it.amount0 : it.amount0;
-    return rec ? { ...rec, flipped, inverted } : null;
+    if (rec) return { ...rec, flipped, inverted };
+    /* ISSUE 95. No balance column means the check cannot be MADE — which is a
+       thing to say, not a reason to go quiet. Returning null hid the banner
+       entirely, so the one file the importer could not verify was also the one
+       file that said nothing about it, while every verifiable file got a
+       sentence. reconcileAmounts is already honest here (it returns a
+       structured unverified verdict for a thin ledger); the caller simply
+       declined to ask.
+
+       `oneSign` is the tell worth naming: a real statement mixes money in and
+       money out, so a file where every amount points the same way is usually a
+       debit/credit pair that resolved to a single column — the shape the two
+       fixes in statement.js address. With no balance column there is nothing
+       to prove it either way, which is exactly why the reader is told rather
+       than corrected. */
+    const signs = new Set(items.map(it => Math.sign(it.amount0)).filter(Boolean));
+    return { verified: false, flipped: false, inverted: false, unchecked: true,
+      oneSign: items.length > 1 && signs.size === 1 };
   }
 
   function renderImportReview() {
@@ -686,7 +703,11 @@ module.exports = function registerImport(ctx) {
     recEl.empty();
     recEl.classList.toggle('hidden', !rec);
     recEl.classList.toggle('imp-reconcile-warn', !!rec && (!rec.verified || rec.inverted));
-    if (rec) recEl.textContent = rec.flipped
+    if (rec && rec.unchecked) {
+      recEl.textContent = rec.oneSign
+        ? 'This statement has no balance column, so these amounts could not be checked against anything — and every one of them has the same sign, which usually means a money-in and money-out pair was read as a single column. Check the + and − signs below, and use “Columns wrong?” if they are.'
+        : 'This statement has no balance column, so these amounts could not be checked against it. Spot-check a few rows below before importing, especially the + and − signs.';
+    } else if (rec) recEl.textContent = rec.flipped
       ? 'This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below.'
       : rec.inverted
         ? 'This statement’s balance column says the money-in and money-out columns are the wrong way round — every amount below has the opposite sign to what the balances imply. Nothing has been corrected, because the signs came from the column names: open “Columns wrong?” and swap them before importing.'
