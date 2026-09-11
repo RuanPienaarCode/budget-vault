@@ -351,6 +351,8 @@ function mountApp(view) {
     accountsIgnored: [],       // ISSUE 60 — account .md paths below Accounts/ that mdFilesIn does not read
     accountsDuplicated: [],    // ISSUE 72 — {label, first, second}: two accounts claiming one transaction folder
     txFolders: [],             // account names whose Transactions/ folder exists on disk
+    txFolderPaths: {},         // ISSUE 97 — label -> the folder path it was READ from, so writers never assemble one
+    txFoldersIgnored: [],      // ISSUE 97 — Transactions/ folder paths whose leaf name a shallower folder already claimed
     rules: [],                 // {pattern, category}
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
     assetsFm: '',              // Assets.md verbatim frontmatter, re-emitted by the serializer

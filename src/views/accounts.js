@@ -2443,7 +2443,10 @@ module.exports = function registerAccounts(ctx) {
        reconciliation read through, so a folder counted as this account's
        everywhere else is counted as this account's here. */
     const labels = (S.txFolders || []).filter(n => accountForLabel(n) === a);
-    const folders = labels.map(n => ctx.folderAt(`Transactions/${n}`)).filter(Boolean);
+    /* ISSUE 97 — the folder this label was READ from, which is not always the
+       assembled one. Deleting an account whose transactions sit under
+       Transactions/Closed/<name>/ used to leave them orphaned on disk. */
+    const folders = labels.map(n => ctx.folderAt((S.txFolderPaths || {})[n] || `Transactions/${n}`)).filter(Boolean);
     const files = Object.values(S.txFiles).filter(f => labels.includes(f.label));
     /* !isSplitPart, like every other raw-row consumer on this page — a split's
        parts are rows THIS APP created out of one statement line, not lines the

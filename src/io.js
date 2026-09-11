@@ -283,9 +283,34 @@ function makeIo({ vault, plugin }) {
     if (!f) return [];
     return f.children.filter(c => c instanceof TFolder);
   }
+  /* Every folder at or below `rel`, shallowest first. ISSUE 97.
+
+     subfoldersIn reads one level, and for Transactions/ that costs ROWS: an
+     account filed under Transactions/Closed/<name>/ loads its balance (since
+     ISSUE 60 taught Accounts/ to recurse) while its money silently is not
+     there. There is no disclosure list for transactions, so nothing says so.
+
+     Breadth-first is load-bearing, not tidiness. Two folders can present the
+     same leaf name — Transactions/<name>/ and Transactions/Closed/<name>/ —
+     and the label is the leaf. Shallowest-first makes "the first one wins"
+     mean the obvious one, deterministically, rather than depending on the
+     order the vault hands back its children; the losers are disclosed rather
+     than dropped. */
+  function subfoldersUnder(rel) {
+    const root = vault.getFolderByPath(relPath(rel));
+    if (!root) return [];
+    const out = [];
+    let level = root.children.filter(c => c instanceof TFolder);
+    while (level.length) {
+      const next = [];
+      for (const f of level) { out.push(f); for (const c of f.children) if (c instanceof TFolder) next.push(c); }
+      level = next;
+    }
+    return out;
+  }
 
   return {
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath,
     lastWriteAt: () => plugin._lastWrite || 0,
   };

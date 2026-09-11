@@ -19,7 +19,7 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment } = ctx;
+  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment, txFileRel } = ctx;
 
   /* A row's own currency symbol, resolved from the account whose folder it
      lives in. Every figure this view prints or exports goes through one of
@@ -592,7 +592,7 @@ module.exports = function registerTransactions(ctx) {
     const go = await confirmModal(app, {
       title: i18n.t('tx.delete.title'),
       message: i18n.t('tx.delete.msg', {
-        date: r.date, desc: r.desc, amount: rowMoney(r.amount, r), file: `Transactions/${f.label}/${f.month}.md`,
+        date: r.date, desc: r.desc, amount: rowMoney(r.amount, r), file: txFileRel(f.label, f.month),
       }) + ' ' + detail,
       confirmText: i18n.t('tx.delete.confirm'),
     });
@@ -772,7 +772,7 @@ module.exports = function registerTransactions(ctx) {
     try {
       for (const [f, doomed] of perFile) {
         const keep = f.rows.filter(x => !doomed.has(x));
-        await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile({ ...f, rows: keep }));
+        await writeFile(txFileRel(f.label, f.month), serializeTxFile({ ...f, rows: keep }));
         f.rows = keep;
         removed += doomed.size;
         files++;
@@ -863,7 +863,7 @@ module.exports = function registerTransactions(ctx) {
       ? { ...existing, rows: existing.rows.concat([row]) }
       : { label, month, rows: [row], dirty: false, fmRaw: TX_FM };
     try {
-      await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+      await writeFile(txFileRel(label, month), serializeTxFile(fileModel));
     } catch (err) {
       return toast(i18n.t('tx.err.save', { error: err.message || err }), true);
     }
@@ -890,7 +890,7 @@ module.exports = function registerTransactions(ctx) {
     try {
       for (const f of Object.values(S.txFiles)) {
         if (!f.dirty) continue;
-        await writeFile(`Transactions/${f.label}/${f.month}.md`, serializeTxFile(f));
+        await writeFile(txFileRel(f.label, f.month), serializeTxFile(f));
         f.dirty = false; n++;
       }
     } catch (err) {
