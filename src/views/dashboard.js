@@ -2521,7 +2521,10 @@ module.exports = function registerDashboard(ctx) {
      up. A new tab, not this one: the budget view is a workspace leaf like any
      other, and opening in place would close the app the reader is using. */
   async function openCategoryFile(cat) {
-    const file = fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
+    // ISSUE 97 — a category filed under Categories/Archive/ still opens.
+    const known = (S.categories || []).find(c => c.name === cat);
+    const file = (known && known.rel && fileAt(known.rel))
+      || fileAt(`Categories/${safeSeg(cat)}.md`) || fileAt(`Categories/${cat}.md`);
     if (!file) return toast(i18n.t('dash.split.noteMissing', { cat }), true);
     await app.workspace.getLeaf('tab').openFile(file);
   }

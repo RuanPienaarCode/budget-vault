@@ -13,7 +13,7 @@ const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
 
 module.exports = function registerCategories(ctx) {
-  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn } = ctx;
+  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder } = ctx;
 
   /* Bumped whenever the category list changes (create/delete). Selects built
      earlier compare against this on open and rebuild their options if stale —
@@ -217,9 +217,13 @@ module.exports = function registerCategories(ctx) {
     // so fall back to scanning frontmatter `name` for an exact match — which
     // also covers files written before safeSeg was used here.
     const safe = safeSeg(name);
-    let file = fileAt(`Categories/${safe}.md`);
+    /* ISSUE 97 — the loaded record knows the path it came from; only fall back
+       to assembling one for a name no loaded category claims. The scan below
+       recurses for the same reason. */
+    const known = (S.categories || []).find(c => c.name === name);
+    let file = (known && known.rel && fileAt(known.rel)) || fileAt(`Categories/${safe}.md`);
     if (!file) {
-      for (const f of mdFilesIn('Categories')) {
+      for (const f of mdFilesUnder('Categories')) {
         const { fm } = parseFrontmatter(await vault.cachedRead(f));
         if ((fm.name || f.basename) === name) { file = f; break; }
       }
