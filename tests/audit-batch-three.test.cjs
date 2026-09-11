@@ -32,6 +32,44 @@
      node tests/audit-batch-three.test.cjs   # non-zero exit on failure */
 
 const assert = require('assert');
+
+/* ISSUE 102 — counting the work instead of timing it, installed FIRST.
+
+   #61's guard below used to be `ok(ms < 60)` around fifteen accountIndex()
+   rebuilds. It measured the machine, not the code: over 25 isolated runs on an
+   unchanged checkout the median was 17 ms and the max 225 ms, so it failed one
+   run in five with nothing wrong. Worse than a false red — scripts/run-tests.mjs
+   is fail-fast by design and this file sorts 20th of 194, so a flake here stopped
+   the run and 174 suites never executed.
+
+   AND IT WAS POINTING THE WRONG WAY. Backing the #61 fix out — accountIndex
+   resolving each file through accountForLabel's scan again — the same fifteen
+   rebuilds took a steady 44-51 ms: comfortably INSIDE the 60 ms budget. So on
+   this hardware the timing guard passed the regression it existed to catch,
+   while failing the correct code one run in five. The two distributions
+   overlapped completely; there was no threshold that separated them, which is
+   why raising the ceiling was never the fix.
+
+   #61 was never really about time. This file's own header records the defect as
+   "O(files x accounts), a million safeSeg calls", and safeSeg calls are COUNTABLE.
+   Counting them separates fixed from regressed by 32x with zero variance.
+
+   The spy has to go in before anything reaches src/: period.js:16 destructures
+   `safeSeg` at module load, so a binding taken there cannot be replaced after the
+   fact. vault-path.js is pure — its own header says "no DOM, no obsidian import" —
+   so requiring it this early, ahead of stubObsidian(), is safe.
+
+   Every module that requires ./vault-path from here on gets the counting wrapper,
+   for the whole file. That is deliberate and harmless: the counter is read only
+   inside the #61 block, which zeroes it immediately before the loop it measures. */
+const vaultPathPath = require.resolve('../src/vault-path');
+const realVaultPath = require(vaultPathPath);
+let safeSegCalls = 0;
+require.cache[vaultPathPath].exports = {
+  ...realVaultPath,
+  safeSeg: (...a) => { safeSegCalls++; return realVaultPath.safeSeg(...a); },
+};
+
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
@@ -95,22 +133,55 @@ const tx = rows => '---\nkind: transactions\n---\n\n| Date | Description | Categ
 (async () => {
   /* ================= #61 — one lookup, built once ====================== */
   {
+    /* Named so the bound below is derived from the fixture rather than repeating
+       its numbers — the two cannot drift if one of them is edited. */
+    const ACCOUNTS = 40, MONTHS = 8, ROWS = 30, REBUILDS = 15;
+    const FILES = ACCOUNTS * MONTHS;                     // 320 transaction files
+
     const F = { ...SETTINGS };
-    for (let a = 0; a < 40; a++) {
+    for (let a = 0; a < ACCOUNTS; a++) {
       F[`${B}/Accounts/Acct ${a}.md`] = `---\ntype: checking\ntx_label: "Acct ${a}"\nbalance: 1\n---\n`;
-      for (let m = 1; m <= 8; m++) {
+      for (let m = 1; m <= MONTHS; m++) {
         const mm = String(m).padStart(2, '0');
-        F[`${B}/Transactions/Acct ${a}/2026-${mm}.md`] = tx(Array.from({ length: 30 }, (_, r) => [`2026-${mm}-${String((r % 27) + 1).padStart(2, '0')}`, 'Shop', '', -10]));
+        F[`${B}/Transactions/Acct ${a}/2026-${mm}.md`] = tx(Array.from({ length: ROWS }, (_, r) => [`2026-${mm}-${String((r % 27) + 1).padStart(2, '0')}`, 'Shop', '', -10]));
       }
     }
     const ctx = makeCtx(F, { settings: { month_start_day: 1 } });
     const S = await loadInto(ctx);
-    const t0 = process.hrtime.bigint();
-    let idx; for (let i = 0; i < 15; i++) idx = ctx.accountIndex();
-    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-    eq(idx.size, 40, 'every account is indexed');
-    for (const [a, e] of idx) eq(e.rows.length, 240, `${a.name} has all its rows`);
-    ok(ms < 60, `fifteen rebuilds at 40 accounts x 320 files stay cheap (${ms.toFixed(0)} ms; the scan took ~47)`);
+
+    /* ISSUE 61 — linear, not quadratic. ISSUE 102 — counted, not timed; the note
+       at the top of this file carries the why.
+
+       The contract per rebuild is: fold the map once (two keys per account), then
+       ONE lookup per transaction file. That is ACCOUNTS * 2 + FILES, and it is
+       never FILES * ACCOUNTS. Measured on dac6ac6: 6 000 calls against 192 000 for
+       the per-file scan #61 replaced.
+
+       The bound is deliberately loose — three times linear, still an order of
+       magnitude under quadratic — so an honest extra safeSeg elsewhere does not
+       fail the build, while a return to the scan cannot pass. */
+    const LINEAR = REBUILDS * (ACCOUNTS * 2 + FILES);    //   6 000
+    const QUADRATIC = REBUILDS * FILES * ACCOUNTS;       // 192 000
+    const BOUND = LINEAR * 3;
+
+    safeSegCalls = 0;
+    let idx; for (let i = 0; i < REBUILDS; i++) idx = ctx.accountIndex();
+    const indexed = safeSegCalls;
+    eq(idx.size, ACCOUNTS, 'every account is indexed');
+    for (const [a, e] of idx) eq(e.rows.length, MONTHS * ROWS, `${a.name} has all its rows`);
+    ok(indexed <= BOUND, `${REBUILDS} rebuilds at ${ACCOUNTS} accounts x ${FILES} files stay linear (${indexed} safeSeg calls; linear is ${LINEAR}, the scan was ${QUADRATIC})`);
+
+    /* The negative control, because a check that cannot fail for the right reason
+       is not a check — the lesson the stale-bundle diagnosis arrived at in d2e15cc,
+       and the shape tests/debt-interest-coverage.test.cjs already uses.
+
+       Drive the PRE-#61 shape against the same fixture and the same counter:
+       accountForLabel once per transaction file, which is the scan accountIndex
+       replaced. It must blow the bound, or the bound is not measuring anything. */
+    safeSegCalls = 0;
+    for (let i = 0; i < REBUILDS; i++) for (const f of Object.values(S.txFiles)) ctx.accountForLabel(f.label);
+    const scanned = safeSegCalls;
+    ok(scanned > BOUND, `the guard can fail: the per-file scan costs ${scanned} calls against a bound of ${BOUND}`);
     /* Equivalence with the scan it replaced, on the labels that could differ:
        case, NFC/NFD and a sanitised colon. */
     for (const label of ['Acct 3', 'acct 3', 'ACCT 3']) {
@@ -118,7 +189,6 @@ const tx = rows => '---\nkind: transactions\n---\n\n| Date | Description | Categ
       let viaIdx = null; for (const [a, e] of idx) if (e.labels.has('Acct 3')) viaIdx = a;
       eq(viaScan, viaIdx, `"${label}" resolves to the same account either way`);
     }
-    void S;
   }
 
   /* ================= #72 — two accounts, one folder, named ============= */
