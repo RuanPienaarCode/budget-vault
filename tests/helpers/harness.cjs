@@ -245,8 +245,13 @@ async function loadInto(ctx) {
      the Dashboard's health card and the Score page both read healthSnapshot off
      ctx, so a harness without it renders neither — and the card's own guard
      would swallow the reason. */
-  require('../../src/health-data')(ctx);
+  /* Same order as controller.js, and for the reason recorded there: every
+     module destructures off ctx at register time, so figures must publish
+     periodFigures before health-data reads it (ISSUE 84). This list is a
+     SECOND declaration of the app's wiring order — when controller.js's moves,
+     this moves with it. */
   require('../../src/figures')(ctx);
+  require('../../src/health-data')(ctx);
   require('../../src/load')(ctx);
   require('../../src/views/notes')(ctx);
   await ctx.loadVault();

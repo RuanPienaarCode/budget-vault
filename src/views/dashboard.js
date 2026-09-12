@@ -42,7 +42,7 @@ const { keeps } = require('../ledger');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -1372,8 +1372,13 @@ module.exports = function registerDashboard(ctx) {
      period's rows, and computing it inside the guard means a throw in there
      costs one card instead of all four. */
   function renderHero() {
-    const sum = periodSummary(S.period);
-    const bud = budgetTotals(S.period);
+    /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
+       ISSUE 84 — this card asked five seams for one period. Every figure it
+       prints now comes off one assembly, which is the point: the hero is where
+       "two figures derived by different rules" costs the reader the most. */
+    const F = periodFigures(S.period);
+    const sum = F.summary;
+    const bud = F.budget;
     /* ISSUE 40. SPEND against SPEND. `bud.spend` no longer holds the
        savings/investment envelopes and `spent` no longer holds the outgoings
        that fill them — both halves moved together, because a remaining figure
@@ -1388,7 +1393,7 @@ module.exports = function registerDashboard(ctx) {
        envelope already over, which is the thing worth knowing. */
     /* ADR-0005: the one "budget used" reading. `spent` here is what the Score
        chip, the Score ring's numerator and the Budget page's tile all print. */
-    const used = budgetUsed(S.period);
+    const used = F.used;
     const spent = used.spent;
     const available = bud.spend - spent;
     const heroNegative = available < 0;
@@ -1412,7 +1417,7 @@ module.exports = function registerDashboard(ctx) {
     /* The plan snapshot (figures.js planFigures): the whole plan, the share
        and the base it was measured against, assembled once for this hero,
        the Budget page's strip and the Report. */
-    const plan = planFigures(S.period);
+    const plan = F.plan;
     const allocated = plan.allocated;
     /* sharePercentLabel, not a bare Math.round: 100.24% allocated rounding to
        "100%" sat beside the Budget page's red "over-budgeted R 97,80" tile,
@@ -1442,7 +1447,7 @@ module.exports = function registerDashboard(ctx) {
     /* ADR-0007 · Hero spent is the one numerator. Headline, meter and tag read
        budgetUsed().spent; the sub-line and stat printed GROSS beside them.
        The three adjustments that make them differ are named, not subtracted. */
-    const { netted: nettedRefunds } = categoryGap(S.period);
+    const { netted: nettedRefunds } = F.gap;
     const spentNoteParts = [
       used.setAside >= 1 ? i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }) : '',
       used.assumed >= 1 ? i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }) : '',

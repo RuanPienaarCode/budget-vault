@@ -117,13 +117,25 @@ const files = {
 
   /* ---- 4. the pages print it, not a private copy ----------------------- */
   const src = f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
-  for (const [f, expr] of [
-    ['views/dashboard.js', 'budgetUsed('],
-    ['views/budgets.js', 'budgetUsed('],
-    ['views/score.js', 'setAsideSpent:'],
-    ['health-data.js', 'budgetUsed('],
+  /* ISSUE 84 · Reaching the rule DIRECTLY or through the period snapshot both
+     satisfy this. periodFigures(p).used IS budgetUsed(p) — figures.js calls it
+     once and hands the result on — so a surface that reads `F.used` is holding
+     the one rule at least as tightly as one spelling the call itself.
+
+     The alternatives matter because this is a literal-text pin, the shape
+     ISSUE 86 named as unable to see anything it was not written for. Left as
+     one fixed string it would have gone red on a change that strengthened the
+     very invariant it exists to protect, which is how a pin teaches the next
+     reader to delete it. */
+  for (const [f, exprs] of [
+    ['views/dashboard.js', ['budgetUsed(', 'F.used']],
+    ['views/budgets.js', ['budgetUsed(']],
+    ['views/score.js', ['setAsideSpent:']],
+    ['health-data.js', ['budgetUsed(', 'F.used']],
   ]) {
-    ok(src(f).includes(expr), `${f} reaches the one rule (expects "${expr}")`);
+    const text = src(f);
+    ok(exprs.some(e => text.includes(e)),
+      `${f} reaches the one rule (expects one of ${exprs.map(e => `"${e}"`).join(' or ')})`);
   }
   for (const [f, expr] of [
     ['views/budgets.js', 'spent / budgetedSpend'],

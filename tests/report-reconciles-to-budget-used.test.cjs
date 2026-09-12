@@ -201,7 +201,13 @@ class PinnedDate extends RealDate {
   /* ---- 6. the report reaches the one rule, it does not re-spell it ------ */
   {
     const src = f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
-    ok(src('views/report.js').includes('budgetUsed('),
+    /* ISSUE 84 · Or through the period snapshot: periodFigures(p).used IS
+       budgetUsed(p). The third literal-text pin widened rather than deleted —
+       see tests/budget-used-one-rule.test.cjs for why they are widened and not
+       removed. What must stay impossible is the report spelling the rule for
+       itself, which the `F.used` reading does not do. */
+    const rep = src('views/report.js');
+    ok(rep.includes('budgetUsed(') || (rep.includes('periodFigures(') && rep.includes('F.used')),
       'views/report.js reads ctx.budgetUsed — the one period-level reading (ADR-0005)');
     ok(/budgetUsedShare|budgetSpent/.test(src('report.js')),
       'src/report.js derives the share and the numerator through money-flow.js, never with its own division');

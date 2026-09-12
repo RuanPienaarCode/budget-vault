@@ -554,7 +554,15 @@ function provenFalse(desc, exactShape, mangled) {
   const BUDGET_USED_LINE = 'const budgetUsed = budgetUsedShare({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent, budgeted: bud });';
   ok(live.moneyFlow.includes(BUDGET_USED_LINE),
     'Budget used (Flow chip): money-flow.js\'s budgetUsed IS budgetUsedShare(), fed by the caller\'s setAsideSpent — the one rule of ADR-0005');
-  ok(live.healthData.includes('const consumptionBudget = budgetUsed(p).spent;'),
+  /* ISSUE 84 · Read off the period snapshot since 2026-09-12 — periodFigures(p)
+     .used IS budgetUsed(p), assembled once per period instead of four seams
+     asked separately. The reading is unchanged; only its spelling is. Both
+     forms are accepted so this term survives the wiring without losing its
+     teeth: what it refuses is health-data inferring the numerator for itself.
+     The fourth literal-text pin widened in this change — ISSUE 86's point
+     about what these regexes can and cannot see, met in practice. */
+  ok(live.healthData.includes('const consumptionBudget = budgetUsed(p).spent;')
+    || live.healthData.includes('const consumptionBudget = F.used.spent;'),
     'Budget used (Score ring): health-data.js\'s per-period numerator is the same reading the Dashboard hero prints');
 
   ok(live.score.includes("if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }"),

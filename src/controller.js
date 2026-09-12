@@ -508,8 +508,13 @@ function mountApp(view) {
   registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
   // After trend-math, whose periodsForMonths it uses, and before the two views
   // that read the snapshot it assembles.
-  registerHealthData(ctx);  // healthSnapshot
+  /* figures BEFORE health-data, and the order is load-bearing. ISSUE 84 —
+     health-data.js reads periodFigures, and every module here destructures off
+     ctx at register time, so a provider registered afterwards binds undefined.
+     Safe in this direction: figures.js reads only period/load seams and nothing
+     health-data publishes. */
   registerFigures(ctx);     // periodFigures, budgetVsActualRows, categorySpendRows, categoryGap (ADR-0006 Phase 3)
+  registerHealthData(ctx);  // healthSnapshot
   /* Before the views, because five of them render its noteButton() chip — they
      reach it through ctx at render time rather than by destructuring, so the
      order is belt-and-braces rather than load-bearing. loadVault calls
