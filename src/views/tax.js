@@ -667,10 +667,17 @@ module.exports = function registerTax(ctx) {
      attachExisting, startTax, newTaxYear) without ever going through mark(),
      so taxDirty was never true to begin with; without a signal to check, a
      failed write there left no lit Save button for anyone to retry with. */
+  /* ISSUE 97 — where a tax year LIVES. The loaded record carries the path it
+     was read from; only a year with no record falls back to the flat default,
+     which is where a new one is created. Tax/<year>/ is the DOCUMENTS folder
+     and is addressed separately — it is not this. */
+  const taxRel = year => ((S.tax || {})[year] || {}).rel || `Tax/${year}.md`;
+
   async function saveTax() {
     if (!S.taxYear) return true;
     try {
-      await writeFile(`Tax/${S.taxYear}.md`, serializeTax(S.taxYear));
+      // ISSUE 97 — the path this year was READ from.
+      await writeFile(taxRel(S.taxYear), serializeTax(S.taxYear));
     } catch (e) {
       toast(`Could not save Tax/${S.taxYear}.md (${e.message || e})`, true);
       return false;
@@ -784,7 +791,7 @@ module.exports = function registerTax(ctx) {
     const year = S.taxYear;
     const t = T();
     if (!year || !t) return;
-    const file = fileAt(`Tax/${year}.md`);
+    const file = fileAt(taxRel(year));
     const folder = ctx.folderAt(`Tax/${year}`);
     const docs = (t.docs || []).length;
     const steps = (t.steps || []).length;

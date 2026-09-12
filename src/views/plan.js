@@ -729,7 +729,8 @@ module.exports = function registerPlan(ctx) {
     const key = S.planName;
     const p = P();
     if (!p) return;
-    const file = fileAt(`Plans/${key}.md`);
+    // ISSUE 97 — the path this plan was READ from, not one assembled from its key.
+    const file = fileAt((p && p.rel) || `Plans/${key}.md`);
     const n = (arr, word) => `${arr.length} ${word}${arr.length === 1 ? '' : 's'}`;
     const go = await confirmModal(app, {
       title: 'Delete plan',

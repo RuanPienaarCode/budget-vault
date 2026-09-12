@@ -826,7 +826,9 @@ module.exports = function registerBudgets(ctx) {
        the only bug was the silence. Now the failure toasts and the same
        left-dirty state is kept on purpose, so the same click retries. */
     try {
-      await writeFile(`Budgets/${S.period}.md`, text);
+      // ISSUE 97 — where this period was READ from. A period filed under
+      // Budgets/2025/ used to be written back flat, forking the file.
+      await writeFile((S.budgetMeta[S.period] || {}).rel || `Budgets/${S.period}.md`, text);
     } catch (e) {
       return toast(i18n.t('bud.err.save', { error: e.message || e }), true);
     }

@@ -126,7 +126,7 @@ module.exports = function registerLoad(ctx) {
       S.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
     }
     S.categories = [];
-    for (const { file, text } of await read(mdFilesIn('Categories'))) {
+    for (const { file, text } of await read(mdFilesUnder('Categories'))) {
       const { fm } = parseFrontmatter(text);
       // Prefer the exact name from frontmatter — filenames drop filesystem-illegal
       // chars, so the frontmatter `name` is the source of truth.
@@ -147,7 +147,7 @@ module.exports = function registerLoad(ctx) {
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */
-        rel: `Categories/${file.name}`,
+        rel: file.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
       });
     }
     const order = typeOrder(S.settings.groups);
@@ -261,10 +261,12 @@ module.exports = function registerLoad(ctx) {
        between monthly and interval periods keeps both sets of files, and the
        one the active period type can't address simply never gets asked for —
        nothing is deleted, so switching back finds them where they were. */
-    for (const { file: f, text } of await read(mdFilesIn('Budgets').filter(f => /^\d{4}-\d{2}(-\d{2})?$/.test(f.basename)))) {
+    for (const { file: f, text } of await read(mdFilesUnder('Budgets').filter(f => /^\d{4}-\d{2}(-\d{2})?$/.test(f.basename)))) {
       const period = f.basename;
       const { raw } = parseFrontmatter(text);
-      S.budgetMeta[period] = { raw };   // verbatim frontmatter for lossless write-back
+      // ISSUE 97 — `rel` beside the frontmatter: views/budgets.js writes the
+      // period back, and must write it where it came from.
+      S.budgetMeta[period] = { raw, rel: f.path.slice(basePath().length + 1) };
       const rows = parseMdTable(text);
       S.budgets[period] = rows.slice(1).map(c => {
         const amt = parseNum(c[2]);
@@ -392,7 +394,7 @@ module.exports = function registerLoad(ctx) {
     /* ADR-0007 · Plans: one file per plan, sliced by heading. The section names are
        load-bearing (plan.js writes them). */
     S.plans = {}; S.planDirty = false;
-    for (const { file: f, text } of await read(mdFilesIn('Plans'))) {
+    for (const { file: f, text } of await read(mdFilesUnder('Plans'))) {
       const { fm, raw, body } = parseFrontmatter(text);
       /* Every status falls back rather than throwing, the same way stepStatus
          does below: these files are hand-editable, and a typo in one cell must
@@ -423,6 +425,7 @@ module.exports = function registerLoad(ctx) {
         /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
            writers derive the path from `file`. */
         file: f.basename,
+        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         started: (fm.started || '').toString().trim(),
@@ -454,7 +457,18 @@ module.exports = function registerLoad(ctx) {
     if (!S.planName || !S.plans[S.planName]) S.planName = Object.keys(S.plans).sort()[0] || null;
 
     S.tax = {}; S.taxDirty = false;
-    for (const { file: f, text } of await read(mdFilesIn('Tax').filter(f => /^\d{4}$/.test(f.basename)))) {
+    /* ADR-0007 · A tax year file is one whose parent is not itself a year.
+       ISSUE 97 — Tax/<year>/ is a DOCUMENTS folder (views/tax.js writes
+       attachments into it), and the filter tests the basename only, so a
+       recursing loader would read Tax/2026/2023.md — a receipt named like a
+       year — as a tax year the household never created.
+
+       Read off the PATH rather than f.parent: the path is the same string in
+       Obsidian and in the harness, where relying on a host object's property
+       would be a divergence waiting to be discovered in production. */
+    const taxYearFile = f => /^\d{4}$/.test(f.basename)
+      && !/^\d{4}$/.test(f.path.split('/').slice(-2, -1)[0] || '');
+    for (const { file: f, text } of await read(mdFilesUnder('Tax').filter(taxYearFile))) {
       const { fm, raw, body } = parseFrontmatter(text);
       // The body holds three tables under "## Progress", "## Documents" and
       // "## Figures". parseMdTable reads every table row in the text it's
@@ -494,6 +508,7 @@ module.exports = function registerLoad(ctx) {
       const assessIncome = signedNum(fm.assessment_income);
       S.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
+        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
         taxpayer_type: ['provisional', 'standard'].includes(fm.taxpayer_type) ? fm.taxpayer_type : 'unknown',
         assessment: ['auto-assessed', 'submit-requested', 'assessed'].includes(fm.assessment) ? fm.assessment : 'unknown',
         deadline_standard: fm.deadline_standard || '',
