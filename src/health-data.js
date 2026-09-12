@@ -54,7 +54,7 @@ module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
-    foreignLabels,
+    foreignLabels, periodFigures,
   } = ctx;
 
   /* ADR-0007 · One measure of saved, assembled once. What crossed into the
@@ -95,8 +95,11 @@ module.exports = function registerHealthData(ctx) {
     const periods = [];
     for (let i = 1; i <= want; i++) {
       const p = shiftPeriod(cur, -i);
-      const spend = periodSpend(p, null);
-      const { start, end } = periodRange(p);
+      /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
+         ISSUE 84 — one call per trailing period instead of four. */
+      const F = periodFigures(p);
+      const spend = F.trend;
+      const { start, end } = F.range;
       const savings = savingContribution(p);
       /* ADR-0007 · Three spend slices per period, and one of them budget-scoped.
          essential / consumption / fixed are household-wide; consumptionBudget is
@@ -106,7 +109,7 @@ module.exports = function registerHealthData(ctx) {
          seen. This used to sum periodSpend()'s NET map with savings types
          dropped — refunds netted, uncategorised gone — and so differed from
          the hero even over a single counted period. */
-      const consumptionBudget = budgetUsed(p).spent;
+      const consumptionBudget = F.used.spent;
       /* ADR-0007 · The household walk is the HOUSEHOLD lens: every account, net
          then flip. Excluded and non-budget rows KEPT (R48,000 of essential spend
          was once divided by R8,000). Pinned by tests/ledger-lenses.test.cjs. */
@@ -118,7 +121,7 @@ module.exports = function registerHealthData(ctx) {
         income,
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
         savings, consumption, fixed, consumptionBudget,
-        budgeted: budgetTotals(p).spend,
+        budgeted: F.budget.spend,
         /* ADR-0007 · A period counts if the household did anything in it. Read off
            householdNet, before the income/transfer drop and the sign flip. */
         counted: spend.count > 0 || Object.keys(householdNet).length > 0,

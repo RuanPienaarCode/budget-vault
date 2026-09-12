@@ -360,7 +360,11 @@ function invariants(label, snap) {
      the plan snapshot (figures.js planFigures), which is the ONE place the
      rule's operands are assembled; the Score still reaches it through
      periodFlow. Either way no view computes "allocated" itself. */
-  for (const [view, re] of [['dashboard', /planFigures\(/], ['score', /periodFlow/]]) {
+  /* ISSUE 84 · `periodFigures(p).plan` IS planFigures(p) — figures.js assembles
+     it once and hands it on — so reading the period snapshot satisfies this the
+     same way calling planFigures directly did. Another literal-text pin widened
+     rather than deleted; see the note in tests/budget-used-one-rule.test.cjs. */
+  for (const [view, re] of [['dashboard', /planFigures\(|periodFigures\(/], ['score', /periodFlow/]]) {
     const src = fsMod.readFileSync(`${__dirname}/../src/views/${view}.js`, 'utf8');
     ok(re.test(src) && !/allocatedShare\(/.test(src),
       `views/${view}.js reads the shared rule rather than computing "allocated" itself`);

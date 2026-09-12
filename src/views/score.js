@@ -28,7 +28,7 @@ const GOOD_ENOUGH = 0.9;
 module.exports = function registerScore(ctx) {
   const {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
-    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, locale,
+    periodSpend, periodSummary, budgetTotals, budgetUsed, catType, locale, periodFigures,
   } = ctx;
 
   function renderScore() {
@@ -733,9 +733,14 @@ module.exports = function registerScore(ctx) {
      the header comment in money-flow.js for why that matters. */
   function buildFlow() {
     const cur = currentPeriod();
-    const summary = periodSummary(cur);
-    const spend = periodSpend(cur, null);
-    const budget = budgetTotals(cur);
+    /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
+       ISSUE 84 — and note the period: currentPeriod(), not S.period. This card
+       is "this period's income" and stays anchored whatever month is on
+       screen, so it asks the snapshot for that one. */
+    const F = periodFigures(cur);
+    const summary = F.summary;
+    const spend = F.trend;
+    const budget = F.budget;
     const fixedCats = new Set(S.categories.filter(c => c.fixed).map(c => c.name));
 
     /* Contributions into savings/investment accounts THIS period — the same
@@ -762,7 +767,7 @@ module.exports = function registerScore(ctx) {
          state (41%), not the spend envelopes alone (30%). Its "budget used"
          still divides by the spend envelopes — see periodFlow's header. */
       income: summary.income, spentTotal: summary.spend, setAsideSpent: summary.setAside,
-      assumedSpent: budgetUsed(cur).assumed,
+      assumedSpent: F.used.assumed,
       budgeted: budget.spend, budgetSetAside: budget.setAside,
       spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
       /* The household's own symbol, so this card's "of which interest" holds

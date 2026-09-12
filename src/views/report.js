@@ -97,7 +97,7 @@ module.exports = function registerReport(ctx) {
     periodsForMonths, earliestDataMonth, periodSummary, catKnown,
     accountIndex, planFigures, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows, categoryGap,
-    budgetUsed, movedToFunds,
+    budgetUsed, movedToFunds, periodFigures,
   } = ctx;
 
   /* -------------------------------- state --------------------------------
@@ -591,7 +591,13 @@ module.exports = function registerReport(ctx) {
     const foreignLabels = new Set();
     const foreignSymbols = [];
     for (const p of periods) {
-      const sum = periodSummary(p);
+      /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
+         ISSUE 84 — this loop asked six seams for one period; periodFigures is
+         the assembly that exists to answer all six at once, and the exported
+         document is precisely where two of them disagreeing is least
+         recoverable. */
+      const F = periodFigures(p);
+      const sum = F.summary;
       income += sum.income; spend += sum.spend; net += sum.net;
       for (const l of (sum.foreign && sum.foreign.labels) || []) foreignLabels.add(l);
       for (const sym of (sum.foreign && sum.foreign.symbols) || []) {
@@ -602,19 +608,19 @@ module.exports = function registerReport(ctx) {
          Budget-vs-Actual table listing rows that sum to R14 500 — the summary
          and the table of one file, disagreeing, with no caveat between them.
          The table lists every envelope, so the total states every envelope. */
-      const plan = planFigures(p);
+      const plan = F.plan;
       budgetIncome += plan.income; budgetSpend += plan.total;
       /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
          numerator and its denominator can never come from two calls. */
-      const bu = budgetUsed(p);
+      const bu = F.used;
       setAsideSpend += bu.setAside || 0;
       assumedSpend += bu.assumed || 0;
       budgetSpendOnly += bu.budgeted || 0;
       movedSoFar += movedToFunds(p) || 0;
 
-      const spendRows = categorySpendRows(p);
+      const spendRows = F.split;
       spendRowsByPeriod.push(spendRows);
-      const gap = categoryGap(p);   // Phase 3 of ADR-0006: one owner for the split's gap
+      const gap = F.gap;             // Phase 3 of ADR-0006: one owner for the split's gap
       uncat += gap.uncat;
       netted += gap.netted;
       const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
