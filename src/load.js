@@ -46,7 +46,7 @@ function fmBool(v) {
 }
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, currentPeriod, periodKeyValid } = ctx;
+  const { S, vault, readFile, basePath, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, currentPeriod, periodKeyValid } = ctx;
 
   /* ADR-0007 · Reads in parallel, parsing serial. The wait is I/O round trips, not work.
      ADR-0007 · read() is declared where loadNotes can reach it. Not inside loadVault. */
@@ -290,15 +290,35 @@ module.exports = function registerLoad(ctx) {
       }
     }
     S.txFolders = [];
-    // Flattened first so every month file across every account goes out in one
-    // batch — this is the bulk of the read count on a real vault.
+    S.txFolderPaths = {};
+    S.txFoldersIgnored = [];
+    /* ADR-0007 · Transactions are read at any depth, and the label is the leaf.
+       ISSUE 97 — read one level, an account under Transactions/Closed/<name>/
+       lost its ROWS while ISSUE 60's fix kept its balance counting: R88 000
+       present, its R250 of interest absent, nothing said. txFolderPaths is the
+       seam the writers need — see txFileRel. */
     const txFiles = [];
-    for (const acct of subfoldersIn('Transactions')) {
-      S.txFolders.push(acct.name);
-      for (const f of acct.children) {
-        if (!(f instanceof TFile) || f.extension !== 'md' || !/^\d{4}-\d{2}$/.test(f.basename)) continue;
-        txFiles.push({ acct, f });
+    for (const folder of subfoldersUnder('Transactions')) {
+      const months = folder.children.filter(f => f instanceof TFile && f.extension === 'md' && /^\d{4}-\d{2}$/.test(f.basename));
+      const rel = folder.path.slice(basePath().length + 1);
+      const depth = rel.split('/').length - 1;          // Transactions/Cheque -> 1
+      if (S.txFolderPaths[folder.name] !== undefined) {
+        // A shallower folder already claimed this label. Only say so if this
+        // one actually holds months — an empty namesake folder costs nothing.
+        if (months.length) S.txFoldersIgnored.push(rel);
+        continue;
       }
+      /* An empty folder at depth 1 is "linked, not imported yet" and MUST be
+         recorded — tests/accounts-folder-state.test.cjs holds that, and losing
+         it sends a reader to re-link a folder already on disk. Deeper, an empty
+         folder cannot be told apart from a pure container like
+         Transactions/Closed/, so there a folder earns its label by holding
+         months. Depth 1 therefore keeps exactly the semantics it always had,
+         and recursion only ever ADDS folders that hold real rows. */
+      if (depth > 1 && !months.length) continue;
+      S.txFolderPaths[folder.name] = rel;
+      S.txFolders.push(folder.name);
+      for (const f of months) txFiles.push({ acct: folder, f });
     }
     const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
     txFiles.forEach(({ acct, f }, i) => {
@@ -308,6 +328,8 @@ module.exports = function registerLoad(ctx) {
       const rows = parseMdTable(text);
       S.txFiles[`${acct.name}/${month}`] = {
         label: acct.name, month, dirty: false, fmRaw: raw,
+        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — the path it was READ from
+
         /* The Split column was added after these files started being written —
            absent on every row of every file that predates it, which the
            schema's read yields as '' exactly as it reads a blank cell. The
@@ -552,5 +574,14 @@ module.exports = function registerLoad(ctx) {
     return want;
   }
 
-  ctx.provide({ loadVault, loadNotes, txSegment });
+  /* ADR-0007 · A transaction month is addressed at the folder it was read from.
+     ISSUE 97 — five writers assembled the path by hand, which forks an account
+     the moment its folder is not flat. Keyed by LABEL, not by file: a brand-new
+     month has none to have been read from. */
+  function txFileRel(label, month) {
+    const folder = (S.txFolderPaths || {})[label] || `Transactions/${label}`;
+    return `${folder}/${month}.md`;
+  }
+
+  ctx.provide({ loadVault, loadNotes, txSegment, txFileRel });
 };

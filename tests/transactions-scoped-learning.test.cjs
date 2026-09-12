@@ -127,6 +127,9 @@ function makeCtx() {
     governingRule: () => null,
     correctRule: async () => false,
     txSegment: s => s,
+    // ISSUE 97 — the seam every transaction writer now addresses instead of
+    // assembling a path. Flat here: this fixture has no nested folder.
+    txFileRel: (label, month) => `Transactions/${label}/${month}.md`,
     registerSaveButton: () => () => {},
     registerDirty: () => {},
     provide(obj) { Object.assign(ctx, obj); },

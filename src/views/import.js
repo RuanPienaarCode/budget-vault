@@ -43,7 +43,7 @@ function decideDayFirst(rawDates, householdDayFirst) {
 }
 
 module.exports = function registerImport(ctx) {
-  const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel } = ctx;
+  const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel, txFileRel } = ctx;
 
   /* The formatter for a previewed row, rebound whenever the destination
      account changes (see renderPreview). Defaults to money() so any path that
@@ -913,7 +913,7 @@ module.exports = function registerImport(ctx) {
         const fileModel = existing
           ? { ...existing, rows: existing.rows.concat(rows) }
           : { label, month, rows, dirty: false, fmRaw: TX_FM };
-        await writeFile(`Transactions/${label}/${month}.md`, serializeTxFile(fileModel));
+        await writeFile(txFileRel(label, month), serializeTxFile(fileModel));
         if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
         S.txFiles[key].rows.push(...rows);
         // Neutralise the committed items and record them in the dedup snapshot so
@@ -1029,7 +1029,7 @@ module.exports = function registerImport(ctx) {
            fails must leave the row in memory as well as on disk, or the app
            starts reporting a total the file does not hold. Same lockstep rule
            commitImport follows in the other direction. */
-        await writeFile(`Transactions/${t.file.label}/${t.file.month}.md`,
+        await writeFile(txFileRel(t.file.label, t.file.month),
           serializeTxFile({ ...t.file, rows: keep }));
         t.file.rows = keep;
         // Disk now matches memory for this file, including whatever unsaved
