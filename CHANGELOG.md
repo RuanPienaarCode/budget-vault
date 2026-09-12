@@ -3,6 +3,60 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.44.0 — 2026-09-12
+
+### Fixed
+
+- **A folder you tidied could take your money off every screen.** The plugin
+  read `Transactions/`, `Categories/`, `Budgets/`, `Plans/` and `Tax/` one level
+  deep only. File a dormant account's months into `Transactions/Closed/`, or a
+  past year's budgets into `Budgets/2025/`, and those files were simply not
+  there — no message, no caveat, nothing on screen to say a figure was missing.
+  Filing things into sub-folders is an ordinary tidy-up in a vault you own, and
+  the plugin's own README promises files you could have written by hand.
+
+  Worse, it had just become *inconsistent*. 1.43.0 taught `Accounts/` to read at
+  any depth, so from that release a nested account loaded its balance while a
+  nested transactions folder still lost its rows: the account present and
+  counted at R88 000, its R250 of interest absent from every figure, and the two
+  never reconciled.
+
+  All five folders now read at any depth. Nothing about where you file a file
+  changes what the plugin reads out of it.
+
+- **And a file read from a sub-folder is now written back to it.** This is the
+  half that mattered most, and the reason the fix was not simply "look deeper":
+  every writer used to *assemble* a path from the record's name. Reading a
+  nested file without teaching the writers first would have turned a missing
+  figure into a duplicated one — the month read from `Transactions/Closed/…`
+  and saved back to `Transactions/…`, two files holding one account's month and
+  the one on screen going stale. Every writer now addresses the path its record
+  was actually read from, including deletes, which used to leave a nested
+  account's transactions orphaned on disk.
+
+- **A tax document named after its year is no longer mistaken for a tax year.**
+  `Tax/<year>/` holds your attachments, and the year-file rule only looked at
+  the filename — so reading deeper would have read `Tax/2026/2023.md`, a receipt
+  named for the year it covers, as a tax year you never created, and offered to
+  write to it.
+
+### Internal
+
+- The period snapshot behind the Dashboard hero, the Report, the Score's flow
+  card and the six-period ring now has real callers. Those surfaces each used to
+  assemble their own period from the same seven parts — the shape behind this
+  app's recurring "two figures, two answers" bug. No figure moved: all 770
+  figures the test ledger pins are byte-identical across the change.
+
+- The Budget page deliberately stays out of that: its strip is computed over
+  your *unsaved* edits so the numbers move as you type, which a saved-state
+  snapshot cannot do. The exception is now pinned by a test rather than left to
+  be rediscovered.
+
+- A performance guard that failed one run in five on unchanged code — and, it
+  turned out, *passed* the regression it existed to catch — now counts work
+  instead of milliseconds.
+
 ## 1.43.0 — 2026-09-10
 
 ### Fixed
