@@ -307,10 +307,10 @@ number	1	-	budTotalsBottom/@bud-note-funds
 ## plan
 number	2026	-	view-plan .financial-period-banner-title/
 number	2026	-	planPicker/button.plan-seg
-money	R 0,00	0	planPot/div.pot-fig[1]
-money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[0]/span.sk2-fig[1]
-money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[1]/span.sk2-fig[1]
-money	R 0,00	0	planPot/div.split-key2[4]/div.sk2-row[2]/span.sk2-fig[1]
+money	R 0,00	0	planPot/div.pot-figs[0]/div.pot-fig-block/div.pot-fig[1]
+money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[0]/span.sk2-fig[1]
+money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[1]/span.sk2-fig[1]
+money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[2]/span.sk2-fig[1]
 
 ## notes
 
