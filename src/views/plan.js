@@ -34,7 +34,7 @@ const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { planSummary, barSegments, SOURCE_KINDS, sharePct,
-  envelopeOverState } = require('../plan-math');
+  envelopeOverState, envelopeBar, round2 } = require('../plan-math');
 const i18n = require('../i18n');
 
 module.exports = function registerPlan(ctx) {
@@ -127,27 +127,59 @@ module.exports = function registerPlan(ctx) {
     $('#planPickerWrap').classList.toggle('hidden', keys.length < 2);
   }
 
-  /* ---- the pot: one sentence, one bar (redesign variant B) ----
+  /* ---- the pot: two figures, one bar ----
 
-     The hero used to lead with the pot itself ("In this plan · R X") and
-     restate it a moment later as "Still left" — the same number twice on a
-     fresh plan, before anything has been spent. This leads with the only
-     question that is actually live: how much of the pot is not yet spoken
-     for. The pot becomes context in the sentence beneath it, and the old
-     "Still left" subtotal is kept ONLY for the one case where it genuinely
-     differs from "not spoken for" — an overspent plan, where spoken-for has
-     run past the pot and `left` (committed+free) and `free` disagree. */
+     THE HERO'S BIG NUMBER IS `placeable`, NOT `free`, and that is the whole of
+     the 1.45.0 fix. It used to be `free` (pot − allocated), which is a true
+     statement about the buckets and the wrong answer to the question the label
+     asks. A live vault on 13 Sep 2026 held R 48 200 with R 28 282 placed and
+     R 33 659 actually gone — a second car repair having run its bucket R 5 377
+     over — and the page said LEFT TO PLACE R 19 918,00 over a "Still left
+     R 14 541,00" set in small italics near the bottom of the key. Both figures
+     right; the headline an invitation to place R 5 377 that no longer existed.
+     Worse, nothing named the overspend: the hero's alarm state and the loud
+     card below both keyed off `free < 0`, and free was +19 918.
+
+     So: the big figure is what can actually be placed, the overspend gets a
+     row of its own in the key AND the loud card, and "Still left" is promoted
+     out of that italic subtotal into a second hero figure beside the first —
+     it is the second thing a reader wants and it was the smallest thing on the
+     card.
+
+     The original objection to a permanent second figure stands and is honoured:
+     on a FRESH plan "still left" is just the pot restated, the same number
+     twice. Hence `showLeft` — it appears once anything has actually been
+     spent, which is the point at which it starts saying something the first
+     figure does not. */
   function renderPot(p, sum) {
     const host = $('#planPot');
     host.empty();
     /* Widths come from barSegments, NOT from the summary: those three always
        sum to the pot, so the bar can never render clipped or backwards. The
        key underneath still reports the summary's honest figures, and the two
-       are identical in every case except an overspent plan — which the loud
-       card at the bottom of the page states in words. */
+       are identical in every case except an overspent plan — which the
+       overspend row and the loud card state in words. */
     const seg = barSegments(sum);
     const pct = v => (sum.pot > 0 ? (v / sum.pot) * 100 : 0);
-    const over = sum.free < 0;
+    const over = sum.placeable < 0;
+    /* WHICH KIND of "past the end" this is, because the two need different
+       words: buckets claiming more than came in is an allocation someone can
+       simply take back, whereas money already out of the account is not. When
+       both are true the spending is the one worth saying, because it is the
+       one that cannot be undrawn. */
+    const overLabel = sum.overspend > 0.005
+      ? i18n.t('plan.hero.overSpent') : i18n.t('plan.hero.overPlaced');
+    /* WHAT THE SECOND SLOT CARRIES, which is not always the same figure.
+
+       "Still left" is the second thing a reader wants — except on an overspent
+       plan, where it is arithmetically forced to equal the first: once the
+       buckets have been run past, `placeable` collapses onto `left` and the
+       hero would print one number twice. In that state the second most
+       important fact is not what remains but how far past the buckets the
+       money went, so the slot swaps to it. Nothing is lost by the swap: `left`
+       is still on screen, as the first figure. */
+    const showOverspend = sum.overspend > 0.005;
+    const showLeft = !showOverspend && sum.spent >= 0.005;
 
     const statusLine = sum.sources === 0 ? null
       : sum.expected <= 0.005 ? i18n.t('plan.hero.allIn')
@@ -155,8 +187,25 @@ module.exports = function registerPlan(ctx) {
       : i18n.t('plan.hero.partial', { received: money(sum.received), expected: money(sum.expected) });
 
     host.append(
-      el('div', { class: 'pot-eyebrow' }, over ? i18n.t('plan.hero.overPlaced') : i18n.t('plan.hero.leftToPlace')),
-      el('div', { class: `pot-fig num ${over ? 'text-danger' : 'plan-free-fig'}` }, money(Math.abs(sum.free))),
+      /* The two figures side by side: what you may still place, and what you
+         still have. They coincide on an overspent plan — every remaining rand
+         is unplaced once the buckets have been run past — and that coincidence
+         is itself the reading, not a duplicate to suppress. */
+      el('div', { class: 'pot-figs' },
+        el('div', { class: 'pot-fig-block' },
+          el('div', { class: 'pot-eyebrow' }, over ? overLabel : i18n.t('plan.hero.leftToPlace')),
+          el('div', { class: `pot-fig num ${over ? 'text-danger' : 'plan-free-fig'}` },
+            money(Math.abs(sum.placeable)))),
+        ...(showOverspend
+          ? [el('div', { class: 'pot-fig-block pot-fig-block-2' },
+              el('div', { class: 'pot-eyebrow pot-eyebrow-danger' }, i18n.t('plan.split.overspent')),
+              el('div', { class: 'pot-fig-2 num text-danger' }, money(sum.overspend)))]
+          : showLeft
+            ? [el('div', { class: 'pot-fig-block pot-fig-block-2' },
+                el('div', { class: 'pot-eyebrow' }, i18n.t('plan.split.stillLeft')),
+                el('div', { class: `pot-fig-2 num ${sum.left < 0 ? 'text-danger' : ''}` },
+                  money(sum.left)))]
+            : [])),
       el('div', { class: 'pot-sub' },
         sum.sources === 0
           ? i18n.t('plan.hero.noSources')
@@ -164,12 +213,14 @@ module.exports = function registerPlan(ctx) {
       /* One bar, three states of the same rand. role=img with the figures in
          the label: a screen reader gets the split as a sentence rather than
          three unlabelled divs, and the visual key below repeats it in text.
-         `left` closes the sentence — the one question the three segments
-         never answer on their own. */
+         The overspend closes the sentence when there is one — a screen-reader
+         user must not have to infer it from two figures that happen to
+         disagree. */
       el('div', { class: 'plan-split', role: 'img',
         'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
           `${money(sum.committed)} allocated but unspent, ${money(sum.free)} not yet allocated. ` +
-          `${money(sum.left)} still left.` },
+          `${money(sum.left)} still left, ${money(sum.placeable)} of it still placeable.` +
+          (sum.overspend > 0.005 ? ` ${money(sum.overspend)} has been spent beyond what the buckets hold.` : '') },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
         el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
@@ -178,12 +229,15 @@ module.exports = function registerPlan(ctx) {
         splitRow2(i18n.t('plan.split.notSpokenFor'), sum.free, 'var(--color-gold)',
           sum.free < 0 ? 'text-danger' : 'plan-free-fig'),
         splitRow2(i18n.t('plan.split.alreadySpent'), sum.spent, 'var(--color-primary)'),
-        /* A SUBTOTAL, not a fourth band, and shown only when it earns its
-           place — see the note above. */
-        ...(Math.abs(sum.left - sum.free) >= 0.005
-          ? [el('div', { class: 'sk2-row sk2-left' },
-              el('span', { class: 'sk2-label' }, i18n.t('plan.split.stillLeft')),
-              el('span', { class: `sk2-fig num ${sum.left < 0 ? 'text-danger' : ''}` }, money(sum.left)))]
+        /* THE ROW THAT WAS MISSING. Not a fourth band of the bar — there is no
+           swatch — but the number that explains why "Not spoken for" above it
+           is larger than the figure in the hero. Drawn only when there is one,
+           per the same rule the rest of the app follows: an all-clear vault
+           gets no shelf standing there saying nothing. */
+        ...(sum.overspend > 0.005
+          ? [el('div', { class: 'sk2-row sk2-over' },
+              el('span', { class: 'sk2-label' }, i18n.t('plan.split.overspent')),
+              el('span', { class: 'sk2-fig num text-danger' }, money(sum.overspend)))]
           : [])));
   }
 
@@ -312,23 +366,63 @@ module.exports = function registerPlan(ctx) {
     });
   }
 
-  /* The ~44px collapsed row. Shares envelopeOverState with the expanded card
-     below so an overspent/overcommitted bucket reads as such even collapsed
-     — a reader scanning the accordion for what needs attention should not
-     have to open every row to find it. */
+  /* WHAT IS LEFT IN ONE BUCKET, as its collapsed row states it. The amount on
+     the right is what was PLACED, and a reader scanning five collapsed rows to
+     answer "have I got anything left for the dentist?" could not get there
+     without opening each one — the placed figure has not moved since the day
+     it was set. Remaining is placed minus gone, so it is a fact about today.
+
+     Derived from the SAME envelopeOverState the expanded card and the live
+     drag handler use (remaining is exactly −overAmt), not recomputed here: one
+     bucket must never read as R 1 200 left collapsed and R 900 over expanded.
+
+     The wording changes rather than the number alone, because three of these
+     states mean genuinely different things and a bare figure conflates them —
+     "R 2 000,00 left" on a bucket nothing has been spent from is just the
+     placed amount restated in a second place, which is how the hero's own bug
+     read on a fresh plan. */
+  function envelopeRemainder(state, spent) {
+    const remaining = round2(-state.overAmt);
+    if (state.isOverspent) return { text: `${money(-remaining)} over`, cls: 'text-danger' };
+    if (spent <= 0.005) return { text: i18n.t('plan.env.nothingSpent'), cls: 'text-muted' };
+    if (remaining <= 0.005) return { text: i18n.t('plan.env.allSpent'), cls: 'text-muted' };
+    return { text: i18n.t('plan.env.leftInBucket', { amount: money(remaining) }), cls: '' };
+  }
+
+  /* The collapsed row. Shares envelopeOverState with the expanded card below
+     so an overspent/overcommitted bucket reads as such even collapsed — a
+     reader scanning the accordion for what needs attention should not have to
+     open every row to find it. Two lines now, not one: the placed amount is
+     the headline figure on the right, and what is actually left sits under the
+     name, where it does not have to compete with it for the same eye. */
   function envelopeSummaryRow(p, env, sum) {
     const items = p.items.filter(i => i.envelope === env.name);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
+    const rem = envelopeRemainder(state, spent);
+    /* The shape of the sentence the remainder just stated. Hidden below 640px
+       (styles.css) — on a phone the row has no width to spare and the words
+       already carry it; on tablet and desktop the middle column is dead space
+       and a reader scanning six buckets for "which one is in trouble" gets it
+       from the colour without reading a figure. Never colour ALONE: every
+       segment this draws has its figure in words to the left of it. */
+    const bar = envelopeBar(env.amount, spent);
+    const barEl = el('span', { class: 'env-sum-bar', 'aria-hidden': 'true' },
+      el('i', { class: 'esb-spent', style: `width:${bar.spent}%` }),
+      el('i', { class: 'esb-left', style: `width:${bar.left}%` }),
+      el('i', { class: 'esb-over', style: `width:${bar.over}%` }));
     return el('button', {
       class: `env-sum${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       type: 'button',
       style: `--tint:${env.tint || 'transparent'}`,
-      'aria-label': i18n.t('plan.env.expandAria', { name: env.name }),
+      'aria-label': i18n.t('plan.env.expandAria', { name: env.name }) + ` — ${rem.text}`,
       onclick: () => { expandedEnvelope = env.name; renderPlan(); },
     },
       el('span', { class: 'env-sum-swatch' }),
-      el('span', { class: 'env-sum-name' }, env.name),
+      el('span', { class: 'env-sum-main' },
+        el('span', { class: 'env-sum-name' }, env.name),
+        el('span', { class: `env-sum-rem num ${rem.cls}` }, rem.text)),
+      barEl,
       el('span', { class: 'env-sum-amt num' }, money(env.amount)),
       el('span', { class: 'env-sum-pct num' }, `${sharePct(env.amount, sum.pot)}%`));
   }
@@ -378,11 +472,17 @@ module.exports = function registerPlan(ctx) {
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
 
-    /* The slider's ceiling is this envelope's amount plus everything not yet
-       spoken for — i.e. the most it could possibly hold without the plan going
-       negative. A fixed max would either stop short of what the pot allows or
-       invite dragging past it. */
-    const ceiling = Math.max(env.amount, env.amount + Math.max(0, sum.free), 100);
+    /* The slider's ceiling is this envelope's amount plus everything that can
+       still be placed — i.e. the most it could possibly hold without the plan
+       going negative. A fixed max would either stop short of what the pot
+       allows or invite dragging past it.
+
+       `placeable`, not `free`: free is blind to money already spent out of an
+       overspent bucket, so on the 13 Sep 2026 vault this ceiling would have
+       let a bucket be dragged R 5 377 past what the plan still had. Same
+       figure as the hero, from the same place — the ceiling and the headline
+       must never disagree about how much room is left. */
+    const ceiling = Math.max(env.amount, env.amount + Math.max(0, sum.placeable), 100);
     const sliderMax = Math.ceil(ceiling);
     const pctOf = v => (sliderMax > 0 ? Math.max(0, Math.min(100, (v / sliderMax) * 100)) : 0);
 
@@ -521,30 +621,65 @@ module.exports = function registerPlan(ctx) {
       right);
   }
 
-  /* ---- what is not spoken for: the only card that is deliberately loud ---- */
+  /* ---- what is not spoken for: the only card that is deliberately loud ----
+
+     THREE states, not two. It used to key off `sum.free` alone, which meant an
+     overspent plan — money gone past what its buckets hold, `free` still
+     comfortably positive — got the CHEERFUL card inviting the reader to place
+     more. That was the loudest part of the 13 Sep 2026 report: the one card on
+     the page whose whole job is to raise its voice sat there encouraging the
+     reader to spend money that was already gone. */
   function renderFree(p, sum) {
     const card = $('#planFree');
+    const overspent = sum.overspend > 0.005;
+    const overplaced = sum.free < -0.005;
     /* A finished split makes this card disappear rather than saying "R 0.00
        left" — an all-clear vault gets no shelf standing there saying nothing,
-       the same rule the Accounts deck follows. */
-    const show = Math.abs(sum.free) >= 0.005;
+       the same rule the Accounts deck follows. An overspend keeps it on screen
+       whatever the split looks like: that is never nothing to say. */
+    const show = overspent || Math.abs(sum.free) >= 0.005;
     card.classList.toggle('hidden', !show);
     if (!show) return;
-    const over = sum.free < 0;
+    const over = overspent || overplaced;
     card.classList.toggle('is-over', over);
     card.empty();
-    card.append(
-      el('h2', {}, over
+
+    const heading = overspent
+      ? `${money(sum.overspend)} more has been spent than these buckets hold`
+      : overplaced
         ? `${money(-sum.free)} more is placed than this plan holds`
-        : `${money(sum.free)} is not spoken for`),
-      el('div', { class: 'free-fig num' },
-        `${sharePct(Math.abs(sum.free), sum.pot)}% of the plan`),
-      el('p', {}, over
+        : `${money(sum.free)} is not spoken for`;
+    /* The percentage is of the figure the heading just quoted, not always of
+       `free` — quoting one number and then taking a share of a different one
+       is how the rest of this repo's two-figures-one-rule bugs started. */
+    const shareOf = overspent ? sum.overspend : Math.abs(sum.free);
+    /* "of which R 9 341,00 can still be placed" beside "that leaves R 9 341,00"
+       is the same number twice in one sentence — and on an overspent plan it
+       always IS the same number, because placeable collapses onto left the
+       moment committed clamps to zero. So the clause changes rather than the
+       figure being printed again. */
+    const allUnplaced = Math.abs(sum.placeable - sum.left) < 0.005;
+    const body = overspent
+      ? `The buckets hold ${money(sum.allocated)} but ${money(sum.spent)} has actually gone. `
+        + `That leaves ${money(sum.left)} in this plan, `
+        + (allUnplaced ? 'all of it unplaced'
+          : `of which ${money(Math.max(0, sum.placeable))} can still be placed`)
+        + ` — not the ${money(sum.free)} the buckets alone suggest. `
+        + 'Raise the bucket that ran over, or record where the extra came from.'
+      : overplaced
         ? 'The spending buckets add up to more than the money coming in. Take some back out, or add the source that covers it.'
-        : 'Leaving money unplaced is a decision too — but it should be one you made, not one you forgot.'),
+        : 'Leaving money unplaced is a decision too — but it should be one you made, not one you forgot.';
+
+    card.append(
+      el('h2', {}, heading),
+      el('div', { class: 'free-fig num' }, `${sharePct(shareOf, sum.pot)}% of the plan`),
+      el('p', {}, body),
       el('div', { class: 'free-acts' },
-        ...(over ? [] : [el('button', { class: 'btn-gradient', type: 'button',
-          onclick: () => addEnvelope(p, sum.free) }, 'Put it in a new spending bucket')]),
+        /* The button offers `placeable`, never `free` — it was the second
+           place the overstated figure reached the reader, and the one that
+           would have written it into a bucket. */
+        ...(over || sum.placeable <= 0.005 ? [] : [el('button', { class: 'btn-gradient', type: 'button',
+          onclick: () => addEnvelope(p, sum.placeable) }, 'Put it in a new spending bucket')]),
         el('button', { class: 'btn-ghost', type: 'button',
           onclick: () => addSource(p) }, '＋ Add a source')));
   }

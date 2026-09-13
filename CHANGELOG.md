@@ -3,6 +3,76 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.45.0 — 2026-09-13
+
+### Fixed
+
+- **An overspent plan told you there was money to place that was already gone.**
+  A plan holding R 48 200 with R 28 282 across five spending buckets, and a
+  second car repair pushing what had actually been spent to R 33 659, led with
+  **LEFT TO PLACE R 19 918,00**. Only R 14 541 existed. Every figure on the page
+  was arithmetically correct — the headline was a lie by omission.
+
+  The cause is one line of arithmetic. `free` is `pot − allocated` and never
+  looks at `spent`, so money leaving an *overspent* bucket leaves the pot without
+  reducing it. The hero printed `free`, and so did the envelope slider's ceiling,
+  which would happily have let a bucket be dragged R 5 377 past what the plan
+  still had. Worse, nothing on the page named that R 5 377: the hero's alarm
+  state and the loud card at the bottom both keyed off `free < 0`, and free was
+  a comfortable +19 918. The one card whose entire job is to raise its voice sat
+  there encouraging the reader to place money that was already spent.
+
+  Two figures close it, derived once in `plan-math.js` beside the four that were
+  already there:
+
+  - `overspend` = `max(0, spent − allocated)` — what went past the buckets.
+  - `placeable` = `pot − max(allocated, spent)` — what can still be placed.
+    Equal to `min(free, left)`, because placing a rand needs it to be both not
+    already in a bucket *and* not already gone.
+
+  The hero now leads with `placeable`, an **Overspent** row appears in the key,
+  the loud card fires on an overspend and says what to do about it, and the
+  slider ceiling uses the same figure as the headline so the two can never
+  disagree about how much room is left.
+
+### Changed
+
+- **The Plan hero carries two figures instead of one.** "Still left to spend"
+  was a 14px italic subtotal at the bottom of the key, rendered only when it
+  disagreed with the hero. It is a hero figure of its own now, at 30px beside
+  the first (24px on a phone), from the moment anything has been spent — before
+  that it would only restate the pot. On an overspent plan the slot carries the
+  overspend instead, because `placeable` collapses onto `left` there and the two
+  would otherwise print the same number twice.
+
+- **Each collapsed spending bucket states what is left in it**, under its name:
+  "R 4 001,00 left", "all of it spent", "nothing spent yet", or "R 600,00 over".
+  The amount on the right is what was *placed*, and it has not moved since the
+  day it was set; answering "have I anything left for the dentist?" used to mean
+  opening every bucket in turn.
+
+- **…and draws it, on tablet and desktop.** A three-segment bar in the row's
+  middle column — primary for money gone, accent for placed-and-unspent, danger
+  for the overshoot, the same colour language as the hero key. Scaled to
+  `max(amount, spent)` so an overspent bucket's green stops where the bucket did
+  and the red runs to where the money did. Hidden below 640px, where the row has
+  no width to spare and the words already carry it.
+
+### Internal
+
+- `round2` could return **negative zero**, which prints as "-R 0,00" through a
+  formatter that reads the sign bit. Any plan that balanced to the cent would
+  have shown "-R 0,00 overspent" on the new row.
+
+- New guard suite `css-class-coverage.test.cjs`: every class the views emit must
+  have a rule in `src/styles.css`, and root `styles.css` must be exactly
+  `src/styles.css + src/styles-presets.css` by digest. Written because the first
+  cut of this release put its CSS in the repo-root `styles.css` — which is build
+  output, regenerated on every build — so the shipped bundle carried the new
+  markup with none of its styling, and every existing gate stayed green.
+  `css-structure.test.cjs` asks whether the stylesheet parses; nothing asked
+  whether it covered what the views render.
+
 ## 1.44.0 — 2026-09-12
 
 ### Fixed

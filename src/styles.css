@@ -3600,6 +3600,11 @@
 @media (max-width: 640px) {
   .budget-app-root .pot { padding: 24px 20px; }
   .budget-app-root .pot-fig { font-size: 34px; }
+  .budget-app-root .pot-fig-2 { font-size: 24px; }
+  .budget-app-root .pot-figs { gap: 10px 26px; }
+  /* Tablet and desktop only. On a phone the collapsed row has no width to give
+     a bar, and the remainder is already stated in words under the name. */
+  .budget-app-root .env-sum-bar { display: none; }
   .budget-app-root .src-amt { width: 110px; }
   .budget-app-root .env { padding: 20px; }
 }
@@ -4100,8 +4105,31 @@
 }
 .budget-app-root .plan-del-ico .ico svg { width: 15px; height: 15px; }
 
-/* ---- hero: "Left to place", the pot as context beneath it ---- */
+/* ---- hero: two figures, the pot as context beneath them ----
+
+   "Left to place" leads and "Still left" sits beside it at roughly two thirds
+   the size — a clear second, not a peer and not the 14px italic subtotal it
+   used to be at the bottom of the key, which was the thing reported as too
+   small to read. They wrap to two rows on a narrow card rather than shrinking,
+   because a hero figure that has to be squinted at is not a hero figure. */
 .budget-app-root .pot-fig.text-danger { color: var(--color-danger-ink); }
+.budget-app-root .pot-figs {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 38px;
+}
+.budget-app-root .pot-fig-block { min-width: 0; }
+.budget-app-root .pot-fig-block .pot-fig { margin-top: 6px; }
+.budget-app-root .pot-fig-2 {
+  font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.02;
+  margin-top: 6px; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.budget-app-root .pot-fig-2.text-danger { color: var(--color-danger-ink); }
+/* The second block's eyebrow is the same size as the first — the hierarchy is
+   carried by the figures, not by shrinking the label until it is unreadable. */
+.budget-app-root .pot-fig-block-2 .pot-eyebrow { color: var(--ink-faint); }
+/* The second slot turns red as a whole when it is carrying the overspend — the
+   label as much as the figure, because "Overspent" in muted grey over a red
+   number reads as a caption on a styling accident rather than as an alarm. */
+.budget-app-root .pot-eyebrow-danger { color: var(--color-danger-ink); }
 .budget-app-root .split-key2 { margin-top: 14px; }
 .budget-app-root .sk2-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -4120,6 +4148,12 @@
    (an overspent plan) — see the note beside its call site in plan.js. */
 .budget-app-root .sk2-left { border-top-style: dashed; font-style: italic; }
 .budget-app-root .sk2-left .sk2-label { font-style: italic; }
+/* The overspend row: no swatch, because it is not a fourth slice of the bar —
+   it is the number that explains why "Not spoken for" above it is larger than
+   the figure in the hero. Dashed rule marks it off, same convention as the
+   subtotal it replaced. */
+.budget-app-root .sk2-over { border-top-style: dashed; }
+.budget-app-root .sk2-over .sk2-label { color: var(--color-danger-ink); font-weight: 700; }
 
 /* ---- money in: compact read-only ledger rows, ~62px each ---- */
 .budget-app-root .src2-list { display: flex; flex-direction: column; }
@@ -4160,7 +4194,7 @@
 .budget-app-root .plan-env-accordion .env::before { opacity: 0; }
 
 .budget-app-root .env-sum {
-  display: flex; align-items: center; gap: 10px; width: 100%;
+  display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%;
   min-height: 44px; padding: 10px 14px; border-radius: 12px;
   border: 1px solid var(--border-color); background: var(--surface);
   font: inherit; cursor: pointer; text-align: left;
@@ -4173,10 +4207,38 @@
   width: 10px; height: 10px; border-radius: 3px; flex: none;
   background: var(--tint, var(--color-primary));
 }
+/* Name over remainder, sharing the row's one flexible column. The name keeps
+   the ellipsis it always had; the remainder never wraps either, so a long
+   bucket name can shorten but the two lines can never become three and break
+   the accordion's even rhythm. */
+.budget-app-root .env-sum-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  align-items: flex-start; gap: 1px;
+}
 .budget-app-root .env-sum-name {
-  flex: 1; min-width: 0; font-size: 13.5px; font-weight: 650; color: var(--text-primary);
+  max-width: 100%; font-size: 13.5px; font-weight: 650; color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.budget-app-root .env-sum-rem {
+  max-width: 100%; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* One bucket's own split, in the row's middle column. Same colour language as
+   the hero key above it — primary for money gone, accent for placed-and-unspent
+   ("Spoken for"), danger for the overshoot — so a reader learns it once. Widths
+   come from envelopeBar and always total 100%, so no segment can clip.
+
+   flex-shrink lets it give way before the name does on a narrowing pane, and it
+   is removed outright under 640px: see the mobile block at the end of this
+   section. */
+.budget-app-root .env-sum-bar {
+  flex: 0 1 190px; min-width: 70px; height: 8px; border-radius: 999px;
+  overflow: hidden; display: flex; background: rgba(127, 127, 127, .14);
+}
+.budget-app-root .env-sum-bar i { display: block; height: 100%; }
+.budget-app-root .esb-spent { background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary)); }
+.budget-app-root .esb-left { background: var(--color-accent); opacity: .45; }
+.budget-app-root .esb-over { background: var(--color-danger); }
 .budget-app-root .env-sum-amt { font-size: 13.5px; font-weight: 700; flex: none; }
 .budget-app-root .env-sum-pct {
   font-size: 11px; font-weight: 700; color: var(--text-muted); flex: none;
