@@ -98,12 +98,21 @@ const EXPLAINED_DIFFERENCES = [
    honest fixture gaps — no investment account, no fixed-bill category, no prior
    period to average, a Plans file holding budget-shaped rows rather than plan
    sources, no stale balance to disclose a drift against. Two are the
-   stated-vs-implied KPI pairs whose partner segment is one of those gaps.
+   stated-vs-implied KPI pairs whose partner segment is one of those gaps. Four
+   more (ISSUE 96) are the Budget strip's own gap note: every named category in
+   this household has a Categories/*.md file and none nets a refund, so
+   budgetSpendGap() answers 0 and the tile's uncat/netted fragments never
+   render — the check the RESTORED dom() calls make is real, this household
+   just cannot exercise it (tests/budget-strip-gap.test.cjs does, directly).
 
    Growing the fixture is how these come off the list, and #89 is that work. A
    check leaving this list is good news that still has to be written down. */
 const CANNOT_BE_MADE = [
   'accounts :: Group "Investments" (stated) vs Dashboard tile (implied)',
+  'budgets :: budTotalsBottom: refunds netted note',
+  'budgets :: budTotalsBottom: uncategorised / unknown-name note',
+  'budgets :: budTotalsTop: refunds netted note',
+  'budgets :: budTotalsTop: uncategorised / unknown-name note',
   'dashboard :: Stale note: drift',
   'plan :: \u03a3 envelopes + free = pot',
   'plan :: \u03a3 sources = pot',
