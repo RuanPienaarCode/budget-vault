@@ -65,9 +65,31 @@ const registerReport = require('./views/report');
    currency.js's formatAmount is the byte-for-byte twin of this function (its
    header explains why the copy exists) and carries the identical change; the
    two are held together by tests/controller-money.test.cjs. */
+/* `toFixed` switches to exponential notation at 1e21 REGARDLESS of the
+   decimals argument, so a dp=0 tile and a dp=2 sentence built from the same
+   figure disagreed the moment either crossed it — the Dashboard's net worth
+   card names both: dash.pos.netWorthSub (dp=0) beside dash.pos.netWorthSay
+   (dp=2), the same w.assets read twice. Worse, at exactly 1e21 `.toFixed(2)`
+   returns the bare string "1e+21" — no '.' to split on — so the decimals
+   branch below appended ",undefined" (#76 item 2's own repro: "R
+   1e+21,undefined").
+
+   Any double this large is already, unconditionally, an exact integer — the
+   gap between adjacent doubles exceeds 1 long before 1e21 — so there is no
+   fractional part `decimals` could ever reveal, and BigInt(v) recovers its
+   exact integer digits with no exponent. Below 1e21 nothing changes: this is
+   the untouched fast path every other case in tests/controller-money.test.cjs
+   pins.
+
+   currency.js's formatAmount carries an identical copy of this helper. */
+function fixedNoExponent(v, decimals) {
+  if (v < 1e21) return v.toFixed(decimals);
+  const digits = BigInt(Math.trunc(v)).toString();
+  return decimals > 0 ? `${digits}.${'0'.repeat(decimals)}` : digits;
+}
 function formatMoney(symbol, v, decimals, loc) {
   if (!Number.isFinite(v)) v = 0;
-  const abs = Math.abs(v).toFixed(decimals);
+  const abs = fixedNoExponent(Math.abs(v), decimals);
   const sign = v < 0 && Number(abs) !== 0 ? '-' : '';
   const parts = abs.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);

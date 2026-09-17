@@ -18,8 +18,28 @@
 const escMd = s => (s ?? '').toString().replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim();
 const unescMd = s => (s ?? '').replace(/<br>/g, '\n').replace(/\\\|/g, '|').trim();
 
+/* #76 item 3. A leading UTF-8 BOM (U+FEFF) — an encoding artifact some
+   editors and OSes prepend, not content the reader typed — defeated capture
+   entirely here: the regex below anchors on the very first character being
+   `-`, so a BOM'd Debts.md loaded its table but S.debtsFm fell back to the
+   bare 'kind: debts' default, and the next save (patchFrontmatter with
+   raw='') wrote THAT in place of whatever tags/aliases the real frontmatter
+   held — silent loss of properties on a file nobody had touched. Whether
+   Obsidian's own reader already strips a BOM before this text arrives was
+   never verified either way, and it doesn't need to be: stripping one here
+   is harmless if Obsidian already did it (the charCode check just misses),
+   and load-bearing if it didn't.
+
+   Not carried forward into `raw`/`body`/the write path: every writeFile call
+   in io.js already emits a bare `---\n` with no BOM of its own, so a file
+   this app saves never has one from the moment it does — preserving an
+   inherited BOM would need new plumbing threaded through raw/body/patchFile
+   for a value nothing downstream reads or displays. It heals on the FIRST
+   save after this fix, the same way this file's own unescMd unwinds a
+   double-escape without a migration. */
 function parseFrontmatter(text) {
-  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const t = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const m = t.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   const fm = {};
   if (m) for (const line of m[1].split(/\r?\n/)) {
     const i = line.indexOf(':');
@@ -32,7 +52,7 @@ function parseFrontmatter(text) {
   }
   // `raw` is the verbatim frontmatter block (between the --- fences) so a
   // serializer can write back keys it doesn't model (tags, aliases, …).
-  return { fm, raw: m ? m[1] : '', body: m ? text.slice(m[0].length) : text };
+  return { fm, raw: m ? m[1] : '', body: m ? t.slice(m[0].length) : t };
 }
 /* "Is the last character an unescaped pipe?" and "split on unescaped pipes".
    Hand-rolled rather than /(?<!\\)\|/ on purpose: a lookbehind *literal* is a

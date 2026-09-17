@@ -79,6 +79,21 @@ ok(DISPATCH.length === 16, `all 16 dispatched views are still parsed out of cont
 const VIEW_MODULES = ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
   'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
 
+/* #76 item 2 — `Number.prototype.toFixed` switches to exponential notation at
+   1e21 regardless of the decimals argument, which is what the ctx.money mock
+   below used to call directly. Byte-identical to plain `.toFixed()` for every
+   magnitude below the boundary (so every existing string assertion in this
+   file is unaffected) and expands to the exact integer digits above it,
+   matching the real fix in src/controller.js's formatMoney and
+   src/currency.js's formatAmount — see those files' own headers for why any
+   double this large is already, unconditionally, an integer. */
+function fixedNoExponent(v, decimals) {
+  if (Math.abs(v) < 1e21) return v.toFixed(decimals);
+  const neg = v < 0;
+  const digits = BigInt(Math.trunc(Math.abs(v))).toString();
+  return (neg ? '-' : '') + (decimals > 0 ? `${digits}.${'0'.repeat(decimals)}` : digits);
+}
+
 /* Mounts one vault against one fresh ctx + DOM, the way controller.js does —
    copied from views-render.test.cjs's mountAll rather than imported, because
    this file may not edit that one and the two harnesses are allowed to drift
@@ -108,8 +123,8 @@ async function mount(files, period, viewsDir, figuresDir) {
   ctx.$$ = () => [];
   ctx.root = $('#root');
   ctx.view = { containerEl: $('#root') };
-  ctx.money = (v, dp = 2) => `R ${Number(v).toFixed(dp)}`;
-  ctx.moneyIn = (sym, v, dp = 2) => `${sym} ${Number(v).toFixed(dp)}`;
+  ctx.money = (v, dp = 2) => `R ${fixedNoExponent(Number(v), dp)}`;
+  ctx.moneyIn = (sym, v, dp = 2) => `${sym} ${fixedNoExponent(Number(v), dp)}`;
   const { el } = require('../src/dom');
   ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
   ctx.plugin.settings = { ...ctx.plugin.settings, chartTrendRange: '6m' };
@@ -138,6 +153,14 @@ const GARBAGE = [
   { name: 'undefined', re: /\bundefined\b/ },
   { name: 'null', re: /\bnull\b/ },
   { name: '[object Object]', re: /\[object Object\]/ },
+  /* #76 item 2 — `toFixed` switches to exponential notation at 1e21
+     regardless of the decimals argument, so a typo'd balance ("R 1e+21")
+     could sit on screen next to a sibling figure of the SAME number printed
+     the ordinary way (the Dashboard net worth card's dp=0 tile beside its
+     dp=2 sentence). \de[+-]\d catches "1e+21"/"1e-7" without matching an
+     ordinary word containing "e" — no real copy in src/lang/en.js has a
+     digit immediately before "e" followed by a sign and a digit. */
+  { name: 'exponent notation', re: /\de[+-]\d/i },
 ];
 function garbageIn(nodes, shapeName, viewName) {
   for (const [key, top] of nodes) {
@@ -353,6 +376,22 @@ SHAPES.push({ name: 'group-nets-to-exactly-zero', files: files(['Budget/Settings
 SHAPES.push({ name: 'multi-currency-account', files: files(['Budget/Settings.md', settings()],
   account('Cheque', 'type: checking\nbalance: 5000.00\nbalance_updated: 2026-01-01\n'),
   account('Euro Wallet', 'type: checking\ncurrency: "€"\nbalance: 400.00\nbalance_updated: 2026-01-01\n')) });
+
+/* ---- extra. a typo'd balance at the 1e21 boundary --------------------------
+   (numbered out of sequence deliberately — inserted after the fact rather
+   than renumbering every shape below it)
+   #76 item 2 — `toFixed` switches to exponential notation at 1e21 REGARDLESS
+   of the decimals argument, so the Dashboard net worth card's dp=0 tile
+   (dash.pos.netWorthSub) and its dp=2 sentence (dash.pos.netWorthSay), both
+   built from the SAME w.assets figure, printed two different renderings of
+   themselves the moment a stray extra digit pushed a balance across the
+   boundary — real, in the sense that a fat-fingered "1000000000000000000000"
+   (one digit long) is a typo away from an ordinary balance, not a value
+   anyone would ever intend. All 15 dispatched views run over it (the matrix
+   loop below), so this also proves no OTHER money() call site anywhere in
+   src/views leaks "1e+21" the same way — not just the one that reported it. */
+SHAPES.push({ name: 'balance-at-1e21-boundary', files: files(['Budget/Settings.md', settings()],
+  account('Cheque', 'type: checking\nbalance: 1000000000000000000000.00\nbalance_updated: 2026-01-01\n')) });
 
 /* ---- 16–19. account-type case/whitespace drift -----------------------------
    `load.js` only DEFAULTS `type` when the frontmatter key is absent — a
