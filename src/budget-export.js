@@ -160,7 +160,7 @@ function subtotalsOf(rows) {
    really cover: today, when the range runs on into the future, because the
    ledger counts what has happened and schedules the rest. `txs` replace the
    per-period lists, so the transactions are the exact-date ones too. */
-function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact }) {
+function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact, typeOrder }) {
   const list = periods || [];
   const only = Array.isArray(categories) ? new Set(categories) : null;
   const keep = cat => !only || only.has(cat);
@@ -195,7 +195,19 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     const total = s.byPeriod.reduce((t, v) => t + v, 0);
     return { ...s, total, average: total / n };
   };
-  const summaryRows = [...byCat.values()].map(finish);
+  /* Grouped by TYPE, then by name. The first version kept first-seen order on
+     the theory that it WAS type order — true only while every category exists
+     in the first period. On the first real vault (twelve periods, seventeen
+     types) "Household" first appeared in month three and landed after the
+     luxuries. `typeOrder` is the household's own (groups.js, handed in by the
+     view); a type it does not name follows in first-seen order, and either
+     way a type is never split in two. */
+  const seenTypes = [];
+  for (const v of byCat.values()) if (!seenTypes.includes(v.type)) seenTypes.push(v.type);
+  const order = [...(typeOrder || []).filter(t => seenTypes.includes(t)), ...seenTypes.filter(t => !(typeOrder || []).includes(t))];
+  const rank = t => order.indexOf(t);
+  const summaryRows = [...byCat.values()].map(finish)
+    .sort((a, b) => rank(a.type) - rank(b.type) || String(a.cat).localeCompare(String(b.cat)));
   const subByType = new Map();
   for (const s of summaryRows) {
     const cur = subByType.get(s.type) || { type: s.type, byPeriod: list.map(() => 0), budget: 0 };
@@ -238,10 +250,15 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     exact: exact ? {
       from: exact.from, to: exact.to, through: exact.through || exact.to,
       rows: exactRows, subtotals: subtotalsOf(exactRows),
+      /* The ledger's own tally for the window — income, gross spend and what
+         of it is uncategorised. Withheld under a category filter for the
+         reason the period headline is: it describes money the table no longer
+         shows. */
+      totals: only ? null : (exact.summary || null),
       periodFrom: first ? first.start : null, periodTo: last ? last.end : null,
     } : null,
     inProgress: inProgress && list.some(p => p.key === inProgress) ? inProgress : null,
-    summary: { rows: summaryRows, subtotals: [...subByType.values()].map(finish) },
+    summary: { rows: summaryRows, subtotals: [...subByType.values()].map(finish).sort((a, b) => rank(a.type) - rank(b.type)) },
     budgets, transactions, foreignSymbols,
   };
 }
@@ -317,6 +334,8 @@ const LABELS = {
   noteInProgress: '{period} is still in progress, so its figures are for part of a period and pull the average down.',
   noteWide: 'The month-by-month columns do not fit on a page for this many periods — the Excel and CSV exports carry every month.',
   noteTx: 'Excluded, transfer and split-parent rows are listed and flagged; they are not part of the budget figures above.',
+  amountsIn: 'Amounts in {currency}.',
+  noteNoBudget: 'No budget was set for this period, so these are actual figures only.',
   exactHeading: 'Actual by category · {from} to {to}',
   noteExact: 'These figures cover exactly {from} to {to}. The budget tables further on cover whole budget periods, {pfrom} to {pto} — every period ending inside the range — so their totals differ at the edges. Budgets are never split across a date.',
   noteExactOnly: 'These figures cover exactly {from} to {to}. No budget period ends inside this range, so there are no budget tables.',
@@ -361,6 +380,38 @@ const txFlag = (t, L) => {
   return [t.excluded ? L.excluded : '', role === 'part' ? L.splitPart : ''].filter(Boolean).join(', ');
 };
 
+/* Rows with each type's subtotal directly UNDER its group, as [{row}|{sub}].
+
+   One block of subtotals after the rows was fine for a fixture with two types
+   and unreadable for a household with seventeen: seventeen "Total …" lines a
+   page away from the rows they total, the block itself split across a page
+   break. A group of ONE gets no subtotal — the row is its own total, and
+   printing it twice is how a seventeen-type table grew eleven lines that said
+   nothing. Rows must arrive grouped by type, which buildModel and figures.js
+   both guarantee. */
+function grouped(rows, subtotals) {
+  const out = [];
+  const subOf = t => (subtotals || []).find(s => s.type === t);
+  let run = 0;
+  rows.forEach((r, i) => {
+    out.push({ row: r });
+    run++;
+    const next = rows[i + 1];
+    if (!next || next.type !== r.type) {
+      if (run > 1 && subOf(r.type)) out.push({ sub: subOf(r.type) });
+      run = 0;
+    }
+  });
+  return out;
+}
+
+/* The Dashboard's rule for the Remaining cell (views/dashboard.js's budget
+   table): printed when the row has a budget, or is an unbudgeted overspend —
+   and BLANK otherwise. Without it an income row with no budget line printed
+   "R -32 400,55 remaining" under a pay cheque, which reads as a loss. The CSV
+   keeps the raw number: it is for a program, and a blank there is a zero. */
+const showsRemaining = r => Number(r.budget) > 0 || !!r.unbudgeted;
+
 /* Amounts are NUMBERS here, with a money style — never a formatted string. A
    string looks identical in the cell and sums to zero. Text cells go in
    verbatim: xlsx.js writes inline strings, which a spreadsheet never
@@ -378,15 +429,17 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
   const sym = symbolFor || (() => '');
 
   const sumRows = [head([L.category, L.type, ...model.periods.map(p => p.name), L.total, L.average, L.budgeted])];
-  for (const r of model.summary.rows) sumRows.push([r.cat, r.type || '', ...r.byPeriod.map(m), m(r.total), m(r.average), m(r.budget)]);
-  for (const s of model.summary.subtotals) {
-    sumRows.push([{ v: fill(L.subtotal, { type: s.type || '' }), s: 'bold' }, '', ...s.byPeriod.map(mb), mb(s.total), mb(s.average), mb(s.budget)]);
+  for (const g of grouped(model.summary.rows, model.summary.subtotals)) {
+    if (g.row) { const r = g.row; sumRows.push([r.cat, r.type || '', ...r.byPeriod.map(m), m(r.total), m(r.average), m(r.budget)]); }
+    else { const t = g.sub; sumRows.push([{ v: fill(L.subtotal, { type: t.type || '' }), s: 'bold' }, '', ...t.byPeriod.map(mb), mb(t.total), mb(t.average), mb(t.budget)]); }
   }
   const sheets = [];
   if (model.exact) {
     const rows = [head([L.category, L.type, L.from, L.to, L.actual])];
-    for (const r of model.exact.rows) rows.push([r.cat, r.type || '', model.exact.from, model.exact.through, m(r.actual)]);
-    for (const t of model.exact.subtotals) rows.push([{ v: fill(L.subtotal, { type: t.type || '' }), s: 'bold' }, '', '', '', mb(t.actual)]);
+    for (const g of grouped(model.exact.rows, model.exact.subtotals)) {
+      if (g.row) rows.push([g.row.cat, g.row.type || '', model.exact.from, model.exact.through, m(g.row.actual)]);
+      else rows.push([{ v: fill(L.subtotal, { type: g.sub.type || '' }), s: 'bold' }, '', '', '', mb(g.sub.actual)]);
+    }
     sheets.push({ name: L.sheetExact, rows, freezeRows: 1, widths: [28, 12, 12, 12, 14] });
   }
   if (!model.exact || model.periods.length) {
@@ -396,7 +449,7 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
   if (model.content === 'full' && model.budgets.length) {
     const rows = [head([L.period, L.from, L.to, L.category, L.type, L.budget, L.actual, L.remaining, L.notes])];
     for (const b of model.budgets) {
-      for (const r of b.rows) rows.push([b.period.name, b.period.start || '', b.period.end || '', r.cat, r.type || '', m(r.budget), m(r.actual), m(r.remaining), r.notes || '']);
+      for (const r of b.rows) rows.push([b.period.name, b.period.start || '', b.period.end || '', r.cat, r.type || '', m(r.budget), m(r.actual), showsRemaining(r) ? m(r.remaining) : null, r.notes || '']);
     }
     sheets.push({ name: L.sheetBudget, rows, freezeRows: 1, widths: [18, 12, 12, 28, 12, 14, 14, 14, 40] });
   }
@@ -430,10 +483,12 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
    Past PDF_MAX_PERIOD_COLS periods the month columns are dropped and the page
    SAYS so: pdf.js will shrink a table's type to fit, but fifteen money columns
    on A4 shrink past reading, and an "all" export can be sixty. */
-function modelToDoc(model, { money, rowMoney, labels } = {}) {
+function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   const L = labelsOf(labels);
   const fmt = money || (v => num(v));
   const rfmt = rowMoney || ((v) => fmt(v));
+  const headline = t => fill(L.periodLine, { income: fmt(t.income), spend: fmt(t.spend) })
+    + ((Number(t.uncatSpend) || 0) ? fill(L.periodUncat, { uncat: fmt(t.uncatSpend) }) : '');
   const wide = model.periods.length > PDF_MAX_PERIOD_COLS;
   const cols = wide ? [] : model.periods;
   const blocks = [];
@@ -443,9 +498,12 @@ function modelToDoc(model, { money, rowMoney, labels } = {}) {
   if (model.exact) {
     blocks.push({ type: 'heading', text: fill(L.exactHeading, { from: model.exact.from, to: model.exact.through }) });
     for (const c of exactNotes(model, L)) blocks.push({ type: 'note', text: c });
-    const xRows = model.exact.rows.map(r => [r.cat, r.type || '', fmt(r.actual)]);
-    const xBold = [];
-    for (const t of model.exact.subtotals) { xBold.push(xRows.length); xRows.push([fill(L.subtotal, { type: t.type || '' }), '', fmt(t.actual)]); }
+    if (model.exact.totals) blocks.push({ type: 'note', text: headline(model.exact.totals) });
+    const xRows = [], xBold = [];
+    for (const g of grouped(model.exact.rows, model.exact.subtotals)) {
+      if (g.row) xRows.push([g.row.cat, g.row.type || '', fmt(g.row.actual)]);
+      else { xBold.push(xRows.length); xRows.push([fill(L.subtotal, { type: g.sub.type || '' }), '', fmt(g.sub.actual)]); }
+    }
     blocks.push({ type: 'table', head: [L.category, L.type, L.actual], rows: xRows, boldRows: xBold, align: ['left', 'left', 'right'] });
   }
   const hasPeriods = !model.exact || model.periods.length > 0;
@@ -453,34 +511,48 @@ function modelToDoc(model, { money, rowMoney, labels } = {}) {
 
   const head = [L.category, ...cols.map(p => p.name), L.total, L.average, L.budgeted];
   const rows = [], boldRows = [];
-  for (const r of model.summary.rows) {
-    rows.push([r.cat, ...(wide ? [] : r.byPeriod.map(v => fmt(v))), fmt(r.total), fmt(r.average), fmt(r.budget)]);
-  }
-  for (const s of model.summary.subtotals) {
-    boldRows.push(rows.length);
-    rows.push([fill(L.subtotal, { type: s.type || '' }), ...(wide ? [] : s.byPeriod.map(v => fmt(v))), fmt(s.total), fmt(s.average), fmt(s.budget)]);
+  /* The month-by-month table is up to fifteen money columns wide, and "R " in
+     every one of two hundred cells cost it a font size and truncated the
+     category names ("Discovery 32 Day notice sa…"). With a plain formatter
+     handed in, the cells carry the number and the unit is said ONCE, above. */
+  const cell = plainMoney || fmt;
+  for (const g of grouped(model.summary.rows, model.summary.subtotals)) {
+    const x = g.row || g.sub;
+    if (g.sub) boldRows.push(rows.length);
+    rows.push([g.row ? x.cat : fill(L.subtotal, { type: x.type || '' }),
+      ...(wide ? [] : x.byPeriod.map(v => cell(v))), cell(x.total), cell(x.average), cell(x.budget)]);
   }
   if (hasPeriods) {
     blocks.push({ type: 'heading', text: L.summaryHeading });
+    if (plainMoney && model.currency) blocks.push({ type: 'note', text: fill(L.amountsIn, { currency: model.currency }) });
     blocks.push({ type: 'table', head, rows, boldRows, align: head.map((h, i) => (i === 0 ? 'left' : 'right')) });
   }
 
   for (const b of model.budgets) {
+    /* A page of its own. A real period table is forty-odd rows; begun two rows
+       from the foot of the summary's last page it reads as two tables, and
+       "where does March start" becomes a search. */
+    blocks.push({ type: 'pagebreak' });
     blocks.push({ type: 'heading', text: b.period.title ? `${b.period.name} · ${b.period.title}` : b.period.name });
-    if (b.summary) {
-      const uncat = Number(b.summary.uncatSpend) || 0;
-      blocks.push({
-        type: 'note',
-        text: fill(L.periodLine, { income: fmt(b.summary.income), spend: fmt(b.summary.spend) })
-          + (uncat ? fill(L.periodUncat, { uncat: fmt(uncat) }) : ''),
-      });
-    }
-    const tRows = b.rows.map(r => [r.cat, r.type || '', fmt(r.budget), fmt(r.actual), fmt(r.remaining),
-      Number(r.budget) > 0 ? `${Math.round((Number(r.actual) || 0) / Number(r.budget) * 100)}%` : '']);
-    const bold = [];
-    for (const s of b.subtotals) {
-      bold.push(tRows.length);
-      tRows.push([fill(L.subtotal, { type: s.type || '' }), '', fmt(s.budget), fmt(s.actual), fmt(s.remaining), '']);
+    if (b.summary) blocks.push({ type: 'note', text: headline(b.summary) });
+    /* A period nobody budgeted. Row by row the Dashboard's rule calls every
+       expense in it an unbudgeted overspend — right for one stray category,
+       wrong for a whole month with no plan, where it printed forty negative
+       "remaining" figures. Said once, and the column left blank. */
+    const planned = b.rows.some(r => Number(r.budget) > 0);
+    if (!planned && b.rows.length) blocks.push({ type: 'note', text: L.noteNoBudget });
+    const rem = x => (planned && showsRemaining(x) ? fmt(x.remaining) : '');
+    const tRows = [], bold = [];
+    for (const g of grouped(b.rows, b.subtotals)) {
+      if (g.row) {
+        const r = g.row;
+        tRows.push([r.cat, r.type || '', fmt(r.budget), fmt(r.actual), rem(r),
+          Number(r.budget) > 0 ? `${Math.round((Number(r.actual) || 0) / Number(r.budget) * 100)}%` : '']);
+      } else {
+        const t = g.sub;
+        bold.push(tRows.length);
+        tRows.push([fill(L.subtotal, { type: t.type || '' }), '', fmt(t.budget), fmt(t.actual), rem(t), '']);
+      }
     }
     blocks.push({
       type: 'table', head: [L.category, L.type, L.budget, L.actual, L.remaining, L.used], rows: tRows, boldRows: bold,

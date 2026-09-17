@@ -692,6 +692,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} isaqhubeka, ngoko amanani ayo ngawenxalenye yexesha kuphela kwaye ehlisa umyinge.',
   'bx.doc.noteWide': 'Iikholam zenyanga ngenyanga azingeni kwiphepha elinye kumaxesha amaninzi kangaka — ukukhutshwa kwe-Excel ne-CSV kuthwala inyanga nganye.',
   'bx.doc.noteTx': 'Imigca ekhutshiweyo, yotshintshiselwano nentloko eyahlulweyo idweliswe kwaye iphawulwe; ayiyonxalenye yamanani ebhajethi angentla.',
+  'bx.doc.amountsIn': 'Izixa zikwi-{currency}.',
+  'bx.doc.noteNoBudget': 'Akukho bhajethi ibibekelwe eli xesha, ngoko ke ngamanani okwenene kuphela.',
   'bx.doc.exactHeading': 'Okwenzekileyo ngedidi · {from} ukuya {to}',
   'bx.doc.noteExact': 'La manani agubungela ngqo ukusuka ku-{from} ukuya ku-{to}. Iitafile zebhajethi ezilandelayo zigubungela onke amaxesha ebhajethi apheleleyo, ukusuka ku-{pfrom} ukuya ku-{pto} — lonke ixesha eliphela ngaphakathi kolu luhlu — ngoko izixa zawo ziyahluka kwiziphelo. Iibhajethi azizange zahlulwe ngomhla.',
   'bx.doc.noteExactOnly': 'La manani agubungela ngqo ukusuka ku-{from} ukuya ku-{to}. Akukho xesha lebhajethi eliphela ngaphakathi kolu luhlu, ngoko akukho zitafile zebhajethi.',

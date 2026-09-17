@@ -49,8 +49,11 @@ module.exports = function registerFigures(ctx) {
   function categoryActualsInRange(start, end, todayArg) {
     const today = todayArg || todayIso();
     const stop = end > today ? today : end;
-    const rows = stop < start ? [] : rowsFrom(summaryInRange(start, stop), []);
-    return { rows, through: stop < start ? start : stop };
+    const sum = stop < start ? null : summaryInRange(start, stop);
+    /* `summary` rides along so the export can print the window's income, gross
+       spend and uncategorised share from the SAME tally the rows came from —
+       the headline every period table already carries. */
+    return { rows: sum ? rowsFrom(sum, []) : [], through: sum ? stop : start, summary: sum };
   }
 
   function rowsFrom(sum, budget) {

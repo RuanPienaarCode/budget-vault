@@ -697,6 +697,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} isaqhubeka, ngakho izibalo zayo ziyingxenye yesikhathi kuphela futhi zehlisa isilinganiso.',
   'bx.doc.noteWide': 'Amakholomu enyanga nenyanga awafaneli ekhasini elilodwa kulezi zikhathi eziningi kangaka — okukhishwe kwe-Excel ne-CSV kuthwala inyanga ngayinye.',
   'bx.doc.noteTx': 'Imigqa ekhishiwe, yokudlulisela nenhloko ehlukanisiwe ibaliwe futhi iphawuliwe; akuyona ingxenye yezibalo zesabelomali ezingenhla.',
+  'bx.doc.amountsIn': 'Amanani aku-{currency}.',
+  'bx.doc.noteNoBudget': 'Asikho isabelomali esabekelwa lesi sikhathi, ngakho lokhu ngamanani angempela kuphela.',
   'bx.doc.exactHeading': 'Okwenzeke ngesigaba · {from} kuya {to}',
   'bx.doc.noteExact': 'Lezi zibalo zimbombela ngqo ukusuka ku-{from} kuya ku-{to}. Amathebula esabelomali alandelayo ambombela zonke izikhathi zesabelomali eziphelele, kusukela ku-{pfrom} kuya ku-{pto} — isikhathi ngasinye esiphela ngaphakathi kwalobu bubanzi — ngakho izamba zawo ziyahluka emaphethelweni. Izabelomali azikaze zihlukaniswe ngosuku.',
   'bx.doc.noteExactOnly': 'Lezi zibalo zimbombela ngqo ukusuka ku-{from} kuya ku-{to}. Asikho isikhathi sesabelomali esiphela ngaphakathi kwalobu bubanzi, ngakho azikho amathebula esabelomali.',

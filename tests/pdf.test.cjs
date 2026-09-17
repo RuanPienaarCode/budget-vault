@@ -409,6 +409,57 @@ function pdfEscapeRef(s) {
 }
 
 /* ============================================================
+   11c. A NARROW table is not stretched to the page. The first real tax-year
+   export put a three-column table (Category | Type | Actual) on a landscape
+   page and spread it edge to edge: twenty centimetres of white between a
+   category and its amount, and a reader tracing each row with a finger. The
+   slack a table may absorb is capped, so its band, its rules and its amounts
+   stop where the table stops. */
+{
+  const doc = buildDoc({ blocks: [{ type: 'table', head: ['Category', 'Type', 'Actual'], align: ['left', 'left', 'right'],
+    rows: [['Food', 'food', 'R 1 000,00'], ['Rent', 'housing', 'R 13 038,00']], boldRows: [] }] });
+  const pages = layoutDocument(doc, { measure: helveticaMeasure, page: PAGE.A4_LANDSCAPE });
+  const band = pages[0].ops.find(o => o.op === 'rect' && o.gray < 0.9);
+  const content = PAGE.A4_LANDSCAPE.width - 80;
+  ok(band.w < content * 0.7, `header band is the TABLE's width (${band.w.toFixed(0)}), not the page's (${content.toFixed(0)})`);
+  const amount = pages[0].ops.find(o => o.op === 'text' && o.text === 'R 13 038,00');
+  ok(amount.x + helveticaMeasure(amount.text, 'regular', amount.size) <= band.x + band.w + 0.01, 'and the right-aligned amounts end inside it');
+  for (const l of pages[0].ops.filter(o => o.op === 'line' && o.y1 < 400)) ok(l.x2 <= band.x + band.w + 0.01, 'rules stop with the table');
+  // a table that NEEDS the page still gets all of it
+  const wide = buildDoc({ blocks: [{ type: 'table', head: Array.from({ length: 12 }, (_, i) => 'Month ' + i), align: Array(12).fill('right'),
+    rows: [Array(12).fill('R 123 456,00')], boldRows: [] }] });
+  const wband = layoutDocument(wide, { measure: helveticaMeasure, page: PAGE.A4_LANDSCAPE })[0].ops.find(o => o.op === 'rect' && o.gray < 0.9);
+  ok(wband.w > content * 0.9, 'a table that needs the page is not shrunk');
+}
+
+/* ============================================================
+   11d. The font size leaves the NAMES readable, not just the numbers whole.
+   The sizing rule asked one question — do the numeric columns fit? — and let
+   the text column absorb whatever was left. On the first real twelve-month
+   export that was 30pt: "Christin…", "Total h…", in a table whose numbers had
+   room to spare at a size smaller. A text column is owed a readable minimum
+   (its natural width, capped) before a size is accepted; only at the floor
+   does truncation take over. */
+{
+  const months = Array.from({ length: 12 }, (_, i) => `Month ${i + 1}`);
+  const head = ['Category', ...months, 'Total', 'Average', 'Budgeted'];
+  const rows = [['Christine pay check', ...months.map(() => '32 400,55'), '404 275,91', '33 689,66', '0,00'],
+    ['Total housing', ...months.map(() => '13 738,00'), '182 343,54', '15 195,30', '28 338,00']];
+  const doc = buildDoc({ blocks: [{ type: 'table', head, rows, boldRows: [1], align: head.map((h, i) => (i ? 'right' : 'left')) }] });
+  const pages = layoutDocument(doc, { measure: helveticaMeasure, page: PAGE.A4_LANDSCAPE });
+  const texts = pages[0].ops.filter(o => o.op === 'text').map(o => o.text);
+  ok(texts.includes('Christine pay check'), `the category name is whole (got: ${texts.filter(t => /^Chr/.test(t))[0]})`);
+  ok(texts.includes('Total housing'), 'and so is the bold subtotal label');
+  ok(texts.includes('404 275,91'), 'with every number still whole');
+  // …while an ordinary 6-column table is NOT shrunk because of one long name
+  const six = buildDoc({ blocks: [{ type: 'table', head: ['Category', 'Type', 'Budget', 'Actual', 'Remaining', 'Used'], boldRows: [],
+    align: ['left', 'left', 'right', 'right', 'right', 'right'],
+    rows: [['A category name that really is unreasonably long for any table anywhere at all, by any standard', 'expense', 'R 1,00', 'R 1,00', 'R 0,00', '100%']] }] });
+  const op = layoutDocument(six, { measure: helveticaMeasure, page: PAGE.A4 })[0].ops.find(o => o.op === 'text' && o.text === 'expense');
+  eq(op.size, 9, 'one absurd name truncates; it does not drag the whole table down a size');
+}
+
+/* ============================================================
    12. layoutDocument driven by a FAKE measure still produces in-bounds
    ops — proves it never reaches for Helvetica metrics itself. */
 {

@@ -216,6 +216,7 @@ function layoutDocument(doc, opts) {
   function headH(size) { return size * 1.9 + 4; }
   function rowH(size) { return size * 1.7 + 4; }
 
+  const MAX_SLACK = 0.45;
   function naturalColWidths(head, rows, align, size) {
     const n = head.length;
     const nat = new Array(n).fill(0);
@@ -242,7 +243,12 @@ function layoutDocument(doc, opts) {
     const total = natural.reduce((a, b) => a + b, 0);
     if (total <= contentWidth) {
       if (total === 0) return natural;
-      const extra = contentWidth - total;
+      /* Slack is CAPPED. A table takes the room it needs plus some air, not the
+         page: the first real export spread a three-column table across a
+         landscape sheet, twenty centimetres of white between a category and
+         its amount. Past the cap the table simply ends, and its band and
+         rules end with it (tableWidth below). */
+      const extra = Math.min(contentWidth - total, total * MAX_SLACK);
       return natural.map(w => w + extra * (w / total));
     }
     const numericIdx = [], textIdx = [];
@@ -252,8 +258,18 @@ function layoutDocument(doc, opts) {
     const widths = natural.slice();
     if (textIdx.length) {
       const available = Math.max(0, contentWidth - numericTotal);
-      const scale = textTotal > 0 ? available / textTotal : 0;
-      for (const c of textIdx) widths[c] = Math.max(MIN_TEXT_COL, natural[c] * scale);
+      /* WATER-FILLED, not scaled. A proportional squeeze made one absurd
+         category name crush the five-letter "Type" column beside it to
+         "exp…": the short column paid for the long one. Instead every text
+         column keeps its natural width up to a common ceiling, and only the
+         columns above the ceiling give way — found by raising the ceiling
+         over the columns in ascending order until the room is spent. */
+      const asc = textIdx.slice().sort((a, b) => natural[a] - natural[b]);
+      let room = available, left = asc.length, ceiling = 0;
+      for (const c of asc) {
+        if (natural[c] * left <= room) { room -= natural[c]; left--; ceiling = natural[c]; } else { ceiling = room / left; break; }
+      }
+      for (const c of textIdx) widths[c] = Math.max(MIN_TEXT_COL, Math.min(natural[c], ceiling));
       // The MIN_TEXT_COL floor can itself push the total back over budget —
       // never claw that back from a numeric column (it must never truncate),
       // so squeeze the text columns a second time instead.
@@ -297,10 +313,20 @@ function layoutDocument(doc, opts) {
      too would shrink the font on an ordinary 6-column budget table just
      because one category name is long, when truncating that one cell at
      size 9 was always the right answer. */
+  /* …with one amendment the first real export forced. "Whatever is left over"
+     was 30pt on a twelve-month summary — "Christin…", "Total h…" — in a table
+     whose numbers had room to spare one size down. So a text column is OWED
+     a readable minimum before a size is accepted: its natural width, capped
+     at TEXT_OWED so that one absurd name still truncates instead of dragging
+     an ordinary table down a size (the case the paragraph above protects).
+     Natural widths, never the derived ones — that circularity is why this
+     function exists at all. At the font floor the debt is forgiven and
+     truncation takes over, because there is nowhere smaller to go. */
+  const TEXT_OWED = 110;
   function numericNaturalTotal(head, rows, align, size) {
     const natural = naturalColWidths(head, rows, align, size);
     let sum = 0;
-    for (let c = 0; c < align.length; c++) if (align[c] === 'right') sum += natural[c];
+    for (let c = 0; c < align.length; c++) sum += align[c] === 'right' ? natural[c] : Math.min(natural[c], TEXT_OWED);
     return sum;
   }
 
@@ -320,7 +346,7 @@ function layoutDocument(doc, opts) {
     let size = TABLE_FONT_START;
     while (size > TABLE_FONT_FLOOR && !fitsAtSize(size)) size--;
     const colWidths = computeColWidths(head, rows, align, weights, size);
-    const plan = { head, rows, align, colWidths, size, boldRows };
+    const plan = { head, rows, align, colWidths, size, boldRows, width: colWidths.reduce((a, b) => a + b, 0) };
     plans.set(block, plan);
     return plan;
   }
@@ -346,13 +372,13 @@ function layoutDocument(doc, opts) {
 
   function drawHeaderRow(plan) {
     const h = headH(plan.size);
-    cur.ops.push({ op: 'rect', x: contentLeft, y, w: contentWidth, h, gray: 0.85 });
+    cur.ops.push({ op: 'rect', x: contentLeft, y, w: plan.width, h, gray: 0.85 });
     let cx = contentLeft;
     for (let c = 0; c < plan.head.length; c++) {
       drawCell(String(plan.head[c] || ''), cx, y, plan.colWidths[c], h, 'bold', plan.size, plan.align[c]);
       cx += plan.colWidths[c];
     }
-    cur.ops.push({ op: 'line', x1: contentLeft, y1: y + h, x2: contentLeft + contentWidth, y2: y + h, width: 0.75, gray: 0.3 });
+    cur.ops.push({ op: 'line', x1: contentLeft, y1: y + h, x2: contentLeft + plan.width, y2: y + h, width: 0.75, gray: 0.3 });
     y += h;
   }
 
@@ -370,9 +396,9 @@ function layoutDocument(doc, opts) {
       if (y + rH > contentBottom) { newPage(); drawHeaderRow(plan); }
       const isBold = plan.boldRows.has(r);
       if (isBold) {
-        cur.ops.push({ op: 'line', x1: contentLeft, y1: y, x2: contentLeft + contentWidth, y2: y, width: 0.75, gray: 0.3 });
+        cur.ops.push({ op: 'line', x1: contentLeft, y1: y, x2: contentLeft + plan.width, y2: y, width: 0.75, gray: 0.3 });
       } else if (r % 2 === 1) {
-        cur.ops.push({ op: 'rect', x: contentLeft, y, w: contentWidth, h: rH, gray: 0.965 });
+        cur.ops.push({ op: 'rect', x: contentLeft, y, w: plan.width, h: rH, gray: 0.965 });
       }
       let cx = contentLeft;
       for (let c = 0; c < plan.head.length; c++) {

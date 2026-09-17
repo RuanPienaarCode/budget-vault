@@ -43,6 +43,7 @@ const { canvasMeasure, rasterisePages } = require('../pdf-raster');
 const { managedFolderMatch } = require('../report');
 const { symbolOf } = require('../currency');
 const { nowLocalMinute, todayIso, isRealIsoDate } = require('../dates');
+const { typeOrder } = require('../groups');
 const i18n = require('../i18n');
 
 /* Every label budget-export.js prints into a document, from the active
@@ -54,7 +55,7 @@ const DOC_LABEL_KEYS = [
   'flag', 'excluded', 'splitParent', 'splitPart', 'subtotal', 'summaryHeading', 'transactionsHeading',
   'generated', 'range', 'categories', 'allCategories', 'periodLine', 'periodUncat',
   'noteFilter', 'noteForeign', 'noteInProgress', 'noteWide', 'noteTx',
-  'exactHeading', 'noteExact', 'noteExactOnly', 'noteExactThrough',
+  'amountsIn', 'noteNoBudget', 'exactHeading', 'noteExact', 'noteExactOnly', 'noteExactThrough',
 ];
 
 module.exports = function registerBudgetExport(ctx) {
@@ -79,7 +80,7 @@ module.exports = function registerBudgetExport(ctx) {
   /* {period}, {income} … survive as literal placeholders: budget-export.js
      fills them itself, per period and per note. Passing each name as its own
      value is what stops i18n.t() from consuming them first. */
-  const KEEP = { from: '{from}', to: '{to}', pfrom: '{pfrom}', pto: '{pto}', through: '{through}', type: '{type}', list: '{list}', period: '{period}', income: '{income}', spend: '{spend}', uncat: '{uncat}' };
+  const KEEP = { currency: '{currency}', from: '{from}', to: '{to}', pfrom: '{pfrom}', pto: '{pto}', through: '{through}', type: '{type}', list: '{list}', period: '{period}', income: '{income}', spend: '{spend}', uncat: '{uncat}' };
   const docLabels = () => {
     const out = {};
     for (const k of DOC_LABEL_KEYS) out[k] = i18n.t(`bx.doc.${k}`, KEEP);
@@ -152,12 +153,12 @@ module.exports = function registerBudgetExport(ctx) {
     });
     let exact = null;
     if (isDates(answer) && datesOk(answer)) {
-      const { rows, through } = categoryActualsInRange(answer.from, answer.to);
-      exact = { from: answer.from, to: answer.to, through, rows,
+      const { rows, through, summary } = categoryActualsInRange(answer.from, answer.to);
+      exact = { from: answer.from, to: answer.to, through, rows, summary,
         txs: withRows && answer.includeTx ? txInRange(answer.from, through) : [] };
     }
     return buildModel({
-      exact,
+      exact, typeOrder: typeOrder((S.settings || {}).groups),
       periods, content: answer.content, categories: answer.categories, includeTx: answer.includeTx,
       generated: nowLocalMinute(), currency: (S.settings || {}).currency || '',
       inProgress: keys.includes(now) ? now : null,
@@ -224,7 +225,11 @@ module.exports = function registerBudgetExport(ctx) {
      reader is told which one they got only when it is the image one, because
      that is the one with a consequence: the text in it cannot be searched. */
   async function pdfBytes(model) {
-    const doc = modelToDoc(model, { money, rowMoney, labels: docLabels() });
+    /* The month-by-month table's cells go without the symbol — see modelToDoc.
+       moneyIn('') rather than a second formatter: the household's separators
+       are the point, only the unit is dropped. */
+    const plainMoney = typeof ctx.moneyIn === 'function' ? v => String(ctx.moneyIn('', v)).trim() : null;
+    const doc = modelToDoc(model, { money, rowMoney, plainMoney, labels: docLabels() });
     const page = doc.landscape ? PAGE.A4_LANDSCAPE : PAGE.A4;
     const meta = { title: `${doc.title} ${model.rangeLabel}`.trim(), created: model.generated.replace(' ', 'T'), producer: 'Budget Vault' };
     const pageLabel = (n, m) => i18n.t('bx.doc.pageOf', { n, m });
