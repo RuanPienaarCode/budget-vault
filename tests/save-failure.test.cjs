@@ -34,6 +34,14 @@ const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
 const i18n = require('../src/i18n');
+/* ISSUE 90 — the clock, pinned. Cases 12/13 (startTax/newTaxYear) seed a
+   phantom tax year off `locale().currentTaxYear(new Date())` and the fixture
+   below hardcodes the write target as `Tax/2026.md` — so this only reads as
+   the FAILING write reconcile.js/views/tax.js expects while the real
+   calendar's tax year (za: Mar-Feb) is still 2026. Reused rather than
+   reinvented: tests/_audit-seed.cjs's atAuditDate() default (2026-09-02)
+   already resolves to tax year 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -141,7 +149,7 @@ function withFailingWrite(ctx) {
    ahead of any timer. */
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
-(async () => {
+atAuditDate(async () => {
   /* ---- 1-6: the six dirtyFlag-backed single-file saves — Owed, Debts,
      Assets, Services, Tax, Plan. Same shape (try/catch around one writeFile,
      clearDirty() only on success), so one loop proves all six. ---- */
@@ -504,4 +512,4 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
   }
 
   console.log(`PASS — save paths fail out loud (${checks} assertions).`);
-})().catch(e => { console.error(e); process.exit(1); });
+}).catch(e => { console.error(e); process.exit(1); });

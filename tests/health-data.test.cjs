@@ -27,6 +27,10 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+/* ISSUE 90 — the clock, pinned. See tests/audit-followups-score-dashboard.test.cjs
+   for why: healthSnapshot()'s trailing window is the six calendar months
+   before the real currentPeriod(), and MONTHS below is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -40,8 +44,15 @@ const table = rows =>
   `${TX_FM}\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n${rows.join('\n')}\n`;
 
 /* ---- 1. the emergency divisor reads the WHOLE household, not just the
-   budget-scoped, non-excluded slice periodSpend hands everything else ---- */
-(async () => {
+   budget-scoped, non-excluded slice periodSpend hands everything else ----
+   Sequenced into part 2 below (rather than fired as two independent
+   atAuditDate() calls) because atAuditDate installs its fake Date on the
+   real, SHARED global Date object: two overlapping calls would each restore
+   the real clock in its own .finally() as soon as ITS OWN body settled,
+   which could yank the pin out from under whichever of the two was still
+   mid-flight. */
+function part1() {
+  return atAuditDate(async () => {
   const SETTINGS = { month_start_day: 1, currency: 'R', country: 'za' };
   const FILES = {
     [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n---\n',
@@ -87,11 +98,13 @@ const table = rows =>
     'and NOT the budget-only, non-excluded figure the bug used to divide by (which would read ~3.25 months)');
 
   console.log(`PASS  health-data.test.cjs / part 1  (${checks} checks)`);
-})();
+  }, '2026-08-15');
+}
 
 /* ---- 2. the savings rate nets withdrawals — an internal transfer between
    two savings accounts must not read as fresh saving ---- */
-(async () => {
+function part2() {
+  return atAuditDate(async () => {
   const SETTINGS = { month_start_day: 1, currency: 'R', country: 'za' };
   const FILES = {
     [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n---\n',
@@ -131,4 +144,7 @@ const table = rows =>
   eq(H.savingsRate, 0, 'so the savings rate reads 0%, not 11% off a transfer the household never made');
 
   console.log(`PASS  health-data.test.cjs / part 2  (${checks} checks)`);
-})();
+  }, '2026-08-15');
+}
+
+part1().then(part2).catch(e => { console.error(e); process.exit(1); });

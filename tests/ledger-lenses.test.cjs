@@ -29,6 +29,13 @@ const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { stamp, tally, LENSES, lensDifference, keeps } = require('../src/ledger');
+/* ISSUE 90 — the clock, pinned, for section 5's two `ctx.currentPeriod()`
+   reads. healthSnapshot()'s trailing window is the six calendar months
+   before the REAL currentPeriod(), and section 5's fixture data is fixed at
+   2026-07 — this only reads back as a single counted period while "now"
+   falls in 2026-08..2027-01. Harmless to the random-vault conservation
+   rounds above section 5, which only ever pass explicit period strings. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 const { supersededBySplit } = require('../src/tx-role');
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -113,7 +120,7 @@ function oracleKeeps(ctx, lensName, t, paired) {
   }
 }
 
-(async () => {
+atAuditDate(async () => {
   const rnd = rng(20260903);
   let rounds = 0;
   for (let round = 0; round < 40; round++) {
@@ -241,4 +248,4 @@ function oracleKeeps(ctx, lensName, t, paired) {
   }
 
   console.log(`PASS — ledger lenses: conservation, exact differences and the old seams as tallies (${checks} checks over ${rounds} rounds)`);
-})().catch(e => { console.error(e); process.exit(1); });
+}, '2026-09-15').catch(e => { console.error(e); process.exit(1); });

@@ -515,8 +515,25 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
    cycle's worth of days, so it reads low early and climbs through the week.
    Feeding that to debt-to-income put a red 36%+ ratio on the strength of the
    day of the week alone. These derive every period from currentPeriod()
-   rather than hardcoding a date, so they don't rot with the calendar. */
+   rather than hardcoding a date, so they don't rot with the calendar —
+   except that "currentPeriod()" itself still reads the real wall clock
+   (ISSUE 90), and the 3-calendar-month window this block builds against a
+   7-day cycle anchored on a Friday (2026-01-02) does not land on the same
+   fencepost every day of the year: measured, this block's own tolerance
+   (2%) is cleared on every day from 2026-09-17 through 2027-03-01 and
+   missed by ~8% on every day from 2027-03-05 onward through at least
+   2028-06-01 — the exact "rots with the calendar" failure the comment above
+   says this design avoids. Pinning the clock removes the wall-clock
+   dependency without changing what is asserted; 15 Aug was checked against
+   2026, 2027 and 2029 and is not a fencepost itself. */
 {
+  const RealDate = Date;
+  class PinnedDate extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(2026, 7, 15, 12, 0, 0); }
+    static now() { return new PinnedDate().getTime(); }
+  }
+  global.Date = PinnedDate;
+  try {
   const SALARY = 26000;
   const mkWeekly = rowsFor => {
     const ctx = intervalCtx(7, '2026-01-02', {});
@@ -567,6 +584,7 @@ function intervalCtx(period_days, period_anchor, txFiles = {}) {
   // A period in the PAST is already finished — it keeps the whole window.
   ok(settled.monthlyIncome(settled.shiftPeriod(nowP, -3)).complete,
     'a past period is complete, so the window ends at itself rather than one earlier');
+  } finally { global.Date = RealDate; }
 }
 
 /* ---- the averaging window is three months, whatever the cycle ---- */

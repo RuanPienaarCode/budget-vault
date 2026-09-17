@@ -40,6 +40,11 @@ const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { periodFlow } = require('../src/money-flow');
 const { debtInterestMonthly } = require('../src/health-math');
+/* ISSUE 90 — the clock, pinned, for part1/part2 below. See
+   tests/audit-followups-score-dashboard.test.cjs for why: healthSnapshot()'s
+   trailing window is the six calendar months before the real currentPeriod(),
+   and MONTHS below is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -271,4 +276,5 @@ function part3() {
    synchronous and would otherwise run — and fail the whole file — before
    either loader-driven part had reached its first assertion, hiding whichever
    of the three actually broke. */
-part1().then(part2).then(part3).catch(e => { console.error(e); process.exit(1); });
+atAuditDate(() => part1().then(part2).then(part3), '2026-08-15')
+  .catch(e => { console.error(e); process.exit(1); });
