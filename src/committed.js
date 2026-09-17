@@ -220,8 +220,9 @@ function remainingCharges({ anchor, next, step, from, to, charges }) {
    dropped, and a debt with no category is claimed for the whole period. */
 /* ADR-0007 · Rule 2 asks the BUDGET lens. `settleRows` is the rows the lens
    kept — a narrower question than `rows`, and asking it of `rows` is what made
-   this function disagree with the Debts page. Falls back to `rows` for the
-   Dashboard's foreign bands, which have no BUDGET lens to ask. */
+   this function disagree with the Debts page. `rows` remains the fallback for
+   a caller with no lens question to ask at all; the Dashboard always has one
+   now, home band or foreign (ISSUE 85 — dropsAnyOf's `except` parameter). */
 function debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today }) {
   const out = [];
   const history = (settleRows || rows || []).filter(r => !isSplitPart(r));

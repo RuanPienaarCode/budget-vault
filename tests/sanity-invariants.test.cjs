@@ -37,6 +37,10 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+/* ISSUE 90 — the clock, pinned. See tests/audit-followups-score-dashboard.test.cjs
+   for why: healthSnapshot()'s trailing window is the six calendar months
+   before the real currentPeriod(), and MONTHS below is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -105,7 +109,7 @@ function vault() {
   return FILES;
 }
 
-(async () => {
+atAuditDate(async () => {
   const ctx = makeCtx(vault(), { budgetFolder: B });
   await loadInto(ctx);
   ctx.S.period = '2026-08';
@@ -174,4 +178,4 @@ function vault() {
   }
 
   console.log(`PASS — sanity invariants: the relationships that hold whatever the data is (${checks} checks).`);
-})().catch(e => { console.error(e.message); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error(e.message); process.exit(1); });

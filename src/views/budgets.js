@@ -50,6 +50,9 @@ const i18n = require('../i18n');
    Pure, and takes both figures rather than reading them: no DOM, no ctx, so
    tests/dash-assumed-actual.test.cjs can drive both callers against it. */
 const { assumedActual } = require('../money-flow');
+// Kept as its own require (not folded into the one above): tests/vocabulary.test.cjs
+// matches that exact line verbatim as the assume-spent seam's import shape.
+const { budgetStripGap } = require('../money-flow');
 
 module.exports = function registerBudgets(ctx) {
   const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
@@ -287,17 +290,20 @@ module.exports = function registerBudgets(ctx) {
      the vault is re-read, so it registers for that half on its own. */
   ctx.registerSaveButton('#budSave');
 
-  /* Totals across the whole draft — budgeted income, budgeted spend, and the
-     actual spend so far. Read off the live draft (not S.budgets) so the strips
-     move as soon as an amount is edited, before the file is saved. */
-  function budgetTotalsStrip() {
+  /* ADR-0007 · Budget strip gap. namedNetSpend, summed over the DRAFT's own
+     row population, then handed to budgetStripGap (money-flow.js) — the pure
+     identity gross spend minus what the rows account for, split into
+     uncategorised and netted. A named seam of its own, distinct from
+     figures.js's categoryGap: the donut's categorySpendRows also shows a
+     spend row for a category with no .md file (any non-income, non-transfer
+     category is shown, known type or not), so its gap sees nothing missing
+     for that money, while the draft here never seeds a row for it — two
+     honest gaps over two different row populations. Exposed on ctx (ISSUE 96)
+     so scripts/reconcile-page.cjs can check the printed note against exactly
+     this, not a re-derivation of it. */
+  function budgetSpendGap() {
     const draft = budgetDraft();
     const sum = periodSummary(S.period);
-    /* The plan snapshot (figures.js planFigures) over the DRAFT, so the
-       strip moves as an amount is typed: the whole plan, its income, the
-       share and what is left — the same assembly the Dashboard hero reads. */
-    const plan = planFigures(S.period, { rows: draft });
-    const income = plan.income, budgeted = plan.total;
     let namedNetSpend = 0;
     for (const d of draft) {
       /* The row's own stored Type cell (d.type, the Type column read out of
@@ -310,23 +316,16 @@ module.exports = function registerBudgets(ctx) {
          case and the row's own amount for income can legitimately be 0. */
       const type = budgetRowType(d);
       if (type === 'income' || type === 'transfer') continue;
-      /* ISSUE 40 follow-up. The spend half on its own. `budgeted` above stays
-         the WHOLE plan — that is what "Total budgeted" means and what
-         `allocPct` should be a share of — but "% of budget used" divides by
-         this, because nothing in its numerator can ever fill a savings
-         envelope: their funding is transfer-typed and summaryInRange drops it,
-         so a household that has funded every envelope read 32% used against
-         the Dashboard's 45% for the same period. */
       /* Real spend already inside sum.spend for THIS category — periodSummary
          doesn't know an assume-spent flag exists, but it knows every real
          transaction, including one in a category the flag was turned on for.
-         The overlay below used to add the WHOLE budgeted amount on top of
-         that, regardless: a category with real spend double-counted its own
-         money (R4 000 budget, R3 000 real spend, flag on -> read R7 000, 175%
-         used, on R3 000 that actually moved). The overlay is only the
-         SHORTFALL beyond what already happened — clamped to zero so a
-         category the assumption undershot never goes negative and pulls the
-         total down. */
+         budgetUsed()'s own overlay used to add the WHOLE budgeted amount on
+         top of that, regardless: a category with real spend double-counted
+         its own money (R4 000 budget, R3 000 real spend, flag on -> read
+         R7 000, 175% used, on R3 000 that actually moved). The overlay is
+         only the SHORTFALL beyond what already happened — clamped to zero so
+         a category the assumption undershot never goes negative and pulls
+         the total down. */
       const raw = sum.byCat[d.category] || 0;
       const realSpend = -raw;
       /* Written as the row's own Actual MINUS what really moved, rather than
@@ -349,6 +348,20 @@ module.exports = function registerBudgets(ctx) {
       // can disclose exactly how it differs from the table under it.
       namedNetSpend += Math.max(0, realSpend);
     }
+    return budgetStripGap({ spend: sum.spend, namedNetSpend, uncatSpend: sum.uncatSpend, unknownSpend: sum.unknown.spend });
+  }
+
+  /* Totals across the whole draft — budgeted income, budgeted spend, and the
+     actual spend so far. Read off the live draft (not S.budgets) so the strips
+     move as soon as an amount is edited, before the file is saved. */
+  function budgetTotalsStrip() {
+    const draft = budgetDraft();
+    const sum = periodSummary(S.period);
+    /* The plan snapshot (figures.js planFigures) over the DRAFT, so the
+       strip moves as an amount is typed: the whole plan, its income, the
+       share and what is left — the same assembly the Dashboard hero reads. */
+    const plan = planFigures(S.period, { rows: draft });
+    const income = plan.income, budgeted = plan.total;
     /* Assume-spent rows have no transactions to find, so periodSummary knows
        nothing about them — and "Total spent" read R1 900 low all month while
        the row itself claimed R1 900 still to go. Added here, off the LIVE draft
@@ -373,18 +386,12 @@ module.exports = function registerBudgets(ctx) {
     /* "Total spent" reads GROSS: sum.spend, every outgoing row, refunds not
        netted, uncategorised and unknown-name spend counted in full. Every row
        below is NET per category (refunds folded in) and only exists for a
-       category this vault actually has — namedNetSpend is that same figure,
-       summed. tests/cross-page-consistency.test.cjs allows exactly this split
-       on the Dashboard because its donut's "not shown" note accounts for the
-       WHOLE gap; this tile carried no such disclosure, so it could not be
-       reconciled to the table under it. Measured against sum.spend rather
-       than derived a second way, so the note accounts for the whole
-       difference by construction — same reason renderSplit's own gapNote is
-       built this way (dashboard.js). Reuses the donut's own keys: the words
+       category this vault actually has — budgetSpendGap() above is that same
+       figure, decomposed. Reuses the donut's own i18n keys below: the words
        fit a category-netting gap regardless of which page it's disclosed on. */
-    const grossGap = Math.max(0, sum.spend - namedNetSpend);
-    const gapUncat = Math.min((sum.uncatSpend || 0) + (sum.unknown.spend || 0), grossGap);
-    const gapNetted = grossGap - gapUncat;
+    const stripGap = budgetSpendGap();
+    const gapUncat = stripGap.uncat;
+    const gapNetted = stripGap.netted;
     /* The tile's OWN sentence, computed here rather than at the return below,
        because every separator decision under it needs to know whether anything
        precedes it. It did not, and the two fragments that carry no leading
@@ -957,17 +964,23 @@ module.exports = function registerBudgets(ctx) {
     renderBudgets();
   }
 
+  // ISSUE 92: freshPeriodNote and typeGroupLabel used to be provided here too,
+  // on the same "worth pinning directly" reasoning as strandedPeriodDays below
+  // — but no test ever called ctx.freshPeriodNote() or ctx.typeGroupLabel();
+  // every guard on them (e.g. tests/budget-stale-type-guard.test.cjs) goes
+  // through renderBudgets' DOM instead, which is the only caller either ever
+  // had. Dropped rather than left as an unread key promising a test that was
+  // never written; both functions are unchanged and still used internally.
   ctx.provide({ renderBudgets, saveBudget, copyPreviousBudget, addNewCategory, invalidateBudgetDraft, budgetDirty,
     otherShapeBudgets, carryStructure,
     // Exposed the same way otherShapeBudgets and carryStructure already are —
     // a pure-ish helper (periodRange aside) worth pinning directly in a bare
     // node test rather than only reachable through the reslice modal's DOM.
     strandedPeriodDays,
-    // Same reason: freshPeriodNote decides whether the silent-period-roll note
-    // (audit finding 2) shows at all, and typeGroupLabel decides what the
-    // group heading prints (finding 4) — both worth pinning directly rather
-    // than only reachable through renderBudgets' full DOM render.
-    freshPeriodNote, typeGroupLabel });
+    // ISSUE 96: the strip's own gap, so scripts/reconcile-page.cjs can check
+    // the printed note fragments against the seam budgetTotalsStrip() itself
+    // reads, rather than there being nothing correct to compare them to.
+    budgetSpendGap });
 };
 
 /* Hung off the module the way dashboard.js hangs sharePercents off its own —

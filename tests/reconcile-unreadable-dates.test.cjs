@@ -67,6 +67,24 @@ const TODAY = '2026-09-02';
 const ACCT = { name: 'Cheque', balance: 10000, balance_updated: '2026-08-20' };
 const row = (date, amount) => ({ date, amount });
 
+/* The clock, pinned for section 8 only (ISSUE 90). views/accounts.js calls
+   statusOf with `today` null — the live page reads the real clock — and this
+   file originally relied on `balance_updated: 2026-08-20` staying "far enough
+   in the past" that STALE_DAYS (30, reconcile.js) would never trip before
+   `unreadable`. That margin is wall-clock time, not a fixture property: once
+   more than 30 days actually elapse, acct-status ranks `stale` ahead of
+   `unreadable` (see acct-status.js's own comment on that ordering) and the
+   whole point of this file — that an unreadable date is never allowed to
+   read as `ok` — stops being exercised. Pinning "now" to the same TODAY the
+   explicit reconcile()/statusOf() calls above already use keeps section 8
+   consistent with sections 1-7 rather than at the mercy of the calendar. */
+const RealDate = Date;
+const [PIN_Y, PIN_M, PIN_D] = TODAY.split('-').map(Number);
+class PinnedDate extends RealDate {
+  constructor(...a) { if (a.length) super(...a); else super(PIN_Y, PIN_M - 1, PIN_D, 12, 0, 0); }
+  static now() { return new PinnedDate().getTime(); }
+}
+
 /* ---- 1. the control: a readable date still behaves exactly as it did ----
    Everything below is only meaningful if the ordinary path is untouched, so
    the ordinary path is asserted first and in full. */
@@ -197,11 +215,11 @@ const row = (date, amount) => ({ date, amount });
   const FILES = {
     [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
     [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\n---\n',
-    /* Confirmed a fortnight before the wall clock can matter: `balance_updated`
-       is far enough in the past that this is never `stale` and near enough that
-       nothing here depends on the day the suite runs. views/accounts.js calls
-       statusOf with `today` null (the live page reads the clock), which is why
-       the fixture rather than the assertion carries that guarantee. */
+    /* `balance_updated` is 13 days before TODAY, well inside STALE_DAYS (30) —
+       and stays that way now that the clock itself is pinned to TODAY just
+       below, rather than left to the real calendar (ISSUE 90: this used to
+       rely on "the suite happens to run soon enough", which is exactly the
+       kind of margin that runs out). */
     [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\ntx_label: "Cheque"\n'
       + 'balance: 10000.00\nbalance_updated: 2026-08-20\n---\n',
     // The typo, in a file a person could have written by hand: 13 is not a month.
@@ -209,6 +227,8 @@ const row = (date, amount) => ({ date, amount });
       + '| 2026-13-05 | Grocer | Groceries | -2000.00 |  |  |  |\n',
   };
 
+  global.Date = PinnedDate;
+  try {
   const ctx = makeCtx(FILES);
   const S = await loadInto(ctx);
   S.period = '2026-08';
@@ -293,4 +313,5 @@ const row = (date, amount) => ({ date, amount });
   }
 
   console.log(`reconcile-unreadable-dates.test.cjs — ${checks} checks OK`);
+  } finally { global.Date = RealDate; }
 })().catch(e => { console.error(e); process.exit(1); });
