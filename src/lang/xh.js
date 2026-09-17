@@ -194,16 +194,14 @@ module.exports = {
   'wiz.folder.willCreate': '"{folder}" ayikho okwangoku — iza kwenzelwa wena.',
   'wiz.folder.name': 'Ifolda yebhajethi',
   'wiz.folder.desc': 'Apho iindidi, iiakhawunti, iibhajethi neentengiselwano zigcinwa khona.',
-  'wiz.folder.notVault': 'Ifolda engaphakathi kwesi sikhwama — ayisiso isikhwama ngokwaso. Ukuyivula nge-“Open folder as vault” kufihla i-plugin.',
+  'wiz.folder.notVault': 'Ifolda engaphakathi kwesi sikhwama — ayisiso isikhwama ngokwaso. Ukuyivula njengesikhwama esizimeleyo kufihla i-plugin.',
   'wiz.folder.connected': 'Kufunyanwe ibhajethi ekhoyo kwa "{folder}" — kuqhagamshelwa kuyo endaweni yokwenza iifayile ezintsha. Iindidi zakho, iiakhawunti neentengiselwano zishiywa kanye njengoko zinjalo; ziisetingi zesi sikrini kuphela ezibhalwa kwiSettings.md yayo.',
-  'wiz.how.name': 'Uza kuyifaka njani inkcitho yakho?',
   'wiz.how.desc': 'Ungakutshintsha oku kamva kwiiSetingi.',
   'wiz.how.csv.title': 'Ngenisa izitheyitmenti zebhanki (i-CSV)',
   'wiz.how.csv.desc': 'Khuphela i-CSV kwibhanki yakho kwaye iapp iyihlela ngeendidi njengoko uyifundisa.',
   'wiz.how.manual.title': 'Ndizichwethezela ngokwam',
   'wiz.how.manual.desc': 'Akukho iifayile zebhanki — ufaka ngesandla umvuzo nenkcitho yakho, umgca ngamnye. Yeyona ndlela ilula yokuqala.',
 
-  'wiz.rates.name': 'Ingaba unemali kwiimali zamazwe ezingaphezu kwesinye?',
   'wiz.rates.desc': 'Phendula ewe kuphela ukuba ezinye zeeakhawunti zakho zikwimali yelizwe eyahlukileyo ku-{symbol}. Le yeyona nxalenye yodwa yesongezelelo esisebenzisa i-intanethi.',
   'wiz.rates.off.title': 'Hayi, okanye hayi ngoku',
   'wiz.rates.off.desc': 'Akukho nto ifunyanwayo kwaye akukho nto iphuma kwisixhobo sakho. Iiakhawunti ezikwenye imali yelizwe zisadweliswa — iidityaniswa zazo zibonakaliswa zodwa endaweni yokudityaniswa. Ungayivula kamva kwiiSetingi.',
@@ -446,7 +444,6 @@ module.exports = {
   'tx.col.amount': 'Isixa',
   'tx.col.excl': 'Ekhutshiwe',
   'tx.col.note': 'Inqaku',
-  'tx.col.split': 'Yahlula',
   'tx.col.actions': 'Izenzo zomgca',
 
   'tx.aria.category': 'Udidi luka-{date} {desc}',
@@ -574,7 +571,6 @@ module.exports = {
     other: 'Kukhutshwe imigca engu-{count} neendidi ezingu-{cats} ziya ku-{path}/',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Iiakhawunti zebhanki',
   'acct.group.savings': 'Imali egciniweyo',
@@ -650,37 +646,19 @@ module.exports = {
   'acct.budget.on': 'U-{name} ubalelwa kwibhajethi kwakhona',
   'acct.budget.off': 'U-{name} akasabalelwa kwiitotali zebhajethi',
 
-  'acct.creditUsed': 'Ityala elisetyenzisiweyo',
-  'acct.creditOf': '{used} kwi-{limit}',
   'acct.overLimit': 'Ngaphaya komda nge-{amount}',
-  'acct.utilised': '{pct}% esetyenzisiweyo · {available} efumanekayo',
 
-  'acct.kpi.inCredit': 'Inemali',
-  'acct.kpi.overdrawn': 'Itsalwe ngokugqithisileyo',
-  'acct.kpi.netWorth': 'Ubuncwane obucocekileyo',
-  'acct.kpi.netWorthNote': 'kwezi akhawunti kuphela',
   'acct.kpi.attention': 'Ifuna ingqwalasela',
-  'acct.kpi.attentionNote': 'iibhalansi ezingaqinisekiswanga okanye ezingahambelaniyo',
-  'acct.kpi.allGood': 'zonke iibhalansi zihambelana',
 
   'acct.aria.showTx': 'Bonisa iintengiselwano zika-{name}',
   'acct.aria.balance': 'Ibhalansi ka-{name}, {amount} — cofa ukuze uhlaziye',
-  'acct.limitSuffix': ' · umda {amount}',
-  'acct.monthlySuffix': ' · {amount}/nyanga',
 
   'acct.badge.notInBudget': 'ayikho kwibhajethi',
   'acct.badge.noTx': 'akukho ntengiselwano',
   'acct.badge.asOf': 'ukuya ku-{date}',
   'acct.badge.currencyClash': 'ifundwa njenge-{code}, hayi i-{symbol}',
   'acct.drawer.currencyClash': 'Ungquzulwano lwemali',
-  'acct.badge.neverConfirmed': 'ayizange iqinisekiswe',
-  'acct.badge.unconfirmed': { one: 'ayiqinisekiswanga usuku olungu-{count}', other: 'ayiqinisekiswanga iintsuku ezingu-{count}' },
 
-  'acct.act.in': ' engenayo · ',
-  'acct.act.out': ' ephumayo · ',
-  'acct.act.count': { one: 'intengiselwano engu-{count} ngo-{month}', other: 'iintengiselwano ezingu-{count} ngo-{month}' },
-
-  'acct.recon.since': { one: 'intengiselwano engu-{count} ukusukela oko · ihlanganisa ', other: 'iintengiselwano ezingu-{count} ukusukela oko · zihlanganisa ' },
   'acct.recon.pending': {
     one: ' · engu-{count} inomhla ophambili, ayikabalwa',
     other: ' · ezingu-{count} zinemihla ephambili, azikabalwa',
@@ -688,12 +666,8 @@ module.exports = {
   'acct.recon.undatable': { one: ' · intengiselwano engu-{count} enomhla le app engakwaziyo ukuwufunda, engekho kuwo omabini amaxesha', other: ' · iintengiselwano ezingu-{count} ezinemihla le app engakwaziyo ukuyifunda, ezingekho kuwo omabini amaxesha' },
   'acct.recon.useThis': 'Sebenzisa le',
   'acct.aria.useThis': 'Misela ibhalansi ka-{name} ku-{amount}',
-  'acct.recon.matches': 'Ihambelana neentengiselwano zakho',
   'acct.recon.upToDate': { one: 'Ihlaziyekile · intengiselwano engu-{count} inomhla ophambili', other: 'Ihlaziyekile · iintengiselwano ezingu-{count} zinemihla ephambili' },
-  'acct.recon.setDate': 'Misela umhla webhalansi ukuze oku kukhangelwe ngokwezintengiselwano zakho',
 
-  'acct.foot.updated': 'ihlaziywe {date}',
-  'acct.foot.noDate': 'akukho mhla webhalansi',
   'acct.aria.exclude': 'Yeka ukubala u-{name} kwiitotali zebhajethi',
   'acct.aria.include': 'Bala u-{name} kwiitotali zebhajethi kwakhona',
   'acct.btn.exclude': 'Khupha kwibhajethi',
@@ -747,7 +721,6 @@ module.exports = {
     one: 'Ifayile yeakhawunti engu-{count} kwifolda engaphantsi kwe-Accounts/ ayifundwa ({names}). Yise ngqo kwi-Accounts/ ukuze ibandakanywe.',
     other: 'Iifayile zeakhawunti ezingu-{count} kwiifolda ezingaphantsi kwe-Accounts/ azifundwa ({names}). Zise ngqo kwi-Accounts/ ukuze zibandakanywe.',
   },
-  'acct.hero.mixed': ' Le totali idibanisa iiakhawunti ezigcinwe kwiimali ezingaphezu kwenye ({symbols}) ngaphandle kokuziguqula.',
   'acct.hero.converted': ' Kunye ne-{list} — iguqulwe kumgca ongasentla ngamaxabiso ka-{date}.',
   'acct.hero.convertedTotal': 'Iyonke eguqulweyo {amount}',
   'acct.hero.convertedStale': ' Kunye ne-{list} — iguqulwe kumgca ongasentla ngamaxabiso ka-{date}, aneentsuku ezingu-{days}.',
@@ -771,7 +744,6 @@ module.exports = {
   'settings.rateRefresh.weekly': 'Iveki nganye',
   'settings.rateRefresh.monthly': 'Inyanga nganye',
 
-  'acct.mixedTitle': 'Idibanisa iiakhawunti ezigcinwe kwiimali ezingaphezu kwenye, ngaphandle kokuziguqula.',
   'acct.hero.count': 'Iiakhawunti',
   'acct.hero.oldest': 'Eyona nkqinisekiso yebhalansi indala',
   'acct.hero.oldestDays': { one: 'usuku olungu-{count}', other: 'iintsuku ezingu-{count}' },
@@ -789,12 +761,10 @@ module.exports = {
 
   /* ---- the queue: the accounts that actually want a decision ---- */
   'acct.deck.title': { one: 'Iakhawunti enye ifuna isigqibo', other: 'Iiakhawunti ezingu-{count} zifuna isigqibo' },
-  'acct.deck.sub': 'Yonke enye into kweli phepha ivumelana neentengiselwano zakho.',
   'acct.deck.clear': 'Yonke into ivumelana neentengiselwano zakho',
   'acct.deck.clearSub': 'Akukho nto kweli phepha ifuna isigqibo namhlanje.',
   'acct.deck.review': 'Hlola',
   'acct.deck.ariaReview': 'Vula umgca ka-{name} ongezantsi',
-  'acct.deck.more': { one: 'Enye iakhawunti engu-{count} — zibonise zonke kwitheyibhile', other: 'Ezinye iiakhawunti ezingu-{count} — zibonise zonke kwitheyibhile' },
   'acct.deck.why.drift': { one: 'Intengiselwano engu-{count} ukusukela ekuqinisekiseni kwakho kokugqibela ithetha u-{implied}, hayi u-{stated}', other: 'Iintengiselwano ezingu-{count} ukusukela ekuqinisekiseni kwakho kokugqibela zithetha u-{implied}, hayi u-{stated}' },
   'acct.deck.why.unreadable': { one: 'Intengiselwano engu-{count} inomhla le app engakwaziyo ukuwufunda, ngoko ibhalansi ayinakukhangelwa ngokuchasene nayo', other: 'Iintengiselwano ezingu-{count} zinemihla le app engakwaziyo ukuyifunda, ngoko ibhalansi ayinakukhangelwa ngokuchasene nazo' },
   'acct.deck.why.stale': { one: 'Ayiqinisekiswanga usuku olungu-{count} — ikhangelwe okokugqibela nga-{date}', other: 'Ayiqinisekiswanga iintsuku ezingu-{count} — ikhangelwe okokugqibela nga-{date}' },
@@ -886,13 +856,11 @@ module.exports = {
   'acct.drawer.ahead': 'Kusezayo',
   'acct.drawer.aheadRows': { one: 'intengiselwano engu-{count} enomhla okamva kweli xesha', other: 'iintengiselwano ezingu-{count} ezinomhla okamva kweli xesha', },
   'acct.drawer.folder': 'Ifolda yeentengiselwano',
-  'acct.drawer.noFolder': 'akukho idityanisiweyo',
   'acct.drawer.inBudget': 'Ibalelwa kwibhajethi',
   'acct.drawer.yes': 'Ewe',
   'acct.drawer.no': 'Hayi',
   'acct.btn.seeTx': 'Bona iintengiselwano',
   'acct.btn.editBalance': 'Hlela ibhalansi',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': 'Ifolda yebhajethi ayifunyanwanga',
@@ -1169,7 +1137,6 @@ module.exports = {
   'score.ring.showAll': 'Bonisa zonke iinxalenye ezintlanu',
   'score.ring.hint': 'Cofa inxalenye ukuze uyibone yodwa.',
   'score.gap.railAria': '{name}: {points} kumanqaku angu-{max} azuziweyo.',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Okuseleyo kweli xesha',

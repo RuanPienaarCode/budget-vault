@@ -166,4 +166,4 @@ function inputMode(v) {
 const TYPE_ORDER = ['income', 'housing', 'utilities', 'food', 'transport', 'health', 'family', 'personal', 'fees', 'expense', 'debt', 'services', 'insurance', 'giving', 'savings', 'investment', 'luxuries', 'transfer'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODES, INPUT_MODE_DEFAULT, inputMode };
+module.exports = { VIEW_TYPE, DEFAULT_SETTINGS, FEEDBACK_URL, SUPPORT_URL, TYPE_ORDER, MONTHS, PERIOD_PRESETS, PALETTE_PRESETS, DEFAULT_PALETTE, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODE_DEFAULT, inputMode };

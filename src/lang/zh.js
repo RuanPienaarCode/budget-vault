@@ -182,16 +182,14 @@ module.exports = {
   'wiz.folder.willCreate': '「{folder}」尚不存在 — 我们会为你创建。',
   'wiz.folder.name': '预算文件夹',
   'wiz.folder.desc': '存放分类、账户、预算和交易的位置。',
-  'wiz.folder.notVault': '这是本仓库内的一个文件夹，不是独立仓库。用“Open folder as vault”打开它会导致插件不出现。',
+  'wiz.folder.notVault': '这是本仓库内的一个文件夹，不是独立仓库。将它作为独立仓库打开会导致插件不出现。',
   'wiz.folder.connected': '在 "{folder}" 中找到了已有的预算 — 将连接到它，而不是创建新文件。你的分类、账户和交易会原样保留；只有本页的设置会写入它的 Settings.md。',
-  'wiz.how.name': '你打算怎样记录支出？',
   'wiz.how.desc': '之后可以在设置中更改。',
   'wiz.how.csv.title': '导入银行对账单（CSV）',
   'wiz.how.csv.desc': '从银行下载 CSV，你教得越多，应用就越会自动把它归入分类。',
   'wiz.how.manual.title': '我自己输入',
   'wiz.how.manual.desc': '不需要银行文件 — 你一行一行手动添加收入和支出。最简单的开始方式。',
 
-  'wiz.rates.name': '您持有一种以上货币的资产吗？',
   'wiz.rates.desc': '仅当您的部分账户使用 {symbol} 以外的货币时才选择"是"。这是本插件唯一会使用网络的功能。',
   'wiz.rates.off.title': '否，或暂时不用',
   'wiz.rates.off.desc': '不会获取任何数据，也不会有任何内容离开您的设备。其他货币的账户仍会列出——只是单独显示它们的合计，而不并入总额。您可以稍后在设置中开启。',
@@ -409,7 +407,6 @@ module.exports = {
   },
   'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
 
-
   /* =========================== Transactions page ========================== */
   'tx.wholeHistory': '全部历史',
   'tx.allAccounts': '所有账户',
@@ -425,7 +422,6 @@ module.exports = {
   'tx.col.amount': '金额',
   'tx.col.excl': '预算外',
   'tx.col.note': '备注',
-  'tx.col.split': '拆分',
   'tx.col.actions': '行操作',
 
   'tx.aria.category': '{date} {desc} 的分类',
@@ -538,7 +534,6 @@ module.exports = {
     other: '已把 {count} 行和 {cats} 个分类导出到 {path}/',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': '银行账户',
   'acct.group.savings': '储蓄',
@@ -614,47 +609,25 @@ module.exports = {
   'acct.budget.on': '{name} 重新计入预算',
   'acct.budget.off': '{name} 不再计入预算合计',
 
-  'acct.creditUsed': '已用额度',
-  'acct.creditOf': '{limit} 中已用 {used}',
   'acct.overLimit': '超出额度 {amount}',
-  'acct.utilised': '已用 {pct}% · 可用 {available}',
 
-  'acct.kpi.inCredit': '正余额',
-  'acct.kpi.overdrawn': '透支',
-  'acct.kpi.netWorth': '净资产',
-  'acct.kpi.netWorthNote': '仅限这些账户',
   'acct.kpi.attention': '需要留意',
-  'acct.kpi.attentionNote': '未确认或不匹配的余额',
-  'acct.kpi.allGood': '每个余额都对得上',
 
   'acct.aria.showTx': '显示 {name} 的交易',
   'acct.aria.balance': '{name} 的余额 {amount} — 点击可更新',
-  'acct.limitSuffix': ' · 额度 {amount}',
-  'acct.monthlySuffix': ' · {amount}/月',
 
   'acct.badge.notInBudget': '不计入预算',
   'acct.badge.noTx': '没有交易',
   'acct.badge.asOf': '截至 {date}',
   'acct.badge.currencyClash': '按 {code} 读取，而非 {symbol}',
   'acct.drawer.currencyClash': '货币冲突',
-  'acct.badge.neverConfirmed': '从未确认',
-  'acct.badge.unconfirmed': { other: '已 {count} 天未确认' },
 
-  'acct.act.in': ' 收入 · ',
-  'acct.act.out': ' 支出 · ',
-  'acct.act.count': { other: '{month} 有 {count} 笔交易' },
-
-  'acct.recon.since': { other: '此后有 {count} 笔交易 · 合计为 ' },
   'acct.recon.pending': { other: ' · 其中 {count} 笔日期在未来，尚未计入' },
   'acct.recon.undatable': { other: ' · 有 {count} 笔交易的日期本应用无法读取，两个时间范围都不计入' },
   'acct.recon.useThis': '采用',
   'acct.aria.useThis': '把 {name} 的余额设为 {amount}',
-  'acct.recon.matches': '与你的交易一致',
   'acct.recon.upToDate': { other: '已是最新 · {count} 笔交易日期在未来' },
-  'acct.recon.setDate': '设置一个余额日期，就能与你的交易核对',
 
-  'acct.foot.updated': '{date} 更新',
-  'acct.foot.noDate': '没有余额日期',
   'acct.aria.exclude': '不再把 {name} 计入预算合计',
   'acct.aria.include': '重新把 {name} 计入预算合计',
   'acct.btn.exclude': '从预算中排除',
@@ -701,7 +674,6 @@ module.exports = {
   'acct.ignoredFiles': {
     other: 'Accounts/ 子文件夹中的 {count} 个账户文件未被读取（{names}）。将其直接移入 Accounts/ 即可包含。',
   },
-  'acct.hero.mixed': ' 此总计将以多种货币（{symbols}）持有的账户相加，未进行换算。',
   'acct.hero.converted': ' 另有 {list} —— 已在上方一行按 {date} 汇率换算。',
   'acct.hero.convertedTotal': '折算合计 {amount}',
   'acct.hero.convertedStale': ' 另有 {list} —— 已在上方一行按 {date} 汇率换算（{days} 天前）。',
@@ -709,7 +681,6 @@ module.exports = {
   'report.debt.otherCurrencies': ' 另有 {list} 以其他货币欠款，未换算。',
   'acct.hero.muted': '已忽略的提醒',
   'dash.foreignExcluded': {
-    one: '有 {count} 个其他货币的账户（{symbols}）未计入这些数字。',
     other: '有 {count} 个其他货币的账户（{symbols}）未计入这些数字。',
   },
 
@@ -725,7 +696,6 @@ module.exports = {
   'settings.rateRefresh.weekly': '每周',
   'settings.rateRefresh.monthly': '每月',
 
-  'acct.mixedTitle': '将以多种货币持有的账户相加，未进行换算。',
   'acct.hero.count': '账户数',
   'acct.hero.oldest': '最旧的余额确认',
   'acct.hero.oldestDays': { other: '{count} 天' },
@@ -740,12 +710,10 @@ module.exports = {
   'acct.where.excluded': '上方合计已排除 {amount}。',
 
   'acct.deck.title': { other: '{count} 个账户需要你确认' },
-  'acct.deck.sub': '本页其余内容都与你的交易一致。',
   'acct.deck.clear': '一切都与你的交易一致',
   'acct.deck.clearSub': '今天本页没有需要确认的内容。',
   'acct.deck.review': '查看',
   'acct.deck.ariaReview': '展开下方 {name} 所在的行',
-  'acct.deck.more': { other: '还有 {count} 个 — 在表格中查看全部' },
   'acct.deck.why.drift': { other: '自上次确认以来的 {count} 笔交易表明应为 {implied}，而非 {stated}' },
   'acct.deck.why.unreadable': { other: '有 {count} 笔交易的日期本应用无法读取，因此余额无法与它们核对' },
   'acct.deck.why.stale': { other: '已 {count} 天未确认 — 上次核对于 {date}' },
@@ -835,13 +803,11 @@ module.exports = {
   'acct.drawer.ahead': '尚未发生',
   'acct.drawer.aheadRows': { other: '本期稍后日期的 {count} 笔', },
   'acct.drawer.folder': '交易文件夹',
-  'acct.drawer.noFolder': '未关联',
   'acct.drawer.inBudget': '计入预算',
   'acct.drawer.yes': '是',
   'acct.drawer.no': '否',
   'acct.btn.seeTx': '查看交易',
   'acct.btn.editBalance': '编辑余额',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': '找不到预算文件夹',
@@ -1097,7 +1063,6 @@ module.exports = {
   'score.ring.showAll': '显示全部五个部分',
   'score.ring.hint': '点按某一部分即可单独查看。',
   'score.gap.railAria': '{name}：已获得 {points} / {max} 分。',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': '本期还剩多少钱',

@@ -305,7 +305,7 @@ function isOrphan(note, known) {
 
 module.exports = {
   NOTES_DIR, NOTE_KINDS, KIND_LABELS, TITLE_MAX,
-  hasOwnNote, isTracked, linkResolves, normalizeKind, unwrapLink,
+  hasOwnNote, isTracked, normalizeKind, unwrapLink,
   noteFileName, uniqueNotePath, noteFmLines, serializeNote,
   noteExcerpt, parseNote, notesFor, sortNotes, isOrphan, fold,
 };

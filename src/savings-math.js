@@ -125,9 +125,13 @@ function daysBetween(fromIso, toIso) {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
 
+/* ADR-0007 · Undatable rows keep a bucket, or the total holds money the
+   bands never show — see monthlyFlows below. */
+const UNDATABLE = '';
+
 /* ADR-0007 · Month keys come from real dates only. '2025-13-05' used to
    vanish from the chart (64/4000 fuzzed vaults); '' routes it to UNDATABLE. */
-const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : '');
+const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : UNDATABLE);
 
 function nextMonth(m) {
   let y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1;
@@ -231,10 +235,6 @@ function totalReturn(account, rows, typeOf, opts) {
    uses. `capital` is money the household moved (contributions less
    withdrawals, so a withdrawal month is negative); `posted` is growth the
    account actually wrote down. */
-/* ADR-0007 · Undatable rows keep a bucket, or the total holds money the
-   bands never show. */
-const UNDATABLE = '';
-
 function monthlyFlows(rows, typeOf, opts) {
   const from = (opts && opts.from) || '';
   const to = (opts && opts.to) || '';
@@ -397,7 +397,7 @@ function savedFromOutside(rows, saverLabels, catType) {
 /* ADR-0007 · The category is consulted only where the dates have run out
    (ISSUE 32): inside the backstamp window equal-and-opposite rows pair
    whatever they are called — tests/health-data.test.cjs pins `Move`. */
-const { INTERNAL_LEG_TYPES } = require('./vocabulary');
+const { isInternalLegType } = require('./vocabulary');
 const looksLikeSpending = r => {
   if (typeof catType !== 'function') return false;  // unchanged for every caller that has not been taught
   const t = catType(r.cat);
@@ -405,7 +405,7 @@ const looksLikeSpending = r => {
      answers to has told us nothing, and reading that as "definitely a
      purchase" is the same unprovable-is-not-disproved error one direction
      over. */
-  return !!t && !INTERNAL_LEG_TYPES.has(t);
+  return !!t && !isInternalLegType(t);
 };
 const couldBeAnInternalLeg = (outRow, inRow) => {
   const gap = daysBetween(outRow.date, inRow.date);   // positive when the money left first

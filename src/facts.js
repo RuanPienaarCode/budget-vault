@@ -264,4 +264,4 @@ function unverifiedFacts() {
   return Object.entries(FACTS).filter(([, f]) => f.verified === null).map(([key]) => key);
 }
 
-module.exports = { FACTS, fact, limitsFor, staleFacts, unverifiedFacts, ZA_YEAR_LIMITS };
+module.exports = { FACTS, fact, limitsFor, staleFacts, unverifiedFacts };
