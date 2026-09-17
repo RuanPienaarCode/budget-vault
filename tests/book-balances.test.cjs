@@ -72,6 +72,19 @@ const FILES = {
   ]),
 };
 
+/* The mirror example, for the OTHER sign: Emergency Fund's withdrawal is
+   bigger than its deposit, so its rows net NEGATIVE instead of positive —
+   driftByType.savings = −1 500, driftByType.checking = −250 (unchanged),
+   whole-book drift = −1 750. Everything else is identical to FILES, so this
+   isolates the sign rather than testing a different scenario. */
+const NEG_FILES = {
+  ...FILES,
+  [`${B}/Transactions/Emergency Fund/2026-08.md`]: TX([
+    '2026-08-05 | From cheque | Saving | 1500.00 | | | ',
+    '2026-08-10 | Car repair | Groceries | -3000.00 | | | ',
+  ]),
+};
+
 async function mount(files = FILES) {
   const ctx = makeCtx(files, { budgetFolder: B });
   const S = await loadInto(ctx);
@@ -150,6 +163,73 @@ async function mount(files = FILES) {
       ok(tile.includes('R 71000'), `position tile: savings & investments = 21 000 + 50 000 implied (got: ${tile.slice(0, 200)})`);
       ok(tile.includes('R 21000'), 'position sub-line: savings implied');
       ok(tile.includes('R 50000'), 'position sub-line: invested');
+      /* ISSUE 88 — the tile prints the IMPLIED total with no caveat beside it.
+         driftByType.savings is +1000 (Emergency Fund), investment is 0
+         (Broker has no rows), so the combined drift is +1000 — POSITIVE,
+         meaning implied is bigger than stated, so the wording must say the
+         STATED figure reads LESS (dash.pos.savingsDriftUp), not "more": this
+         tile prints the implied number already, so a caveat that said "more"
+         here would describe the number already on screen, not the one it
+         disagrees with. */
+      ok(/Your stated balances read R 1000 less\./.test(tile),
+        'the Dashboard tile discloses the same drift the Savings page states, worded for the base IT prints (implied)');
+    }
+    /* ---- 3b. no drift, no sentence, on the Dashboard tile too --------------- */
+    {
+      const quiet = { ...FILES };
+      delete quiet[`${B}/Transactions/Emergency Fund/2026-08.md`];
+      delete quiet[`${B}/Transactions/Cheque/2026-08.md`];
+      const { ctx, text } = await mountView(quiet, 'dashboard');
+      ctx.renderDashboard();
+      ok(!/stated balances/.test(text('dashPositionKpis')), 'no drift, no sentence on the position tile either');
+    }
+    /* ---- 3b(ii). the OTHER sign: driftByType.savings is −1500 here -------- */
+    {
+      const { ctx, text } = await mountView(NEG_FILES, 'dashboard');
+      ctx.renderDashboard();
+      const tile = text('dashPositionKpis');
+      /* NEGATIVE drift = implied smaller than stated, so the stated figure
+         reads MORE than what this tile (implied) shows — savingsDriftDown,
+         the mirror of 3a's assertion. */
+      ok(/Your stated balances read R 1500 more\./.test(tile),
+        'the sign flips correctly: implied below stated reads as the stated figure being the bigger one');
+      ok(!/less\./.test(tile), 'and the "less" wording from the positive case does not leak into this one');
+    }
+
+    /* ---- 3c. the Accounts hero prints the STATED book and its own drift ---- */
+    {
+      const { ctx, text } = await mountView(FILES, 'accounts');
+      ctx.renderAccounts();
+      const hero = text('acctSummary');
+      ok(hero.includes('R 77000.00'), `hero: net of stated balances = 20 000 + 50 000 + 10 000 − 3 000 (got: ${hero.slice(0, 200)})`);
+      /* balances.drift is 750 for this fixture (implied 77 750 − stated 77 000):
+         Emergency Fund +1000, Cheque −250 net to +750 across the whole book —
+         the hero prints the WHOLE book's drift, not per type, because `net`
+         above is built from every account, not just the pool. This hero
+         prints STATED, so the sign keeps the ORIGINAL sense — a positive
+         drift means transactions since the stated figures netted MORE in. */
+      ok(/Transactions since your stated balances add up to R 750 more\./.test(hero),
+        'the Accounts hero discloses the same drift figures.js computes for the whole book, worded for the base IT prints (stated)');
+    }
+    {
+      const quiet = { ...FILES };
+      delete quiet[`${B}/Transactions/Emergency Fund/2026-08.md`];
+      delete quiet[`${B}/Transactions/Cheque/2026-08.md`];
+      const { ctx, text } = await mountView(quiet, 'accounts');
+      ctx.renderAccounts();
+      ok(!/stated balances/.test(text('acctSummary')), 'no drift, no sentence on the Accounts hero either');
+    }
+    /* ---- 3d. the OTHER sign on the hero: whole-book drift is −1750 here --- */
+    {
+      const { ctx, text } = await mountView(NEG_FILES, 'accounts');
+      ctx.renderAccounts();
+      const hero = text('acctSummary');
+      /* NEGATIVE drift here keeps the ORIGINAL sense (this hero prints
+         STATED, unlike the tile above): transactions since the stated
+         figures netted an OUTFLOW, so they add up to less — driftDown. */
+      ok(/Transactions since your stated balances add up to R 1750 less\./.test(hero),
+        'the sign flips correctly on the hero too, and in the opposite direction from the tile\'s wording because this surface prints the OTHER base');
+      ok(!/add up to R 1750 more/.test(hero), 'and the "more" wording from the positive case does not leak into this one');
     }
 
     /* ---- 4. the Savings KPIs print the STATED book and say what moved ------ */

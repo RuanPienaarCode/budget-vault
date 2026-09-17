@@ -117,6 +117,22 @@ function categoryGap({ spend, uncatSpend, rows } = {}) {
   return { total, notShown, uncat, netted: notShown - uncat };
 }
 
+/* ADR-0007 · Budget strip gap. categoryGap's identity — gross spend minus
+   what the rows account for, split into uncategorised and netted — over the
+   STRIP's own row population: every category views/budgets.js's
+   budgetDraft() seeds a row for. Deliberately NOT categoryGap: the donut's
+   categorySpendRows also shows a spend row for a category with no .md file
+   (any non-income, non-transfer category is shown, known type or not), so
+   its gap sees nothing missing for that money; the strip's draft never seeds
+   a row for it, so the whole amount falls into `uncat` here instead. Two
+   honest gaps over two different row populations — ISSUE 96. */
+function budgetStripGap({ spend, namedNetSpend, uncatSpend, unknownSpend } = {}) {
+  const total = Number(namedNetSpend) || 0;
+  const notShown = Math.max(0, (Number(spend) || 0) - total);
+  const uncat = Math.min((Number(uncatSpend) || 0) + (Number(unknownSpend) || 0), notShown);
+  return { total, notShown, uncat, netted: notShown - uncat };
+}
+
 function periodFlow({
   income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
@@ -258,6 +274,6 @@ function railSegments(breakdown) {
 
 module.exports = {
   periodFlow, railSegments, incomeBaseFor, allocatedShare, budgetUsedShare, budgetSpent, assumedActual, assumedProvision,
-  budgetRowStatus, categoryGap,
+  budgetRowStatus, categoryGap, budgetStripGap,
   HOUSING_TYPES, SUBSCRIPTION_TYPES,
 };

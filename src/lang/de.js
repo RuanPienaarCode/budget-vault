@@ -734,6 +734,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} Tag', other: '{count} Tage' },
   'acct.hero.oldestNone': 'keiner',
   'acct.hero.unreadable': { one: '{count} Kontostand konnte nicht gelesen werden und bleibt aus dieser Summe ausgeschlossen.', other: '{count} Kontostände konnten nicht gelesen werden und bleiben aus dieser Summe ausgeschlossen.' },
+  'acct.hero.driftUp': ' Buchungen seit deinen angegebenen Kontoständen ergeben zusammen {amount} mehr.',
+  'acct.hero.driftDown': ' Buchungen seit deinen angegebenen Kontoständen ergeben zusammen {amount} weniger.',
   'acct.where.title': 'Wo es liegt',
   'acct.where.sub': 'Anteil dessen, was diese Konten halten',
   'acct.where.aria': 'Anteil dessen, was diese Konten halten: {parts}',
@@ -929,6 +931,8 @@ module.exports = {
   'dash.pos.savings': 'Sparen und Anlagen',
   'dash.pos.savingsSub': '{savings} gespart · {invested} angelegt',
   'dash.pos.savingsSay': '{amount} in Sparen und Anlagen. Sparen und Anlagen öffnen.',
+  'dash.pos.savingsDriftUp': ' Deine angegebenen Kontostände liegen {amount} niedriger.',
+  'dash.pos.savingsDriftDown': ' Deine angegebenen Kontostände liegen {amount} höher.',
 
   'dash.overlap': 'Erfasste Kreditkartenkonten: {accounts} · erfasste Kartenschulden: {debts} — steht eine Karte in beiden, ist sie oben doppelt gezählt.',
   'dash.overlap.btn': 'Schulden prüfen',

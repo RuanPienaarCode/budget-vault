@@ -749,6 +749,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} दिन', other: '{count} दिन' },
   'acct.hero.oldestNone': 'कोई नहीं',
   'acct.hero.unreadable': { one: '{count} खाते का बैलेंस पढ़ा नहीं जा सका और वह इस जोड़ से बाहर है।', other: '{count} खातों के बैलेंस पढ़े नहीं जा सके और वे इस जोड़ से बाहर हैं।' },
+  'acct.hero.driftUp': ' आपके बताए गए बैलेंस के बाद के लेन-देन जुड़कर {amount} ज़्यादा बनाते हैं।',
+  'acct.hero.driftDown': ' आपके बताए गए बैलेंस के बाद के लेन-देन जुड़कर {amount} कम बनाते हैं।',
   'acct.where.title': 'पैसा कहाँ है',
   'acct.where.sub': 'इन खातों में रखे पैसे का हिस्सा',
   'acct.where.aria': 'इन खातों में रखे पैसे का हिस्सा: {parts}',
@@ -948,6 +950,8 @@ module.exports = {
   'dash.pos.savings': 'बचत और निवेश',
   'dash.pos.savingsSub': '{savings} बचत · {invested} निवेश',
   'dash.pos.savingsSay': 'बचत और निवेश में {amount}। "बचत और निवेश" खोलें।',
+  'dash.pos.savingsDriftUp': ' आपके बताए गए बैलेंस {amount} कम दिखते हैं।',
+  'dash.pos.savingsDriftDown': ' आपके बताए गए बैलेंस {amount} ज़्यादा दिखते हैं।',
 
   'dash.overlap': 'ट्रैक किए गए क्रेडिट कार्ड खाते: {accounts} · ट्रैक किए गए कार्ड कर्ज़: {debts} — अगर कोई कार्ड दोनों में है, तो वह ऊपर दो बार गिना गया है।',
   'dash.overlap.btn': 'कर्ज़ देखें',

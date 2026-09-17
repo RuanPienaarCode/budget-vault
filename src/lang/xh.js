@@ -749,6 +749,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: 'usuku olungu-{count}', other: 'iintsuku ezingu-{count}' },
   'acct.hero.oldestNone': 'akukho',
   'acct.hero.unreadable': { one: 'Ibhalansi yeakhawunti engu-{count} ayikwazanga ukufundwa kwaye ishiywe ngaphandle kwale totali.', other: 'Iibhalansi zeeakhawunti ezingu-{count} azikwazanga ukufundwa kwaye zishiywe ngaphandle kwale totali.' },
+  'acct.hero.driftUp': ' Iintengiselwano ukusukela kwiibhalansi ozichazileyo zihlanganisa {amount} ngaphezulu.',
+  'acct.hero.driftDown': ' Iintengiselwano ukusukela kwiibhalansi ozichazileyo zihlanganisa {amount} ngaphantsi.',
   'acct.where.title': 'Apho ihleli khona',
   'acct.where.sub': 'Isabelo soko kubanjwe zezi akhawunti',
   'acct.where.aria': 'Isabelo soko kubanjwe zezi akhawunti: {parts}',
@@ -949,6 +951,8 @@ module.exports = {
   'dash.pos.savings': 'Imali egciniweyo notyalo-mali',
   'dash.pos.savingsSub': '{savings} egciniweyo · {invested} etyalwe',
   'dash.pos.savingsSay': '{amount} kwimali egciniweyo nakutyalo-mali. Vula iMali egciniweyo notyalo-mali.',
+  'dash.pos.savingsDriftUp': ' Iibhalansi ozichazileyo zibonisa {amount} ngaphantsi.',
+  'dash.pos.savingsDriftDown': ' Iibhalansi ozichazileyo zibonisa {amount} ngaphezulu.',
 
   'dash.overlap': 'Iiakhawunti zamakhadi etyala ezilandelelwayo: {accounts} · amatyala amakhadi alandelelwayo: {debts} — ukuba nakuphi na ikhadi likuzo zombini, libalwa kabini ngentla.',
   'dash.overlap.btn': 'Hlola amatyala',

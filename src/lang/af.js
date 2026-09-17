@@ -733,6 +733,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} dag', other: '{count} dae' },
   'acct.hero.oldestNone': 'geen',
   'acct.hero.unreadable': { one: '{count} rekeningsaldo kon nie gelees word nie en word uit hierdie totaal weggelaat.', other: '{count} rekeningsaldo\'s kon nie gelees word nie en word uit hierdie totaal weggelaat.' },
+  'acct.hero.driftUp': ' Transaksies sedert jou aangeduide balanse tel op tot {amount} meer.',
+  'acct.hero.driftDown': ' Transaksies sedert jou aangeduide balanse tel op tot {amount} minder.',
   'acct.where.title': 'Waar dit lê',
   'acct.where.sub': 'Aandeel van wat hierdie rekeninge hou',
   'acct.where.aria': 'Aandeel van wat hierdie rekeninge hou: {parts}',
@@ -928,6 +930,8 @@ module.exports = {
   'dash.pos.savings': 'Spaargeld en beleggings',
   'dash.pos.savingsSub': '{savings} spaargeld · {invested} belê',
   'dash.pos.savingsSay': '{amount} in spaargeld en beleggings. Maak Spaargeld en Beleggings oop.',
+  'dash.pos.savingsDriftUp': ' Jou aangeduide balanse toon {amount} minder.',
+  'dash.pos.savingsDriftDown': ' Jou aangeduide balanse toon {amount} meer.',
 
   'dash.overlap': 'Kredietkaartrekeninge gevolg: {accounts} · kaartskulde gevolg: {debts} — as enige kaart in albei is, word dit hierbo dubbel getel.',
   'dash.overlap.btn': 'Gaan skuld na',

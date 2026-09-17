@@ -23,6 +23,22 @@ let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
+/* The clock, pinned (ISSUE 90). `ctx.renderAccounts()` reaches acct-status.js's
+   statusOf() with `today` null — the live page reads the real clock — so this
+   fixture's `balance_updated: 2026-08-20` was originally left unpinned on the
+   assumption that "13 days old" would always be well inside STALE_DAYS (30).
+   Real elapsed time closed that gap: once the suite runs more than 30 days
+   after 2026-08-20, the Cheque row in section 2 is reported `stale` (which
+   acct-status ranks ahead of `unreadable`) rather than `unreadable`, and the
+   assertion that the Ignore button is withheld from an unreadable-date row
+   stops being exercised at all. Same Date-subclass pattern as
+   dashboard-cards.test.cjs. */
+const RealDate = Date;
+class PinnedDate extends RealDate {
+  constructor(...a) { if (a.length) super(...a); else super(2026, 8, 2, 12, 0, 0); }
+  static now() { return new PinnedDate().getTime(); }
+}
+
 async function mount(files) {
   const ctx = makeCtx(files);
   const S = await loadInto(ctx);
@@ -50,6 +66,8 @@ const BASE = {
 };
 
 (async () => {
+  global.Date = PinnedDate;
+  try {
   /* ---- 1. nofolder: Ignore is offered, mutes exactly that state, saves one key ---- */
   {
     const { ctx, S, $, writes } = await mount({ ...BASE,
@@ -86,4 +104,5 @@ const BASE = {
     ok(!btn, 'an unreadable-date row offers no Ignore: a typo is not a judgement');
   }
   console.log(`accounts-ignore-action.test.cjs — ${checks} checks OK`);
+  } finally { global.Date = RealDate; }
 })().catch(e => { console.error(e); process.exit(1); });

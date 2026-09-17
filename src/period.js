@@ -89,14 +89,25 @@ module.exports = function registerPeriod(ctx) {
     // reader's own calendar shows — isoOf reads with the same local getters.
     return { start: isoOf(new Date(y, m - 2, n)), end: isoOf(new Date(y, m - 1, n - 1)) };
   }
-  function currentPeriod() {
-    const now = new Date();
+  /* `today` is injected like periodSummary's, per CLAUDE.md's rule for this
+     codebase — optional, so every existing caller (and production) is
+     unchanged. Before this there was no seam at all: the year-rollover branch
+     below (`m > 12`) could only be exercised by monkeypatching the global
+     Date constructor, and nothing did, which is how a `m > 12` -> `m >= 12`
+     mutation survived — it only misfires in NOVEMBER, the one month where
+     incrementing lands exactly on 12 rather than past it: on the 23rd-30th
+     with month_start_day 23, the correct branch leaves m at 12 (this
+     December's period) while the mutant rolls it to next January
+     (tests/figures/household2.cjs, ISSUE 89). */
+  function currentPeriod(todayArg) {
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
+    const [ty, tm, td] = today.split('-').map(Number);
     const iv = intervalDays();
     if (iv) {
-      return isoFromDayNum(periodStartOnOrBefore(dayNum(isoOf(now)), iv));
+      return isoFromDayNum(periodStartOnOrBefore(dayNum(today), iv));
     }
-    let y = now.getFullYear(), m = now.getMonth() + 1;
-    if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {
+    let y = ty, m = tm;
+    if (S.settings.month_start_day > 1 && td >= S.settings.month_start_day) {
       m += 1; if (m > 12) { m = 1; y += 1; }
     }
     return `${y}-${String(m).padStart(2, '0')}`;
@@ -264,6 +275,21 @@ module.exports = function registerPeriod(ctx) {
     const c = (S.categories || []).find(x => x.name === name);
     return c && c.type_stated ? poolCatType(S.categories, name) : null;
   }
+  /* ADR-0007 · One as-of-today window, shared by every reader. The rule
+     itself — closes at today for a period that contains it, null before the
+     period starts — used to live only inside movedToFunds; savingContribution
+     (health-data.js) asked savedFromOutside() the identical question over the
+     WHOLE period, which is ISSUE 87. Both now call this. */
+  function periodWindowAsOf(p, todayArg) {
+    const { start, end } = periodRange(p);
+    /* Injected like periodSummary's, and for the same reason. */
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
+    /* ADR-0007 · Moved-to-funds windows as of today. ISSUE 35's shape: a period
+       not yet started moves nothing, and this figure has nowhere to put a caveat. */
+    if (today < start) return null;
+    return { start, stop: today < end ? today : end };
+  }
+
   /* ADR-0007 · Moved-to-funds is an aggregate, not per envelope. ISSUE 43 — no
      link exists from a transfer row to a category, and free text is not guessed. */
   /* ADR-0007 · Moved-to-funds is household currency, both directions. The way
@@ -272,7 +298,6 @@ module.exports = function registerPeriod(ctx) {
      EUR 2 000 leaving cannot cancel a real R 2 000. Every surface printing this
      figure already carries foreignLabels()' own disclosure beside it. */
   function movedToFunds(p, todayArg) {
-    const { start, end } = periodRange(p);
     const foreign = foreignLabels();
     const labels = new Map();
     for (const f of Object.values(S.txFiles)) {
@@ -283,13 +308,9 @@ module.exports = function registerPeriod(ctx) {
       }
     }
     if (!labels.size) return 0;
-    /* Injected like periodSummary's, and for the same reason. */
-    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
-    /* ADR-0007 · Moved-to-funds windows as of today. ISSUE 35's shape: a period
-       not yet started moves nothing, and this figure has nowhere to put a caveat. */
-    if (today < start) { return 0; }
-    const stop = today < end ? today : end;
-    const rows = txInRange(start, stop).filter(t => !foreign.has(t.label));
+    const window = periodWindowAsOf(p, todayArg);
+    if (!window) return 0;
+    const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
     return savedFromOutside(rows, labels, declaredCatType);
   }
 
@@ -521,6 +542,10 @@ module.exports = function registerPeriod(ctx) {
        oracle or a view that re-spells "which folders are set aside" is a second
        rule waiting to disagree with this one. */
     earmarkedLabels, movedToFunds, declaredCatType,
+    /* ISSUE 87. Published so savingContribution (health-data.js) closes its
+       window the same way movedToFunds does, rather than keeping a second
+       copy of "as of today" that can drift from this one again. */
+    periodWindowAsOf, txInRange,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,

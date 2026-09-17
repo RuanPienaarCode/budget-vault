@@ -23,6 +23,10 @@ const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom, descend } = require('./helpers/dom-stub.cjs');
 const { PILLARS } = require('../src/health-math');
+/* ISSUE 90 — the clock, pinned. See tests/audit-followups-score-dashboard.test.cjs
+   for why: healthSnapshot()'s trailing window is the six calendar months
+   before the real currentPeriod(), and MONTHS below is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -97,7 +101,7 @@ const find = (root, cls) => descend(root).filter(e => hasCls(e, cls));
 const textOf = e => descend(e).map(x => x.textContent || '').join(' ') + (e.textContent || '');
 const textsOf = (root, cls) => find(root, cls).map(textOf);
 
-(async () => {
+atAuditDate(async () => {
   const { nodes } = await mount();
   const ctxRoot = nodes.get('#root');
   const hero = nodes.get('#scoreHero');
@@ -234,4 +238,4 @@ const textsOf = (root, cls) => find(root, cls).map(textOf);
   }
 
   console.log(`PASS — score page: wins before gaps, gaps biggest-first, every pillar explained, and the celebration is conditional (${checks} assertions).`);
-})().catch(e => { console.error('FAIL —', e.message); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error('FAIL —', e.message); process.exit(1); });

@@ -7,6 +7,13 @@
    them filtered currency and one did not, so the Dashboard hero, the Budget
    strip and the Report printed a figure the Score page would not recognise.
 
+   Both now take an explicit `today` (ISSUE 87 taught savingContribution the
+   same as-of-today window movedToFunds already closed), so every call below
+   passes TODAY to both — otherwise savingContribution would default to the
+   pinned clock (2026-09-02) instead of the whole-period reading this file is
+   actually testing, and the currency assertions below would fail for a
+   window reason that has nothing to do with them.
+
    Measured on the BudgetAudit household plus one euro fund, whole period
    (today = 2026-09-30) so both functions see the same rows. The truth is
    R7 000: R2 000 moved to the emergency fund and a R5 000 family gift into it.
@@ -62,7 +69,7 @@ atAuditDate(async () => {
     const ctx = await vault(SEED);
     eq(ctx.movedToFunds(PERIOD, TODAY), TRUTH,
       'R2 000 to the emergency fund plus a R5 000 gift into it is R7 000 moved');
-    eq(ctx.savingContribution(PERIOD), TRUTH,
+    eq(ctx.savingContribution(PERIOD, TODAY), TRUTH,
       'and the Score reads the same R7 000 off the same pairing');
   }
 
@@ -73,7 +80,7 @@ atAuditDate(async () => {
       'the euro fund is a foreign folder, which is what every other period figure filters on');
     eq(ctx.movedToFunds(PERIOD, TODAY), TRUTH,
       'EUR 5 000 arriving in a euro fund is not R5 000 moved — there is no rate to add it with');
-    eq(ctx.savingContribution(PERIOD), TRUTH,
+    eq(ctx.savingContribution(PERIOD, TODAY), TRUTH,
       'and the two functions still agree, which is the whole point of the fix');
   }
 
@@ -82,7 +89,7 @@ atAuditDate(async () => {
     const ctx = await vault(withFund(EUR_FUND, [['2026-09-01', 'Euro withdrawal', 'Transfer', -2000]]));
     eq(ctx.movedToFunds(PERIOD, TODAY), TRUTH,
       'EUR 2 000 leaving a euro fund cannot pair with — and delete — a real R2 000 contribution');
-    eq(ctx.savingContribution(PERIOD), TRUTH,
+    eq(ctx.savingContribution(PERIOD, TODAY), TRUTH,
       'the Score was never fooled by this leg either');
   }
 
@@ -94,7 +101,7 @@ atAuditDate(async () => {
     const ctx = await vault(withFund(RAND_FUND, [['2026-09-01', 'Withdrawal', 'Transfer', -2000]]));
     eq(ctx.movedToFunds(PERIOD, TODAY), 5000,
       'a rand fund-to-fund shuffle still cancels: R7 000 less the R2 000 that only moved between pockets');
-    eq(ctx.savingContribution(PERIOD), 5000,
+    eq(ctx.savingContribution(PERIOD, TODAY), 5000,
       'and the Score reads that same R5 000');
   }
 
