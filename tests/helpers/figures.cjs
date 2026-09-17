@@ -89,7 +89,28 @@ function dispatchedViews() {
    are spread across sixteen files and several are `new Date()` with no
    argument inside a view. Restored by the returned function; a harvest that
    left the clock pinned would silently change every suite that ran after it in
-   the same process. */
+   the same process.
+
+   ISSUE 90 (Third). Pinning the EPOCH instant is not pinning the DAY: `iso` was
+   fixed to `${iso}T12:00:00Z`, and every consumer here reads it back through
+   LOCAL getters (isoOf, todayIso — this codebase's own rule is local-calendar
+   dates throughout, ADR-0007). Noon UTC is a different LOCAL calendar day on
+   any host east of UTC+12 — at UTC+14 (Pacific/Kiritimati, a real IANA zone,
+   not a corner case) "2026-09-02T12:00:00Z" reads back as 3 September. Eight
+   figures in the golden ledger are downstream of exactly that local `today`,
+   so the ledger a contributor blessed was quietly a different fixture from
+   the one CI (or a teammate on another zone) verified.
+
+   Fixed at the root rather than by hunting the 12:00 offset for a "safe"
+   hour — there is no hour of the day that survives every zone from UTC-12 to
+   UTC+14, a 26-hour spread. What DOES survive is not asking the local
+   timezone to agree with the intent at all: process.env.TZ is read by V8's
+   Date getters on every call, not cached at construction (verified — flipping
+   it after building a Date changes what that same object's getters report),
+   so pinning it to UTC for exactly the window the clock is pinned makes
+   "local calendar day" and "UTC calendar day" the same question, on every
+   host. Restored alongside global.Date so a harvest run under a real TZ for
+   some OTHER reason is not left silently on UTC afterwards. */
 function pinClock(iso) {
   const Real = Date;
   const fixed = new Real(`${iso}T12:00:00Z`).getTime();
@@ -102,7 +123,12 @@ function pinClock(iso) {
   Pinned.parse = Real.parse;
   Pinned.UTC = Real.UTC;
   global.Date = Pinned;
-  return () => { global.Date = Real; };
+  const hadTZ = 'TZ' in process.env, realTZ = process.env.TZ;
+  process.env.TZ = 'UTC';
+  return () => {
+    global.Date = Real;
+    if (hadTZ) process.env.TZ = realTZ; else delete process.env.TZ;
+  };
 }
 
 /* ---- one mount, one view ------------------------------------------------

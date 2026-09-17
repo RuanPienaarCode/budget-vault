@@ -89,14 +89,25 @@ module.exports = function registerPeriod(ctx) {
     // reader's own calendar shows — isoOf reads with the same local getters.
     return { start: isoOf(new Date(y, m - 2, n)), end: isoOf(new Date(y, m - 1, n - 1)) };
   }
-  function currentPeriod() {
-    const now = new Date();
+  /* `today` is injected like periodSummary's, per CLAUDE.md's rule for this
+     codebase — optional, so every existing caller (and production) is
+     unchanged. Before this there was no seam at all: the year-rollover branch
+     below (`m > 12`) could only be exercised by monkeypatching the global
+     Date constructor, and nothing did, which is how a `m > 12` -> `m >= 12`
+     mutation survived — it only misfires in NOVEMBER, the one month where
+     incrementing lands exactly on 12 rather than past it: on the 23rd-30th
+     with month_start_day 23, the correct branch leaves m at 12 (this
+     December's period) while the mutant rolls it to next January
+     (tests/figures/household2.cjs, ISSUE 89). */
+  function currentPeriod(todayArg) {
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
+    const [ty, tm, td] = today.split('-').map(Number);
     const iv = intervalDays();
     if (iv) {
-      return isoFromDayNum(periodStartOnOrBefore(dayNum(isoOf(now)), iv));
+      return isoFromDayNum(periodStartOnOrBefore(dayNum(today), iv));
     }
-    let y = now.getFullYear(), m = now.getMonth() + 1;
-    if (S.settings.month_start_day > 1 && now.getDate() >= S.settings.month_start_day) {
+    let y = ty, m = tm;
+    if (S.settings.month_start_day > 1 && td >= S.settings.month_start_day) {
       m += 1; if (m > 12) { m = 1; y += 1; }
     }
     return `${y}-${String(m).padStart(2, '0')}`;
