@@ -540,6 +540,21 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': '导出预算',
+  'bx.mode': '周期',
+  'bx.mode.months': '按月回溯',
+  'bx.mode.dates': '日期范围',
+  'bx.preset.taxThis': '本纳税年度',
+  'bx.preset.taxLast': '上一纳税年度',
+  'bx.preset.calThis': '今年',
+  'bx.preset.calLast': '去年',
+  'bx.preset.custom': '自定义',
+  'bx.dates.from': '从',
+  'bx.dates.to': '到',
+  'bx.dates.desc': '支出和交易明细使用的正是这些日期。预算表会显示在此范围内结束的每一个完整预算周期——预算不会按日期拆分。',
+  'bx.previewDates': {
+    other: '{range} · {count} 个预算周期 · {cats} 个分类',
+  },
+  'bx.problem.badDates': '请选择开始日期和结束日期，开始日期须早于结束日期。',
   'bx.range': '往前追溯多久',
   'bx.range.1': '1 个月',
   'bx.range.2': '2 个月',
@@ -635,6 +650,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} 仍在进行中，因此其数字只反映部分周期，并会拉低平均值。',
   'bx.doc.noteWide': '周期太多，按月列出的列在一页放不下 — Excel 和 CSV 导出包含每个月份。',
   'bx.doc.noteTx': '已排除、转账和拆分源的行会被列出并标记；它们不计入以上的预算数字。',
+  'bx.doc.exactHeading': '按分类实际 · {from} 至 {to}',
+  'bx.doc.noteExact': '这些数字准确覆盖 {from} 至 {to}。后面的预算表覆盖完整的预算周期，{pfrom} 至 {pto} —— 即在此范围内结束的每个周期 —— 因此两端的合计会有差异。预算不会按日期拆分。',
+  'bx.doc.noteExactOnly': '这些数字准确覆盖 {from} 至 {to}。没有预算周期在此范围内结束，因此没有预算表。',
+  'bx.doc.noteExactThrough': '范围止于 {to}；数字延续到生成当天，即 {through}。',
   'bx.doc.pageOf': '第 {n} 页，共 {m} 页',
 
   /* ============================= Accounts page ============================ */

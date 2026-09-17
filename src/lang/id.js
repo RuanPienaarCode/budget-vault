@@ -553,6 +553,21 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Ekspor anggaran',
+  'bx.mode': 'Periode',
+  'bx.mode.months': 'Bulan ke belakang',
+  'bx.mode.dates': 'Rentang tanggal',
+  'bx.preset.taxThis': 'Tahun pajak ini',
+  'bx.preset.taxLast': 'Tahun pajak lalu',
+  'bx.preset.calThis': 'Tahun ini',
+  'bx.preset.calLast': 'Tahun lalu',
+  'bx.preset.custom': 'Kustom',
+  'bx.dates.from': 'Dari',
+  'bx.dates.to': 'Sampai',
+  'bx.dates.desc': 'Pengeluaran dan transaksi memakai tanggal ini secara persis. Tabel anggaran menampilkan setiap periode anggaran penuh yang berakhir di dalamnya — anggaran tidak pernah terpotong di tengah tanggal.',
+  'bx.previewDates': {
+    other: '{range} · {count} periode anggaran · {cats} kategori',
+  },
+  'bx.problem.badDates': 'Pilih tanggal mulai dan tanggal selesai, dengan tanggal mulai lebih dulu.',
   'bx.range': 'Seberapa jauh ke belakang',
   'bx.range.1': '1 bulan',
   'bx.range.2': '2 bulan',
@@ -648,6 +663,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} masih berjalan, jadi angkanya hanya untuk sebagian periode dan menurunkan rata-rata.',
   'bx.doc.noteWide': 'Kolom bulan demi bulan tidak muat dalam satu halaman untuk periode sebanyak ini — ekspor Excel dan CSV memuat setiap bulan.',
   'bx.doc.noteTx': 'Baris yang di luar anggaran, transfer dan asal pecahan dicantumkan dan ditandai; baris-baris itu bukan bagian dari angka anggaran di atas.',
+  'bx.doc.exactHeading': 'Realisasi per kategori · {from} sampai {to}',
+  'bx.doc.noteExact': 'Angka ini mencakup persis {from} sampai {to}. Tabel anggaran selanjutnya mencakup periode anggaran penuh, {pfrom} sampai {pto} — setiap periode yang berakhir di dalam rentang ini — sehingga totalnya berbeda di ujung-ujungnya. Anggaran tidak pernah terpotong di tengah tanggal.',
+  'bx.doc.noteExactOnly': 'Angka ini mencakup persis {from} sampai {to}. Tidak ada periode anggaran yang berakhir di dalam rentang ini, jadi tidak ada tabel anggaran.',
+  'bx.doc.noteExactThrough': 'Rentang berakhir pada {to}; angkanya berlaku sampai {through}, hari saat ini dibuat.',
   'bx.doc.pageOf': 'Halaman {n} dari {m}',
 
   /* ============================= Accounts page ============================ */

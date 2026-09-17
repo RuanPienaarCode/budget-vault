@@ -579,6 +579,22 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Exportar orçamento',
+  'bx.mode': 'Período',
+  'bx.mode.months': 'Meses atrás',
+  'bx.mode.dates': 'Intervalo de datas',
+  'bx.preset.taxThis': 'Este ano fiscal',
+  'bx.preset.taxLast': 'Ano fiscal passado',
+  'bx.preset.calThis': 'Este ano',
+  'bx.preset.calLast': 'Ano passado',
+  'bx.preset.custom': 'Personalizado',
+  'bx.dates.from': 'De',
+  'bx.dates.to': 'Até',
+  'bx.dates.desc': 'Os gastos e as transações usam exatamente essas datas. As tabelas de orçamento mostram todo período de orçamento completo que termina dentro delas — um orçamento nunca é dividido no meio de uma data.',
+  'bx.previewDates': {
+    one: '{range} · {count} período de orçamento · {cats} categorias',
+    other: '{range} · {count} períodos de orçamento · {cats} categorias',
+  },
+  'bx.problem.badDates': 'Escolha uma data de início e uma data de fim, com o início primeiro.',
   'bx.range': 'Até quando voltar',
   'bx.range.1': '1 mês',
   'bx.range.2': '2 meses',
@@ -678,6 +694,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} ainda está em andamento, então os números cobrem só parte de um período e puxam a média para baixo.',
   'bx.doc.noteWide': 'As colunas mês a mês não cabem em uma página para tantos períodos — as exportações em Excel e CSV trazem todos os meses.',
   'bx.doc.noteTx': 'Linhas fora do orçamento, de transferência e de origem dividida são listadas e marcadas; elas não fazem parte dos números do orçamento acima.',
+  'bx.doc.exactHeading': 'Real por categoria · {from} a {to}',
+  'bx.doc.noteExact': 'Esses números cobrem exatamente {from} a {to}. As tabelas de orçamento mais adiante cobrem períodos de orçamento completos, {pfrom} a {pto} — todo período que termina dentro do intervalo — então os totais diferem nas bordas. Orçamentos nunca são divididos no meio de uma data.',
+  'bx.doc.noteExactOnly': 'Esses números cobrem exatamente {from} a {to}. Nenhum período de orçamento termina dentro deste intervalo, então não há tabelas de orçamento.',
+  'bx.doc.noteExactThrough': 'O intervalo termina em {to}; os números vão até {through}, o dia em que isto foi gerado.',
   'bx.doc.pageOf': 'Página {n} de {m}',
 
   /* ============================= Accounts page ============================ */

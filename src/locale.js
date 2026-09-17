@@ -118,6 +118,16 @@ const reconcileAssessed = (p, figures, t, employmentCodes, currency) => {
   return msgs;
 };
 
+/* A tax year as DATES. `yearSpan` beside it is the same fact as display text,
+   and until the budget export needed to select a tax year nothing had to
+   compute with it. Kept per profile, next to the sentence it must agree with,
+   and pinned against that sentence in tests/locale-profiles.test.cjs — a range
+   that drifted from its own label would export the wrong twelve months under
+   the right heading. Local calendar strings, never Date maths: dates.js's
+   header explains what a UTC round-trip does east of Greenwich. */
+const leapFeb = y => ((y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 29 : 28);
+const calendarYear = y => ({ start: `${y}-01-01`, end: `${y}-12-31` });
+
 /* Shared generic tax content for countries without a dedicated profile. */
 const genericTax = (authority) => ({
   authority,
@@ -125,6 +135,7 @@ const genericTax = (authority) => ({
   yearHint: 'Tax year (calendar year)',
   figureCodeLabel: 'Code',
   yearSpan: y => `Jan – Dec ${y}`,
+  taxYearRange: calendarYear,
   currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
   seedDeadlines: () => ({ deadline_standard: '', deadline_provisional: '' }),
   deadlineLabels: ['Deadline', 'Alternative deadline'],
@@ -192,6 +203,7 @@ const PROFILES = {
     yearHint: 'Tax year (ends Feb of this year)',
     figureCodeLabel: 'Source code',
     yearSpan: y => `1 Mar ${y - 1} – end Feb ${y}`,
+    taxYearRange: y => ({ start: `${y - 1}-03-01`, end: `${y}-02-${leapFeb(y)}` }),
     currentTaxYear: now => (now.getMonth() + 1 >= 3 ? now.getFullYear() : now.getFullYear() - 1),
     /* Filing-season deadlines shift a little every year — editable defaults
        (2026-season dates carried forward as a pattern). */
@@ -347,6 +359,7 @@ const PROFILES = {
     yearHint: 'Tax year (calendar year)',
     figureCodeLabel: 'Form line',
     yearSpan: y => `Jan – Dec ${y}`,
+    taxYearRange: calendarYear,
     currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-04-15`, deadline_provisional: `${y + 1}-10-15` }),
     deadlineLabels: ['Filing deadline', 'Extension deadline'],
@@ -412,6 +425,7 @@ const PROFILES = {
     yearHint: 'Tax year (ends 5 Apr of this year)',
     figureCodeLabel: 'Box',
     yearSpan: y => `6 Apr ${y - 1} – 5 Apr ${y}`,
+    taxYearRange: y => ({ start: `${y - 1}-04-06`, end: `${y}-04-05` }),
     /* The one cutover in this file that does NOT fall on a month boundary, and
        the only one that needs a day. za's year ends at the end of February and
        au's on 30 June, so `>= 3` and `>= 7` are exactly right for them; the
@@ -499,6 +513,7 @@ const PROFILES = {
     yearHint: 'Tax year (ends 30 Jun of this year)',
     figureCodeLabel: 'Label',
     yearSpan: y => `1 Jul ${y - 1} – 30 Jun ${y}`,
+    taxYearRange: y => ({ start: `${y - 1}-07-01`, end: `${y}-06-30` }),
     currentTaxYear: now => (now.getMonth() + 1 >= 7 ? now.getFullYear() : now.getFullYear() - 1),
     seedDeadlines: y => ({ deadline_standard: `${y}-10-31`, deadline_provisional: `${y + 1}-05-15` }),
     deadlineLabels: ['Self-lodgement deadline', 'Tax agent deadline (typical)'],
@@ -558,6 +573,7 @@ const PROFILES = {
     yearHint: 'Tax year (calendar year)',
     figureCodeLabel: 'Line',
     yearSpan: y => `Jan – Dec ${y}`,
+    taxYearRange: calendarYear,
     currentTaxYear: now => (now.getMonth() + 1 <= 4 ? now.getFullYear() - 1 : now.getFullYear()),
     seedDeadlines: y => ({ deadline_standard: `${y + 1}-04-30`, deadline_provisional: `${y + 1}-06-15` }),
     deadlineLabels: ['Filing deadline', 'Self-employed deadline'],
@@ -619,6 +635,7 @@ const PROFILES = {
     yearHint: 'Tax year (calendar year)',
     figureCodeLabel: 'Item',
     yearSpan: y => `Jan – Dec ${y}`,
+    taxYearRange: calendarYear,
     /* Annual reconciliation runs 1 Mar – 30 Jun of the following year, so up
        to June you are still settling the prior calendar year. */
     currentTaxYear: now => (now.getMonth() + 1 <= 6 ? now.getFullYear() - 1 : now.getFullYear()),

@@ -614,6 +614,22 @@ module.exports = {
      exactly. File and sheet names are deliberately NOT here: see
      budgetExportPaths() on why a translated file name breaks overwrite. */
   'bx.title': 'Export budget',
+  'bx.mode': 'Period',
+  'bx.mode.months': 'Months back',
+  'bx.mode.dates': 'Date range',
+  'bx.preset.taxThis': 'This tax year',
+  'bx.preset.taxLast': 'Last tax year',
+  'bx.preset.calThis': 'This year',
+  'bx.preset.calLast': 'Last year',
+  'bx.preset.custom': 'Custom',
+  'bx.dates.from': 'From',
+  'bx.dates.to': 'To',
+  'bx.dates.desc': 'Spending and transactions use exactly these dates. The budget tables show every whole budget period that ends inside them — a budget is never split across a date.',
+  'bx.previewDates': {
+    one: '{range} · {count} budget period · {cats} categories',
+    other: '{range} · {count} budget periods · {cats} categories',
+  },
+  'bx.problem.badDates': 'Choose a start date and an end date, with the start first.',
   'bx.range': 'How far back',
   'bx.range.1': '1 month',
   'bx.range.2': '2 months',
@@ -713,6 +729,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} is still in progress, so its figures are for part of a period and pull the average down.',
   'bx.doc.noteWide': 'The month-by-month columns do not fit on a page for this many periods — the Excel and CSV exports carry every month.',
   'bx.doc.noteTx': 'Excluded, transfer and split-parent rows are listed and flagged; they are not part of the budget figures above.',
+  'bx.doc.exactHeading': 'Actual by category · {from} to {to}',
+  'bx.doc.noteExact': 'These figures cover exactly {from} to {to}. The budget tables further on cover whole budget periods, {pfrom} to {pto} — every period ending inside the range — so their totals differ at the edges. Budgets are never split across a date.',
+  'bx.doc.noteExactOnly': 'These figures cover exactly {from} to {to}. No budget period ends inside this range, so there are no budget tables.',
+  'bx.doc.noteExactThrough': 'The range ends on {to}; the figures run through {through}, the day this was made.',
   'bx.doc.pageOf': 'Page {n} of {m}',
 
   /* ============================= Accounts page ============================ */

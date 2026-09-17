@@ -173,6 +173,39 @@ const text = (ctx, p) => ctx.vault._store.get(p);
     eq(ctx.budgetExportCategories().length, ctx.S.categories.length, 'so "all ticked" and "no filter" are the same set of named categories');
   }
 
+  /* ---- 5e. a DATE range: exact dates for money, whole periods for budgets ----
+     10 Jun – 4 Jul cuts through both fixture months. The exact-date Groceries
+     is the 3 Jul R1 200 alone: the 4 Jun R2 100,50 is before the range and the
+     5 Jul split part is after it. The only period ENDING inside the range is
+     June — whose own table still says R2 100,50, because a budget period is
+     never cut. Two different numbers for "Groceries", both right, and the
+     export is only honest if it carries both AND says which is which. */
+  {
+    const ctx = await mount();
+    const a = { ...ANSWER, mode: 'dates', from: '2026-06-10', to: '2026-07-04', formats: ['csv'] };
+    const d = ctx.describeBudgetExport(a);
+    ok(!d.problem, `a date range is exportable: ${d.problem || ''}`);
+    const { written, model } = await ctx.runBudgetExport(a);
+    eq(written, d.files, 'preview == written, in date mode too');
+    eq(model.periods.map(p => p.key), ['2026-06'], 'whole periods: only June ENDS inside 10 Jun – 4 Jul');
+    const base = 'Exports/Budget 2026-06-10 to 2026-07-04';
+    const exact = text(ctx, `${base} - Exact dates.csv`);
+    ok(exact.includes('Groceries,expense,R,2026-06-10,2026-07-04,1200.00'), 'exact-date Groceries is the one purchase inside the dates');
+    const same = ctx.categoryActualsInRange('2026-06-10', '2026-07-04').rows.find(r => r.cat === 'Groceries');
+    eq(same.actual, 1200, 'and it is figures.js\'s own answer for that window, not one computed here');
+    ok(text(ctx, `${base} - Budget.csv`).includes('June 2026,2026-06-01,2026-06-30,Groceries,expense,R,4500.00,2100.50'), 'while June\'s budget table is June, whole');
+    const txs = text(ctx, `${base} - Transactions.csv`).trim().split('\n').slice(1).map(l => l.slice(0, 10));
+    eq(txs, ['2026-07-01', '2026-07-03'], 'transactions are the exact-date ones: nothing from 1–9 June, nothing after 4 July');
+
+    ok(/date/i.test(ctx.describeBudgetExport({ ...a, from: '2026-07-04', to: '2026-06-10' }).problem || ''), 'from after to is refused before the click');
+    ok(ctx.describeBudgetExport({ ...a, from: '2026-13-45' }).problem, 'as is a date that is not one');
+    ok(ctx.describeBudgetExport({ ...a, from: '2019-01-01', to: '2019-12-31' }).problem, 'and a range with nothing in it');
+
+    const pre = ctx.budgetExportPresets();
+    eq(pre.map(x => x.key), ['taxThis', 'taxLast', 'calThis', 'calLast'], 'the fixture household is ZA, so it is offered tax years');
+    ok(pre[0].from.endsWith('-03-01'), 'starting 1 March');
+  }
+
   /* ---- 6. text Helvetica cannot draw ---- */
   {
     const ctx = await mount({

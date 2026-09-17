@@ -23,9 +23,10 @@ const { assumedActual, budgetRowStatus, categoryGap: gapOf, incomeBaseFor, alloc
 const { accountType } = require('./vocabulary');
 const { netByOwner } = require('./owners');
 const { normalizeAmount } = require('./amount');
+const { todayIso } = require('./dates');
 
 module.exports = function registerFigures(ctx) {
-  const { S, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
+  const { S, summaryInRange, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
 
   /* Budget vs actual, one row per category that is either budgeted or
      spent, the type read live (budgetRowType), and an assume-spent row's
@@ -33,8 +34,26 @@ module.exports = function registerFigures(ctx) {
      column reads. Every row carries its status (budgetRowStatus) so no page
      recomputes "remaining" or "unbudgeted". */
   function budgetVsActualRows(p) {
-    const sum = periodSummary(p);
-    const budget = S.budgets[p] || [];
+    return rowsFrom(periodSummary(p), S.budgets[p] || []);
+  }
+
+  /* The same rows over an arbitrary DATE window — what the budget export's
+     "tax year" range prints as exact-date actuals. No budget is handed in: a
+     budget belongs to a period and cannot be cut at a date, so these rows carry
+     actuals only, and an assume-spent category therefore shows what really
+     moved rather than its plan. One rule (rowsFrom), two windows — a second
+     spelling of "which categories are rows and which sign they carry" is how
+     the exact-dates table would come to disagree with the period tables
+     printed under it. Capped at today, as periodSummary caps a running
+     period: what is dated ahead is scheduled, not spent. */
+  function categoryActualsInRange(start, end, todayArg) {
+    const today = todayArg || todayIso();
+    const stop = end > today ? today : end;
+    const rows = stop < start ? [] : rowsFrom(summaryInRange(start, stop), []);
+    return { rows, through: stop < start ? start : stop };
+  }
+
+  function rowsFrom(sum, budget) {
     const rows = new Map();
     for (const b of budget) {
       const type = budgetRowType(b);
@@ -254,5 +273,5 @@ module.exports = function registerFigures(ctx) {
     };
   }
 
-  ctx.provide({ budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
+  ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };

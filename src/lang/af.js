@@ -562,6 +562,22 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Voer begroting uit',
+  'bx.mode': 'Tydperk',
+  'bx.mode.months': 'Maande terug',
+  'bx.mode.dates': 'Datumreeks',
+  'bx.preset.taxThis': 'Hierdie belastingjaar',
+  'bx.preset.taxLast': 'Verlede belastingjaar',
+  'bx.preset.calThis': 'Hierdie jaar',
+  'bx.preset.calLast': 'Verlede jaar',
+  'bx.preset.custom': 'Pasgemaak',
+  'bx.dates.from': 'Van',
+  'bx.dates.to': 'Tot',
+  'bx.dates.desc': 'Besteding en transaksies gebruik presies hierdie datums. Die begrotingtabelle wys elke volle begrotingtydperk wat binne hulle eindig — \'n begroting word nooit oor \'n datum verdeel nie.',
+  'bx.previewDates': {
+    one: '{range} · {count} begrotingtydperk · {cats} kategorieë',
+    other: '{range} · {count} begrotingtydperke · {cats} kategorieë',
+  },
+  'bx.problem.badDates': 'Kies \'n begindatum en \'n einddatum, met die begin eerste.',
   'bx.range': 'Hoe ver terug',
   'bx.range.1': '1 maand',
   'bx.range.2': '2 maande',
@@ -661,6 +677,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} is nog aan die gang, so sy syfers is vir slegs \'n deel van \'n tydperk en trek die gemiddelde af.',
   'bx.doc.noteWide': 'Die maand-tot-maand kolomme pas nie op \'n bladsy vir so baie tydperke nie — die Excel- en CSV-uitvoere dra elke maand.',
   'bx.doc.noteTx': 'Uitgeslote, oorplasing- en verdeeloorsprong-rye word gelys en gemerk; hulle is nie deel van die begrotingsyfers hierbo nie.',
+  'bx.doc.exactHeading': 'Werklik per kategorie · {from} tot {to}',
+  'bx.doc.noteExact': 'Hierdie syfers dek presies {from} tot {to}. Die begrotingtabelle verder aan dek volle begrotingtydperke, {pfrom} tot {pto} — elke tydperk wat binne die reeks eindig — so hul totale verskil by die rande. Begrotings word nooit oor \'n datum verdeel nie.',
+  'bx.doc.noteExactOnly': 'Hierdie syfers dek presies {from} tot {to}. Geen begrotingtydperk eindig binne hierdie reeks nie, so daar is geen begrotingtabelle nie.',
+  'bx.doc.noteExactThrough': 'Die reeks eindig op {to}; die syfers loop deur tot {through}, die dag toe dit gemaak is.',
   'bx.doc.pageOf': 'Bladsy {n} van {m}',
 
   /* ============================= Accounts page ============================ */

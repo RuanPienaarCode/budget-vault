@@ -3,6 +3,44 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Added
+
+- **Export a tax year, a calendar year or any two dates.** The Budget page's
+  Export dialog now opens with a choice — **Months back** or **Date range** —
+  and the date range comes with ready-made spans from your own country profile:
+  *This tax year*, *Last tax year*, *This year*, *Last year*. A South African
+  vault is offered 1 March to the end of February, a UK one 6 April to 5 April,
+  an Australian one 1 July to 30 June; countries that tax the calendar year get
+  the calendar year. Two date fields underneath always show the span and can be
+  edited, which is what **Custom** means. *Last tax year* is the default,
+  because it is the one a return or an accountant asks for, and it is complete.
+
+  A tax year and a budget period rarely share edges — a payday household's
+  March runs 23 February to 22 March — so a date-range export answers two
+  questions with two rules, and says so on its first page:
+
+  - **Money is exact.** A new first table, *Actual by category*, and the
+    transactions use exactly the dates you chose. It is the same row rule the
+    budget tables use, read over a date window instead of a period.
+  - **Budgets are whole periods.** The budget tables show every period that
+    *ends* inside the range — so two consecutive tax years never both claim the
+    period that straddles their boundary — and a budget is never prorated to a
+    date, because a prorated budget is a figure nobody set.
+
+  When the range runs into the future the document says which day the figures
+  actually run through. A range no budget period ends in still exports its
+  exact-date table, without empty budget tables beside it. A remembered preset
+  is re-resolved against today's date, so "last tax year" chosen in 2026 means
+  2026/27 in 2027 rather than quietly staying a year behind.
+
+- Each country profile now states its tax year as dates (`taxYearRange`) beside
+  the label the Tax page has always printed, and a test holds the two together:
+  consecutive years must tile the calendar with no gap and no overlap.
+
+- Seventeen new interface strings in all twelve languages.
+
 ## 1.46.0 — 2026-09-17
 
 ### Added

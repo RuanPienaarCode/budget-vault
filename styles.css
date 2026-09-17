@@ -2660,6 +2660,14 @@
   outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px;
 }
 .budget-export-folder { width: 100%; }
+/* The two date fields share a row and wrap to two on a narrow phone. A native
+   date input has an intrinsic width that differs wildly between WebKit and
+   Chromium, so the FIELD is given the width and the input fills it. */
+.budget-export-dates { display: flex; flex-wrap: wrap; gap: 10px; margin: -4px 0 0; }
+.budget-export-date-field { flex: 1 1 140px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+/* `input.` + the modal class: app.css sizes input[type='date'] at (0,1,1). */
+.budget-export-modal input.budget-export-date { width: 100%; min-height: 36px; }
+.budget-export-dates-desc { margin: 8px 0 14px; }
 .budget-export-cats {
   margin: -4px 0 14px; border-radius: 6px;
   border: 1px solid var(--background-modifier-border, rgba(128,128,128,.25));
@@ -2704,6 +2712,7 @@
   .budget-export-modal button.budget-export-pill { min-height: 44px; padding: 8px 16px; }
   .budget-export-cat { padding: 10px; }
   .budget-export-modal button.budget-export-link { padding: 8px 0; }
+  .budget-export-modal input.budget-export-date { min-height: 44px; }
 }
 
 /* ============================================================

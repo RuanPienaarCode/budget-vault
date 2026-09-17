@@ -577,6 +577,22 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Khupha ibhajethi',
+  'bx.mode': 'Ixesha',
+  'bx.mode.months': 'Iinyanga ezidlulileyo',
+  'bx.mode.dates': 'Uluhlu lwemihla',
+  'bx.preset.taxThis': 'Unyaka werhafu wangoku',
+  'bx.preset.taxLast': 'Unyaka werhafu odlulileyo',
+  'bx.preset.calThis': 'Unyaka wangoku',
+  'bx.preset.calLast': 'Unyaka odlulileyo',
+  'bx.preset.custom': 'Okwakho',
+  'bx.dates.from': 'Ukusuka',
+  'bx.dates.to': 'Ukuya',
+  'bx.dates.desc': 'Inkcitho neentengiselwano zisebenzisa le mihla ngqo. Iitafile zebhajethi zibonisa lonke ixesha lebhajethi elipheleleyo eliphela ngaphakathi kwayo — ibhajethi ayikaze yahlulwe ngomhla.',
+  'bx.previewDates': {
+    one: '{range} · Ixesha lebhajethi elingu-{count} · iindidi ezingu-{cats}',
+    other: '{range} · Amaxesha ebhajethi angu-{count} · iindidi ezingu-{cats}',
+  },
+  'bx.problem.badDates': 'Khetha umhla wokuqala nomhla wokugqibela, umhla wokuqala uqala.',
   'bx.range': 'Buyela umva kangakanani',
   'bx.range.1': 'Inyanga eyi-1',
   'bx.range.2': 'Iinyanga ezi-2',
@@ -676,6 +692,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} isaqhubeka, ngoko amanani ayo ngawenxalenye yexesha kuphela kwaye ehlisa umyinge.',
   'bx.doc.noteWide': 'Iikholam zenyanga ngenyanga azingeni kwiphepha elinye kumaxesha amaninzi kangaka — ukukhutshwa kwe-Excel ne-CSV kuthwala inyanga nganye.',
   'bx.doc.noteTx': 'Imigca ekhutshiweyo, yotshintshiselwano nentloko eyahlulweyo idweliswe kwaye iphawulwe; ayiyonxalenye yamanani ebhajethi angentla.',
+  'bx.doc.exactHeading': 'Okwenzekileyo ngedidi · {from} ukuya {to}',
+  'bx.doc.noteExact': 'La manani agubungela ngqo ukusuka ku-{from} ukuya ku-{to}. Iitafile zebhajethi ezilandelayo zigubungela onke amaxesha ebhajethi apheleleyo, ukusuka ku-{pfrom} ukuya ku-{pto} — lonke ixesha eliphela ngaphakathi kolu luhlu — ngoko izixa zawo ziyahluka kwiziphelo. Iibhajethi azizange zahlulwe ngomhla.',
+  'bx.doc.noteExactOnly': 'La manani agubungela ngqo ukusuka ku-{from} ukuya ku-{to}. Akukho xesha lebhajethi eliphela ngaphakathi kolu luhlu, ngoko akukho zitafile zebhajethi.',
+  'bx.doc.noteExactThrough': 'Olu luhlu luphela ngo-{to}; amanani aqhubeka ukuya ku-{through}, umhla oku kwenziwa ngawo.',
   'bx.doc.pageOf': 'Iphepha {n} kwezingu-{m}',
 
   /* ============================= Accounts page ============================ */

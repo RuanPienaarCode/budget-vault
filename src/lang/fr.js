@@ -576,6 +576,22 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Exporter le budget',
+  'bx.mode': 'Période',
+  'bx.mode.months': 'Mois précédents',
+  'bx.mode.dates': 'Plage de dates',
+  'bx.preset.taxThis': 'Cette année fiscale',
+  'bx.preset.taxLast': 'Année fiscale précédente',
+  'bx.preset.calThis': 'Cette année',
+  'bx.preset.calLast': 'L\'année dernière',
+  'bx.preset.custom': 'Personnalisé',
+  'bx.dates.from': 'Du',
+  'bx.dates.to': 'Au',
+  'bx.dates.desc': 'Les dépenses et les transactions utilisent exactement ces dates. Les tableaux de budget montrent chaque période de budget complète se terminant dans cet intervalle — un budget n\'est jamais scindé sur une date.',
+  'bx.previewDates': {
+    one: '{range} · {count} période budgétaire · {cats} catégories',
+    other: '{range} · {count} périodes budgétaires · {cats} catégories',
+  },
+  'bx.problem.badDates': 'Choisissez une date de début et une date de fin, la date de début en premier.',
   'bx.range': 'Jusqu\'où remonter',
   'bx.range.1': '1 mois',
   'bx.range.2': '2 mois',
@@ -675,6 +691,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} est encore en cours, donc ses chiffres ne couvrent qu\'une partie d\'une période et font baisser la moyenne.',
   'bx.doc.noteWide': 'Les colonnes mois par mois ne tiennent pas sur une page pour autant de périodes — les exports Excel et CSV incluent chaque mois.',
   'bx.doc.noteTx': 'Les lignes exclues, de virement et de parent réparti sont listées et repérées ; elles ne font pas partie des chiffres du budget ci-dessus.',
+  'bx.doc.exactHeading': 'Réel par catégorie · {from} au {to}',
+  'bx.doc.noteExact': 'Ces chiffres couvrent exactement {from} au {to}. Les tableaux de budget plus loin couvrent des périodes de budget complètes, {pfrom} au {pto} — chaque période se terminant dans l\'intervalle — leurs totaux diffèrent donc aux bords. Les budgets ne sont jamais scindés sur une date.',
+  'bx.doc.noteExactOnly': 'Ces chiffres couvrent exactement {from} au {to}. Aucune période de budget ne se termine dans cet intervalle, il n\'y a donc pas de tableaux de budget.',
+  'bx.doc.noteExactThrough': 'L\'intervalle se termine le {to} ; les chiffres vont jusqu\'au {through}, le jour où ceci a été généré.',
   'bx.doc.pageOf': 'Page {n} sur {m}',
 
   /* ============================= Accounts page ============================ */
