@@ -24,7 +24,7 @@
    what headerLines() would derive for these four columns character for
    character, so that migration stays a pure refactor when someone takes it on. */
 
-const { escMd, patchFrontmatter } = require('./markdown');
+const { escMd, patchFrontmatter, freshLeadLines, withLeadExtra } = require('./markdown');
 const { typeOrder, typeRank } = require('./groups');
 
 /* The shipped column order and the shipped separator, byte for byte — files
@@ -121,7 +121,13 @@ function amountCell(row) {
    they saved it from. `groups` is S.settings.groups (src/groups.js): the
    household's custom groups slot in before `expense`, and a type nobody
    declared sorts last rather than above income. */
-function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote = '', groups = [] }) {
+/* ISSUE 67 — leadRaw/trailRaw: a paragraph a household hand-typed above or
+   below the table, captured by load.js (splitAroundTable) and replayed here.
+   The title and range note are NEVER frozen from disk — rangeNote must keep
+   tracking month_start_day/period_days, which is exactly why withLeadExtra
+   regenerates freshLeadLines() fresh every save and only reaches past it for
+   whatever a reader's own file held beyond that fixed shape. */
+function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote = '', groups = [], leadRaw = null, trailRaw = null }) {
   /* Defaulted HERE rather than at each call site, so a writer that forgets
      cannot produce a file the vault's own tag searches never see — see
      BUDGET_FRONTMATTER above. A caller with a real block still patches it. */
@@ -129,8 +135,8 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
   const order = typeOrder(groups);
   const sorted = [...rows].sort((a, b) =>
     typeRank(a.type, order) - typeRank(b.type, order) || a.category.localeCompare(b.category));
-  const lines = ['---', fm, '---', '', `# Budget — ${period}`, '',
-    rangeNote, '',
+  const leadLines = withLeadExtra(leadRaw, freshLeadLines(`Budget — ${period}`, [rangeNote]));
+  const lines = ['---', fm, '---', ...leadLines,
     BUDGET_HEADER, BUDGET_SEPARATOR];
   for (const r of sorted) {
     /* Type goes through escMd like every other text cell. It was the one that
@@ -145,7 +151,7 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
        and no vault gets a churn diff out of this. */
     lines.push(`| ${escMd(r.category)} | ${escMd(r.type)} | ${amountCell(r)} | ${escMd(r.notes)} |`);
   }
-  lines.push('');
+  lines.push(...(trailRaw ? trailRaw.split(/\r?\n/) : ['']));
   return lines.join('\n');
 }
 

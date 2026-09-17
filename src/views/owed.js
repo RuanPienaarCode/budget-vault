@@ -192,6 +192,9 @@ module.exports = function registerOwed(ctx) {
         '`Repaid` is how much has come back; `Lent` is when it went out.',
       ],
       schema: SCHEMAS.owed, rows: S.owed,
+      // ISSUE 67/69 — a paragraph above/below the table and a hand-added
+      // column both survive a save now; see load.js's tableParts.
+      leadRaw: S.owedLead, trailRaw: S.owedTrail, extraCols: S.owedExtraCols,
     });
   }
 

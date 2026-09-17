@@ -335,6 +335,9 @@ module.exports = function registerServices(ctx) {
       fm: S.servicesFm, fallback: 'kind: services', title: 'Services & Subscriptions',
       prose: [`Recurring services and subscriptions. \`cycle\` is one of: ${CYCLES.join(', ')}.`],
       schema: SCHEMAS.services, rows: S.services,
+      // ISSUE 67/69 — a paragraph above/below the table and a hand-added
+      // column both survive a save now; see load.js's tableParts.
+      leadRaw: S.servicesLead, trailRaw: S.servicesTrail, extraCols: S.servicesExtraCols,
     });
   }
 

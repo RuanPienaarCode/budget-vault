@@ -808,6 +808,11 @@ module.exports = function registerBudgets(ctx) {
       rawFrontmatter: (meta && meta.raw) || '',
       rows: draft,
       groups: S.settings.groups,
+      // ISSUE 67 — a paragraph a household added above or below the table;
+      // null for a period whose file was never on disk at load, which is
+      // exactly what a brand-new period's fixed shape already means.
+      leadRaw: (meta && meta.leadRaw) ?? null,
+      trailRaw: (meta && meta.trailRaw) ?? null,
       rangeNote: budgetRangeNote({
         monthStartDay: S.settings.month_start_day,
         intervalDays: ctx.intervalDays(),

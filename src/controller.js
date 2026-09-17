@@ -356,15 +356,31 @@ function mountApp(view) {
     rules: [],                 // {pattern, category}
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
     assetsFm: '',              // Assets.md verbatim frontmatter, re-emitted by the serializer
+    // ISSUE 67/69 — <x>Lead/<x>Trail: raw text around the table (a paragraph
+    // above or below it) the serializer replays verbatim; <x>ExtraCols: a
+    // hand-added column's header/separator, past the schema's own —
+    // table-schema.js's mdTableFile carries all three.
+    assetsLead: null,
+    assetsTrail: null,
+    assetsExtraCols: null,
     assetsDirty: false,
     debts: [],                 // {name, lender, type, balance, original, rate, payment, extra, start, category, status, notes}
     debtsFm: '',               // Debts.md verbatim frontmatter
+    debtsLead: null,
+    debtsTrail: null,
+    debtsExtraCols: null,
     debtsDirty: false,
     owed: [],                  // {person, amount, description, due, status}
     owedFm: '',                // Owed Money.md verbatim frontmatter
+    owedLead: null,
+    owedTrail: null,
+    owedExtraCols: null,
     owedDirty: false,
     services: [],              // {name, provider, amount, cycle, next, category, active, notes}
     servicesFm: '',            // Services.md verbatim frontmatter
+    servicesLead: null,
+    servicesTrail: null,
+    servicesExtraCols: null,
     servicesDirty: false,
     // basename -> {file, name, fmRaw, started, status, sources, envelopes, items}
     plans: {},

@@ -747,6 +747,9 @@ module.exports = function registerDebts(ctx) {
         '`status` is `active` or `paid`.',
       ],
       schema: SCHEMAS.debts, rows: S.debts,
+      // ISSUE 67/69 — a paragraph above/below the table and a hand-added
+      // column both survive a save now; see load.js's tableParts.
+      leadRaw: S.debtsLead, trailRaw: S.debtsTrail, extraCols: S.debtsExtraCols,
     });
   }
 
