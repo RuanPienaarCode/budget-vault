@@ -181,9 +181,35 @@ function primaryTotal(accounts, household) {
 
    controller.js's formatMoney carries this identical change; the two are held
    byte-for-byte together by tests/controller-money.test.cjs. */
+/* `toFixed` switches to exponential notation at 1e21 REGARDLESS of the
+   decimals argument (that threshold is in the spec, not this codebase), so a
+   dp=0 tile and a dp=2 sentence built from the same figure disagreed the
+   moment either crossed it — the Dashboard's net worth card names both:
+   dash.pos.netWorthSub (dp=0) beside dash.pos.netWorthSay (dp=2) reading the
+   same w.assets. Worse, at exactly 1e21 `.toFixed(2)` returns the bare string
+   "1e+21" — no '.' to split on — so the decimals branch below appended
+   ",undefined" (#76 item 2's own repro: "R 1e+21,undefined").
+
+   Any double this large is already, unconditionally, an exact integer: the
+   gap between adjacent doubles exceeds 1 long before 1e21 (the smallest gap
+   at that magnitude is 2^(1023-52)-ish, far above 1), so there is no
+   fractional part `decimals` could ever reveal. BigInt(v) on such a value
+   recovers its exact integer digits with no exponent — it is not an
+   approximation, it is the same bits toFixed was about to mis-render. Below
+   1e21 nothing changes: this is the untouched fast path every other case in
+   tests/controller-money.test.cjs pins.
+
+   controller.js carries an identical copy — see this function's own header
+   for why the two files can't share one — pinned byte-for-byte together by
+   the same test. */
+function fixedNoExponent(v, decimals) {
+  if (v < 1e21) return v.toFixed(decimals);
+  const digits = BigInt(Math.trunc(v)).toString();
+  return decimals > 0 ? `${digits}.${'0'.repeat(decimals)}` : digits;
+}
 function formatAmount(symbol, v, decimals, loc) {
   if (!Number.isFinite(v)) v = 0;
-  const abs = Math.abs(v).toFixed(decimals);
+  const abs = fixedNoExponent(Math.abs(v), decimals);
   const sign = v < 0 && Number(abs) !== 0 ? '-' : '';
   const parts = abs.split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, loc.thousands);
