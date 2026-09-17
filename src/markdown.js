@@ -218,4 +218,150 @@ const yamlStr = v => `"${String(v ?? '')
   .replace(/\n/g, '\\n')
   .replace(/\t/g, '\\t')}"`;
 
-module.exports = { escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr, unquoteYaml };
+/* Issue #69 — like parseMdTable, but keeps the header and separator rows the
+   generic reader throws away. Needed only by callers preserving columns a
+   schema does not model; every other caller keeps using parseMdTable so this
+   never becomes a second parser the first one can drift from without
+   anything going red. Deliberately a SEPARATE loop over the same rule rather
+   than a wrapper around parseMdTable, because parseMdTable's contract is "the
+   data rows, no header" and changing what it returns would ripple through
+   every existing caller — tests/markdown-preserve.test.cjs holds `.dataRows`
+   and `.header` to exactly what parseMdTable(text) and parseMdTable(text)[0]
+   already give, over the same fixtures parseMdTable's own tests use, so the
+   two cannot disagree about where a table starts or stops without a test
+   going red. */
+function parseMdTableWithSeparator(text) {
+  const rows = [];
+  let sep = null;
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t.startsWith('|')) { if (rows.length) break; continue; }
+    if (/^\|[\s:|-]+\|$/.test(t)) {
+      // The first separator-shaped line right after the header is THE
+      // separator; a table with no header (rows.length === 0 here) never
+      // reaches this arm because parseMdTable's own rule doesn't either.
+      if (rows.length === 1 && !sep) {
+        let inner = t.slice(1);
+        if (endsWithBarePipe(inner)) inner = inner.slice(0, -1);
+        sep = splitBarePipes(inner).map(c => c.trim());
+      }
+      continue;
+    }
+    let inner = t.slice(1);
+    if (endsWithBarePipe(inner)) inner = inner.slice(0, -1);
+    rows.push(splitBarePipes(inner).map(c => c.trim()));
+  }
+  return { header: rows[0], sep, dataRows: rows.slice(1) };
+}
+
+/* Issue #67 — where the FIRST table sits inside a body of text, expressed as
+   the raw text before it and the raw text after it. Copies parseMdTable's own
+   "first table only, a blank (or any non-`|`) line ends it" rule rather than
+   calling it, because a caller here wants the BOUNDARY, not the rows — but it
+   is copied from the same four lines above on purpose, and
+   tests/markdown-preserve.test.cjs pins the two functions to agreeing about
+   where that boundary falls over a shared set of fixtures, so the copy cannot
+   drift without a test noticing.
+
+   Used to preserve whatever the plugin does not model around a table it owns
+   (a paragraph above it, a `## heading` a household added below it) — never
+   to reparse the table itself. */
+function splitAroundTable(text) {
+  const lines = text.split(/\r?\n/);
+  let start = -1, end = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t.startsWith('|')) { if (start >= 0) { end = i; break; } continue; }
+    if (start < 0) start = i;
+  }
+  if (start < 0) return { before: text, after: '' };
+  return { before: lines.slice(0, start).join('\n'), after: lines.slice(end).join('\n') };
+}
+
+/* Issue #67 — the lines a fresh save of a single-table or lead-paragraph
+   region would ALWAYS write, before any reader's own extra content is
+   considered: a blank line under the frontmatter fence, the `# Title`, a
+   blank line, the view's own prose (fixed strings, or in tax.js's case a
+   locale-derived sentence that must keep tracking the household's country —
+   so these lines are always regenerated fresh, never frozen from disk), and
+   a trailing blank line before whatever comes next. Shared by
+   table-schema.js's mdTableFile, budget-file.js, tax.js and plan.js so the
+   shape is declared once rather than four times drifting apart. */
+function freshLeadLines(title, contentLines) {
+  return ['', `# ${title}`, '', ...contentLines, ''];
+}
+
+/* Issue #67 — replay a reader's own extra content past the lines a fresh save
+   would always write. `capturedBefore` is the raw text read off disk last
+   load (via splitAroundTable, or the lead chunk of a body.split(/##/) for a
+   multi-table file); `freshLines` is freshLeadLines()'s own output for the
+   CURRENT state, so a setting or a rename that must keep tracking live state
+   (a budget's range note, a plan's own name) is regenerated fresh every save
+   regardless of what used to be on disk. Anything the reader's file held
+   BEYOND that fixed shape — a paragraph they added, a heading they started —
+   is never interpreted, only replayed byte for byte in the position it was
+   found.
+
+   `capturedBefore` carries one leading blank line that is not something
+   anyone typed: parseFrontmatter's `body` is sliced right after the closing
+   `---`, one character short of consuming the newline that followed it, so
+   every capture off real text starts one line "early" compared to the
+   literal array a writer builds by hand. Dropped here, once, rather than
+   adjusted at every call site. */
+function withLeadExtra(capturedBefore, freshLines) {
+  if (capturedBefore == null) return freshLines;
+  const content = capturedBefore.split(/\r?\n/).slice(1);
+  if (content.length <= freshLines.length) return freshLines;
+  /* Before trusting a POSITION to mean "past the fixed shape", check that the
+     shape is actually still there: every fixed line except the title (index
+     1 — a plan's own name is itself live state, allowed to differ) must
+     match exactly where freshLines says it should be. A mismatch means the
+     reader inserted or edited something INSIDE the fixed block rather than
+     appending after it — guessing where "extra" starts from there risks
+     duplicating the plugin's own line while still losing the reader's, which
+     is worse than doing nothing. Replay the whole captured block exactly as
+     found instead: unregenerated (so a locale or a rename goes stale there
+     until the reader's own next edit un-misaligns it), but nothing is
+     invented and nothing is lost. */
+  const fixedTail = freshLines.slice(2);
+  const alignedTail = content.slice(2, freshLines.length);
+  const aligned = fixedTail.length === alignedTail.length && fixedTail.every((l, i) => alignedTail[i] === l);
+  return aligned ? [...freshLines, ...content.slice(freshLines.length)] : content;
+}
+
+/* Issue #67 — the same preservation for a MULTI-table file (tax, plan), whose
+   sections are already delimited by top-level `## ` headings (load.js's
+   section() reads the known ones by name). Splitting on that same boundary
+   gives every OTHER chunk for free: `lead` is the paragraph above the first
+   heading (fed to withLeadExtra by the caller, the same as a single-table
+   file's lead), and `extras` is every chunk this file does NOT recognise —
+   a `## My own working` a household added anywhere — PLUS, for each chunk
+   this file DOES recognise, whatever splitAroundTable finds after that
+   chunk's OWN table and before the next heading (a plain paragraph with no
+   heading of its own, which section()'s caller only ever fed to
+   parseMdTable and never looked at again). Both kinds carry `after`: the
+   name of the nearest RECOGNISED section before them, or null for anything
+   above the first one — so a save can put each one back relative to the
+   section it followed rather than at a fixed line number that shifts every
+   time a row is added or removed. */
+function extraContent(body, knownNames) {
+  const chunks = body.split(/\r?\n##\s+/);
+  const extras = [];
+  let lastKnown = null;
+  for (const raw of chunks.slice(1)) {
+    const name = knownNames.find(n => raw.trim().toLowerCase().startsWith(n));
+    if (name) {
+      lastKnown = name;
+      const extra = splitAroundTable(raw).after.trim();
+      if (extra) extras.push({ after: name, raw: extra });
+    } else {
+      extras.push({ after: lastKnown, raw: ('## ' + raw).trim() });
+    }
+  }
+  return { lead: chunks[0], extras };
+}
+
+module.exports = {
+  escMd, unescMd, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr, unquoteYaml,
+  parseMdTableWithSeparator, splitAroundTable, freshLeadLines, withLeadExtra, extraContent,
+};

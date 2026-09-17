@@ -30,7 +30,7 @@
 
 const { el, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
+const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { planSummary, barSegments, SOURCE_KINDS, sharePct,
@@ -939,28 +939,41 @@ module.exports = function registerPlan(ctx) {
       ? r[`${key}Raw`] : Number(r[key] || 0).toFixed(2));
     const word = (r, key, fallback) => (r[`${key}Raw`] != null && r[key] === fallback
       ? r[`${key}Raw`] : r[key]);
-    const lines = ['---', ...fm.split('\n'), '---', '', `# ${p.name}`, '',
+    /* ISSUE 67 — the intro paragraph here has no live-state dependency (unlike
+       tax.js's), but withLeadExtra is the same contract regardless: the fixed
+       lines are always regenerated (so a renamed plan's `# ${p.name}` stays
+       current), and only whatever a reader's own file held beyond that shape
+       is replayed. `p.extras` — a `## heading` of their own, or a paragraph
+       left under one of the three tables — comes from extraContent in load.js. */
+    const leadLines = withLeadExtra(p.leadRaw, freshLeadLines(p.name, [
       'Money that arrives once, divided on purpose.',
       'Source `status` is `received` or `expected`; item `status` is `planned`, `part` or `done`.',
-      'An envelope\'s amount is what you placed in it — it need not equal the items inside.', '',
+      'An envelope\'s amount is what you placed in it — it need not equal the items inside.',
+    ]));
+    const extrasAfter = name => (p.extras || []).filter(e => e.after === name)
+      .flatMap(e => ['', ...e.raw.split(/\r?\n/)]);
+    const lines = ['---', ...fm.split('\n'), '---', ...leadLines, ...extrasAfter(null),
       '## Money in', '',
       '| Source | Kind | Amount | Date | Status | Notes |',
       '|--------|------|-------:|------|--------|-------|'];
     for (const s of p.sources) {
       lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${cash(s, 'amount')} | ${escMd(s.date || '')} | ${word(s, 'status', 'received')} | ${escMd(s.notes || '')} |`);
     }
+    lines.push(...extrasAfter('money in'));
     lines.push('', '## Envelopes', '',
       '| Envelope | Amount | Note | Tint |',
       '|----------|-------:|------|------|');
     for (const e of p.envelopes) {
       lines.push(`| ${escMd(e.name)} | ${cash(e, 'amount')} | ${escMd(e.note || '')} | ${escMd(e.tint || '')} |`);
     }
+    lines.push(...extrasAfter('envelopes'));
     lines.push('', '## Items', '',
       '| Item | Envelope | Amount | Spent | Status | Category | Notes |',
       '|------|----------|-------:|------:|--------|----------|-------|');
     for (const i of p.items) {
       lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${cash(i, 'amount')} | ${cash(i, 'spent')} | ${word(i, 'status', 'planned')} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
     }
+    lines.push(...extrasAfter('items'));
     lines.push('');
     return lines.join('\n');
   }

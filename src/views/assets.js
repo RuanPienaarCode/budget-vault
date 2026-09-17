@@ -353,6 +353,9 @@ module.exports = function registerAssets(ctx) {
         'that was last worked out. Money owed against any of these lives on the Debt page.',
       ],
       schema: SCHEMAS.assets, rows: S.assets,
+      // ISSUE 67/69 — a paragraph above/below the table and a hand-added
+      // column both survive a save now; see load.js's tableParts.
+      leadRaw: S.assetsLead, trailRaw: S.assetsTrail, extraCols: S.assetsExtraCols,
     });
   }
 
