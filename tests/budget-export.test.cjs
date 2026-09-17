@@ -97,6 +97,49 @@ const P = [
   eq(bx.exportPeriods({ ...base, earliest: '2020-01', periodsForMonths: n => n * 4, range: '3', includeCurrent: true }).length, 12, 'the range names a span of time; the period count is periodsForMonths\'s');
 }
 
+/* ============================ 1b. a DATE range ==============================
+   "My budget for the 2026 tax year." Two different questions hide in that, and
+   the owner's ruling (17 Sep 2026) answers each with its own rule:
+
+     MONEY is exact. A tax return wants 1 Mar – 28 Feb, not 23 Feb – 22 Feb.
+     BUDGETS are whole periods. A budget cannot be cut at an arbitrary date
+       without prorating it, and a prorated budget is a figure nobody set.
+
+   A period belongs to the range its END falls in — so two consecutive tax
+   years never both claim the period that straddles their boundary. */
+{
+  const shift = (p, d) => {
+    let [y, m] = p.split('-').map(Number); m += d;
+    while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; }
+    return `${y}-${String(m).padStart(2, '0')}`;
+  };
+  // payday periods: "2026-03" runs 23 Feb – 22 Mar
+  const range = p => { const [y, m] = p.split('-').map(Number); const q = shift(p, -1).split('-');
+    return { start: `${q[0]}-${q[1]}-23`, end: `${y}-${String(m).padStart(2, '0')}-22` }; };
+  const base = { anchor: '2026-09', shiftPeriod: shift, periodRange: range, earliest: '2024-01' };
+  const ty26 = bx.periodsEndingIn({ ...base, from: '2025-03-01', to: '2026-02-28' });
+  eq([ty26[0], ty26[ty26.length - 1], ty26.length], ['2025-03', '2026-02', 12], 'ZA tax year 2026: the twelve periods ENDING 22 Mar 2025 … 22 Feb 2026');
+  const ty27 = bx.periodsEndingIn({ ...base, from: '2026-03-01', to: '2027-02-28' });
+  eq(ty27[0], '2026-03', 'and the straddling period (23 Feb – 22 Mar 2026) belongs to the NEXT year only');
+  ok(!ty26.includes('2026-03'), 'never to both — a period counted in two tax years is income declared twice');
+  eq(ty27[ty27.length - 1], '2026-09', 'a range running into the future stops at the current period — no invented months ahead');
+  eq(bx.periodsEndingIn({ ...base, from: '2026-05-01', to: '2026-05-10' }), [], 'a range no period ends in has no budget tables — and that is an answer, not an error');
+  eq(bx.periodsEndingIn({ ...base, earliest: '2025-11', from: '2025-03-01', to: '2026-02-28' })[0], '2025-11', 'never reaches before the first month with data');
+  eq(bx.periodsEndingIn({ ...base, from: '2026-03-01', to: '2025-03-01' }), [], 'from after to is nothing, not everything');
+
+  const za = y => ({ start: `${y - 1}-03-01`, end: `${y}-02-${(y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 29 : 28}` });
+  const pre = bx.datePresets({ today: '2026-09-17', taxYearRange: za });
+  eq(pre.map(x => x.key), ['taxThis', 'taxLast', 'calThis', 'calLast'], 'four presets');
+  eq([pre[0].from, pre[0].to, pre[0].year], ['2026-03-01', '2027-02-28', 2027], 'this tax year is the one CONTAINING today — not the filing-season year locale.currentTaxYear answers');
+  eq([pre[1].from, pre[1].to], ['2025-03-01', '2026-02-28'], 'last tax year');
+  eq([pre[2].from, pre[2].to, pre[3].from, pre[3].to], ['2026-01-01', '2026-12-31', '2025-01-01', '2025-12-31'], 'calendar years');
+  eq(bx.datePresets({ today: '2028-02-29', taxYearRange: za })[0].to, '2028-02-29', 'a leap day is inside its own tax year');
+  const uk = y => ({ start: `${y - 1}-04-06`, end: `${y}-04-05` });
+  eq(bx.datePresets({ today: '2026-04-05', taxYearRange: uk })[0].to, '2026-04-05', 'UK: 5 April is the LAST day of the year');
+  eq(bx.datePresets({ today: '2026-04-06', taxYearRange: uk })[0].from, '2026-04-06', 'and 6 April the first of the next');
+  eq(bx.datePresets({ today: '2026-09-17' }).map(x => x.key), ['calThis', 'calLast'], 'a profile with no tax-year rule offers calendar years only, never a guessed tax year');
+}
+
 /* ================================ 2–5. the model ============================== */
 const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
 {
@@ -174,6 +217,36 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
         `summary subtotal "${s.type}" for period ${i} equals that period's own table — the identity the two pages must share`);
     }
   }
+}
+
+/* ---- the exact-dates section rides on the same model ---- */
+{
+  const exact = { from: '2026-03-01', to: '2027-02-28', through: '2026-09-17',
+    rows: [row('Salary', 'income', 0, 61000), row('Groceries', 'expense', 0, 11000.25), row('Fuel', 'expense', 0, 900)],
+    txs: [tx('2026-03-02', 'PnP', 'Cheque', 'Groceries', -400), tx('2026-03-03', 'Shell', 'Cheque', 'Fuel', -900)] };
+  const m = bx.buildModel({ periods: P, content: 'full', categories: ['Groceries'], includeTx: true, exact, ...META });
+  eq(m.rangeLabel, '2026-03-01 to 2027-02-28', 'a date-range export is named for its DATES, not for the periods that happen to fall in it');
+  eq(m.exact.rows.map(r => r.cat), ['Groceries'], 'the category filter reaches the exact-dates table too');
+  eq(m.exact.subtotals.map(s => [s.type, s.actual]), [['expense', 11000.25]], 'with its own per-type subtotals');
+  eq(m.transactions.map(t => t.desc), ['PnP'], 'transactions are the EXACT-date ones, filtered — not the per-period lists');
+  eq([m.exact.periodFrom, m.exact.periodTo], ['2026-05-23', '2026-07-22'], 'and the model knows the span the budget tables really cover, so the document can state both');
+
+  const files = bx.modelToCsv(m, { symbolFor: () => 'R' });
+  eq(files.map(f => f.kind), ['exact', 'summary', 'budget', 'transactions'], 'an extra CSV, first');
+  eq(files[0].text.split('\n').slice(0, 2), ['Category,Type,Currency,From,To,Actual', 'Groceries,expense,R,2026-03-01,2026-09-17,11000.25'],
+    'its To is the day the figures actually run through — today, when the range ends in the future');
+  const sheets = bx.modelToSheets(m, {});
+  eq(sheets.map(x => x.name)[0], 'Exact dates', 'and a sheet, first');
+  const doc = bx.modelToDoc(m, { money: v => 'R ' + Number(v).toFixed(2) });
+  const notes = doc.blocks.filter(b => b.type === 'note').map(b => b.text).join('\n');
+  ok(/2026-03-01/.test(notes) && /2026-09-17/.test(notes) && /2026-05-23/.test(notes) && /2026-07-22/.test(notes),
+    'the document states BOTH spans — exact dates for the money, whole periods for the budgets — so neither is mistaken for the other');
+  eq(doc.blocks.find(b => b.type === 'table').head, ['Category', 'Type', 'Actual'], 'the exact-dates table comes first');
+  ok(bx.budgetExportPaths(m, '').pdf.includes('Budget 2026-03-01 to 2027-02-28 (Groceries).pdf'), 'file named by the dates');
+
+  const bare = bx.buildModel({ periods: [], content: 'full', categories: null, includeTx: false, exact, ...META });
+  const bareDoc = bx.modelToDoc(bare, { money: v => String(v) });
+  eq(bareDoc.blocks.filter(b => b.type === 'table').length, 1, 'a short range that no period ends in still exports its exact-date table, and no empty budget tables');
 }
 
 /* ================================== 6. CSV =================================== */

@@ -78,6 +78,62 @@ function exportPeriods({ range, includeCurrent, anchor, shiftPeriod, periodsForM
   return out.reverse();
 }
 
+/* Which budget periods belong to a DATE range: those whose END falls inside it.
+
+   A tax year (1 Mar – 28 Feb) and a payday period (23 Feb – 22 Mar) do not
+   share edges, so "the periods in the range" needs a rule, and only one rule
+   keeps two consecutive years from both claiming the straddling period: a
+   period belongs to the range that contains its last day. (By START would
+   work as well; by overlap would count the straddler twice — a month of
+   income declared in two tax years.) The end, because that is the month a
+   period is NAMED after (period.js's periodMonthName).
+
+   Walks back from the current period, so a range running into the future
+   stops at "now" rather than inventing months ahead, and never reaches before
+   the first month with data — the two rules exportPeriods() above follows. */
+function periodsEndingIn({ from, to, anchor, shiftPeriod, periodRange, earliest }) {
+  const out = [];
+  if (!from || !to || from > to) return out;
+  for (let i = 0; i < MAX_PERIODS; i++) {
+    const p = shiftPeriod(anchor, -i);
+    const end = periodRange(p).end;
+    if (end < from) break;
+    if (!earliest || end.slice(0, 7) < earliest) break;
+    if (end <= to) out.push(p);
+  }
+  return out.reverse();
+}
+
+/* The date ranges the dialog offers ready-made. `taxYearRange(y)` is the
+   country profile's (locale.js) — this module does not know any country's
+   tax year, and a profile without one gets calendar years only rather than a
+   guess.
+
+   "This tax year" is the one CONTAINING today. Deliberately not
+   locale.currentTaxYear(): that answers "which return is being filed" — in
+   March a US household is filing LAST year — which is the Tax page's question
+   and the wrong one for "export this year so far". Found by trying the three
+   candidate labels around today's calendar year, since a tax year's label can
+   be the year it starts in or the year it ends in, per country. */
+function datePresets({ today, taxYearRange }) {
+  const y = Number(String(today).slice(0, 4));
+  const out = [];
+  if (typeof taxYearRange === 'function') {
+    for (const cand of [y - 1, y, y + 1]) {
+      const r = taxYearRange(cand);
+      if (r && r.start <= today && today <= r.end) {
+        const prev = taxYearRange(cand - 1);
+        out.push({ key: 'taxThis', from: r.start, to: r.end, year: cand });
+        out.push({ key: 'taxLast', from: prev.start, to: prev.end, year: cand - 1 });
+        break;
+      }
+    }
+  }
+  out.push({ key: 'calThis', from: `${y}-01-01`, to: `${y}-12-31`, year: y });
+  out.push({ key: 'calLast', from: `${y - 1}-01-01`, to: `${y - 1}-12-31`, year: y - 1 });
+  return out;
+}
+
 /* Per-type subtotals over the rows actually shown. `remaining` comes from
    budgetRowStatus over the summed operands — the row rule, applied to a row
    that happens to be a sum — so a subtotal can never disagree with the lines
@@ -96,7 +152,15 @@ function subtotalsOf(rows) {
 /* `categories`: null means "no filter"; an ARRAY means "exactly these", and an
    empty array is therefore "none", not "all". The dialog refuses to submit an
    empty pick; the model must not quietly widen one into a full export. */
-function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress }) {
+/* `exact`, when present, is a DATE-RANGE export (the owner's ruling of 17 Sep
+   2026): money by exact dates, budgets by whole periods, both spans stated.
+     { from, to, through, rows, txs }
+   `rows` are figures.js's categoryActualsInRange() — the SAME row rule as the
+   period tables, over an arbitrary window — and `through` is the last day they
+   really cover: today, when the range runs on into the future, because the
+   ledger counts what has happened and schedules the rest. `txs` replace the
+   per-period lists, so the transactions are the exact-date ones too. */
+function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact }) {
   const list = periods || [];
   const only = Array.isArray(categories) ? new Set(categories) : null;
   const keep = cat => !only || only.has(cat);
@@ -152,9 +216,10 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     }))
     : [];
 
-  const transactions = includeTx
-    ? list.reduce((all, p) => all.concat((p.txs || []).filter(t => !only || only.has(t.cat))), [])
-    : null;
+  const txSource = exact ? (exact.txs || []) : list.reduce((all, p) => all.concat(p.txs || []), []);
+  const transactions = includeTx ? txSource.filter(t => !only || only.has(t.cat)) : null;
+
+  const exactRows = exact ? (exact.rows || []).filter(r => keep(r.cat)) : null;
 
   const foreignSymbols = [...new Set(list.reduce((all, p) =>
     all.concat(((p.summary || {}).foreign || {}).symbols || []), []))];
@@ -165,7 +230,16 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     generated, currency: currency || '',
     filtered: !!only, categories: only ? [...only] : null,
     periods: list.map(p => ({ key: p.key, name: p.name, title: p.title, start: p.start, end: p.end })),
-    rangeLabel: !first ? '' : (list.length === 1 ? first.name : `${first.name} to ${last.name}`),
+    /* A date-range export is named for its DATES: the periods that happen to
+       end inside it are a consequence, and "March 2025 to February 2026" would
+       claim a span the money in the file does not cover. */
+    rangeLabel: exact ? `${exact.from} to ${exact.to}`
+      : (!first ? '' : (list.length === 1 ? first.name : `${first.name} to ${last.name}`)),
+    exact: exact ? {
+      from: exact.from, to: exact.to, through: exact.through || exact.to,
+      rows: exactRows, subtotals: subtotalsOf(exactRows),
+      periodFrom: first ? first.start : null, periodTo: last ? last.end : null,
+    } : null,
     inProgress: inProgress && list.some(p => p.key === inProgress) ? inProgress : null,
     summary: { rows: summaryRows, subtotals: [...subByType.values()].map(finish) },
     budgets, transactions, foreignSymbols,
@@ -187,13 +261,27 @@ const csvLines = (head, body) => [head.map(csvCell).join(','), ...body].join('\n
    for its own: the caveat IS the number's unit, and the file outlives the app. */
 function modelToCsv(model, { symbolFor } = {}) {
   const cur = model.currency;
-  const files = [{
+  const files = [];
+  if (model.exact) {
+    /* From/To on every row, and To is `through`: the day the figure really
+       runs to. A row that said 2027-02-28 in September 2026 would be claiming
+       five months that have not happened. */
+    files.push({
+      kind: 'exact',
+      text: csvLines(['Category', 'Type', 'Currency', 'From', 'To', 'Actual'],
+        model.exact.rows.map(r => [csvCell(r.cat), csvCell(r.type || ''), csvCell(cur),
+          csvCell(model.exact.from), csvCell(model.exact.through), num(r.actual)].join(','))),
+    });
+  }
+  /* No period ends inside a short range: there is no summary to write, and an
+     empty file with a header is a file someone will open expecting data. */
+  if (!model.exact || model.periods.length) files.push({
     kind: 'summary',
     text: csvLines(
       ['Category', 'Type', 'Currency', ...model.periods.map(p => p.name), 'Total', 'Average', 'Budgeted'],
       model.summary.rows.map(r => [csvCell(r.cat), csvCell(r.type || ''), csvCell(cur),
         ...r.byPeriod.map(num), num(r.total), num(r.average), num(r.budget)].join(','))),
-  }];
+  });
   if (model.content === 'full') {
     const body = [];
     for (const b of model.budgets) {
@@ -229,6 +317,11 @@ const LABELS = {
   noteInProgress: '{period} is still in progress, so its figures are for part of a period and pull the average down.',
   noteWide: 'The month-by-month columns do not fit on a page for this many periods — the Excel and CSV exports carry every month.',
   noteTx: 'Excluded, transfer and split-parent rows are listed and flagged; they are not part of the budget figures above.',
+  exactHeading: 'Actual by category · {from} to {to}',
+  noteExact: 'These figures cover exactly {from} to {to}. The budget tables further on cover whole budget periods, {pfrom} to {pto} — every period ending inside the range — so their totals differ at the edges. Budgets are never split across a date.',
+  noteExactOnly: 'These figures cover exactly {from} to {to}. No budget period ends inside this range, so there are no budget tables.',
+  noteExactThrough: 'The range ends on {to}; the figures run through {through}, the day this was made.',
+  sheetExact: 'Exact dates',
   sheetSummary: 'Summary', sheetBudget: 'Budget', sheetTransactions: 'Transactions', sheetAbout: 'About',
 };
 const fill = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
@@ -238,6 +331,19 @@ const labelsOf = over => Object.assign({}, LABELS, over || {});
    A document must carry what its on-screen twin prints beside the number —
    and the screen names held-out currencies, flags a part-period, and would
    never show a filtered total without the filter beside it. */
+/* The two spans, in words. The whole risk of a date-range export is that the
+   reader takes the budget tables for the tax year, or the exact figures for
+   whole periods — so every rendering a person reads says which is which. */
+function exactNotes(model, L) {
+  const x = model.exact;
+  if (!x) return [];
+  const out = [x.periodFrom
+    ? fill(L.noteExact, { from: x.from, to: x.through, pfrom: x.periodFrom, pto: x.periodTo })
+    : fill(L.noteExactOnly, { from: x.from, to: x.through })];
+  if (x.through !== x.to) out.push(fill(L.noteExactThrough, { to: x.to, through: x.through }));
+  return out;
+}
+
 function caveats(model, L) {
   const out = [];
   if (model.filtered) out.push(fill(L.noteFilter, { list: model.categories.join(', ') }));
@@ -276,9 +382,18 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
   for (const s of model.summary.subtotals) {
     sumRows.push([{ v: fill(L.subtotal, { type: s.type || '' }), s: 'bold' }, '', ...s.byPeriod.map(mb), mb(s.total), mb(s.average), mb(s.budget)]);
   }
-  const sheets = [{ name: L.sheetSummary, rows: sumRows, freezeRows: 1, widths: [28, 12, ...model.periods.map(() => 14), 14, 14, 14] }];
+  const sheets = [];
+  if (model.exact) {
+    const rows = [head([L.category, L.type, L.from, L.to, L.actual])];
+    for (const r of model.exact.rows) rows.push([r.cat, r.type || '', model.exact.from, model.exact.through, m(r.actual)]);
+    for (const t of model.exact.subtotals) rows.push([{ v: fill(L.subtotal, { type: t.type || '' }), s: 'bold' }, '', '', '', mb(t.actual)]);
+    sheets.push({ name: L.sheetExact, rows, freezeRows: 1, widths: [28, 12, 12, 12, 14] });
+  }
+  if (!model.exact || model.periods.length) {
+    sheets.push({ name: L.sheetSummary, rows: sumRows, freezeRows: 1, widths: [28, 12, ...model.periods.map(() => 14), 14, 14, 14] });
+  }
 
-  if (model.content === 'full') {
+  if (model.content === 'full' && model.budgets.length) {
     const rows = [head([L.period, L.from, L.to, L.category, L.type, L.budget, L.actual, L.remaining, L.notes])];
     for (const b of model.budgets) {
       for (const r of b.rows) rows.push([b.period.name, b.period.start || '', b.period.end || '', r.cat, r.type || '', m(r.budget), m(r.actual), m(r.remaining), r.notes || '']);
@@ -297,6 +412,7 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
     [L.currency, model.currency],
     [L.categories, model.filtered ? model.categories.join(', ') : L.allCategories],
     [],
+    ...exactNotes(model, L).map(c => [c]),
     ...caveats(model, L).map(c => [c]),
     ...(model.transactions ? [[L.noteTx]] : []),
   ];
@@ -323,6 +439,16 @@ function modelToDoc(model, { money, rowMoney, labels } = {}) {
   const blocks = [];
 
   for (const c of caveats(model, L)) blocks.push({ type: 'note', text: c });
+
+  if (model.exact) {
+    blocks.push({ type: 'heading', text: fill(L.exactHeading, { from: model.exact.from, to: model.exact.through }) });
+    for (const c of exactNotes(model, L)) blocks.push({ type: 'note', text: c });
+    const xRows = model.exact.rows.map(r => [r.cat, r.type || '', fmt(r.actual)]);
+    const xBold = [];
+    for (const t of model.exact.subtotals) { xBold.push(xRows.length); xRows.push([fill(L.subtotal, { type: t.type || '' }), '', fmt(t.actual)]); }
+    blocks.push({ type: 'table', head: [L.category, L.type, L.actual], rows: xRows, boldRows: xBold, align: ['left', 'left', 'right'] });
+  }
+  const hasPeriods = !model.exact || model.periods.length > 0;
   if (wide) blocks.push({ type: 'note', text: L.noteWide });
 
   const head = [L.category, ...cols.map(p => p.name), L.total, L.average, L.budgeted];
@@ -334,8 +460,10 @@ function modelToDoc(model, { money, rowMoney, labels } = {}) {
     boldRows.push(rows.length);
     rows.push([fill(L.subtotal, { type: s.type || '' }), ...(wide ? [] : s.byPeriod.map(v => fmt(v))), fmt(s.total), fmt(s.average), fmt(s.budget)]);
   }
-  blocks.push({ type: 'heading', text: L.summaryHeading });
-  blocks.push({ type: 'table', head, rows, boldRows, align: head.map((h, i) => (i === 0 ? 'left' : 'right')) });
+  if (hasPeriods) {
+    blocks.push({ type: 'heading', text: L.summaryHeading });
+    blocks.push({ type: 'table', head, rows, boldRows, align: head.map((h, i) => (i === 0 ? 'left' : 'right')) });
+  }
 
   for (const b of model.budgets) {
     blocks.push({ type: 'heading', text: b.period.title ? `${b.period.name} · ${b.period.title}` : b.period.name });
@@ -422,11 +550,11 @@ function budgetExportPaths(model, folder) {
     dir, base,
     pdf: `${base}.pdf`,
     xlsx: `${base}.xlsx`,
-    csv: { summary: `${base} - Summary.csv`, budget: `${base} - Budget.csv`, transactions: `${base} - Transactions.csv` },
+    csv: { exact: `${base} - Exact dates.csv`, summary: `${base} - Summary.csv`, budget: `${base} - Budget.csv`, transactions: `${base} - Transactions.csv` },
   };
 }
 
 module.exports = {
   RANGE_KEYS, PDF_MAX_PERIOD_COLS, LABELS,
-  exportPeriods, buildModel, modelToCsv, modelToSheets, modelToDoc, budgetExportPaths,
+  exportPeriods, periodsEndingIn, datePresets, buildModel, modelToCsv, modelToSheets, modelToDoc, budgetExportPaths,
 };

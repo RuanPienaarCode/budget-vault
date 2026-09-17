@@ -540,6 +540,21 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': '予算を書き出す',
+  'bx.mode': '期間',
+  'bx.mode.months': '過去の月数',
+  'bx.mode.dates': '日付範囲',
+  'bx.preset.taxThis': 'この税年度',
+  'bx.preset.taxLast': '前の税年度',
+  'bx.preset.calThis': '今年',
+  'bx.preset.calLast': '昨年',
+  'bx.preset.custom': 'カスタム',
+  'bx.dates.from': '開始',
+  'bx.dates.to': '終了',
+  'bx.dates.desc': '支出と取引はこの日付を正確に使います。予算表には、この範囲内に終了するすべての完全な予算期間が表示されます — 予算が日付の途中で分割されることはありません。',
+  'bx.previewDates': {
+    other: '{range} · 予算期間 {count} 件 · カテゴリ {cats} 件',
+  },
+  'bx.problem.badDates': '開始日と終了日を選んでください。開始日を先にしてください。',
   'bx.range': 'どこまで遡るか',
   'bx.range.1': '1か月',
   'bx.range.2': '2か月',
@@ -635,6 +650,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} はまだ進行中のため、その数値は期間の一部だけのもので、平均を押し下げます。',
   'bx.doc.noteWide': 'これだけ多い期間だと月ごとの列が1ページに収まりません — ExcelとCSVの書き出しには毎月分が含まれます。',
   'bx.doc.noteTx': '除外・振替・分割元の行は一覧表示され、フラグが付きます。上の予算の数値には含まれません。',
+  'bx.doc.exactHeading': 'カテゴリ別実績 · {from}から{to}まで',
+  'bx.doc.noteExact': 'この数値は{from}から{to}までを正確にカバーしています。この先の予算表は完全な予算期間、{pfrom}から{pto}までをカバーしており — 範囲内に終了するすべての期間を含むため — 端の部分で合計が異なります。予算が日付の途中で分割されることはありません。',
+  'bx.doc.noteExactOnly': 'この数値は{from}から{to}までを正確にカバーしています。この範囲内に終了する予算期間がないため、予算表はありません。',
+  'bx.doc.noteExactThrough': 'この範囲は{to}までですが、数値はこれが作成された日である{through}まで含まれています。',
   'bx.doc.pageOf': '{m} ページ中 {n} ページ目',
 
   /* ============================= Accounts page ============================ */

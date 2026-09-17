@@ -582,6 +582,22 @@ module.exports = {
      {n} {m} placeholders in bx.doc.* are filled by src/budget-export.js
      directly, so keep those names exactly. */
   'bx.title': 'Khipha isabelomali',
+  'bx.mode': 'Isikhathi',
+  'bx.mode.months': 'Izinyanga ezedlule',
+  'bx.mode.dates': 'Ububanzi bezinsuku',
+  'bx.preset.taxThis': 'Unyaka wentela wamanje',
+  'bx.preset.taxLast': 'Unyaka wentela odlule',
+  'bx.preset.calThis': 'Unyaka wamanje',
+  'bx.preset.calLast': 'Unyaka odlule',
+  'bx.preset.custom': 'Okwakho',
+  'bx.dates.from': 'Kusukela',
+  'bx.dates.to': 'Kuya',
+  'bx.dates.desc': 'Ukuchitha nemisebenzi yemali kusetshenziswa lezi zinsuku ngqo. Amathebula esabelomali abonisa isikhathi sesabelomali esiphelele ngasinye esiphela ngaphakathi kwazo — isabelomali asikaze sihlukaniswe ngosuku.',
+  'bx.previewDates': {
+    one: '{range} · Isikhathi sesabelomali esingu-{count} · izigaba ezingu-{cats}',
+    other: '{range} · Izikhathi zesabelomali ezingu-{count} · izigaba ezingu-{cats}',
+  },
+  'bx.problem.badDates': 'Khetha usuku lokuqala nosuku lokugcina, usuku lokuqala kuqala.',
   'bx.range': 'Buyela emuva kangakanani',
   'bx.range.1': 'Inyanga eyi-1',
   'bx.range.2': 'Izinyanga ezi-2',
@@ -681,6 +697,10 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} isaqhubeka, ngakho izibalo zayo ziyingxenye yesikhathi kuphela futhi zehlisa isilinganiso.',
   'bx.doc.noteWide': 'Amakholomu enyanga nenyanga awafaneli ekhasini elilodwa kulezi zikhathi eziningi kangaka — okukhishwe kwe-Excel ne-CSV kuthwala inyanga ngayinye.',
   'bx.doc.noteTx': 'Imigqa ekhishiwe, yokudlulisela nenhloko ehlukanisiwe ibaliwe futhi iphawuliwe; akuyona ingxenye yezibalo zesabelomali ezingenhla.',
+  'bx.doc.exactHeading': 'Okwenzeke ngesigaba · {from} kuya {to}',
+  'bx.doc.noteExact': 'Lezi zibalo zimbombela ngqo ukusuka ku-{from} kuya ku-{to}. Amathebula esabelomali alandelayo ambombela zonke izikhathi zesabelomali eziphelele, kusukela ku-{pfrom} kuya ku-{pto} — isikhathi ngasinye esiphela ngaphakathi kwalobu bubanzi — ngakho izamba zawo ziyahluka emaphethelweni. Izabelomali azikaze zihlukaniswe ngosuku.',
+  'bx.doc.noteExactOnly': 'Lezi zibalo zimbombela ngqo ukusuka ku-{from} kuya ku-{to}. Asikho isikhathi sesabelomali esiphela ngaphakathi kwalobu bubanzi, ngakho azikho amathebula esabelomali.',
+  'bx.doc.noteExactThrough': 'Lobu bubanzi buphela ngo-{to}; izibalo ziqhubeka kuya ku-{through}, usuku lokwenziwa kwalokhu.',
   'bx.doc.pageOf': 'Ikhasi {n} kwangu-{m}',
 
   /* ============================= Accounts page ============================ */

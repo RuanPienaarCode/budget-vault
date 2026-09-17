@@ -34,7 +34,7 @@
    explain it. */
 
 const {
-  exportPeriods, buildModel, modelToCsv, modelToSheets, modelToDoc, budgetExportPaths,
+  exportPeriods, periodsEndingIn, datePresets, buildModel, modelToCsv, modelToSheets, modelToDoc, budgetExportPaths,
 } = require('../budget-export');
 const { askBudgetExport, showBudgetExportDone } = require('../budget-export-modal');
 const { buildXlsx } = require('../xlsx');
@@ -42,7 +42,7 @@ const { PAGE, docEncodable, helveticaMeasure, layoutDocument, renderVectorPdf, r
 const { canvasMeasure, rasterisePages } = require('../pdf-raster');
 const { managedFolderMatch } = require('../report');
 const { symbolOf } = require('../currency');
-const { nowLocalMinute } = require('../dates');
+const { nowLocalMinute, todayIso, isRealIsoDate } = require('../dates');
 const i18n = require('../i18n');
 
 /* Every label budget-export.js prints into a document, from the active
@@ -54,13 +54,14 @@ const DOC_LABEL_KEYS = [
   'flag', 'excluded', 'splitParent', 'splitPart', 'subtotal', 'summaryHeading', 'transactionsHeading',
   'generated', 'range', 'categories', 'allCategories', 'periodLine', 'periodUncat',
   'noteFilter', 'noteForeign', 'noteInProgress', 'noteWide', 'noteTx',
+  'exactHeading', 'noteExact', 'noteExactOnly', 'noteExactThrough',
 ];
 
 module.exports = function registerBudgetExport(ctx) {
   const {
     S, app, plugin, money, toast, writeVaultFile, writeVaultBinary, fileAtVaultPath,
     currentPeriod, shiftPeriod, periodRange, periodMonthName, periodTitle, periodSummary, txInPeriod,
-    periodsForMonths, earliestDataMonth, budgetVsActualRows,
+    periodsForMonths, earliestDataMonth, budgetVsActualRows, categoryActualsInRange, txInRange, locale,
   } = ctx;
 
   /* The same two per-row helpers views/transactions.js builds for its own
@@ -78,7 +79,7 @@ module.exports = function registerBudgetExport(ctx) {
   /* {period}, {income} … survive as literal placeholders: budget-export.js
      fills them itself, per period and per note. Passing each name as its own
      value is what stops i18n.t() from consuming them first. */
-  const KEEP = { type: '{type}', list: '{list}', period: '{period}', income: '{income}', spend: '{spend}', uncat: '{uncat}' };
+  const KEEP = { from: '{from}', to: '{to}', pfrom: '{pfrom}', pto: '{pto}', through: '{through}', type: '{type}', list: '{list}', period: '{period}', income: '{income}', spend: '{spend}', uncat: '{uncat}' };
   const docLabels = () => {
     const out = {};
     for (const k of DOC_LABEL_KEYS) out[k] = i18n.t(`bx.doc.${k}`, KEEP);
@@ -109,7 +110,24 @@ module.exports = function registerBudgetExport(ctx) {
      is already in type-then-name order (load.js), the grouping the list draws. */
   const budgetExportCategories = () => S.categories.map(c => ({ name: c.name, type: c.type }));
 
+  /* `mode: 'dates'` is the tax-year / financial-year / custom range. A real
+     calendar date both ends, in order — dates.js's isRealIsoDate, because
+     "2026-02-30" matches the ISO shape and is not a day. */
+  const isDates = answer => answer.mode === 'dates';
+  const datesOk = answer => isRealIsoDate(answer.from) && isRealIsoDate(answer.to) && answer.from <= answer.to;
+
+  /* The ready-made ranges, from the household's own country profile: a ZA
+     vault is offered 1 Mar – end Feb, a UK one 6 Apr – 5 Apr, and a profile
+     with no rule gets calendar years only. */
+  const budgetExportPresets = () => datePresets({ today: todayIso(), taxYearRange: (locale() || {}).taxYearRange });
+
   function periodsFor(answer) {
+    if (isDates(answer)) {
+      return datesOk(answer) ? periodsEndingIn({
+        from: answer.from, to: answer.to, anchor: currentPeriod(),
+        shiftPeriod, periodRange, earliest: earliestDataMonth(),
+      }) : [];
+    }
     return exportPeriods({
       range: answer.range, includeCurrent: answer.includeCurrent, anchor: currentPeriod(),
       shiftPeriod, periodsForMonths,
@@ -127,10 +145,19 @@ module.exports = function registerBudgetExport(ctx) {
         key: p, name: periodMonthName(p), title: periodTitle(p), start, end,
         rows: budgetVsActualRows(p),
         summary: periodSummary(p),
-        txs: withRows && answer.includeTx ? txInPeriod(p) : [],
+        /* In date mode the transactions are the exact-date ones, gathered once
+           below — not each period's list, which would run past both ends. */
+        txs: withRows && answer.includeTx && !isDates(answer) ? txInPeriod(p) : [],
       };
     });
+    let exact = null;
+    if (isDates(answer) && datesOk(answer)) {
+      const { rows, through } = categoryActualsInRange(answer.from, answer.to);
+      exact = { from: answer.from, to: answer.to, through, rows,
+        txs: withRows && answer.includeTx ? txInRange(answer.from, through) : [] };
+    }
     return buildModel({
+      exact,
       periods, content: answer.content, categories: answer.categories, includeTx: answer.includeTx,
       generated: nowLocalMinute(), currency: (S.settings || {}).currency || '',
       inProgress: keys.includes(now) ? now : null,
@@ -143,8 +170,9 @@ module.exports = function registerBudgetExport(ctx) {
     if (answer.formats.includes('pdf')) out.push(paths.pdf);
     if (answer.formats.includes('xlsx')) out.push(paths.xlsx);
     if (answer.formats.includes('csv')) {
-      out.push(paths.csv.summary);
-      if (model.content === 'full') out.push(paths.csv.budget);
+      if (model.exact) out.push(paths.csv.exact);
+      if (!model.exact || model.periods.length) out.push(paths.csv.summary);
+      if (model.content === 'full' && model.budgets.length) out.push(paths.csv.budget);
       if (model.transactions) out.push(paths.csv.transactions);
     }
     return { paths, list: out };
@@ -159,10 +187,11 @@ module.exports = function registerBudgetExport(ctx) {
     /* Called on every keystroke in the folder field, and an "all" walk builds
        rows for every period the vault holds — so the model is kept for as long
        as the answers that shape it stand still. The folder is not one of them. */
-    const key = JSON.stringify([answer.range, answer.includeCurrent, answer.content, answer.categories, answer.includeTx]);
+    const key = JSON.stringify([answer.mode, answer.from, answer.to, answer.range, answer.includeCurrent, answer.content, answer.categories, answer.includeTx]);
     if (memo.key !== key) memo = { key, model: modelFor(answer, false) };
     const model = memo.model;
-    if (!model.periods.length) return { problem: i18n.t('bx.problem.noPeriods') };
+    if (isDates(answer) && !datesOk(answer)) return { problem: i18n.t('bx.problem.badDates') };
+    if (!isDates(answer) && !model.periods.length) return { problem: i18n.t('bx.problem.noPeriods') };
     if (answer.categories && !answer.categories.length) return { problem: i18n.t('bx.problem.noCats') };
     const { paths, list } = filesFor(answer, model);
     /* views/report.js's M1: a file written into Categories/, Accounts/,
@@ -173,9 +202,10 @@ module.exports = function registerBudgetExport(ctx) {
     const managed = managedFolderMatch(paths.dir, plugin.settings.budgetFolder);
     if (managed) return { problem: i18n.t('report.field.folderManaged', { folder: managed }) };
     if (inConfigDir(paths.dir)) return { problem: i18n.t('bx.problem.configDir', { folder: configDir() }) };
-    if (!model.summary.rows.length) return { problem: i18n.t('bx.problem.noRows') };
+    const catCount = Math.max(model.summary.rows.length, model.exact ? model.exact.rows.length : 0);
+    if (!catCount) return { problem: i18n.t('bx.problem.noRows') };
     return {
-      what: i18n.t('bx.preview', { count: model.periods.length, range: model.rangeLabel, cats: model.summary.rows.length }),
+      what: i18n.t(model.exact ? 'bx.previewDates' : 'bx.preview', { count: model.periods.length, range: model.rangeLabel, cats: catCount }),
       files: list,
       /* An export REPLACES whatever is at its path — that is its contract, and
          what someone who just fixed a category and exported again wants. It is
@@ -254,6 +284,7 @@ module.exports = function registerBudgetExport(ctx) {
       state: remembered,
       defaultFolder: plugin.settings.exportFolder || 'Exports',
       categories: budgetExportCategories(),
+      presets: budgetExportPresets(),
       describe,
     });
     if (!answer) return;                       // cancelled — say nothing, do nothing
@@ -277,6 +308,11 @@ module.exports = function registerBudgetExport(ctx) {
        is deliberately NOT remembered: categories come and go between exports,
        and a stale tick list silently narrows next month's file. */
     plugin.settings.budgetExport = {
+      /* A preset is remembered by NAME and re-resolved next time against that
+         day's date; only a custom range is remembered as dates. */
+      mode: answer.mode, preset: answer.preset,
+      from: answer.preset === 'custom' ? answer.from : undefined,
+      to: answer.preset === 'custom' ? answer.to : undefined,
       range: answer.range, includeCurrent: answer.includeCurrent, content: answer.content,
       includeTx: answer.includeTx, formats: answer.formats, folder: answer.folder,
     };
@@ -317,5 +353,5 @@ module.exports = function registerBudgetExport(ctx) {
     }
   }
 
-  ctx.provide({ exportBudget, runBudgetExport, describeBudgetExport: describe, budgetExportCategories });
+  ctx.provide({ exportBudget, runBudgetExport, describeBudgetExport: describe, budgetExportCategories, budgetExportPresets });
 };

@@ -41,7 +41,19 @@ class BudgetExportModal extends Modal {
     this.resolve = resolve;
     this.submitted = false;
     const s = opts.state || {};
+    /* Last tax year is the default date range: it is the one a return, an
+       accountant or a loan application asks for, and it is COMPLETE — "this
+       tax year" is a part-year for eleven months out of twelve. A remembered
+       custom range comes back as typed; a remembered preset is re-resolved
+       against today, so "last tax year" chosen in 2026 means 2026/27 in 2027
+       instead of silently staying a year behind. */
+    const presets = opts.presets || [];
+    const remembered = presets.find(p => p.key === s.preset);
+    const fallback = presets.find(p => p.key === 'taxLast') || presets.find(p => p.key === 'calLast') || presets[0] || {};
+    const chosen = s.preset === 'custom' && s.from && s.to ? { key: 'custom', from: s.from, to: s.to } : (remembered || fallback);
     this.state = {
+      mode: s.mode === 'dates' ? 'dates' : 'months',
+      preset: chosen.key || 'custom', from: chosen.from || '', to: chosen.to || '',
       range: RANGE_KEYS.includes(String(s.range)) ? String(s.range) : '3',
       includeCurrent: s.includeCurrent !== false,
       content: s.content === 'summary' ? 'summary' : 'full',
@@ -69,6 +81,7 @@ class BudgetExportModal extends Modal {
   answer() {
     const s = this.state;
     return {
+      mode: s.mode, preset: s.preset, from: s.from, to: s.to,
       range: s.range, includeCurrent: s.includeCurrent, content: s.content,
       /* Every box ticked IS "all categories": handing back the full list would
          stamp "(selected categories)" on the file name and a filter caveat on
@@ -108,11 +121,18 @@ class BudgetExportModal extends Modal {
     const scroll = c.scrollTop;
     c.empty();
 
-    c.append(this.field(i18n.t('bx.range'), null, this.pills(i18n.t('bx.range'),
-      RANGE_KEYS.map(k => ({ key: k, label: i18n.t(`bx.range.${k}`) })),
-      k => s.range === k, k => { s.range = k; })));
-    new Setting(c).setName(i18n.t('bx.includeCurrent')).setDesc(i18n.t('bx.includeCurrent.desc'))
-      .addToggle(tg => tg.setValue(s.includeCurrent).onChange(v => { s.includeCurrent = v; this.draw(); }));
+    c.append(this.field(i18n.t('bx.mode'), null, this.pills(i18n.t('bx.mode'),
+      [{ key: 'months', label: i18n.t('bx.mode.months') }, { key: 'dates', label: i18n.t('bx.mode.dates') }],
+      k => s.mode === k, k => { s.mode = k; })));
+    if (s.mode === 'dates') {
+      c.append(this.dateRange());
+    } else {
+      c.append(this.field(i18n.t('bx.range'), null, this.pills(i18n.t('bx.range'),
+        RANGE_KEYS.map(k => ({ key: k, label: i18n.t(`bx.range.${k}`) })),
+        k => s.range === k, k => { s.range = k; })));
+      new Setting(c).setName(i18n.t('bx.includeCurrent')).setDesc(i18n.t('bx.includeCurrent.desc'))
+        .addToggle(tg => tg.setValue(s.includeCurrent).onChange(v => { s.includeCurrent = v; this.draw(); }));
+    }
 
     c.append(this.field(i18n.t('bx.content'), i18n.t(`bx.content.${s.content}.desc`), this.pills(i18n.t('bx.content'),
       [{ key: 'full', label: i18n.t('bx.content.full') }, { key: 'summary', label: i18n.t('bx.content.summary') }],
@@ -150,6 +170,50 @@ class BudgetExportModal extends Modal {
     buttons.settingEl.classList.add('budget-export-actions');
     this.drawPreview();
     c.scrollTop = scroll;
+  }
+
+  /* Presets from the household's own country profile, then the two dates
+     themselves — always shown and always editable, so a preset is a way of
+     FILLING the fields rather than a second, hidden source of truth: what is
+     exported is what the two fields say. Typing in either one is what
+     "Custom" means, so it lights by itself.
+
+     Native <input type="date">: the platform's own picker and no soft
+     keyboard on a phone (dom.js's dateInput makes the same choice). Created
+     once and re-attached, like the folder field, so a redraw never takes the
+     picker away mid-choice. */
+  dateRange() {
+    const s = this.state;
+    const presets = this.opts.presets || [];
+    const wrap = el('div', {});
+    wrap.append(this.field(i18n.t('bx.mode.dates'), null, this.pills(i18n.t('bx.mode.dates'),
+      [...presets.map(p => ({ key: p.key, label: i18n.t(`bx.preset.${p.key}`) })), { key: 'custom', label: i18n.t('bx.preset.custom') }],
+      k => s.preset === k,
+      k => {
+        s.preset = k;
+        const p = presets.find(x => x.key === k);
+        if (p) { s.from = p.from; s.to = p.to; }
+      })));
+    if (!this.dateInputs) {
+      const make = key => {
+        const input = el('input', { type: 'date', class: 'budget-export-date', 'aria-label': i18n.t(`bx.dates.${key}`) });
+        const onEdit = () => {
+          s[key] = input.value;
+          if (s.preset !== 'custom') { s.preset = 'custom'; this.draw(); } else this.drawPreview();
+        };
+        input.addEventListener('change', onEdit);
+        input.addEventListener('input', onEdit);
+        return input;
+      };
+      this.dateInputs = { from: make('from'), to: make('to') };
+    }
+    this.dateInputs.from.value = s.from;
+    this.dateInputs.to.value = s.to;
+    wrap.append(el('div', { class: 'budget-export-dates' },
+      el('label', { class: 'budget-export-date-field' }, el('span', {}, i18n.t('bx.dates.from')), this.dateInputs.from),
+      el('label', { class: 'budget-export-date-field' }, el('span', {}, i18n.t('bx.dates.to')), this.dateInputs.to)));
+    wrap.append(el('div', { class: 'budget-export-desc budget-export-dates-desc' }, i18n.t('bx.dates.desc')));
+    return wrap;
   }
 
   checklist() {

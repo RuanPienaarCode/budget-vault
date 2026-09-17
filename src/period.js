@@ -546,6 +546,10 @@ module.exports = function registerPeriod(ctx) {
        window the same way movedToFunds does, rather than keeping a second
        copy of "as of today" that can drift from this one again. */
     periodWindowAsOf, txInRange,
+    /* Published for figures.js's categoryActualsInRange — the budget export's
+       exact-date window reads the SAME tally periodSummary does, rather than a
+       second walk over the ledger. */
+    summaryInRange,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,

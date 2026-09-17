@@ -23,7 +23,7 @@ const STRING_KEYS = ['label', 'currency', 'thousands', 'decimal', 'authority', '
 const NULLABLE_KEYS = ['banks', 'importHint'];   // must be PRESENT, may be null (za importHint / eu banks)
 const BOOL_KEYS = ['dayFirst'];
 const ARRAY_KEYS = ['deadlineLabels', 'taxpayerTypes', 'assessments'];
-const FN_KEYS = ['yearSpan', 'currentTaxYear', 'seedDeadlines', 'activeDeadline', 'seasonMsgs', 'seedSteps', 'seedDocs', 'figureChecks'];
+const FN_KEYS = ['yearSpan', 'taxYearRange', 'currentTaxYear', 'seedDeadlines', 'activeDeadline', 'seasonMsgs', 'seedSteps', 'seedDocs', 'figureChecks'];
 const ENUM_KEYS = {
   defaultTaxpayerType: ['provisional', 'standard', 'unknown'],
   // 'assessed' is a terminal state no profile defaults to, but the enum must
@@ -236,4 +236,27 @@ assert.strictEqual(localeFor('ZA '), PROFILES.za, 'localeFor is case/space-insen
 }
 
 if (failures) { console.error(`\nFAIL — ${failures} profile issue(s) above.`); process.exit(1); }
+/* taxYearRange is yearSpan as DATES — the budget export selects a tax year by
+   it. The label and the range are one fact kept twice, so they are compared:
+   consecutive years must tile the calendar with no gap and no overlap (a gap
+   is a day of income in no tax year; an overlap is one in two), and the span's
+   own day numbers must appear in its label. */
+{
+  const next = iso => { const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8) + 1)); return d.toISOString().slice(0, 10); };
+  for (const [code, p] of Object.entries(PROFILES)) {
+    assert.strictEqual(typeof p.taxYearRange, 'function', `${code}: taxYearRange missing`);
+    for (const y of [2024, 2025, 2026, 2027, 2028]) {
+      const a = p.taxYearRange(y), b = p.taxYearRange(y + 1);
+      assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(a.start) && /^\d{4}-\d{2}-\d{2}$/.test(a.end) && a.start < a.end, `${code} ${y}: a real ISO range`);
+      assert.strictEqual(next(a.end), b.start, `${code}: tax year ${y} ends the day before ${y + 1} starts — no gap, no overlap`);
+      const label = p.yearSpan(y);
+      assert.ok(label.includes(a.end.slice(0, 4)), `${code} ${y}: the label names the year the range ends in (${label} vs ${a.end})`);
+      const startDay = String(+a.start.slice(8));
+      if (/^\d/.test(label)) assert.ok(label.startsWith(startDay + ' '), `${code} ${y}: label "${label}" starts on day ${startDay}, as the range does`);
+    }
+  }
+  assert.strictEqual(PROFILES.za.taxYearRange(2028).end, '2028-02-29', 'za: a leap February ends on the 29th');
+  assert.strictEqual(PROFILES.za.taxYearRange(2100).end, '2100-02-28', 'za: and 2100 is not a leap year');
+}
+
 console.log(`PASS — all ${Object.keys(PROFILES).length} country profiles carry the full key set the views read.`);
