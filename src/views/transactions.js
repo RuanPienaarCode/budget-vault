@@ -1002,12 +1002,12 @@ module.exports = function registerTransactions(ctx) {
   // filteredRows, published for the same reason syncOptions is above: so a
   // test can drive the REAL row-ordering function instead of a hand-written
   // mirror of its sort (tests/transactions-sort-order.test.cjs).
-  /* unsplitTransaction alongside its sibling: splitTransaction and
-     deleteTransaction are both published so a test can drive the REAL function,
-     and the reversal of a split deserves that no less than the split. Checked
+  /* deleteTransaction is published alongside splitTransaction so a test can
+     drive the REAL function. unsplitTransaction stays internal-only: no test
+     ever exercised it through ctx, so it never earned a place here. Checked
      against the flat namespace before publishing — ctx.provide throws at mount
      on a collision, so a name only fails on the device. */
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
-    unsplitTransaction, deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
+    deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
     exportTransactions, syncOptions, filteredRows });
 };

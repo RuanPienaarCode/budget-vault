@@ -61,9 +61,6 @@ function passthroughPairs(rows) {
   return drop;
 }
 
-/* The stamps a lens may drop on, in the order the former walks applied them. */
-const STAMPS = Object.freeze(['excluded', 'nonBudget', 'foreign', 'earmarkedOut', 'transfer', 'passthrough', 'splitParent', 'splitPart']);
-
 /* Stamp every row once.
 
    env:
@@ -262,4 +259,4 @@ function lensDifference(stamped, a, b) {
   return out;
 }
 
-module.exports = { stamp, tally, LENSES, STAMPS, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf };
+module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf };

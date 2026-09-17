@@ -181,16 +181,14 @@ module.exports = {
   'wiz.folder.willCreate': '„{folder}“ existiert noch nicht — der Ordner wird für dich angelegt.',
   'wiz.folder.name': 'Budget-Ordner',
   'wiz.folder.desc': 'Wo die Kategorien, Konten, Budgets und Transaktionen liegen.',
-  'wiz.folder.notVault': 'Ein Ordner in diesem Vault — kein eigener Vault. Ihn mit „Open folder as vault“ zu öffnen, blendet das Plugin aus.',
+  'wiz.folder.notVault': 'Ein Ordner in diesem Vault — kein eigener Vault. Ihn als eigenen Vault zu öffnen, blendet das Plugin aus.',
   'wiz.folder.connected': 'Bestehendes Budget in "{folder}" gefunden — es wird verbunden, statt neue Dateien anzulegen. Deine Kategorien, Konten und Transaktionen bleiben genau wie sie sind; nur die Einstellungen auf diesem Bildschirm werden in die Settings.md geschrieben.',
-  'wiz.how.name': 'Wie trägst du deine Ausgaben ein?',
   'wiz.how.desc': 'Du kannst das später in den Einstellungen ändern.',
   'wiz.how.csv.title': 'Kontoauszüge importieren (CSV)',
   'wiz.how.csv.desc': 'Lade eine CSV bei deiner Bank herunter, und die App sortiert sie in Kategorien, während du es ihr beibringst.',
   'wiz.how.manual.title': 'Selbst eintippen',
   'wiz.how.manual.desc': 'Keine Bankdateien — du trägst Einnahmen und Ausgaben von Hand ein, Zeile für Zeile. Der einfachste Anfang.',
 
-  'wiz.rates.name': 'Halten Sie Geld in mehr als einer Währung?',
   'wiz.rates.desc': 'Antworten Sie nur mit Ja, wenn einige Ihrer Konten in einer anderen Währung als {symbol} geführt werden. Dies ist der einzige Teil des Plugins, der das Internet nutzt.',
   'wiz.rates.off.title': 'Nein, oder jetzt nicht',
   'wiz.rates.off.desc': 'Es wird nichts abgerufen und nichts verlässt Ihr Gerät. Konten in einer anderen Währung werden weiterhin aufgeführt — ihre Summen werden nur getrennt angezeigt statt hinzugerechnet. Sie können dies später in den Einstellungen aktivieren.',
@@ -414,7 +412,6 @@ module.exports = {
   },
   'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
 
-
   /* =========================== Transactions page ========================== */
   'tx.wholeHistory': 'Gesamte Historie',
   'tx.allAccounts': 'Alle Konten',
@@ -433,7 +430,6 @@ module.exports = {
   'tx.col.amount': 'Betrag',
   'tx.col.excl': 'Ausg. Budget',
   'tx.col.note': 'Notiz',
-  'tx.col.split': 'Aufteilen',
   'tx.col.actions': 'Zeilenaktionen',
 
   'tx.aria.category': 'Kategorie für {date} {desc}',
@@ -561,7 +557,6 @@ module.exports = {
     other: '{count} Zeilen und {cats} Kategorien nach {path}/ exportiert',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Bankkonten',
   'acct.group.savings': 'Sparen',
@@ -637,37 +632,19 @@ module.exports = {
   'acct.budget.on': '{name} zählt wieder zum Budget',
   'acct.budget.off': '{name} zählt nicht mehr zu den Budgetsummen',
 
-  'acct.creditUsed': 'Kredit genutzt',
-  'acct.creditOf': '{used} von {limit}',
   'acct.overLimit': '{amount} über dem Rahmen',
-  'acct.utilised': '{pct}% genutzt · {available} verfügbar',
 
-  'acct.kpi.inCredit': 'Im Haben',
-  'acct.kpi.overdrawn': 'Überzogen',
-  'acct.kpi.netWorth': 'Nettovermögen',
-  'acct.kpi.netWorthNote': 'nur über diese Konten',
   'acct.kpi.attention': 'Braucht Aufmerksamkeit',
-  'acct.kpi.attentionNote': 'unbestätigte oder nicht übereinstimmende Kontostände',
-  'acct.kpi.allGood': 'jeder Kontostand stimmt',
 
   'acct.aria.showTx': 'Transaktionen von {name} anzeigen',
   'acct.aria.balance': 'Kontostand von {name}, {amount} — zum Aktualisieren klicken',
-  'acct.limitSuffix': ' · Rahmen {amount}',
-  'acct.monthlySuffix': ' · {amount}/Mon.',
 
   'acct.badge.notInBudget': 'nicht im Budget',
   'acct.badge.noTx': 'keine Transaktionen',
   'acct.badge.asOf': 'Stand {date}',
   'acct.badge.currencyClash': 'wird als {code} gelesen, nicht als {symbol}',
   'acct.drawer.currencyClash': 'Währungskonflikt',
-  'acct.badge.neverConfirmed': 'nie bestätigt',
-  'acct.badge.unconfirmed': { one: 'seit {count} Tag unbestätigt', other: 'seit {count} Tagen unbestätigt' },
 
-  'acct.act.in': ' rein · ',
-  'acct.act.out': ' raus · ',
-  'acct.act.count': { one: '{count} Transaktion im {month}', other: '{count} Transaktionen im {month}' },
-
-  'acct.recon.since': { one: '{count} Transaktion seitdem · ergibt zusammen ', other: '{count} Transaktionen seitdem · ergeben zusammen ' },
   'acct.recon.pending': {
     one: ' · {count} in der Zukunft datiert, noch nicht gezählt',
     other: ' · {count} in der Zukunft datiert, noch nicht gezählt',
@@ -675,12 +652,8 @@ module.exports = {
   'acct.recon.undatable': { one: ' · {count} Transaktion mit einem Datum, das diese App nicht lesen kann — in keinem der beiden Zeitfenster', other: ' · {count} Transaktionen mit Daten, die diese App nicht lesen kann — in keinem der beiden Zeitfenster' },
   'acct.recon.useThis': 'Übernehmen',
   'acct.aria.useThis': 'Kontostand von {name} auf {amount} setzen',
-  'acct.recon.matches': 'Passt zu deinen Transaktionen',
   'acct.recon.upToDate': { one: 'Aktuell · {count} Transaktion in der Zukunft datiert', other: 'Aktuell · {count} Transaktionen in der Zukunft datiert' },
-  'acct.recon.setDate': 'Setze ein Kontostandsdatum, um dies gegen deine Transaktionen zu prüfen',
 
-  'acct.foot.updated': 'aktualisiert {date}',
-  'acct.foot.noDate': 'kein Kontostandsdatum',
   'acct.aria.exclude': '{name} nicht mehr zu den Budgetsummen zählen',
   'acct.aria.include': '{name} wieder zu den Budgetsummen zählen',
   'acct.btn.exclude': 'Aus Budget ausschließen',
@@ -733,7 +706,6 @@ module.exports = {
     one: '{count} Kontodatei in einem Unterordner von Accounts/ wird nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',
     other: '{count} Kontodateien in Unterordnern von Accounts/ werden nicht gelesen ({names}). Verschieben Sie sie direkt nach Accounts/, um sie einzubeziehen.',
   },
-  'acct.hero.mixed': ' Diese Summe addiert Konten in mehr als einer Währung ({symbols}), ohne sie umzurechnen.',
   'acct.hero.converted': ' Zuzüglich {list} — oben umgerechnet zu Kursen vom {date}.',
   'acct.hero.convertedTotal': 'Umgerechnete Summe {amount}',
   'acct.hero.convertedStale': ' Zuzüglich {list} — oben umgerechnet zu Kursen vom {date}, {days} Tage alt.',
@@ -757,7 +729,6 @@ module.exports = {
   'settings.rateRefresh.weekly': 'Wöchentlich',
   'settings.rateRefresh.monthly': 'Monatlich',
 
-  'acct.mixedTitle': 'Addiert Konten in mehr als einer Währung, ohne sie umzurechnen.',
   'acct.hero.count': 'Konten',
   'acct.hero.oldest': 'Älteste Bestätigung',
   'acct.hero.oldestDays': { one: '{count} Tag', other: '{count} Tage' },
@@ -774,12 +745,10 @@ module.exports = {
   'acct.where.excluded': '{amount} aus der Summe oben ausgeschlossen.',
 
   'acct.deck.title': { one: 'Ein Konto braucht eine Entscheidung', other: '{count} Konten brauchen eine Entscheidung' },
-  'acct.deck.sub': 'Alles andere auf dieser Seite stimmt mit deinen Transaktionen überein.',
   'acct.deck.clear': 'Alles stimmt mit deinen Transaktionen überein',
   'acct.deck.clearSub': 'Auf dieser Seite ist heute nichts zu entscheiden.',
   'acct.deck.review': 'Ansehen',
   'acct.deck.ariaReview': 'Die Zeile {name} unten öffnen',
-  'acct.deck.more': { one: '{count} weiteres Konto — alle in der Tabelle zeigen', other: '{count} weitere Konten — alle in der Tabelle zeigen' },
   'acct.deck.why.drift': { one: '{count} Transaktion seit der letzten Bestätigung ergibt {implied}, nicht {stated}', other: '{count} Transaktionen seit der letzten Bestätigung ergeben {implied}, nicht {stated}' },
   'acct.deck.why.unreadable': { one: '{count} Transaktion trägt ein Datum, das diese App nicht lesen kann — der Kontostand lässt sich nicht dagegen prüfen', other: '{count} Transaktionen tragen Daten, die diese App nicht lesen kann — der Kontostand lässt sich nicht dagegen prüfen' },
   'acct.deck.why.stale': { one: 'Seit {count} Tag unbestätigt — zuletzt geprüft am {date}', other: 'Seit {count} Tagen unbestätigt — zuletzt geprüft am {date}' },
@@ -869,13 +838,11 @@ module.exports = {
   'acct.drawer.ahead': 'Noch ausstehend',
   'acct.drawer.aheadRows': { one: '{count} Buchung mit späterem Datum in dieser Periode', other: '{count} Buchungen mit späterem Datum in dieser Periode', },
   'acct.drawer.folder': 'Transaktionsordner',
-  'acct.drawer.noFolder': 'keiner verknüpft',
   'acct.drawer.inBudget': 'Zählt zum Budget',
   'acct.drawer.yes': 'Ja',
   'acct.drawer.no': 'Nein',
   'acct.btn.seeTx': 'Transaktionen ansehen',
   'acct.btn.editBalance': 'Saldo bearbeiten',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': 'Budget-Ordner nicht gefunden',
@@ -1152,7 +1119,6 @@ module.exports = {
   'score.ring.showAll': 'Alle fünf Teile zeigen',
   'score.ring.hint': 'Tippe auf einen Teil, um ihn für sich zu sehen.',
   'score.gap.railAria': '{name}: {points} von {max} Punkten erreicht.',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Geld übrig in diesem Zeitraum',

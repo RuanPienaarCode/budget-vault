@@ -15,10 +15,10 @@
                  rate lookup would be a page that goes blank when the wifi
                  does. First render after load shows the un-converted split;
                  refreshRates() then fills the cache and asks for a redraw.
-     fxState()   { on, table, stale, date, age } — everything a view needs to
-                 decide what to print AND what to say about it, in one call,
-                 so no view can print a converted figure while forgetting its
-                 provenance. */
+     fxConvert() bundles the provenance a view needs to print alongside a
+                 converted figure ({ stale, date, age, ... }) into the same
+                 call that does the conversion, so no view can print one
+                 without the other. */
 
 const fx = require('./fx');
 const { fetchRates, readCachedRates } = require('./fx-fetch');
@@ -45,12 +45,6 @@ module.exports = function registerFxLive(ctx) {
   });
 
   function fxTable() { return enabled() ? table : null; }
-
-  function fxState() {
-    const t = fxTable();
-    const { age, stale } = fx.stalenessOf(t, todayIso());
-    return { on: !!t, table: t, stale, age, date: (t && t.date) || '' };
-  }
 
   /* Read the cache, then refresh from the network if the cached rates are
      stale (or absent). Returns whether anything CHANGED, so the caller can
@@ -93,5 +87,5 @@ module.exports = function registerFxLive(ctx) {
     return fx.convertAccounts(accounts, household(), t, todayIso());
   }
 
-  ctx.provide({ fxTable, fxState, refreshRates, fxConvert });
+  ctx.provide({ fxTable, refreshRates, fxConvert });
 };

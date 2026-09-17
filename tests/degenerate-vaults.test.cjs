@@ -639,8 +639,8 @@ async function runNegativeControls() {
      balance) but never reached by the calendar walk that builds the points. */
   {
     revert(dir, 'savings-math.js',
-      "const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : '');",
-      "const monthOf = iso => (ISO_DATE.test(iso || '') ? String(iso).slice(0, 7) : '');");
+      "const monthOf = iso => (isRealIsoDate(iso) ? String(iso).slice(0, 7) : UNDATABLE);",
+      "const monthOf = iso => (ISO_DATE.test(iso || '') ? String(iso).slice(0, 7) : UNDATABLE);");
     delete require.cache[require.resolve(path.join(dir, 'savings-math.js'))];
     const acct = { name: 'Fund', type: 'investment', balance: 10500, starting_amount: 10000, inception_date: '2025-01-01' };
     const rows = [

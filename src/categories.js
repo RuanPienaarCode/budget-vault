@@ -125,14 +125,6 @@ module.exports = function registerCategories(ctx) {
     sel.addEventListener('focus', refresh);
     sel.addEventListener('keydown', refresh);
   }
-  function catSelect(current, onchange, label) {
-    const sel = el('select', { class: 'category-select', ...(label ? { 'aria-label': label } : {}) });
-    fillCatOptions(sel, current);
-    let builtVersion = catsVersion;
-    refreshOnOpen(sel, () => builtVersion, v => builtVersion = v);
-    wireCatChange(sel, current, onchange);
-    return sel;
-  }
   /* Lazy variant for large lists (Transactions table, CSV import review):
      starts with just the current value and builds the full list on first
      open — version 0 forces that initial build through the same path. */
@@ -383,6 +375,6 @@ module.exports = function registerCategories(ctx) {
     return drop.size;
   }
 
-  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, catSelect, lazyCatSelect, deferredCatSelect,
+  ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, lazyCatSelect, deferredCatSelect,
     learnRules, governingRule, correctRule, cleanupRules });
 };

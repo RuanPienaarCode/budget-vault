@@ -182,16 +182,14 @@ module.exports = {
   'wiz.folder.willCreate': '「{folder}」はまだ存在しません — こちらで作成します。',
   'wiz.folder.name': '予算フォルダ',
   'wiz.folder.desc': 'カテゴリ、口座、予算、取引を保管する場所です。',
-  'wiz.folder.notVault': 'このVault内のフォルダであり、独立したVaultではありません。「Open folder as vault」で開くとプラグインが表示されなくなります。',
+  'wiz.folder.notVault': 'このVault内のフォルダであり、独立したVaultではありません。これを独立したVaultとして開くと、プラグインが表示されなくなります。',
   'wiz.folder.connected': '"{folder}" に既存の予算が見つかりました — 新しくファイルを作らず、こちらに接続します。カテゴリ・口座・取引はそのままです。この画面の設定だけが Settings.md に書き込まれます。',
-  'wiz.how.name': '支出はどうやって記録しますか？',
   'wiz.how.desc': 'あとから設定で変更できます。',
   'wiz.how.csv.title': '銀行明細（CSV）を取り込む',
   'wiz.how.csv.desc': '銀行から CSV をダウンロードすると、教えるほどアプリが自動でカテゴリに仕分けします。',
   'wiz.how.manual.title': '自分で入力する',
   'wiz.how.manual.desc': '銀行ファイルは不要 — 収入と支出を 1 行ずつ手で追加します。いちばん手軽な始め方です。',
 
-  'wiz.rates.name': '複数の通貨で資産を持っていますか？',
   'wiz.rates.desc': '口座の一部が {symbol} 以外の通貨である場合にのみ「はい」を選んでください。プラグインでインターネットを使うのはこの機能だけです。',
   'wiz.rates.off.title': 'いいえ、または今はしない',
   'wiz.rates.off.desc': '何も取得せず、端末から何も送信されません。他の通貨の口座も引き続き一覧に表示されます — 合計に足し込まず、別に表示するだけです。あとから設定で有効にできます。',
@@ -409,7 +407,6 @@ module.exports = {
   },
   'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
 
-
   /* =========================== Transactions page ========================== */
   'tx.wholeHistory': '全期間',
   'tx.allAccounts': 'すべての口座',
@@ -425,7 +422,6 @@ module.exports = {
   'tx.col.amount': '金額',
   'tx.col.excl': '予算除外',
   'tx.col.note': 'メモ',
-  'tx.col.split': '分割',
   'tx.col.actions': '行の操作',
 
   'tx.aria.category': '{date} {desc} のカテゴリ',
@@ -538,7 +534,6 @@ module.exports = {
     other: '{count} 行とカテゴリ {cats} 件を {path}/ に書き出しました',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': '銀行口座',
   'acct.group.savings': '貯蓄',
@@ -614,47 +609,25 @@ module.exports = {
   'acct.budget.on': '{name} を再び予算に含めます',
   'acct.budget.off': '{name} は予算の合計に含めなくなりました',
 
-  'acct.creditUsed': '利用額',
-  'acct.creditOf': '{limit} 中 {used}',
   'acct.overLimit': '限度額を {amount} 超過',
-  'acct.utilised': '{pct}% 利用 · 残り {available}',
 
-  'acct.kpi.inCredit': 'プラス残高',
-  'acct.kpi.overdrawn': 'マイナス残高',
-  'acct.kpi.netWorth': '純資産',
-  'acct.kpi.netWorthNote': 'これらの口座のみ',
   'acct.kpi.attention': '要確認',
-  'acct.kpi.attentionNote': '未確認または一致しない残高',
-  'acct.kpi.allGood': 'すべての残高が一致しています',
 
   'acct.aria.showTx': '{name} の取引を表示',
   'acct.aria.balance': '{name} の残高 {amount} — クリックして更新',
-  'acct.limitSuffix': ' · 限度額 {amount}',
-  'acct.monthlySuffix': ' · 月 {amount}',
 
   'acct.badge.notInBudget': '予算対象外',
   'acct.badge.noTx': '取引なし',
   'acct.badge.asOf': '{date} 時点',
   'acct.badge.currencyClash': '{symbol} ではなく {code} として読まれます',
   'acct.drawer.currencyClash': '通貨の不一致',
-  'acct.badge.neverConfirmed': '未確認',
-  'acct.badge.unconfirmed': { other: '{count} 日間未確認' },
 
-  'acct.act.in': ' 入金 · ',
-  'acct.act.out': ' 出金 · ',
-  'acct.act.count': { other: '{month} の取引 {count} 件' },
-
-  'acct.recon.since': { other: 'その後 {count} 件の取引 · 合計 ' },
   'acct.recon.pending': { other: ' · {count} 件は先の日付のため未計上' },
   'acct.recon.undatable': { other: ' · このアプリが読み取れない日付の取引が {count} 件、どちらの期間にも入りません' },
   'acct.recon.useThis': 'これを使う',
   'acct.aria.useThis': '{name} の残高を {amount} に設定',
-  'acct.recon.matches': '取引と一致しています',
   'acct.recon.upToDate': { other: '最新 · 先の日付の取引が {count} 件' },
-  'acct.recon.setDate': '残高の日付を設定すると、取引と照合できます',
 
-  'acct.foot.updated': '{date} に更新',
-  'acct.foot.noDate': '残高の日付なし',
   'acct.aria.exclude': '{name} を予算の合計に含めないようにする',
   'acct.aria.include': '{name} を再び予算の合計に含める',
   'acct.btn.exclude': '予算から除外',
@@ -701,7 +674,6 @@ module.exports = {
   'acct.ignoredFiles': {
     other: 'Accounts/ のサブフォルダにある {count} 件の口座ファイルは読み込まれていません（{names}）。Accounts/ 直下に移動すると含まれます。',
   },
-  'acct.hero.mixed': ' この合計は複数の通貨（{symbols}）で保有する口座を、換算せずに合算しています。',
   'acct.hero.converted': ' さらに {list} — 上の行で {date} のレートで換算。',
   'acct.hero.convertedTotal': '換算合計 {amount}',
   'acct.hero.convertedStale': ' さらに {list} — 上の行で {date} のレート（{days} 日前）で換算。',
@@ -709,7 +681,6 @@ module.exports = {
   'report.debt.otherCurrencies': ' ほかに他の通貨で{list}の負債があります（換算なし）。',
   'acct.hero.muted': '無視中の警告',
   'dash.foreignExcluded': {
-    one: '他の通貨の口座 {count} 件（{symbols}）はこれらの数値に含まれていません。',
     other: '他の通貨の口座 {count} 件（{symbols}）はこれらの数値に含まれていません。',
   },
 
@@ -725,7 +696,6 @@ module.exports = {
   'settings.rateRefresh.weekly': '毎週',
   'settings.rateRefresh.monthly': '毎月',
 
-  'acct.mixedTitle': '複数の通貨で保有する口座を、換算せずに合算しています。',
   'acct.hero.count': '口座数',
   'acct.hero.oldest': '最も古い残高確認',
   'acct.hero.oldestDays': { other: '{count} 日' },
@@ -742,12 +712,10 @@ module.exports = {
   'acct.where.excluded': '上の合計から {amount} が除外されています。',
 
   'acct.deck.title': { other: '{count} 件の口座に判断が必要です' },
-  'acct.deck.sub': 'このページのそれ以外は取引と一致しています。',
   'acct.deck.clear': 'すべて取引と一致しています',
   'acct.deck.clearSub': '今日このページで判断が必要なものはありません。',
   'acct.deck.review': '確認',
   'acct.deck.ariaReview': '下の {name} の行を開く',
-  'acct.deck.more': { other: '他に {count} 件 — 表ですべて表示' },
   'acct.deck.why.drift': { other: '前回確認以降の {count} 件の取引は {stated} ではなく {implied} を示しています' },
   'acct.deck.why.unreadable': { other: '{count} 件の取引に、このアプリが読み取れない日付が付いています — 残高をそれらと照合できません' },
   'acct.deck.why.stale': { other: '{count} 日間未確認 — 最終確認 {date}' },
@@ -837,13 +805,11 @@ module.exports = {
   'acct.drawer.ahead': 'これから',
   'acct.drawer.aheadRows': { other: 'この期間の後の日付の {count} 件', },
   'acct.drawer.folder': '取引フォルダー',
-  'acct.drawer.noFolder': '未設定',
   'acct.drawer.inBudget': '予算に含める',
   'acct.drawer.yes': 'はい',
   'acct.drawer.no': 'いいえ',
   'acct.btn.seeTx': '取引を見る',
   'acct.btn.editBalance': '残高を編集',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': '予算フォルダが見つかりません',
@@ -1101,7 +1067,6 @@ module.exports = {
   'score.ring.showAll': '5つの要素すべてを表示',
   'score.ring.hint': '部分をタップすると、それだけを表示します。',
   'score.gap.railAria': '{name}: {points} / {max} ポイント獲得。',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'この期間に残っているお金',

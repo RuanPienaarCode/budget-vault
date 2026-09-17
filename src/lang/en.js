@@ -197,9 +197,8 @@ module.exports = {
   'wiz.folder.willCreate': '"{folder}" doesn\'t exist yet — it will be created for you.',
   'wiz.folder.name': 'Budget folder',
   'wiz.folder.desc': 'Where the categories, accounts, budgets and transactions are kept.',
-  'wiz.folder.notVault': 'A folder inside this vault — not a vault of its own. Opening it with “Open folder as vault” hides the plugin.',
+  'wiz.folder.notVault': 'A folder inside this vault — not a vault of its own. Opening it as its own vault hides the plugin.',
   'wiz.folder.connected': 'Found an existing budget in "{folder}" — connecting to it instead of creating new files. Your categories, accounts and transactions are left exactly as they are; only the settings on this screen are written into its Settings.md.',
-  'wiz.how.name': 'How will you add your spending?',
   'wiz.how.desc': 'You can change this later in Settings.',
   'wiz.how.csv.title': 'Import bank statements (CSV)',
   'wiz.how.csv.desc': 'Download a CSV from your bank and the app sorts it into categories as you teach it.',
@@ -212,7 +211,6 @@ module.exports = {
      someone's financial vault is not a default anybody gets to choose for
      them. "Not now" is offered first and is the answer if the wizard is
      closed. */
-  'wiz.rates.name': 'Do you hold money in more than one currency?',
   'wiz.rates.desc': 'Only answer yes if some of your accounts are in a different currency from {symbol}. This is the only part of the plugin that uses the internet.',
   'wiz.rates.off.title': 'No, or not now',
   'wiz.rates.off.desc': 'Nothing is fetched and nothing leaves your device. Accounts in another currency are still listed — their totals are just shown separately instead of added in. You can turn this on later in Settings.',
@@ -470,7 +468,6 @@ module.exports = {
   'tx.col.amount': 'Amount',
   'tx.col.excl': 'Excl. budget',
   'tx.col.note': 'Note',
-  'tx.col.split': 'Split',
   'tx.col.actions': 'Row actions',
 
   'tx.aria.category': 'Category for {date} {desc}',
@@ -609,7 +606,6 @@ module.exports = {
     other: 'Exported {count} rows and {cats} categories to {path}/',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Bank accounts',
   'acct.group.savings': 'Savings',
@@ -685,37 +681,19 @@ module.exports = {
   'acct.budget.on': '{name} counts toward the budget again',
   'acct.budget.off': '{name} no longer counts toward budget totals',
 
-  'acct.creditUsed': 'Credit used',
-  'acct.creditOf': '{used} of {limit}',
   'acct.overLimit': 'Over limit by {amount}',
-  'acct.utilised': '{pct}% used · {available} available',
 
-  'acct.kpi.inCredit': 'In credit',
-  'acct.kpi.overdrawn': 'Overdrawn',
-  'acct.kpi.netWorth': 'Net worth',
-  'acct.kpi.netWorthNote': 'across these accounts only',
   'acct.kpi.attention': 'Needs attention',
-  'acct.kpi.attentionNote': 'balances unconfirmed or not matching',
-  'acct.kpi.allGood': 'every balance checks out',
 
   'acct.aria.showTx': 'Show {name} transactions',
   'acct.aria.balance': 'Balance for {name}, {amount} — click to update',
-  'acct.limitSuffix': ' · limit {amount}',
-  'acct.monthlySuffix': ' · {amount}/m',
 
   'acct.badge.notInBudget': 'not in budget',
   'acct.badge.noTx': 'no transactions',
   'acct.badge.asOf': 'as of {date}',
   'acct.badge.currencyClash': 'reads as {code}, not {symbol}',
   'acct.drawer.currencyClash': 'Currency conflict',
-  'acct.badge.neverConfirmed': 'never confirmed',
-  'acct.badge.unconfirmed': { one: 'unconfirmed {count} day', other: 'unconfirmed {count} days' },
 
-  'acct.act.in': ' in · ',
-  'acct.act.out': ' out · ',
-  'acct.act.count': { one: '{count} transaction in {month}', other: '{count} transactions in {month}' },
-
-  'acct.recon.since': { one: '{count} transaction since · they add up to ', other: '{count} transactions since · they add up to ' },
   'acct.recon.pending': {
     one: ' · {count} dated ahead, not counted yet',
     other: ' · {count} dated ahead, not counted yet',
@@ -723,12 +701,8 @@ module.exports = {
   'acct.recon.undatable': { one: ' · {count} transaction carrying a date this app cannot read, in neither window', other: ' · {count} transactions carrying dates this app cannot read, in neither window' },
   'acct.recon.useThis': 'Use this',
   'acct.aria.useThis': 'Set {name} balance to {amount}',
-  'acct.recon.matches': 'Matches your transactions',
   'acct.recon.upToDate': { one: 'Up to date · {count} transaction dated ahead', other: 'Up to date · {count} transactions dated ahead' },
-  'acct.recon.setDate': 'Set a balance date to check this against your transactions',
 
-  'acct.foot.updated': 'updated {date}',
-  'acct.foot.noDate': 'no balance date',
   'acct.aria.exclude': 'Stop counting {name} toward budget totals',
   'acct.aria.include': 'Count {name} toward budget totals again',
   'acct.btn.exclude': 'Exclude from budget',
@@ -782,11 +756,6 @@ module.exports = {
     one: '{count} account file in a sub-folder of Accounts/ is not being read ({names}). Move it directly into Accounts/ to include it.',
     other: '{count} account files in sub-folders of Accounts/ are not being read ({names}). Move them directly into Accounts/ to include them.',
   },
-  /* ITEM 5: the hero itself no longer does this — its own total now sums only
-     the household's own currency (acct.hero.otherCurrencies, below, is what
-     it says instead). This key stays live for the Ring and the "Whose it is"
-     split, which still add every currency together and are unchanged. */
-  'acct.hero.mixed': ' This total adds accounts held in more than one currency ({symbols}) without converting them.',
   /* The provenance a converted figure must never appear without. currency.js
      refused conversion because "a rate is a fact about a day that this vault
      does not hold" — so the day travels with the number, and a rate old
@@ -824,7 +793,6 @@ module.exports = {
   'settings.rateRefresh.weekly': 'Weekly',
   'settings.rateRefresh.monthly': 'Monthly',
 
-  'acct.mixedTitle': 'Adds accounts held in more than one currency, without converting them.',
   'acct.hero.count': 'Accounts',
   'acct.hero.oldest': 'Oldest balance check',
   'acct.hero.oldestDays': { one: '{count} day', other: '{count} days' },
@@ -844,12 +812,10 @@ module.exports = {
 
   /* ---- the queue: the accounts that actually want a decision ---- */
   'acct.deck.title': { one: 'One account wants a decision', other: '{count} accounts want a decision' },
-  'acct.deck.sub': 'Everything else on this page agrees with your transactions.',
   'acct.deck.clear': 'Everything agrees with your transactions',
   'acct.deck.clearSub': 'Nothing on this page needs a decision today.',
   'acct.deck.review': 'Review',
   'acct.deck.ariaReview': 'Open the {name} row below',
-  'acct.deck.more': { one: '{count} more account — show them all in the table', other: '{count} more accounts — show them all in the table' },
   'acct.deck.why.drift': { one: '{count} transaction since you last confirmed implies {implied}, not {stated}', other: '{count} transactions since you last confirmed imply {implied}, not {stated}' },
   'acct.deck.why.unreadable': { one: '{count} transaction carries a date this app cannot read, so the balance cannot be checked against it', other: '{count} transactions carry dates this app cannot read, so the balance cannot be checked against them' },
   'acct.deck.why.stale': { one: 'Unconfirmed for {count} day — last checked {date}', other: 'Unconfirmed for {count} days — last checked {date}' },
@@ -943,13 +909,11 @@ module.exports = {
   'acct.drawer.ahead': 'Still to come',
   'acct.drawer.aheadRows': { one: '{count} transaction dated later this period', other: '{count} transactions dated later this period', },
   'acct.drawer.folder': 'Transactions folder',
-  'acct.drawer.noFolder': 'none linked',
   'acct.drawer.inBudget': 'Counts toward the budget',
   'acct.drawer.yes': 'Yes',
   'acct.drawer.no': 'No',
   'acct.btn.seeTx': 'See transactions',
   'acct.btn.editBalance': 'Edit balance',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': 'Budget folder not found',
@@ -1252,7 +1216,6 @@ module.exports = {
   'score.ring.showAll': 'Show all five parts',
   'score.ring.hint': 'Tap a part to see it on its own.',
   'score.gap.railAria': '{name}: {points} of {max} points earned.',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Money left this period',

@@ -180,16 +180,14 @@ module.exports = {
   'wiz.folder.willCreate': '"{folder}" bestaan nog nie — dit sal vir jou geskep word.',
   'wiz.folder.name': 'Begrotingsvouer',
   'wiz.folder.desc': 'Waar die kategorieë, rekeninge, begrotings en transaksies gehou word.',
-  'wiz.folder.notVault': '\'n Vouer binne hierdie kluis — nie \'n kluis op sy eie nie. Om dit met “Open folder as vault” oop te maak, versteek die inprop.',
+  'wiz.folder.notVault': '\'n Vouer binne hierdie kluis — nie \'n kluis op sy eie nie. Om dit as sy eie kluis oop te maak, versteek die inprop.',
   'wiz.folder.connected': 'Bestaande begroting in "{folder}" gevind — ons koppel daaraan in plaas daarvan om nuwe lêers te skep. Jou kategorieë, rekeninge en transaksies bly presies soos hulle is; net die instellings op hierdie skerm word na sy Settings.md geskryf.',
-  'wiz.how.name': 'Hoe gaan jy jou uitgawes byvoeg?',
   'wiz.how.desc': 'Jy kan dit later in Instellings verander.',
   'wiz.how.csv.title': 'Voer bankstate in (CSV)',
   'wiz.how.csv.desc': 'Laai \'n CSV by jou bank af en die program sorteer dit in kategorieë soos jy dit leer.',
   'wiz.how.manual.title': 'Tik dit self in',
   'wiz.how.manual.desc': 'Geen banklêers nie — jy voeg jou inkomste en uitgawes met die hand by, een reël op \'n slag. Die eenvoudigste manier om te begin.',
 
-  'wiz.rates.name': 'Hou jy geld in meer as een geldeenheid?',
   'wiz.rates.desc': 'Antwoord net ja as van jou rekeninge in \'n ander geldeenheid as {symbol} is. Dit is die enigste deel van die inprop wat die internet gebruik.',
   'wiz.rates.off.title': 'Nee, of nie nou nie',
   'wiz.rates.off.desc': 'Niks word gehaal nie en niks verlaat jou toestel nie. Rekeninge in \'n ander geldeenheid word steeds gelys — hulle totale word net apart gewys in plaas van bygetel. Jy kan dit later in Instellings aanskakel.',
@@ -413,7 +411,6 @@ module.exports = {
   },
   'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
 
-
   /* =========================== Transactions page ========================== */
   'tx.wholeHistory': 'Hele geskiedenis',
   'tx.allAccounts': 'Alle rekeninge',
@@ -432,7 +429,6 @@ module.exports = {
   'tx.col.amount': 'Bedrag',
   'tx.col.excl': 'Uitgesl. begr.',
   'tx.col.note': 'Nota',
-  'tx.col.split': 'Verdeel',
   'tx.col.actions': 'Ryaksies',
 
   'tx.aria.category': 'Kategorie vir {date} {desc}',
@@ -560,7 +556,6 @@ module.exports = {
     other: '{count} rye en {cats} kategorieë na {path}/ uitgevoer',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Bankrekeninge',
   'acct.group.savings': 'Spaargeld',
@@ -636,37 +631,19 @@ module.exports = {
   'acct.budget.on': '{name} tel weer by die begroting',
   'acct.budget.off': '{name} tel nie meer by begrotingstotale nie',
 
-  'acct.creditUsed': 'Krediet gebruik',
-  'acct.creditOf': '{used} van {limit}',
   'acct.overLimit': '{amount} oor die perk',
-  'acct.utilised': '{pct}% gebruik · {available} beskikbaar',
 
-  'acct.kpi.inCredit': 'In krediet',
-  'acct.kpi.overdrawn': 'Oortrokke',
-  'acct.kpi.netWorth': 'Netto waarde',
-  'acct.kpi.netWorthNote': 'net oor hierdie rekeninge',
   'acct.kpi.attention': 'Kort aandag',
-  'acct.kpi.attentionNote': 'onbevestigde of nie-ooreenstemmende saldo\'s',
-  'acct.kpi.allGood': 'elke saldo klop',
 
   'acct.aria.showTx': 'Wys {name} se transaksies',
   'acct.aria.balance': 'Saldo vir {name}, {amount} — klik om by te werk',
-  'acct.limitSuffix': ' · perk {amount}',
-  'acct.monthlySuffix': ' · {amount}/m',
 
   'acct.badge.notInBudget': 'nie in begroting nie',
   'acct.badge.noTx': 'geen transaksies',
   'acct.badge.asOf': 'soos op {date}',
   'acct.badge.currencyClash': 'lees as {code}, nie {symbol} nie',
   'acct.drawer.currencyClash': 'Valuta-konflik',
-  'acct.badge.neverConfirmed': 'nooit bevestig nie',
-  'acct.badge.unconfirmed': { one: 'onbevestig vir {count} dag', other: 'onbevestig vir {count} dae' },
 
-  'acct.act.in': ' in · ',
-  'acct.act.out': ' uit · ',
-  'acct.act.count': { one: '{count} transaksie in {month}', other: '{count} transaksies in {month}' },
-
-  'acct.recon.since': { one: '{count} transaksie sedertdien · tel op tot ', other: '{count} transaksies sedertdien · tel op tot ' },
   'acct.recon.pending': {
     one: ' · {count} vorentoe gedateer, nog nie getel nie',
     other: ' · {count} vorentoe gedateer, nog nie getel nie',
@@ -674,12 +651,8 @@ module.exports = {
   'acct.recon.undatable': { one: ' · {count} transaksie met \'n datum wat hierdie app nie kan lees nie, in geen van die twee vensters nie', other: ' · {count} transaksies met datums wat hierdie app nie kan lees nie, in geen van die twee vensters nie' },
   'acct.recon.useThis': 'Gebruik hierdie',
   'acct.aria.useThis': 'Stel {name} se saldo op {amount}',
-  'acct.recon.matches': 'Stem ooreen met jou transaksies',
   'acct.recon.upToDate': { one: 'Op datum · {count} transaksie met \'n toekomstige datum', other: 'Op datum · {count} transaksies met \'n toekomstige datum' },
-  'acct.recon.setDate': 'Stel \'n saldodatum om dit teen jou transaksies te toets',
 
-  'acct.foot.updated': 'bygewerk op {date}',
-  'acct.foot.noDate': 'geen saldodatum',
   'acct.aria.exclude': 'Hou op om {name} by begrotingstotale te tel',
   'acct.aria.include': 'Tel {name} weer by begrotingstotale',
   'acct.btn.exclude': 'Sluit uit begroting',
@@ -732,7 +705,6 @@ module.exports = {
     one: '{count} rekeninglêer in ’n subgids van Accounts/ word nie gelees nie ({names}). Skuif dit direk na Accounts/ om dit in te sluit.',
     other: '{count} rekeninglêers in subgidse van Accounts/ word nie gelees nie ({names}). Skuif hulle direk na Accounts/ om hulle in te sluit.',
   },
-  'acct.hero.mixed': ' Hierdie totaal tel rekeninge in meer as een geldeenheid ({symbols}) bymekaar sonder om om te skakel.',
   'acct.hero.converted': ' Plus {list} — hierbo omgeskakel teen koerse vir {date}.',
   'acct.hero.convertedTotal': 'Omgeskakelde totaal {amount}',
   'acct.hero.convertedStale': ' Plus {list} — hierbo omgeskakel teen koerse vir {date}, {days} dae oud.',
@@ -756,7 +728,6 @@ module.exports = {
   'settings.rateRefresh.weekly': 'Weekliks',
   'settings.rateRefresh.monthly': 'Maandeliks',
 
-  'acct.mixedTitle': 'Tel rekeninge in meer as een geldeenheid bymekaar, sonder om om te skakel.',
   'acct.hero.count': 'Rekeninge',
   'acct.hero.oldest': 'Oudste balansbevestiging',
   'acct.hero.oldestDays': { one: '{count} dag', other: '{count} dae' },
@@ -773,12 +744,10 @@ module.exports = {
   'acct.where.excluded': '{amount} uitgesluit van die totaal hierbo.',
 
   'acct.deck.title': { one: 'Een rekening wag op \'n besluit', other: '{count} rekeninge wag op \'n besluit' },
-  'acct.deck.sub': 'Alles anders op hierdie bladsy stem met jou transaksies ooreen.',
   'acct.deck.clear': 'Alles stem met jou transaksies ooreen',
   'acct.deck.clearSub': 'Niks op hierdie bladsy verg vandag \'n besluit nie.',
   'acct.deck.review': 'Bekyk',
   'acct.deck.ariaReview': 'Open die {name}-ry hieronder',
-  'acct.deck.more': { one: 'Nog {count} rekening — wys almal in die tabel', other: 'Nog {count} rekeninge — wys almal in die tabel' },
   'acct.deck.why.drift': { one: '{count} transaksie sedert jy laas bevestig het impliseer {implied}, nie {stated} nie', other: '{count} transaksies sedert jy laas bevestig het impliseer {implied}, nie {stated} nie' },
   'acct.deck.why.unreadable': { one: '{count} transaksie dra \'n datum wat hierdie app nie kan lees nie, so die saldo kan nie daarteen nagegaan word nie', other: '{count} transaksies dra datums wat hierdie app nie kan lees nie, so die saldo kan nie daarteen nagegaan word nie' },
   'acct.deck.why.stale': { one: 'Onbevestig vir {count} dag — laas nagegaan {date}', other: 'Onbevestig vir {count} dae — laas nagegaan {date}' },
@@ -868,13 +837,11 @@ module.exports = {
   'acct.drawer.ahead': 'Nog te kom',
   'acct.drawer.aheadRows': { one: '{count} transaksie later hierdie tydperk gedateer', other: '{count} transaksies later hierdie tydperk gedateer', },
   'acct.drawer.folder': 'Transaksievouer',
-  'acct.drawer.noFolder': 'geen gekoppel nie',
   'acct.drawer.inBudget': 'Tel by die begroting',
   'acct.drawer.yes': 'Ja',
   'acct.drawer.no': 'Nee',
   'acct.btn.seeTx': 'Sien transaksies',
   'acct.btn.editBalance': 'Wysig saldo',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': 'Begrotingsvouer nie gevind nie',
@@ -1151,7 +1118,6 @@ module.exports = {
   'score.ring.showAll': 'Wys al vyf dele',
   'score.ring.hint': 'Tik op \'n deel om dit op sy eie te sien.',
   'score.gap.railAria': '{name}: {points} van {max} punte verdien.',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Geld oor hierdie tydperk',

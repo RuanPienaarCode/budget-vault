@@ -36,8 +36,6 @@
    only seeds the dropdown. */
 const SOURCE_KINDS = ['Salary', 'UIF', 'Tax', 'Bonus', 'Gift', 'Sale', 'Once-off', 'Other'];
 
-const ITEM_STATUSES = ['planned', 'part', 'done'];
-
 const sum = (rows, pick) => rows.reduce((t, r) => t + (Number(pick(r)) || 0), 0);
 
 /* round2 everywhere a total leaves this module. Floating-point addition over a
@@ -221,4 +219,4 @@ function envelopeOverState(amount, items, spent) {
 }
 
 module.exports = { planSummary, barSegments, envelopeGap, envelopeBar, sharePct, round2,
-  isReceived, envelopeOverState, SOURCE_KINDS, ITEM_STATUSES };
+  isReceived, envelopeOverState, SOURCE_KINDS };
