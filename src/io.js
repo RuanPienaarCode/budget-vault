@@ -80,6 +80,27 @@ function makeIo({ vault, plugin }) {
     stampWrite();
     return path;
   }
+  /* writeVaultFile's BINARY sibling, the way writeBinary is writeFile's — a PDF
+     or a workbook is bytes, and vault.modify() on bytes would UTF-8-encode
+     them: every byte above 0x7F becomes two, which shifts every offset a PDF's
+     xref table and a zip's central directory depend on. The file would exist,
+     have a plausible size, and open nowhere. Same vault ring as writeVaultFile
+     because the destination is the same dialog-typed export folder; takes a
+     Uint8Array and hands Obsidian exactly the bytes it views (not the whole
+     backing buffer, which a subarray can share with something larger). */
+  async function writeVaultBinary(rel, bytes) {
+    const path = guardedVaultPath(rel);
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    stampWrite();
+    const f = vault.getFileByPath(path);
+    if (f) { await vault.modifyBinary(f, buf); }
+    else {
+      await ensureFolder(path.split('/').slice(0, -1).join('/'));
+      await vault.createBinary(path, buf);
+    }
+    stampWrite();
+    return path;
+  }
   /* The wizard's sibling of writeVaultFile: same vault-ring containment, same
      write-guard stamping, but SKIPS a file that already exists — re-running
      the wizard (or racing device sync) must never overwrite real data. Same
@@ -310,7 +331,7 @@ function makeIo({ vault, plugin }) {
   }
 
   return {
-    basePath, relPath, readFile, writeFile, writeVaultFile, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
+    basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath,
     lastWriteAt: () => plugin._lastWrite || 0,
   };
