@@ -744,6 +744,8 @@ module.exports = {
   'acct.hero.oldestDays': { other: '{count} hari' },
   'acct.hero.oldestNone': 'tidak ada',
   'acct.hero.unreadable': { other: '{count} saldo rekening tidak bisa dibaca dan tidak masuk ke total ini.' },
+  'acct.hero.driftUp': ' Transaksi sejak saldo yang Anda catat berjumlah {amount} lebih banyak.',
+  'acct.hero.driftDown': ' Transaksi sejak saldo yang Anda catat berjumlah {amount} lebih sedikit.',
   'acct.where.title': 'Di mana uangnya',
   'acct.where.sub': 'Porsi dari apa yang dipegang rekening-rekening ini',
   'acct.where.aria': 'Porsi dari apa yang dipegang rekening-rekening ini: {parts}',
@@ -942,6 +944,8 @@ module.exports = {
   'dash.pos.savings': 'Tabungan dan investasi',
   'dash.pos.savingsSub': '{savings} tabungan · {invested} investasi',
   'dash.pos.savingsSay': '{amount} di tabungan dan investasi. Buka Tabungan dan investasi.',
+  'dash.pos.savingsDriftUp': ' Saldo yang Anda catat menunjukkan {amount} lebih sedikit.',
+  'dash.pos.savingsDriftDown': ' Saldo yang Anda catat menunjukkan {amount} lebih banyak.',
 
   'dash.overlap': 'Rekening kartu kredit yang dilacak: {accounts} · utang kartu yang dilacak: {debts} — kalau ada kartu yang tercatat di keduanya, ia terhitung dua kali di atas.',
   'dash.overlap.btn': 'Tinjau utang',

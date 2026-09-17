@@ -731,6 +731,8 @@ module.exports = {
   'acct.hero.oldestDays': { other: '{count} 日' },
   'acct.hero.oldestNone': 'なし',
   'acct.hero.unreadable': { other: '{count} 件の口座残高を読み取れず、この合計から除外されています。' },
+  'acct.hero.driftUp': ' 入力した残高以降の取引を合計すると {amount} 多くなります。',
+  'acct.hero.driftDown': ' 入力した残高以降の取引を合計すると {amount} 少なくなります。',
   'acct.where.title': 'どこにあるか',
   'acct.where.sub': 'これらの口座が保有する割合',
   'acct.where.aria': 'これらの口座が保有する割合: {parts}',
@@ -922,6 +924,8 @@ module.exports = {
   'dash.pos.savings': '貯蓄と投資',
   'dash.pos.savingsSub': '貯蓄 {savings} · 投資 {invested}',
   'dash.pos.savingsSay': '貯蓄と投資で {amount}。貯蓄と投資を開きます。',
+  'dash.pos.savingsDriftUp': ' 入力した残高では {amount} 少なくなります。',
+  'dash.pos.savingsDriftDown': ' 入力した残高では {amount} 多くなります。',
 
   'dash.overlap': '記録中のクレジットカード口座: {accounts} · カード負債: {debts} — 同じカードが両方にある場合、上では二重に数えられます。',
   'dash.overlap.btn': '負債を確認',

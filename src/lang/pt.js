@@ -777,6 +777,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} dia', other: '{count} dias' },
   'acct.hero.oldestNone': 'nenhuma',
   'acct.hero.unreadable': { one: '{count} saldo de conta não pôde ser lido e ficou de fora deste total.', other: '{count} saldos de contas não puderam ser lidos e ficaram de fora deste total.' },
+  'acct.hero.driftUp': ' As transações desde os saldos informados somam {amount} a mais.',
+  'acct.hero.driftDown': ' As transações desde os saldos informados somam {amount} a menos.',
   'acct.where.title': 'Onde está',
   'acct.where.sub': 'Participação no que estas contas guardam',
   'acct.where.aria': 'Participação no que estas contas guardam: {parts}',
@@ -979,6 +981,8 @@ module.exports = {
   'dash.pos.savings': 'Poupança e investimentos',
   'dash.pos.savingsSub': '{savings} em poupança · {invested} investidos',
   'dash.pos.savingsSay': '{amount} em poupança e investimentos. Abrir Poupança e investimentos.',
+  'dash.pos.savingsDriftUp': ' Os saldos informados são {amount} a menos.',
+  'dash.pos.savingsDriftDown': ' Os saldos informados são {amount} a mais.',
 
   'dash.overlap': 'Contas de cartão de crédito acompanhadas: {accounts} · dívidas de cartão acompanhadas: {debts} — se algum cartão estiver nos dois, ele é contado duas vezes acima.',
   'dash.overlap.btn': 'Revisar dívidas',

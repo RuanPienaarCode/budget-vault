@@ -53,8 +53,8 @@ const TRAILING_MONTHS = 6;
 module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, catType, declaredCatType,
-    periodsForMonths, shiftPeriod, periodRange, currentPeriod, txInPeriod,
-    foreignLabels, periodFigures,
+    periodsForMonths, shiftPeriod, periodRange, currentPeriod,
+    foreignLabels, periodFigures, periodWindowAsOf, txInRange,
   } = ctx;
 
   /* ADR-0007 · One measure of saved, assembled once. What crossed into the
@@ -64,7 +64,13 @@ module.exports = function registerHealthData(ctx) {
      household-currency rows only. ADR-0007 · The savings pool: savings and
      investment accounts, household currency only. ADR-0007 · Pool rows are
      household rows filtered by label. */
-  function savingContribution(p) {
+  /* ADR-0007 · The saving-rate window closes at today too. ISSUE 87 — this
+     used to take txInPeriod(p) WHOLE, so a period containing today counted
+     money dated later in it as already saved; periodWindowAsOf (period.js)
+     is the one place that rule lives now. */
+  function savingContribution(p, todayArg) {
+    const window = periodWindowAsOf(p, todayArg);
+    if (!window) return 0;
     const foreign = foreignLabels();
     const idx = accountIndex();
     const savers = poolAccounts(S.accounts).filter(a => !isForeign(a, S.settings.currency));
@@ -72,7 +78,7 @@ module.exports = function registerHealthData(ctx) {
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
-    const rows = txInPeriod(p).filter(t => !foreign.has(t.label));
+    const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
     return savedFromOutside(rows, saverLabels, declaredCatType);
   }
 

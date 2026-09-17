@@ -776,6 +776,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} jour', other: '{count} jours' },
   'acct.hero.oldestNone': 'aucun',
   'acct.hero.unreadable': { one: '{count} solde de compte n\'a pas pu être lu et est exclu de ce total.', other: '{count} soldes de compte n\'ont pas pu être lus et sont exclus de ce total.' },
+  'acct.hero.driftUp': ' Les opérations depuis vos soldes indiqués totalisent {amount} de plus.',
+  'acct.hero.driftDown': ' Les opérations depuis vos soldes indiqués totalisent {amount} de moins.',
   'acct.where.title': 'Où cela se trouve',
   'acct.where.sub': 'Part de ce que détiennent ces comptes',
   'acct.where.aria': 'Part de ce que détiennent ces comptes : {parts}',
@@ -975,6 +977,8 @@ module.exports = {
   'dash.pos.savings': 'Épargne et placements',
   'dash.pos.savingsSub': '{savings} d\'épargne · {invested} investi',
   'dash.pos.savingsSay': '{amount} en épargne et placements. Ouvrir Épargne et placements.',
+  'dash.pos.savingsDriftUp': ' Les soldes indiqués affichent {amount} de moins.',
+  'dash.pos.savingsDriftDown': ' Les soldes indiqués affichent {amount} de plus.',
 
   'dash.overlap': 'Comptes de carte suivis : {accounts} · dettes de carte suivies : {debts} — si une carte figure dans les deux, elle est comptée deux fois ci-dessus.',
   'dash.overlap.btn': 'Vérifier les dettes',
