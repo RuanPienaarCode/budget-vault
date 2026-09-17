@@ -94,6 +94,57 @@ function periodCtx(monthStartDay, txFiles = {}) {
     'start day 28 lands inside February in every year — this is why the loader clamps to 28');
 }
 
+/* ---- month_start_day = 29/30/31 — beyond what the loader will ever store,
+   pinned anyway ----
+
+   ISSUE 89. load.js clamps a hand-edited Settings.md to 1-28 precisely
+   because "29-31 skews period lengths and misassigns rolled-over days" (its
+   own comment) — but periodRange() itself carries no such clamp, and a state
+   built without the loader (a stale reload, a future caller) can still reach
+   these values. Nothing pinned what periodRange DOES with them, which matters
+   because the right answer looks wrong at first glance: `new Date(y, m, n)`
+   is asked for a day past the end of a short month and JS rolls it FORWARD
+   into the next one (Date's own day arithmetic is a strict day-by-day
+   sequence, whatever `n` is) rather than refusing it or clamping it back to
+   the month's last real day.
+
+   That rollover is not a bug to fix — it is what keeps every period adjacent
+   to its neighbour with no gap and no overlap, for free, because both a
+   period's END (n-1 in month m-1) and the NEXT period's START (n in the same
+   month m-1) are two points on that same strictly increasing sequence, one
+   day apart by construction. A "fix" that clamped the day to the month's own
+   length instead — the obviously-correct-looking change — breaks exactly
+   this: clamped to 28, both '2026-02' and '2026-03' at month_start_day 30
+   would end/start on the SAME day (28 Feb), so the last two days of February
+   are claimed by neither period and the two are back-to-back double-counted
+   on every other read. Pinned across the one month short enough to expose it
+   (February, leap and non-leap) and the boundary immediately after it. */
+{
+  const nextIso = iso => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+
+  for (const [n, leapEnd, nonLeapEnd] of [
+    [29, '2024-02-28', '2026-02-28'],
+    [30, '2024-02-29', '2026-03-01'],
+    [31, '2024-03-01', '2026-03-02'],
+  ]) {
+    const api = periodCtx(n);
+    const leapFeb = api.periodRange('2024-02'), leapMar = api.periodRange('2024-03');
+    const feb = api.periodRange('2026-02'), mar = api.periodRange('2026-03');
+
+    eq(leapFeb.end, leapEnd, `month_start_day ${n}: leap February's period ends ${leapEnd}`);
+    eq(feb.end, nonLeapEnd, `month_start_day ${n}: non-leap February's period ends ${nonLeapEnd}`);
+
+    // Adjacency: the very next calendar day after one period's end must be
+    // the next period's start — no gap, no overlap, on both calendars. This
+    // is the property an explicit "clamp to the month's own length" would
+    // break, so it is what has to be pinned rather than the exact dates alone.
+    eq(nextIso(leapFeb.end), leapMar.start,
+      `month_start_day ${n}: leap February's period and March's are adjacent, not overlapping`);
+    eq(nextIso(feb.end), mar.start,
+      `month_start_day ${n}: non-leap February's period and March's are adjacent, not overlapping`);
+  }
+}
+
 /* ---- the floor of MONTH_KEY, and the promise its comment makes ----
 
    MONTH_KEY admits years 0100–9999 and its comment states the rule outright:

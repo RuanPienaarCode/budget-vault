@@ -60,6 +60,19 @@ eq(fx.rateBetween('CNY', 'XXX', TABLE), null, 'in either direction');
   const r = fx.rateBetween('CNY', 'IDR', TABLE);
   ok(Math.abs(r - (1 / 0.000379)) < 1e-6, 'cross-rating through the base is exact: 1 CNY buys 1/0.000379 IDR');
 }
+{
+  /* ISSUE 89. normalizeTable already drops a zero rate at the boundary (line
+     47 above), so this is defence for a table rateBetween is handed directly
+     — a raw object built without normalizeTable, exactly the shape a caller
+     that skips it could pass. `rf <= 0` -> `rf < 0` lets rf===0 through, and
+     rt / 0 is Infinity: every amount FROM that currency would convert to a
+     confident, silent Infinity rather than the null this guard exists to
+     return instead. A real 3-letter code, since normalizeCode refuses
+     anything else before the guard is ever reached. */
+  const zero = { base: 'IDR', date: '2026-08-29', rates: { IDR: 1, XYZ: 0 } };
+  eq(fx.rateBetween('XYZ', 'IDR', zero), null,
+    'a zero FROM-rate is refused, never divided by — it would buy Infinity of the base');
+}
 
 /* ---------------------------------- convert ------------------------------ */
 {
