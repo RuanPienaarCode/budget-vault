@@ -677,6 +677,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} is nog aan die gang, so sy syfers is vir slegs \'n deel van \'n tydperk en trek die gemiddelde af.',
   'bx.doc.noteWide': 'Die maand-tot-maand kolomme pas nie op \'n bladsy vir so baie tydperke nie — die Excel- en CSV-uitvoere dra elke maand.',
   'bx.doc.noteTx': 'Uitgeslote, oorplasing- en verdeeloorsprong-rye word gelys en gemerk; hulle is nie deel van die begrotingsyfers hierbo nie.',
+  'bx.doc.amountsIn': 'Bedrae in {currency}.',
+  'bx.doc.noteNoBudget': 'Geen begroting is vir hierdie tydperk opgestel nie, dus is dit slegs werklike syfers.',
   'bx.doc.exactHeading': 'Werklik per kategorie · {from} tot {to}',
   'bx.doc.noteExact': 'Hierdie syfers dek presies {from} tot {to}. Die begrotingtabelle verder aan dek volle begrotingtydperke, {pfrom} tot {pto} — elke tydperk wat binne die reeks eindig — so hul totale verskil by die rande. Begrotings word nooit oor \'n datum verdeel nie.',
   'bx.doc.noteExactOnly': 'Hierdie syfers dek presies {from} tot {to}. Geen begrotingtydperk eindig binne hierdie reeks nie, so daar is geen begrotingtabelle nie.',

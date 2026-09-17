@@ -694,6 +694,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} ainda está em andamento, então os números cobrem só parte de um período e puxam a média para baixo.',
   'bx.doc.noteWide': 'As colunas mês a mês não cabem em uma página para tantos períodos — as exportações em Excel e CSV trazem todos os meses.',
   'bx.doc.noteTx': 'Linhas fora do orçamento, de transferência e de origem dividida são listadas e marcadas; elas não fazem parte dos números do orçamento acima.',
+  'bx.doc.amountsIn': 'Valores em {currency}.',
+  'bx.doc.noteNoBudget': 'Nenhum orçamento foi definido para este período, por isso constam apenas os valores reais.',
   'bx.doc.exactHeading': 'Real por categoria · {from} a {to}',
   'bx.doc.noteExact': 'Esses números cobrem exatamente {from} a {to}. As tabelas de orçamento mais adiante cobrem períodos de orçamento completos, {pfrom} a {pto} — todo período que termina dentro do intervalo — então os totais diferem nas bordas. Orçamentos nunca são divididos no meio de uma data.',
   'bx.doc.noteExactOnly': 'Esses números cobrem exatamente {from} a {to}. Nenhum período de orçamento termina dentro deste intervalo, então não há tabelas de orçamento.',

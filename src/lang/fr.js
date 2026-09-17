@@ -691,6 +691,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} est encore en cours, donc ses chiffres ne couvrent qu\'une partie d\'une période et font baisser la moyenne.',
   'bx.doc.noteWide': 'Les colonnes mois par mois ne tiennent pas sur une page pour autant de périodes — les exports Excel et CSV incluent chaque mois.',
   'bx.doc.noteTx': 'Les lignes exclues, de virement et de parent réparti sont listées et repérées ; elles ne font pas partie des chiffres du budget ci-dessus.',
+  'bx.doc.amountsIn': 'Montants en {currency}.',
+  'bx.doc.noteNoBudget': 'Aucun budget n\'a été défini pour cette période : seuls les montants réels figurent ici.',
   'bx.doc.exactHeading': 'Réel par catégorie · {from} au {to}',
   'bx.doc.noteExact': 'Ces chiffres couvrent exactement {from} au {to}. Les tableaux de budget plus loin couvrent des périodes de budget complètes, {pfrom} au {pto} — chaque période se terminant dans l\'intervalle — leurs totaux diffèrent donc aux bords. Les budgets ne sont jamais scindés sur une date.',
   'bx.doc.noteExactOnly': 'Ces chiffres couvrent exactement {from} au {to}. Aucune période de budget ne se termine dans cet intervalle, il n\'y a donc pas de tableaux de budget.',

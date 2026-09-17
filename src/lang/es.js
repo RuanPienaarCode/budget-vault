@@ -679,6 +679,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} todavía está en curso, así que sus cifras corresponden solo a una parte de un periodo y bajan el promedio.',
   'bx.doc.noteWide': 'Las columnas mes a mes no caben en una página para tantos periodos — las exportaciones de Excel y CSV incluyen todos los meses.',
   'bx.doc.noteTx': 'Las filas excluidas, de transferencia y de origen dividido se listan y se marcan; no forman parte de las cifras del presupuesto anteriores.',
+  'bx.doc.amountsIn': 'Importes en {currency}.',
+  'bx.doc.noteNoBudget': 'No se fijó presupuesto para este periodo, así que solo figuran los importes reales.',
   'bx.doc.exactHeading': 'Real por categoría · {from} a {to}',
   'bx.doc.noteExact': 'Estas cifras cubren exactamente {from} a {to}. Las tablas de presupuesto más adelante cubren periodos de presupuesto completos, {pfrom} a {pto} — cada periodo que termina dentro del rango — así que sus totales difieren en los extremos. Los presupuestos nunca se dividen en una fecha.',
   'bx.doc.noteExactOnly': 'Estas cifras cubren exactamente {from} a {to}. Ningún periodo de presupuesto termina dentro de este rango, así que no hay tablas de presupuesto.',

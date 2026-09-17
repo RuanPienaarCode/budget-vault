@@ -729,6 +729,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} is still in progress, so its figures are for part of a period and pull the average down.',
   'bx.doc.noteWide': 'The month-by-month columns do not fit on a page for this many periods — the Excel and CSV exports carry every month.',
   'bx.doc.noteTx': 'Excluded, transfer and split-parent rows are listed and flagged; they are not part of the budget figures above.',
+  'bx.doc.amountsIn': 'Amounts in {currency}.',
+  'bx.doc.noteNoBudget': 'No budget was set for this period, so these are actual figures only.',
   'bx.doc.exactHeading': 'Actual by category · {from} to {to}',
   'bx.doc.noteExact': 'These figures cover exactly {from} to {to}. The budget tables further on cover whole budget periods, {pfrom} to {pto} — every period ending inside the range — so their totals differ at the edges. Budgets are never split across a date.',
   'bx.doc.noteExactOnly': 'These figures cover exactly {from} to {to}. No budget period ends inside this range, so there are no budget tables.',

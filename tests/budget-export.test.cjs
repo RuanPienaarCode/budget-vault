@@ -160,7 +160,7 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   eq(rent.byPeriod, [0, 9000], 'and a category that first appears later is zero before it');
   ok(m.summary.rows.every(r => r.byPeriod.length === 2), 'every summary row is exactly as wide as the period list');
 
-  eq(m.summary.rows.map(r => r.cat), ['Salary', 'Groceries', 'Fuel', '=Rent'], 'first-seen order, which is figures.js\'s own type-then-name order');
+  eq(m.summary.rows.map(r => r.cat), ['Salary', '=Rent', 'Fuel', 'Groceries'], 'grouped by type, then by name — NOT first-seen order, which the first real export showed is only type order while every category exists in month one');
   const sub = m.summary.subtotals.find(s => s.type === 'expense');
   eq(sub.byPeriod, [6100.5, 15400], 'expense subtotal per period');
   eq(sub.total, 21500.5, 'expense subtotal total');
@@ -186,7 +186,7 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
 {
   const m = bx.buildModel({ periods: P, content: 'full', categories: ['Groceries', 'Fuel'], includeTx: true, ...META });
   eq(m.filtered, true, 'a category list is a filter');
-  eq(m.summary.rows.map(r => r.cat), ['Groceries', 'Fuel'], 'summary narrowed');
+  eq(m.summary.rows.map(r => r.cat), ['Fuel', 'Groceries'], 'summary narrowed (and in name order within the type)');
   eq(m.budgets[1].rows.map(r => r.cat), ['Groceries'], 'every period table narrowed');
   eq(m.budgets[1].subtotals.find(s => s.type === 'expense').actual, 6400, 'subtotals cover ONLY the rows the reader can see');
   ok(!m.summary.subtotals.some(s => s.type === 'income'), 'a type with no rows left has no subtotal line');
@@ -247,6 +247,80 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   const bare = bx.buildModel({ periods: [], content: 'full', categories: null, includeTx: false, exact, ...META });
   const bareDoc = bx.modelToDoc(bare, { money: v => String(v) });
   eq(bareDoc.blocks.filter(b => b.type === 'table').length, 1, 'a short range that no period ends in still exports its exact-date table, and no empty budget tables');
+}
+
+/* ===================== 5b. what the first REAL exports showed =================
+   Every fixture above has all its categories present in the first period. A
+   real household does not: on the vault these were reviewed against (17 Sep
+   2026, a 12-period tax year, 17 category types) "Household" first appears in
+   month three and "Electricity" in month ten — and FIRST-SEEN order put a
+   housing row after the luxuries and a utilities row at the very bottom, with
+   seventeen "Total …" lines in one block after them, split across a page. */
+{
+  const A = { ...P[0], rows: [row('Salary', 'income', 0, 100), row('Rent', 'housing', 50, 50), row('Spotify', 'luxuries', 5, 5)], txs: [] };
+  const B = { ...P[1], rows: [row('Salary', 'income', 0, 100), row('Household', 'housing', 0, 20), row('Rent', 'housing', 50, 50),
+    row('Electricity', 'utilities', 0, 30), row('Spotify', 'luxuries', 5, 5)], txs: [] };
+  const typeOrder = ['income', 'housing', 'utilities', 'luxuries'];
+  const m = bx.buildModel({ periods: [A, B], content: 'full', categories: null, includeTx: false, typeOrder, ...META });
+  eq(m.summary.rows.map(r => r.cat), ['Salary', 'Household', 'Rent', 'Electricity', 'Spotify'],
+    'summary rows are grouped by TYPE in the household\'s own order, then by name — not by the month a category first appeared');
+  eq(m.summary.subtotals.map(s => s.type), typeOrder, 'and subtotals follow the same order');
+  const loose = bx.buildModel({ periods: [A, B], content: 'full', categories: null, includeTx: false, ...META });
+  eq(loose.summary.rows.map(r => r.type), ['income', 'housing', 'housing', 'luxuries', 'utilities'],
+    'with no order handed in, types still GROUP (in first-seen order) — a type is never split in two');
+
+  const money = v => 'R ' + Number(v).toFixed(2);
+  const doc = bx.modelToDoc(m, { money, plainMoney: v => Number(v).toFixed(2) });
+  const sum = doc.blocks.filter(b => b.type === 'table')[0];
+  eq(sum.rows.map(r => r[0]), ['Salary', 'Household', 'Rent', 'Total housing', 'Electricity', 'Spotify'],
+    'each subtotal sits directly under ITS group — and a group of one has none, the row being its own total');
+  eq(sum.boldRows, [3], 'bold marks follow the subtotal to where it now is');
+  ok(sum.rows.every(r => r.slice(1).every(c => !/R/.test(c))), 'month-by-month cells carry no currency symbol: fifteen columns of "R " cost a font size and truncated names');
+  ok(doc.blocks.some(b => b.type === 'note' && /Amounts in R\b/.test(b.text)), 'the unit is stated once, above the table');
+
+  const july = doc.blocks.filter(b => b.type === 'table')[2];
+  const salary = july.rows.find(r => r[0] === 'Salary');
+  eq(salary[4], '', 'an income row with no budget has NO remaining — the Dashboard leaves that cell blank, and "R -100.00 remaining" on a pay cheque reads as a loss');
+  const elec = july.rows.find(r => r[0] === 'Electricity');
+  eq(elec[4], 'R -30.00', 'an UNBUDGETED expense does print it: that overspend is the point');
+  eq(july.rows.find(r => r[0] === 'Rent')[4], 'R 0.00', 'and a budgeted row always does');
+
+  const kinds = doc.blocks.map(b => b.type);
+  const firstPeriodHeading = doc.blocks.findIndex(b => b.type === 'heading' && /June 2026/.test(b.text));
+  eq(kinds[firstPeriodHeading - 1], 'pagebreak', 'each period starts its own page: a forty-row table that begins two rows from the foot of a page is two tables to the eye');
+
+  const sheets = bx.modelToSheets(m, {});
+  const val = c => (c && typeof c === 'object' ? c.v : c);
+  eq(sheets[0].rows.map(r => val(r[0])).slice(1), ['Salary', 'Household', 'Rent', 'Total housing', 'Electricity', 'Spotify'], 'the workbook groups the same way');
+  const bSheet = sheets.find(x => x.name === 'Budget');
+  const sal = bSheet.rows.find(r => val(r[3]) === 'Salary');
+  eq(val(sal[7]), null, 'and blanks the same remaining cell');
+}
+{
+  // the exact-dates table gets the headline every period table has
+  const exact = { from: '2026-03-01', to: '2026-03-31', through: '2026-03-31', rows: [row('Salary', 'income', 0, 100)], txs: [],
+    summary: { income: 100, spend: 40, uncatSpend: 15 } };
+  const doc = bx.modelToDoc(bx.buildModel({ periods: [], content: 'summary', categories: null, includeTx: false, exact, ...META }), { money: v => 'R ' + v });
+  ok(doc.blocks.some(b => b.type === 'note' && /Income R 100/.test(b.text) && /Spent R 40/.test(b.text) && /Uncategorised R 15/.test(b.text)),
+    'income, spend and uncategorised for the exact range — the ledger\'s own tally, not a sum of the rows');
+  const filtered = bx.modelToDoc(bx.buildModel({ periods: [], content: 'summary', categories: ['Salary'], includeTx: false, exact, ...META }), { money: v => 'R ' + v });
+  ok(!filtered.blocks.some(b => b.type === 'note' && /Spent R 40/.test(b.text)), 'withheld under a category filter, as the period headline is: it would describe money the table does not show');
+}
+
+/* ---- a period with NO budget at all ----
+   On the reviewed vault budgets begin partway through the tax year; every
+   earlier period printed forty rows of "Remaining R -700,00" — each expense
+   flagged as an unbudgeted overspend, which is the right reading of ONE stray
+   category and the wrong one for a month nobody planned. Said once, above the
+   table, and the column left blank. */
+{
+  const bare = { ...P[0], rows: [row('Salary', 'income', 0, 100), row('Rent', 'housing', 0, 50), row('Food', 'food', 0, 20)], txs: [] };
+  const doc = bx.modelToDoc(bx.buildModel({ periods: [bare, P[1]], content: 'full', categories: null, includeTx: false, ...META }), { money: v => 'R ' + Number(v).toFixed(2) });
+  const tables = doc.blocks.filter(b => b.type === 'table');
+  ok(tables[1].rows.every(r => r[4] === ''), 'no Remaining anywhere in a period that has no budget');
+  const i = doc.blocks.indexOf(tables[1]);
+  ok(doc.blocks.slice(i - 3, i).some(b => b.type === 'note' && /no budget/i.test(b.text)), 'and a note above it says why');
+  ok(tables[2].rows.some(r => r[4] !== ''), 'a period that HAS a budget is untouched');
 }
 
 /* ================================== 6. CSV =================================== */

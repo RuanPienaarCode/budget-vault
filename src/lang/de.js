@@ -678,6 +678,8 @@ module.exports = {
   'bx.doc.noteInProgress': '{period} läuft noch, daher gelten seine Zahlen nur für einen Teil eines Zeitraums und senken den Durchschnitt.',
   'bx.doc.noteWide': 'Die Monat-für-Monat-Spalten passen bei so vielen Zeiträumen nicht auf eine Seite — die Excel- und CSV-Exporte enthalten jeden Monat.',
   'bx.doc.noteTx': 'Ausgeschlossene, Umbuchungs- und Aufteilungsursprung-Zeilen sind aufgeführt und markiert; sie sind nicht Teil der obigen Budgetzahlen.',
+  'bx.doc.amountsIn': 'Beträge in {currency}.',
+  'bx.doc.noteNoBudget': 'Für diesen Zeitraum wurde kein Budget festgelegt, daher stehen hier nur Ist-Werte.',
   'bx.doc.exactHeading': 'Tatsächlich nach Kategorie · {from} bis {to}',
   'bx.doc.noteExact': 'Diese Zahlen decken genau {from} bis {to} ab. Die Budgettabellen weiter unten decken vollständige Budgetzeiträume ab, {pfrom} bis {pto} — jeden Zeitraum, der innerhalb des Bereichs endet — daher weichen ihre Summen an den Rändern ab. Budgets werden nie über ein Datum hinweg aufgeteilt.',
   'bx.doc.noteExactOnly': 'Diese Zahlen decken genau {from} bis {to} ab. Kein Budgetzeitraum endet innerhalb dieses Bereichs, daher gibt es keine Budgettabellen.',

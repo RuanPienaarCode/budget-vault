@@ -3,6 +3,44 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Fixed
+
+Found by reading two real exports — a twelve-period tax year over a household
+with seventeen category types — rather than by a test. Every fixture had all of
+its categories present in the first month; no real household does.
+
+- **The summary table was out of order.** Rows were kept in the order a
+  category first appeared, on the theory that this *was* type order. It is only
+  while every category exists in month one: "Household" first appeared in month
+  three and landed after the luxuries, "Electricity" at the very bottom. Rows
+  are now grouped by type, in your own group order, then by name.
+- **Subtotals sit under their own group.** Seventeen "Total …" lines in one
+  block, a page away from the rows they total and split across a page break,
+  are now one line beneath each group. A group of one has none — the row is its
+  own total.
+- **An income row no longer shows a negative "Remaining".** With no budget line
+  a pay cheque printed "R -32 400,55 remaining", which reads as a loss. The
+  export now follows the Dashboard's rule: the cell is filled when the row has
+  a budget or is an unbudgeted overspend, and blank otherwise. The CSV keeps
+  the raw number.
+- **A period with no budget at all says so once**, above its table, and leaves
+  the Remaining column blank — instead of flagging every expense in an
+  unplanned month as its own overspend.
+- **The tax-year table now has the headline every period table has** — income,
+  spent and uncategorised for the exact dates, from the same tally as its rows.
+- **The month-by-month table is readable.** Its cells no longer repeat the
+  currency symbol (the unit is stated once above it), and the font size is now
+  chosen so that category names stay whole, not only the numbers: the first
+  export printed "Christin…" and "Total h…" in a table with room to spare one
+  size down. When text columns must give way, only the long one does — a long
+  name no longer crushes the short "Type" column beside it.
+- **Narrow tables are no longer stretched across the page.** A three-column
+  table on a landscape sheet put twenty centimetres between a category and its
+  amount; tables now take the room they need plus some air.
+- **Each period starts on its own page** in a full export.
+
 ## 1.47.0 — 2026-09-17
 
 ### Added
