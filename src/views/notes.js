@@ -463,5 +463,5 @@ module.exports = function registerNotes(ctx) {
      the wikilink is REMOVED, and that branch is unreachable through
      repointNotes, which cannot change a note's kind. Untestable-through-the-
      front-door is how a graph fills up with links to files that do not exist. */
-  ctx.provide({ renderNotes, addNote, openNote, deleteNote, repointNotes, writeNoteSubject: writeSubject, noteButton, showNotesFor });
+  ctx.provide({ renderNotes, addNote, repointNotes, writeNoteSubject: writeSubject, noteButton });
 };

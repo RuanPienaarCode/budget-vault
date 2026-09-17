@@ -84,8 +84,6 @@ function ownerKey(v) {
   return String(v ?? '').trim().toLowerCase();
 }
 
-const isJoint = v => ownerKey(v) === JOINT;
-
 /* What an owner reads as on screen.
 
    A declared owner is shown with the spelling Settings.md gave it rather than
@@ -165,17 +163,6 @@ function netByOwner(accounts, declared = []) {
   });
 }
 
-/* Is there anything for an owner control to DO? One owner — or none — means
-   every account answers the question the same way, and a filter row offering a
-   single chip is a control that cannot change what is on screen. The Accounts
-   page uses this to decide whether the owner band exists at all. */
-function ownersWorthShowing(accounts) {
-  const keys = new Set(accounts.map(a => ownerKey(a.owner)));
-  keys.delete('');
-  return keys.size > 0 && new Set(accounts.map(a => ownerKey(a.owner))).size > 1;
-}
-
 module.exports = {
-  JOINT, parseOwners, ownerKey, isJoint, ownerLabel, ownerOptions, netByOwner,
-  ownersWorthShowing,
+  JOINT, parseOwners, ownerKey, ownerLabel, ownerOptions, netByOwner,
 };

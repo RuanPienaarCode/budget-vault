@@ -142,6 +142,12 @@ class BudgetPlugin extends Plugin {
     let text;
     if (f) {
       text = await this.app.vault.read(f);
+      /* #76 item 3, the second reader of the same shape: with a leading BOM
+         the match below misses, and the save PREPENDED a fresh block ahead of
+         the real one — two frontmatter blocks, the user's properties buried
+         below the first. Dropped here for the reason markdown.js's
+         parseFrontmatter drops it: nothing this app writes carries one. */
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
       /* patchFrontmatter, not a line regex. The line regex this replaced could
          not collapse a BLOCK value: patching `owners:` written as a YAML list
          (`owners:` newline `  - Alex` — the way a YAML-literate user writes a

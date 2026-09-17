@@ -433,5 +433,47 @@ const FILES = {
   eq(ctxCase.txSegment('FNB Cheque'), 'FNB Cheque',
     'and an exact match is unaffected');
 
+  /* ---------------- #76 item 3: a BOM'd Debts.md must not drop tags/aliases -
+     src/markdown.js's parseFrontmatter anchored on /^---/, so a file
+     beginning with U+FEFF (an encoding artifact some editors/OSes prepend,
+     not something the reader typed) defeated capture entirely: S.debtsFm
+     fell back to the bare 'kind: debts' default, and the next save wrote
+     that in place of whatever tags/aliases the real frontmatter held —
+     silent property loss on a file nobody had touched. Through the REAL
+     loader and the REAL serializer, not a parser unit test: a hand-written
+     mirror of parseFrontmatter would have "passed" from the day this test
+     was written, which is exactly the gap CLAUDE.md names for file-format
+     work. */
+  {
+    const bomFiles = {
+      [`${B}/Settings.md`]: FILES[`${B}/Settings.md`],
+      [`${B}/Debts.md`]: '﻿---\nkind: debts\ntags: [finance, finance/debts]\naliases: [liabilities]\n---\n\n'
+        + '# Debts\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n'
+        + '|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n'
+        + '| Visa | Bank | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 0.00 | 2024-03-01 | | active | |\n',
+    };
+    const ctxBom = makeCtx(bomFiles);
+    const sBom = await loadInto(ctxBom);
+    eq(sBom.debts.length, 1, 'the debt ROW still loads from a BOM-prefixed file — parseMdTable never anchored on the BOM in the first place');
+    ok(/tags:\s*\[finance, finance\/debts\]/.test(sBom.debtsFm),
+      'the BOM must not defeat frontmatter capture — S.debtsFm must carry the real tags, not the bare "kind: debts" fallback');
+    ok(/aliases:\s*\[liabilities\]/.test(sBom.debtsFm), 'and the aliases alongside them');
+
+    require('../src/categories')(ctxBom);
+    require('../src/views/debts')(ctxBom);
+    const rewrittenBom = ctxBom.serializeDebts();
+    ok(rewrittenBom.charCodeAt(0) !== 0xFEFF,
+      'the save never re-emits a BOM of its own — every writeFile call in io.js already writes a bare "---\\n", '
+      + 'which is why this heals on the first save rather than needing a migration (see markdown.js\'s own comment)');
+    ok(/tags:\s*\[finance, finance\/debts\]/.test(rewrittenBom), 'tags survive load -> save through the REAL serializer');
+    ok(/aliases:\s*\[liabilities\]/.test(rewrittenBom),
+      'and aliases survive alongside them — the exact pair #76 reported as dropped');
+
+    const sBom2 = await loadInto(makeCtx({ ...bomFiles, [`${B}/Debts.md`]: rewrittenBom }));
+    eq(sBom2.debts.length, 1, 'the round-tripped (now BOM-free) file still loads its one debt row');
+    ok(/tags:\s*\[finance, finance\/debts\]/.test(sBom2.debtsFm),
+      'and a SECOND load -> save cycle keeps the tags — nothing about dropping the BOM re-corrupts them');
+  }
+
   console.log(`PASS — full vault round-trip through the REAL loader + serializers (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

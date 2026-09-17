@@ -25,6 +25,10 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+/* ISSUE 90 — the clock, pinned. See tests/audit-followups-score-dashboard.test.cjs
+   for why: healthSnapshot()'s trailing window is the six calendar months
+   before the real currentPeriod(), and MONTHS below is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -62,7 +66,7 @@ async function snap(debtsFile) {
   return ctx.healthSnapshot();
 }
 
-(async () => {
+atAuditDate(async () => {
   /* ---- 1. no Debt page: credited, and disclosed ---- */
   {
     const s = await snap(null);
@@ -119,4 +123,4 @@ async function snap(debtsFile) {
   }
 
   console.log(`PASS — debt scoring: an empty Debt page is credited and disclosed, a blank Payment is unmeasured rather than zero (${checks} assertions).`);
-})().catch(e => { console.error('FAIL —', e.message); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error('FAIL —', e.message); process.exit(1); });

@@ -235,7 +235,7 @@ function lookup(lang, key, count) {
 
    t('nav.dashboard')
    t('settings.budgetsKept', { count: n })      // plural entry, `count` selects
-   t('tax.filedOn', { date: '2026-08-07' })     // {date} interpolated
+   t('acct.badge.asOf', { date: '2026-08-07' }) // {date} interpolated
 
    Resolution order is active language -> English -> the key itself. Returning
    the key is the deliberate worst case: it is visible in the interface and

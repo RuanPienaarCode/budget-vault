@@ -61,9 +61,6 @@ function passthroughPairs(rows) {
   return drop;
 }
 
-/* The stamps a lens may drop on, in the order the former walks applied them. */
-const STAMPS = Object.freeze(['excluded', 'nonBudget', 'foreign', 'earmarkedOut', 'transfer', 'passthrough', 'splitParent', 'splitPart']);
-
 /* Stamp every row once.
 
    env:
@@ -157,6 +154,11 @@ const LENSES = Object.freeze({
   ACCOUNT: Object.freeze({ name: 'ACCOUNT', drop: Object.freeze(['splitParent']), sign: 'gross' }),
 });
 
+/* Exported (ISSUE 85) as the seam for "this lens, but ignore one veto" — the
+   Dashboard hero needs BUDGET's other four vetoes on a foreign band, whose
+   rows BUDGET would otherwise drop whole by its own `foreign` veto. Any
+   caller doing this still names the lens it is asking, so the vetoes stay
+   defined here and nowhere else. */
 const dropsAnyOf = (lens, s, except) => lens.drop.some(k => k !== except && s[k]);
 const keeps = (lens, s) => !dropsAnyOf(lens, s, null);
 
@@ -257,4 +259,4 @@ function lensDifference(stamped, a, b) {
   return out;
 }
 
-module.exports = { stamp, tally, LENSES, STAMPS, lensDifference, passthroughPairs, rowKey, keeps };
+module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf };

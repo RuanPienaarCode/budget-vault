@@ -58,7 +58,7 @@ const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'l
 const INPUT_MODE_DESC = 'Whether this household imports bank statements or types its spending in by hand. "Type them in myself" hides the Import CSV link in the menu and the import button in the top bar — nothing is deleted, and the import screen is still reachable from the command palette ("Budget: Import a bank statement (CSV)") or by setting this back to "Import bank statements".';
 const INPUT_MODE_OPTIONS = { csv: 'Import bank statements (CSV)', manual: 'Type them in myself' };
 
-/* Shared by display() and getSettingDefinitions(), same as PALETTE_DESC above.
+/* Shared by display() and getSettingDefinitions(), like INPUT_MODE_DESC above.
    It has to explain what the setting TURNS ON as well as what it stores: an
    empty owners line is why the Accounts page shows no owner control at all, and
    a reader hunting for that field would otherwise have no way to find this. */
@@ -88,10 +88,6 @@ const OWNERS_DESC = 'The people this household\'s accounts can belong to, separa
 const languageOptions = () =>
   Object.fromEntries(LANGUAGE_ORDER.map(id => [id, LANGUAGE_NAMES[id]]));
 
-/* Shared by display() and getSettingDefinitions() so the two tabs can't drift. */
-const PALETTE_DESC = 'Which colours the budget is drawn in. Each palette has its own light and dark version, so this is independent of the Theme setting above.';
-const MONTH_START_DESC = 'Day of the month each financial period begins on — usually your payday. Choose 1 for an ordinary calendar month. 1–28.';
-const PERIOD_LENGTH_DESC = 'How long each budget period runs. Monthly uses the month start day above. The other options line periods up with a pay cycle instead, counting from the date below.';
 const PERIOD_LENGTH_NO_ANCHOR = ' Periods are running monthly: set a last payday below to start the cycle.';
 
 /* A cycle length with no usable anchor. The loader drops BOTH keys in that
@@ -113,9 +109,12 @@ function periodNeedsAnchor(md) {
 
 /* Shared by both tabs so the warning can never appear on one and not the other
    — tests/settings-parity.test.cjs pins that neither side may inline the bare
-   constant instead. */
+   constant instead. Resolved at call time, like FX_OPTIONS above, so the text
+   follows the interface language rather than whichever one was active when
+   the module first loaded. */
 function periodLengthDesc(md) {
-  return periodNeedsAnchor(md) ? PERIOD_LENGTH_DESC + PERIOD_LENGTH_NO_ANCHOR : PERIOD_LENGTH_DESC;
+  const desc = i18n.t('settings.periodLength.desc');
+  return periodNeedsAnchor(md) ? desc + PERIOD_LENGTH_NO_ANCHOR : desc;
 }
 const OVERSPEND_LAG_DESC = 'How many periods back the Budget page reads when you press "Pull overspend" on an already-spent category. 1 is the previous period. Set it higher when the hole you are funding is older than that — a credit card settles in arrears, so August is often covering June. 1–12.';
 
@@ -124,9 +123,6 @@ const OVERSPEND_LAG_DESC = 'How many periods back the Budget page reads when you
    and a reader who has not found that control yet would have no way to learn
    the two belong together. */
 const EMERGENCY_TARGET_DESC = 'How many months of essential spending your emergency fund is aiming to cover — the target the Dashboard\'s Financial health card measures against. 6 is the usual goal, 3 the common first milestone. Essential spending is everything except luxuries, giving, savings and investments. Mark which account holds the fund with "Emergency fund" on the Accounts page — until you do, the card has nothing to measure. 1–24.';
-const PERIOD_ANCHOR_DESC = 'When were you last paid? Any recent payday works — only the day it falls on within the cycle matters, so an earlier or later one gives the same result. Ignored when the period length is monthly.';
-const FEEDBACK_DESC = 'Report a bug, flag an issue or request a feature. Opens a Google Form in your browser — nothing from your budget is attached or sent.';
-const SUPPORT_DESC = 'Budget Vault is free and always will be. If you\'d like to say thanks, this opens PayPal in your browser — entirely optional, and nothing in the plugin changes either way.';
 
 class BudgetSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
@@ -138,8 +134,8 @@ class BudgetSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('Budget folder')
-      .setDesc('Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.')
+      .setName(i18n.t('settings.folder.name'))
+      .setDesc(i18n.t('settings.folder.desc'))
       .addText(t => t
         .setPlaceholder(DEFAULT_SETTINGS.budgetFolder)
         .setValue(this.plugin.settings.budgetFolder)
@@ -159,12 +155,12 @@ class BudgetSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Theme')
-      .setDesc('Follow Obsidian\'s light/dark mode, or force the Airy Glass dark or light palette.')
+      .setName(i18n.t('settings.theme.name'))
+      .setDesc(i18n.t('settings.theme.desc'))
       .addDropdown(d => d
-        .addOption('auto', 'Follow Obsidian')
-        .addOption('dark', 'Always dark')
-        .addOption('light', 'Always light')
+        .addOption('auto', i18n.t('settings.theme.auto'))
+        .addOption('dark', i18n.t('settings.theme.dark'))
+        .addOption('light', i18n.t('settings.theme.light'))
         .setValue(this.plugin.settings.theme)
         .onChange(async v => {
           this.plugin.settings.theme = v;
@@ -177,8 +173,8 @@ class BudgetSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Colour palette')
-      .setDesc(PALETTE_DESC)
+      .setName(i18n.t('settings.palette.name'))
+      .setDesc(i18n.t('settings.palette.desc'))
       .addDropdown(d => {
         for (const [id, label] of Object.entries(PALETTE_PRESETS)) d.addOption(id, label);
         d.setValue(this.plugin.settings.palette)
@@ -194,15 +190,15 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Setup wizard')
-      .setDesc('Re-run the first-run wizard — folder, name, budget period, currency, starter files.')
+      .setName(i18n.t('settings.wizard.name'))
+      .setDesc(i18n.t('settings.wizard.desc'))
       .addButton(b => b
-        .setButtonText('Run setup wizard')
+        .setButtonText(i18n.t('settings.wizard.button'))
         .onClick(() => new OnboardingWizard(this.app, this.plugin).open()));
 
     new Setting(containerEl)
-      .setName('Open on startup')
-      .setDesc('Open the budget view automatically when Obsidian starts.')
+      .setName(i18n.t('settings.startup.name'))
+      .setDesc(i18n.t('settings.startup.desc'))
       .addToggle(t => t
         .setValue(this.plugin.settings.openOnStartup)
         .onChange(async v => {
@@ -215,8 +211,8 @@ class BudgetSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Privacy splash screen')
-      .setDesc('Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.')
+      .setName(i18n.t('settings.privacy.name'))
+      .setDesc(i18n.t('settings.privacy.desc'))
       .addToggle(t => t
         .setValue(this.plugin.settings.privacyLock)
         .onChange(async v => {
@@ -230,21 +226,21 @@ class BudgetSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Send feedback')
-      .setDesc(FEEDBACK_DESC)
+      .setName(i18n.t('settings.feedback.name'))
+      .setDesc(i18n.t('settings.feedback.desc'))
       .addButton(b => b
-        .setButtonText('Open feedback form')
+        .setButtonText(i18n.t('settings.feedback.button'))
         .onClick(() => window.open(FEEDBACK_URL, '_blank')));
 
     new Setting(containerEl)
-      .setName('Support Budget Vault')
-      .setDesc(SUPPORT_DESC)
+      .setName(i18n.t('settings.support.name'))
+      .setDesc(i18n.t('settings.support.desc'))
       .addButton(b => b
-        .setButtonText('Send a thank you')
+        .setButtonText(i18n.t('settings.support.button'))
         .onClick(() => window.open(SUPPORT_URL, '_blank')));
 
-    new Setting(containerEl).setName('Budget data').setHeading()
-      .setDesc('Stored in Settings.md inside the budget folder, so they apply on every device.');
+    new Setting(containerEl).setName(i18n.t('settings.data.name')).setHeading()
+      .setDesc(i18n.t('settings.data.desc'));
 
     const fmSection = containerEl.createDiv();
     this.renderMdSettings(fmSection);
@@ -272,8 +268,8 @@ class BudgetSettingTab extends PluginSettingTab {
     setLanguage(md.language || i18n.defaultLanguage());
 
     new Setting(containerEl)
-      .setName('Name / household')
-      .setDesc('Shown in the dashboard greeting and top bar. Leave blank for none.')
+      .setName(i18n.t('settings.household.name'))
+      .setDesc(i18n.t('settings.household.desc'))
       .addText(t => {
         t.setValue(md.household ?? '');
         t.onChange(v => {
@@ -360,8 +356,8 @@ class BudgetSettingTab extends PluginSettingTab {
     };
 
     new Setting(containerEl)
-      .setName('Month start day')
-      .setDesc(MONTH_START_DESC)
+      .setName(i18n.t('settings.monthStart.name'))
+      .setDesc(i18n.t('settings.monthStart.desc'))
       .addText(t => {
         t.inputEl.type = 'number';
         t.setValue(String(md.month_start_day ?? 23));
@@ -429,7 +425,7 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Period length')
+      .setName(i18n.t('settings.periodLength.name'))
       .setDesc(periodLengthDesc(md))
       .addDropdown(d => {
         const cur = periodDaysOrZero(md.period_days);
@@ -448,8 +444,8 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Last payday')
-      .setDesc(PERIOD_ANCHOR_DESC)
+      .setName(i18n.t('settings.anchor.name'))
+      .setDesc(i18n.t('settings.anchor.desc'))
       .addText(t => {
         t.inputEl.type = 'date';
         t.setValue((md.period_anchor ?? '').toString().trim());
@@ -476,8 +472,11 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Country')
-      .setDesc('Drives amount formatting, bank-statement date order and the Tax view\'s checklist (tailored to your country\'s tax authority). Existing tax years keep their data — only labels and new-year seeds change.')
+      .setName(i18n.t('settings.country.name'))
+      // The key's English carries one more sentence than the hardcoded string
+      // it replaces ("Independent of the interface language below.") — kept,
+      // because it is true and the language setting does sit below this one.
+      .setDesc(i18n.t('settings.country.desc'))
       .addDropdown(d => {
         for (const code of COUNTRY_ORDER) d.addOption(code, PROFILES[code].label);
         const cur = (md.country ?? 'za').toString().trim().toLowerCase();
@@ -531,8 +530,8 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Currency symbol')
-      .setDesc('Shown before every amount, e.g. R.')
+      .setName(i18n.t('settings.currency.name'))
+      .setDesc(i18n.t('settings.currency.desc'))
       .addText(t => {
         t.setValue(md.currency ?? 'R');
         t.onChange(v => {
@@ -861,72 +860,72 @@ class BudgetSettingTab extends PluginSettingTab {
     setLanguage(this.mdSettings().language || i18n.defaultLanguage());
     return [
       {
-        name: 'Budget folder',
-        desc: 'Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
+        name: i18n.t('settings.folder.name'),
+        desc: i18n.t('settings.folder.desc'),
         control: { type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder },
       },
       {
-        name: 'Theme',
-        desc: 'Follow Obsidian\'s light/dark mode, or force the Airy Glass dark or light palette.',
+        name: i18n.t('settings.theme.name'),
+        desc: i18n.t('settings.theme.desc'),
         control: {
           type: 'dropdown', key: 'theme', defaultValue: DEFAULT_SETTINGS.theme,
-          options: { auto: 'Follow Obsidian', dark: 'Always dark', light: 'Always light' },
+          options: { auto: i18n.t('settings.theme.auto'), dark: i18n.t('settings.theme.dark'), light: i18n.t('settings.theme.light') },
         },
       },
       {
-        name: 'Colour palette',
-        desc: PALETTE_DESC,
+        name: i18n.t('settings.palette.name'),
+        desc: i18n.t('settings.palette.desc'),
         control: {
           type: 'dropdown', key: 'palette', defaultValue: DEFAULT_SETTINGS.palette,
           options: PALETTE_PRESETS,
         },
       },
       {
-        name: 'Setup wizard',
-        desc: 'Re-run the first-run wizard — folder, name, budget period, currency, starter files.',
+        name: i18n.t('settings.wizard.name'),
+        desc: i18n.t('settings.wizard.desc'),
         render: setting => {
           setting.addButton(b => b
-            .setButtonText('Run setup wizard')
+            .setButtonText(i18n.t('settings.wizard.button'))
             .onClick(() => new OnboardingWizard(this.app, this.plugin).open()));
         },
       },
       {
-        name: 'Open on startup',
-        desc: 'Open the budget view automatically when Obsidian starts.',
+        name: i18n.t('settings.startup.name'),
+        desc: i18n.t('settings.startup.desc'),
         control: { type: 'toggle', key: 'openOnStartup', defaultValue: DEFAULT_SETTINGS.openOnStartup },
       },
       {
-        name: 'Privacy splash screen',
-        desc: 'Cover the budget with a splash screen until you tap "Enter budget" — on open, and again whenever Obsidian goes to the background. Nothing is read from the vault until you tap.',
+        name: i18n.t('settings.privacy.name'),
+        desc: i18n.t('settings.privacy.desc'),
         control: { type: 'toggle', key: 'privacyLock', defaultValue: DEFAULT_SETTINGS.privacyLock },
       },
       {
-        name: 'Send feedback',
-        desc: FEEDBACK_DESC,
+        name: i18n.t('settings.feedback.name'),
+        desc: i18n.t('settings.feedback.desc'),
         render: setting => {
           setting.addButton(b => b
-            .setButtonText('Open feedback form')
+            .setButtonText(i18n.t('settings.feedback.button'))
             .onClick(() => window.open(FEEDBACK_URL, '_blank')));
         },
       },
       {
-        name: 'Support Budget Vault',
-        desc: SUPPORT_DESC,
+        name: i18n.t('settings.support.name'),
+        desc: i18n.t('settings.support.desc'),
         render: setting => {
           setting.addButton(b => b
-            .setButtonText('Send a thank you')
+            .setButtonText(i18n.t('settings.support.button'))
             .onClick(() => window.open(SUPPORT_URL, '_blank')));
         },
       },
       {
-        name: 'Budget data',
-        desc: 'Stored in Settings.md inside the budget folder, so they apply on every device.',
+        name: i18n.t('settings.data.name'),
+        desc: i18n.t('settings.data.desc'),
         render: setting => { setting.setHeading(); },
       },
       {
-        name: 'Name / household',
-        desc: 'Shown in the dashboard greeting and top bar. Leave blank for none.',
-        control: { type: 'text', key: 'household', placeholder: 'Leave blank for none' },
+        name: i18n.t('settings.household.name'),
+        desc: i18n.t('settings.household.desc'),
+        control: { type: 'text', key: 'household', placeholder: i18n.t('settings.household.placeholder') },
       },
       {
         name: 'Household members',
@@ -962,13 +961,13 @@ class BudgetSettingTab extends PluginSettingTab {
           .onChange(v => { this.setNonEssential(this.mdSettings(), row.key, v); })),
       })),
       {
-        name: 'Month start day',
-        desc: MONTH_START_DESC,
+        name: i18n.t('settings.monthStart.name'),
+        desc: i18n.t('settings.monthStart.desc'),
         control: {
           type: 'number', key: 'month_start_day', defaultValue: 23, min: 1, max: 28,
           validate: v => {
             const n = parseInt(v, 10);
-            return n >= 1 && n <= 28 ? undefined : 'Pick a day between 1 and 28.';
+            return n >= 1 && n <= 28 ? undefined : i18n.t('settings.monthStart.invalid');
           },
         },
       },
@@ -996,7 +995,7 @@ class BudgetSettingTab extends PluginSettingTab {
         },
       },
       {
-        name: 'Period length',
+        name: i18n.t('settings.periodLength.name'),
         desc: periodLengthDesc(this.mdSettings()),
         control: {
           type: 'dropdown', key: 'period_days', defaultValue: '0',
@@ -1004,19 +1003,19 @@ class BudgetSettingTab extends PluginSettingTab {
         },
       },
       {
-        name: 'Last payday',
-        desc: PERIOD_ANCHOR_DESC,
+        name: i18n.t('settings.anchor.name'),
+        desc: i18n.t('settings.anchor.desc'),
         control: {
           type: 'text', key: 'period_anchor', placeholder: 'YYYY-MM-DD',
           validate: v => {
             const s = String(v).trim();
-            return !s || isRealIsoDate(s) ? undefined : 'Use a real date as YYYY-MM-DD, e.g. 2026-08-07.';
+            return !s || isRealIsoDate(s) ? undefined : i18n.t('settings.anchor.invalid');
           },
         },
       },
       {
-        name: 'Country',
-        desc: 'Drives amount formatting, bank-statement date order and the Tax view\'s checklist (tailored to your country\'s tax authority). Existing tax years keep their data — only labels and new-year seeds change.',
+        name: i18n.t('settings.country.name'),
+        desc: i18n.t('settings.country.desc'),
         control: {
           type: 'dropdown', key: 'country', defaultValue: 'za',
           options: Object.fromEntries(COUNTRY_ORDER.map(code => [code, PROFILES[code].label])),
@@ -1039,11 +1038,11 @@ class BudgetSettingTab extends PluginSettingTab {
         },
       },
       {
-        name: 'Currency symbol',
-        desc: 'Shown before every amount, e.g. R.',
+        name: i18n.t('settings.currency.name'),
+        desc: i18n.t('settings.currency.desc'),
         control: {
           type: 'text', key: 'currency', placeholder: 'R',
-          validate: v => (String(v).trim() ? undefined : 'Enter a currency symbol.'),
+          validate: v => (String(v).trim() ? undefined : i18n.t('settings.currency.invalid')),
         },
       },
       {

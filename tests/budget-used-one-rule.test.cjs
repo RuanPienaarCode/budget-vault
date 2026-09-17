@@ -38,6 +38,16 @@ const path = require('path');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { periodFlow, budgetUsedShare } = require('../src/money-flow');
+/* ISSUE 90 — the clock, pinned. Section 3 below sets `ctx.S.period =
+   ctx.currentPeriod()` and then asserts `countedPeriods === 1` off
+   healthSnapshot()'s trailing window, which is always the six calendar
+   months before the REAL currentPeriod() (health-data.js), never S.period.
+   The fixture's only data is period P ('2026-07'); this only reads as one
+   counted period while "now" falls in 2026-08..2027-01. Pinning inside
+   August 2026 keeps that true on every run, reusing the shared helper
+   tests/_audit-seed.cjs's atAuditDate() already carries for this exact
+   shape. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const near = (a, b, m) => ok(a !== null && Math.abs(a - b) < 1e-9, `${m} (got ${a}, want ${b})`);
@@ -68,7 +78,7 @@ const files = {
   [`${B}/Transactions/Fund/${P}.md`]: txFile([['2026-07-10', 'From cheque', 'Emergency', 2000]]),
 };
 
-(async () => {
+atAuditDate(async () => {
   const ctx = makeCtx(files, { settings: { month_start_day: 1 } });
   await loadInto(ctx);
   ctx.S.period = P;
@@ -149,4 +159,4 @@ const files = {
   ok(!('assumedSpend' in ctx), 'ctx no longer publishes assumedSpend');
 
   console.log(`budget-used-one-rule — ${checks} checks OK`);
-})().catch(e => { console.error(e); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error(e); process.exit(1); });

@@ -36,9 +36,9 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
-/* `keeps` is the lens row test — ledger()/LENSES come off ctx (period.js
+/* `keeps`/`dropsAnyOf` are the lens row tests — ledger()/LENSES come off ctx (period.js
    provides them), but the predicate itself is a pure module export. */
-const { keeps } = require('../ledger');
+const { keeps, dropsAnyOf } = require('../ledger');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
@@ -613,6 +613,26 @@ module.exports = function registerDashboard(ctx) {
       ...S.debts.filter(d => d.status !== 'paid').map(x => symbolOf(x, home)),
     ])].filter(sym => sym && sym !== home);
 
+    /* ISSUE 85 (ADR-0007 · Rule 2 asks the BUDGET lens). The rows that may
+       SETTLE an instalment, asked once here and reused by every band below —
+       the same question views/debts.js:390 asks with
+       `tally(ledger(start, end), LENSES.BUDGET)`. Before this fix the walk
+       above built `rows` with no vetoes at all, so rule 2 in committed.js let
+       an Excluded row, or one from a `budget: false` account, or a payment out
+       of an earmarked fund, settle a debt the Debts page still showed as
+       short: the hero dropped the instalment from "still committed" and added
+       it to "actually free" while the Debts page read R9 000 outstanding.
+       `settleRows` fixed that for the home band; `settleRowsFx` closes the
+       same gap for a foreign one, which could not ask BUDGET at all — that
+       lens drops every foreign row by construction — until `dropsAnyOf`'s
+       `except` parameter was exported as the seam for asking it EXCEPT the
+       foreign veto, narrowed to the rows of that one currency. */
+    const stamped = ledger(start, end);
+    const settleRows = stamped.filter(s => keeps(LENSES.BUDGET, s)).map(s => s.row);
+    const settleRowsFx = sym => stamped
+      .filter(s => s.foreign && s.symbol === sym && !dropsAnyOf(LENSES.BUDGET, s, 'foreign'))
+      .map(s => s.row);
+
     const foreignGroups = foreignSyms
       .map(sym => ({
         sym,
@@ -621,6 +641,7 @@ module.exports = function registerDashboard(ctx) {
           services: fxOf(S.services, sym),
           debts: fxOf(S.debts.filter(d => d.status !== 'paid'), sym),
           ...txOf(sym),
+          settleRows: settleRowsFx(sym),
           periodStart: start, periodEnd: end, today: todayIso(),
         }),
       }))
@@ -631,17 +652,6 @@ module.exports = function registerDashboard(ctx) {
        longer holds unconditionally — it holds for the ones that say nothing,
        which is still nearly all of them. A euro subscription belongs to the
        euro band, not the household chain that subtracts it from rand cash. */
-    /* The rows that may SETTLE an instalment, asked of the same lens the Debts
-       page asks — `tally(ledger(start, end), LENSES.BUDGET)` there, the rows
-       behind that tally here. The walk above builds `rows` with no vetoes at
-       all, so rule 2 in committed.js used to let an Excluded row, or one from a
-       `budget: false` account, settle a debt that the Debts page still showed
-       as short: the hero dropped the instalment from "still committed" and
-       added it to "actually free" while the Debts page read R9 000 outstanding.
-       Home band only — see debtCommitments' comment for why a foreign band
-       cannot ask a lens that drops every foreign row. */
-    const settleRows = ledger(start, end).filter(s => keeps(LENSES.BUDGET, s)).map(s => s.row);
-
     const L = whatsLeft({
       accounts: byCurrency.get(home) || [],
       services: homeish(S.services), debts: homeish(S.debts),
@@ -1257,13 +1267,33 @@ module.exports = function registerDashboard(ctx) {
        carry a verdict — net worth and debt — and this band has to read the same
        way. Given green it becomes a second green number beside the gradient one,
        and the eye stops being able to tell which of the four is the headline. */
+    /* ISSUE 88 — figures.js's own contract: a page printing one base of the
+       balance book must be handed the other's drift. This tile prints the
+       IMPLIED savings+investment total (balances.implied.byType above) with
+       no caveat beside it, while the Savings page's own KPIs print STATED and
+       disclose the same gap — on the committed fixture R14 500 here against
+       R15 000 there, with nothing here explaining why. Read off
+       balances.driftByType (figures.js), never recomputed: it is the exact
+       figure the Savings page's own driftLine() sums, combined across both
+       pool types because this tile prints them combined.
+
+       Own keys, not the Dashboard's stale-note sentence: "since then" has no
+       date on this tile to be "then" — dedicated wording names what this
+       page prints instead (IMPLIED) against what the reader typed (STATED).
+       driftByType is implied − stated, so a POSITIVE drift means the number
+       on this tile is bigger than the stated figure — i.e. the stated
+       balances read LESS — and 'Up' is named for the sign, not the word. */
+    const savingsDrift = (balances.driftByType.savings || 0) + (balances.driftByType.investment || 0);
+    const savingsDriftLine = Math.abs(savingsDrift) >= 1
+      ? i18n.t(savingsDrift > 0 ? 'dash.pos.savingsDriftUp' : 'dash.pos.savingsDriftDown', { amount: money(Math.abs(savingsDrift), 0) })
+      : '';
     posTile(grid, {
       label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0), fig: 'pos-savings',
       sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
-        + otherLine(savingsOthers),
+        + otherLine(savingsOthers) + savingsDriftLine,
       view: 'savings',
       say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) })
-        + otherLine(savingsOthers),
+        + otherLine(savingsOthers) + savingsDriftLine,
     });
   }
 

@@ -287,7 +287,7 @@ function canConvert(settings, table) {
 }
 
 module.exports = {
-  STALE_AFTER_DAYS, REFRESH_AFTER_DAYS, DEFAULT_CADENCE, normalizeCadence, refreshAfterDays, refreshDue,
-  CODE_BY_COUNTRY, codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
+  STALE_AFTER_DAYS, REFRESH_AFTER_DAYS, normalizeCadence, refreshAfterDays, refreshDue,
+  codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
   rateBetween, convert, stalenessOf, convertAccounts, canConvert,
 };

@@ -159,6 +159,11 @@ function globals(ctx, S, period, today) {
   const budget = ctx.budgetTotals(period);
   const used = ctx.budgetUsed(period);
   const fig = ctx.periodFigures(period);
+  /* ISSUE 96: the Budget strip's OWN gap, not periodFigures.gap (the donut's —
+     see the ADR-0007 entry money-flow.js's budgetStripGap points at). reconcile()
+     sets S.period to `period` before calling this function, so this reads the
+     saved file, the same as every other seam checked here. */
+  const stripGap = ctx.budgetSpendGap();
   const spend = ctx.periodSpend(period, null);
   const income = ctx.monthlyIncome(period);
   const deficit = ctx.periodDeficit(period);
@@ -332,7 +337,7 @@ function globals(ctx, S, period, today) {
       fundedFromSavings: summary.fundedFromSavings, byCat: sortedPairs(summary.byCat) },
     budget, used, deficit, moved, income,
     figures: {
-      rows: fig.rows, split: fig.split, gap: fig.gap, scheduled: fig.scheduled, fundedFromSavings: fig.fundedFromSavings,
+      rows: fig.rows, split: fig.split, gap: fig.gap, stripGap, scheduled: fig.scheduled, fundedFromSavings: fig.fundedFromSavings,
       uncountedIncome: fig.uncountedIncome,
       trend: { whole: sortedPairs(spend.whole), wholeTotal: Object.values(spend.whole).reduce((a, b) => a + b, 0), count: spend.count },
       planTotal: budget.spend + budget.setAside,
@@ -663,16 +668,20 @@ function runChecks(G, pages) {
       globalValue: F.plan && F.plan.unallocated != null ? Math.abs(F.plan.unallocated) : null, globalSource: '|periodFigures.plan.unallocated|' });
     dom({ page: BP, name: `${strip}: total spent`, formula: 'budgetUsed(p).spent', re: new RegExp(`^${strip}/@bud-spent$`), globalValue: U.spent, globalSource: 'budgetUsed.spent' });
     dom({ page: BP, name: `${strip}: % of budget used`, formula: 'budgetUsed(p).used', kind: 'percent', re: new RegExp(`^${strip}/@bud-note-spent$`), globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed.used' });
-    /* WITHDRAWN, not pinned. This compared the Budget strip's gap against
-       `periodFigures.gap.notShown`, which is the DONUT's gap: it sums
-       categorySpendRows, which iterates sum.byCat and so includes categories
-       with no .md file, while the strip sums budgetDraft(), which seeds a row
-       only for declared categories and so excludes them. Two honest gaps, two
-       different numbers, one check conflating them — and the strip's gap has
-       no seam in the register at all (views/budgets.js recomputes grossGap by
-       hand), so there is nothing correct to compare it to yet. A check with no
-       right answer is worse than no check: it trains a reader to ignore a red
-       line. Restore it when the strip's gap gets a seam — see ISSUE 96. */
+    /* RESTORED (ISSUE 96). This used to compare the Budget strip's gap
+       against `periodFigures.gap.notShown` — the DONUT's gap, over a
+       different row population (categorySpendRows includes a category with
+       no .md file; the strip's draft never seeds one) — and was withdrawn
+       because there was nothing correct to compare the strip's own gap to.
+       views/budgets.js's budgetSpendGap() is that seam now (money-flow.js's
+       budgetStripGap, ADR-0007), so the check reads it instead. Each figure
+       is its own data-fig and, like the tile's other fragments, omitted
+       (never printed as R 0,00) below R1 — so a fixture with no such gap
+       reads `unverified` here, not `pass`. */
+    dom({ page: BP, name: `${strip}: uncategorised / unknown-name note`, formula: 'budgetSpendGap().uncat',
+      re: new RegExp(`^${strip}/@bud-note-uncat$`), globalValue: F.stripGap.uncat, globalSource: 'budgetSpendGap().uncat' });
+    dom({ page: BP, name: `${strip}: refunds netted note`, formula: 'budgetSpendGap().netted',
+      re: new RegExp(`^${strip}/@bud-note-netted$`), globalValue: F.stripGap.netted, globalSource: 'budgetSpendGap().netted' });
     /* Both figures live in ONE named fragment ("R2 000 set aside, R1 000 moved
        so far"), so they are index 0 and 1 WITHIN it — stable however many other
        fragments the note carries. Addressed by ordinal across the whole note

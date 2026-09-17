@@ -154,6 +154,6 @@ async function readCachedRates(io) {
 }
 
 module.exports = {
-  RATES_FILE, PROVIDER_NAME, PROVIDER_TERMS, endpointFor,
+  RATES_FILE, PROVIDER_NAME, endpointFor,
   parseProviderPayload, serializeRates, parseRatesFile, fetchRates, readCachedRates,
 };

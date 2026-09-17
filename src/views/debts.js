@@ -951,5 +951,5 @@ module.exports = function registerDebts(ctx) {
   function replan() { renderDebtKpis(); renderDebtPlan(); }
 
   // serializeDebts is published so the vault round-trip test drives the real one.
-  ctx.provide({ renderDebts, saveDebts, addDebt, serializeDebts, replan, DEBT_TYPES });
+  ctx.provide({ renderDebts, saveDebts, addDebt, serializeDebts, replan });
 };

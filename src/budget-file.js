@@ -155,4 +155,4 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
   return lines.join('\n');
 }
 
-module.exports = { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER, BUDGET_SEPARATOR, BUDGET_FRONTMATTER };
+module.exports = { serializeBudgetFile, budgetRangeNote, BUDGET_HEADER, BUDGET_FRONTMATTER };

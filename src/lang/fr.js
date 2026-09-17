@@ -186,16 +186,14 @@ module.exports = {
   'wiz.folder.willCreate': '« {folder} » n\'existe pas encore — il sera créé pour vous.',
   'wiz.folder.name': 'Dossier du budget',
   'wiz.folder.desc': 'Où sont conservés les catégories, comptes, budgets et transactions.',
-  'wiz.folder.notVault': 'Un dossier dans ce coffre, pas un coffre à part. L’ouvrir avec « Open folder as vault » masque le plugin.',
+  'wiz.folder.notVault': 'Un dossier dans ce coffre, pas un coffre à part. L’ouvrir comme un coffre à part masque le plugin.',
   'wiz.folder.connected': 'Budget existant trouvé dans "{folder}" — connexion à celui-ci plutôt que création de nouveaux fichiers. Vos catégories, comptes et transactions restent exactement tels quels ; seuls les réglages de cet écran sont écrits dans son Settings.md.',
-  'wiz.how.name': 'Comment allez-vous saisir vos dépenses ?',
   'wiz.how.desc': 'Vous pourrez le changer plus tard dans les Paramètres.',
   'wiz.how.csv.title': 'Importer les relevés bancaires (CSV)',
   'wiz.how.csv.desc': 'Téléchargez un CSV depuis votre banque et l\'application le range en catégories à mesure que vous lui apprenez.',
   'wiz.how.manual.title': 'Les saisir moi-même',
   'wiz.how.manual.desc': 'Aucun fichier bancaire — vous ajoutez vos revenus et vos dépenses à la main, ligne par ligne. La façon la plus simple de commencer.',
 
-  'wiz.rates.name': 'Détenez-vous de l\'argent dans plus d\'une devise ?',
   'wiz.rates.desc': 'Ne répondez oui que si certains de vos comptes sont dans une devise autre que {symbol}. C\'est la seule partie de l\'extension qui utilise internet.',
   'wiz.rates.off.title': 'Non, ou pas maintenant',
   'wiz.rates.off.desc': 'Rien n\'est récupéré et rien ne quitte votre appareil. Les comptes dans une autre devise restent affichés — leurs totaux sont simplement présentés séparément au lieu d\'être additionnés. Vous pourrez l\'activer plus tard dans les Paramètres.',
@@ -419,7 +417,6 @@ module.exports = {
   },
   'bud.copy.nothing': 'Rien à copier — chaque catégorie a déjà une valeur',
 
-
   /* =========================== Transactions page ========================== */
   'tx.wholeHistory': 'Tout l\'historique',
   'tx.allAccounts': 'Tous les comptes',
@@ -438,7 +435,6 @@ module.exports = {
   'tx.col.amount': 'Montant',
   'tx.col.excl': 'Hors budget',
   'tx.col.note': 'Note',
-  'tx.col.split': 'Répartir',
   'tx.col.actions': 'Actions de ligne',
 
   'tx.aria.category': 'Catégorie pour {date} {desc}',
@@ -574,7 +570,6 @@ module.exports = {
     other: '{count} lignes et {cats} catégories exportées vers {path}/',
   },
 
-
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Comptes bancaires',
   'acct.group.savings': 'Épargne',
@@ -650,37 +645,19 @@ module.exports = {
   'acct.budget.on': '{name} compte de nouveau dans le budget',
   'acct.budget.off': '{name} ne compte plus dans les totaux du budget',
 
-  'acct.creditUsed': 'Crédit utilisé',
-  'acct.creditOf': '{used} sur {limit}',
   'acct.overLimit': '{amount} au-dessus du plafond',
-  'acct.utilised': '{pct}% utilisé · {available} disponible',
 
-  'acct.kpi.inCredit': 'Créditeur',
-  'acct.kpi.overdrawn': 'À découvert',
-  'acct.kpi.netWorth': 'Valeur nette',
-  'acct.kpi.netWorthNote': 'sur ces comptes uniquement',
   'acct.kpi.attention': 'À vérifier',
-  'acct.kpi.attentionNote': 'soldes non confirmés ou qui ne correspondent pas',
-  'acct.kpi.allGood': 'tous les soldes concordent',
 
   'acct.aria.showTx': 'Afficher les transactions de {name}',
   'acct.aria.balance': 'Solde de {name}, {amount} — cliquez pour mettre à jour',
-  'acct.limitSuffix': ' · plafond {amount}',
-  'acct.monthlySuffix': ' · {amount}/mois',
 
   'acct.badge.notInBudget': 'hors budget',
   'acct.badge.noTx': 'aucune transaction',
   'acct.badge.asOf': 'au {date}',
   'acct.badge.currencyClash': 'lu comme {code}, pas {symbol}',
   'acct.drawer.currencyClash': 'Conflit de devise',
-  'acct.badge.neverConfirmed': 'jamais confirmé',
-  'acct.badge.unconfirmed': { one: 'non confirmé depuis {count} jour', other: 'non confirmé depuis {count} jours' },
 
-  'acct.act.in': ' entrée · ',
-  'acct.act.out': ' sortie · ',
-  'acct.act.count': { one: '{count} transaction en {month}', other: '{count} transactions en {month}' },
-
-  'acct.recon.since': { one: '{count} transaction depuis · totalise ', other: '{count} transactions depuis · totalisent ' },
   'acct.recon.pending': {
     one: ' · {count} datée en avance, pas encore comptée',
     other: ' · {count} datées en avance, pas encore comptées',
@@ -688,12 +665,8 @@ module.exports = {
   'acct.recon.undatable': { one: ' · {count} transaction portant une date que cette application ne peut pas lire, dans aucune des deux fenêtres', other: ' · {count} transactions portant des dates que cette application ne peut pas lire, dans aucune des deux fenêtres' },
   'acct.recon.useThis': 'Utiliser',
   'acct.aria.useThis': 'Mettre le solde de {name} à {amount}',
-  'acct.recon.matches': 'Correspond à vos transactions',
   'acct.recon.upToDate': { one: 'À jour · {count} transaction datée en avance', other: 'À jour · {count} transactions datées en avance' },
-  'acct.recon.setDate': 'Indiquez une date de solde pour la confronter à vos transactions',
 
-  'acct.foot.updated': 'mis à jour le {date}',
-  'acct.foot.noDate': 'pas de date de solde',
   'acct.aria.exclude': 'Ne plus compter {name} dans les totaux du budget',
   'acct.aria.include': 'Compter de nouveau {name} dans les totaux du budget',
   'acct.btn.exclude': 'Exclure du budget',
@@ -746,7 +719,6 @@ module.exports = {
     one: '{count} fichier de compte dans un sous-dossier de Accounts/ n’est pas lu ({names}). Déplacez-le directement dans Accounts/ pour l’inclure.',
     other: '{count} fichiers de compte dans des sous-dossiers de Accounts/ ne sont pas lus ({names}). Déplacez-les directement dans Accounts/ pour les inclure.',
   },
-  'acct.hero.mixed': ' Ce total additionne des comptes tenus dans plusieurs devises ({symbols}) sans les convertir.',
   'acct.hero.converted': ' Plus {list} — converti sur la ligne ci-dessus aux taux du {date}.',
   'acct.hero.convertedTotal': 'Total converti {amount}',
   'acct.hero.convertedStale': ' Plus {list} — converti sur la ligne ci-dessus aux taux du {date}, vieux de {days} jours.',
@@ -770,12 +742,13 @@ module.exports = {
   'settings.rateRefresh.weekly': 'Hebdomadaire',
   'settings.rateRefresh.monthly': 'Mensuel',
 
-  'acct.mixedTitle': 'Additionne des comptes tenus dans plusieurs devises, sans les convertir.',
   'acct.hero.count': 'Comptes',
   'acct.hero.oldest': 'Confirmation de solde la plus ancienne',
   'acct.hero.oldestDays': { one: '{count} jour', other: '{count} jours' },
   'acct.hero.oldestNone': 'aucun',
   'acct.hero.unreadable': { one: '{count} solde de compte n\'a pas pu être lu et est exclu de ce total.', other: '{count} soldes de compte n\'ont pas pu être lus et sont exclus de ce total.' },
+  'acct.hero.driftUp': ' Les opérations depuis vos soldes indiqués totalisent {amount} de plus.',
+  'acct.hero.driftDown': ' Les opérations depuis vos soldes indiqués totalisent {amount} de moins.',
   'acct.where.title': 'Où cela se trouve',
   'acct.where.sub': 'Part de ce que détiennent ces comptes',
   'acct.where.aria': 'Part de ce que détiennent ces comptes : {parts}',
@@ -785,12 +758,10 @@ module.exports = {
   'acct.where.excluded': '{amount} exclu du total ci-dessus.',
 
   'acct.deck.title': { one: 'Un compte attend une décision', other: '{count} comptes attendent une décision' },
-  'acct.deck.sub': 'Tout le reste de cette page concorde avec vos transactions.',
   'acct.deck.clear': 'Tout concorde avec vos transactions',
   'acct.deck.clearSub': 'Rien sur cette page ne demande de décision aujourd\'hui.',
   'acct.deck.review': 'Examiner',
   'acct.deck.ariaReview': 'Ouvrir la ligne {name} ci-dessous',
-  'acct.deck.more': { one: '{count} compte de plus — tout afficher dans le tableau', other: '{count} comptes de plus — tout afficher dans le tableau' },
   'acct.deck.why.drift': { one: '{count} transaction depuis votre dernière confirmation implique {implied}, et non {stated}', other: '{count} transactions depuis votre dernière confirmation impliquent {implied}, et non {stated}' },
   'acct.deck.why.unreadable': { one: '{count} transaction porte une date que cette application ne peut pas lire, le solde ne peut donc pas être vérifié par rapport à elle', other: '{count} transactions portent des dates que cette application ne peut pas lire, le solde ne peut donc pas être vérifié par rapport à elles' },
   'acct.deck.why.stale': { one: 'Non confirmé depuis {count} jour — dernière vérification le {date}', other: 'Non confirmé depuis {count} jours — dernière vérification le {date}' },
@@ -880,13 +851,11 @@ module.exports = {
   'acct.drawer.ahead': 'À venir',
   'acct.drawer.aheadRows': { one: '{count} opération datée plus tard dans cette période', other: '{count} opérations datées plus tard dans cette période', },
   'acct.drawer.folder': 'Dossier de transactions',
-  'acct.drawer.noFolder': 'aucun lié',
   'acct.drawer.inBudget': 'Compte pour le budget',
   'acct.drawer.yes': 'Oui',
   'acct.drawer.no': 'Non',
   'acct.btn.seeTx': 'Voir les transactions',
   'acct.btn.editBalance': 'Modifier le solde',
-
 
   /* ===================== shell chrome + Dashboard page ==================== */
   'shell.connect.title': 'Dossier du budget introuvable',
@@ -975,6 +944,8 @@ module.exports = {
   'dash.pos.savings': 'Épargne et placements',
   'dash.pos.savingsSub': '{savings} d\'épargne · {invested} investi',
   'dash.pos.savingsSay': '{amount} en épargne et placements. Ouvrir Épargne et placements.',
+  'dash.pos.savingsDriftUp': ' Les soldes indiqués affichent {amount} de moins.',
+  'dash.pos.savingsDriftDown': ' Les soldes indiqués affichent {amount} de plus.',
 
   'dash.overlap': 'Comptes de carte suivis : {accounts} · dettes de carte suivies : {debts} — si une carte figure dans les deux, elle est comptée deux fois ci-dessus.',
   'dash.overlap.btn': 'Vérifier les dettes',
@@ -1161,7 +1132,6 @@ module.exports = {
   'score.ring.showAll': 'Afficher les cinq parties',
   'score.ring.hint': 'Touchez une partie pour la voir seule.',
   'score.gap.railAria': '{name} : {points} sur {max} points obtenus.',
-
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Argent restant cette période',

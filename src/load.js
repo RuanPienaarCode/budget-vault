@@ -465,14 +465,6 @@ module.exports = function registerLoad(ctx) {
     S.plans = {}; S.planDirty = false;
     for (const { file: f, text } of await read(mdFilesUnder('Plans'))) {
       const { fm, raw, body } = parseFrontmatter(text);
-      /* Every status falls back rather than throwing, the same way stepStatus
-         does below: these files are hand-editable, and a typo in one cell must
-         not cost the reader the other forty rows. */
-      const srcStatus = s => (s || '').trim().toLowerCase() === 'expected' ? 'expected' : 'received';
-      const itemStatus = s => {
-        const t = (s || '').trim().toLowerCase();
-        return t === 'done' ? 'done' : (t === 'part' || t === 'partial') ? 'part' : 'planned';
-      };
       // Money columns go through normalizeAmount for the reason the debt
       // balances do: a hand-typed "40 000,00" read as 40 would be written
       // straight back over a figure nobody was editing.
@@ -551,14 +543,6 @@ module.exports = function registerLoad(ctx) {
       // The body holds three tables under "## Progress", "## Documents" and
       // "## Figures". parseMdTable reads every table row in the text it's
       // given, so slice the body by heading first and parse each on its own.
-      const stepStatus = s => {
-        const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
-        return ['todo', 'busy', 'done', 'n/a', 'na'].includes(t) ? (t === 'na' ? 'n/a' : t) : 'todo';
-      };
-      const docStatus = s => {
-        const t = (s || '').trim().toLowerCase().replace(/[-\s]/g, '');
-        return t === 'uploaded' ? 'uploaded' : (t === 'n/a' || t === 'na') ? 'n/a' : 'needed';
-      };
       /* ADR-0007 · Tax figures go through normalizeAmount. The one reader every hand-editable
          amount shares; coerce, do not throw. */
       const figAmount = s => normalizeAmount(s) ?? 0;

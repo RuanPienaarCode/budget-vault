@@ -17,6 +17,14 @@ const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom, descend } = require('./helpers/dom-stub.cjs');
+/* ISSUE 90 — the clock, pinned. healthSnapshot()'s trailing window is always
+   the six CALENDAR months before currentPeriod() (health-data.js), never
+   S.period, however this fixture sets S.period. MONTHS below is fixed at
+   Feb-Jul 2026 so that window only lines up while the suite happens to run
+   in Aug-2026-ish; reusing tests/_audit-seed.cjs's helper (the shared fix for
+   this exact shape) pins "now" inside August 2026 so the window always reads
+   MONTHS regardless of the real date the suite runs on. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -59,7 +67,7 @@ const FILES = {
 };
 for (const m of MONTHS) { FILES[`${B}/Transactions/Cheque/${m}.md`] = TX(m); }
 
-(async () => {
+atAuditDate(async () => {
   const ctx = makeCtx(FILES, { budgetFolder: B, settings: SETTINGS });
   const S = await loadInto(ctx);
   S.period = '2026-08';
@@ -169,4 +177,4 @@ for (const m of MONTHS) { FILES[`${B}/Transactions/Cheque/${m}.md`] = TX(m); }
   console.log(`PASS — audit follow-ups: reserves defines "essential" and states its divisor, `
     + `the fixed-flag empty state discloses its score effect, all four health tiles route, `
     + `and the missing-categories tile is a real button (${checks} assertions).`);
-})().catch(e => { console.error('FAIL —', e.message); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error('FAIL —', e.message); process.exit(1); });
