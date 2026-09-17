@@ -29,6 +29,11 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+/* ISSUE 90 — the clock, pinned, for section 6 below only. See
+   tests/audit-followups-score-dashboard.test.cjs for why: healthSnapshot()'s
+   trailing window is the six calendar months before the real currentPeriod(),
+   and section 6's MONTHS is fixed at Feb-Jul 2026. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -290,7 +295,7 @@ const moneyFlow = require('../src/money-flow');
     return ctx.healthSnapshot();
   }
 
-  (async () => {
+  atAuditDate(async () => {
     /* A. blank Rate, blank Payment. The Debt page's own money() reader really
        does write both cells as "0.00" underneath, so this proves the fix
        survives the round trip through the on-disk format, not just a
@@ -345,7 +350,7 @@ const moneyFlow = require('../src/money-flow');
     }
 
     console.log(`PASS — null-vs-zero part 1/2 (health-data through the real loader): ${checks} assertions so far.`);
-  })().then(runPart2).catch(e => { console.error('FAIL —', e.stack || e.message); process.exit(1); });
+  }, '2026-08-15').then(runPart2).catch(e => { console.error('FAIL —', e.stack || e.message); process.exit(1); });
 }
 
 /* ═══════════════════ 7. src/savings-math.js ════════════════════════════════

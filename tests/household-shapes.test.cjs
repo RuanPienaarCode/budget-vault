@@ -52,6 +52,14 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
+/* ISSUE 90 — the clock, pinned. See tests/audit-followups-score-dashboard.test.cjs
+   for why: healthSnapshot()'s trailing window (via snapOf's default period
+   '2026-08') is the six calendar months before the real currentPeriod(), and
+   MONTHS below is fixed at Feb-Jul 2026. 15 Aug is also before the 25th, so
+   this holds for the 'month_start_day 25' shape below too — currentPeriod()
+   only rolls a settings-day vault into the NEXT named period once the pinned
+   day reaches that settings value. */
+const { atAuditDate } = require('./_audit-seed.cjs');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -233,7 +241,7 @@ function invariants(label, snap) {
   }
 }
 
-(async () => {
+atAuditDate(async () => {
   /* ---- 1. settlement lag ---- */
   const byLag = [];
   for (const lag of [0, 1, 2, 3, 4, 5, 6, 7, 11, 17]) {
@@ -411,4 +419,4 @@ function invariants(label, snap) {
   }
 
   console.log(`PASS — the maths holds for households that are not the author's (${checks} checks).`);
-})().catch(e => { console.error(e.message); process.exit(1); });
+}, '2026-08-15').catch(e => { console.error(e.message); process.exit(1); });
