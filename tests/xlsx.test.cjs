@@ -293,4 +293,22 @@ throwsOk(() => buildXlsx(null), 'a non-array throws');
   }
 }
 
+/* Excel's hard limit is 32 767 characters in a cell; one longer and Excel
+   offers to "repair" the WHOLE workbook, which is how a single pasted note
+   becomes "the export is corrupt". Cut by CODE POINT, so the cut can never
+   land inside a surrogate pair and leave half an emoji — which escXml would
+   then have to strip, or which would make the part ill-formed. */
+{
+  const long = 'a'.repeat(32760) + '😀'.repeat(20);           // 32 800 UTF-16 units
+  const bytes = buildXlsx([{ name: 'S', rows: [[long, 'short']] }]);
+  // The archive is STORED, so the sheet XML is in there verbatim as UTF-8; the
+  // zip's own binary headers decode to replacement characters, which is fine.
+  const xml = new TextDecoder('utf-8').decode(bytes);
+  const m = /<t xml:space="preserve">(a+[^<]*)<\/t>/.exec(xml);
+  ok(m, 'the long cell is present');
+  ok(m[1].length <= 32767, `cell text is capped at Excel's 32 767 (got ${m[1].length})`);
+  ok(m[1].endsWith('…'), 'and says it was cut, rather than ending mid-word as if that were the whole note');
+  ok(!/[\uD800-\uDBFF]$/.test(m[1].slice(0, -1)), 'the cut did not split a surrogate pair');
+}
+
 console.log(`xlsx.test.cjs — ${checks} checks OK`);

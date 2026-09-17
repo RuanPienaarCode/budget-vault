@@ -36,6 +36,11 @@ All notable changes to Budget Vault. Versions match the plugin version in
   - The dialog remembers your last range, content, file types and folder. The
     category ticks are deliberately not remembered: categories come and go, and
     a stale tick list would silently narrow next month's file.
+  - **It tells you before it replaces anything.** Exporting the same selection
+    again overwrites the earlier files — that is what you want after fixing a
+    category — so the preview names any file that is already there, in case it
+    is one you edited by hand. Obsidian's own settings folder and the folders
+    this app loads data from are refused as destinations.
   - Afterwards a second dialog lists what was written with **Open** and **Show
     in file explorer** — the two honest ways onward, since a plugin cannot raise
     the share sheet itself. Files land in the vault (`Exports/` by default), as
@@ -68,7 +73,7 @@ All notable changes to Budget Vault. Versions match the plugin version in
   - Past twelve periods the PDF summary drops its month columns — they do not
     fit on a page — and says that the workbook and CSV carry every month.
 
-- Eighty-eight new interface strings in all twelve languages, including every
+- Ninety new interface strings in all twelve languages, including every
   heading and caveat printed into the exported document. File and sheet names
   stay English on purpose, so re-exporting after a language change still
   overwrites the earlier file instead of orphaning it.

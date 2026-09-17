@@ -614,6 +614,11 @@ module.exports = {
     one: 'Ixesha elingu-{count} · {range} · iindidi ezingu-{cats}',
     other: 'Amaxesha angu-{count} · {range} · iindidi ezingu-{cats}',
   },
+  'bx.replaces': {
+    one: 'Oku kuthatha indawo yefayile esele ikhona: {files}',
+    other: 'Oku kuthatha indawo yeefayile ezingu-{count} esele zikhona: {files}',
+  },
+  'bx.problem.configDir': 'Oko kungaphakathi kwe-{folder}, apho i-Obsidian igcina khona iisetingi zayo — iifayile ezilapho azibonakali kwivault yakho. Khetha enye ifolda.',
   'bx.problem.noPeriods': 'Akukho xesha liphelileyo elinedatha okwangoku — vula "Bandakanya ixesha langoku".',
   'bx.problem.noCats': 'Khetha ubuncinane udidi olunye.',
   'bx.problem.noRows': 'Akukho nto yokukhupha — akukho bhajethi okanye nkcitho kwiindidi ezikhethiweyo kweli xesha.',

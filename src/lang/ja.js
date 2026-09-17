@@ -576,6 +576,10 @@ module.exports = {
   'bx.preview': {
     other: '{count} 期間 · {range} · カテゴリ {cats} 件',
   },
+  'bx.replaces': {
+    other: '既にある {count} 件のファイルを置き換えます: {files}',
+  },
+  'bx.problem.configDir': 'そこは Obsidian 自身の設定が置かれる {folder} の中です — そこにあるファイルは保管庫に表示されません。別のフォルダーを選んでください。',
   'bx.problem.noPeriods': 'データのある終了済みの期間がまだありません — 「現在の期間を含める」をオンにしてください。',
   'bx.problem.noCats': 'カテゴリを1つ以上選んでください。',
   'bx.problem.noRows': '書き出すものがありません — 選んだカテゴリにこの期間の予算も支出もありません。',

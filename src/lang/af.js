@@ -599,6 +599,11 @@ module.exports = {
     one: '{count} tydperk · {range} · {cats} kategorieë',
     other: '{count} tydperke · {range} · {cats} kategorieë',
   },
+  'bx.replaces': {
+    one: 'Dit vervang \'n lêer wat reeds daar is: {files}',
+    other: 'Dit vervang {count} lêers wat reeds daar is: {files}',
+  },
+  'bx.problem.configDir': 'Dit is binne {folder}, waar Obsidian sy eie instellings hou — lêers daar wys nie in jou kluis nie. Kies \'n ander vouer.',
   'bx.problem.noPeriods': 'Daar is nog geen voltooide tydperk met data nie — skakel "Sluit die huidige tydperk in" aan.',
   'bx.problem.noCats': 'Kies ten minste een kategorie.',
   'bx.problem.noRows': 'Niks om uit te voer nie — geen begroting of besteding in die gekose kategorieë vir hierdie tydperk nie.',

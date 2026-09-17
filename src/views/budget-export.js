@@ -88,6 +88,27 @@ module.exports = function registerBudgetExport(ctx) {
     return out;
   };
 
+  /* Obsidian's own config folder (".obsidian" unless the vault renamed it).
+     io.js's guardedVaultPath keeps a write inside the VAULT, and the config
+     folder is inside the vault — so a typed ".obsidian/plugins" was a legal
+     destination: a real file, a success toast, and nothing visible anywhere,
+     since the file explorer hides that folder. Compared by SEGMENT, so
+     ".obsidian-notes" is still an ordinary folder. */
+  const configDir = () => String((app.vault && app.vault.configDir) || '.obsidian');
+  const inConfigDir = dir => {
+    const segs = String(dir || '').split('/').filter(Boolean);
+    const cfg = configDir().split('/').filter(Boolean);
+    return cfg.length > 0 && cfg.every((seg, i) => (segs[i] || '').toLowerCase() === seg.toLowerCase());
+  };
+
+  /* Every category a TRANSACTION can carry — transfers included, though they
+     are never a budget row (figures.js drops them). The first checklist left
+     them out, which made "every box ticked" (no filter, transfers listed) and
+     "one box unticked" (a filter no transfer could ever be in) differ by a
+     whole class of transactions the reader never chose to remove. S.categories
+     is already in type-then-name order (load.js), the grouping the list draws. */
+  const budgetExportCategories = () => S.categories.map(c => ({ name: c.name, type: c.type }));
+
   function periodsFor(answer) {
     return exportPeriods({
       range: answer.range, includeCurrent: answer.includeCurrent, anchor: currentPeriod(),
@@ -151,10 +172,18 @@ module.exports = function registerBudgetExport(ctx) {
        exceptions. */
     const managed = managedFolderMatch(paths.dir, plugin.settings.budgetFolder);
     if (managed) return { problem: i18n.t('report.field.folderManaged', { folder: managed }) };
+    if (inConfigDir(paths.dir)) return { problem: i18n.t('bx.problem.configDir', { folder: configDir() }) };
     if (!model.summary.rows.length) return { problem: i18n.t('bx.problem.noRows') };
     return {
       what: i18n.t('bx.preview', { count: model.periods.length, range: model.rangeLabel, cats: model.summary.rows.length }),
       files: list,
+      /* An export REPLACES whatever is at its path — that is its contract, and
+         what someone who just fixed a category and exported again wants. It is
+         also how a hand-edited "Budget June 2026.xlsx" kept in the same folder
+         would be lost without a word. views/tax.js can refuse to overwrite; an
+         export cannot, so it says which files are already there, per file,
+         before the click. */
+      replaces: list.filter(p => !!fileAtVaultPath(p)),
     };
   }
 
@@ -187,6 +216,11 @@ module.exports = function registerBudgetExport(ctx) {
     try {
       const model = modelFor(answer, true);
       const { paths } = filesFor(answer, model);
+      /* Refused here as well as in describe(): the dialog's refusal can be
+         bypassed by anything that calls this directly; the write cannot. */
+      if (inConfigDir(paths.dir) || managedFolderMatch(paths.dir, plugin.settings.budgetFolder)) {
+        throw new Error(`Refused export into ${paths.dir}`);
+      }
       if (answer.formats.includes('pdf')) {
         const pdf = await pdfBytes(model);
         raster = pdf.raster;
@@ -219,11 +253,7 @@ module.exports = function registerBudgetExport(ctx) {
     const answer = await askBudgetExport(app, {
       state: remembered,
       defaultFolder: plugin.settings.exportFolder || 'Exports',
-      /* S.categories is already in type-then-name order (load.js), which is
-         the grouping the checklist draws. Transfers are left out: they are
-         never a budget row (figures.js drops them), so ticking one would
-         select nothing. */
-      categories: S.categories.filter(c => c.type !== 'transfer').map(c => ({ name: c.name, type: c.type })),
+      categories: budgetExportCategories(),
       describe,
     });
     if (!answer) return;                       // cancelled — say nothing, do nothing
@@ -287,5 +317,5 @@ module.exports = function registerBudgetExport(ctx) {
     }
   }
 
-  ctx.provide({ exportBudget, runBudgetExport, describeBudgetExport: describe });
+  ctx.provide({ exportBudget, runBudgetExport, describeBudgetExport: describe, budgetExportCategories });
 };

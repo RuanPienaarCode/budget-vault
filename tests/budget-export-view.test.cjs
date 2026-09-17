@@ -134,6 +134,45 @@ const text = (ctx, p) => ctx.vault._store.get(p);
     ok(ctx.describeBudgetExport({ ...ANSWER, categories: ['No such category'] }).problem, 'a pick that matches nothing is refused rather than exported empty');
   }
 
+  /* ---- 5b. an export REPLACES what is at its path, so the preview must say so ----
+     writeVaultFile/writeVaultBinary modify in place — right for re-exporting a
+     selection you just corrected, and silent data loss for the household
+     member who keeps their own hand-edited "Budget June 2026 to July 2026.xlsx"
+     in Exports/. views/tax.js refuses to overwrite a certificate; an export
+     cannot refuse (overwriting is its contract), so it discloses, per file,
+     BEFORE the click. */
+  {
+    const ctx = await mount();
+    eq(ctx.describeBudgetExport(ANSWER).replaces, [], 'a first export replaces nothing');
+    await ctx.runBudgetExport({ ...ANSWER, formats: ['xlsx'] });
+    eq(ctx.describeBudgetExport(ANSWER).replaces, ['Exports/Budget June 2026 to July 2026.xlsx'],
+      'a second one names exactly the file already there — not the PDF and CSVs that are new');
+  }
+
+  /* ---- 5c. Obsidian's own config folder is not an export destination ---- */
+  {
+    const ctx = await mount();
+    ctx.app.vault.configDir = '.obsidian';
+    ok(ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian/plugins' }).problem, 'a folder inside the config directory is refused');
+    ok(ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian' }).problem, 'and the directory itself');
+    ok(!ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian-notes' }).problem, 'a folder that merely STARTS with the same characters is not — segments, not prefixes');
+    let err = null;
+    try { await ctx.runBudgetExport({ ...ANSWER, folder: '.obsidian', formats: ['csv'] }); } catch (e) { err = e; }
+    ok(err, 'and the write refuses a second time, independently of the dialog');
+    ok(![...ctx.vault._store.keys()].some(k => k.startsWith('.obsidian/')), 'nothing was written there');
+  }
+
+  /* ---- 5d. the checklist offers every category a TRANSACTION can carry ----
+     Transfer-typed categories are never a budget row, so the first checklist
+     left them out — and then "every box ticked" (no filter) listed transfer
+     transactions while unticking any one unrelated box made them vanish, with
+     nothing on the page to say why. */
+  {
+    const ctx = await mount();
+    ok(ctx.budgetExportCategories().some(c => c.type === 'transfer'), 'transfer categories are in the list');
+    eq(ctx.budgetExportCategories().length, ctx.S.categories.length, 'so "all ticked" and "no filter" are the same set of named categories');
+  }
+
   /* ---- 6. text Helvetica cannot draw ---- */
   {
     const ctx = await mount({

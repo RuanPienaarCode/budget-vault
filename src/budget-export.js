@@ -112,8 +112,16 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
   const byCat = new Map();
   shown.forEach((rows, i) => {
     for (const r of rows) {
-      let s = byCat.get(r.cat);
-      if (!s) { s = { cat: r.cat, type: r.type, byPeriod: list.map(() => 0), budget: 0 }; byCat.set(r.cat, s); }
+      /* Keyed by TYPE and name, not name alone. figures.js reads a type live,
+         so within one export a category is normally one type throughout — but
+         for a category since DELETED, budgetRowType falls back to the type each
+         period's own budget file stored, and those can differ. Keyed by name,
+         July's "savings" R90 was poured into the EXPENSE subtotal while July's
+         own table printed it under savings. Two rows is the honest rendering:
+         the category really was two things. */
+      const key = `${r.type}\u0000${r.cat}`;
+      let s = byCat.get(key);
+      if (!s) { s = { cat: r.cat, type: r.type, byPeriod: list.map(() => 0), budget: 0 }; byCat.set(key, s); }
       s.byPeriod[i] += Number(r.actual) || 0;
       s.budget += Number(r.budget) || 0;
     }
@@ -380,6 +388,15 @@ function modelToDoc(model, { money, rowMoney, labels } = {}) {
    that overwrote last week's full export would be that rule turned into data
    loss. Literal English words, never i18n: views/report.js's filenameLabel
    explains how a translated "to" made the same selection land on two paths. */
+/* djb2 over the sorted names, base 36. Not a security hash: it only has to make
+   "these four" and "those four" different file names, deterministically, in
+   every engine — so no crypto.subtle (async) and no Node crypto. */
+function pickTag(sortedCats) {
+  let h = 5381;
+  for (const ch of sortedCats.join('\u0000')) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
+  return h.toString(36).padStart(4, '0');
+}
+
 function budgetExportPaths(model, folder) {
   const dir = String(folder || EXPORT_DIR).split('/')
     .filter(seg => seg.trim() && !/^\.+$/.test(seg.trim()))
@@ -388,12 +405,13 @@ function budgetExportPaths(model, folder) {
      categories)" would let an export of Groceries silently overwrite last
      week's export of Fuel. Up to three are named; past that the name counts
      them, because a file name has a length limit and a category list does not.
-     Two different picks of the same SIZE above three still share a name — the
-     dialog's preview line shows the path before the click for exactly that
-     reason. */
-  const cats = model.categories || [];
+     The count alone is not enough — two different picks of four would share a
+     path, and one would silently overwrite the other — so it carries a short
+     tag of WHICH ones, over the SORTED list so the same pick ticked in another
+     order still lands on, and replaces, its own earlier file. */
+  const cats = (model.categories || []).slice().sort();
   const filterTag = !model.filtered ? ''
-    : (cats.length && cats.length <= 3 ? `(${cats.join(', ')})` : `(${cats.length} categories)`);
+    : (cats.length && cats.length <= 3 ? `(${cats.join(', ')})` : `(${cats.length} categories ${pickTag(cats)})`);
   const name = safeName([
     model.content === 'full' ? 'Budget' : 'Budget summary',
     model.rangeLabel,

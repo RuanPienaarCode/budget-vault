@@ -619,6 +619,11 @@ module.exports = {
     one: 'Isikhathi esingu-{count} · {range} · izigaba ezingu-{cats}',
     other: 'Izikhathi ezingu-{count} · {range} · izigaba ezingu-{cats}',
   },
+  'bx.replaces': {
+    one: 'Lokhu kuthatha indawo yefayela elivele likhona: {files}',
+    other: 'Lokhu kuthatha indawo yamafayela angu-{count} avele ekhona: {files}',
+  },
+  'bx.problem.configDir': 'Lokho kungaphakathi kwe-{folder}, lapho i-Obsidian igcina khona izilungiselelo zayo — amafayela alapho awabonakali ku-vault yakho. Khetha enye ifolda.',
   'bx.problem.noPeriods': 'Asikho isikhathi esiphelile esinedatha okwamanje — vula "Faka isikhathi samanje".',
   'bx.problem.noCats': 'Khetha okungenani isigaba esisodwa.',
   'bx.problem.noRows': 'Akukho okokukhipha — asikho isabelomali noma ukusetshenziswa kwezigaba ezikhethiwe kulesi sikhathi.',

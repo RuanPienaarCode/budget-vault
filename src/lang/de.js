@@ -600,6 +600,11 @@ module.exports = {
     one: '{count} Zeitraum · {range} · {cats} Kategorien',
     other: '{count} Zeiträume · {range} · {cats} Kategorien',
   },
+  'bx.replaces': {
+    one: 'Dies ersetzt eine bereits vorhandene Datei: {files}',
+    other: 'Dies ersetzt {count} bereits vorhandene Dateien: {files}',
+  },
+  'bx.problem.configDir': 'Das liegt in {folder}, wo Obsidian seine eigenen Einstellungen ablegt — Dateien dort erscheinen nicht in deinem Vault. Wähle einen anderen Ordner.',
   'bx.problem.noPeriods': 'Es gibt noch keinen abgeschlossenen Zeitraum mit Daten — schalte "Aktuellen Zeitraum einbeziehen" ein.',
   'bx.problem.noCats': 'Wähle mindestens eine Kategorie.',
   'bx.problem.noRows': 'Nichts zu exportieren — kein Budget oder keine Ausgaben in den gewählten Kategorien für diesen Zeitraum.',

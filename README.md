@@ -64,7 +64,7 @@ Note the two levels: `Finances/` is an ordinary folder *inside* your vault, and
 that is the folder above them, the one holding `.obsidian/`. See the note under
 [Install](#install) for what happens if you open one of them as a vault instead.
 
-Two folders sit **outside** the budget folder, at the top of your vault, because what they hold isn't household data to load back in — it's something you asked the plugin to write out: `Exports/` (CSV/Markdown transaction exports) and `Reports/` (the one-note financial report, Markdown and/or JSON). Both default to those names but are yours to rename or relocate from the Transactions and Report pages, and both show you the exact path before anything is written.
+Two folders sit **outside** the budget folder, at the top of your vault, because what they hold isn't household data to load back in — it's something you asked the plugin to write out: `Exports/` (CSV/Markdown transaction exports, and the Budget page's **Export** — your budget for the last month, quarter, year or everything, as a PDF, an Excel workbook or CSV) and `Reports/` (the one-note financial report, Markdown and/or JSON). Both default to those names but are yours to rename or relocate from the Transactions, Budget and Report pages, and both show you the exact path before anything is written.
 
 ### Debts.md
 

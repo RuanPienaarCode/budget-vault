@@ -613,6 +613,11 @@ module.exports = {
     one: '{count} période · {range} · {cats} catégories',
     other: '{count} périodes · {range} · {cats} catégories',
   },
+  'bx.replaces': {
+    one: 'Ceci remplace un fichier déjà présent : {files}',
+    other: 'Ceci remplace {count} fichiers déjà présents : {files}',
+  },
+  'bx.problem.configDir': 'Ce dossier se trouve dans {folder}, où Obsidian conserve ses propres réglages — les fichiers qui s\'y trouvent n\'apparaissent pas dans votre coffre. Choisissez un autre dossier.',
   'bx.problem.noPeriods': 'Il n\'y a encore aucune période terminée avec des données — activez « Inclure la période en cours ».',
   'bx.problem.noCats': 'Choisissez au moins une catégorie.',
   'bx.problem.noRows': 'Rien à exporter — aucun budget ni dépense dans les catégories choisies pour cette période.',

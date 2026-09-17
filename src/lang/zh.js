@@ -576,6 +576,10 @@ module.exports = {
   'bx.preview': {
     other: '{count} 个周期 · {range} · {cats} 个分类',
   },
+  'bx.replaces': {
+    other: '这会替换已存在的 {count} 个文件：{files}',
+  },
+  'bx.problem.configDir': '该位置在 {folder} 里面，那是 Obsidian 保存自身设置的地方——放在那里的文件不会显示在你的库中。请选择其他文件夹。',
   'bx.problem.noPeriods': '目前还没有带数据的已结束周期 — 请打开"包含当前周期"。',
   'bx.problem.noCats': '请至少选择一个分类。',
   'bx.problem.noRows': '没有可导出的内容 — 所选分类在此周期内没有预算或支出。',

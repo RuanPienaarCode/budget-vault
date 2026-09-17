@@ -196,6 +196,12 @@ class BudgetExportModal extends Modal {
       this.previewEl.append(
         el('div', { class: 'budget-export-what' }, d.what),
         el('div', { class: 'budget-export-files' }, d.files.join('\n')));
+      /* Named, not counted: "replaces 1 file" leaves the reader to work out
+         which, and the one they would mind is the one they need to see. */
+      if (d.replaces && d.replaces.length) {
+        this.previewEl.append(el('div', { class: 'budget-export-replaces' },
+          i18n.t('bx.replaces', { count: d.replaces.length, files: d.replaces.map(p => p.split('/').pop()).join(', ') })));
+      }
     }
     if (this.goBtn) this.goBtn.setDisabled(!!d.problem);
     this.blocked = !!d.problem;

@@ -589,6 +589,10 @@ module.exports = {
   'bx.preview': {
     other: '{count} periode · {range} · {cats} kategori',
   },
+  'bx.replaces': {
+    other: 'Ini menggantikan {count} file yang sudah ada: {files}',
+  },
+  'bx.problem.configDir': 'Itu berada di dalam {folder}, tempat Obsidian menyimpan pengaturannya sendiri — file di sana tidak tampil di vault Anda. Pilih folder lain.',
   'bx.problem.noPeriods': 'Belum ada periode selesai dengan data — nyalakan "Sertakan periode saat ini".',
   'bx.problem.noCats': 'Pilih setidaknya satu kategori.',
   'bx.problem.noRows': 'Tidak ada yang bisa diekspor — tidak ada anggaran atau pengeluaran di kategori yang dipilih untuk periode ini.',

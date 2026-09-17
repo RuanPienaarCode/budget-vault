@@ -52,3 +52,26 @@ which is what makes these changes the author's to make.
 
 This repository's git history was rewritten on 7 August 2026, so commit
 identifiers from before that date no longer resolve here.
+
+
+THIRD-PARTY MATERIAL
+--------------------
+
+src/pdf.js carries the advance widths of Helvetica and Helvetica-Bold, taken
+from Adobe's Core 14 AFM font metric files. No font program is included — only
+the published width of each character, which a PDF that names a built-in font
+needs in order to place text. Those files are distributed under this notice,
+which is retained here as it requires:
+
+  Copyright (c) 1985, 1987, 1989, 1990, 1991, 1992, 1993, 1997 Adobe Systems
+  Incorporated. All Rights Reserved.
+
+  This file and the 14 PostScript(R) AFM files it accompanies may be used,
+  copied, and distributed for any purpose and without charge, with or without
+  modification, provided that all copyright notices are retained; that the AFM
+  files are not distributed without this file; and that all modifications to
+  this file or any of the AFM files are prominently noted in the modified
+  file(s).
+
+Helvetica is a trademark of Linotype-Hell AG and/or its subsidiaries.
+PostScript is a registered trademark of Adobe Systems Incorporated.

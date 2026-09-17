@@ -153,6 +153,29 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   eq(none.summary.rows, [], 'an EMPTY list is "none selected", not "no filter" — the dialog must refuse it, the model must not widen it');
 }
 
+/* ---- a category whose TYPE differs between periods ----
+   figures.js reads a category's type live, so inside one export it is normally
+   one type throughout — except for a category that has since been DELETED,
+   where budgetRowType falls back to the type each period's own budget file
+   stored. Keyed by name alone, the summary kept the first period's type and
+   poured July's "savings" R90 into the EXPENSE subtotal, while July's own
+   table, two pages on, printed it under savings: two figures derived by
+   different rules, inside one document. */
+{
+  const A = { ...P[0], rows: [row('Old Cat', 'expense', 100, 80)], txs: [] };
+  const B = { ...P[1], rows: [row('Old Cat', 'savings', 100, 90)], txs: [] };
+  const m = bx.buildModel({ periods: [A, B], content: 'full', categories: null, includeTx: false, ...META });
+  eq(m.summary.rows.map(r => [r.cat, r.type, r.byPeriod]), [['Old Cat', 'expense', [80, 0]], ['Old Cat', 'savings', [0, 90]]],
+    'one summary row per category PER TYPE — the name alone is not the key');
+  eq(m.summary.subtotals.map(s => [s.type, s.total]), [['expense', 80], ['savings', 90]], 'so each subtotal holds only its own type');
+  for (const [i, b] of m.budgets.entries()) {
+    for (const s of b.subtotals) {
+      eq(m.summary.subtotals.find(x => x.type === s.type).byPeriod[i], s.actual,
+        `summary subtotal "${s.type}" for period ${i} equals that period's own table — the identity the two pages must share`);
+    }
+  }
+}
+
 /* ================================== 6. CSV =================================== */
 {
   const m = bx.buildModel({ periods: P, content: 'full', categories: null, includeTx: true, ...META });
@@ -257,7 +280,11 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   const two = bx.buildModel({ periods: P.slice(0, 1), content: 'summary', categories: ['Groceries'], includeTx: false, ...META });
   ok(bx.budgetExportPaths(two, '').pdf !== bx.budgetExportPaths(s, '').pdf, 'nor may one filtered export overwrite a DIFFERENT filtered one: the name says which categories');
   const many = bx.buildModel({ periods: P, content: 'full', categories: ['Salary', 'Groceries', 'Fuel', '=Rent'], includeTx: false, ...META });
-  eq(bx.budgetExportPaths(many, '').pdf, 'Exports/Budget June 2026 to July 2026 (4 categories).pdf', 'past three, the name counts them rather than growing without bound');
+  ok(/^Exports\/Budget June 2026 to July 2026 \(4 categories [0-9a-z]{4,}\)\.pdf$/.test(bx.budgetExportPaths(many, '').pdf), 'past three, the name counts them rather than growing without bound — plus a short tag of WHICH four');
+  const other = bx.buildModel({ periods: P, content: 'full', categories: ['Salary', 'Groceries', 'Fuel', 'Other'], includeTx: false, ...META });
+  ok(bx.budgetExportPaths(other, '').pdf !== bx.budgetExportPaths(many, '').pdf, 'two DIFFERENT picks of the same size must not share a path: that is one export silently overwriting another');
+  const reordered = bx.buildModel({ periods: P, content: 'full', categories: ['=Rent', 'Fuel', 'Groceries', 'Salary'], includeTx: false, ...META });
+  eq(bx.budgetExportPaths(reordered, '').pdf, bx.budgetExportPaths(many, '').pdf, 'while the SAME pick, ticked in another order, still overwrites itself — named by what is in it');
   eq(bx.budgetExportPaths(m, '../../secrets').dir, 'secrets', 'a traversal folder resolves to the folder actually named');
   const evil = bx.buildModel({ periods: [{ ...P[0], name: 'Pay/day: *June*' }], content: 'summary', categories: null, includeTx: false, ...META });
   ok(!/[\\:*?"<>|]/.test(bx.budgetExportPaths(evil, 'Exports').pdf.split('/').pop()), 'a period name cannot put a path character in the file name');

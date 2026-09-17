@@ -75,6 +75,23 @@ function bmpCharIsLegal(code) {
   return false;
 }
 
+/* Excel refuses a cell longer than 32 767 characters — and not just the cell:
+   it offers to "repair" the whole workbook, so one pasted-in note turns into
+   "the export is corrupt". Capped with an ellipsis so the reader can see it
+   was cut. Walked by code point: a cut that landed between the halves of a
+   surrogate pair would leave a lone surrogate for escXml to strip at best. */
+const CELL_MAX = 32767;
+function capCell(value) {
+  const str = String(value);
+  if (str.length <= CELL_MAX) return str;
+  let out = '';
+  for (const ch of str) {
+    if (out.length + ch.length > CELL_MAX - 1) break;
+    out += ch;
+  }
+  return out + '\u2026';
+}
+
 function escXml(value) {
   const s = value === null || value === undefined ? '' : String(value);
   let out = '';
@@ -254,7 +271,7 @@ function rowXml(rowNumber, cells) {
     } else {
       // Inline string, never sharedStrings — see this module's header for why
       // that also closes the formula-injection hole without a quote prefix.
-      parts.push(`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${escXml(v)}</t></is></c>`);
+      parts.push(`<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${escXml(capCell(v))}</t></is></c>`);
     }
   }
   return parts.length ? `<row r="${rowNumber}">${parts.join('')}</row>` : `<row r="${rowNumber}"/>`;

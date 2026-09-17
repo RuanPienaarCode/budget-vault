@@ -2693,6 +2693,7 @@
 .budget-export-actions { border-top: 0; padding-top: 6px; }
 .budget-export-files { white-space: pre-line; overflow-wrap: anywhere; opacity: .75; font-variant-numeric: tabular-nums; }
 .budget-export-problem { color: var(--text-error, #d33); font-weight: 600; }
+.budget-export-replaces { margin-top: 6px; color: var(--text-warning, #b7791f); overflow-wrap: anywhere; }
 .budget-export-done { margin: 0 0 4px; }
 .budget-export-done-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; }
 .budget-export-done-row + .budget-export-done-row {
