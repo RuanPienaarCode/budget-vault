@@ -5,7 +5,7 @@
 const { el, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr } = require('../markdown');
-const { SCHEMAS, headerLines, rowLine } = require('../table-schema');
+const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
 const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
@@ -810,11 +810,21 @@ module.exports = function registerTransactions(ctx) {
        six-column shape it has always had by slicing the schema, not by
        hand-writing a second header. */
     const hasSplit = f.rows.some(r => splitRole(r.split));
-    const schema = hasSplit ? SCHEMAS.transactions
+    /* ISSUE 69 — a hand-added column (a running Balance) past what this
+       schema knows about, carried through via extraCells/extraCols the same
+       way table-schema.js's mdTableFile does for the four flat tables. An
+       extra column FIXES where Split sits on disk (position 6) even on a
+       save where every split has since been cleared — dropping Split here
+       would shift the reader's own column into Split's old slot instead of
+       merely losing an empty one. */
+    const extraCols = f.extraCols;
+    const keepSplit = hasSplit || (extraCols && f.splitHeaderPresent);
+    const schema = keepSplit ? SCHEMAS.transactions
       : { ...SCHEMAS.transactions, columns: SCHEMAS.transactions.columns.slice(0, 6) };
-    const lines = ['---', fm, '---', '', ...headerLines(schema)];
+    const [header, sep] = extraCols ? headerLinesWithExtras(schema, extraCols) : headerLines(schema);
+    const lines = ['---', fm, '---', '', header, sep];
     f.rows.sort((a, b) => a.date.localeCompare(b.date));
-    for (const r of f.rows) lines.push(rowLine(schema, r));
+    for (const r of f.rows) lines.push(extraCols ? rowLineWithExtras(schema, r, extraCols) : rowLine(schema, r));
     lines.push('');
     return lines.join('\n');
   }

@@ -7,7 +7,7 @@
    Edit seeded sources to match your own banks, providers and income. */
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
-const { escMd, patchFrontmatter, yamlStr } = require('../markdown');
+const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { todayIso, daysUntil } = require('../dates');
@@ -632,18 +632,32 @@ module.exports = function registerTax(ctx) {
        coerced status word. */
     const cash = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : Number(r[key] || 0).toFixed(2));
     const word = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : r[key]);
-    const lines = ['---', ...fm.split('\n'), '---', '', `# Tax Year ${year}`, '',
+    /* ISSUE 67 — the intro paragraph is locale-derived (loc.authority,
+       loc.yearSpan), so it is regenerated fresh every save — a household that
+       switches country must see the new one, not a sentence frozen from the
+       day this page first loaded. withLeadExtra only reaches PAST that fixed
+       shape, for whatever a reader's own file held beyond it. Anything they
+       added as its own `## heading`, or a plain paragraph left under one of
+       the three tables below, is in `t.extras` (extraContent, load.js) and is
+       replayed via extrasAfter() at the position it was found. */
+    const leadLines = withLeadExtra(t.leadRaw, freshLeadLines(`Tax Year ${year}`, [
       `${loc.authority === 'Tax' ? 'Tax' : loc.authority} return tracking for the ${year} tax year (${loc.yearSpan(+year)}).`,
       'Step `status` is `todo`, `busy`, `done` or `n/a`; document `status` is `needed`, `uploaded` or `n/a`.',
-      `Uploaded files live in \`Tax/${year}/\`.`, '',
+      `Uploaded files live in \`Tax/${year}/\`.`,
+    ]));
+    const extrasAfter = name => (t.extras || []).filter(e => e.after === name)
+      .flatMap(e => ['', ...e.raw.split(/\r?\n/)]);
+    const lines = ['---', ...fm.split('\n'), '---', ...leadLines, ...extrasAfter(null),
       '## Progress', '',
       '| Step | Status | Due | Notes |',
       '|------|--------|-----|-------|'];
     for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${word(s, 'status')} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
+    lines.push(...extrasAfter('progress'));
     lines.push('', '## Documents', '',
       '| Document | Source | Status | File | Notes |',
       '|----------|--------|--------|------|-------|');
     for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${word(d, 'status')} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+    lines.push(...extrasAfter('documents'));
     // Emit the header even when empty so the section is discoverable in the
     // raw file rather than appearing only once a figure is added.
     lines.push('', '## Figures', '',
@@ -652,6 +666,7 @@ module.exports = function registerTax(ctx) {
     for (const f of (t.figures || [])) {
       lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${cash(f, 'amount')} |`);
     }
+    lines.push(...extrasAfter('figures'));
     lines.push('');
     return lines.join('\n');
   }

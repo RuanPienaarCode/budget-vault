@@ -38,7 +38,7 @@
    gains a second door onto raw transaction rows; everything still goes
    through tx-role.js. */
 
-const { escMd, unescMd } = require('./markdown');
+const { escMd, unescMd, freshLeadLines, withLeadExtra } = require('./markdown');
 const { parseNum } = require('./amount');
 const { splitRole } = require('./tx-role');
 
@@ -65,6 +65,64 @@ function rowToObject(schema, cells) {
     Object.assign(obj, schema.columns[i].read(cells[i]));
   }
   return obj;
+}
+
+/* ISSUE 69. A cell past the schema's own columns is never interpreted — this
+   file has no idea what a hand-added "Balance" column means — only carried,
+   verbatim, exactly as parseMdTable handed it back (still \|-escaped, like
+   every raw this module keeps). `known` is the FULL schema length, not
+   usedColumns()'s trimmed one: a row's position on disk is fixed by what was
+   actually written, and the optional tail (currency) still owns its own slot
+   whether or not this particular file ever used it. Called once per row from
+   load.js, right after rowToObject. */
+function attachExtraCells(obj, known, cells) {
+  const extra = cells.slice(known);
+  if (extra.length) obj.extraCells = extra;
+  return obj;
+}
+
+/* ISSUE 69. The table-level half of the same contract: the header cells and
+   separator cells past `known`, captured ONCE per file rather than once per
+   row. `header`/`sep` come from parseMdTableWithSeparator; `dataRows` from
+   the same call, so a row LONGER than the header (a cell nobody named) still
+   gets a slot here — synthesised with a blank header and a plain `---`
+   separator, because "no column happens to be named for it" is not licence
+   to drop it. A row SHORTER than the header is the ordinary case every other
+   column here already handles: absent means blank, not missing. Returns null
+   when nothing on this table reaches past `known`, which is the common case
+   and keeps every existing writer's output byte-identical. */
+function extraColsOf(known, header, sep, dataRows) {
+  const extraHeaders = (header || []).slice(known);
+  const extraSep = (sep || []).slice(known);
+  let maxLen = extraHeaders.length;
+  for (const c of dataRows) maxLen = Math.max(maxLen, c.length - known);
+  if (maxLen <= 0) return null;
+  return {
+    headers: Array.from({ length: maxLen }, (_, i) => extraHeaders[i] ?? ''),
+    sep: Array.from({ length: maxLen }, (_, i) => extraSep[i] ?? '---'),
+  };
+}
+
+/* ISSUE 69. headerLines()/rowLine() with the extra columns appended after the
+   schema's own — same pipe-joined shape, so a table with no extras (the
+   common case, extraCols null) is unreachable through these and every
+   existing byte stays exactly as usedColumns() already produces it. */
+function headerLinesWithExtras(schema, extraCols) {
+  const header = `| ${schema.columns.map(c => c.header).concat(extraCols.headers).join(' | ')} |`;
+  const knownSep = schema.columns.map(c => {
+    const width = c.header.length + 2;
+    return c.align === 'right' ? '-'.repeat(width - 1) + ':' : '-'.repeat(width);
+  });
+  const sep = '|' + knownSep.concat(extraCols.sep).join('|') + '|';
+  return [header, sep];
+}
+
+function rowLineWithExtras(schema, row, extraCols) {
+  const known = schema.columns.map(c => c.write(row));
+  const extra = row.extraCells || [];
+  const named = extraCols.headers.map((_, i) => extra[i] ?? '');
+  const surplus = extra.length > extraCols.headers.length ? extra.slice(extraCols.headers.length) : [];
+  return `| ${known.concat(named, surplus).join(' | ')} |`;
 }
 
 /* Shared shapes. Each helper pairs a read with the write that reverses it,
@@ -517,13 +575,26 @@ function usedColumns(schema, rows) {
   return cols.slice(0, Math.max(last, floor));
 }
 
-function mdTableFile({ fm, fallback, title, prose, schema, rows }) {
-  const used = { ...schema, columns: usedColumns(schema, rows) };
-  const lines = ['---', ...(fm || fallback).split('\n'), '---', '', `# ${title}`, '',
-    ...prose, '', ...headerLines(used)];
-  for (const r of rows) lines.push(rowLine(used, r));
-  lines.push('');
+/* ISSUE 67/69. `leadRaw`/`trailRaw` are the raw text load.js captured around
+   the table last load (via markdown.js's splitAroundTable) — null for a file
+   that was never loaded, which regenerates exactly the fixed shape below and
+   keeps every golden byte this function has always produced. `extraCols`
+   (ISSUE 69) is table-schema.js's own concern: when a file carries columns
+   this schema does not model, `used` stays the FULL schema rather than
+   usedColumns()'s trimmed one, because a row already holding data past the
+   optional tail fixes that tail's position on disk whether or not this
+   particular save would otherwise have dropped it. */
+function mdTableFile({ fm, fallback, title, prose, schema, rows, leadRaw, trailRaw, extraCols }) {
+  const used = { ...schema, columns: extraCols ? schema.columns : usedColumns(schema, rows) };
+  const leadLines = withLeadExtra(leadRaw, freshLeadLines(title, prose));
+  const [header, sep] = extraCols ? headerLinesWithExtras(used, extraCols) : headerLines(used);
+  const lines = ['---', ...(fm || fallback).split('\n'), '---', ...leadLines, header, sep];
+  for (const r of rows) lines.push(extraCols ? rowLineWithExtras(used, r, extraCols) : rowLine(used, r));
+  lines.push(...(trailRaw ? trailRaw.split(/\r?\n/) : ['']));
   return lines.join('\n');
 }
 
-module.exports = { SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,};
+module.exports = {
+  SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,
+  attachExtraCells, extraColsOf, headerLinesWithExtras, rowLineWithExtras,
+};
