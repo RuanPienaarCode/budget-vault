@@ -2628,6 +2628,84 @@
   .budget-split-cat, .budget-split-note { flex: 1 1 100%; }
 }
 
+/* Budget export dialog. Mounted on document.body like every Obsidian modal, so
+   nothing under .budget-app-root reaches it — these are its own classes, on
+   Obsidian's own variables (the app's sealed palette stops at the app root;
+   a modal is Obsidian's furniture and should look like the modals beside it).
+   Pills are 36px tall and grow to 44px under a coarse pointer: the range row
+   is six buttons wide and a thumb has to land on one of them.
+
+   The two BUTTON classes are spelled `.budget-export-modal button.x`, not `.x`:
+   Obsidian's app.css styles every button through `button:not(.clickable-icon)`
+   (0,1,1), which out-ranks a lone class (0,1,0) — on the first pass the
+   "Select all / none" links rendered as grey boxed buttons in the dark theme,
+   from a rule that was never this stylesheet's. */
+.budget-export-modal .budget-export-field { margin: 0 0 14px; }
+.budget-export-label { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+.budget-export-desc { font-size: 12px; line-height: 1.45; opacity: .7; margin: 6px 0 0; }
+.budget-export-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.budget-export-modal button.budget-export-pill {
+  min-height: 36px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  font-size: 13px; font-weight: 500; line-height: 1.2;
+  color: var(--text-normal); background: transparent; box-shadow: none;
+  border: 1px solid var(--background-modifier-border, rgba(128,128,128,.35));
+}
+.budget-export-modal button.budget-export-pill:hover { background: var(--background-modifier-hover, rgba(128,128,128,.12)); }
+.budget-export-modal button.budget-export-pill.is-active {
+  color: var(--text-on-accent, #fff); background: var(--interactive-accent, #5b6cff);
+  border-color: var(--interactive-accent, #5b6cff);
+}
+.budget-export-modal button.budget-export-pill:focus-visible,
+.budget-export-modal button.budget-export-link:focus-visible {
+  outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px;
+}
+.budget-export-folder { width: 100%; }
+.budget-export-cats {
+  margin: -4px 0 14px; border-radius: 6px;
+  border: 1px solid var(--background-modifier-border, rgba(128,128,128,.25));
+}
+.budget-export-cats-bulk {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
+}
+.budget-export-count { margin-left: auto; font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+.budget-export-modal button.budget-export-link {
+  padding: 0; height: auto; border: 0; background: none; box-shadow: none; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--text-accent, var(--interactive-accent, #5b6cff));
+}
+.budget-export-modal button.budget-export-link:hover { text-decoration: underline; background: none; }
+.budget-export-cats-list { max-height: 34vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 6px; }
+.budget-export-cats-type {
+  padding: 8px 10px 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; opacity: .6;
+}
+.budget-export-cat { display: flex; align-items: center; gap: 10px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.budget-export-cat input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+.budget-export-cat span { overflow-wrap: anywhere; }
+.budget-export-preview {
+  margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; font-size: 12.5px; line-height: 1.5;
+  background: var(--background-secondary, rgba(128,128,128,.1));
+}
+.budget-export-what { font-weight: 600; }
+/* The Cancel/Export row is a Setting with no name — drop the divider Obsidian
+   draws above every setting-item, which here would rule off the preview from
+   the button it explains. */
+.budget-export-actions { border-top: 0; padding-top: 6px; }
+.budget-export-files { white-space: pre-line; overflow-wrap: anywhere; opacity: .75; font-variant-numeric: tabular-nums; }
+.budget-export-problem { color: var(--text-error, #d33); font-weight: 600; }
+.budget-export-replaces { margin-top: 6px; color: var(--text-warning, #b7791f); overflow-wrap: anywhere; }
+.budget-export-done { margin: 0 0 4px; }
+.budget-export-done-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; }
+.budget-export-done-row + .budget-export-done-row {
+  border-top: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
+}
+.budget-export-done-path { flex: 1 1 auto; font-size: 13px; overflow-wrap: anywhere; }
+@media (pointer: coarse) {
+  .budget-export-modal button.budget-export-pill { min-height: 44px; padding: 8px 16px; }
+  .budget-export-cat { padding: 10px; }
+  .budget-export-modal button.budget-export-link { padding: 8px 0; }
+}
+
 /* ============================================================
    MOBILE DENSITY — reclaim horizontal space for data.
    Obsidian mobile already eats ~10-24px of pane padding, then this

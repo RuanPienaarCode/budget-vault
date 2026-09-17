@@ -326,6 +326,7 @@ const SHELL_HTML = `
               <div class="sub">Amounts are per financial period · saved to <code>Budgets/&lt;period&gt;.md</code></div>
             </div>
             <div class="row">
+              <button class="btn-ghost" id="budExport"><span class="ico" data-ico="file-down"></span> <span data-i18n="shell.bud.export">Export</span></button>
               <button class="btn-ghost" id="budCopyPrev" data-i18n="shell.bud.copyPrev">Copy previous period</button>
               <button class="btn-ghost" id="budAddCat"><span class="ico" data-ico="plus"></span> New category</button>
               <button class="btn-gradient" id="budSave" disabled data-i18n="shell.bud.save">Save budget</button>

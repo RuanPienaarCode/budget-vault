@@ -3,6 +3,81 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.46.0 — 2026-09-17
+
+### Added
+
+- **Export your budget as a PDF, an Excel workbook or CSV.** A new **Export**
+  button on the Budget page opens a dialog that asks four things: how far back
+  (1, 2, 3, 6 months, a year, or everything), what to export, which categories,
+  and what kind of file. The line at the bottom names the periods covered and
+  the exact files it is about to write before anything is written, and the
+  Export button stays dead — with the reason in words — when there would be
+  nothing to write.
+
+  - **Full budget** is a month-by-month summary followed by every period's own
+    table: budgeted, actual, remaining and percentage used per category, with a
+    subtotal per type. **Category summary** is the first table alone — one
+    column per period, then Total, Average and Budgeted — so six months read as
+    a trend rather than a lump sum.
+  - **All categories or the ones you tick.** A filter narrows everything at
+    once — summary, period tables, subtotals and transactions — and the document
+    says so on its first page, because a total over rows you cannot see is not a
+    total. A filtered export is named for what it holds — `Budget June 2026
+    (Groceries, Fuel).pdf` — so it never overwrites the full one.
+  - **Include the current period** is a switch, on by default. Switch it off
+    and "last 3 months" means the three *finished* periods. When the
+    in-progress period is included the document says its figures are for part
+    of a period and pull the average down.
+  - **Include the transactions** adds the rows behind the figures: an appendix
+    in the PDF, a sheet in the workbook, a third CSV. Excluded rows and split
+    parents are listed and flagged, not dropped — the same rule the
+    transactions export has always followed.
+  - The dialog remembers your last range, content, file types and folder. The
+    category ticks are deliberately not remembered: categories come and go, and
+    a stale tick list would silently narrow next month's file.
+  - **It tells you before it replaces anything.** Exporting the same selection
+    again overwrites the earlier files — that is what you want after fixing a
+    category — so the preview names any file that is already there, in case it
+    is one you edited by hand. Obsidian's own settings folder and the folders
+    this app loads data from are refused as destinations.
+  - Afterwards a second dialog lists what was written with **Open** and **Show
+    in file explorer** — the two honest ways onward, since a plugin cannot raise
+    the share sheet itself. Files land in the vault (`Exports/` by default), as
+    every export here does: a browser download quietly does nothing inside
+    Obsidian on a phone.
+
+  Every figure is the one the Budget page prints. Each period's rows come from
+  the same function the Budget page and the Dashboard table read, the PDF, the
+  workbook and the CSVs are three arrangements of one model built once, and an
+  end-to-end test compares the exported Actual against that function's own
+  answer rather than re-deriving it.
+
+- **No new dependencies.** The PDF writer, the XLSX writer and the ZIP
+  container underneath it are written by hand in this repository — about 1 500
+  lines, **29 KB** on a 1.8 MB bundle — and `package.json` still lists `esbuild`
+  and nothing else. `docs/adr/0008` records why: the long-standing "no PDF"
+  decision was an argument against *bundling a PDF library*, and it still
+  stands; it had quietly become a refusal of PDF itself, and Obsidian's own
+  Export to PDF — the suggested alternative — does not exist on mobile.
+  - Workbook amounts are real numbers with a money format, never text, so a
+    `SUM` over a column works. Text is stored as inline strings, which a
+    spreadsheet never evaluates — a bank description beginning `=` is inert.
+  - The PDF is real, selectable text in the built-in Helvetica, a few kilobytes
+    a page. Those fonts are Latin-only, so when a category or note uses a script
+    they cannot draw (Chinese, Japanese, Hindi…) the **same layout** is painted
+    through the browser's own text engine and each page is stored as an image
+    instead of printing question marks. The dialog tells you when that happened,
+    because that PDF's text cannot be searched. The workbook and CSVs are UTF-8
+    and unaffected.
+  - Past twelve periods the PDF summary drops its month columns — they do not
+    fit on a page — and says that the workbook and CSV carry every month.
+
+- Ninety new interface strings in all twelve languages, including every
+  heading and caveat printed into the exported document. File and sheet names
+  stay English on purpose, so re-exporting after a language change still
+  overwrites the earlier file instead of orphaning it.
+
 ## 1.45.0 — 2026-09-13
 
 ### Fixed

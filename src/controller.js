@@ -27,6 +27,7 @@ const registerDashboard = require('./views/dashboard');
 const registerScore = require('./views/score');
 const registerTransactions = require('./views/transactions');
 const registerBudgets = require('./views/budgets');
+const registerBudgetExport = require('./views/budget-export');
 const registerPlan = require('./views/plan');
 const registerAccounts = require('./views/accounts');
 const registerSavings = require('./views/savings');
@@ -565,6 +566,9 @@ function mountApp(view) {
   registerScore(ctx);
   registerTransactions(ctx);
   registerBudgets(ctx);
+  // After figures (budgetVsActualRows) and trend-math (periodsForMonths,
+  // earliestDataMonth), which it destructures; budgetDirty it reads late.
+  registerBudgetExport(ctx);
   registerPlan(ctx);
   registerAccounts(ctx);
   registerSavings(ctx);
@@ -993,6 +997,7 @@ function mountApp(view) {
   $('#budSave').addEventListener('click', ctx.saveBudget);
   $('#budCopyPrev').addEventListener('click', ctx.copyPreviousBudget);
   $('#budAddCat').addEventListener('click', ctx.addNewCategory);
+  $('#budExport').addEventListener('click', ctx.exportBudget);
   /* Wrapped rather than passed by reference: addAccount now takes a defaults
      object, and a bare listener would hand it the MouseEvent. */
   $('#acctAdd').addEventListener('click', () => ctx.addAccount());
