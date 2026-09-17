@@ -275,5 +275,4 @@ function railSegments(breakdown) {
 module.exports = {
   periodFlow, railSegments, incomeBaseFor, allocatedShare, budgetUsedShare, budgetSpent, assumedActual, assumedProvision,
   budgetRowStatus, categoryGap, budgetStripGap,
-  HOUSING_TYPES, SUBSCRIPTION_TYPES,
 };
