@@ -731,6 +731,8 @@ module.exports = {
   'acct.hero.oldestDays': { other: '{count} 天' },
   'acct.hero.oldestNone': '无',
   'acct.hero.unreadable': { other: '有 {count} 个账户余额无法读取，未计入此合计。' },
+  'acct.hero.driftUp': ' 自您填写的余额以来的交易合计多出 {amount}。',
+  'acct.hero.driftDown': ' 自您填写的余额以来的交易合计少了 {amount}。',
   'acct.where.title': '资金分布',
   'acct.where.sub': '这些账户各自所占的比例',
   'acct.where.aria': '这些账户各自所占的比例：{parts}',
@@ -922,6 +924,8 @@ module.exports = {
   'dash.pos.savings': '储蓄与投资',
   'dash.pos.savingsSub': '储蓄 {savings} · 投资 {invested}',
   'dash.pos.savingsSay': '储蓄与投资共 {amount}。打开储蓄与投资。',
+  'dash.pos.savingsDriftUp': ' 您填写的余额少了 {amount}。',
+  'dash.pos.savingsDriftDown': ' 您填写的余额多了 {amount}。',
 
   'dash.overlap': '已记录的信用卡账户：{accounts} · 信用卡债务：{debts} — 如果同一张卡两边都有，上面会重复计算。',
   'dash.overlap.btn': '查看债务',

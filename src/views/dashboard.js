@@ -1267,13 +1267,33 @@ module.exports = function registerDashboard(ctx) {
        carry a verdict — net worth and debt — and this band has to read the same
        way. Given green it becomes a second green number beside the gradient one,
        and the eye stops being able to tell which of the four is the headline. */
+    /* ISSUE 88 — figures.js's own contract: a page printing one base of the
+       balance book must be handed the other's drift. This tile prints the
+       IMPLIED savings+investment total (balances.implied.byType above) with
+       no caveat beside it, while the Savings page's own KPIs print STATED and
+       disclose the same gap — on the committed fixture R14 500 here against
+       R15 000 there, with nothing here explaining why. Read off
+       balances.driftByType (figures.js), never recomputed: it is the exact
+       figure the Savings page's own driftLine() sums, combined across both
+       pool types because this tile prints them combined.
+
+       Own keys, not the Dashboard's stale-note sentence: "since then" has no
+       date on this tile to be "then" — dedicated wording names what this
+       page prints instead (IMPLIED) against what the reader typed (STATED).
+       driftByType is implied − stated, so a POSITIVE drift means the number
+       on this tile is bigger than the stated figure — i.e. the stated
+       balances read LESS — and 'Up' is named for the sign, not the word. */
+    const savingsDrift = (balances.driftByType.savings || 0) + (balances.driftByType.investment || 0);
+    const savingsDriftLine = Math.abs(savingsDrift) >= 1
+      ? i18n.t(savingsDrift > 0 ? 'dash.pos.savingsDriftUp' : 'dash.pos.savingsDriftDown', { amount: money(Math.abs(savingsDrift), 0) })
+      : '';
     posTile(grid, {
       label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0), fig: 'pos-savings',
       sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
-        + otherLine(savingsOthers),
+        + otherLine(savingsOthers) + savingsDriftLine,
       view: 'savings',
       say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) })
-        + otherLine(savingsOthers),
+        + otherLine(savingsOthers) + savingsDriftLine,
     });
   }
 

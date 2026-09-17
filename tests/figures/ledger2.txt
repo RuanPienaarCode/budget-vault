@@ -339,6 +339,7 @@ number	1	-	acctOwners/button.acct-seg[2]/span.acct-seg-n
 money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-num[1]
 money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-sub[2]
 money	R 0,00	0	acctSummary/div.card[0]/div.hero-sub[2]
+money	R 28 500	28500	acctSummary/div.card[0]/div.hero-sub[2]
 number	2	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[0]/div.acct-fact-v[1]
 number	2	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[1]/div.acct-fact-v[1]
 number	7	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[2]/div.acct-fact-v[1]

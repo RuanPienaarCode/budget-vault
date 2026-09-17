@@ -275,6 +275,21 @@ module.exports = function registerPeriod(ctx) {
     const c = (S.categories || []).find(x => x.name === name);
     return c && c.type_stated ? poolCatType(S.categories, name) : null;
   }
+  /* ADR-0007 · One as-of-today window, shared by every reader. The rule
+     itself — closes at today for a period that contains it, null before the
+     period starts — used to live only inside movedToFunds; savingContribution
+     (health-data.js) asked savedFromOutside() the identical question over the
+     WHOLE period, which is ISSUE 87. Both now call this. */
+  function periodWindowAsOf(p, todayArg) {
+    const { start, end } = periodRange(p);
+    /* Injected like periodSummary's, and for the same reason. */
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
+    /* ADR-0007 · Moved-to-funds windows as of today. ISSUE 35's shape: a period
+       not yet started moves nothing, and this figure has nowhere to put a caveat. */
+    if (today < start) return null;
+    return { start, stop: today < end ? today : end };
+  }
+
   /* ADR-0007 · Moved-to-funds is an aggregate, not per envelope. ISSUE 43 — no
      link exists from a transfer row to a category, and free text is not guessed. */
   /* ADR-0007 · Moved-to-funds is household currency, both directions. The way
@@ -283,7 +298,6 @@ module.exports = function registerPeriod(ctx) {
      EUR 2 000 leaving cannot cancel a real R 2 000. Every surface printing this
      figure already carries foreignLabels()' own disclosure beside it. */
   function movedToFunds(p, todayArg) {
-    const { start, end } = periodRange(p);
     const foreign = foreignLabels();
     const labels = new Map();
     for (const f of Object.values(S.txFiles)) {
@@ -294,13 +308,9 @@ module.exports = function registerPeriod(ctx) {
       }
     }
     if (!labels.size) return 0;
-    /* Injected like periodSummary's, and for the same reason. */
-    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
-    /* ADR-0007 · Moved-to-funds windows as of today. ISSUE 35's shape: a period
-       not yet started moves nothing, and this figure has nowhere to put a caveat. */
-    if (today < start) { return 0; }
-    const stop = today < end ? today : end;
-    const rows = txInRange(start, stop).filter(t => !foreign.has(t.label));
+    const window = periodWindowAsOf(p, todayArg);
+    if (!window) return 0;
+    const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
     return savedFromOutside(rows, labels, declaredCatType);
   }
 
@@ -532,6 +542,10 @@ module.exports = function registerPeriod(ctx) {
        oracle or a view that re-spells "which folders are set aside" is a second
        rule waiting to disagree with this one. */
     earmarkedLabels, movedToFunds, declaredCatType,
+    /* ISSUE 87. Published so savingContribution (health-data.js) closes its
+       window the same way movedToFunds does, rather than keeping a second
+       copy of "as of today" that can drift from this one again. */
+    periodWindowAsOf, txInRange,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,

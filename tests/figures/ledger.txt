@@ -121,6 +121,7 @@ money	R 14 500	14500	dashPositionKpis/@pos-savings
 money	R 14 500	14500	dashPositionKpis/div.mini[3]/div.s[1]
 money	R 0	0	dashPositionKpis/div.mini[3]/div.s[1]
 money	$ 1 000	1000	dashPositionKpis/div.mini[3]/div.s[1]
+money	R 500	500	dashPositionKpis/div.mini[3]/div.s[1]
 
 ## score
 number	4	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
@@ -389,6 +390,7 @@ money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-num[1]
 money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-sub[2]
 money	R 0,00	0	acctSummary/div.card[0]/div.hero-sub[2]
 money	$ 1 000	1000	acctSummary/div.card[0]/div.hero-sub[2]
+money	R 6 100	6100	acctSummary/div.card[0]/div.hero-sub[2]
 number	3	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[0]/div.acct-fact-v[1]
 number	3	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[1]/div.acct-fact-v[1]
 number	1	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[2]/div.acct-fact-v[1]

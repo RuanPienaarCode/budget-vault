@@ -830,6 +830,8 @@ module.exports = {
   'acct.hero.oldestDays': { one: '{count} day', other: '{count} days' },
   'acct.hero.oldestNone': 'none',
   'acct.hero.unreadable': { one: '{count} account balance could not be read and is left out of this total.', other: '{count} account balances could not be read and are left out of this total.' },
+  'acct.hero.driftUp': ' Transactions since your stated balances add up to {amount} more.',
+  'acct.hero.driftDown': ' Transactions since your stated balances add up to {amount} less.',
   'acct.where.title': 'Where it sits',
   'acct.where.sub': 'Share of what these accounts hold',
   'acct.where.aria': 'Share of what these accounts hold: {parts}',
@@ -1041,6 +1043,8 @@ module.exports = {
   'dash.pos.savings': 'Savings & investments',
   'dash.pos.savingsSub': '{savings} savings · {invested} invested',
   'dash.pos.savingsSay': '{amount} in savings and investments. Open Savings and Investments.',
+  'dash.pos.savingsDriftUp': ' Your stated balances read {amount} less.',
+  'dash.pos.savingsDriftDown': ' Your stated balances read {amount} more.',
 
   'dash.overlap': 'Credit-card accounts tracked: {accounts} · card debts tracked: {debts} — if any card is in both, it is counted twice above.',
   'dash.overlap.btn': 'Review debts',

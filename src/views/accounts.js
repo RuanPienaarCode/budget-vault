@@ -909,6 +909,27 @@ module.exports = function registerAccounts(ctx) {
     const elsewhere = (S.assets || []).some(x => x.value > 0)
       || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
 
+    /* ISSUE 88 — figures.js's own contract: a page printing one base of the
+       balance book must be handed the other's drift. This hero prints `net`
+       off STATED balances (balances.stated.accounts above) with no caveat,
+       while the Dashboard's position tile and the Savings chart print IMPLIED
+       for the same accounts and say nothing either — on the vault this was
+       measured against, the gap was R 16 894,05, big enough to want an answer.
+       `balances.drift` (figures.js) is exactly `w.net`'s own implied-minus-
+       stated gap, because `net` here is built from the same account list and
+       the same positive-minus-negative rule balanceBook() sums by.
+
+       Own keys, not the Dashboard's stale-note sentence: "since then" has no
+       date named on this hero to be "then" — dedicated wording says "since
+       your stated balances" instead. drift is implied − stated, so a
+       POSITIVE drift means the transactions since those stated balances
+       netted an INFLOW the reader hasn't seen confirmed yet — "add up to
+       more", the same direction the reused sentence always meant. */
+    const heroDrift = balances.drift || 0;
+    const heroDriftLine = Math.abs(heroDrift) >= 1
+      ? i18n.t(heroDrift > 0 ? 'acct.hero.driftUp' : 'acct.hero.driftDown', { amount: money(Math.abs(heroDrift), 0) })
+      : '';
+
     const hero = el('div', { class: 'card hero acct-hero' },
       el('div', { class: 'hero-lbl' }, i18n.t('acct.hero.label')),
       /* ISSUE 31. THE HEADLINE IS THE SPLIT, always — home currency summed,
@@ -946,7 +967,8 @@ module.exports = function registerAccounts(ctx) {
         + (conv ? convLine : otherCurrenciesLine(others))
         // TODO(i18n): acct.hero.unreadable — "{count} account balance could
         // not be read and is left out of this total." (plural: "balances").
-        + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')));
+        + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')
+        + heroDriftLine));
 
     const facts = el('div', { class: 'acct-hero-facts' });
     const fact = (label, value, cls) => facts.append(el('div', { class: 'acct-fact' },
