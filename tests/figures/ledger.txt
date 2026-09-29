@@ -9,8 +9,8 @@ number	1	-	heroCard/div.hero-grid/div[0]/div.hero-sub[4]
 money	R 30 000,00	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
 money	R 17 500,00	17500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
 percent	58%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
 money	R 1 000	1000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
+money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
 money	R 12 100,00	12100	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
 percent	78%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
 number	45	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
@@ -287,8 +287,8 @@ money	R 12 500,00	12500	budTotalsTop/@bud-unallocated
 money	R 12 100,00	12100	budTotalsTop/@bud-spent
 percent	78%	-	budTotalsTop/@bud-note-spent
 money	R 500,00	500	budTotalsTop/@bud-note-spent
-money	R 2 000	2000	budTotalsTop/@bud-note-setaside
 money	R 1 000	1000	budTotalsTop/@bud-note-setaside
+money	R 2 000	2000	budTotalsTop/@bud-note-setaside
 money	R 1 500,00	1500	budTotalsTop/@bud-note-funds
 number	1	-	budTotalsTop/@bud-note-funds
 money	R 30 000,00	30000	budTotalsBottom/@bud-income
@@ -300,8 +300,8 @@ money	R 12 500,00	12500	budTotalsBottom/@bud-unallocated
 money	R 12 100,00	12100	budTotalsBottom/@bud-spent
 percent	78%	-	budTotalsBottom/@bud-note-spent
 money	R 500,00	500	budTotalsBottom/@bud-note-spent
-money	R 2 000	2000	budTotalsBottom/@bud-note-setaside
 money	R 1 000	1000	budTotalsBottom/@bud-note-setaside
+money	R 2 000	2000	budTotalsBottom/@bud-note-setaside
 money	R 1 500,00	1500	budTotalsBottom/@bud-note-funds
 number	1	-	budTotalsBottom/@bud-note-funds
 

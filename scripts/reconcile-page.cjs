@@ -1120,8 +1120,10 @@ function runChecks(G, pages) {
        moved-to-funds figure rides inside it — so ITS gate is set-aside, not
        itself: a household that moved money to a fund without spending any
        set-aside has a moved figure and, correctly, no sentence. */
-    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 0, renderedFrom: 0.005 });
-    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 1, renderedFrom: 0.005, renderedWhen: U.setAside });
+    /* The note reads "R {moved} of R {setAside} saved so far" (1.49.1): moved is
+       the first figure, the set-aside the second. */
+    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 1, renderedFrom: 0.005 });
+    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 0, renderedFrom: 0.005, renderedWhen: U.setAside });
   }
 
   /* ---- score ---------------------------------------------------------- */
