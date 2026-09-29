@@ -390,7 +390,18 @@ function couldBeSameMovement(outIso, inIso) {
 /* ADR-0007 · The outflow's category closes the mirror case, on the outflow
    side only (ISSUE 32). Optional; absent or unknown means every outflow
    stays matchable. */
-function savedFromOutside(rows, saverLabels, catType) {
+/* ADR-0006 amendment, 29 Sep 2026 (Ruan). `opts.ownLabels` (Set or Map of folder
+   labels: the household's own accounts NOT in the pool) makes "moved" mean a
+   TRANSFER. An inflow then counts only when it pairs, by the same
+   couldBeAnInternalLeg / couldBeSameMovement test the pool-to-pool cancel uses,
+   with an outflow from one of those accounts. A UIF payout, gift or refund paid
+   straight into a fund has no such leg: outside money, not moved. Absent, the
+   old reading holds. `opts.regular` also counts nothing the household marked
+   Excluded, on either leg: Excluded is the household's own veto of a windfall
+   from the income base, so it cannot stay in the saving rate's numerator. */
+function savedFromOutside(rows, saverLabels, catType, opts) {
+  const ownLabels = opts && opts.ownLabels ? opts.ownLabels : null;
+  const regular = !!(opts && opts.regular);
   let savings = 0;
   const labels = saverLabels instanceof Map ? saverLabels : new Map(saverLabels || []);
   const householdRows = rows || [];
@@ -416,21 +427,23 @@ const couldBeAnInternalLeg = (outRow, inRow) => {
    declared 'interest' fold only (poolCatType); an interest credit has no other
    leg, so it never enters the pairing. */
 const isPoolGrowth = r => (typeof catType === 'function' ? catType(r.cat) : null) === 'interest';
-const inflows = [], outflows = [];
+const inflows = [], outflows = [], ownOutflows = [];
 {
   for (const r of householdRows) {
     if (!r || typeof r.amount !== 'number' || !r.amount) { continue; }
     if (supersededBySplit(r)) { continue; }   // its parts are in this same list
+    if (ownLabels && r.amount < 0 && ownLabels.has(r.label) && !labels.has(r.label)) { ownOutflows.push(r); continue; }
     const a = labels.get(r.label);
     if (!a) { continue; }                     // not a savings or investment account
     if (r.amount > 0 && isPoolGrowth(r)) { continue; }
     /* ADR-0007 · Nothing is skipped on the strength of a row's own flags; the
-       pool boundary and the household's own declaration are the only tests
-       (the R40 000 UIF is in the income base, so it is in the saving too). */
+       pool boundary and the household's own declaration are the only tests.
+       Since 29 Sep 2026 the saving RATE (opts.regular) does read Excluded, as
+       the household's stated veto rather than an inference from it. */
     (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
   }
 }
-const spent = new Set();
+const spent = new Set(), ownSpent = new Set();
 for (const { acct, row } of inflows) {
   /* ADR-0007 · Saving is what crossed into the pool from outside it — not
      gross inflow (1.23.0, +R1 250 a month) and not net of every outflow
@@ -444,6 +457,24 @@ for (const { acct, row } of inflows) {
     && Math.abs(-o.row.amount - row.amount) < 0.005
     && couldBeSameMovement(o.row.date, row.date));
   if (j !== -1) { spent.add(j); continue; }
+
+  if (ownLabels) {
+    /* Not a fund-to-fund shuffle. It is moved money only if some other account
+       of the household's own sent it. */
+    /* The NEAREST dated candidate, not the first: on the vault this was built
+       against, a R500 unit-trust deposit took an unrelated Excluded R500 from
+       four days before as its leg, and the real same-day one was left over. */
+    let k = -1, best = Infinity;
+    ownOutflows.forEach((o, i) => {
+      if (ownSpent.has(i) || !couldBeAnInternalLeg(o, row)
+        || Math.abs(-o.amount - row.amount) >= 0.005 || !couldBeSameMovement(o.date, row.date)) { return; }
+      const gap = Math.abs(daysBetween(o.date, row.date));
+      if (gap < best) { best = gap; k = i; }
+    });
+    if (k === -1) { continue; }
+    ownSpent.add(k);
+    if (regular && (row.excluded || ownOutflows[k].excluded)) { continue; }
+  } else if (regular && row.excluded) { continue; }
 
   savings += row.amount;
 }

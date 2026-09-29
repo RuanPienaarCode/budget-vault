@@ -259,8 +259,10 @@ function provenFalse(desc, exactShape, mangled) {
      book, and the book applies the filter this term always pinned. */
   ok(live.accounts.includes('const primary = balances.stated.accounts, others = balances.stated.others;'),
     'Net worth: and `primary` is the balance book\'s stated home-currency account list (ITEM 5, applied once in figures.js)');
-  ok(live.figures.includes('const readable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);')
-    && live.figures.includes('const statedAll = S.accounts.filter(readable);'),
+  /* 2026-09-29: the predicate is figures.js's exported balanceReadable (one
+     rule, imported by the Dashboard and the Accounts page); the book applies it. */
+  ok(live.figures.includes('const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);')
+    && live.figures.includes('const statedAll = S.accounts.filter(balanceReadable);'),
     'Net worth: and the book builds that list from the same readable-accounts filter this term always pinned');
   ok(!live.accounts.includes("i18n.t('dash.pos.netWorth')") && !live.accounts.includes("'Net worth'"),
     'Net worth: accounts.js never borrows the "Net worth" word for its narrower figure — its own label key is distinct');
@@ -409,8 +411,13 @@ function provenFalse(desc, exactShape, mangled) {
     'Assume-spent (provision): assumedProvision() is DERIVED from that same rule minus what really moved — never a second expression of the same idea, which is how the overlay and the row\'s own Actual cell drifted apart over a refund');
   ok(live.budgets.includes('const assumed = used.assumed;'),
     'Assume-spent (Budget): the totals strip reads the provision off budgetUsed(), not a loop of its own');
-  ok(live.budgets.includes('assumed ? assumedActual(d.amount, realSpend)'),
-    'Assume-spent (Budget): and the row\'s Actual cell reads the rule directly');
+  /* Audit 2026-09-29 (F5): the Budget page's Actual cell no longer calls the
+     rule itself — it asked catAssumeSpent() without the income/transfer guard
+     figures.js applies, and an income category flagged assume_spent printed
+     its budget as "already spent". It renders the row budgetVsActualRows
+     hands back, over the unsaved draft, so the rule has ONE caller. */
+  ok(live.budgets.includes('budgetVsActualRows(S.period, { rows: draft })') && !live.budgets.includes('assumed ? assumedActual(d.amount, realSpend)'),
+    'Assume-spent (Budget): and the row\'s Actual cell reads the Dashboard\'s own row (budgetVsActualRows over the draft), with no assumed-actual rule of its own');
 
   ok(live.dashboard.includes("const { assumedActual } = require('../money-flow');"),
     'Assume-spent (Dashboard): reads the SAME function rather than re-deriving it — its own copy used to discard real spend, so a category over its budget read "on budget" here and over there');
@@ -542,7 +549,7 @@ function provenFalse(desc, exactShape, mangled) {
      tally() (src/ledger.js), and health-data.js reads it off the HOUSEHOLD
      tally rather than looping itself. */
   ok(live.ledger.includes("if (!isSetAsideType(type)) consumption += -amt;")
-    && live.healthData.includes("const consumption = h.consumption, fixed = h.fixed, income = h.netIncome;"),
+    && live.healthData.includes("const consumption = h.consumption, fixed = h.fixed, income = F.summary.income;"),
     'Budget used (Score ring): the consumption figure excludes set-aside spend through the vocabulary owner, inside the one tally the Score reads');
 
   /* 2026-09-03, ADR-0005: the numerator is no longer inferred from the

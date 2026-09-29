@@ -196,7 +196,7 @@ const SHELL_HTML = `
           <div class="card-h">
             <div>
               <h2 data-i18n="shell.dash.trend">Spending Trend</h2>
-              <div class="sub" id="trendSub" data-i18n="shell.dash.trendSub">Spent vs budget</div>
+              <div class="sub" id="trendSub" data-i18n="shell.dash.trendSub">Spent vs spending budget</div>
             </div>
             <div class="card-h-controls">
               <div class="legend">
@@ -284,6 +284,10 @@ const SHELL_HTML = `
              is one you will not find in time. Built by renderTransactions from
              S.lastImport; hidden when there is nothing to undo. -->
         <div class="tx-undo hidden" id="txUndoBar" role="status"></div>
+        <!-- What a Dashboard drill-through left out: "N rows from accounts
+             outside the budget are hidden", with a way to show them. Built by
+             renderTransactions; hidden when nothing was left out. -->
+        <div class="tx-undo hidden" id="txScopeNote" role="status"></div>
         <div class="card">
           <!-- Two stacked rows, not two columns. Side by side, the four filters
                and the five actions fought for one line and the filters lost:

@@ -10,6 +10,7 @@ const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso } = require('../dates');
+const { balanceReadable } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency } = require('../currency');
@@ -36,13 +37,16 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
+/* The income row's words ("more than planned" / "still to come" / "received as
+   planned") are the Budget page's own, so one row reads the same on both. */
+const { incomeRemainingText } = require('./budgets');
 /* `keeps`/`dropsAnyOf` are the lens row tests — ledger()/LENSES come off ctx (period.js
    provides them), but the predicate itself is a pure module export. */
-const { keeps, dropsAnyOf } = require('../ledger');
+const { keeps, dropsAnyOf, isRefund } = require('../ledger');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, nonBudgetLabels, catType, catAssumeSpent, accountIndex, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -428,7 +432,6 @@ module.exports = function registerDashboard(ctx) {
     /* Implied balances, not stated ones — reconcile() is what turns a claim
        with an age into what the account should read right now. `dated` is what
        separates "this account holds nothing" from "nobody has said". */
-    const idx = accountIndex();
     /* Rows reconcile() could not place, tallied PER CURRENCY GROUP, because
        that is how the figures below are printed: the household chain states
        one cash figure and each foreign band states its own, so a rupiah row
@@ -464,7 +467,6 @@ module.exports = function registerDashboard(ctx) {
        cannot have affected. */
     /* Phase 3 of ADR-0006: one reconcile pass per render, in figures.js. */
     const book = bookFigures();
-    const { unplacedBy, confirmDayBy } = book;
     const accounts = S.accounts.map(a => {
       const rec = book.reconciled.get(a);
       return {
@@ -472,6 +474,21 @@ module.exports = function registerDashboard(ctx) {
         inBudget: a.in_budget !== false,
         dated: rec.state !== 'no-date',
         implied: rec.state === 'drift' ? rec.implied : a.balance,
+        /* Whether the stated balance is stale, carried on the account so
+           whatsLeft can count it among the accounts cash actually summed — a
+           local recount over S.accounts named accounts the figure never
+           contained (2026-09-29 audit, F2). */
+        stale: !!a.balance_updated && isStale(a.balance_updated),
+        /* The one predicate the balance book and the Accounts page hold an
+           unreadable balance out with ("about 300" is parsed to 0 and kept in
+           balanceRaw): figures.js's balanceReadable, imported not respelled. */
+        readable: balanceReadable(a),
+        /* The rows reconcile() could not place, and the rows dated on the
+           confirmation day, per account: whatsLeft sums them over the accounts
+           that reached a printed figure, instead of this card reading the
+           book's per-currency totals over every in-budget account. */
+        unplaced: rec.unreadable || 0,
+        sameDay: rec.sameDay || null,
         /* Rule 7 and the owed line are decided inside committed.js, not here —
            this only hands over what they need to decide with. */
         type: a.type,
@@ -528,20 +545,42 @@ module.exports = function registerDashboard(ctx) {
     const home = S.settings.currency;
     const txByCurrency = new Map();
     const txGroup = sym => {
-      if (!txByCurrency.has(sym)) txByCurrency.set(sym, { rows: [], incomeRows: [], cardRows: [] });
+      if (!txByCurrency.has(sym)) txByCurrency.set(sym, { rows: [], incomeRows: [], cardRows: [], cardRefundRows: [] });
       return txByCurrency.get(sym);
     };
     /* Frozen and shared, for a symbol with no transaction folders of its own —
        a euro subscription in a vault with no euro account is exactly that, and
        it must reach whatsLeft with three EMPTY lists rather than borrowing the
        household's. */
-    const NO_TX = Object.freeze({ rows: [], incomeRows: [], cardRows: [] });
+    const NO_TX = Object.freeze({ rows: [], incomeRows: [], cardRows: [], cardRefundRows: [] });
     const txOf = sym => txByCurrency.get(sym) || NO_TX;
     /* A second list, in-budget accounts only, for the repeating-credit search.
        A fund's monthly debit order is a CREDIT on that fund's own statement, and
        predicting it as household income would announce money arriving when it is
        only moving between the reader's own pockets. */
-    const skipLabels = nonBudgetLabels();
+    /* ONE stamp of the whole history, read three ways below: which rows may
+       elect the repeating credit, which rows may settle a debt, and (for a
+       foreign band) which of those belong to one currency. Every row is
+       stamped once, by the ledger, with every reason it might be held out. */
+    /* Every row in the vault, whatever its date cell says: '' and '\uffff' bound
+       every string, where '0000-01-01'..'9999-12-31' dropped a date that begins
+       with a letter. The hand walk this replaced kept those rows, and the
+       service price still scores its description groups over them; the readers
+       below refuse an unreal date themselves, so nothing new reaches a figure. */
+    const stampedAll = ledger('', '\uffff');
+    /* The rows the repeating-credit search may see: BUDGET's vetoes with the
+       foreign one lifted (a foreign band asks the same question of its own
+       currency's rows, and the partition below already separates them).
+       That drops Excluded rows, `budget: false` accounts — the old
+       `skipLabels` test, now the lens's own — and TRANSFER-category rows,
+       which the hand walk never asked about: on a synthetic household a
+       monthly R35 000 "from money market" transfer beat a R30 000 salary as
+       the income that was "landing", because findRecurringCredit picks the
+       largest repeating credit and a transfer between the household's own
+       accounts is not income. */
+    const incomeKept = new Set(stampedAll
+      .filter(s => !dropsAnyOf(LENSES.BUDGET, s, 'foreign'))
+      .map(s => s.row._row));
     /* And a third, for the settle-monthly cards only: their spending this cycle
        is what gets measured against the income that clears it. Each folder is
        resolved to its account through accountForLabel — the SAME three-way
@@ -554,14 +593,35 @@ module.exports = function registerDashboard(ctx) {
        figures, depending on whether its name survives safeSeg. The card test
        itself is isSettleCard, the one definition committed.js exports. */
     const cardAccounts = new Set(S.accounts.filter(isSettleCard));
+    /* ISSUE 85 (ADR-0007 · lenses). `rows` (a service's charge history) and
+       `cardRows` (what a settle card carried) are the MERCHANT lens: the split
+       parent is the bank's line, the parts are dropped. They were the last two
+       hand-built sets on this page - `rows` took every row with no veto and
+       committed.js filtered split parts itself. Not ACCOUNT: that lens drops the
+       parent and lost part of the card spend on the audited vault. */
+    const merchantKept = new Set(stampedAll
+      .filter(s => keeps(LENSES.MERCHANT, s))
+      .map(s => s.row._row));
+    /* A refund on a settle card lowers what the cycle spent on it: the MERCHANT
+       rows the ledger calls refunds (positive, ordinary category on file). */
+    const refundKept = new Set(stampedAll
+      .filter(s => keeps(LENSES.MERCHANT, s) && isRefund(s))
+      .map(s => s.row._row));
+    /* The partition only sorts lens-approved rows into their currency; which
+       rows are approved is decided once, above, by the ledger. */
     for (const f of Object.values(S.txFiles)) {
       const owner = accountForLabel(f.label);
       const isCardFolder = owner ? cardAccounts.has(owner) : false;
       const g = txGroup(symbolOf(owner, home));
       for (const r of f.rows) {
-        g.rows.push(r);
-        if (!skipLabels.has(f.label)) g.incomeRows.push(r);
-        if (isCardFolder) g.cardRows.push(r);
+        if (merchantKept.has(r)) {
+          g.rows.push(r);
+          if (isCardFolder) {
+            g.cardRows.push(r);
+            if (refundKept.has(r)) g.cardRefundRows.push(r);
+          }
+        }
+        if (incomeKept.has(r)) g.incomeRows.push(r);
       }
     }
 
@@ -627,7 +687,19 @@ module.exports = function registerDashboard(ctx) {
        lens drops every foreign row by construction — until `dropsAnyOf`'s
        `except` parameter was exported as the seam for asking it EXCEPT the
        foreign veto, narrowed to the rows of that one currency. */
-    const stamped = ledger(start, end);
+    /* ALL HISTORY up to the period's end, not the period alone (2026-09-29
+       audit, F4). committed.js reads these rows twice: rule 2 filters its own
+       dates to periodStart..asOf, but `usualDay(paid…)` — the day of the month
+       an instalment is habitually paid — used to read every payment ever made.
+       Cut to the period, a monthly debt lost its usual day (the "was due"
+       flag disappeared) and on a 14-day period the instalment dropped out of
+       "still committed" altogether, being unplaceable in a window under 28
+       days. The BUDGET lens is kept (ISSUE 85): the vetoes are about WHICH rows
+       may settle an instalment, not about how far back the habit is read. */
+    /* Named `stamped`: tests/instalment-one-rule.test.cjs pins the wiring by
+       this spelling (settleRows built by filtering `stamped` through the
+       BUDGET lens), and the spelling is the rule. */
+    const stamped = stampedAll.filter(s => s.date <= end);
     const settleRows = stamped.filter(s => keeps(LENSES.BUDGET, s)).map(s => s.row);
     const settleRowsFx = sym => stamped
       .filter(s => s.foreign && s.symbol === sym && !dropsAnyOf(LENSES.BUDGET, s, 'foreign'))
@@ -688,36 +760,35 @@ module.exports = function registerDashboard(ctx) {
        counted at all because their balance has no date to measure from, and
        how many transaction rows the implied balances behind it could not
        place because their own dates name no day. */
-    /* ADR-0007 · Unconfirmed counts only accounts this chain summed: same
-       currency, and dated at all — an undated one is reported by its own
-       fragment below and was being caveated twice. */
-    const staleCount = S.accounts.filter(a => a.in_budget !== false
-      && symbolOf(a, home) === home
-      && a.balance_updated && isStale(a.balance_updated)).length;
     const cashParts = [];
-    /* whatsLeft's own count, not a second one computed here. The old local
-       recount said "in budget AND dated" while the figure above it summed only
-       what was positive, so the two disagreed on exactly the account that
-       contributed nothing — which is the class of drift the reconcile() sharing
-       further down this file exists to stop. */
+    /* whatsLeft's own counts, not second ones computed here. The old local
+       recount (S.accounts, in budget, home currency, stale) said "in budget AND
+       dated" while the figure above it summed only what was positive, so the
+       two disagreed on exactly the account that contributed nothing: on the
+       real vault "2 accounts · 1 unconfirmed" named a cash account that was
+       not one of the 2. `staleCounted` is a subset of `countedAccounts` by
+       construction. */
     cashParts.push(i18n.t('dash.left.counted', { count: L.countedAccounts }));
-    if (staleCount) cashParts.push(i18n.t('dash.left.unconfirmed', { count: staleCount }));
+    if (L.staleCounted) cashParts.push(i18n.t('dash.left.unconfirmed', { count: L.staleCounted }));
     if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
+    /* A balance nobody could read is held out of the figure the way the
+       balance book holds it out; the sentence is the Accounts page's own. */
+    if (L.unreadableAccounts.length) cashParts.push(i18n.t('acct.hero.unreadable', { count: L.unreadableAccounts.length }));
     /* The rows behind the figure, not the accounts in front of it. Every term
        of this chain is built out of IMPLIED balances (see the reconcile() call
        above), and an implied balance is the stated one plus everything dated
        after it — so a row nothing can date is money the figure does not
-       contain. Home group only, matching the arithmetic `L` was handed.
+       contain. Counted over the accounts this figure summed (and the cards it
+       states), matching the arithmetic `L` was handed: an account that
+       contributed nothing cannot qualify a total it is not in.
        Silent when the sentence has no translation yet; see unreadableNote(). */
-    const cashUnplaced = unreadableNote(unplacedBy.get(home) || 0);
+    const cashUnplaced = unreadableNote(L.unplaced);
     if (cashUnplaced) cashParts.push(cashUnplaced);
-    /* ISSUE 45. Home group only, matching the arithmetic `L` was handed —
-       each foreign band carries its own below. `count` is passed as well as
-       `amount` because i18n.t() selects the plural form off `count` alone. */
-    const cashConfirmDay = confirmDayBy.get(home);
-    if (cashConfirmDay && cashConfirmDay.count) {
+    /* ISSUE 45. Same set, same reason. `count` is passed as well as `amount`
+       because i18n.t() selects the plural form off `count` alone. */
+    if (L.confirmDay.count) {
       cashParts.push(i18n.t('dash.left.confirmDay', {
-        count: cashConfirmDay.count, amount: money(cashConfirmDay.net, 0),
+        count: L.confirmDay.count, amount: money(L.confirmDay.net, 0),
       }));
     }
     /* NO "adds more than one currency" caveat on this figure, deliberately.
@@ -853,23 +924,35 @@ module.exports = function registerDashboard(ctx) {
            less its committed does not reach its free figure without it, and a
            term that moves a total silently is the exclusion currency.js forbids. */
         g.L.earmarked >= 1 ? i18n.t('dash.left.earmarked') + ' ' + gm(g.L.earmarked) : null,
-        g.L.committedOther || g.L.cardDue
-          ? i18n.t('dash.left.committed') + ' ' + gm(g.L.committedOther + g.L.cardDue) : null,
+        /* `committedShown`, not committedOther + cardDue: inside a settlement
+           cycle `free` leaves the card out, so summing it here printed three
+           terms (cash · committed · free) that did not add up. */
+        g.L.committedShown
+          ? i18n.t('dash.left.committed') + ' ' + gm(g.L.committedShown) : null,
         g.L.cashKnown
           ? i18n.t(g.L.short ? 'dash.left.short' : 'dash.left.free') + ' ' + gm(Math.abs(g.L.free)) : null,
+        /* The settlement cycle, as the home chain states it and from the same
+           keys, in this band's own symbol. Inside a cycle the card leaves both
+           `free` and the committed term above, so without these two sentences a
+           band with a euro card carrying 500 says nothing about it. */
+        g.L.cycle
+          ? i18n.t('dash.left.cycle', { spend: gm(g.L.cycle.spend), settling: gm(g.L.cycle.settling) }) : null,
+        g.L.cycle
+          ? i18n.t(g.L.cycle.over ? 'dash.left.cycleOver' : 'dash.left.cycleUnder',
+            { amount: gm(Math.abs(g.L.cycle.headroom)), date: g.L.cycle.date }) : null,
         /* This band's own cash is an implied balance too, so the same caveat
-           belongs to it — and its OWN count, not the household's. A euro row
-           nobody can date qualifies the euro figure and nothing else, which is
-           the whole reason unplacedBy is keyed by symbol. */
-        unreadableNote(unplacedBy.get(g.sym) || 0) || null,
-        /* ISSUE 45, per foreign band — same reason the line above is keyed by
-           symbol: this band states its own cash figure, so it must state its
-           own confirmation-day caveat rather than borrow the household's. */
-        (confirmDayBy.get(g.sym) && confirmDayBy.get(g.sym).count)
+           belongs to it — and its OWN count, over ITS accounts. A euro row
+           nobody can date qualifies the euro figure and nothing else. */
+        unreadableNote(g.L.unplaced) || null,
+        /* ISSUE 45, per foreign band — this band states its own cash figure,
+           so it states its own confirmation-day caveat. */
+        g.L.confirmDay.count
           ? i18n.t('dash.left.confirmDay', {
-            count: confirmDayBy.get(g.sym).count,
-            amount: ctx.moneyIn(g.sym, confirmDayBy.get(g.sym).net, 0),
+            count: g.L.confirmDay.count,
+            amount: ctx.moneyIn(g.sym, g.L.confirmDay.net, 0),
           }) : null,
+        g.L.unreadableAccounts.length
+          ? i18n.t('acct.hero.unreadable', { count: g.L.unreadableAccounts.length }) : null,
       ].filter(Boolean);
       body.append(el('div', { class: 'left-fx' },
         el('span', { class: 'left-fx-sym' }, g.sym),
@@ -1009,6 +1092,26 @@ module.exports = function registerDashboard(ctx) {
         : i18n.t('dash.left.owedCards', { amount: money(L.owedElse, 0), count: L.owedElseCards.length });
       body.append(el('div', { class: 'kpi-caveat-txt left-owed' },
         icoEl(['info', 'alert-circle']), line));
+    }
+
+    /* Accounts the household opted out of the budget, named (2026-09-29 audit,
+       Ruan's decision). `cash` above leaves a `budget: false` account out on
+       purpose; what was missing was the sentence saying which ones and how
+       much, so a reader whose business cheque and online wallet are not in "in your
+       accounts" is not left to wonder. whatsLeft's own `outside` - the accounts
+       cashOnHand() itself walked past - so the sentence and the figure share
+       one rule and cannot describe different sets. Everyday accounts only (a
+       savings or investment pool outside the budget was never cash), and home
+       currency only, because `L` is the home band; a foreign account has its
+       own. `count` is passed as well as `amount`: i18n.t() picks the plural
+       off `count` alone. Quiet, like the owed-cards line beside it, and named
+       for the reconciliation. */
+    if (L.outside && L.outside.count > 0) {
+      body.append(el('div', { class: 'kpi-caveat-txt left-owed' },
+        icoEl(['info', 'alert-circle']),
+        el('span', { 'data-fig': 'left-outside' }, i18n.t('dash.left.outside', {
+          count: L.outside.count, amount: money(L.outside.amount, 0),
+        }))));
     }
 
     /* The disclosure is part of the feature, not a courtesy. A card asserting a
@@ -1361,7 +1464,6 @@ module.exports = function registerDashboard(ctx) {
 
        Home-currency accounts only, and the count of what that leaves out
        travels with it — the sentence below states both. */
-    const idx = accountIndex();
     /* Phase 3 of ADR-0006: the same reconcile pass the what's-left card
        reads — see bookFigures() in figures.js for the counting rules. */
     const { drift, driftForeign, driftUnplaced } = bookFigures().drift;
@@ -1425,8 +1527,17 @@ module.exports = function registerDashboard(ctx) {
        chip, the Score ring's numerator and the Budget page's tile all print. */
     const used = F.used;
     const spent = used.spent;
+    /* NO BUDGET FILE for this period (2026-09-29 audit). Every verdict below
+       is a comparison against the plan, and there is no plan: on the first
+       days of a fresh period the hero read "Over budget this period" with the whole spend
+       and "0% of the R 0 income this budget plans for" — an over-budget claim
+       against a budget of nothing, and a share of nothing. The test is the
+       Budget page's own (`S.budgets[period]` holds no rows; see
+       renderShapeNote), so the two pages agree on which periods are empty.
+       What IS known — what has been spent so far — is still shown. */
+    const noBudget = !(S.budgets[S.period] || []).length;
     const available = bud.spend - spent;
-    const heroNegative = available < 0;
+    const heroNegative = !noBudget && available < 0;
     const meterMax = Math.max(spent, bud.spend, 1);
     const fillPct = Math.min(100, (spent / meterMax) * 100).toFixed(2);
     const markPct = bud.spend > 0 ? ((bud.spend / meterMax) * 100).toFixed(2) : null;
@@ -1454,7 +1565,12 @@ module.exports = function registerDashboard(ctx) {
        and the rounding ate the only fact the two figures disagreed on — which
        side of the line the plan is on. Same rule for "used", where 100% is
        the same kind of boundary. */
-    const budgetedPct = allocated === null ? null : sharePercentLabel(allocated, locale().decimal);
+    /* No share of a plan with no income to measure it against: "0% of the R 0
+       income this budget plans for" divides by nothing. A finished period with
+       no budget but real income still says "0% of income budgeted" — true, and
+       measured against income that exists. */
+    const budgetedPct = (allocated === null || (noBudget && !(plan.incomeBase > 0)))
+      ? null : sharePercentLabel(allocated, locale().decimal);
     /* ISSUE 36. WHICH income that percentage is of, when it is not the one
        printed six inches to the left.
 
@@ -1498,17 +1614,26 @@ module.exports = function registerDashboard(ctx) {
        movedToFunds() pairs the legs, so money shuffled between two funds is
        not counted as fresh saving — the same reading the score's own saving
        rate takes, from the same function. */
-    const moved = (bud.setAside || 0) > 0 ? movedToFunds(S.period) : 0;
-    const setAsideNote = (bud.setAside || 0) > 0
-      ? i18n.t('dash.stat.setAsideMoved', {
-        amount: money(bud.setAside, 0), moved: money(moved, 0),
+    /* "OF WHICH" (2026-09-29 audit, Ruan's decision). The stat prints the whole
+       plan and the hero's sub-line prints the SPENDING budget; the difference
+       between them is exactly this set-aside figure, so it is worded as a part
+       of the plan rather than as a second thing. A reader subtracts the two
+       printed numbers and lands on the denominator of "spent of … spending
+       budget" and of the used-percentage, which is the whole point.
+       `plan.setAside` is planFigures' own — budgetTotalsOf's bucket — not a
+       recomputation. */
+    const moved = (plan.setAside || 0) > 0 ? movedToFunds(S.period) : 0;
+    const setAsideNote = (plan.setAside || 0) > 0
+      ? i18n.t('dash.stat.ofWhichSetAside', {
+        amount: money(plan.setAside, 0), moved: money(moved, 0),
       })
       : '';
 
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
+    /* With no plan the big number is what was spent, not a remainder of it. */
     const heroNum = el('div', { class: `hero-num${heroNegative ? ' hero-num--negative' : ''}` },
-      el('small', {}, cur), money(Math.abs(available), 0).slice(cur.length + 1));
+      el('small', {}, cur), money(noBudget ? spent : Math.abs(available), 0).slice(cur.length + 1));
     const meter = el('div', { class: `hero-meter${heroNegative ? ' over' : ''}` },
       el('i', { style: `width:${fillPct}%` }));
     if (markPct !== null) meter.append(el('span', { class: 'hero-mark', style: `left:${markPct}%`, 'aria-hidden': 'true' }));
@@ -1618,20 +1743,12 @@ module.exports = function registerDashboard(ctx) {
          sibling — the global button reset plus .stat's own rules already lay
          it out identically to the <div> it replaces (see the comment on the
          uncategorised button below for why no new CSS is needed).
-         Reuses openCategory(), the SAME drill-through the donut and the
-         budget table already use, rather than a bespoke handler — it is
-         already guarded for a category the #txCategory select has no option
-         for (`.some(o => o.value === cat)`), which an ORPHANED name always
-         is (transactions.js:197 builds the select only from S.categories).
-         So this cannot pre-filter to just the offending rows — there is no
-         filter vocabulary for "category name matches no known category" on
-         the Transactions page (that page is a teammate's file, not touched
-         here) — but it still clears the other filters and lands the reader
-         on Transactions with every orphaned name visible right there on
-         this tile to search for by eye, which is a real step forward from a
-         tap that did nothing at all. */
+         openMissingCategories() is the same drill-through as the donut's, with
+         the Transactions page's "Missing categories" option (built from the
+         names on the rows, transactions.js) so the tap lands on exactly the
+         rows this tile counts, and says so when it leaves one out. */
       statCol.append(
-        el('button', { type: 'button', class: 'stat', onclick: () => openCategory(names[0]) },
+        el('button', { type: 'button', class: 'stat', onclick: openMissingCategories },
           el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.missing'))),
           el('div', {}, el('div', { class: 'sv text-warning' }, String(names.length)),
             el('div', { class: 'st' }, i18n.t('dash.stat.missingSub', { count: sum.unknown.count })),
@@ -1642,13 +1759,18 @@ module.exports = function registerDashboard(ctx) {
     hero.append(el('div', { class: 'hero-grid' },
       el('div', {},
         S.settings.household ? el('div', { class: 'hero-greet' }, i18n.t('dash.greet.line', { greeting, name: S.settings.household })) : '',
-        el('div', { class: 'hero-lbl' }, i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
+        el('div', { class: 'hero-lbl' }, noBudget
+          /* The Budget page's own words for a period with no budget yet; a
+             finished period is not "new", so it says what the export says. */
+          ? i18n.t(S.period >= currentPeriod() ? 'bud.fresh.title' : 'bx.doc.noteNoBudget')
+          : i18n.t(heroNegative ? 'dash.hero.overspent' : 'dash.hero.remaining')),
         heroNum,
         /* Named for the harvest: the greeting above is conditional on
            `household:` being set, so addressing this line by sibling index read
            the set-aside note instead on any vault without one. */
-        el('div', { class: 'hero-sub', 'data-fig': 'hero-budget' },
-          i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
+        el('div', { class: 'hero-sub', 'data-fig': 'hero-budget' }, noBudget
+          ? i18n.t('dash.stat.spent')
+          : i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
         spentNoteParts.length
           ? el('div', { class: 'hero-sub hero-sub--ahead' }, spentNoteParts.join(' · '))
           : '',
@@ -1680,7 +1802,8 @@ module.exports = function registerDashboard(ctx) {
               amount: money(fromFunds.spend, 0), count: fromFunds.count,
             }))
           : '',
-        meter),
+        /* A meter of spent against nothing is a full bar with no meaning. */
+        noBudget ? '' : meter),
       statCol));
   }
 
@@ -1726,8 +1849,16 @@ module.exports = function registerDashboard(ctx) {
         el('td', { class: 'num' }, r.budget ? money(r.budget) : '—'),
         el('td', { class: 'num' }, money(r.actual)),
         el('td', {}, bar),
-        el('td', { class: `num${over || unbudgeted ? ' text-danger' : ''}` },
-          (r.budget || unbudgeted) ? money(remaining) : '')));
+        /* An INCOME row that beat its plan is not overspent: budgetRowStatus
+           reports `over` and a negative `remaining` for any row whose actual
+           exceeds its budget, and this cell printed that as a red "R -1 000"
+           (2026-09-29 audit). It reads the Budget page's own two sentences
+           instead - the same keys, so one row is worded one way on both pages
+           - and is never red. */
+        el('td', { class: `num${(over || unbudgeted) && r.type !== 'income' ? ' text-danger' : ''}` },
+          r.type === 'income' && r.budget
+            ? incomeRemainingText(remaining, money)
+            : (r.budget || unbudgeted) ? money(remaining) : '')));
     }
     if (!sorted.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
@@ -2235,9 +2366,14 @@ module.exports = function registerDashboard(ctx) {
       return { baseText: '—', text: i18n.t('dash.split.new'), cls: 'is-new' };
     }
     const avg = (base.totals[cat] || 0) / base.counted;
-    /* Both sides rounded BEFORE subtracting, so the change really is the
-       difference between the two figures printed beside it. Rounding after
-       instead is what let a row read R915 against R636 and call it +R278. */
+    /* Both sides are the PRINTED whole-unit figures: `now` is the Spent
+       column's own value (already allocated by largest remainder, so it can
+       differ from a plain rounding of the raw amount by one unit) and the
+       baseline is rounded the way baseText prints it. Rounding after
+       instead is what let a row read one figure against another and call the
+       difference R1 more than it was; and
+       rounding the raw amount independently of the allocation is what let one
+       read R3 775 against R2 513 and call it +R1 261. */
     const r = v => Number(v.toFixed(0));
     const diff = r(now) - r(avg);
     /* DEADBAND, both ways. A move earns a colour only when it is worth noticing
@@ -2431,22 +2567,18 @@ module.exports = function registerDashboard(ctx) {
        reassuring, wrong, and wrong in the direction that stops people looking. */
     const base = compareBaseline();
 
-    /* The figure the compare column reads for THIS period, windowed to match
-       the baseline exactly — the baseline (compareTotals, in trend-math.js)
-       already caps each earlier period at `elapsedDays()` of itself, but this
-       side was still reading `x.amount`, the WHOLE period's spend including
-       rows dated ahead of today. reconcile.js documents statements routinely
-       carrying such rows. Two windows on one comparison is not like-for-like
-       even though the column is labelled that way (see dash.split.likeForLike
-       below): an Insurance debit dated the 28th, viewed on the 24th, was
-       counted on the "now" side and excluded from every earlier period it was
-       measured against, so the legend reported a swing that had not happened
-       in either period.
+    /* The figure the Change column reads for THIS period is the figure the
+       Spent column PRINTS (`rowMoney[i]` below), not the raw amount behind it.
+       The Spent column is allocated by largest remainder so it sums to the
+       centre total; the change used to be r(raw) − r(average), so a row could
+       print R3 775 beside a baseline of R2 513 and a Change of +R1 261. The
+       column's own promise (compareCell) is that the change is the difference
+       of the two figures printed beside it.
 
-       Only while the period is running (`base.days !== null`) — a finished
-       period has no "ahead of today" rows left to over-count, and periodSpend
-       with a null cap is exactly x.amount again, so nothing changes there. */
-    const nowByCat = base && base.days !== null ? periodSpend(S.period, base.days).part : null;
+       The window needs nothing extra: `spend` comes from periodSummary, which
+       closes at today for the running period (ISSUE 35), and the baseline caps
+       each earlier period at the same elapsed days, so Spent and baseline are
+       already like-for-like. */
 
     const legend = el('ul', { class: 'donut-legend donut-legend--linked' });
     if (base) legend.append(el('li', { class: 'donut-legend-head' },
@@ -2465,7 +2597,7 @@ module.exports = function registerDashboard(ctx) {
          each time. A change figure there would be arithmetic without meaning —
          the same reason the row has no drill-through. */
       const cmp = base && !x.other
-        ? compareCell(x.cat, nowByCat ? (nowByCat[x.cat] || 0) : x.amount, base)
+        ? compareCell(x.cat, rowMoney[i], base)
         : null;
       const face = () => [
         el('i', { style: `background:${x.color}` }),
@@ -2522,16 +2654,41 @@ module.exports = function registerDashboard(ctx) {
      an earlier visit would land the reader on "0 rows" with nothing visible to
      explain it. `whole history` goes too, and that one matters more here than
      it does on Accounts: this donut is explicitly one period's spending, and
-     leaving the box ticked answers a question the reader did not ask. */
+     leaving the box ticked answers a question the reader did not ask.
+
+     IN-BUDGET ROWS ONLY (2026-09-29 audit, Ruan's decision). The wedge, the
+     legend row and the budget-table figure are all taken under the BUDGET
+     lens, which holds out the rows of a `budget: false` account. The page this
+     lands on listed them anyway, so a household with a business account
+     charging the same category saw rows that did not add up to the figure it
+     had just clicked. setTxInBudgetOnly() narrows the list to the accounts the
+     figure was built from, and the page says how many rows that hid and offers
+     them back. Excluded rows are NOT hidden: they are held out of the figure
+     too, but "still listed everywhere transactions are shown" (CONTEXT.md), so
+     the reader can see the ones they vetoed. */
   function openCategory(cat) {
     ctx.switchView('transactions');
     const sel = $('#txCategory');
-    if ([...sel.options].some(o => o.value === cat)) sel.value = cat;
+    /* Always assigned. A name with no <option> used to leave the select at
+       whatever it held before, so the tap landed on Transactions under a stale
+       category filter from an earlier visit: a page titled by one category and
+       filtered by another, or "0 rows" with nothing to explain it. The other
+       three filters are cleared for exactly that reason. Orphaned names now
+       have options of their own (transactions.js builds them from the rows),
+       so this only falls back to "all categories" for a name that is on no
+       row at all. */
+    const known = [...sel.options].some(o => o.value === cat);
+    sel.value = known ? cat : '';
     $('#txAccount').value = '';
     $('#txSearch').value = '';
     $('#txWholeHistory').checked = false;
+    if (typeof ctx.setTxInBudgetOnly === 'function') ctx.setTxInBudgetOnly(known ? cat : null);
     ctx.renderTransactions();
   }
+  /* The "Missing categories" tile: category names on rows that no category file
+     answers to. Selects the Transactions page's own option for them - the same
+     one a reader can pick by hand - rather than a bespoke filter. */
+  function openMissingCategories() { openCategory('__missing__'); }
 
   /* The hero's uncategorised-count drill-through — same shape as
      openCategory() just above, with the '__none__' sentinel value
@@ -2547,6 +2704,9 @@ module.exports = function registerDashboard(ctx) {
     $('#txAccount').value = '';
     $('#txSearch').value = '';
     $('#txWholeHistory').checked = false;
+    /* The count on the tile is taken inside the budget, so the list is too —
+       the same scope, and the same "N rows hidden" note, as openCategory(). */
+    if (typeof ctx.setTxInBudgetOnly === 'function') ctx.setTxInBudgetOnly('__none__');
     ctx.renderTransactions();
   }
 

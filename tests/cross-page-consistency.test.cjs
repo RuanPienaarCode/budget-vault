@@ -103,6 +103,7 @@ class FakeEl {
   empty() { this.children = []; this._text = ''; }
   append(...kids) { for (const k of kids) this.children.push(k); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  hasAttribute(k) { return k in this.attrs; }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
   addEventListener(ev, fn) { (this._listeners[ev] = this._listeners[ev] || []).push(fn); }
 }

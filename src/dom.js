@@ -50,6 +50,28 @@ function dateInput(value, attrs, commit) {
   });
 }
 
+/* Table semantics and column names that survive the phone layout. Under 600px
+   the Transactions and Budget tables stack each row into a card (styles.css,
+   "stacked rows"): a grid <tr> is no longer a row to VoiceOver, and the card
+   prints each cell's `data-label` where the column header used to be. So stamp
+   the ARIA roles explicitly, and give every body cell its column's name.
+   `labels` is by column position; a falsy entry (the actions column) and any
+   spanning cell (group bars, empty state, "show more") get no label. */
+function tableCells(table, labels) {
+  table.setAttribute('role', 'table');
+  for (const group of Array.from(table.children)) {
+    group.setAttribute('role', 'rowgroup');
+    const head = group.tagName === 'THEAD';
+    for (const tr of Array.from(group.children)) {
+      tr.setAttribute('role', 'row');
+      Array.from(tr.children).forEach((cell, i) => {
+        cell.setAttribute('role', head ? 'columnheader' : 'cell');
+        if (!head && labels[i] && !cell.hasAttribute('colspan')) cell.setAttribute('data-label', labels[i]);
+      });
+    }
+  }
+}
+
 /* Rebuilding a table's innerHTML resets its scroll container to the left edge.
    On a phone every table here is wider than the screen, so that yanks the
    columns out from under the reader. Call around a rebuild to hold position. */
@@ -189,4 +211,4 @@ function setInert(elm, on) {
   }
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells };

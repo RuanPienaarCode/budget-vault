@@ -100,9 +100,10 @@ at('2026-09-15', async () => {
   const pool = new Map([['Emergency fund', 'Emergency fund']]);
 
   eq(savedFromOutside(rows, pool, ctx.declaredCatType), 40000,
-    'the R40 000 UIF paid straight into the fund is still saving; the R632.63 the fund earned itself is not');
-  eq(ctx.movedToFunds('2026-09', '2026-09-15'), 40000,
-    'and the Dashboard hero\'s "moved so far" reads the same figure — interest never moved anywhere');
+    'read the old way (any inflow that is not interest), the UIF payout counts; the interest the fund earned itself does not');
+  eq(ctx.movedToFunds('2026-09', '2026-09-15'), 0,
+    'and the Dashboard hero\'s "moved so far" is nothing: interest never moved anywhere, and (29 Sep 2026, ADR-0006 amendment) '
+    + 'a UIF payout paid straight into the fund has no sending leg in an account of the household\'s own');
 
   console.log(`savings-interest-not-saving.test.cjs — ${checks} checks OK`);
 });

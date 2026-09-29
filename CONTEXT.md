@@ -54,7 +54,10 @@ _Avoid_: plan, allocation, envelope
 
 **Excluded transaction**:
 A row the user has vetoed from income and spend totals. Still listed everywhere
-transactions are shown, so nothing silently disappears.
+transactions are shown, so nothing silently disappears. It is how a windfall
+(a UIF payout, a tax rebate) is kept out of the income base, and since
+29 Sep 2026 it keeps that windfall out of moved-to-funds and the saving rate
+too.
 _Avoid_: ignored, hidden, skipped
 
 **Non-budget account**:
@@ -96,6 +99,30 @@ _Avoid_: deposit, top-up, payment in, investment
 Money taken back out of a savings or investment account. The counterpart to a
 contribution.
 _Avoid_: drawdown, redemption, disinvestment
+
+**Moved to funds**:
+Money the household transferred, in a period so far, from one of its own
+non-fund accounts into a savings or investment account — the receiving side of
+a set-aside, and the one figure behind "R X moved so far" on the Dashboard, the
+Budget strip and the Report. An inflow counts only when an equal outflow from
+another of the household's own accounts is its other leg, and never when the
+household marked either leg Excluded. So a payout or gift that lands in a fund
+from outside, interest the fund credited itself, a shuffle between two funds
+and a windfall the household vetoed from its income are all not moved. Decided
+29 Sep 2026 (ADR-0006, amendment).
+_Avoid_: saved, deposited, contributions, set aside (that is the sending side)
+
+**Saving rate**:
+Regular saving from normal income, over normal income: moved to funds (above),
+averaged over the completed periods, divided by the same periods' budget income
+— the income the Dashboard and the Budget page print, which leaves out
+Excluded rows. Both sides of the ratio have the one scope, so a lump sum can
+raise neither: a UIF-style payout moved into a fund once made a
+household look as if it saved several times its regular rate. It is the measure behind the health card's saving
+tile, the Score's saving pillar and the Report's health section. The Savings
+page's growth chart is a different question — it counts every rand that went
+into a fund, lump sums included — and is not the saving rate.
+_Avoid_: savings rate, contribution rate, growth
 
 **Growth**:
 What an account earned without the household putting anything in. Deliberately

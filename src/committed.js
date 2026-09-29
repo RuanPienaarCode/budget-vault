@@ -15,7 +15,6 @@
 const { ISO_DATE, isRealIsoDate, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
 const { isPoolAccount, accountType } = require('./vocabulary');
 const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
-const { isSplitPart } = require('./tx-role');
 
 /* ADR-0007 · Whole-month placement window. An instalment with no known
    payment day is only claimed inside a window of 28 days or more. */
@@ -91,22 +90,54 @@ function earmarkOf(a) {
    the what's-left chain below all used to spell this themselves. */
 function debtMonthly(d) { return (Number(d && d.payment) || 0) + (Number(d && d.extra) || 0); }
 
+/* ADR-0007 · An unreadable balance is unknown, on the same predicate as
+   figures.js's balanceBook(): the loader parsed "about 300" to 0 and kept the
+   text in balanceRaw, and adding "0 plus the rows since" as cash is a figure
+   the reader never wrote. The view hands over `readable`; absent means
+   readable, so every caller that never heard of the field is unchanged. */
+const isUnreadable = a => !!a && a.readable === false;
+
 function cashOnHand(accounts) {
-  let cash = 0, counted = 0, earmarked = 0;
+  let cash = 0, counted = 0, staleCounted = 0, earmarked = 0;
   const unknown = [];
+  /* Held out because the balance could not be read, not because it has no
+     date: a different reason, and the card says which. */
+  const unreadable = [];
+  /* The accounts whose implied balance actually reached `cash`. The card's
+     own sentences about them (unconfirmed, rows nothing could place, rows on
+     a confirmation day) must describe THIS set and no wider one: on the real
+     vault "2 accounts · 1 unconfirmed" named an unconfirmed cash account that
+     held nothing and so was not among the 2. */
+  const contributors = [];
   /* Named, not just totalled: a figure held back from "actually free" is an
      exclusion, and this app does not exclude in silence. */
   const earmarkedFrom = [];
+  /* Accounts the household opted OUT of the budget whose money this card would
+     otherwise have counted as cash (a business cheque, an online wallet),
+     named because an exclusion the reader cannot see is the silent kind
+     (2026-09-29 audit). Judged by the SAME tests as the loop below - dated,
+     readable, positive - so the sentence cannot describe an account the card
+     would not have counted anyway. NOT the pools: a savings or investment
+     account outside the budget was never cash, and naming it would drown the
+     two that matter. Foreign accounts never arrive - the view partitions first. */
+  const outside = [];
   for (const a of accounts || []) {
-    if (!a || a.inBudget === false) continue;
+    if (a && a.inBudget === false) {
+      if (a.dated && !isUnreadable(a) && a.implied > 0 && !isPoolAccount(a)) outside.push({ name: a.name, amount: a.implied });
+      continue;
+    }
+    if (!a) continue;
     if (!a.dated) { unknown.push(a.name); continue; }
+    if (isUnreadable(a)) { unreadable.push(a.name); continue; }
     if (a.implied > 0) {
       cash += a.implied; counted++;
+      if (a.stale) staleCounted++;
+      contributors.push(a);
       const ear = earmarkOf(a);
       if (ear > 0) { earmarked += ear; earmarkedFrom.push({ name: a.name, amount: ear }); }
     }
   }
-  return { cash, counted, unknown, earmarked, earmarkedFrom };
+  return { cash, counted, staleCounted, unknown, unreadable, earmarked, earmarkedFrom, contributors, outside };
 }
 
 /* ---------------------------- commitments ------------------------------- */
@@ -118,14 +149,17 @@ function cashOnHand(accounts) {
    ALREADY landed is a separate question asked only of this period. */
 function serviceCommitments({ services, rows, from, to, periodStart }) {
   const out = [];
-  const history = (rows || []).filter(r => !isSplitPart(r));
+  const history = rows || [];
   for (const s of services || []) {
     if (!s || !s.active) continue;
     const m = matchCharges(s, history);
     /* ADR-0007 · Price from the dominant group, timing from every group. A
        renamed debit order is still taking the money; a stale anchor silently
        dropped Airtime and Website Hosting from the committed figure. */
-    const stats = chargeStats(m.charges);        // price
+    /* `current`, not `charges`: the price is what the service charges NOW,
+       and the dominant group by lifetime total can be a description the
+       merchant abandoned (see currentCharges in recurring.js). */
+    const stats = chargeStats(m.current || m.charges);   // price
     /* ADR-0007 · Charged by today, not merely present. A row dated later this
        period is not history (ISSUE 35/42/44's as-of, reaching the last
        figure); price is deliberately not filtered.
@@ -225,7 +259,7 @@ function remainingCharges({ anchor, next, step, from, to, charges }) {
    now, home band or foreign (ISSUE 85 — dropsAnyOf's `except` parameter). */
 function debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today }) {
   const out = [];
-  const history = (settleRows || rows || []).filter(r => !isSplitPart(r));
+  const history = settleRows || rows || [];
   for (const d of debts || []) {
     if (!d || d.status === 'paid') continue;
     const payment = debtMonthly(d);
@@ -278,7 +312,7 @@ function debtCommitments({ debts, rows, settleRows, from, to, periodStart, perio
 function cardCommitments({ accounts, from, to }) {
   const out = [];
   for (const a of accounts || []) {
-    if (!isSettleCard(a) || a.inBudget === false || !a.dated) continue;
+    if (!isSettleCard(a) || a.inBudget === false || !a.dated || isUnreadable(a)) continue;
     const owed = a.implied < 0 ? -a.implied : 0;
     if (!owed) continue;
 
@@ -314,11 +348,11 @@ function cardsOwed(accounts) {
      without re-deriving which accounts are cards under a second rule. */
   const entries = [];
   for (const a of accounts || []) {
-    if (!a || a.inBudget === false || !a.dated) continue;
+    if (!a || a.inBudget === false || !a.dated || isUnreadable(a)) continue;
     if (accountType(a) !== 'credit_card') continue;
     if (a.implied < 0) {
       owed += -a.implied; cards.push(a.name);
-      entries.push({ name: a.name, amount: -a.implied });
+      entries.push({ name: a.name, amount: -a.implied, account: a });
     }
   }
   return { owed, cards, entries };
@@ -329,7 +363,7 @@ function cardsOwed(accounts) {
 /* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
    `cardRows` from settle-monthly cards, `incomeRows` from in-budget accounts
    only; `free` may be negative, `perDay` is null on the last day. */
-function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, periodStart, periodEnd, today }) {
+function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, cardRefundRows, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
   /* The window starts today, not at the period start: a charge dated earlier
@@ -337,8 +371,22 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
      not the place to argue about it. */
   const from = now && now > periodStart ? now : periodStart;
 
-  const { cash, counted, unknown, earmarked, earmarkedFrom } = cashOnHand(accounts);
+  const { cash, counted, staleCounted, unknown, unreadable, earmarked, earmarkedFrom, contributors, outside } = cashOnHand(accounts);
   const { owed, cards, entries: owedEntries } = cardsOwed(accounts);
+
+  /* The rows behind the accounts whose balances reached a figure on this card:
+     the ones cash counted, and the cards whose owed balance is claimed or
+     stated. An account that contributed to neither (a stale cash account at
+     zero, an overdrawn cheque) is in no printed figure, so a caveat drawn from
+     its rows would qualify a total it cannot have moved. Carried on the
+     accounts by the view (`unplaced`, `sameDay`) because reconcile() is not
+     this module's business; summed here because WHICH accounts is. */
+  let unplaced = 0, sameDayCount = 0, sameDayNet = 0;
+  for (const a of new Set([...contributors, ...owedEntries.map(e => e.account)])) {
+    unplaced += a.unplaced || 0;
+    if (a.sameDay && a.sameDay.count) { sameDayCount += a.sameDay.count; sameDayNet += a.sameDay.net || 0; }
+  }
+  const confirmDay = { count: sameDayCount, net: Math.round(sameDayNet * 100) / 100 || 0 };
 
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
   const items = [
@@ -373,9 +421,15 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
      cycle and R0.02 of interest proved the card is a conduit, not a loan. */
   /* ISSUE 91's guard, third of three. Junk sorting into this window inflates
      card spend and can distort the settlement `cycle` derived from it. */
-  const cardSpend = (cardRows || []).reduce((s, r) => (
-    r && typeof r.amount === 'number' && r.amount < 0 && !isSplitPart(r) &&
-    isRealIsoDate(r.date) && r.date >= periodStart && r.date <= periodEnd ? s - r.amount : s), 0);
+  const inCycle = r => isRealIsoDate(r.date) && r.date >= periodStart && r.date <= periodEnd;
+  const cardGross = (cardRows || []).reduce((s, r) => (
+    r && typeof r.amount === 'number' && r.amount < 0 && inCycle(r) ? s - r.amount : s), 0);
+  /* ADR-0007 · A refund on the card lowers the cycle's spend. `cardRefundRows`
+     are the positive rows the ledger calls refunds (isRefund), Excluded or not;
+     the net is floored at zero. */
+  const cardRefunds = (cardRefundRows || []).reduce((s, r) => (
+    r && typeof r.amount === 'number' && r.amount > 0 && inCycle(r) ? s + r.amount : s), 0);
+  const cardSpend = cardRefunds ? Math.max(0, cardGross - cardRefunds) : cardGross;
   const settling = (credit && now && credit.next >= now) ? credit : null;
   /* ADR-0007 · Settle-monthly re-checked inside whatsLeft, never trusted from
      the caller: a revolving balance must never read as a cycle. */
@@ -404,24 +458,42 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
     cash,
     cashKnown: counted > 0,
     countedAccounts: counted,
+    /* Of the counted accounts, those whose stated balance is stale. */
+    staleCounted,
     unknownAccounts: unknown,
+    unreadableAccounts: unreadable,
+    unplaced,
+    confirmDay,
     cardDue,
     /* The debit-order half on its own, so the chain can show four terms that
        still add up: cash - committedOther - cardDue = free (outside a
        cycle; inside one, cash - committedOther = free directly). */
     committedOther,
+    /* The committed figure a BAND prints as one term: whatever `free` actually
+       subtracted. Inside a settlement cycle the card leaves `free` (it is
+       measured against the salary that settles it), so it must leave the
+       printed term too, or cash · committed · free stop adding up — a euro
+       band read "€6 000 cash · €1 000 committed · €6 000 free". The home chain
+       keeps committedOther and a separate card term, which sum to the same. */
+    committedShown: cycle ? committedOther : committed,
     /* ISSUE 48. Beside the figures AND inside `free`, unlike `owed` below —
        the whole point is that this one changes the answer. `earmarkedFrom`
        names which accounts, because "R23 000 is spoken for" with no way to
        see where invites the reader to assume it is wrong. */
     earmarked: spokenFor,
     earmarkedFrom,
+    /* Left OUT of `cash` on purpose and named beside it (see cashOnHand). */
+    outside: { count: outside.length, amount: outside.reduce((t, o) => t + o.amount, 0), accounts: outside },
     incoming,
     /* ADR-0007 · afterIncoming counts the settling salary once: inside a
        cycle `incoming` is the credit that funds the card band, so cardDue
        comes back off. Null when nothing is arriving. */
     afterIncoming: incoming ? free + incoming.amount - (cycle ? cardDue : 0) : null,
     cardSpend,
+    /* The two halves of cardSpend, for the tests and any sentence that wants
+       to say what came back: spend = max(0, cardGross - cardRefunds). */
+    cardGross,
+    cardRefunds,
     cycle,
     /* Reported beside the figures, deliberately absent from every one of them:
        cash, committed and free are all unchanged by this. */

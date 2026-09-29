@@ -9,6 +9,8 @@ const { el, icoEl, keepScroll, caveatChip } = require('../dom');
    the two rings on this app cannot drift apart visually. */
 const { createChart, arcPath, tip, themeColors } = require('../chart');
 const { normalizeAmount } = require('../amount');
+/* The readable-balance rule is figures.js's, not this page's own copy. */
+const { balanceReadable } = require('../figures');
 /* A display symbol per account, and the disclosure when a total spans more
    than one of them. It converts nothing — see the module header. isForeign is
    used only by this view's own splitByCurrency() below — currency.js stays
@@ -165,7 +167,7 @@ module.exports = function registerAccounts(ctx) {
      (`normalizeAmount(t) ?? 0`) forced a.balance to a fabricated zero — see
      amount.js's own warning that a fallback "must not be a plausible wrong
      number". That is the one case this page must not render as real money. */
-  const unreadableBalance = a => a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null;
+  const unreadableBalance = a => !balanceReadable(a);
 
   // Every type the loader can produce must appear in exactly one group, or an
   // account renders nowhere on this page — including `other`, which is what a

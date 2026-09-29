@@ -91,6 +91,7 @@ class FakeEl {
   querySelectorAll() { return []; }
   querySelector() { return null; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  hasAttribute(k) { return k in this.attrs; }
   removeAttribute(k) { delete this.attrs[k]; }
   addEventListener() {}
   focus() {}

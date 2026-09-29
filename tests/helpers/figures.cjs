@@ -334,9 +334,24 @@ function harvestView(ctx, nodes, raws, { view, fn }) {
     const rootId = sel.replace(/^#/, '');
     for (const leaf of leaves(root)) {
       const text = ownText(leaf);
-      for (const num of numbersIn(text, moneyStrings)) {
-        figures.push({ view, address: addressOf(leaf, rootId), kind: num.kind,
-          text: num.text, raw: num.raw, ambiguous: !!num.ambiguous });
+      const nums = numbersIn(text, moneyStrings);
+      if (!nums.length) continue;
+      /* The words around the figure, recorded HERE, at harvest time, on the
+         figure itself. reconcile-page.cjs used to rebuild this afterwards as a
+         Map keyed by address, and an address is not unique: every
+         `acctTable/@acct-group-total` shares one, and so does every Savings
+         worth-chart segment (data-fig stops addressOf's walk at the name). The
+         Map kept the LAST leaf written under each key, so all of a page's group
+         totals read the same neighbours and "the Savings group" was looked up
+         among text that only ever described the final group. The leaf is in
+         hand here; nothing needs to be guessed back from a string. */
+      const p = leaf._parent;
+      const parentText = p ? String(p.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      const context = { own: text.replace(/\s+/g, ' ').trim(), parent: parentText.slice(0, 140) };
+      const address = addressOf(leaf, rootId);
+      for (const num of nums) {
+        figures.push({ view, address, kind: num.kind,
+          text: num.text, raw: num.raw, ambiguous: !!num.ambiguous, context });
       }
     }
   }

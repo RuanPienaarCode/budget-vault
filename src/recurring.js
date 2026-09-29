@@ -169,6 +169,56 @@ function chargeStats(charges) {
   };
 }
 
+/* The group of charges that says what the service costs TODAY.
+
+   `matchCharges` names the dominant description by lifetime total, and that is
+   right for telling a subscription from the bank's fee on it. It is wrong for
+   the AMOUNT once the merchant has renamed its debit order: on the vault this
+   was audited against, a phone contract printed "last charged" at the price of
+   an old description whose final charge was months back, while the current
+   debit order was higher, and a hosting subscription printed the old group's
+   price while its latest charge, which had landed under a variant of the
+   description, was different. "Still committed" came out light.
+
+   So a group that has been charged MORE RECENTLY than the dominant one takes
+   over, provided its charges are the same KIND of charge: within a factor of
+   two of the dominant group's usual amount. The band is what keeps the
+   Spotify fee (R2 against R95, posted the same day or the day after) from
+   taking the price over — that is a rider on the service, not the service —
+   while still admitting a real price rise. A renamed order whose amount moved
+   by more than that is left with the dominant group, exactly as before: there
+   is no way to tell it from a different charge, and "no answer" beats a guess.
+
+   Ties on the most recent date go to the larger lifetime total, so the
+   dominant group is only ever displaced by strictly newer evidence. */
+const CURRENT_BAND = 2;
+function lastDateOf(list) {
+  let last = '';
+  for (const r of list) if (isRealIsoDate(r.date) && r.date > last) last = r.date;
+  return last;
+}
+function typicalOf(list) {
+  const dated = list.filter(r => isRealIsoDate(r.date)).sort((a, b) => a.date.localeCompare(b.date));
+  return median((dated.length ? dated : list).slice(-3).map(r => Math.abs(r.amount)));
+}
+function currentCharges(scored) {
+  const dominant = scored[0];
+  const domLast = lastDateOf(dominant.list);
+  const domTypical = typicalOf(dominant.list);
+  if (!(domTypical > 0)) return dominant.list;
+  let best = null;
+  for (const g of scored.slice(1)) {
+    const last = lastDateOf(g.list);
+    if (!last || last <= domLast) continue;
+    const typical = typicalOf(g.list);
+    if (!(typical > 0)) continue;
+    const ratio = typical / domTypical;
+    if (ratio > CURRENT_BAND || ratio < 1 / CURRENT_BAND) continue;
+    if (!best || last > best.last || (last === best.last && g.total > best.g.total)) best = { g, last };
+  }
+  return best ? best.g.list : dominant.list;
+}
+
 /* Charges belonging to a service, plus any OTHER merchant the tokens also hit.
 
    Rows matching the tokens are grouped by normalised description and the group
@@ -179,7 +229,7 @@ function chargeStats(charges) {
    and worth telling the reader about. */
 function matchCharges(service, rows, tokens) {
   const toks = tokens || serviceTokens(service);
-  if (!toks.length) return { charges: [], related: [], tokens: toks };
+  if (!toks.length) return { charges: [], current: [], related: [], tokens: toks };
 
   const groups = new Map();
   for (const r of rows || []) {
@@ -190,7 +240,7 @@ function matchCharges(service, rows, tokens) {
     if (!groups.has(n)) groups.set(n, []);
     groups.get(n).push(r);
   }
-  if (!groups.size) return { charges: [], related: [], tokens: toks };
+  if (!groups.size) return { charges: [], current: [], related: [], tokens: toks };
 
   const scored = [...groups].map(([key, list]) => ({
     key, list, total: list.reduce((s, r) => s + Math.abs(r.amount), 0),
@@ -198,6 +248,11 @@ function matchCharges(service, rows, tokens) {
 
   return {
     charges: scored[0].list,
+    /* What the service is charging NOW, which `charges` is not always: the
+       dominant group is the one with the largest LIFETIME total, and a
+       merchant that renames its debit order leaves that group behind with the
+       history while the money moves to a smaller one. */
+    current: currentCharges(scored),
     related: scored.slice(1).map(g => ({ key: g.key, count: g.list.length, total: g.total })),
     /* Every row the tokens hit, in date order. Price comes from the dominant
        group above; "is this still being charged" must come from ALL of them.

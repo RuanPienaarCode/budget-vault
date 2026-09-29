@@ -173,6 +173,9 @@ async function mountSavings(files) {
       FILES[`${B}/Transactions/Cheque/${m}.md`] = table([
         `| ${m}-01 | Salary | Salary | 45000.00 | | | |`,
         `| ${m}-05 | Groceries | Groceries | -30000.00 | | | |`,
+        // Its sending leg: since 29 Sep 2026 a deposit counts as moved only
+        // when an account of the household's own sent it.
+        `| ${m}-15 | To Nest | Groceries | -5000.00 | | | |`,
       ]);
       // R5,000 a month put into the capital-S account.
       FILES[`${B}/Transactions/Nest/${m}.md`] = table([

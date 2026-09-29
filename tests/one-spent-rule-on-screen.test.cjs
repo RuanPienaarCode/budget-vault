@@ -67,14 +67,14 @@ async function renderDash(files, { period = PERIOD, today = TODAY } = {}) {
 
   /* ---- 2. the hero prints the one numerator, everywhere it prints one --- */
   const hero = t('#heroCard');
-  has(hero, 'R 12 100,00 spent of R 15 500,00 budgeted',
+  has(hero, 'R 12 100,00 spent of R 15 500,00 spending budget',
     'hero sub-line: the one numerator against the spend envelopes');
   hasNot(hero, 'R 13 600,00 spent',
     'hero sub-line: gross spend is not what "spent" means on this card');
   /* The headline renders its currency symbol as its own element, so the
      figure's own text is the bare amount. */
   has(hero, '3 400', 'hero headline: budgeted less that same numerator');
-  has(hero, '78% used', 'hero tag: the share built from the same two figures');
+  has(hero, '78% of spending budget used', 'hero tag: the share built from the same two figures');
 
   /* The stat under "Total spent". Read by address rather than by scanning the
      whole card, because 12 100 also appears in the sub-line above it. */

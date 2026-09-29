@@ -311,7 +311,24 @@ module.exports = function registerPeriod(ctx) {
     const window = periodWindowAsOf(p, todayArg);
     if (!window) return 0;
     const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
-    return savedFromOutside(rows, labels, declaredCatType);
+    return transfersIntoFunds(rows, labels);
+  }
+  /* ADR-0006 amendment, 29 Sep 2026 (Ruan). The one assembly of "moved to funds"
+     and of the saving rate's numerator: only a transfer in from the household's
+     own non-pool accounts counts, and nothing it marked Excluded on either leg.
+     `poolLabels` (label -> account) is the receiving side; the sending side is
+     every other household-currency folder that resolves to an account. Excluded
+     is read here too because on the vault this was decided on, a large UIF-style
+     payout reached a fund as a transfer OUT of the cheque account (both legs
+     Excluded), so the transfer test alone left that month far too high. */
+  function transfersIntoFunds(rows, poolLabels) {
+    const foreign = foreignLabels();
+    const ownLabels = new Set();
+    for (const f of Object.values(S.txFiles)) {
+      if (foreign.has(f.label) || poolLabels.has(f.label)) continue;
+      if (accountForLabel(f.label)) ownLabels.add(f.label);
+    }
+    return savedFromOutside(rows, poolLabels, declaredCatType, { ownLabels, regular: true });
   }
 
   function earmarkedLabels() {
@@ -541,7 +558,7 @@ module.exports = function registerPeriod(ctx) {
     /* ISSUE 41. Published for the same reason foreignLabels above it is: an
        oracle or a view that re-spells "which folders are set aside" is a second
        rule waiting to disagree with this one. */
-    earmarkedLabels, movedToFunds, declaredCatType,
+    earmarkedLabels, movedToFunds, transfersIntoFunds, declaredCatType,
     /* ISSUE 87. Published so savingContribution (health-data.js) closes its
        window the same way movedToFunds does, rather than keeping a second
        copy of "as of today" that can drift from this one again. */

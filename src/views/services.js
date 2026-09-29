@@ -156,7 +156,12 @@ module.exports = function registerServices(ctx) {
     for (const s of S.services) {
       const m = matchCharges(s, rows);
       const home = matchCharges(s, homeRows);
-      const stats = chargeStats(home.charges);
+      /* `current`, not `charges`: what the merchant takes NOW. The dominant
+         group by lifetime total can be a description the merchant abandoned,
+         and committed.js already prices the same service off `current` — read
+         through `charges` here, the Services page priced a service at the old
+         description while the Dashboard committed the current price (2026-09-29 audit). */
+      const stats = chargeStats(home.current || home.charges);
       /* The symbols this service was actually billed in, other than the
          household's — named on the row so a reader can see WHY no price
          verdict is offered rather than just noticing one is missing. */

@@ -91,40 +91,77 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
    so is exactly the question ISSUE 88 is about. */
 const EXPLAINED_DIFFERENCES = [
   'accounts :: Group "Savings" (stated) vs Dashboard tile (implied)',
-  "dashboard :: What's left: cash in your accounts vs implied bank balances",
-];
-
-/* Every check the fixture cannot make, pinned in both directions. Ten are
-   honest fixture gaps — no investment account, no fixed-bill category, no prior
-   period to average, a Plans file holding budget-shaped rows rather than plan
-   sources, no stale balance to disclose a drift against. Two are the
-   stated-vs-implied KPI pairs whose partner segment is one of those gaps. Four
-   more (ISSUE 96) are the Budget strip's own gap note: every named category in
-   this household has a Categories/*.md file and none nets a refund, so
-   budgetSpendGap() answers 0 and the tile's uncat/netted fragments never
-   render — the check the RESTORED dom() calls make is real, this household
-   just cannot exercise it (tests/budget-strip-gap.test.cjs does, directly).
-
-   Growing the fixture is how these come off the list, and #89 is that work. A
-   check leaving this list is good news that still has to be written down. */
-const CANNOT_BE_MADE = [
-  'accounts :: Group "Investments" (stated) vs Dashboard tile (implied)',
-  'budgets :: budTotalsBottom: refunds netted note',
-  'budgets :: budTotalsBottom: uncategorised / unknown-name note',
-  'budgets :: budTotalsTop: refunds netted note',
-  'budgets :: budTotalsTop: uncategorised / unknown-name note',
-  'dashboard :: Stale note: drift',
-  'plan :: \u03a3 envelopes + free = pot',
-  'plan :: \u03a3 sources = pot',
-  'savings :: KPI "Investments" (stated) vs chart "Investments" segment (implied)',
+  /* The Savings page's KPI reads STATED balances and its worth chart IMPLIED
+     ones; the fixture's emergency fund has drifted, so the two differ by the
+     drift. This pair was unmeasurable while the segment lookup depended on a
+     context Map that collapsed every worth-chart segment into one — it comes
+     onto this list when the per-figure context (tests/helpers/figures.cjs)
+     let the check find its segment. */
   'savings :: KPI "Savings" (stated) vs chart "Savings" segment (implied)',
-  'savings :: Worth chart: "Investments" segment (implied)',
-  'savings :: Worth chart: "Savings" segment (implied)',
-  'score :: Budget chip "budget used" (this period) vs ring (six-period average)',
-  'score :: Ring: budget used (six-period average)',
-  'score :: Ring: fixed bills % of income',
-  'score :: Ring: living costs % of income',
+  /* And "What's left: cash in your accounts vs implied bank balances" is GONE
+     from this list, on purpose: it was the oracle that was wrong (it summed
+     every non-pool account type, ignoring `budget:` and the balance date),
+     not a second basis the app prints. cashOnHand() and the oracle now agree,
+     so the check passes. */
 ];
+
+/* Every check the fixture cannot make, pinned in both directions. Honest
+   fixture gaps — no investment account, no fixed-bill category, no prior
+   period to average for the ring's budget-used, a Plans file holding
+   budget-shaped rows rather than plan sources. Growing the fixture is how
+   these come off the list, and #89 is that work. A check leaving this list is
+   good news that still has to be written down.
+
+   Three groups LEFT this list with the checker fixes of 2026-09-29, none by
+   growing the fixture:
+     - the Budget strip's uncategorised / netted notes (four checks): the page
+       draws them from R1 up, so their absence on a household with no such gap
+       is the correct reading, and dom({ renderedFrom }) now says so as a PASS —
+       while a note that fails to render against a seam of R4 000 is a FAIL.
+     - "Stale note: drift": the note is drawn only when a balance is stale, and
+       nothing on this fixture is, so absence is again correct. (At a later
+       clock — tests/reconcile-checker-fixes.test.cjs — it renders and is
+       checked.)
+     - the Score's "living costs" ring figure and the Savings "Savings" segment
+       and KPI pair: an ordinal that assumed a fixed-bills figure above it, and
+       a per-figure context that was overwritten by its neighbours. */
+const CANNOT_BE_MADE = [
+  /* Empty since 2026-09-29: the fixture's Plans/2026-09.md became a real
+     windfall plan (money in + envelopes), so the Plan page's two pot checks
+     are measured like everything else. */
+];
+/* Six more LEFT this list on 2026-09-29 (lane Z, item 4), none by growing the
+   fixture: the extractor read absence as "unverified" where the page's own rule
+   makes absence the correct reading.
+     - Score: fixed bills % and budget used (six-period average), and the
+       chip-versus-ring comparison. score.js scoreNow drops a bit whose metric is
+       null; the household has neither a fixed-bill category nor a completed
+       period with a budget, so the seam is null and the page prints nothing.
+       Null beside nothing is a PASS; a non-null seam with nothing printed is a
+       FAIL (tests/lane-z-absence.test.cjs).
+     - Investments: the household holds no investment account. accounts.js draws a
+       group only for a kind it holds and savings.js draws a worth segment only
+       for a type that holds money, so no group and no segment is right. An
+       investment account existing while its group is missing is a FAIL. */
+
+/* A screen bug the reconciliation found and the app has not fixed yet, pinned so
+   the suite can stay green while it is fixed in the file that owns it - and
+   pinned in BOTH directions, so the entry has to be deleted the moment the fix
+   lands (the second assertion below fails when a listed check starts passing).
+   This is NOT the place to park a checker fault: `fail` above is empty on
+   purpose, and everything here is a defect the reader would see.
+
+     Drill-through lists earmarked-fund outflows. The Dashboard's Groceries wedge
+     is R2 400: Checkers R2 000 plus the R400 Takealot part. The BUDGET lens holds
+     out the R1 500 pram paid from the earmarked emergency fund (ISSUE 41, shown
+     on the hero as funded from savings), but the Transactions list the wedge
+     opens scopes only to accounts inside the budget, so it lists R3 900 under a
+     wedge of R2 400. Foreign-currency accounts are held out of the wedge the same
+     way and would list too. Fix, in src/views/transactions.js filteredRows(): hide
+     what ledger.js vetoes - `nonBudgetLabels() U foreignLabels()` and outflows of
+     `earmarkedLabels()` - not `nonBudgetLabels()` alone. Verified against the
+     household on a scratch copy: the check passes and nothing else moves. */
+const KNOWN_SCREEN_BUGS = [];
 
 /* A floor under the passing count as well, so a wholesale collapse into
    `unverified` cannot read as a pass even if someone updates the list above
@@ -155,7 +192,10 @@ const MIN_PASSING = 100;
 
   /* ---- the ratchet ------------------------------------------------------ */
 
-  const failures = idsOf('fail');
+  const allFailures = idsOf('fail');
+  const failures = allFailures.filter(f => !KNOWN_SCREEN_BUGS.includes(f));
+  eq(KNOWN_SCREEN_BUGS.filter(f => !allFailures.includes(f)), [],
+    'a known screen bug no longer fails - the fix has landed. Delete it from KNOWN_SCREEN_BUGS in this commit.');
   eq(failures, [],
     'a figure disagrees with the global total it is checked against — this is the '
     + '"two figures derived by different rules" shape, and every one of these was a real '
@@ -210,6 +250,6 @@ const MIN_PASSING = 100;
     + 'ever disagree, one of them is wrong about what the household spent');
 
   console.log(`PASS — the reconciliation runs as a gate: ${figures} figures, ${result.length} checks, `
-    + `${passing} agree, ${failures.length} disagree, ${explained.length} explained, ${quiet.length} not measurable `
+    + `${passing} agree, ${failures.length} disagree (+${KNOWN_SCREEN_BUGS.length} known screen bug), ${explained.length} explained, ${quiet.length} not measurable `
     + `(${Date.now() - t0}ms, ${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

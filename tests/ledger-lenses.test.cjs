@@ -36,7 +36,7 @@ const { stamp, tally, LENSES, lensDifference, keeps } = require('../src/ledger')
    falls in 2026-08..2027-01. Harmless to the random-vault conservation
    rounds above section 5, which only ever pass explicit period strings. */
 const { atAuditDate } = require('./_audit-seed.cjs');
-const { supersededBySplit } = require('../src/tx-role');
+const { supersededBySplit, isSplitPart } = require('../src/tx-role');
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -116,6 +116,7 @@ function oracleKeeps(ctx, lensName, t, paired) {
     case 'HOUSEHOLD': return !foreign && !transfer && !supersededBySplit(t)
       && !paired.has(`${t.label}|${t.date}|${(t.amount || 0).toFixed(2)}|${t.desc || ''}`);
     case 'ACCOUNT': return !supersededBySplit(t);
+    case 'MERCHANT': return !isSplitPart(t);
     default: throw new Error(lensName);
   }
 }

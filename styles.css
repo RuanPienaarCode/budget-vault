@@ -512,23 +512,40 @@
   }
   .budget-app-root .topbar .brand { display: none; }
 
+  /* The label used to share one row with the three nav buttons and was
+     ellipsised to "Jul 23 – Au…": on an iPhone-width pane that row leaves the
+     label ~87px and "Jul 23 – Aug 22, 2026" needs ~137px, so the one thing
+     the pill exists to say (WHICH range) was the part cut off. The same
+     flex-shrink had also squeezed the buttons from 32px to 20px wide.
+     Two rows instead: the label takes the pill's full width on top and the
+     three buttons sit beneath it, in the same left-to-right order as before
+     (previous, jump to current, next). The label is moved with order:-1 rather
+     than the markup being reordered, so the DOM, tab order and the screen-
+     reader reading order are untouched. A pane too narrow even for the full
+     width wraps the label instead of clipping it. */
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;
     margin-left: 0;
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0.25rem;
-    padding: 0.25rem 0.35rem;
+    align-content: center;
+    gap: 0;
+    padding: 0.2rem 0.35rem;
+    border-radius: 20px;
   }
   .budget-app-root .header-period-pill .pnav-dot { display: none; }
   .budget-app-root .header-period-pill .pnav-label {
-    flex: 1 1 auto;
+    order: -1;
+    flex: 1 0 100%;
     min-width: 0;
     text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    padding-top: 0.1rem;
   }
-  .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 32px; }
+  .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 28px; flex: none; }
 }
 
 .budget-app-root .drawer-overlay {
@@ -2409,6 +2426,26 @@
   .budget-app-root .donut-legend li,
   .budget-app-root .donut-legend .dl-link { gap: 7px; }
   .budget-app-root .donut-legend .dl-note { margin-left: 0; }
+  /* The name is the one column that can afford to be taller instead of
+     narrower: at this width it gets ~74px, and "Debt Repayments" (107px) was
+     cut to "Debt Repa…" with nothing on the row to say what it was. Let it
+     wrap to a second line — anywhere, so one long unbroken word cannot push the
+     figures out either — and let the row's other cells stay centred on it. */
+  /* The 7px gap the rule above asks for was never applied to the linked
+     legend: .dl-link's own base rule, further down the file at the same
+     specificity, wins on source order and kept 10px. Five gaps at 3px is the
+     15px that lets a 10-letter word ("Repayments" is 74.6px at 13px, against
+     a 74px name column) sit on a line whole instead of splitting as
+     "Repayment / s". One more class in the selector is all the fix needs. */
+  .budget-app-root .donut-legend li .dl-link { gap: 7px; }
+  .budget-app-root .donut-legend .dl-name {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: break-word;   /* Safari 15.0-15.3 has no `anywhere` */
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
 }
 /* Why the baseline column is a part-month while the period is still running.
    A full-width flex row so it lands UNDER the donut and the legend rather than
@@ -2714,6 +2751,42 @@
   .budget-export-modal button.budget-export-link { padding: 8px 0; }
   .budget-export-modal input.budget-export-date { min-height: 44px; }
 }
+/* On a phone the dialog holds ~1200px of options in a ~690px window, so the
+   Cancel / Export row — the last thing in it — sat below the fold and the
+   reader had to scroll to the end to find the one button that does the work.
+   Pin it to the bottom edge of whatever scrolls (Obsidian scrolls the
+   .modal-content; a host that scrolls .modal itself works the same, because
+   sticky binds to the nearest scrolling ancestor). Opaque, with the modal's own
+   background, or the options scrolling underneath would show through the
+   buttons; the hairline above it marks where the scrolling area ends. */
+@media (max-width: 600px) {
+  /* Spelled with the same shape as Obsidian's own
+     `.modal:not(.mod-settings) .setting-item:not(.setting-item-heading)` (0,4,0)
+     — which sets background-color: transparent, the padding and the top border
+     on every setting row — plus one class, so it outranks it (0,5,0) on
+     specificity alone rather than on source order. Without that the row stuck
+     but stayed see-through, and the options scrolled visibly underneath the
+     buttons. */
+  .modal.budget-export-modal .setting-item.budget-export-actions:not(.setting-item-heading) {
+    position: sticky;
+    /* Negative: .modal is the scroller and carries its own padding, and a
+       sticky box binds to the PADDING edge — at bottom:0 it stopped a padding
+       short of the modal's bottom edge and the options scrolled visibly through
+       the strip beneath the buttons. Reaching into the padding closes it. */
+    bottom: calc(var(--size-4-4, 16px) * -1);
+    z-index: 2;
+    background-color: var(--modal-background, var(--background-primary));
+    border-top: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
+    padding-top: 10px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  /* On a phone Obsidian zeroes the modal's bottom padding (.is-phone .modal),
+     so the negative offset above would push the row past the visible edge and
+     clip the buttons on a phone without a home indicator. */
+  .is-phone .modal.budget-export-modal .setting-item.budget-export-actions:not(.setting-item-heading) {
+    bottom: 0;
+  }
+}
 
 /* ============================================================
    MOBILE DENSITY — reclaim horizontal space for data.
@@ -2794,6 +2867,127 @@
      specificity, so the Debts table never got this shrink and kept a 70px bar
      while every other view dropped to 64px. Matched specificity so it does. */
   .budget-app-root .debt-prog .cat-bar { min-width: 64px; }
+}
+
+/* ------------------- Transactions + Budget: stacked rows -------------------
+   Both pages are editing surfaces, not read-only tables: every row carries
+   inputs and icon buttons. Left as tables they are 868px (Transactions) and
+   1013px (Budget) wide inside a ~365px scroller, so Split / Delete / Note /
+   Exclude on one page and the assume-spent / fixed / clear / delete buttons on
+   the other sat past the right edge and needed a sideways swipe to reach —
+   with nothing on screen to say they were there.
+
+   Under 600px each row becomes a small card instead (a grid, placed by column
+   position — the cells carry no classes and the column ORDER is fixed by
+   the render functions, so nth-child is the honest selector), and every
+   control is on screen. Scoped by id to the two tables: the same .table class
+   is shared by fifteen others that are read-only and scroll fine.
+
+   Desktop is untouched — nothing here applies above 600px.
+
+   Column headers do not survive the reshaping, so the thead is kept for
+   assistive tech (clipped, not display:none, the way .sr-only does it) and each
+   cell that would otherwise be a bare number can print its own label from a
+   `data-label` attribute. That attribute is a markup change the CSS cannot make
+   for itself; until the render functions write it the cards are complete but
+   unlabelled, and they degrade to exactly that. The Exclude checkbox has no
+   text at all, so it carries a glyph of its own in the meantime.
+
+   No new colours: borders and ink are the existing tokens. */
+@media (max-width: 600px) {
+  .budget-app-root #txTable,
+  .budget-app-root #txTable tbody,
+  .budget-app-root #budTable,
+  .budget-app-root #budTable tbody { display: block; width: 100%; }
+
+  .budget-app-root #txTable thead,
+  .budget-app-root #budTable thead {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .budget-app-root #txTable tbody tr,
+  .budget-app-root #budTable tbody tr:not(.type-row) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 4px;
+    align-items: center;
+    padding: 0.7rem 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .budget-app-root #txTable tbody tr:last-child,
+  .budget-app-root #budTable tbody tr:last-child { border-bottom: none; }
+
+  .budget-app-root #txTable tbody td,
+  .budget-app-root #budTable tbody td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  /* A cell's own label (dom.js tableCells). Visual only: the clipped thead
+     keeps role=columnheader, so the alt-text form (Safari 17.4+) stops
+     VoiceOver reading the column name twice; older engines keep the first. */
+  .budget-app-root #txTable tbody td[data-label]::before,
+  .budget-app-root #budTable tbody td[data-label]::before {
+    content: attr(data-label);
+    content: attr(data-label) / "";
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ---- Transactions: description + amount / date + account / category +
+          exclude / note + actions ---- */
+  .budget-app-root #txTable tbody td:nth-child(2) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #txTable tbody td:nth-child(5) { grid-column: 2; grid-row: 1; text-align: right; }
+  .budget-app-root #txTable tbody td:nth-child(1) { grid-column: 1; grid-row: 2; font-size: 0.8rem; }
+  .budget-app-root #txTable tbody td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; font-size: 0.8rem; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #txTable tbody td:nth-child(4) { grid-column: 1; grid-row: 3; }
+  .budget-app-root #txTable tbody td:nth-child(6) {
+    grid-column: 2; grid-row: 3;
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  }
+  .budget-app-root #txTable tbody td:nth-child(6)[data-label]::before { margin-bottom: 0; }
+  .budget-app-root #txTable tbody td:nth-child(7) { grid-column: 1; grid-row: 4; }
+  .budget-app-root #txTable tbody td:nth-child(8) { grid-column: 2; grid-row: 4; white-space: nowrap; text-align: right; }
+  /* The note input carries an inline 130px width; min-width outranks width, so
+     the field fills its cell without an !important fighting a style attribute. */
+  .budget-app-root #txTable tbody td:nth-child(7) input { min-width: 100%; box-sizing: border-box; }
+
+  /* ---- Budget: category + type / amount + actual / notes / actions ---- */
+  .budget-app-root #budTable tbody td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #budTable tbody td:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
+  .budget-app-root #budTable tbody td:nth-child(3) { grid-column: 1; grid-row: 2; text-align: left; }
+  .budget-app-root #budTable tbody td:nth-child(3) .bud-amt-wrap { align-items: flex-start; }
+  .budget-app-root #budTable tbody td:nth-child(4) { grid-column: 2; grid-row: 2; text-align: right; }
+  .budget-app-root #budTable tbody td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+  .budget-app-root #budTable tbody td:nth-child(5) input { min-width: 100%; box-sizing: border-box; }
+  .budget-app-root #budTable tbody td:nth-child(6) {
+    grid-column: 1 / -1; grid-row: 4;
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
+  }
+  .budget-app-root #budTable tbody td:nth-child(6):empty { display: none; }
+
+  /* Group bars ("Income", "Fixed"...) keep their full-width band. */
+  .budget-app-root #budTable tbody tr.type-row { display: block; }
+  .budget-app-root #budTable tbody tr.type-row td { display: block; padding: 0.6rem 0.5rem; }
+
+  /* Lone-cell rows — the empty-state line and Transactions' "Show more" — span
+     the card. Last, so it outranks the nth-child(1) placement above at equal
+     specificity. */
+  .budget-app-root #txTable tbody td[colspan],
+  .budget-app-root #budTable tbody td[colspan] { grid-column: 1 / -1; grid-row: auto; }
 }
 
 /* ------------------------- import: DIY-CSV help ------------------------- */

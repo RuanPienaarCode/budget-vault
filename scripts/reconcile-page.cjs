@@ -31,7 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian } = require('../tests/helpers/harness.cjs');
 stubObsidian();
-const { dispatchedViews, pinClock, mountFor, harvestView, leaves, ownText } = require('../tests/helpers/figures.cjs');
+const { dispatchedViews, pinClock, mountFor, harvestView } = require('../tests/helpers/figures.cjs');
 
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
@@ -159,12 +159,24 @@ function globals(ctx, S, period, today) {
   const budget = ctx.budgetTotals(period);
   const used = ctx.budgetUsed(period);
   const fig = ctx.periodFigures(period);
+  const FC = period === ctx.currentPeriod() ? fig : ctx.periodFigures(ctx.currentPeriod());
   /* ISSUE 96: the Budget strip's OWN gap, not periodFigures.gap (the donut's —
      see the ADR-0007 entry money-flow.js's budgetStripGap points at). reconcile()
      sets S.period to `period` before calling this function, so this reads the
      saved file, the same as every other seam checked here. */
   const stripGap = ctx.budgetSpendGap();
   const spend = ctx.periodSpend(period, null);
+  /* The SAME window the donut is built over. periodFigures.split reads
+     periodSummary(p), which closes at `asOf` (today, for the running period),
+     while periodSpend(p, null).whole is the whole period. Comparing the two
+     failed on any faked mid-period clock by exactly the rows dated after
+     today. periodSpend's own day cap is the seam for "start..asOf", so the
+     capped reading is taken THROUGH the seam rather than rebuilt from the
+     ledger: a finished period has no cap (asOf = end), and a period still
+     ahead of us has an empty window (0 days). */
+  const dayNo = require('../src/dates').isoDayNumber;
+  const capDays = today < start ? 0 : (asOf >= end ? null : dayNo(asOf) - dayNo(start) + 1);
+  const spendSoFar = ctx.periodSpend(period, capDays);
   const income = ctx.monthlyIncome(period);
   const deficit = ctx.periodDeficit(period);
   const moved = ctx.movedToFunds(period);
@@ -190,6 +202,10 @@ function globals(ctx, S, period, today) {
       byCat: sortedPairs(t.byCat), spendByCat: sortedPairs(t.spendByCat),
     };
   };
+  /* The window the summary calls `scheduled`: the day after asOf to the end
+     (the whole period when it is still ahead of us). Empty for a finished one. */
+  const restFrom = summary.scheduled && summary.scheduled.from ? summary.scheduled.from : null;
+  const stampedRest = restFrom ? ctx.ledger(restFrom, end) : [];
   const lensNames = Object.keys(LENSES);
   const lenses = {
     soFar: Object.fromEntries(lensNames.map(n => [n, tallyOf(stampedSoFar, LENSES[n])])),
@@ -319,11 +335,45 @@ function globals(ctx, S, period, today) {
   });
   const driftSum = accounts.filter(a => !a.foreign && a.rec.state === 'drift').reduce((t, a) => t + (a.rec.delta || 0), 0);
 
+  /* Cash on hand, spelled as committed.js's cashOnHand() defines it (ADR-0007):
+     the IMPLIED balance of every account that is in the budget, in the
+     household's currency, and has a balance date — only when positive, pool
+     accounts (savings, investment, emergency fund) INCLUDED. It is not the bank
+     total: that is a different question (Σ implied over non-pool TYPES, every
+     account, whatever `budget:` says), and comparing the two made an
+     intentional definition look like a disagreement. Spelled here from the
+     account list, not by calling cashOnHand, so it stays a second reading.
+
+     `heldOut` names what the rule leaves out on purpose - the EVERYDAY
+     `budget: false` accounts with money in them (home currency, dated,
+     readable, positive, and not a savings or investment pool) - because "the
+     card omits an account" is an exclusion the reader is entitled to see
+     named, not a silent one. It is the scope the card's own sentence uses
+     ("N accounts outside the budget not counted"), spelled here from the
+     account list so the page is checked against a second reading; a pool
+     outside the budget is a different declaration and is not in it. */
+  const cashCounts = a => a.inBudget && !a.foreign && a.rec.state !== 'no-date';
+  const cashOf = a => Math.max(0, isNum(a.implied) ? a.implied : (a.stated || 0));
+  const cash = {
+    oracle: accounts.filter(cashCounts).reduce((t, a) => t + cashOf(a), 0),
+    counted: accounts.filter(a => cashCounts(a) && cashOf(a) > 0).map(a => a.name),
+    heldOut: accounts.filter(a => !a.inBudget && !a.foreign && !a.pool && a.statedRaw == null
+      && a.rec.state !== 'no-date' && cashOf(a) > 0)
+      .map(a => ({ name: a.name, amount: cashOf(a) })),
+  };
+
+  /* The rows the Transactions page itself selects for this period — its own
+     filteredRows(), before the table's window is applied, in the order the
+     table draws them. The page shows the first PAGE (100) of these and says so,
+     so "what should be on screen" is a slice of THIS list, not of the raw rows
+     the oracle adds up. */
+  const txPage = ctx.filteredRows().rows.map(r => Number(r.amount) || 0);
+
   const health = ctx.healthSnapshot();
   const debtsActive = activeDebts(S.debts);
 
   return {
-    meta: { period, start, end, asOf, today, running, currency: cur,
+    meta: { period, start, end, asOf, today, running, currency: cur, currentPeriod: ctx.currentPeriod(),
       periodTitle: ctx.periodTitle ? ctx.periodTitle(period) : period },
     settings: primitives(S.settings),
     census: {
@@ -339,9 +389,28 @@ function globals(ctx, S, period, today) {
     figures: {
       rows: fig.rows, split: fig.split, gap: fig.gap, stripGap, scheduled: fig.scheduled, fundedFromSavings: fig.fundedFromSavings,
       uncountedIncome: fig.uncountedIncome,
-      trend: { whole: sortedPairs(spend.whole), wholeTotal: Object.values(spend.whole).reduce((a, b) => a + b, 0), count: spend.count },
+      trend: { whole: sortedPairs(spend.whole), wholeTotal: Object.values(spend.whole).reduce((a, b) => a + b, 0), count: spend.count,
+        part: sortedPairs(spendSoFar.part), partTotal: Object.values(spendSoFar.part).reduce((a, b) => a + b, 0), capDays },
       planTotal: budget.spend + budget.setAside,
-      allocated: budget.income > 0 ? (budget.spend + budget.setAside) / budget.income : null,
+      /* The app's own allocatedShare, carried through from periodFigures.plan
+         rather than re-derived. This line used to be `income > 0 ? total /
+         income : null` — the checker's private rule for the one figure the
+         Dashboard hero, the Budget strip and the Score chip all print, and it
+         differs from the app's on exactly the edges allocatedShare exists for
+         (zero budget beside real income is 0%, a finished period stands its
+         actual income in for a plan that names none). Spelling a rule here that
+         the app already owns is the bug shape this instrument is built to find. */
+      allocated: fig.plan.allocated,
+      /* What the SCORE page draws. score.js buildFlow() is anchored to
+         currentPeriod() whatever month is on screen ("this period's income"),
+         so its flow card and chips are checked against THAT period's snapshot,
+         not the selected one. Primitives only — the whole snapshot would bloat
+         the JSON twin. */
+      current: {
+        period: ctx.currentPeriod(),
+        income: FC.summary.income, spent: FC.used.spent, used: FC.used.used,
+        budgeted: FC.budget.spend + FC.budget.setAside, allocated: FC.plan.allocated,
+      },
       /* periodFigures' OWN plan snapshot, carried through rather than
          re-derived. ADR-0007 registers `unallocated` as income − total; this
          script had spelled it total − income by hand a few lines away and so
@@ -351,12 +420,13 @@ function globals(ctx, S, period, today) {
       plan: fig.plan,
     },
     lenses, oracle, lensDiff, droppedByBudget,
+    rest: { from: restFrom, TREND: tallyOf(stampedRest, LENSES.TREND), BUDGET: tallyOf(stampedRest, LENSES.BUDGET) },
     worth: { implied: primitives(W), stated: primitives(Wstated), naive, driftSum,
       otherCurrencies: W.otherCurrencies,
       byTypeStated: byType(statedHome), byTypeImplied: byType(impliedHome), byOwnerStated: byOwner(stated, statedHome) },
     book: { drift: book.drift, stale: primitives(book.stale), overdrawn: book.overdrawn,
       unplaced: [...book.unplacedBy.entries()], confirmDay: [...book.confirmDayBy.entries()].map(([k, v]) => [k, v]) },
-    accounts,
+    accounts, cash, txPage,
     health: { metrics: primitives(health.metrics), breakdown: health.breakdown, target: health.target,
       debtInterest: health.debtInterest, earmarks: primitives(health.earmarks), empty: health.empty, debtsRecorded: health.debtsRecorded },
     assets: (S.assets || []).map(x => ({ name: x.name, type: x.type, value: x.value, valued: x.valued || x.valued_on || null, foreign: isForeign(x, cur) })),
@@ -367,29 +437,110 @@ function globals(ctx, S, period, today) {
   };
 }
 
-/* ---- the DOM harvest, with the words around each number ----------------- */
+/* ---- the DOM harvest, with the words around each number -----------------
+   Each figure carries its own `context: { own, parent }`, recorded by
+   harvestView() at the moment it reads the leaf. This used to be rebuilt here
+   as a Map keyed by ADDRESS, and an address is not a key: every
+   acct-group-total shares one, and so does every worth-chart segment, so the
+   last leaf written won and the rest read its neighbours. */
 async function harvestPages(files, { period, budgetFolder }) {
   const out = [];
   for (const v of dispatchedViews()) {
     const m = await mountFor(files, { period, budgetFolder });
     const r = harvestView(m.ctx, m.nodes, m.raws, v);
-    /* Address → the leaf's own text and its parent's, so a row in the page
-       reads "R 13 038 · 36%  (Food)" rather than a bare number. */
-    const context = new Map();
-    const { addressOf } = require('../tests/helpers/figures.cjs');
-    for (const [sel, root] of m.nodes) {
-      const rootId = sel.replace(/^#/, '');
-      for (const leaf of leaves(root)) {
-        const p = leaf._parent;
-        const parentText = p ? String(p.textContent || '').replace(/\s+/g, ' ').trim() : '';
-        context.set(addressOf(leaf, rootId), { own: ownText(leaf).replace(/\s+/g, ' ').trim(), parent: parentText.slice(0, 140) });
-      }
-    }
-    r.figures = r.figures.map(f => ({ ...f, context: context.get(f.address) || { own: '', parent: '' } }));
+    /* The Dashboard's drill-throughs are clicked AFTER its figures are read:
+       opening Transactions renders that view into the same stub DOM. */
+    if (v.view === 'dashboard' && !r.error) r.drill = drillThrough(m.ctx, m.nodes, period);
     m.restore();
     out.push(r);
   }
   return out;
+}
+
+/* ---- the Dashboard's drill-throughs, clicked the way the page wires them -----
+   A wedge, the Uncategorised tile and the Missing categories tile each open
+   Transactions filtered to the rows behind the figure. What the reader is told
+   ("this is what adds up to the number you tapped") is only true if the rows
+   listed sum to it, so each is clicked and its list summed.
+
+   The stub DOM does not reflect an <option>'s value attribute onto `.value` the
+   way a browser does; realSelect makes it so, exactly as
+   tests/dashboard-audit-outside-budget.test.cjs does, so the page's own
+   membership test in openCategory() runs against real values. switchView is the
+   one controller.js function the click needs: it renders the target view.
+
+   Returns plain sums, never rows: the JSON twin of a live run must not carry a
+   vault's transactions. `after` is the part of a list dated after the period's
+   asOf - a running period lists rows the figure (closed at today) has not
+   reached, and that is a difference worth naming rather than hiding. */
+function drillThrough(ctx, nodes, period) {
+  const { find, hasClass, textOf } = domReaders();
+  const asOf = ctx.periodSummary(period).asOf;
+  ctx.switchView = () => ctx.renderTransactions();
+  const sel = ctx.$('#txCategory');
+  if (!sel) return { error: 'no #txCategory in the stub DOM', wedges: [], tiles: [] };
+  Object.defineProperty(sel, 'options', {
+    configurable: true,
+    get() { return sel.children.filter(c => c.tagName === 'OPTION').map(o => ({ value: o.attrs.value, textContent: o.textContent })); },
+  });
+  const rounded = v => Math.round(v * 100) / 100;
+  const listed = () => {
+    const { rows, hiddenOutside } = ctx.filteredRows();
+    const counted = rows.filter(r => !r.excluded);
+    const later = counted.filter(r => r.date > asOf);
+    return {
+      listed: rows.length, hiddenOutside: hiddenOutside || 0,
+      count: counted.length, sum: rounded(counted.reduce((t, r) => t + (Number(r.amount) || 0), 0)),
+      after: { count: later.length, sum: rounded(later.reduce((t, r) => t + (Number(r.amount) || 0), 0)) },
+      excludedListed: rows.length - counted.length,
+    };
+  };
+  const reset = () => { ctx.$('#txWholeHistory').checked = false; };
+  reset();
+
+  const wedges = [];
+  const legend = nodes.get('#dashSplit');
+  const items = find(legend, n => n.tagName === 'LI' && find(n, m => hasClass(m, 'dl-link')).length);
+  for (const li of items) {
+    const name = textOf(find(li, m => hasClass(m, 'dl-name'))[0]);
+    const link = find(li, m => hasClass(m, 'dl-link'))[0];
+    reset();
+    link._fire('click');
+    wedges.push({ name, selected: sel.value, ...listed() });
+  }
+
+  const tiles = [];
+  const heroBtns = find(nodes.get('#heroCard'), n => n.tagName === 'BUTTON' && hasClass(n, 'stat'));
+  const sum = ctx.periodSummary(period);
+  /* dashboard.js draws Uncategorised (when its count is above zero), then
+     Missing categories (when its own is): position is the language-free way to
+     tell them apart, and the count of buttons is itself checked below. */
+  const expect = [];
+  if (sum.uncategorised > 0) expect.push('uncategorised');
+  if (sum.unknown && sum.unknown.count > 0) expect.push('missing');
+  heroBtns.forEach((b, i) => {
+    const kind = expect[i] || `unexpected-${i}`;
+    reset();
+    b._fire('click');
+    tiles.push({ kind, selected: sel.value, ...listed() });
+  });
+  return { error: null, asOf, wedges, tiles, expectedTiles: expect };
+}
+
+/* Three readers over the stub DOM. Spelled here rather than borrowed from
+   tests/helpers/dash-audit.cjs: that file belongs to the audit suites, and a
+   script that reads a real vault should not stop working when one is renamed. */
+function domReaders() {
+  const { leaves, ownText } = require('../tests/helpers/figures.cjs');
+  const find = (node, pred, out = []) => {
+    if (!node) return out;
+    if (pred(node)) out.push(node);
+    for (const c of node.children || []) if (c.nodeType === 1) find(c, pred, out);
+    return out;
+  };
+  const hasClass = (n, c) => !!(n._cls && n._cls.has(c));
+  const textOf = node => (node ? leaves(node).map(ownText).filter(Boolean).join(' ') : '');
+  return { find, hasClass, textOf };
 }
 
 /* ---- checks ---------------------------------------------------------- */
@@ -439,9 +590,43 @@ function makeChecker(G, pages) {
     else { status = expectDiff ? 'info' : 'fail'; delta = pageValue - globalValue; why = kind === 'money' ? explain(delta) : []; }
     checks.push({ page, name, formula, pageValue, pageSource, globalValue, globalSource, status, delta, why, kind, note });
   }
-  /* A rendered figure against a global one. */
-  function dom({ page, name, formula, re, globalValue, globalSource, kind = 'money', note, index = 0, expectDiff = false }) {
+  /* A rendered figure against a global one.
+
+     `renderedFrom` names a note the page only draws once its figure is big
+     enough to be worth a sentence (budgets.js: `gapUncat >= 1`, `used.setAside
+     > 0`; dashboard.js: `Math.abs(drift) >= 1`). Such a check used to report
+     `unverified` whenever the figure was missing, which made two very
+     different states look the same: "absent because the seam is below the bar"
+     and "absent because the note failed to render while the seam says R 4 000".
+     The second is a defect and was invisible. Now, with the figure missing:
+
+       |gate| <  renderedFrom  ->  pass  (absent by design)
+       |gate| >= renderedFrom  ->  fail  (the seam says it should be there)
+       gate is null            ->  pass  (the seam has nothing to say, so the
+                                   page saying nothing is the same reading)
+
+     `gate` is `renderedWhen` when the app's own condition tests a DIFFERENT
+     quantity than the one printed (the moved-to-funds figure rides in the
+     set-aside sentence and is drawn whenever set-aside is), else the global
+     value itself. A figure that IS found is compared exactly as before. */
+  function dom({ page, name, formula, re, globalValue, globalSource, kind = 'money', note, index = 0, expectDiff = false, renderedFrom = null, renderedWhen }) {
     const f = figs(page, re, kind)[index] || null;
+    if (!f && renderedFrom != null) {
+      const gate = renderedWhen === undefined ? globalValue : renderedWhen;
+      if (!isNum(gate) && !isNum(globalValue)) {
+        checks.push({ page, name, formula, pageValue: null, globalValue: null, kind, note: note || '',
+          pageSource: `not rendered — and the seam is null, so there is nothing to print`, globalSource: globalSource || '',
+          status: 'pass', delta: null, why: [] });
+        return;
+      }
+      if (isNum(gate)) {
+        const absentByDesign = Math.abs(gate) < renderedFrom;
+        checks.push({ page, name, formula, pageValue: null, globalValue, kind, note: note || '',
+          pageSource: absentByDesign ? `not rendered — |${Math.round(gate * 100) / 100}| is under ${renderedFrom}, the bar the page draws this note from` : `NOT RENDERED although the seam says ${gate} (drawn from ${renderedFrom} up) — no ${kind} figure at /${re.source}/`,
+          globalSource: globalSource || '', status: absentByDesign ? 'pass' : 'fail', delta: null, why: [] });
+        return;
+      }
+    }
     add({ page, name, formula, pageValue: figValue(f), pageSource: f ? `${f.address} = "${f.text}"` : `no ${kind} figure at /${re.source}/`,
       globalValue, globalSource, tol: figTol(f), kind, note, expectDiff });
   }
@@ -502,8 +687,39 @@ function runChecks(G, pages) {
     left: sf.BUDGET.kept, leftSource: 'BUDGET.kept', right: sf.TREND.kept, rightSource: 'TREND.kept', tol: 0 });
   identity({ name: 'Σ split rows = Σ TREND spendByCat', formula: 'the donut and the comparison column are one net-per-category reading',
     left: splitTotal, leftSource: 'Σ periodFigures.split', right: sf.TREND.spendByCatTotal, rightSource: 'Σ tally(TREND).spendByCat' });
-  identity({ name: 'Σ split rows = Σ periodSpend(p).whole', formula: 'identity 2 of tests/cross-page-consistency',
-    left: splitTotal, leftSource: 'Σ periodFigures.split', right: F.trend.wholeTotal, rightSource: 'Σ periodSpend(p).whole' });
+  /* Same window on both sides (item 1 of the 2026-09-29 lane-Z brief). The split
+     closes at asOf, so it is read against periodSpend's capped `part`; the WHOLE
+     period is compared only when the window is the whole period (asOf = end).
+     What lies between the two - net spend on rows dated after asOf - is not
+     additive across categories (spendByCat clips each window's category net
+     at zero), so it is stated, not subtracted: see the next check. */
+  identity({ name: 'Σ split rows = Σ periodSpend(p).whole', formula: 'identity 2 of tests/cross-page-consistency, over one window: start..asOf on both sides (periodSpend capped to the days elapsed; the whole period once asOf = end)',
+    left: splitTotal, leftSource: 'Σ periodFigures.split (start..asOf)',
+    right: F.trend.partTotal, rightSource: F.trend.capDays === null ? 'Σ periodSpend(p).whole (finished period: the window IS the period)' : `Σ periodSpend(p, ${F.trend.capDays}).part (start..${G.meta.asOf})` });
+  {
+    /* The named difference, stated and then checked exactly. Between the split
+       (start..asOf) and the whole period lies the spend dated after asOf, and it
+       cannot be subtracted from the two spend totals: spendByCat clips each
+       window's per-category net at zero, so a category that nets to a refund in
+       one window and to spend in the other is clipped differently on each side.
+       What IS exact is the un-clipped net per category, so the two are pinned
+       there, and the summary's own `scheduled` disclosure is pinned to the
+       BUDGET lens over the rest of the period. */
+    const rest = G.rest;
+    const cats = new Set([...G.lenses.whole.TREND.byCat.map(x => x.key), ...G.lenses.soFar.TREND.byCat.map(x => x.key), ...rest.TREND.byCat.map(x => x.key)]);
+    const get = (t, k) => (t.byCat.find(x => x.key === k) || { value: 0 }).value;
+    let resid = 0, worst = '';
+    for (const k of cats) {
+      const r = Math.abs(get(G.lenses.whole.TREND, k) - get(G.lenses.soFar.TREND, k) - get(rest.TREND, k));
+      if (r > resid) { resid = r; worst = k; }
+    }
+    identity({ name: 'Whole period = start..asOf + after asOf (TREND net, per category)', formula: 'ledger additivity: the un-clipped net of every category over the period is its net so far plus its net still to come',
+      left: resid, leftSource: `largest per-category residual${resid > CENT ? ` (${worst})` : ''}`, right: 0, rightSource: 'exact',
+      note: `after-asOf window: ${rest.from || 'none'}..${G.meta.end}` });
+    identity({ name: 'periodSummary.scheduled.spend = BUDGET spend of the rows after asOf', formula: 'the "rest of period" disclosure is the BUDGET tally over the complementary window',
+      left: F.scheduled.spend || 0, leftSource: 'periodSummary.scheduled.spend',
+      right: rest.BUDGET.spend, rightSource: 'tally(ledger(after asOf..end), BUDGET).spend' });
+  }
   identity({ name: 'Donut gap identity: split + uncat + netted = gross spend', formula: 'hero spend = donut total + uncategorised spend + refunds netted (identity 1)',
     left: splitTotal + F.gap.uncat + F.gap.netted, leftSource: 'Σ split + gap.uncat + gap.netted', right: S.spend, rightSource: 'periodSummary.spend' });
   identity({ name: 'budgetUsed.spent = max(0, spend − setAside) + assumed', formula: 'ADR-0005, the one rule',
@@ -554,6 +770,43 @@ function runChecks(G, pages) {
     column({ page: D, name: `Donut slices = split rows (${n ? n - 1 : 0} named + other)`, formula: 'slice i = split[i]; the last slice = Σ split[n−1..]',
       re: /^dashSplit\/svg\.donut\/path[^/]*\/title/, seam, globalSource: 'periodFigures.split[].amount, tail folded' });
   }
+  {
+    /* The legend's three money columns are one sum the reader does in their
+       head: Spent, the baseline (3M / prev), and Change, which the header says
+       is Spent against that baseline. dashboard.js compareCell() rounds both
+       operands BEFORE subtracting "so the change really is the difference
+       between the two figures printed beside it" — but it subtracts the
+       windowed `now` it computed, while the Spent column beside it prints
+       rowMoney[i] (a whole-period, sum-preserving allocation). The two only
+       agree when no row is dated ahead of today and no allocation nudged a row
+       by a unit, and nothing checked that they do. A row prints R 2 400 spent,
+       R 4 000 usual, and "−R 1 500".
+
+       Per row, in whole currency units (all three are printed at 0 decimals, so
+       tol 0.51 means exact). The sign is a glyph in the delta's own text
+       ("+R 1 600", "−R 1 600"), not part of the harvested figure, so it is read
+       from the leaf's context. A row with no baseline ("new", "—") has no sum
+       to check and is not counted. */
+    const legend = C.figs(D, /^dashSplit\/ul\.donut-legend\/li\[\d+\]\/.*span\.dl-(val|base|delta)\[/, 'money');
+    const rowsOf = new Map();
+    for (const f of legend) {
+      const [, i, col] = f.address.match(/li\[(\d+)\]\/.*span\.dl-(val|base|delta)\[/);
+      (rowsOf.get(i) || rowsOf.set(i, {}).get(i))[col] = f;
+    }
+    const compared = [], bad = [];
+    for (const [i, r] of rowsOf) {
+      if (!r.val || !r.base || !r.delta) continue;
+      const own = String(r.delta.context.own || '');
+      const sign = /^\s*[\u2212-]/.test(own) ? -1 : 1;
+      const shownChange = sign * figValue(r.delta), want = figValue(r.val) - figValue(r.base);
+      compared.push(i);
+      if (!near(shownChange, want, 0.51)) bad.push(`row ${i}: ${figValue(r.val)} − ${figValue(r.base)} = ${want}, page prints ${shownChange}`);
+    }
+    C.add({ page: D, name: 'Donut legend: Change = Spent − baseline (per row)', formula: 'the Change column is the Spent column minus the 3M / prev column, after the rounding the page prints', kind: 'count',
+      pageValue: compared.length ? compared.length - bad.length : null,
+      pageSource: compared.length ? `${compared.length - bad.length} of ${compared.length} rows hold${bad.length ? ` · failing: ${bad.join('; ')}` : ''}` : 'no legend row carries a baseline',
+      globalValue: compared.length, globalSource: 'legend rows with a Spent, a baseline and a Change', tol: 0 });
+  }
   /* dashboard.js:1669 prints a remaining figure for a budgeted row and for
      an `unbudgeted` one (budgetRowStatus: spend with no envelope, not income,
      not assumed) — never for an unbudgeted income row or a netted refund. */
@@ -561,27 +814,58 @@ function runChecks(G, pages) {
   /* budgets.js:621-648 prints the SAME rows, but an overspend as a magnitude
      ("over by R 197,60") where the Dashboard prints "R -197,60"; and an
      assume-spent row still inside its envelope prints words, not a number. */
+  /* An income row above its plan prints "R X more than planned" on the
+     Dashboard too (2026-09-29 follow-up: it printed a red "R -X" until then),
+     so its figure is the magnitude; every other row prints the signed one. */
+  /* An income row exactly on its plan prints the words "received as planned"
+     on both pages now (budgets.js incomeRemainingText), so no figure to match. */
+  const onPlanIncome = r => r.type === 'income' && r.budget && Math.round(r.remaining * 100) === 0;
+  const drawnDashboard = drawn.filter(r => !onPlanIncome(r))
+    .map(r => (r.type === 'income' && r.remaining < 0 ? -r.remaining : r.remaining));
   const drawnBudgetPage = F.rows
     .filter(r => (r.budget && !(r.assumed && r.actual <= r.budget)) || r.unbudgeted)
-    .map(r => (r.remaining < 0 && r.type !== 'income') ? -r.remaining : r.remaining);
+    /* An income row that landed exactly on its plan (to the cent) prints the
+       words "as planned" (budgets.js incomeRemainingText), not "R 0,00 still to
+       come", so it has no figure for the seam's 0 to match. allowExtraZero on the
+       column below keeps a build that still prints the zero passing. */
+    .filter(r => !onPlanIncome(r))
+    /* Income folds too since the 2026-09-29 audit: an income row above its plan
+       prints "R X more than planned", a magnitude, not "R -X left". */
+    .map(r => r.remaining < 0 ? -r.remaining : r.remaining);
   column({ page: D, name: 'Budget table: Budget column = rows', formula: 'budgetVsActualRows[].budget',
     re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[1\]$/, seam: F.rows.map(r => r.budget).filter(v => v), globalSource: 'periodFigures.rows[].budget (non-zero)' , note: 'zero budgets print blank' });
   column({ page: D, name: 'Budget table: Actual column = rows', formula: 'budgetVsActualRows[].actual',
     re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[2\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual' });
   column({ page: D, name: 'Budget table: Remaining column = rows', formula: 'budgetRowStatus.remaining = budget − actual',
-    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, seam: drawn.map(r => r.remaining), globalSource: 'periodFigures.rows[].remaining (rows with a budget or an actual)' });
+    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, seam: drawnDashboard, allowExtraZero: true, globalSource: 'periodFigures.rows[].remaining (rows with a budget or an actual; an income row above its plan is the magnitude of "R X more than planned")' });
   {
-    const bars = C.figs(D, /^trendChart\/svg\/rect\[\d+\]\/title/, 'money');
-    const last = bars.reduce((m, f) => Math.max(m, Number((f.address.match(/rect\[(\d+)\]/) || [])[1])), -1);
-    const vals = bars.filter(f => f.address.includes(`rect[${last}]`)).map(figValue);
-    /* views/dashboard.js:1708 — the bar carries budgetUsed(p).spent, the
-       ADR-0005 numerator, not gross spend. */
+    /* `last` is the last bar that PRINTS ANYTHING, not the last bar that prints
+       money. A period the vault holds no rows for is drawn with a title of just
+       its label ("Oct 26" — dashboard.js renderTrend's `covered` test, the same
+       periodSpend count), so taking `last` over money figures alone skipped it
+       and read the PREVIOUS period's bar as the current one. Every label ends in
+       a number, so the harvest sees every bar's title as a figure of some kind. */
+    const titles = C.figs(D, /^trendChart\/svg\/rect\[\d+\]\/title/, null);
+    const idxOf = f => Number((f.address.match(/rect\[(\d+)\]/) || [])[1]);
+    const last = titles.reduce((m, f) => Math.max(m, idxOf(f)), -1);
+    const vals = titles.filter(f => idxOf(f) === last && f.kind === 'money').map(figValue);
+    /* views/dashboard.js:2106 — the bar's title is the label, then three money
+       figures in a FIXED order: spent, budget, income. Read by position, so a
+       series whose value equals another's (an unbudgeted period draws R 0 twice;
+       spent can equal income) cannot be satisfied by the wrong slot. `spent` is
+       budgetUsed(p).spent, the ADR-0005 numerator, not gross spend. */
     const want = [['spent', U.spent, 'budgetUsed(p).spent'], ['budget', B.spend, 'budgetTotals.spend'], ['income', S.income, 'periodSummary.income']];
-    for (const [n, v, src] of want) {
-      C.add({ page: D, name: `Trend chart, current bar: ${n}`, formula: 'the last bar of the trend is this period (dashboard.js renderTrend data row)',
-        pageValue: vals.find(x => near(x, v)) ?? (vals.length ? vals[0] : null), pageSource: `trendChart rect[${last}] titles: [${vals.join(', ')}]`,
-        globalValue: v, globalSource: src });
-    }
+    const uncovered = F.trend.count === 0;
+    want.forEach(([n, v, src], i) => {
+      /* No rows in the period: the page draws NO money for it, by design, and
+         that absence is the correct reading. A pass, worded as one — not a
+         comparison of a value that is not there. */
+      const absent = uncovered && !vals.length;
+      C.add({ page: D, name: `Trend chart, current bar: ${n}`, formula: 'the last bar of the trend is this period (dashboard.js renderTrend data row); read by position: spent, budget, income',
+        pageValue: absent ? 0 : (i < vals.length ? vals[i] : null),
+        pageSource: absent ? `trendChart rect[${last}] prints its label only — the period holds no rows` : `trendChart rect[${last}] titles: [${vals.join(', ')}]`,
+        globalValue: absent ? 0 : v, globalSource: absent ? 'periodSpend(p).count = 0, so no money is drawn' : src });
+    });
   }
   const poolsImplied = (W.byTypeImplied.savings || 0) + (W.byTypeImplied.investment || 0);
   dom({ page: D, name: 'Position: net worth', formula: 'worth(impliedAccounts, debts, assets, owed).net',
@@ -600,8 +884,81 @@ function runChecks(G, pages) {
     re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: W.byTypeImplied.savings || 0, globalSource: 'byTypeImplied.savings', index: 0 });
   dom({ page: D, name: 'Position sub: invested (implied)', formula: 'Σ implied, type investment',
     re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: W.byTypeImplied.investment || 0, globalSource: 'byTypeImplied.investment', index: 1 });
-  dom({ page: D, name: 'Stale note: drift', formula: 'Σ reconcile delta where state = drift (home currency)',
-    re: /^dashStale\//, globalValue: W.driftSum, globalSource: 'bookFigures().drift.drift' });
+  {
+    /* The note prints |drift| and says the direction in WORDS ("add up to R 6 100
+       more" / "less") — dashboard.js renderStale: `Math.abs(drift)`, key
+       dash.stale.driftUp / driftDown. This compared the printed magnitude to the
+       SIGNED seam, so every household whose balances had drifted DOWN failed by
+       exactly twice the figure. Magnitude here; the direction is its own check
+       below, so the sign is still guarded.
+
+       And the whole sentence is drawn only when some balance is stale
+       (`if (!s.stale) return`), with the drift clause only from R1 up, so absence
+       is judged against THAT: with nothing stale the note is correctly not there,
+       and with a stale balance and a R6 100 drift a missing note is a failure. */
+    const stale = G.book.stale.stale > 0;
+    const gate = stale ? Math.abs(W.driftSum) : 0;
+    dom({ page: D, name: 'Stale note: drift', formula: '|Σ reconcile delta where state = drift| (home currency), printed as a magnitude',
+      re: /^dashStale\//, globalValue: Math.abs(W.driftSum), globalSource: '|bookFigures().drift.drift|', renderedFrom: 1, renderedWhen: gate });
+    const f = C.fig(D, /^dashStale\//);
+    const own = f ? String(f.context.own || '') : '';
+    const word = /\bmore\b/i.test(own) ? 1 : /\bless\b/i.test(own) ? -1 : null;
+    const absent = !f && gate < 1;
+    C.add({ page: D, name: 'Stale note: drift direction', formula: 'dash.stale.driftUp ("more") when Σ delta > 0, driftDown ("less") when < 0', kind: 'count',
+      pageValue: absent ? Math.sign(W.driftSum) : word, pageSource: absent ? 'not rendered — nothing stale, or drift under R1' : (f ? `${f.address}: "…${own.slice(-40)}"` : 'no drift note'),
+      globalValue: Math.sign(W.driftSum), globalSource: 'sign of bookFigures().drift.drift', tol: 0,
+      note: 'reads the English wording; another interface language reports unverified rather than guessing' });
+  }
+  /* Drill-through: tap a wedge, a legend row or a hero tile, land on
+     Transactions, and the rows listed are the figure you tapped. Clicked by
+     drillThrough() above, the way the page wires it. Excluded rows are listed
+     on purpose (CONTEXT.md: nothing silently disappears) and are out of the
+     figure, so they are not summed. A running period can list rows dated after
+     today that the figure (closed at today) has not reached; such a difference
+     is a FAIL that names the rows, because the reader sees a list that does not
+     add up. */
+  {
+    const drill = (C.byView[D] || {}).drill;
+    const push = (o) => C.checks.push({ page: D, formula: '', pageValue: null, globalValue: null, delta: null, why: [], kind: 'count', note: '', ...o });
+    if (!drill || drill.error) {
+      push({ name: 'Drill-through: exercised', pageSource: drill ? drill.error : 'the Dashboard did not render, so nothing was clicked', globalSource: 'harvestPages → drillThrough()', status: 'unverified' });
+    } else {
+      const laterNote = w => (w.after.count ? `${w.after.count} listed row(s) dated after ${drill.asOf} (${money(-w.after.sum)}) are not in a figure that closes at ${drill.asOf}` : '');
+      const named = drill.wedges.map(w => w.name);
+      const want = F.split.slice(0, named.length).map(r => r.cat);
+      push({ name: 'Drill-through: every legend row is a split row, in order', formula: 'the clickable rows are the top of periodFigures.split',
+        pageValue: named.length, globalValue: F.split.length ? Math.min(F.split.length, Math.max(named.length, 1)) : 0, kind: 'count',
+        pageSource: `${named.length} legend link(s): ${named.join(' | ')}`, globalSource: `split: ${want.join(' | ')}`,
+        status: named.length && JSON.stringify(named) === JSON.stringify(want) || (!named.length && !F.split.length) ? 'pass' : 'fail' });
+      for (const w of drill.wedges) {
+        const row = F.split.find(r => r.cat === w.name);
+        if (!row) { push({ name: `Drill-through: wedge "${w.name}"`, pageSource: `legend row "${w.name}" has no split row`, globalSource: 'periodFigures.split', status: 'fail' }); continue; }
+        if (w.selected !== w.name) push({ name: `Drill-through: wedge "${w.name}" selects its category`, pageValue: null, pageSource: `Transactions category filter reads "${w.selected}"`, globalSource: `"${w.name}"`, status: 'fail' });
+        C.add({ page: D, name: `Drill-through: wedge "${w.name}" lists rows that sum to it`, formula: 'Σ counted rows listed on Transactions after tapping the wedge = the wedge (net outflow of the category)',
+          pageValue: -w.sum, pageSource: `${w.count} counted row(s) listed (${w.excludedListed} excluded shown, ${w.hiddenOutside} outside the budget hidden)`,
+          globalValue: row.amount, globalSource: 'periodFigures.split[].amount', kind: 'money', note: laterNote(w) });
+        const last = C.checks[C.checks.length - 1];
+        if (last.status === 'fail' && w.after.count && near(last.delta, -w.after.sum, 0.011)) last.why.push('rows dated after today are listed but not yet in the figure');
+      }
+      const tileWant = drill.expectedTiles;
+      push({ name: 'Drill-through: hero tiles drawn exactly when their counts are above zero', formula: 'Uncategorised when periodSummary.uncategorised > 0; Missing categories when unknown.count > 0',
+        pageValue: drill.tiles.length, globalValue: tileWant.length, pageSource: `${drill.tiles.length} tile button(s)`, globalSource: `expected: ${tileWant.join(', ') || 'none'}`,
+        status: drill.tiles.length === tileWant.length ? 'pass' : 'fail' });
+      for (const t of drill.tiles) {
+        if (t.kind === 'uncategorised') {
+          if (t.selected !== '__none__') push({ name: 'Drill-through: Uncategorised tile selects Uncategorised', pageSource: `filter reads "${t.selected}"`, globalSource: '__none__', status: 'fail' });
+          C.add({ page: D, name: 'Drill-through: Uncategorised tile lists as many counted rows as it says', formula: 'periodSummary.uncategorised = counted rows listed', kind: 'count', tol: 0,
+            pageValue: t.count, pageSource: `${t.count} counted row(s) listed (${t.hiddenOutside} outside the budget hidden)`, globalValue: S.uncategorised, globalSource: 'periodSummary.uncategorised',
+            note: t.after.count ? `${t.after.count} of the listed rows are dated after ${drill.asOf}` : '' });
+        } else if (t.kind === 'missing') {
+          if (t.selected !== '__missing__') push({ name: 'Drill-through: Missing categories tile selects its option', pageSource: `filter reads "${t.selected}"`, globalSource: '__missing__', status: 'fail' });
+          C.add({ page: D, name: 'Drill-through: Missing categories tile lists as many counted rows as it says', formula: 'periodSummary.unknown.count = counted rows listed', kind: 'count', tol: 0,
+            pageValue: t.count, pageSource: `${t.count} counted row(s) listed (${t.hiddenOutside} outside the budget hidden)`, globalValue: S.unknown && S.unknown.count, globalSource: 'periodSummary.unknown.count',
+            note: t.after.count ? `${t.after.count} of the listed rows are dated after ${drill.asOf}` : '' });
+        }
+      }
+    }
+  }
   /* The health card: three figures off healthSnapshot(). */
   dom({ page: D, name: 'Health: emergency fund set aside', formula: 'resolveEarmarks(home accounts).total',
     re: /^healthBody\/.*health-fig\[1\]\//, globalValue: G.health.earmarks.total, globalSource: 'healthSnapshot().earmarks.total' });
@@ -631,15 +988,84 @@ function runChecks(G, pages) {
     const shortFig = C.fig(D, /^leftBody\/@left-short$/);
     const free = freeFig || shortFig;
     const term = f => (f ? figValue(f) : 0);
+    /* Absence is a reading, not a skip. This whole block used to sit behind
+       `if (cash)`, so a card that failed to render passed every check by not
+       being there. dashboard.js renderLeft() has two rules for not drawing the
+       chain, and both are checked here:
+         - the period is not the one you are in (S.period !== currentPeriod()):
+           the card prints its "only reads true for the period you are in"
+           sentence and no figure, so a figure would be the defect;
+         - the current period, but nothing to say (`nothing`: no confirmed cash,
+           nothing scheduled, nothing owed, no other currency): the card hides.
+           cashKnown is "at least one in-budget, dated account with a positive
+           implied balance", which is G.cash.counted, so a card that is absent
+           while that list is not empty is a defect. What the checker cannot see
+           (services, debts and card commitments with no counted cash) is named
+           in the pass, not assumed away. */
+    const isCurrent = G.meta.period === G.meta.currentPeriod;
+    const leftFigs = C.figs(D, /^leftBody\//, 'money').length + C.figs(D, /^leftBody\//, 'number').length;
+    {
+      let status, pageSource, globalSource;
+      if (!isCurrent) {
+        status = cash || freeFig || shortFig ? 'fail' : 'pass';
+        pageSource = status === 'pass' ? 'card carries no figure (it prints its "only for the period you are in" sentence)' : `a what's-left figure IS drawn at ${(cash || free).address}`;
+        globalSource = `period ${G.meta.period} is not the current period (${G.meta.currentPeriod}); the page draws the card only for the current one (dashboard.js renderLeft)`;
+      } else if (cash) {
+        status = 'pass'; pageSource = cash.address;
+        globalSource = 'current period: the card renders';
+      } else if (G.cash.counted.length) {
+        status = 'fail';
+        pageSource = `NOT RENDERED - no @left-cash figure (${leftFigs} figures under leftBody)`;
+        globalSource = `current period and ${G.cash.counted.length} counted account(s) (${G.cash.counted.join(', ')}): cashKnown is true, so the card must draw`;
+      } else {
+        status = 'pass'; pageSource = 'not rendered - the card hides itself when it has nothing to say';
+        globalSource = 'current period, no counted cash (no in-budget dated account holds a positive balance); a card with only commitments to show is outside what this checker can see';
+      }
+      C.checks.push({ page: D, name: "What's left: the card renders when it should", formula: 'renderLeft(): drawn for the current period when cash is known, and only then',
+        pageValue: null, pageSource, globalValue: null, globalSource, status, delta: null, why: [], kind: 'count', note: '' });
+    }
+    if (cash && !free) C.checks.push({ page: D, name: "What's left: the free (or short) tile is drawn", formula: 'the card always ends in = free or = short',
+      pageValue: null, pageSource: 'cash tile drawn, but neither @left-free nor @left-short', globalValue: null, globalSource: 'renderLeft() appends one of them after the cash tile',
+      status: 'fail', delta: null, why: [], kind: 'count', note: '' });
     if (cash && free) C.add({
       page: D, name: "What's left: free = cash − earmarked − committed − card",
       formula: 'the equation the card prints, term by term',
       pageValue: shortFig ? -figValue(shortFig) : figValue(free), pageSource: free.address,
       globalValue: term(cash) - term(earmarked) - term(committed) - term(cardDue),
       globalSource: 'cash − earmarked − committed − cardDue, as the card prints them', tol: 1.01 });
-    const bank = Object.entries(W.byTypeImplied).filter(([t]) => !['savings', 'investment'].includes(t)).reduce((t, [, v]) => t + v, 0);
-    if (cash) C.add({ page: D, name: "What's left: cash in your accounts vs implied bank balances", formula: 'cashOnHand() counts confirmed, in-budget, non-pool accounts; the implied bank total counts every bank-type account', pageValue: figValue(cash), pageSource: cash.address,
-      globalValue: bank, globalSource: 'Σ implied, non-pool types', tol: figTol(cash), expectDiff: true });
+    /* cashOnHand() (committed.js) counts the implied balance of every in-budget,
+       home-currency account with a balance date, when positive — pool accounts
+       INCLUDED. So the oracle is G.cash.oracle, spelled that way, and the two
+       must AGREE. The old oracle summed every non-pool TYPE regardless of
+       `budget:`, and its formula text said "confirmed" and "non-pool", neither
+       of which the app does; it reported an `info` difference on a household
+       where nothing differed. */
+    if (cash) C.add({ page: D, name: "What's left: cash in your accounts = cash on hand", formula: 'cashOnHand(): Σ positive implied balance of in-budget, home-currency accounts that carry a balance date (pool accounts included)', pageValue: figValue(cash), pageSource: cash.address,
+      globalValue: G.cash.oracle, globalSource: `Σ implied over ${G.cash.counted.length} account(s): ${G.cash.counted.join(', ') || 'none'}`,
+      /* Printed to the whole currency unit, and the recorded raw value is the
+         view's already-rounded operand — so cents cannot be asked of it. On a
+         real vault the tile read a whole-unit figure against an implied balance
+         with cents and failed by pure rounding. */
+      tol: Math.max(figTol(cash), 0.51) });
+    /* What that rule leaves out on purpose, NAMED on the card (2026-09-29 audit,
+       Ruan's decision): "N accounts outside the budget not counted (R X)". It
+       used to be an `info` row comparing the cash figure to itself plus the
+       held-out money - a tautology that could not fail. Now the sentence is a
+       figure like any other: the amount and the count it prints are compared to
+       the checker's own reading of the same scope (G.cash.heldOut), and a sentence
+       that is missing while an account is held out is a FAIL. With nothing held
+       out the page prints nothing, which is a pass. Gated on the cash figure
+       being on the card at all, as every check in this block is: on a period
+       other than the one you are in the card prints its "only reads true for
+       the period you are in" sentence instead of any of these. */
+    if (cash) dom({ page: D, name: "What's left: accounts outside the budget - amount", formula: 'Σ implied balance of the everyday (non-pool), home-currency, dated, readable `budget: false` accounts with money in them - the sentence under the card',
+      re: /^leftBody\/@left-outside$/, globalValue: G.cash.heldOut.reduce((t, x) => t + x.amount, 0),
+      globalSource: G.cash.heldOut.length ? G.cash.heldOut.map(x => `${x.name} (${money(x.amount)})`).join(' + ') : 'no everyday budget:false account holds money',
+      renderedFrom: 0.005,
+      note: G.cash.heldOut.length ? `held out on purpose: ${G.cash.heldOut.map(x => x.name).join(', ')}` : '' });
+    if (cash) dom({ page: D, name: "What's left: accounts outside the budget - count", formula: 'how many accounts that is',
+      re: /^leftBody\/@left-outside$/, kind: 'number', globalValue: G.cash.heldOut.length,
+      globalSource: 'accounts held out', renderedFrom: 1 });
   }
 
   /* ---- budget page ---------------------------------------------------- */
@@ -679,30 +1105,46 @@ function runChecks(G, pages) {
        (never printed as R 0,00) below R1 — so a fixture with no such gap
        reads `unverified` here, not `pass`. */
     dom({ page: BP, name: `${strip}: uncategorised / unknown-name note`, formula: 'budgetSpendGap().uncat',
-      re: new RegExp(`^${strip}/@bud-note-uncat$`), globalValue: F.stripGap.uncat, globalSource: 'budgetSpendGap().uncat' });
+      re: new RegExp(`^${strip}/@bud-note-uncat$`), globalValue: F.stripGap.uncat, globalSource: 'budgetSpendGap().uncat',
+      /* budgets.js: `if (gapUncat >= 1) addPart(...)`. */
+      renderedFrom: 1 });
     dom({ page: BP, name: `${strip}: refunds netted note`, formula: 'budgetSpendGap().netted',
-      re: new RegExp(`^${strip}/@bud-note-netted$`), globalValue: F.stripGap.netted, globalSource: 'budgetSpendGap().netted' });
+      re: new RegExp(`^${strip}/@bud-note-netted$`), globalValue: F.stripGap.netted, globalSource: 'budgetSpendGap().netted',
+      renderedFrom: 1 });
     /* Both figures live in ONE named fragment ("R2 000 set aside, R1 000 moved
        so far"), so they are index 0 and 1 WITHIN it — stable however many other
        fragments the note carries. Addressed by ordinal across the whole note
        before, which is why both were passing by coincidence. */
     const setAsideNote = new RegExp(`^${strip}/@bud-note-setaside$`);
-    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 0 });
-    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 1 });
+    /* The sentence is drawn when `used.setAside > 0` (budgets.js), and the
+       moved-to-funds figure rides inside it — so ITS gate is set-aside, not
+       itself: a household that moved money to a fund without spending any
+       set-aside has a moved figure and, correctly, no sentence. */
+    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 0, renderedFrom: 0.005 });
+    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 1, renderedFrom: 0.005, renderedWhen: U.setAside });
   }
 
   /* ---- score ---------------------------------------------------------- */
   const SC = 'score';
-  dom({ page: SC, name: 'Flow: income in', formula: 'periodSummary.income',
-    re: /score-flow-in/, globalValue: S.income, globalSource: 'periodSummary(currentPeriod).income' });
-  dom({ page: SC, name: 'Budget chip: budgeted (whole plan)', formula: 'budgetTotals.spend + setAside',
-    re: /score-flow-chips\[\d+\]\/div\.mini\[1\]\/div\.score-flow-row\[1\]/, globalValue: F.planTotal, globalSource: 'budgetTotals(p)' });
-  dom({ page: SC, name: 'Budget chip: allocated of income', formula: 'plan / budget income', kind: 'percent',
-    re: /score-flow-chips\[\d+\]\/div\.mini\[1\]\/div\.score-flow-row\[2\]/, globalValue: F.allocated == null ? null : F.allocated * 100, globalSource: 'allocatedShare' });
-  dom({ page: SC, name: 'Budget chip: spent', formula: 'budgetUsed.spent',
-    re: /score-flow-chips\[\d+\]\/div\.mini\[1\]\/div\.score-flow-row\[3\]/, globalValue: U.spent, globalSource: 'budgetUsed(p).spent' });
-  dom({ page: SC, name: 'Budget chip: budget used', formula: 'budgetUsed.used', kind: 'percent',
-    re: /score-flow-chips\[\d+\]\/div\.mini\[1\]\/div\.score-flow-row\[4\]/, globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed(p).used' });
+  /* score.js buildFlow() is anchored to currentPeriod(), not the selected
+     period, so these compare against THAT period's snapshot (G.figures.current).
+     They compared against the selected period's before, which is the same
+     number only when the selection is the running period — pick September on
+     the fifth of October and the page (correctly) still said October while the
+     check said September. Every figure is addressed by its data-fig name: the
+     chip rows are conditional (allocated, budget used), so a row's position
+     moves with the household. */
+  const CU = F.current;
+  dom({ page: SC, name: 'Flow: income in', formula: 'periodSummary(currentPeriod).income',
+    re: /\/@score-flow-in$/, globalValue: CU.income, globalSource: `periodFigures(currentPeriod ${CU.period}).summary.income` });
+  dom({ page: SC, name: 'Budget chip: budgeted (whole plan)', formula: 'budgetTotals(currentPeriod).spend + setAside',
+    re: /\/@score-budgeted$/, globalValue: CU.budgeted, globalSource: `budgetTotals(currentPeriod ${CU.period})` });
+  dom({ page: SC, name: 'Budget chip: allocated of income', formula: 'periodFigures(currentPeriod).plan.allocated', kind: 'percent',
+    re: /\/@score-allocated$/, globalValue: CU.allocated == null ? null : CU.allocated * 100, globalSource: 'plan.allocated (allocatedShare)', renderedFrom: 0 });
+  dom({ page: SC, name: 'Budget chip: spent', formula: 'budgetUsed(currentPeriod).spent',
+    re: /\/@score-spent$/, globalValue: CU.spent, globalSource: `budgetUsed(currentPeriod ${CU.period}).spent` });
+  dom({ page: SC, name: 'Budget chip: budget used', formula: 'budgetUsed(currentPeriod).used', kind: 'percent',
+    re: /\/@score-used$/, globalValue: CU.used == null ? null : CU.used * 100, globalSource: `budgetUsed(currentPeriod ${CU.period}).used`, renderedFrom: 0 });
   /* The ring legend, one row per pillar, every figure off healthSnapshot(). */
   const H = G.health.metrics;
   const ring = i => new RegExp(`score-ring-legend\\[\\d+\\]/button\\.score-ring-row\\[${i}\\]/`);
@@ -711,14 +1153,46 @@ function runChecks(G, pages) {
   dom({ page: SC, name: 'Ring: % of income saved', formula: 'savingsRate', kind: 'percent', re: ring(1), globalValue: isNum(H.savingsRate) ? H.savingsRate * 100 : null, globalSource: 'metrics.savingsRate' });
   dom({ page: SC, name: 'Ring: saved per month', formula: 'monthlySavings', re: ring(1), globalValue: H.monthlySavings, globalSource: 'metrics.monthlySavings' });
   dom({ page: SC, name: 'Ring: % of income to interest', formula: 'interestShare', kind: 'percent', re: ring(2), globalValue: isNum(H.interestShare) ? H.interestShare * 100 : null, globalSource: 'metrics.interestShare' });
-  dom({ page: SC, name: 'Ring: fixed bills % of income', formula: 'fixedShare', kind: 'percent', re: ring(3), globalValue: isNum(H.fixedShare) ? H.fixedShare * 100 : null, globalSource: 'metrics.fixedShare', index: 0 });
-  dom({ page: SC, name: 'Ring: living costs % of income', formula: 'consumptionShare', kind: 'percent', re: ring(3), globalValue: isNum(H.consumptionShare) ? H.consumptionShare * 100 : null, globalSource: 'metrics.consumptionShare', index: 1 });
-  dom({ page: SC, name: 'Ring: budget used (six-period average)', formula: 'metrics.budgetUsed', kind: 'percent', re: ring(3), globalValue: isNum(H.budgetUsed) ? H.budgetUsed * 100 : null, globalSource: 'metrics.budgetUsed', index: 2 });
+  /* The spending pillar's row is ONE sentence of up to three percentages, each
+     conditional on its own measure being known (score.js scoreNow, key
+     'spending': fixed bills, living costs, budget used — in that order, a bit
+     dropped when its metric is null). So a figure's ordinal is its rank among
+     the measures that are PRESENT, not a constant. These were index 0/1/2, and
+     on a household with no fixed-bill category the row reads "45% living costs
+     · 78% budget used": the living-costs check then took index 1 and compared
+     the BUDGET-USED percent to consumptionShare (page 78, global 45.17 — a
+     disagreement made entirely by the checker). `spendingBits` is the same
+     presence rule, read off the same metrics. */
+  const spendingBits = [['fixed', H.fixedShare], ['living', H.consumptionShare], ['budget', H.budgetUsed]].filter(([, v]) => isNum(v)).map(([k]) => k);
+  const spendingAt = k => spendingBits.indexOf(k);
+  /* The "now" sentence only — the row's "how" prose sits in the same button and
+     can carry a percentage of its own. */
+  const spendingNow = /score-ring-legend\[\d+\]\/button\.score-ring-row\[3\]\/span\.score-ring-row-body\[\d+\]\/span\.score-ring-row-now/;
+  const spendingDom = (name, formula, k, v, src) => dom({ page: SC, name, formula, kind: 'percent', re: spendingNow,
+    /* Absent measure: nothing to find, and nothing to compare. score.js scoreNow
+       drops a bit whose metric is null, so a null seam beside no figure is the
+       page saying what the seam says (a PASS, via renderedFrom); a non-null seam
+       with no figure to find is a FAIL. Index -1 finds no figure. */
+    index: spendingAt(k), globalValue: isNum(v) ? v * 100 : null, globalSource: src, renderedFrom: 0 });
+  spendingDom('Ring: fixed bills % of income', 'fixedShare', 'fixed', H.fixedShare, 'metrics.fixedShare');
+  spendingDom('Ring: living costs % of income', 'consumptionShare', 'living', H.consumptionShare, 'metrics.consumptionShare');
+  spendingDom('Ring: budget used (six-period average)', 'metrics.budgetUsed', 'budget', H.budgetUsed, 'metrics.budgetUsed');
+  {
+    /* And the presence rule itself: the row prints exactly one percentage per
+       known measure. A fourth figure, or one too few, means a bit was added or
+       dropped on one side only — the state the ordinal above cannot see. */
+    const printed = C.figs(SC, spendingNow, 'percent').length;
+    C.add({ page: SC, name: 'Ring: spending row prints one percentage per known measure', formula: 'fixedShare, consumptionShare, budgetUsed — each only when non-null', kind: 'count',
+      pageValue: printed, pageSource: `${printed} percentages in the spending row`, globalValue: spendingBits.length, globalSource: `known measures: ${spendingBits.join(', ') || 'none'}`, tol: 0 });
+  }
   dom({ page: SC, name: 'Ring: net worth', formula: 'healthSnapshot → worth(impliedAccounts…).net', re: ring(4), globalValue: W.implied.net, globalSource: 'worth().net' });
   {
     /* Two "budget used" readings on one screen, by two documented rules. */
-    const chip = C.fig(SC, /score-flow-chips\[\d+\]\/div\.mini\[1\]\/div\.score-flow-row\[4\]/, 'percent');
-    C.add({ page: SC, name: 'Budget chip "budget used" (this period) vs ring (six-period average)', formula: 'budgetUsed(p).used vs healthMetrics.budgetUsed — same numerator rule, different window', kind: 'percent',
+    const chip = C.fig(SC, /\/@score-used$/, 'percent');
+    if (!isNum(H.budgetUsed)) C.checks.push({ page: SC, name: 'Budget chip "budget used" (this period) vs ring (six-period average)', formula: 'budgetUsed(p).used vs healthMetrics.budgetUsed — same numerator rule, different window', kind: 'percent',
+      pageValue: figValue(chip), pageSource: chip ? chip.address : 'no chip', globalValue: null, globalSource: 'metrics.budgetUsed is null (no completed period with a budget to average), so the ring prints no such figure and there is nothing to set the chip against',
+      status: 'pass', delta: null, why: [], note: 'the chip itself is checked by "Budget chip: budget used"' });
+    else C.add({ page: SC, name: 'Budget chip "budget used" (this period) vs ring (six-period average)', formula: 'budgetUsed(p).used vs healthMetrics.budgetUsed — same numerator rule, different window', kind: 'percent',
       pageValue: figValue(chip), pageSource: chip ? chip.address : 'no chip', globalValue: isNum(H.budgetUsed) ? H.budgetUsed * 100 : null, globalSource: 'metrics.budgetUsed × 100', tol: 0.51, expectDiff: true });
   }
 
@@ -726,12 +1200,27 @@ function runChecks(G, pages) {
   const T = 'transactions';
   {
     const cells = C.figs(T, /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, 'money');
-    const shown = cells.length, total = G.oracle.whole.all.rows;
-    C.add({ page: T, name: 'Rows rendered = rows in period', formula: 'txInPeriod(p).length; the table windows to PAGE rows and says so', kind: 'count',
-      pageValue: shown, pageSource: `${shown} amount cells in txTable`, globalValue: total, globalSource: 'raw rows in period (this script)', tol: 0,
-      note: shown < total ? 'the table is windowed — press "show more" in the app; the sum below is over the rendered window only' : '' });
-    if (shown === total) {
-      C.add({ page: T, name: 'Σ rendered amounts = Σ raw rows', formula: 'every row, excluded and split parents included',
+    const shown = cells.length, total = G.oracle.whole.all.rows, mine = G.txPage;
+    /* transactions.js `const PAGE = 100`: the table draws that many rows and a
+       "Show more" for the rest. tests/reconcile-checker-fixes.test.cjs pins this
+       constant against the source, so it cannot drift silently. */
+    const WINDOW = 100;
+    C.add({ page: T, name: 'Rows selected = rows in period', formula: "the page's own filteredRows() (before its window) against the raw rows in the period", kind: 'count',
+      pageValue: mine.length, pageSource: "ctx.filteredRows().rows — the page's own selection", globalValue: total, globalSource: 'raw rows in period (this script)', tol: 0 });
+    /* This compared the rendered rows to ALL the rows in the period, so a period
+       past 100 rows ("100 of 108 rows" + Show more) failed on the very window
+       the page announces, and the sum check under it was skipped — the one
+       check that says the rendered amounts are the right ones. It compares
+       against the window now, so it runs on every household. */
+    const windowSize = Math.min(mine.length, WINDOW);
+    C.add({ page: T, name: 'Rows rendered = rows in the window', formula: 'min(filteredRows().length, PAGE); the table windows to PAGE rows and says so', kind: 'count',
+      pageValue: shown, pageSource: `${shown} amount cells in txTable`, globalValue: windowSize, globalSource: `min(${mine.length} selected rows, ${WINDOW})`, tol: 0,
+      note: mine.length > WINDOW ? `windowed: ${shown} of ${mine.length} rows shown, the rest behind "Show more"` : '' });
+    C.add({ page: T, name: 'Σ rendered amounts = Σ the window of filteredRows()', formula: 'the rows the table drew are the first PAGE rows the page selected, and their amounts add up',
+      pageValue: cells.reduce((t, f) => t + (figValue(f) || 0), 0), pageSource: `Σ ${shown} txTable amounts`,
+      globalValue: mine.slice(0, windowSize).reduce((t, v) => t + v, 0), globalSource: `Σ first ${windowSize} of filteredRows()` });
+    if (mine.length <= WINDOW) {
+      C.add({ page: T, name: 'Σ rendered amounts = Σ raw rows', formula: 'every row, excluded and split parents included (unwindowed: the whole period is on screen)',
         pageValue: cells.reduce((t, f) => t + (figValue(f) || 0), 0), pageSource: 'Σ txTable amounts', globalValue: G.oracle.whole.all.sum, globalSource: 'oracle Σ amount' });
     }
   }
@@ -763,8 +1252,13 @@ function runChecks(G, pages) {
        the net as though the page had said zero. Named per bar now, and each bar
        is a partition of its OWN total; Σ of all segments across both bars
        equals no figure the page prints. */
-    const ownedSegs = C.figs(V, /^savingsWorth\/@worth-owned-seg$/, 'money');
-    const owedSegs = C.figs(V, /^savingsWorth\/@worth-owed-seg$/, 'money');
+    /* The name sits on the segment's <g>; the money is in the <title> beneath
+       it ("Savings: R 14 500,00 · 13% of what you own"), so the address runs on
+       past `-seg`. Anchoring the pattern at `-seg$` matched nothing, the two
+       Σ-segment checks below are guarded by `.length` and so were silently
+       never made, and the per-type segment lookup found no segment at all. */
+    const ownedSegs = C.figs(V, /^savingsWorth\/@worth-owned-seg\//, 'money');
+    const owedSegs = C.figs(V, /^savingsWorth\/@worth-owed-seg\//, 'money');
     const segFigs = [...ownedSegs, ...owedSegs];
     const sumOf = fs_ => fs_.map(figValue).reduce((a, b) => a + b, 0);
     if (ownedSegs.length) C.add({ page: V, name: 'Worth chart: Σ owned segments = "What you own"', formula: 'the owned bar is a partition of its own total', pageValue: sumOf(ownedSegs), pageSource: `Σ ${ownedSegs.length} segments`, globalValue: W.implied.assets, globalSource: 'worth().assets' });
@@ -774,13 +1268,25 @@ function runChecks(G, pages) {
     const segNamed = name => segFigs.find(f => new RegExp(`^${name}:`, 'i').test(f.context.parent || ''));
     for (const [label, type] of [['Investments', 'investment'], ['Savings', 'savings']]) {
       const f = segNamed(label);
-      C.add({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: figValue(f), pageSource: f ? f.address : `no segment titled ${label}`,
-        globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, tol: figTol(f) });
+      /* A segment exists only for a type that holds money (savings.js builds
+         `assets` from worth()'s groups), so no segment beside an implied total
+         of nil is the chart drawing exactly what it should. It used to read
+         `unverified` because the value was null; it is a reading, and the
+         opposite case - no segment while the seam holds money - stays a FAIL
+         (add() reports a missing page value as unverified, so that is made
+         explicit below). */
+      const implied = W.byTypeImplied[type] || 0;
+      const absentByDesign = !f && Math.abs(implied) < 0.005;
+      if (!f && !absentByDesign) C.checks.push({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: null, pageSource: `NOT DRAWN although the seam holds ${implied}`, globalValue: implied, globalSource: `byTypeImplied.${type}`, status: 'fail', delta: null, why: [], kind: 'money', note: '' });
+      else if (absentByDesign) C.checks.push({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: 0, pageSource: `no segment titled ${label} - the chart draws only types that hold money`, globalValue: 0, globalSource: `byTypeImplied.${type}`, status: 'pass', delta: null, why: [], kind: 'money', note: '' });
+      else C.add({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: figValue(f), pageSource: f ? f.address : `no segment titled ${label}`,
+        globalValue: implied, globalSource: `byTypeImplied.${type}`, tol: figTol(f) });
       /* The KPI above the chart reads STATED balances, the chart reads
          IMPLIED ones. One page, two bases; the difference is the drift. */
       const kpi = C.fig(V, type === 'savings' ? /^savingsKpis\/div\.mini\[1\]\/div\.v/ : /^savingsKpis\/div\.mini\[2\]\/div\.v/);
       C.add({ page: V, name: `KPI "${label}" (stated) vs chart "${label}" segment (implied)`, formula: 'the KPI sums S.accounts balances; the chart sums impliedAccounts() — same accounts, two bases', pageValue: figValue(kpi), pageSource: kpi ? kpi.address : 'no KPI',
-        globalValue: figValue(f), globalSource: f ? f.address : 'no segment', tol: figTol(kpi), expectDiff: true });
+        /* No segment beside an implied total of nil is a chart segment worth 0. */
+        globalValue: f ? figValue(f) : (absentByDesign ? 0 : null), globalSource: f ? f.address : (absentByDesign ? `no segment drawn (implied ${type} total is nil)` : 'no segment'), tol: figTol(kpi), expectDiff: true });
     }
     C.add({ page: V, name: 'KPI "Investments" (stated) vs Dashboard tile "invested" (implied)', formula: 'views/savings.js totalInvest reads stated balances; the Dashboard position tile reads implied ones', pageValue: figValue(C.fig(V, /^savingsKpis\/div\.mini\[2\]\/div\.v/)), pageSource: 'savingsKpis mini[2]',
       globalValue: W.byTypeImplied.investment || 0, globalSource: 'byTypeImplied.investment (what the Dashboard prints)', expectDiff: true });
@@ -805,7 +1311,16 @@ function runChecks(G, pages) {
     column({ page: A, name: 'Group totals = Σ by group (bank / savings / investments)', formula: 'type-row totals; bank = every non-pool type', re: /^acctTable\/@acct-group-total$/, seam: Object.values(groups).filter(v => Math.abs(v) >= 0.005), globalSource: 'Σ stated by group (this script)' });
     for (const [label, type] of [['Savings', 'savings'], ['Investments', 'investment']]) {
       const f = C.figs(A, /^acctTable\/@acct-group-total$/, 'money').find(x => new RegExp(`^${label}`).test(x.context.parent || ''));
-      C.add({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones', pageValue: figValue(f), pageSource: f ? f.address : `no ${label} group`,
+      /* accounts.js draws a group only when an account of that kind exists
+         (`if (!inGroup.length) continue`), so no group with no such account is
+         the table as designed. A group missing while an account of the type
+         exists is a FAIL. */
+      const held = G.accounts.some(a => a.type === type);
+      if (!f && !held) C.checks.push({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones',
+        pageValue: 0, pageSource: `no ${label} group - no account of type ${type}, and the table draws a group only for a kind it holds`, globalValue: 0, globalSource: `byTypeImplied.${type}`, status: 'pass', delta: null, why: [], kind: 'money', note: '' });
+      else if (!f) C.checks.push({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones',
+        pageValue: null, pageSource: `NOT DRAWN although an account of type ${type} exists`, globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, status: 'fail', delta: null, why: [], kind: 'money', note: '' });
+      else C.add({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones', pageValue: figValue(f), pageSource: f ? f.address : `no ${label} group`,
         globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, tol: figTol(f), expectDiff: true });
     }
   }
@@ -1242,5 +1757,8 @@ if (require.main === module) (async () => {
 })().catch(e => { console.error(e); process.exit(1); });
 
 /* The reconciliation as a function, and the fixture it can run over without a
-   real vault — see tests/reconcile-gate.test.cjs. */
-module.exports = { reconcile, householdVault };
+   real vault — see tests/reconcile-gate.test.cjs. runChecks and makeChecker are
+   exported for tests/reconcile-checker-fixes.test.cjs, which needs to hand a
+   check a TAMPERED page and see it fail: a check that has only ever been shown
+   passing has not been shown to check anything. */
+module.exports = { reconcile, householdVault, runChecks, makeChecker };
