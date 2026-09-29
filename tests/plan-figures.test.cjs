@@ -152,7 +152,7 @@ async function mountView(files, view) {
       ctx.renderDashboard();
       const hero = text('heroCard');
       ok(hero.includes('R 12000.00'), `hero "Budgeted" is the whole plan (got: ${hero.slice(0, 240)})`);
-      ok(hero.includes('80% of the R 15000 income this budget plans for'),
+      ok(hero.includes('80% of planned income (R 15000)'),
         'and names the plan\'s own income as the base, because it is not the income that arrived');
     } finally { unpin(); }
   }
@@ -165,7 +165,7 @@ async function mountView(files, view) {
       ctx.renderBudgets();
       const strip = text('budTotalsTop');
       ok(strip.includes('R 12000.00'), `strip "Total budgeted" is the whole plan (got: ${strip.slice(0, 300)})`);
-      ok(strip.includes('80% of budgeted income'), 'and its share of the plan\'s income');
+      ok(strip.includes('80% of planned income'), 'and its share of the plan\'s income');
       ok(strip.includes('Left to budget') && strip.includes('R 3000.00'), 'and what is left to budget');
     } finally { unpin(); }
     const unpin2 = pinClock('2026-09-05');
@@ -175,8 +175,10 @@ async function mountView(files, view) {
       const strip = text('budTotalsTop');
       ok(strip.includes('Left to budget') && strip.includes('R 2000.00'),
         'finished period, no income row: the settled actual income stands in, as the hero\'s rule says');
-      ok(/% of budgeted income/.test(strip),
+      ok(/\d% of income/.test(strip),
         'and the share is stated by the same rule the hero uses — it used to be blank here alone');
+      ok(!/of planned income/.test(strip),
+        'and, measured against the income that arrived, it does not call that income "planned"');
     } finally { unpin2(); }
   }
 

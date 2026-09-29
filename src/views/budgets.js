@@ -547,7 +547,12 @@ module.exports = function registerBudgets(ctx) {
        printed spent by the printed total gets 88% beside a printed 105%
        (2026-09-29 audit). The figure is planFigures' own (`plan.setAside`,
        over the same draft as everything else on the strip), not a recount. */
-    const budgetedNote = allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '';
+    /* Named by its base, the Dashboard's rule: "of planned income" only when the
+       plan has an income row; measured against the income that arrived, it is
+       just "of income". */
+    const budgetedNote = allocPct === null ? ''
+      : plan.hasIncomeRow ? i18n.t('bud.total.budgetedNote', { pct: allocPct })
+        : i18n.t('dash.stat.allocated', { pct: allocPct });
     const budgetedParts = [];
     if (budgetedNote) budgetedParts.push({ fig: 'bud-budgeted-note', text: budgetedNote });
     if (plan.setAside > 0) {

@@ -1000,7 +1000,7 @@ async function mount(files, period = '2026-07') {
     };
     const { ctx, nodes } = await mount(DONE, '2026-07');
     ctx.renderDashboard();
-    ok(/50% of income budgeted/.test(nodes.get('heroCard').textContent),
+    ok(/50% of income/.test(nodes.get('heroCard').textContent),
       'a finished period states its own share: 6 000 budgeted against 12 000 earned');
   });
   await atDate('2026-07-02', async () => {
@@ -1021,7 +1021,7 @@ async function mount(files, period = '2026-07') {
        clause naming the R10 000, because the income line beside it reads
        R255: this is exactly the card that sent a reader looking for the
        arithmetic that turns 255 into 50%. */
-    ok(/50% of the R 10000 income this budget plans for/.test(hero),
+    ok(/50% of planned income \(R 10000\)/.test(hero),
       `budgeted income is the denominator, so day 1 reads the same as day 31 — and the card says which income — got: ${hero}`);
     ok(!/50% of income budgeted/.test(hero),
       'and the bare form is not printed beside an income figure it is not taken against');

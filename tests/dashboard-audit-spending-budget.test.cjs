@@ -82,7 +82,7 @@ const files = () => ({
     const statText = textOf(stat);
     const [total, aside] = moneys(statText);
     eq(total, PLAN, 'the Budgeted stat still states the whole plan');
-    ok(/of which/.test(statText), `and says the set-aside is part of it: ${statText}`);
+    ok(/for savings/.test(statText), `and says the set-aside is part of it: ${statText}`);
     eq(aside, SET_ASIDE, 'with the set-aside envelopes named');
     eq(total - aside, denom, 'so plan less set-aside IS the denominator printed above');
 
@@ -107,7 +107,7 @@ const files = () => ({
     const budgetedTile = tile('bud-budgeted');
     const [plan, aside] = moneys(budgetedTile);
     eq(plan, PLAN, 'Total budgeted is the whole plan');
-    ok(/of which/.test(budgetedTile), `and the tile says the set-aside is part of it: ${budgetedTile}`);
+    ok(/for savings/.test(budgetedTile), `and the tile says the set-aside is part of it: ${budgetedTile}`);
     eq(aside, SET_ASIDE, 'naming the set-aside envelopes');
     ok(fig('bud-budgeted-setaside'), 'the fragment has its own name for the reconciliation');
 
