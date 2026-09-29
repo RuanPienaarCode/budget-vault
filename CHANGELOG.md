@@ -3,6 +3,21 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.48.0 — 2026-09-29
+
+### Added
+
+- **A read-only API for other plugins.** `app.plugins.plugins['budget-app'].api`
+  (`apiVersion: 1`) hands a sibling plugin the Dashboard's own "left to spend"
+  figure for today's period — start, end, budgeted, spent, left, the categories
+  over budget and the caveats the Dashboard prints beside it — with no view
+  open. `onChange(cb)` fires after the budget folder changes and returns an
+  unsubscribe. Built for the Vista dashboard, whose Budget card used to count
+  the figure itself and drifted from this app in thirteen ways. It is a second
+  assembly of the app's own reader, not a second reader; checked against the
+  golden household fixture and against the Dashboard rendered over a real
+  vault.
+
 ## 1.47.1 — 2026-09-17
 
 ### Fixed
