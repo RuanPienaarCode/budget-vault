@@ -1058,8 +1058,8 @@ module.exports = {
   'dash.stat.allocated': 'आय का {pct}%',
   'dash.stat.allocatedOf': 'नियोजित आय ({amount}) का {pct}%',
   'dash.stat.setAside': 'बचत के लिए {amount}',
-  'dash.stat.setAsideMoved': 'बचत के लिए {amount}, अब तक {moved} भेजा',
-  'dash.stat.ofWhichSetAside': 'बचत के लिए {amount}, अब तक {moved} भेजा',
+  'dash.stat.setAsideMoved': '{amount} में से {moved} अब तक बचाया',
+  'dash.stat.ofWhichSetAside': '{amount} में से {moved} अब तक बचाया',
   'dash.scheduledAhead': 'आज तक · {amount} और इस अवधि में बाद की तारीख का है',
   'dash.fundedFromSavings': {
     one: '{amount} और आपके फंड से गया ({count} लेनदेन), जिसे यह बजट नहीं गिनता',

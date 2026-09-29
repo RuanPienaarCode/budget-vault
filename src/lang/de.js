@@ -1039,8 +1039,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% des Einkommens',
   'dash.stat.allocatedOf': '{pct}% der geplanten Einnahmen ({amount})',
   'dash.stat.setAside': '{amount} zum Sparen',
-  'dash.stat.setAsideMoved': '{amount} zum Sparen, {moved} bisher überwiesen',
-  'dash.stat.ofWhichSetAside': '{amount} zum Sparen, {moved} bisher überwiesen',
+  'dash.stat.setAsideMoved': '{moved} von {amount} bisher gespart',
+  'dash.stat.ofWhichSetAside': '{moved} von {amount} bisher gespart',
   'dash.scheduledAhead': 'Bis heute · {amount} mehr sind später in dieser Periode datiert',
   'dash.fundedFromSavings': {
     one: '{amount} mehr ging aus Ihren Rücklagen ({count} Buchung) und zählt in diesem Budget nicht mit',

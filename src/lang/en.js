@@ -1113,8 +1113,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% of income',
   'dash.stat.allocatedOf': '{pct}% of planned income ({amount})',
   'dash.stat.setAside': '{amount} for savings',
-  'dash.stat.setAsideMoved': '{amount} for savings, {moved} moved so far',
-  'dash.stat.ofWhichSetAside': '{amount} for savings, {moved} moved so far',
+  'dash.stat.setAsideMoved': '{moved} of {amount} saved so far',
+  'dash.stat.ofWhichSetAside': '{moved} of {amount} saved so far',
   'dash.scheduledAhead': 'Up to today · {amount} more is dated later this period',
   'dash.fundedFromSavings': {
     one: '{amount} more went out of your funds ({count} transaction), which this budget does not count',

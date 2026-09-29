@@ -1040,8 +1040,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% de los ingresos',
   'dash.stat.allocatedOf': '{pct}% de los ingresos previstos ({amount})',
   'dash.stat.setAside': '{amount} para ahorro',
-  'dash.stat.setAsideMoved': '{amount} para ahorro, {moved} movido hasta ahora',
-  'dash.stat.ofWhichSetAside': '{amount} para ahorro, {moved} movido hasta ahora',
+  'dash.stat.setAsideMoved': '{moved} de {amount} ahorrado hasta ahora',
+  'dash.stat.ofWhichSetAside': '{moved} de {amount} ahorrado hasta ahora',
   'dash.scheduledAhead': 'Hasta hoy · {amount} más con fecha posterior en este periodo',
   'dash.fundedFromSavings': {
     one: '{amount} más salió de tus fondos ({count} movimiento), que este presupuesto no cuenta',

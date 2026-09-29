@@ -996,8 +996,8 @@ module.exports = {
   'dash.stat.allocated': '収入の{pct}%',
   'dash.stat.allocatedOf': '予定収入（{amount}）の {pct}%',
   'dash.stat.setAside': '貯蓄用 {amount}',
-  'dash.stat.setAsideMoved': '貯蓄用 {amount}、これまでに {moved} を移動',
-  'dash.stat.ofWhichSetAside': '貯蓄用 {amount}、これまでに {moved} を移動',
+  'dash.stat.setAsideMoved': '{amount} のうち {moved} を貯蓄済み',
+  'dash.stat.ofWhichSetAside': '{amount} のうち {moved} を貯蓄済み',
   'dash.scheduledAhead': '本日まで · この期間の後の日付に {amount} があります',
   'dash.fundedFromSavings': {
     other: '別に {amount} が資金から出ています（{count} 件）。この予算には含まれません',

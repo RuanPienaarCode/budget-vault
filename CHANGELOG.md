@@ -8,9 +8,10 @@ All notable changes to Budget Vault. Versions match the plugin version in
 ### Changed
 
 - **The Budgeted line says it plainly.** "103% of the R 40 795 income this
-  budget plans for · of which R 4 079 set aside" now reads "103% of planned
-  income (R 40 795) · R 4 079 for savings", on the Dashboard and the Budget
-  page alike.
+  budget plans for · of which R 4 079 set aside, R 0 moved so far" now reads
+  "103% of planned income (R 40 795) · R 0 of R 4 079 saved so far": how much
+  of the saving you planned has actually reached your savings accounts. The
+  Budget page and the report say it the same way.
 
 ### Fixed
 

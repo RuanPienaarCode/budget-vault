@@ -1016,8 +1016,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% dari pemasukan',
   'dash.stat.allocatedOf': '{pct}% dari pemasukan yang direncanakan ({amount})',
   'dash.stat.setAside': '{amount} untuk tabungan',
-  'dash.stat.setAsideMoved': '{amount} untuk tabungan, {moved} sudah dipindahkan',
-  'dash.stat.ofWhichSetAside': '{amount} untuk tabungan, {moved} sudah dipindahkan',
+  'dash.stat.setAsideMoved': '{moved} dari {amount} sudah ditabung',
+  'dash.stat.ofWhichSetAside': '{moved} dari {amount} sudah ditabung',
   'dash.scheduledAhead': 'Sampai hari ini · {amount} lagi bertanggal lebih lanjut dalam periode ini',
   'dash.fundedFromSavings': {
     other: '{amount} lagi keluar dari dana Anda ({count} transaksi), yang tidak dihitung anggaran ini',

@@ -1059,8 +1059,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% da renda',
   'dash.stat.allocatedOf': '{pct}% da renda prevista ({amount})',
   'dash.stat.setAside': '{amount} para poupança',
-  'dash.stat.setAsideMoved': '{amount} para poupança, {moved} movido até agora',
-  'dash.stat.ofWhichSetAside': '{amount} para poupança, {moved} movido até agora',
+  'dash.stat.setAsideMoved': '{moved} de {amount} poupado até agora',
+  'dash.stat.ofWhichSetAside': '{moved} de {amount} poupado até agora',
   'dash.scheduledAhead': 'Até hoje · mais {amount} com data posterior neste período',
   'dash.fundedFromSavings': {
     one: 'mais {amount} saiu dos seus fundos ({count} lançamento), que este orçamento não conta',

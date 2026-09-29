@@ -996,8 +996,8 @@ module.exports = {
   'dash.stat.allocated': '收入的 {pct}%',
   'dash.stat.allocatedOf': '计划收入（{amount}）的 {pct}%',
   'dash.stat.setAside': '储蓄 {amount}',
-  'dash.stat.setAsideMoved': '储蓄 {amount}，已转入 {moved}',
-  'dash.stat.ofWhichSetAside': '储蓄 {amount}，已转入 {moved}',
+  'dash.stat.setAsideMoved': '{amount} 中已储蓄 {moved}',
+  'dash.stat.ofWhichSetAside': '{amount} 中已储蓄 {moved}',
   'dash.scheduledAhead': '截至今天 · 本期稍后还有 {amount}',
   'dash.fundedFromSavings': {
     other: '另有 {amount} 从您的专款支出（{count} 笔），本预算不计入',

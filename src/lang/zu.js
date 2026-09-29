@@ -1064,8 +1064,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% yemali engenayo',
   'dash.stat.allocatedOf': '{pct}% yemali engenayo ehleliwe (i-{amount})',
   'dash.stat.setAside': 'i-{amount} yokonga',
-  'dash.stat.setAsideMoved': 'i-{amount} yokonga, i-{moved} isihanjisiwe',
-  'dash.stat.ofWhichSetAside': 'i-{amount} yokonga, i-{moved} isihanjisiwe',
+  'dash.stat.setAsideMoved': 'i-{moved} kwe-{amount} isilondoloziwe',
+  'dash.stat.ofWhichSetAside': 'i-{moved} kwe-{amount} isilondoloziwe',
   'dash.scheduledAhead': 'Kuze kube namuhla · enye i-{amount} inosuku olulandelayo kule nkathi',
   'dash.fundedFromSavings': {
     one: 'enye i-{amount} iphume ezikhwameni zakho ({count} ukuthengiselana), engabalwa kule bhajethi',

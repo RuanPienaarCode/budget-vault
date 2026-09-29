@@ -1038,8 +1038,8 @@ module.exports = {
   'dash.stat.allocated': '{pct}% van inkomste',
   'dash.stat.allocatedOf': '{pct}% van beplande inkomste ({amount})',
   'dash.stat.setAside': '{amount} vir spaar',
-  'dash.stat.setAsideMoved': '{amount} vir spaar, {moved} reeds geskuif',
-  'dash.stat.ofWhichSetAside': '{amount} vir spaar, {moved} reeds geskuif',
+  'dash.stat.setAsideMoved': '{moved} van {amount} reeds gespaar',
+  'dash.stat.ofWhichSetAside': '{moved} van {amount} reeds gespaar',
   'dash.scheduledAhead': 'Tot vandag · {amount} meer is later hierdie tydperk gedateer',
   'dash.fundedFromSavings': {
     one: '{amount} meer het uit jou fondse gegaan ({count} transaksie), wat hierdie begroting nie tel nie',

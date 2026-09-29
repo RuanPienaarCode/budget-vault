@@ -80,9 +80,11 @@ const files = () => ({
     const stat = find(nodes.get('#heroCard'), n => hasClass(n, 'stat') && /Budgeted/.test(textOf(n)))[0];
     ok(stat, 'the Budgeted stat is rendered');
     const statText = textOf(stat);
-    const [total, aside] = moneys(statText);
+    /* "R total … R moved of R set-aside saved so far": the set-aside is the last figure. */
+    const statMoneys = moneys(statText);
+    const [total, aside] = [statMoneys[0], statMoneys[statMoneys.length - 1]];
     eq(total, PLAN, 'the Budgeted stat still states the whole plan');
-    ok(/for savings/.test(statText), `and says the set-aside is part of it: ${statText}`);
+    ok(/saved so far/.test(statText), `and says the set-aside is part of it: ${statText}`);
     eq(aside, SET_ASIDE, 'with the set-aside envelopes named');
     eq(total - aside, denom, 'so plan less set-aside IS the denominator printed above');
 
