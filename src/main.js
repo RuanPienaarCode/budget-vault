@@ -17,11 +17,19 @@ const { defaultLanguage } = require('./i18n');
 const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
 const { OnboardingWizard } = require('./onboarding');
+const { buildApi } = require('./api');
 
 class BudgetPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this._lastWrite = 0;   // shared write-guard timestamp (see io.js stampWrite)
+    /* Headless read API for a sibling plugin — app.plugins.plugins['budget-app'].api.
+       Built here (not lazily on first access) so `registerEvent` below is called
+       during onload, which is where Obsidian expects it and where its own
+       auto-unregister-on-unload bookkeeping is wired up. api.js builds its own
+       ctx (io + period + load + trend-math + figures — no view, no DOM) on
+       first real use. */
+    this.api = buildApi(this);
     this.registerView(VIEW_TYPE, leaf => new BudgetView(leaf, this));
     this.addRibbonIcon('wallet', 'Open budget', () => this.activateView());
     this.addCommand({ id: 'open-budget', name: 'Open budget', callback: () => this.activateView() });
