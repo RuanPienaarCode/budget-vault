@@ -3,6 +3,21 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.49.1 — 2026-09-29
+
+### Changed
+
+- **The Budgeted line says it plainly.** "103% of the R 40 795 income this
+  budget plans for · of which R 4 079 set aside" now reads "103% of planned
+  income (R 40 795) · R 4 079 for savings", on the Dashboard and the Budget
+  page alike.
+
+### Fixed
+
+- The Budget page said "of budgeted income" even when a finished period with
+  no income row was measured against the income that arrived. It now says
+  "of income" there, as the Dashboard does.
+
 ## 1.49.0 — 2026-09-29
 
 A totals audit of the Dashboard, Transactions and Budget pages. An independent
