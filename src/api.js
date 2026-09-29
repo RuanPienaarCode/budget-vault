@@ -123,11 +123,10 @@ function buildApi(plugin) {
      than throwing at construction. Scoped to the budget folder and debounced
      800ms, the same window controller.js's own watcher uses for the same
      reason: a sync client delivers a folder's files as a burst of individual
-     events, not one. Echoes of this module's OWN writes are not a concern —
-     this module never writes — but an open VIEW's save is exactly the kind of
-     "our own write" controller.js's watcher already knows to ignore via
-     ctx.lastWriteAt(), and that write lands in the same budget folder this
-     watches, so the same guard applies here. */
+     events, not one. There is deliberately NO ctx.lastWriteAt() guard here:
+     controller.js skips the view's own saves because the view already holds
+     that state, but this ctx is a separate one that has not seen the write —
+     a subscriber must hear about a save made in the Budget view. */
   if (typeof plugin.app.vault.on === 'function' && typeof plugin.registerEvent === 'function') {
     let timer = null;
     const scheduleReload = () => {
@@ -139,7 +138,6 @@ function buildApi(plugin) {
       const c = ensureCtx();
       const bp = c.basePath();
       if (path !== bp && !path.startsWith(bp + '/')) return;
-      if (Date.now() - c.lastWriteAt() < 2000) return;
       scheduleReload();
     };
     plugin.registerEvent(plugin.app.vault.on('modify', onFsChange));

@@ -143,6 +143,38 @@ function makePlugin(files, budgetFolder = B) {
       checks++;
     }
 
+    /* ---- 5. the vault watcher: a save made in the Budget view IS a change ----
+       The view's writes stamp plugin._lastWrite so the VIEW's own watcher can
+       skip reloading state it already holds. This API holds a separate ctx that
+       has not seen that write, so a subscriber (Vista's card) must still hear
+       about it. Outside the budget folder, nothing fires. */
+    {
+      const plugin = makePlugin(SEED);
+      const handlers = {};
+      plugin.app.vault.on = (name, fn) => { (handlers[name] = handlers[name] || []).push(fn); return { name, fn }; };
+      plugin.registerEvent = () => {};
+      const api = buildApi(plugin);
+      let fired = 0;
+      api.onChange(() => { fired++; });
+      const emit = (name, path) => handlers[name].forEach(fn => fn({ path }));
+      const settle = () => new Promise(r => setTimeout(r, 1000));
+
+      plugin._lastWrite = Date.now();   // the Budget view just saved
+      emit('modify', `${B}/Transactions/2026-06.md`);
+      await settle();
+      eq(fired, 1, 'a save from the Budget view still notifies API subscribers');
+
+      emit('modify', 'Journal/2026-06-20.md');
+      await settle();
+      eq(fired, 1, 'a change outside the budget folder does not notify');
+
+      emit('modify', `${B}/Settings.md`);
+      emit('create', `${B}/Categories/New.md`);
+      emit('modify', `${B}/Settings.md`);
+      await settle();
+      eq(fired, 2, 'a burst of changes is debounced into one notification');
+    }
+
     console.log(`api: ${checks} checks passed.`);
   } finally { unpin(); }
 })().catch(e => { console.error(e); process.exit(1); });
