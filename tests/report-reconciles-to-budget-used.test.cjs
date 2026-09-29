@@ -155,6 +155,8 @@ class PinnedDate extends RealDate {
       'the gross Spend row still states periodSummary().spend');
     ok(md.includes(`| ${i18n.t('report.col.budgetSpend')} | ${money(bt.spend + bt.setAside)} |`),
       'the Budgeted spend row still states the WHOLE plan — the reconciliation is added, not traded for it');
+    eq(i18n.t('report.col.budgetSpend'), i18n.t('bud.total.budgeted'),
+      'and it is labelled as the whole plan, the way the Budget page labels it — not as spending');
     ok(md.includes(`| ${i18n.t('report.col.income')} | ${money(sum.income)} |`), 'Income still reads periodSummary().income');
     ok(md.includes(`| ${i18n.t('report.col.net')} | ${money(sum.net)} |`), 'Net still reads periodSummary().net');
     ok(md.includes(`| ${i18n.t('report.col.budgetIncome')} | ${money(bt.income)} |`), 'Budgeted income still reads budgetTotals().income');

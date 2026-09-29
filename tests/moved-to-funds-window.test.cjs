@@ -10,6 +10,11 @@
    gift dated 28 September, the Dashboard read R2 000 moved and the Score
    read R7 000 behind it — one fact, two windows, no disclosure on either.
 
+   Since 29 Sep 2026 a gift paid straight into a fund is not "moved" at all
+   (ADR-0006 amendment), so the late-dated money below is a TRANSFER from the
+   cheque account, dated the 28th; the gift stays in the seed as outside money
+   that never counts.
+
    Fixed by both functions reading the one `periodWindowAsOf(p, todayArg)`
    (period.js), pinned here rather than only in the (already-passing)
    moved-to-funds-currency suite, because that file's job is currency, not
@@ -25,6 +30,16 @@ const { SEED, TODAY, PERIOD, B, atAuditDate } = require('./_audit-seed.cjs');
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
+/* R5 000 moved from the cheque account on 28 September: a transfer, so it is
+   moved once it has landed, and only then. */
+const LATE = {
+  ...SEED,
+  [`${B}/Transactions/Cheque/2026-09.md`]: SEED[`${B}/Transactions/Cheque/2026-09.md`]
+    + '| 2026-09-28 | To emergency fund | Transfer | -5000.00 |  |  |  |\n',
+  [`${B}/Transactions/Emergency fund/2026-09.md`]: SEED[`${B}/Transactions/Emergency fund/2026-09.md`]
+    + '| 2026-09-28 | From cheque | Transfer | 5000.00 |  |  |  |\n',
+};
+
 async function vault(files) {
   const ctx = makeCtx(files, { budgetFolder: B });
   const S = await loadInto(ctx);
@@ -38,12 +53,12 @@ atAuditDate(async () => {
      family gift dated 28 September — five days after the pinned audit date
      of 2026-09-02, so it has not happened yet from the reader's seat. */
   {
-    const ctx = await vault(SEED);
+    const ctx = await vault(LATE);
     eq(ctx.movedToFunds(PERIOD), 2000,
-      'movedToFunds already closed at today: the gift has not landed yet');
+      'movedToFunds already closed at today: the 28th has not landed yet');
     eq(ctx.savingContribution(PERIOD), 2000,
       'FIX: savingContribution now closes at the same today — before the fix this read 7000, '
-      + 'counting a gift five days before it exists');
+      + 'counting a transfer five days before it exists');
   }
 
   /* ---- 2. negative control: the whole-period reading is still reachable --
@@ -52,9 +67,9 @@ atAuditDate(async () => {
      capability — a caller that genuinely wants the plan (not yet built) is
      not blocked by this fix. */
   {
-    const ctx = await vault(SEED);
+    const ctx = await vault(LATE);
     eq(ctx.savingContribution(PERIOD, '2026-09-30'), 7000,
-      'asked explicitly for the whole period, savingContribution still counts the gift');
+      'asked explicitly for the whole period, savingContribution still counts the late transfer');
     eq(ctx.movedToFunds(PERIOD, '2026-09-30'), 7000,
       'and movedToFunds answers identically when asked the same way — one window, two callers');
   }

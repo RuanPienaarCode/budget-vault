@@ -199,7 +199,7 @@
       <tr><td><code>isStaleValuation(v, today, days)</code></td><td>reconcile.js:97</td><td>Valuation age; <code>null</code> date is not stale; the 365-day constant lives only in views/assets.js</td><td>Assets, Savings</td></tr>
       <tr><td><code>splitShortfall(parent, parts)</code></td><td>tx-role.js:168</td><td>Money a half-deleted split drops from every total, computed in cents</td><td>Transactions split chip</td></tr>
       <tr><td><code>supersededBySplit(row)</code></td><td>tx-role.js:74</td><td>The predicate every raw-row reader must apply: a parent whose parts are also present</td><td>exporter, dedupe, committed, health-data, reconcile, report, savings-math, Transactions, Services, Accounts</td></tr>
-      <tr><td><code>savedFromOutside(rows, saverLabels, catType)</code></td><td>savings-math.js:725</td><td>Money that crossed into the savings pool from outside it, pairing legs so a fund shuffle is not saving</td><td>health-data saving rate, Score flow, <code>movedToFunds</code></td></tr>
+      <tr><td><code>savedFromOutside(rows, saverLabels, catType)</code></td><td>savings-math.js:725</td><td>Money that crossed into the savings pool from outside it, pairing legs so a fund shuffle is not saving; with <code>ownLabels</code>/<code>regular</code> (via <code>period.js:transfersIntoFunds</code>) only transfers from own accounts, Excluded legs vetoed (2026-09-29)</td><td>health-data saving rate, Score flow, <code>movedToFunds</code> (the latter two through <code>transfersIntoFunds</code>)</td></tr>
       <tr><td><code>sharePercents(amounts)</code></td><td>share-percents.js:43</td><td>Largest-remainder so a column sums to exactly 100</td><td>Dashboard donut, Accounts donut, Savings, Budget, Score, Report</td></tr>
     </tbody>
   </table>

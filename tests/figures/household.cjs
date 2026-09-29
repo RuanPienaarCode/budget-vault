@@ -130,10 +130,16 @@ const SEED = {
     + '|---|---|---:|---|---|---|---|---|---|\n'
     + '| Virgin Active | Virgin | 1000.00 | monthly | 2026-09-06 | Gym | yes |  |  |\n',
 
+  /* A windfall plan the Plan page can actually read (2026-09-29 audit: this
+     file used to be shaped like a budget, so the page drew no pot and the
+     reconcile could never check "sources = pot" or "envelopes + free = pot"). */
   [`${B}/Plans/2026-09.md`]: '---\nkind: plan\n---\n\n'
-    + '| Category | Type | Amount | Notes |\n|---|---|---:|---|\n'
-    + '| Salary | income | 30000.00 |  |\n'
-    + '| Rent | expense | 9000.00 |  |\n',
+    + '## Money in\n\n| Source | Kind | Amount | Date | Status | Notes |\n|---|---|---:|---|---|---|\n'
+    + '| Tax refund | Refund | 6000.00 | 2026-09-10 | received |  |\n'
+    + '| Bonus | Bonus | 4000.00 | 2026-09-25 | expected |  |\n\n'
+    + '## Envelopes\n\n| Envelope | Amount | Note | Tint |\n|---|---:|---|---|\n'
+    + '| Emergency top-up | 5000.00 |  |  |\n'
+    + '| Holiday | 3000.00 |  |  |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: pending\n---\n\n'
     + '# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n'

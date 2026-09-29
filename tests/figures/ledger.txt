@@ -89,7 +89,6 @@ number	2026	-	dashSplitSub/
 money	R 2 000,00	2000	dashSplitSub/
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[1]
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[2]
-money	R 0,00	0	dashBudget/tbody/tr[1]/td.num[4]
 money	R 500,00	500	dashBudget/tbody/tr[3]/td.num[1]
 money	R 500,00	500	dashBudget/tbody/tr[3]/td.num[2]
 money	R 0,00	0	dashBudget/tbody/tr[3]/td.num[4]
@@ -217,7 +216,7 @@ number	0.28	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 money	$ 1 000	1000	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 money	R 977 600	977600	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 number	3	-	scoreWork/div.score-gap[2]/p.score-gap-do[0]
-money	R 30 000	30000	view-score/div.card/div.body-pad[1]/div.score-flow-top[0]/div.score-flow-in[1]
+money	R 30 000	30000	view-score/@score-flow-in
 money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
 percent	0%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
 money	R 11 600	11600	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
@@ -238,10 +237,10 @@ percent	3%	-	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/d
 money	R 17 400	17400	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
 money	R 3 400	3400	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
 money	R 14 500	14500	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
-money	R 17 500	17500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[1]/b.num
-percent	58%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[2]/b.num
-money	R 12 100	12100	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[3]/b.num
-percent	78%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[4]/b.num
+money	R 17 500	17500	view-score/@score-budgeted
+percent	58%	-	view-score/@score-allocated
+money	R 12 100	12100	view-score/@score-spent
+percent	78%	-	view-score/@score-used
 money	R 3 400	3400	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[1]/b.num
 money	R 14 500	14500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[2]/b.num
 money	R 17 900	17900	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[3]/b.num
@@ -268,7 +267,6 @@ money	R 30 000,00	30000	txTable/tbody/tr[9]/td.num[4]
 number	2026	-	budPeriodLabel/
 number	1	-	budPeriodLabel/
 number	30, 2026	-	budPeriodLabel/
-money	R 0,00	0	budTable/tbody/tr[1]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 30 000,00	30000	budTable/tbody/tr[1]/td.num[3]
 money	R 500,00	500	budTable/tbody/tr[3]/td.num[3]
 money	R 2 600,00	2600	budTable/tbody/tr[4]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
@@ -284,6 +282,7 @@ money	R 30 000,00	30000	budTotalsTop/@bud-income
 money	R 30 000,00	30000	budTotalsTop/@bud-income-note
 money	R 17 500,00	17500	budTotalsTop/@bud-budgeted
 percent	58%	-	budTotalsTop/@bud-budgeted-note
+money	R 2 000,00	2000	budTotalsTop/@bud-budgeted-setaside
 money	R 12 500,00	12500	budTotalsTop/@bud-unallocated
 money	R 12 100,00	12100	budTotalsTop/@bud-spent
 percent	78%	-	budTotalsTop/@bud-note-spent
@@ -296,6 +295,7 @@ money	R 30 000,00	30000	budTotalsBottom/@bud-income
 money	R 30 000,00	30000	budTotalsBottom/@bud-income-note
 money	R 17 500,00	17500	budTotalsBottom/@bud-budgeted
 percent	58%	-	budTotalsBottom/@bud-budgeted-note
+money	R 2 000,00	2000	budTotalsBottom/@bud-budgeted-setaside
 money	R 12 500,00	12500	budTotalsBottom/@bud-unallocated
 money	R 12 100,00	12100	budTotalsBottom/@bud-spent
 percent	78%	-	budTotalsBottom/@bud-note-spent
@@ -308,10 +308,29 @@ number	1	-	budTotalsBottom/@bud-note-funds
 ## plan
 number	2026	-	view-plan .financial-period-banner-title/
 number	2026	-	planPicker/button.plan-seg
-money	R 0,00	0	planPot/div.pot-figs[0]/div.pot-fig-block/div.pot-fig[1]
-money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[0]/span.sk2-fig[1]
-money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[1]/span.sk2-fig[1]
+money	R 2 000,00	2000	planPot/div.pot-figs[0]/div.pot-fig-block/div.pot-fig[1]
+money	R 10 000,00	10000	planPot/div.pot-sub[1]
+money	R 6 000,00	6000	planPot/div.pot-sub[1]
+money	R 4 000,00	4000	planPot/div.pot-sub[1]
+money	R 8 000,00	8000	planPot/div.split-key2[3]/div.sk2-row[0]/span.sk2-fig[1]
+money	R 2 000,00	2000	planPot/div.split-key2[3]/div.sk2-row[1]/span.sk2-fig[1]
 money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[2]/span.sk2-fig[1]
+number	10	-	planSources/div.src2-list/div.src2-row[0]/button.src2-main[0]/div.src2-line2[1]/span[0]
+number	2026	-	planSources/div.src2-list/div.src2-row[0]/button.src2-main[0]/div.src2-line2[1]/span[0]
+money	R 6 000,00	6000	planSources/div.src2-list/div.src2-row[0]/div.src2-amt
+number	25	-	planSources/div.src2-list/div.src2-row[1]/button.src2-main[0]/div.src2-line2[1]/span[0]
+number	2026	-	planSources/div.src2-list/div.src2-row[1]/button.src2-main[0]/div.src2-line2[1]/span[0]
+money	R 4 000,00	4000	planSources/div.src2-list/div.src2-row[1]/div.src2-amt
+number	2	-	planEnvSub/
+money	R 8 000,00	8000	planEnvSub/
+money	R 10 000,00	10000	planEnvSub/
+percent	50%	-	planEnvelopes/div.env/div.env-top[1]/span.env-share
+money	R 5 000,00	5000	planEnvelopes/div.env/button.env-amt-btn/div.env-amt
+money	R 5 000,00	5000	planEnvelopes/div.env/div.env-rail[2]/div.env-rail-note/div.env-rail-flags/span.num
+money	R 3 000,00	3000	planEnvelopes/button.env-sum/span.env-sum-amt[3]
+percent	30%	-	planEnvelopes/button.env-sum/span.env-sum-pct[4]
+money	R 2 000,00	2000	planFree/h2
+percent	20%	-	planFree/div.free-fig[0]
 
 ## notes
 

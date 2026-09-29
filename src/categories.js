@@ -11,6 +11,8 @@ const { typeOrder, typeRank } = require('./groups');
 const { todayIso } = require('./dates');
 const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
+/* Namespace import: `t` is a local in several files of this app. */
+const i18n = require('./i18n');
 
 module.exports = function registerCategories(ctx) {
   const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder } = ctx;
@@ -51,7 +53,12 @@ module.exports = function registerCategories(ctx) {
       { key: 'fixed', label: 'Fixed / committed bill', type: 'toggles',
         options: [{ value: 'yes', label: 'Money you are committed to pay every period — rent, debt repayments, insurance' }] },
     ]);
-    if (!r || !r.name.trim()) return null;
+    if (!r) return null;
+    /* A blank name used to close the dialog with no word said, so Create
+       looked like it had done nothing at all. The Add-transaction form toasts
+       for its blank field (tx.err.desc); this does the same. Cancel returns
+       null above and stays silent. */
+    if (!r.name.trim()) { toast(i18n.t('cat.err.nameRequired'), true); return null; }
     const realName = r.name.trim();
     if (S.categories.some(c => c.name.toLowerCase() === realName.toLowerCase())) { toast('Category already exists', true); return null; }
     const type = r.type;

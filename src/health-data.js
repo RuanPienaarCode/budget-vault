@@ -12,7 +12,6 @@ const {
 } = require('./health-math');
 const { activeDebts } = require('./worth');
 const { poolAccounts, isSetAsideType } = require('./vocabulary');
-const { splitFlows, savedFromOutside } = require('./savings-math');
 /* The same split-parent guard splitFlows applies, from the same module, so the
    saving-rate walk below and the Savings page's own flows cannot disagree
    about which rows are real. */
@@ -54,7 +53,7 @@ module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod,
-    foreignLabels, periodFigures, periodWindowAsOf, txInRange,
+    foreignLabels, periodFigures, periodWindowAsOf, txInRange, transfersIntoFunds,
   } = ctx;
 
   /* ADR-0007 · One measure of saved, assembled once. What crossed into the
@@ -79,7 +78,10 @@ module.exports = function registerHealthData(ctx) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
     const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
-    return savedFromOutside(rows, saverLabels, declaredCatType);
+    /* 29 Sep 2026 (Ruan): "we don't save 30%": the rate is regular saving from
+       normal income. The very assembly movedToFunds uses (period.js): transfers
+       in from the household's own accounts, nothing marked Excluded. */
+    return transfersIntoFunds(rows, saverLabels);
   }
 
   function healthSnapshot() {
@@ -122,9 +124,18 @@ module.exports = function registerHealthData(ctx) {
       const h = tally(ledger(start, end), LENSES.HOUSEHOLD);
       const householdNet = h.byCat;
       const householdSpend = h.spendByCat;
-      const consumption = h.consumption, fixed = h.fixed, income = h.netIncome;
+      /* 29 Sep 2026 (Ruan): the income every ratio below divides by is the income
+         the Dashboard and the Budget page print, the BUDGET lens's, so a row the
+         household marked Excluded (UIF, a tax rebate) is not in the base. It was
+         h.netIncome, which keeps Excluded rows: a month with a windfall read far
+         higher there than the Dashboard showed, and the rate was inflated. Read off the
+         snapshot already taken above rather than tallied a second time. */
+      const consumption = h.consumption, fixed = h.fixed, income = F.summary.income;
       periods.push({
         income,
+        /* The spending, debt and net-worth shares keep household scope: their
+           numerators are HOUSEHOLD-lens (health-math.js healthMetrics). */
+        householdIncome: h.netIncome,
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
         savings, consumption, fixed, consumptionBudget,
         budgeted: F.budget.spend,

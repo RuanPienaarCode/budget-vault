@@ -88,6 +88,7 @@ class FakeEl {
   querySelectorAll() { return []; }
   querySelector() { return null; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  hasAttribute(k) { return k in this.attrs; }
   removeAttribute(k) { delete this.attrs[k]; }
   addEventListener(type, fn) { (this._listeners ||= {})[type] = fn; }
   click() { if (this._listeners && this._listeners.click) this._listeners.click(); }

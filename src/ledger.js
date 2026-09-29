@@ -152,6 +152,17 @@ const LENSES = Object.freeze({
      the budget thinks of it; only a split's superseded parent is not money.
      The Accounts page's flow chips and sparkline. */
   ACCOUNT: Object.freeze({ name: 'ACCOUNT', drop: Object.freeze(['splitParent']), sign: 'gross' }),
+  /* "What did a merchant actually charge." The Dashboard hero's service history
+     (price and cadence of a debit order) and the rows on a settle-monthly card.
+     Keeps everything the bank printed - excluded rows, non-budget accounts,
+     foreign ones, transfers - because none of those change what a merchant took
+     or what a card owes, and drops only a split's PARTS. The parent is the
+     bank's own line; the parts are the household's re-description of the same
+     money, so counting both charges it twice. This is the OPPOSITE of ACCOUNT,
+     which drops the parent: a split whose parts sum to less than its parent
+     (splitShortfall) leaves the remainder on no part at all, and ACCOUNT under a
+     card lost part of its spend that way on the audited vault (ISSUE 85). */
+  MERCHANT: Object.freeze({ name: 'MERCHANT', drop: Object.freeze(['splitPart']), sign: 'gross' }),
 });
 
 /* Exported (ISSUE 85) as the seam for "this lens, but ignore one veto" — the
@@ -161,6 +172,17 @@ const LENSES = Object.freeze({
    defined here and nowhere else. */
 const dropsAnyOf = (lens, s, except) => lens.drop.some(k => k !== except && s[k]);
 const keeps = (lens, s) => !dropsAnyOf(lens, s, null);
+
+/* A refund is money coming back on a row that names an ordinary spending
+   category: positive, its category on file, and neither income nor transfer.
+   The net reading of every ledger folds these into the category they came from
+   (tally's `spendByCat`); a card's settlement cycle needs the same reading,
+   because a refund lowers what the card owes. An uncategorised inflow, an
+   unknown category, a payment INTO the card (a transfer) and income deposited
+   on it are all deliberately not refunds: netting a settlement payment would
+   read a card as owing nothing. */
+const isRefund = s => !!s && s.amount > 0 && !!s.cat && s.known === true
+  && s.type !== 'income' && s.type !== 'transfer';
 
 /* One loop. Returns every figure the three former walks produced, so a
    caller reads the field it needs and nothing computes a second time. */
@@ -259,4 +281,4 @@ function lensDifference(stamped, a, b) {
   return out;
 }
 
-module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf };
+module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf, isRefund };

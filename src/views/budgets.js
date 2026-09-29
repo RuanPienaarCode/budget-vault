@@ -2,7 +2,7 @@
 /* Budget page — per-period category amounts, edited as a draft and saved to
    Budgets/<period>.md. */
 
-const { el, icoEl } = require('../dom');
+const { el, icoEl, tableCells } = require('../dom');
 const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
    setup wizard — see the header of budget-file.js for why it stopped being
@@ -54,8 +54,31 @@ const { assumedActual } = require('../money-flow');
 // matches that exact line verbatim as the assume-spent seam's import shape.
 const { budgetStripGap } = require('../money-flow');
 
+/* What an INCOME row says about its plan, on the Budget page and the
+   Dashboard's budget table alike (2026-09-29 audit). Three states, not two:
+   short of plan ("still to come"), past it ("more than planned"), and exactly
+   on it. The third used to fall into the first and print "R 0,00 still to
+   come" beside an income line that had arrived in full - the one moment the
+   sentence was plainly wrong. "Exactly" is to the cent, the precision money
+   is stored and printed at, so a float residue from summing rows (a
+   remaining of 0.0000000004) reads as on plan rather than as R 0,00 still
+   to come; a genuine one-cent gap still reads as one.
+
+   Module-level and exported for the same reason assumedActual is: two pages
+   word this one fact, and a sentence written twice is how they came to
+   disagree in the first place. Takes `money` rather than reading ctx, so a
+   bare-node test can drive it. */
+function incomeRemainingText(remaining, money) {
+  const r = Number(remaining) || 0;
+  const cents = Math.round(r * 100);
+  if (cents === 0) return i18n.t('bud.remaining.incomeAsPlanned');
+  return cents < 0
+    ? i18n.t('bud.remaining.incomeMore', { amount: money(-r) })
+    : i18n.t('bud.remaining.incomeToCome', { amount: money(r) });
+}
+
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, budgetVsActualRows, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -102,6 +125,17 @@ module.exports = function registerBudgets(ctx) {
 
     const fresh = freshPeriodNote();
     if (fresh) {
+      /* Copy previous period has been pressed (or a row typed): the DRAFT now
+         holds rows that Save would write, even though nothing is saved yet,
+         and the test above reads the SAVED budget. The banner stayed up until
+         Save, still offering a copy that a second click answered with "Nothing
+         to copy". It steps aside instead - the lit Save button already says
+         the period is unsaved, and the ghost button above the table still
+         copies into whatever is left. The predicate is saveBudget's own
+         (persistedRows), so "the draft has rows" and "Save would write rows"
+         cannot come apart. Only this branch: the other-shape offer below
+         brings over categories and notes, a different act. */
+      if (persistedRows(budgetDraft()).length) { box.classList.add('hidden'); return; }
       box.classList.remove('hidden');
       const label = `${periodMonthName(fresh.prevKey)} · ${periodTitle(fresh.prevKey)}`;
       /* i18n wave: bud.fresh.title / bud.fresh.body added to lang/en.js (and
@@ -253,6 +287,14 @@ module.exports = function registerBudgets(ctx) {
       ? i18n.t('bud.shape.brought', { count: brought })
       : i18n.t('bud.shape.allHere'));
   }
+
+  /* The draft rows that reach the file. Rows already in the period file (a
+     deliberately zero-budgeted category must survive) plus any virtual row the
+     user gave an amount or a note; untouched zero rows stay display-only, so
+     the period file does not bloat to all 50+ categories. saveBudget writes
+     exactly these, and the new-period banner asks the same question. */
+  const persistedRows = draft =>
+    draft.filter(d => d.category && (d.inFile || d.amount || (d.notes && d.notes.trim())));
 
   let budDraft = null, budDraftPeriod = null;
   /* This page's dirty state used to live only in the DOM, read back off
@@ -499,6 +541,19 @@ module.exports = function registerBudgets(ctx) {
           : (plan.incomeBase > 0 ? i18n.t('bud.total.leftNote') : ''),
       };
     }
+    /* "Total budgeted" is the WHOLE plan; the percentage on the Total spent
+       tile is of the SPENDING budget (ADR-0005), which is the plan less its
+       set-aside envelopes. Without the second line a reader dividing the
+       printed spent by the printed total gets 88% beside a printed 105%
+       (2026-09-29 audit). The figure is planFigures' own (`plan.setAside`,
+       over the same draft as everything else on the strip), not a recount. */
+    const budgetedNote = allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '';
+    const budgetedParts = [];
+    if (budgetedNote) budgetedParts.push({ fig: 'bud-budgeted-note', text: budgetedNote });
+    if (plan.setAside > 0) {
+      budgetedParts.push({ fig: 'bud-budgeted-setaside',
+        text: (budgetedNote ? ' · ' : '') + i18n.t('bud.total.ofWhichSetAside', { amount: money(plan.setAside) }) });
+    }
     /* Every tile names itself. The unallocated one is conditional (a running
        period with no income row omits it), so addressing any of these by
        position means the tile after it is read as the tile before it the
@@ -507,7 +562,8 @@ module.exports = function registerBudgets(ctx) {
       { label: i18n.t('bud.total.income'), value: money(income), grad: true, fig: 'bud-income',
         note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },
       { label: i18n.t('bud.total.budgeted'), value: money(budgeted), fig: 'bud-budgeted',
-        note: allocPct !== null ? i18n.t('bud.total.budgetedNote', { pct: allocPct }) : '' },
+        note: budgetedParts.map(x => x.text).join(''),
+        noteParts: budgetedParts },
       ...(unallocatedTile ? [unallocatedTile] : []),
       { label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,
         fig: 'bud-spent', note: spentNote + gapText(),
@@ -560,7 +616,8 @@ module.exports = function registerBudgets(ctx) {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     renderShapeNote();
     const draft = budgetDraft();
-    const sum = periodSummary(S.period);
+    /* The Dashboard table's rows, over the unsaved draft. */
+    const rowOf = new Map(budgetVsActualRows(S.period, { rows: draft }).map(r => [r.cat, r]));
     const t = $('#budTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, i18n.t('bud.col.category')), el('th', { scope: 'col' }, i18n.t('bud.col.type')),
@@ -604,19 +661,18 @@ module.exports = function registerBudgets(ctx) {
       const catRows = groups.get(type).sort((a, b) => a.category.localeCompare(b.category));
       body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, typeGroupLabel(type))));
       for (const d of catRows) {
-        /* An assume-spent row is its own actual: the money left in an earlier
-           period, so no transaction in THIS one will ever match it — UNLESS a
-           real transaction landed in the category anyway, which the toggle's
-           own tooltip merely asserts won't happen. periodSummary counts that
-           transaction like any other, inside `raw`/`realSpend` below, so it
-           was already inside sum.spend once — reading it a second time here
-           (the row used to just read d.amount outright) is what doubled a
-           category that both transacted AND carried the flag. `actual` is now
-           whichever is bigger: the assumed amount if nothing (or less than
-           it) really moved, or the real spend if it overran the assumption —
-           the same max() the totals strip's overlay is the complement of, so
-           the two can never disagree about this category's contribution. */
-        const assumed = catAssumeSpent(d.category);
+        /* Actual and remaining come from the row budgetVsActualRows handed
+           back, not from a rule of this page's own. An assume-spent row is its
+           own actual (the money left in an earlier period) until real spend
+           overruns it, and only an expense can be one: the row carries
+           `assumed` with the income/transfer guard already applied. This page
+           used to ask catAssumeSpent(d.category) directly, without that guard,
+           and printed an income category's budget as "already spent" beside a
+           Dashboard row reading what had really arrived. `over`, `unbudgeted`
+           and `remaining` are budgetRowStatus's, the Dashboard's own. */
+        const row = rowOf.get(d.category);
+        const assumed = row.assumed;
+        const isIncome = type === 'income';
         /* Whether this category is a fixed, committed bill — its own read
            straight off S.categories rather than a shared ctx helper, because
            period.js (which owns catType/catAssumeSpent) is not this lane's to
@@ -624,29 +680,24 @@ module.exports = function registerBudgets(ctx) {
            export. See load.js for why `fixed` is its own flag rather than a
            guess from `type`. */
         const fixed = S.categories.find(c => c.name === d.category)?.fixed === true;
-        const raw = sum.byCat[d.category] || 0;
-        const realSpend = -raw;
-        const actual = assumed ? assumedActual(d.amount, realSpend) : (type === 'income' ? raw : -raw);
-        const overActual = actual > d.amount && d.amount > 0 && type !== 'income';
-        /* Live "remaining" line under the amount input — budget minus actual,
-           red when overspent (never red for income: earning above target is
-           fine). An assumed row with nothing (or less than the assumption)
-           really moved still reads the static "already spent" label — that
-           case has no real remaining line to show, by design, the whole
-           budget stands provisioned. One that overran the assumption falls
-           through to the same over/left arithmetic as an ordinary row,
-           because at that point it IS one: real money moved past what was
-           set aside for it. */
+        const actual = row.actual;
+        const overActual = row.over && !isIncome;
+        /* Live "remaining" line under the amount input. Typing an amount
+           re-renders the page, which rebuilds the draft rows, so the line
+           moves with the edit before anything is saved. Red when overspent,
+           never for income: earning above target is fine, and reads as a
+           surplus ("more than planned") rather than a negative "left". An
+           assumed row that has not overrun its provision reads the static
+           "already spent" label; one that has falls through to the same
+           over/left arithmetic as an ordinary row, because at that point it
+           IS one. */
         const remainingEl = el('div', { class: 'bud-remaining' });
         const updateRemaining = () => {
-          if (!d.amount) {
+          if (!row.budget) {
             /* Spend in a category nobody budgeted for used to leave this line
                blank — the one kind of overspend this page said nothing
-               about. Mirrors dashboard.js's renderBudgetTable, which fixed
-               the same "blank reads as nothing to report" gap for the same
-               reason: three such rows on that vault came to R995 with
-               nothing on screen to say so. */
-            if (actual > 0 && type !== 'income' && !assumed) {
+               about. Mirrors dashboard.js's renderBudgetTable. */
+            if (row.unbudgeted) {
               remainingEl.textContent = i18n.t('bud.remaining.over', { amount: money(actual) });
               remainingEl.className = 'bud-remaining over';
             } else {
@@ -654,17 +705,20 @@ module.exports = function registerBudgets(ctx) {
             }
             return;
           }
-          if (assumed && realSpend <= d.amount) {
+          if (assumed && !row.over) {
             remainingEl.textContent = i18n.t('bud.remaining.assumed');
             remainingEl.className = 'bud-remaining bud-remaining-assumed';
             return;
           }
-          const rem = d.amount - actual;
-          const over = rem < 0 && type !== 'income';
-          remainingEl.textContent = over
-            ? i18n.t('bud.remaining.over', { amount: money(-rem) })
-            : i18n.t('bud.remaining.left', { amount: money(rem) });
-          remainingEl.className = 'bud-remaining' + (over ? ' over' : '');
+          if (isIncome) {
+            remainingEl.textContent = incomeRemainingText(row.remaining, money);
+            remainingEl.className = 'bud-remaining';
+            return;
+          }
+          remainingEl.textContent = row.remaining < 0
+            ? i18n.t('bud.remaining.over', { amount: money(-row.remaining) })
+            : i18n.t('bud.remaining.left', { amount: money(row.remaining) });
+          remainingEl.className = 'bud-remaining' + (row.remaining < 0 ? ' over' : '');
         };
         updateRemaining();
         /* Actual cell — kept as element references so an amount edit can
@@ -678,7 +732,7 @@ module.exports = function registerBudgets(ctx) {
            typing. */
         const actualTd = el('td', { class: `num${overActual ? ' text-danger' : assumed ? ' bud-actual-assumed' : ' text-muted'}`, style: 'white-space:nowrap' },
           money(actual),
-          assumed && realSpend <= 0 ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : '');
+          assumed && row.realSpend <= 0 ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : '');
         body.append(el('tr', {},
           el('td', {}, d.category,
             assumed ? el('div', { class: 'bud-assumed-tag' }, i18n.t('bud.assumed.tag')) : ''),
@@ -791,6 +845,9 @@ module.exports = function registerBudgets(ctx) {
     // all used to leave a header bar sitting over an empty <tbody>.
     if (!draft.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
+    /* Phone width stacks each row into a card (dom.js tableCells). */
+    tableCells(t, [i18n.t('bud.col.category'), i18n.t('bud.col.type'), i18n.t('bud.col.amount'),
+      i18n.t('bud.col.actual'), i18n.t('bud.col.notes'), null]);
     renderBudgetTotals();
   }
 
@@ -799,7 +856,7 @@ module.exports = function registerBudgets(ctx) {
     // zero-budgeted category must survive) plus any virtual row the user
     // gave an amount or a note. Untouched zero rows stay display-only, so
     // the period file doesn't bloat to all 50+ categories.
-    const draft = budgetDraft().filter(d => d.category && (d.inFile || d.amount || (d.notes && d.notes.trim())));
+    const draft = persistedRows(budgetDraft());
     for (const d of draft) d.inFile = true;
     S.budgets[S.period] = draft.map(d => ({ ...d }));
     const meta = S.budgetMeta[S.period];
@@ -957,7 +1014,7 @@ module.exports = function registerBudgets(ctx) {
         }
       } else { draft.push({ ...r, inFile: true }); copied++; }
     }
-    if (copied) $('#budSave').disabled = false;
+    if (copied) { budDirty = true; $('#budSave').disabled = false; }
     renderBudgets();
     toast(copied ? i18n.t('bud.copy.done', { count: copied }) : i18n.t('bud.copy.nothing'));
   }
@@ -996,3 +1053,4 @@ module.exports = function registerBudgets(ctx) {
    a test mounting one without the other would then fail on the wiring rather
    than on its subject. */
 module.exports.assumedActual = assumedActual;
+module.exports.incomeRemainingText = incomeRemainingText;

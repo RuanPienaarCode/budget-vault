@@ -168,6 +168,65 @@ to the commit before, so nothing but comments moved. Line counts fell from
 block over twelve lines, every pointer naming a register entry, every entry
 naming a function that still exists.
 
+## Amendment, 29 Sep 2026: moved to funds and the saving rate
+
+Decided by Ruan on 29 Sep 2026 after a walk through the August figures, in his
+words: "we don't save 30%... it should be from our normal income we put aside
+to save, not lump sums because it messes the number."
+
+Two figures had been derived by different rules, and the lenses above are why
+the disagreement could be named. The health card's saving rate divided
+everything that crossed into a fund from outside it (the numerator,
+`savedFromOutside`) by the HOUSEHOLD lens's income, which keeps rows the
+household marked Excluded. In one month a large UIF-style payout sat in both: it was
+Excluded on the way in and moved on into a fund, so it counted in full as
+"saving" over an income base that also held it. The card read about three
+times the regular rate; the regular transfers into funds were a fraction of that. The Dashboard's "R X moved
+so far" counted the same payout.
+
+**The rule now, one seam, both sides of the ratio in the same scope:**
+
+- **Moved to funds** (`ctx.transfersIntoFunds`, read by `movedToFunds` and by
+  `savingContribution`) counts an inflow into a savings or investment account
+  only when it pairs with an equal outflow from another of the household's own
+  non-fund accounts, by the pairing the fund-to-fund cancel already used
+  (`couldBeAnInternalLeg`, `couldBeSameMovement`, the nearest date winning), and
+  when neither leg is marked Excluded. Outside money landing in a fund, interest,
+  and fund-to-fund shuffles are not moved.
+- **Saving rate** = moved to funds, averaged over the completed periods, divided
+  by the same periods' **budget** income (`periodSummary(p).income`, the figure
+  the Dashboard and the Budget page print; the BUDGET lens). HOUSEHOLD stays the
+  lens for what the household spent, where an Excluded bill from a joint account
+  is still a bill; it is no longer the lens for the income that spending and
+  saving are measured against.
+
+**Why the transfer test alone was not enough.** Ruan believed the UIF payment
+went straight into the fund. On the vault it landed in the cheque account
+(Excluded) and was transferred on (Excluded, both legs), so it IS a transfer
+from an own account and the pairing rule leaves it in. What removes it is the
+household's own Excluded veto, read in the same place. That also settles the
+earlier reversal recorded in ADR-0007 ("Nothing is skipped on the strength of a
+row's own flags"): a rule that skipped income-typed Excluded rows from the
+numerator alone was reverted because interest left the numerator while income
+went on counting it. Here the denominator drops Excluded rows too, and `excluded`
+is read as what the household stated it to be, a veto, not inferred intent.
+
+**Consequences, stated rather than hidden.**
+
+- Every ratio in `healthMetrics` divides by the one `avg.income`, so the debt
+  interest share, the instalment share, the fixed and consumption shares and the
+  net-worth multiple now divide by budget income as well. Their numerators
+  (fixed, consumption, essential) remain HOUSEHOLD-lens spend, Excluded rows
+  kept, so on a household that Excludes real bills the spending shares read
+  higher than before. That mismatch is open for Ruan (see the change's report).
+- The Score's saving line used to say one-off windfalls count. They no longer do.
+- The Savings page growth chart is unchanged: it answers "what went into the
+  fund", and a lump sum did. `splitFlows` and `monthlyFlows` keep their
+  inception-date windowing.
+- Fixtures: the committed ledgers do not move (their households hold no
+  windfall); `tests/lane-r-moved-to-funds.test.cjs` and
+  `tests/lane-r-saving-rate.test.cjs` pin the rule on a synthetic household.
+
 ## What this does not change
 
 Every product decision the comments record stands: gross versus net, the

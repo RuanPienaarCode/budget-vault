@@ -86,7 +86,6 @@ number	1	-	dashSplitSub/
 number	2026	-	dashSplitSub/
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[1]
 money	R 30 000,00	30000	dashBudget/tbody/tr[1]/td.num[2]
-money	R 0,00	0	dashBudget/tbody/tr[1]/td.num[4]
 money	R 4 200,00	4200	dashBudget/tbody/tr[3]/td.num[1]
 money	R 1 500,00	1500	dashBudget/tbody/tr[3]/td.num[2]
 money	R 2 700,00	2700	dashBudget/tbody/tr[3]/td.num[4]
@@ -204,7 +203,7 @@ money	R 137 000	137000	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 number	0.38	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 money	R 943 000	943000	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 number	3	-	scoreWork/div.score-gap[2]/p.score-gap-do[0]
-money	R 30 000	30000	view-score/div.card/div.body-pad[1]/div.score-flow-top[0]/div.score-flow-in[1]
+money	R 30 000	30000	view-score/@score-flow-in
 money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
 percent	0%	-	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[1]
 money	R 1 500	1500	view-score/div.card/div.body-pad[1]/div.score-flow-sankey-wrap[1]/svg.score-flow-sankey/text.score-flow-amt[3]
@@ -223,10 +222,10 @@ money	R 0	0	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/di
 money	R 28 500	28500	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-head[0]/span.score-flow-m-amt[1]
 money	R 13 100	13100	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
 money	R 15 400	15400	view-score/div.card/div.body-pad[1]/div.score-flow-mobile-wrap[2]/div.score-flow-mobile/div.score-flow-m-row[3]/div.score-flow-m-sub[2]
-money	R 14 600	14600	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[1]/b.num
-percent	49%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[2]/b.num
-money	R 1 500	1500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[3]/b.num
-percent	10%	-	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[1]/div.score-flow-row[4]/b.num
+money	R 14 600	14600	view-score/@score-budgeted
+percent	49%	-	view-score/@score-allocated
+money	R 1 500	1500	view-score/@score-spent
+percent	10%	-	view-score/@score-used
 money	R 13 100	13100	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[1]/b.num
 money	R 15 400	15400	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[2]/b.num
 money	R 28 500	28500	view-score/div.card/div.body-pad[1]/div.score-flow-chips[3]/div.mini[2]/div.score-flow-row[3]/b.num
@@ -244,7 +243,6 @@ money	R -1 500,00	-1500	txTable/tbody/tr[1]/td.num[4]
 number	2026	-	budPeriodLabel/
 number	23	-	budPeriodLabel/
 number	22, 2026	-	budPeriodLabel/
-money	R 0,00	0	budTable/tbody/tr[1]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 30 000,00	30000	budTable/tbody/tr[1]/td.num[3]
 money	R 2 700,00	2700	budTable/tbody/tr[3]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 1 500,00	1500	budTable/tbody/tr[3]/td.num[3]

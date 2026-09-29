@@ -16,7 +16,10 @@
 
    Measured on the BudgetAudit household plus one euro fund, whole period
    (today = 2026-09-30) so both functions see the same rows. The truth is
-   R7 000: R2 000 moved to the emergency fund and a R5 000 family gift into it.
+   R2 000: R2 000 moved to the emergency fund from the cheque account. (It was
+   R7 000 until 29 Sep 2026: the R5 000 family gift paid straight into the fund
+   counted then, and does not now, because nothing of the household's own sent
+   it. ADR-0006 amendment.)
 
      inflow   EUR 5 000 arriving read as R12 000 — a euro added to a rand
      outflow  EUR 2 000 leaving read as R5 000 — a euro cancelling a rand
@@ -39,7 +42,7 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 /* The whole period, so the as-of-today window holds nothing back and the two
    functions are answering over exactly the same rows. */
 const TODAY = '2026-09-30';
-const TRUTH = 7000;
+const TRUTH = 2000;
 
 /* type savings + a goal is a pool account AND an earmarked one, so
    movedToFunds() reaches this folder by either test; `currency: EUR` against
@@ -68,9 +71,9 @@ atAuditDate(async () => {
   {
     const ctx = await vault(SEED);
     eq(ctx.movedToFunds(PERIOD, TODAY), TRUTH,
-      'R2 000 to the emergency fund plus a R5 000 gift into it is R7 000 moved');
+      'R2 000 to the emergency fund is moved; the R5 000 gift into it is outside money and is not');
     eq(ctx.savingContribution(PERIOD, TODAY), TRUTH,
-      'and the Score reads the same R7 000 off the same pairing');
+      'and the Score reads the same R2 000 off the same seam');
   }
 
   /* ---------------- a foreign arrival must not inflate ------------------ */
@@ -99,10 +102,10 @@ atAuditDate(async () => {
        by anything else: the identical rows in the household's own currency
        still pair, so a rand shuffle between two funds is still not saving. */
     const ctx = await vault(withFund(RAND_FUND, [['2026-09-01', 'Withdrawal', 'Transfer', -2000]]));
-    eq(ctx.movedToFunds(PERIOD, TODAY), 5000,
-      'a rand fund-to-fund shuffle still cancels: R7 000 less the R2 000 that only moved between pockets');
-    eq(ctx.savingContribution(PERIOD, TODAY), 5000,
-      'and the Score reads that same R5 000');
+    eq(ctx.movedToFunds(PERIOD, TODAY), 0,
+      'a rand fund-to-fund shuffle still cancels: the R2 000 only moved between pockets, so nothing was moved');
+    eq(ctx.savingContribution(PERIOD, TODAY), 0,
+      'and the Score reads that same nothing');
   }
 
   console.log(`PASS moved-to-funds-currency (${checks} checks)`);

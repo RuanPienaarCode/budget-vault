@@ -873,7 +873,7 @@ module.exports = function registerScore(ctx) {
     const body = el('div', { class: 'body-pad' });
     body.append(el('div', { class: 'score-flow-top' },
       el('div', { class: 'score-flow-eyebrow' }, i18n.t('score.flow.moneyIn')),
-      el('div', { class: 'score-flow-in num' }, money(flow.income, 0),
+      el('div', { class: 'score-flow-in num', 'data-fig': 'score-flow-in' }, money(flow.income, 0),
         el('small', {}, i18n.t('score.flow.thisPeriod')))));
 
     /* Nothing has HAPPENED yet is a different picture from a picture with
@@ -1197,9 +1197,23 @@ module.exports = function registerScore(ctx) {
      rows inside it, rather than a second card component. */
   function buildChip(title, rows, note) {
     const chip = el('div', { class: 'mini score-flow-chip' }, el('div', { class: 'l' }, title));
+    /* Names for the Budget chip's four figures (data-fig on the <b>), so a
+       reconciliation addresses "the allocated share" and not "the second row of
+       the second chip" — allocated and budget-used are conditional, and the
+       position of everything after them moves. Keyed by the row's own label
+       rather than passed alongside it: the rows are built and pinned as plain
+       [label, value] pairs (tests/vocabulary.test.cjs matches their source),
+       and a label is unique within this chip. */
+    const chipFigs = title === i18n.t('score.flow.chip.budget') ? {
+      [i18n.t('score.flow.chip.budgeted')]: 'score-budgeted',
+      [i18n.t('score.flow.chip.allocatedOfIncome')]: 'score-allocated',
+      [i18n.t('score.flow.chip.spent')]: 'score-spent',
+      [i18n.t('score.flow.chip.budgetUsed')]: 'score-used',
+    } : {};
     for (const [label, value, warn] of rows) {
+      const fig = chipFigs[label];
       chip.append(el('div', { class: `score-flow-row${warn ? ' is-warn' : ''}` },
-        el('span', {}, label), el('b', { class: 'num' }, value)));
+        el('span', {}, label), el('b', { class: 'num', ...(fig ? { 'data-fig': fig } : {}) }, value)));
     }
     /* Optional, and appended AFTER every row rather than under the one row it
        is actually about — `.s` is already the sealed note style every `.mini`

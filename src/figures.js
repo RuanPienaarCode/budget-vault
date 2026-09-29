@@ -25,6 +25,13 @@ const { netByOwner } = require('./owners');
 const { normalizeAmount } = require('./amount');
 const { todayIso } = require('./dates');
 
+/* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
+   keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
+   text is the balance unknown ("1 234,56" is kept too and is real money). The
+   balance book, the Dashboard's what's-left accounts and the Accounts page all
+   hold an unreadable balance out on this one test. */
+const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
+
 module.exports = function registerFigures(ctx) {
   const { S, summaryInRange, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
 
@@ -32,9 +39,16 @@ module.exports = function registerFigures(ctx) {
      spent, the type read live (budgetRowType), and an assume-spent row's
      Actual through assumedActual() — the rule the Budget page's own Actual
      column reads. Every row carries its status (budgetRowStatus) so no page
-     recomputes "remaining" or "unbudgeted". */
-  function budgetVsActualRows(p) {
-    return rowsFrom(periodSummary(p), S.budgets[p] || []);
+     recomputes "remaining" or "unbudgeted".
+
+     `opts.rows` is the Budget page's unsaved draft, handed in the way
+     planFigures and budgetUsed already take it. On 1.47.1 that page kept its
+     own Actual and remaining rule and forgot this one's type guard, so an
+     income category carrying assume_spent printed its budget as "already
+     spent" beside a Dashboard row reading what really arrived. Every other
+     reader takes the saved file. */
+  function budgetVsActualRows(p, opts) {
+    return rowsFrom(periodSummary(p), (opts && opts.rows) || S.budgets[p] || []);
   }
 
   /* The same rows over an arbitrary DATE window — what the budget export's
@@ -61,7 +75,11 @@ module.exports = function registerFigures(ctx) {
     for (const b of budget) {
       const type = budgetRowType(b);
       const assumed = type !== 'income' && type !== 'transfer' && catAssumeSpent(b.category);
-      rows.set(b.category, { budget: b.amount, type, actual: assumed ? assumedActual(b.amount, 0) : 0, notes: b.notes, assumed });
+      /* `realSpend` rides along on an assume-spent row only: the Budget page
+         says "no transaction expected" when it is 0, and the row's actual
+         (the larger of plan and real) cannot tell 0 from "less than plan". */
+      rows.set(b.category, { budget: b.amount, type, actual: assumed ? assumedActual(b.amount, 0) : 0, notes: b.notes, assumed,
+        ...(assumed ? { realSpend: 0 } : {}) });
     }
     for (const [cat, amt] of Object.entries(sum.byCat)) {
       if (!cat) continue;
@@ -70,6 +88,7 @@ module.exports = function registerFigures(ctx) {
       const existing = rows.get(cat);
       if (existing && existing.assumed) {
         existing.actual = assumedActual(existing.budget, -amt);
+        existing.realSpend = -amt;
         continue;
       }
       /* A category with no file and no budget row is the uncategorised /
@@ -204,12 +223,18 @@ module.exports = function registerFigures(ctx) {
       if (!foreign) driftUnplaced += rec.unreadable || 0;
       if (rec.state === 'drift') { if (foreign) driftForeign++; else drift += rec.delta; }
     }
+    const balances = balanceBook();
     return {
       reconciled, unplacedBy, confirmDayBy,
       drift: { drift, driftForeign, driftUnplaced },
       stale: stalenessSummary(S.accounts),
-      overdrawn: S.accounts.filter(a => (a.balance || 0) < 0).length,
-      balances: balanceBook(),
+      /* The Debt tile's "all on N accounts", counted on the basis and scope of
+         the amount beside it (worth().fromAccounts over the implied, readable,
+         household-currency accounts): a STATED overdraft a later deposit has
+         cleared, a euro card and an unreadable balance are none of them in
+         that amount, so none of them is in this count. */
+      overdrawn: balances.implied.accounts.filter(a => (a.balance || 0) < 0).length,
+      balances,
     };
   }
 
@@ -235,7 +260,6 @@ module.exports = function registerFigures(ctx) {
      owners through netByOwner(), the Accounts page's own rule. */
   function balanceBook() {
     const cur = S.settings.currency;
-    const readable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
     const declared = Array.isArray(S.settings.owners) ? S.settings.owners : [];
     const summarise = (accounts, all) => {
       const byType = {};
@@ -259,8 +283,8 @@ module.exports = function registerFigures(ctx) {
         net: Math.round((positive - negative) * 100) / 100 || 0,
       };
     };
-    const statedAll = S.accounts.filter(readable);
-    const impliedAll = impliedAccounts().filter(readable);
+    const statedAll = S.accounts.filter(balanceReadable);
+    const impliedAll = impliedAccounts().filter(balanceReadable);
     const stated = summarise(splitByCurrency(statedAll, cur).primary, statedAll);
     const implied = summarise(splitByCurrency(impliedAll, cur).primary, impliedAll);
     const driftByType = {};
@@ -278,3 +302,4 @@ module.exports = function registerFigures(ctx) {
 
   ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };
+module.exports.balanceReadable = balanceReadable;

@@ -2,7 +2,7 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, icoEl } = require('../dom');
+const { el, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr } = require('../markdown');
 const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
@@ -96,8 +96,35 @@ module.exports = function registerTransactions(ctx) {
   /* Windowing state. `renderToken` changes whenever the FILTERS change, which
      is what resets the window — a plain re-render (a category edit, a reload)
      must not throw the reader back to the first page. */
+  /* The Transactions category filter's value for "names no category file
+     answers to" - beside shell.js's '__none__' for "no name at all". */
+  const MISSING = '__missing__';
   const PAGE = 100;
   let shown = PAGE, shownFor = null;
+
+  /* IN-BUDGET ROWS ONLY - set by a Dashboard drill-through, never by hand
+     (2026-09-29 audit, Ruan's decision). The Dashboard's category figures are
+     taken under the BUDGET lens, which holds out the rows of a `budget: false`
+     account, so a drill-through from one of them narrows the list to the same
+     accounts and the rows add up to the figure that was clicked.
+
+     It is bound to the CATEGORY VALUE the drill-through selected, not kept as
+     a free flag: the moment the category select holds anything else the state
+     is dropped (filteredRows), so choosing another category by hand - or
+     coming back to this one by hand - is the page exactly as it always was,
+     and nothing else has to remember to clear it. The note's "show them"
+     link drops it too. The page's own category filter is untouched otherwise.
+
+     The same scope also holds back rows DATED AFTER TODAY. A running period's
+     Dashboard figures close at today (period.js periodSummary: the rest of the
+     window comes back as `scheduled`, not counted), so a category clicked on
+     the 10th read R500 while its list, showing the whole period, added up to
+     R500 plus whatever was already dated the 20th. The cut-off is the
+     Dashboard's own - todayIso(), which periodSummary defaults to - not a
+     second clock. A finished period has no such row and a future period has
+     nothing counted at all, so the same rule is right for both. */
+  let inBudgetFor = null;
+  function setTxInBudgetOnly(cat) { inBudgetFor = cat || null; }
 
   /* The rows the current filters select — ALL of them, before the table's page
      window is applied.
@@ -136,17 +163,58 @@ module.exports = function registerTransactions(ctx) {
        branch already agreed on. */
     list.sort((a, b) => b.date.localeCompare(a.date));
     const acc = $('#txAccount').value, cat = $('#txCategory').value, q = $('#txSearch').value.trim().toLowerCase();
-    const rows = list.filter(t =>
-      (!acc || t.label === acc) &&
-      (!cat || (cat === '__none__' ? !t.cat : t.cat === cat)) &&
-      (!q || t.desc.toLowerCase().includes(q)));
+    /* Self-healing, see inBudgetFor above. */
+    if (inBudgetFor !== null && cat !== inBudgetFor) inBudgetFor = null;
+    /* Everything the BUDGET lens holds out of the wedge, one reason each
+       (ledger.js vetoes): an account opted out with `budget: false`, an account
+       in another currency (the donut adds home-currency rand only), and money
+       paid OUT of an earmarked fund - the hero shows that as funded from
+       savings, not as spending (2026-09-29 audit: a pram paid from the
+       emergency fund put R1 500 into a R2 400 Groceries list). */
+    const scoped = inBudgetFor !== null;
+    const labelsOf = fn => (scoped && typeof ctx[fn] === 'function' ? ctx[fn]() : null);
+    const outside = labelsOf('nonBudgetLabels');
+    const foreign = labelsOf('foreignLabels');
+    const earmarked = labelsOf('earmarkedLabels');
+    /* "Missing categories": a name on the row that no category file answers to
+       (the Dashboard tile of the same name, ledger.js's `known`). */
+    const known = cat === MISSING ? new Set((S.categories || []).map(c => c.name)) : null;
+    const today = inBudgetFor !== null ? todayIso() : null;
+    let hiddenOutside = 0, hiddenFuture = 0, hiddenForeign = 0, hiddenFund = 0;
+    const rows = list.filter(t => {
+      if (acc && t.label !== acc) return false;
+      if (cat) {
+        if (cat === '__none__') { if (t.cat) return false; }
+        else if (cat === MISSING) { if (!t.cat || known.has(t.cat)) return false; }
+        else if (t.cat !== cat) return false;
+      }
+      if (q && !t.desc.toLowerCase().includes(q)) return false;
+      /* Counted only among the rows every OTHER filter kept, so the note says
+         how many rows this one alone took away. */
+      if (outside && outside.has(t.label)) { hiddenOutside++; return false; }
+      if (foreign && foreign.has(t.label)) { hiddenForeign++; return false; }
+      if (earmarked && earmarked.has(t.label) && Number(t.amount) < 0) { hiddenFund++; return false; }
+      /* After the account test, so a row is counted under ONE reason: the note
+         adds its two sentences up to the rows that went missing, never more. */
+      if (today !== null && t.date > today) { hiddenFuture++; return false; }
+      return true;
+    });
     const filters = [];
     if (acc) filters.push(`account: ${acc}`);
-    if (cat) filters.push(`category: ${cat === '__none__' ? 'Uncategorised' : cat}`);
+    if (cat) filters.push(`category: ${cat === '__none__' ? 'Uncategorised' : cat === MISSING ? 'Missing categories' : cat}`);
     if (q) filters.push(`search: "${$('#txSearch').value.trim()}"`);
+    /* Named for the export and the bulk actions, which describe what is on
+       screen: a file or a confirmation that omitted this would list a filter
+       narrower than the one that was applied. */
+    if (scoped) filters.push('the rows the Dashboard counts: inside the budget, home currency, not paid from a savings fund');
+    if (today !== null) filters.push('dated up to today only');
     return {
       rows,
-      token: `${acc}|${cat}|${q}|${whole}|${S.period}`,
+      hiddenOutside,
+      hiddenFuture,
+      hiddenForeign,
+      hiddenFund,
+      token: `${acc}|${cat}|${q}|${whole}|${S.period}|${inBudgetFor !== null ? 'in' : 'all'}`,
       range: whole ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
       filters,
     };
@@ -215,15 +283,54 @@ module.exports = function registerTransactions(ctx) {
     bar.append(el('div', { class: 'tx-undo-acts' }, undo, hide));
   }
 
+  /* Says what the in-budget scope left out, and gives it back. Shown only
+     while the scope is on AND it hid something: a note about a filter that
+     changed nothing is noise. The scope holds rows back for two reasons -
+     an account outside the budget, a date after today - and each gets its own
+     sentence rather than one composed from both, so the count in each stays
+     under its own plural rule in every language. One button gives them all
+     back: they are one scope, and it is dropped as one. */
+  function renderScopeNote({ outside = 0, foreign = 0, fund = 0, future = 0 } = {}) {
+    const note = $('#txScopeNote');
+    if (!note || typeof note.empty !== 'function') return;
+    note.empty();
+    const any = outside + foreign + fund + future;
+    note.classList.toggle('hidden', !any);
+    if (!any) return;
+    const show = el('button', { type: 'button', class: 'tx-undo-btn' }, i18n.t('tx.outside.show'));
+    show.addEventListener('click', () => { inBudgetFor = null; renderTransactions(); });
+    const said = [];
+    if (outside) said.push(el('div', {}, i18n.t('tx.outside.hidden', { count: outside })));
+    if (foreign) said.push(el('div', {}, i18n.t('tx.foreign.hidden', { count: foreign })));
+    if (fund) said.push(el('div', {}, i18n.t('tx.fund.hidden', { count: fund })));
+    if (future) said.push(el('div', {}, i18n.t('tx.future.hidden', { count: future })));
+    note.append(
+      el('div', { class: 'tx-undo-txt' }, said),
+      el('div', { class: 'tx-undo-acts' }, show));
+  }
+
   function renderTransactions() {
     renderUndoBar();
     ensureBulkCatButton();
     $('#txSubNote').textContent = $('#txWholeHistory').checked ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
     syncOptions($('#txAccount'), [...new Set(Object.values(S.txFiles).map(f => f.label))].sort(),
       [['', i18n.t('tx.allAccounts')]]);
-    syncOptions($('#txCategory'), S.categories.map(c => c.name),
-      [['', i18n.t('tx.allCategories')], ['__none__', i18n.t('tx.uncategorised')]]);
-    const { rows: filtered, token: renderToken } = filteredRows();
+    /* Category names the rows carry that no category file answers to. Deleting
+       a category leaves its name on its rows by design and there is no rename
+       UI, so this list is how a reader gets back to them (2026-09-29 audit: the
+       Dashboard's Missing categories tile could only clear a stale filter,
+       because this select was built from the category files alone). Each name
+       is an option of its own, so a donut wedge for one lands on its rows, and
+       one pseudo-option gathers them all. Read off every row in the vault, not
+       the period's: the select is period-independent. */
+    const catNames = new Set((S.categories || []).map(c => c.name));
+    const orphaned = new Set();
+    for (const f of Object.values(S.txFiles)) for (const r of f.rows) if (r.cat && !catNames.has(r.cat)) orphaned.add(r.cat);
+    syncOptions($('#txCategory'), [...S.categories.map(c => c.name), ...[...orphaned].sort((a, b) => a.localeCompare(b))],
+      [['', i18n.t('tx.allCategories')], ['__none__', i18n.t('tx.uncategorised')],
+        ...(orphaned.size ? [[MISSING, i18n.t('dash.stat.missing')]] : [])]);
+    const { rows: filtered, token: renderToken, hiddenOutside, hiddenFuture, hiddenForeign, hiddenFund } = filteredRows();
+    renderScopeNote({ outside: hiddenOutside, foreign: hiddenForeign, fund: hiddenFund, future: hiddenFuture });
     let list = filtered;
     /* Window the table. The old shape sliced to 800 and built every one: ~13,600
        nodes and, before deferredCatSelect, 800 native <select>s — rebuilt in full
@@ -314,12 +421,22 @@ module.exports = function registerTransactions(ctx) {
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
+      const remaining = total - list.length;
+      /* "Show 55 more of 55 remaining" says the same number twice. When what is
+         left fits in one page the button takes all of it, so it says that;
+         otherwise it still names the page and the pile. */
       const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
-        i18n.t('tx.showMore', { n: Math.min(PAGE, total - list.length), remaining: total - list.length, count: total - list.length }));
+        remaining <= PAGE
+          ? i18n.t('tx.showRest', { remaining, count: remaining })
+          : i18n.t('tx.showMore', { n: PAGE, remaining, count: remaining }));
       more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
       body.append(el('tr', {}, el('td', { colspan: '8', style: 'padding:0' }, more)));
     }
     t.append(body);
+    /* Phone width stacks each row into a card: keep the column names and the
+       table semantics (dom.js tableCells). The actions column goes unlabelled. */
+    tableCells(t, [i18n.t('tx.col.date'), i18n.t('tx.col.desc'), i18n.t('tx.col.account'), i18n.t('tx.col.category'),
+      i18n.t('tx.col.amount'), i18n.t('tx.col.excl'), i18n.t('tx.col.note'), null]);
   }
 
   /* ------------------------------- splitting -------------------------------
@@ -659,8 +776,11 @@ module.exports = function registerTransactions(ctx) {
   // referenced from src/ before it exists in every lang/*.js table, and this
   // file may only add lang/en.js keys, never lang files themselves. Keys
   // wanted, once someone with lang/ access adds them (English text alongside
-  // each — reuses tx.bulk.needFilter / tx.bulk.none / tx.col.category /
-  // tx.uncategorised, which already exist and ARE used below):
+  // each — reuses tx.bulk.none / tx.col.category / tx.uncategorised, which
+  // already exist and ARE used below. The "pick a filter first" toast has its
+  // own key, tx.bulkCat.needFilter (all 12 languages): tx.bulk.needFilter
+  // talks about DELETING, and read as a warning on an action that deletes
+  // nothing):
   //   tx.bulkCat.button  "Set category"
   //   tx.bulkCat.title   "Set category for these rows"
   //   tx.bulkCat.msg     "{count} rows will be set to {cat}." ({count} plural)
@@ -668,7 +788,7 @@ module.exports = function registerTransactions(ctx) {
   //   tx.bulkCat.done    "{count} rows recategorised — remember to Save." ({count} plural)
   async function categoriseFilteredTransactions() {
     const { rows, filters } = filteredRows();
-    if (!filters.length) return toast(i18n.t('tx.bulk.needFilter'), true);
+    if (!filters.length) return toast(i18n.t('tx.bulkCat.needFilter'), true);
     if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
 
     const values = await askFields(app, 'Set category for these rows', [
@@ -1019,5 +1139,5 @@ module.exports = function registerTransactions(ctx) {
      on a collision, so a name only fails on the device. */
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
     deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
-    exportTransactions, syncOptions, filteredRows });
+    exportTransactions, syncOptions, filteredRows, setTxInBudgetOnly });
 };

@@ -105,10 +105,10 @@ function lagVault(lagDays) {
     f[`${B}/Transactions/Cheque/${m}.md`] = tbl([
       `| ${m}-01 | Pay | Salary | 30000.00 | | | |`,
       `| ${m}-03 | Rent | Rent | -9000.00 | | | |`,
-      `| ${m}-10 | To pot | Move | -3000.00 | yes | | |`,
+      `| ${m}-10 | To pot | Move | -3000.00 | | | |`,
     ]);
     f[`${B}/Transactions/Pot/${m}.md`] = tbl([
-      `| ${m}-${String(10 + lagDays).padStart(2, '0')} | From cheque | Move | 3000.00 | yes | | |`,
+      `| ${m}-${String(10 + lagDays).padStart(2, '0')} | From cheque | Move | 3000.00 | | | |`,
     ]);
   }
   return f;
@@ -273,28 +273,28 @@ atAuditDate(async () => {
   /* The R40 000 UIF shape: income-typed, excluded, arriving in a non-pool
      account and moving on into a pot.
 
-     It COUNTS, on both sides. The rule that used to drop it was justified by
-     "the same rand is not counted as income", and that was never true — income
-     is built from householdNet, which filters transfer-typed rows and paired
-     pass-throughs and does not look at `excluded` at all. So the household
-     received the money and put it away, income sees it once, saving sees it
-     once, and the two sides of the ratio agree.
+     It does NOT count, on either side (Ruan, 29 Sep 2026, ADR-0006 amendment).
+     Until then it counted on both, on the reasoning that income was built from
+     a lens that keeps `excluded` rows, so the two sides of the ratio agreed.
+     They agreed and the answer was wrong: a lump sum the household had itself
+     marked Excluded read as 30% saved. Now Excluded is a veto on both sides:
+     the rows are out of the income base (budget income) and out of the
+     saving (regular transfers only).
 
-     Asserted here on BOTH sides rather than on savings alone, because the
-     whole defect was the two disagreeing: a savings figure is only meaningful
-     next to the income it is a share of. */
+     Still asserted on BOTH sides rather than on savings alone, because a
+     savings figure is only meaningful next to the income it is a share of. */
   const uif = [];
   for (const lag of [0, 3, 4, 11]) {
     const s3 = await snapOf(uifVault(lag));
     uif.push({ lag, savings: s3.metrics.monthlySavings, income: s3.metrics.monthlyIncome });
     invariants(`uif passthrough ${lag}d`, s3);
   }
-  ok(uif.every(r => Math.abs(r.savings - 3000) < 0.01),
-    'money that arrived and was put away is saved, at every lag — the pass-through legs '
-    + `cancel and the arrival does not (got ${uif.map(r => r.savings).join(', ')})`);
-  ok(uif.every(r => Math.abs(r.income - 33000) < 0.01),
-    'and the SAME rand is in the income base, which is why counting it as saving is '
-    + `consistent rather than inflationary (got ${uif.map(r => r.income).join(', ')})`);
+  ok(uif.every(r => Math.abs(r.savings) < 0.01),
+    'money the household marked Excluded that arrived and was put away is not regular saving, at any lag '
+    + `(got ${uif.map(r => r.savings).join(', ')})`);
+  ok(uif.every(r => Math.abs(r.income - 30000) < 0.01),
+    'and it is out of the income base too, so the two sides of the ratio agree on the smaller number '
+    + `(got ${uif.map(r => r.income).join(', ')})`);
   ok(new Set(uif.map(r => Math.round(r.savings))).size === 1
      && new Set(uif.map(r => Math.round(r.income))).size === 1,
     'neither side moves with settlement lag');

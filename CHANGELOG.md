@@ -3,6 +3,58 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.49.0 — 2026-09-29
+
+A totals audit of the Dashboard, Transactions and Budget pages. An independent
+count from the raw transaction files matched every money figure on those pages
+to the cent; what was wrong was two different figures under one word, labels
+and drill-throughs that disagreed with the figure beside them, and a saving
+rate inflated by lump sums.
+
+### Changed
+
+- **"Budgeted" now names which budget.** The figure "budget used" is measured
+  against is labelled the **spending budget** wherever it appears; the whole
+  plan says "of which R X set aside". Dividing the printed spent by the printed
+  budget now gives the printed percentage.
+- **The saving rate is regular saving from normal income.** It counts transfers
+  into your funds from your own accounts and divides by the income the
+  Dashboard prints. Rows you mark Excluded (a UIF payout, a tax rebate) leave
+  both sides, so a windfall no longer reads as saving. "Moved to funds" follows
+  the same rule. Living costs and fixed bills still divide by household income.
+- **Dashboard drill-throughs list what the figure counts.** Tapping a category,
+  the Uncategorised tile or the Missing categories tile lists only rows the
+  Dashboard counted — not accounts outside the budget, foreign-currency
+  accounts, spending paid from an earmarked fund, or rows dated after today —
+  with a "N rows hidden · Show them" note.
+- **Money left this period** names the everyday accounts outside the budget it
+  leaves out, and nets refunds on the card against the card cycle.
+
+### Fixed
+
+- The Budget page's Actual column used its own rule; it now reads the
+  Dashboard's.
+- A service whose debit order changed description kept its old price on the
+  Dashboard and the Services page; both now read the current charge.
+- The donut's Change column now equals the difference of the two figures
+  printed beside it.
+- A period with no budget file no longer reads "Over budget".
+- Income rows read "more than planned", "still to come" or "received as
+  planned", never a red negative.
+- Money left: an "unconfirmed" count that included an account it never
+  counted, an unreadable balance counted as cash, a foreign band whose terms
+  did not add up, and a transfer mistaken for the incoming salary.
+- The Debt tile's account count uses the same balances as its amount.
+- Set category no longer shows the Delete warning; a blank category name says
+  so; "Show the remaining N rows"; the new-period banner hides once a budget
+  is copied in.
+- On a phone, Transactions and Budget rows stack into labelled cards, so row
+  actions no longer need a sideways swipe; the period pill, the export
+  buttons and long legend names stay readable.
+
+New strings in all twelve languages; the non-English wording is not yet
+native-reviewed.
+
 ## 1.48.0 — 2026-09-29
 
 ### Added

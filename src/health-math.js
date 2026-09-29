@@ -100,7 +100,7 @@ function debtInterestCoverage(debts, household) {
    consumption, fixed, budgeted, consumptionBudget, counted }]. */
 function monthlyAverages(periods, monthsPerPeriod) {
   const mpp = monthsPerPeriod > 0 ? monthsPerPeriod : 1;
-  const KEYS = ['income', 'essential', 'savings', 'consumption', 'fixed'];
+  const KEYS = ['income', 'householdIncome', 'essential', 'savings', 'consumption', 'fixed'];
   const sums = {}; for (const k of KEYS) { sums[k] = 0; }
   let counted = 0;
   /* ADR-0007 · Budgeted spend averages over planned periods only ("budget
@@ -109,7 +109,8 @@ function monthlyAverages(periods, monthsPerPeriod) {
   for (const p of periods || []) {
     if (!p || !p.counted) { continue; }
     counted++;
-    for (const k of KEYS) { sums[k] += p[k] || 0; }
+    /* householdIncome falls back to income for a caller passing the old shape. */
+    for (const k of KEYS) { sums[k] += (k === 'householdIncome' && p[k] === undefined ? p.income : p[k]) || 0; }
     if (p.budgeted > 0) {
       planned++;
       plannedBudgeted += p.budgeted;
@@ -240,7 +241,15 @@ function healthMetrics({
 }) {
   const avg = monthlyAverages(periods, monthsPerPeriod);
   const hasIncome = avg.income !== null && avg.income > 0;
+  /* Income is normal income (2026-09-29, Ruan: "from our normal income … not
+     lump sums"): the budget income, Excluded windfalls out. The two SPENDING
+     shares are the exception - their numerators are HOUSEHOLD-lens spend,
+     which keeps Excluded rows, so they divide by household income; over
+     budget income they read living costs above 100% of income on the real vault. */
   const share = v => (hasIncome && v !== null && v !== undefined ? v / avg.income : null);
+  const hhIncome = avg.householdIncome;
+  const hasHhIncome = hhIncome !== null && hhIncome > 0;
+  const spendShare = v => (hasHhIncome && v !== null && v !== undefined ? v / hhIncome : null);
 
   const months = (earmarks && earmarks.any && avg.essential !== null && avg.essential > 0)
     ? earmarks.total / avg.essential
@@ -254,6 +263,7 @@ function healthMetrics({
 
   const m = {
     monthlyIncome: avg.income,
+    monthlyHouseholdIncome: hhIncome,
     monthlyEssential: avg.essential,
     monthlySavings: avg.savings,
     monthlyConsumption: avg.consumption,
@@ -270,8 +280,8 @@ function healthMetrics({
        to service, and "0% of income to instalments" would be full marks for an
        unanswered question. health-data.js decides when that is the case. */
     instalmentShare: share(debtInstalments),
-    fixedShare: share(fixedMonthly),
-    consumptionShare: share(avg.consumption),
+    fixedShare: spendShare(fixedMonthly),
+    consumptionShare: spendShare(avg.consumption),
     /* Budget adherence is the one ratio NOT taken against income — it is spend
        against the household's own plan. Null when nothing was budgeted, because
        dividing by an absent plan measures the absence, not the household. */
@@ -311,18 +321,21 @@ function scoreBreakdown(m, targetMonths) {
       const need = FULL_MARKS.savingsRate * m.monthlyIncome - (m.monthlySavings || 0);
       return need > 0 ? { kind: 'monthly', amount: need } : null;
     }
+    /* The spending shares are household-scoped (see healthMetrics), so their
+       gap converts back through household income; the rest through income. */
+    const hh = m.monthlyHouseholdIncome ?? m.monthlyIncome;
     if (key === 'debt') {
       return m.monthlyIncome && (m.interestShare || 0) > 0
         ? { kind: 'interest', amount: (m.interestShare || 0) * m.monthlyIncome }
         : null;
     }
     if (key === 'spending') {
-      if (!m.monthlyIncome) { return null; }
+      if (!hh) { return null; }
       /* The cheapest of the three to move is whichever is furthest from its
          floor, but the honest single figure is what living costs would have to
          come down by to clear the consumption ceiling — the one a reader can
          act on this month without renegotiating a contract. */
-      const target = FULL_MARKS.consumptionFloor * m.monthlyIncome;
+      const target = FULL_MARKS.consumptionFloor * hh;
       const need = (m.monthlyConsumption || 0) - target;
       return need > 0 ? { kind: 'trim', amount: need } : null;
     }
