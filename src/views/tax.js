@@ -7,6 +7,7 @@
    Edit seeded sources to match your own banks, providers and income. */
 
 const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
@@ -160,12 +161,35 @@ module.exports = function registerTax(ctx) {
 
     // Outcome fields only once there is an outcome — they are noise before it.
     if (t.assessment === 'assessed') {
-      const num = (label, key, placeholder) => field(label, el('input', { type: 'text', inputmode: 'decimal',
-        class: 'form-control form-control-sm', value: t[key] === null || t[key] === undefined ? '' : String(t[key]),
+      /* Read by normalizeAmount — the reader load.js uses for these same two
+         keys (ISSUE 52) — and NOT the digit-scraper that was here,
+         `Number(raw.replace(/[^\d.-]/g, ''))`, which deleted the decimal comma
+         and the space South Africa groups with: "-6 315,28" became -631 528
+         and "412 345,67" became 41 234 567, written to the file and fed to the
+         assessed-income check. The page wrote by one rule and read back by
+         another (three audit lanes, 7 Oct 2026).
+
+         A cleared field means no figure, as it always has: this is a TEXT
+         input, so an empty value is what the reader typed. Text holding no
+         number at all is refused — the stored figure is kept, the field is
+         redrawn to show it, and the reader is told — the contract
+         views/debts.js's editMoney states. Redrawn by setting this field's own
+         value, never by re-rendering the card: a handler must not rebuild the
+         subtree holding the control that fired it (see refreshDerived). An
+         accepted value replaces any unreadable text the loader kept in
+         `<key>Raw`, which would otherwise be written back over it. */
+      const shown = key => (t[key] === null || t[key] === undefined ? '' : String(t[key]));
+      const num = (label, what, key, placeholder) => field(label, el('input', { type: 'text', inputmode: 'decimal',
+        class: 'form-control form-control-sm', value: shown(key),
         placeholder, onchange: e => {
           const raw = e.target.value.trim();
-          const n = Number(raw.replace(/[^\d.-]/g, ''));
-          t[key] = raw === '' ? null : (Number.isFinite(n) ? n : null);
+          const n = raw === '' ? null : normalizeAmount(raw);
+          if (raw !== '' && n === null) {
+            toast(`${what} must be a number`, true);
+            e.target.value = shown(key);
+            return;
+          }
+          t[key] = n; t[`${key}Raw`] = null;
           mark(); refreshDerived(t);
         } }));
       b.append(el('div', { class: 'row tax-season-row' },
@@ -174,8 +198,8 @@ module.exports = function registerTax(ctx) {
           v => { t.assessment_date = v; mark(); refreshDerived(t); })),
         field('Reference', el('input', { type: 'text', class: 'form-control form-control-sm', value: t.assessment_ref,
           placeholder: 'Notice / document no.', onchange: e => { t.assessment_ref = e.target.value.trim(); mark(); } })),
-        num('Result (− = refund)', 'assessment_result', '-1250.00'),
-        num('Taxable income assessed', 'assessment_income', '0.00')));
+        num('Result (− = refund)', 'Result', 'assessment_result', '-1250.00'),
+        num('Taxable income assessed', 'Taxable income', 'assessment_income', '0.00')));
     }
 
     b.append(el('p', { class: 'tax-season-msg' }, loc.seasonMsgs(t).join(' ')));
@@ -248,9 +272,24 @@ module.exports = function registerTax(ctx) {
           el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num', style: 'width:130px',
             value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
             'aria-label': `Amount for ${f.code || 'this figure'}`,
+            /* normalizeAmount, the reader load.js applies to this very cell, so
+               "23 800,50" is 23 800,50 here as it is on the next load — the
+               digit-scraper that was here stored 2 380 050 and told the reader
+               R 2 356 250 of their interest was taxable. A cleared cell is no
+               figure (0, which this cell already shows as blank); text with
+               no number in it is refused, the stored figure kept and redrawn
+               into this field (not the table — see refreshDerived), as
+               views/debts.js's editMoney does. An accepted figure supersedes
+               any unreadable text the loader kept in amountRaw. */
             onchange: e => {
-              const n = Number(e.target.value.replace(/[^\d.-]/g, ''));
-              f.amount = Number.isFinite(n) ? n : 0; refresh();
+              const raw = e.target.value.trim();
+              const n = raw === '' ? 0 : normalizeAmount(raw);
+              if (n === null) {
+                toast('Amount must be a number', true);
+                e.target.value = f.amount === 0 ? '' : String(f.amount);
+                return;
+              }
+              f.amount = n; f.amountRaw = null; refresh();
             } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
             'aria-label': `Remove figure ${f.code}`,
@@ -606,9 +645,21 @@ module.exports = function registerTax(ctx) {
   /* ------------------------------ persist -------------------------------- */
   function serializeTax(year) {
     const t = S.tax[year];
+    /* A frontmatter word outside the vocabulary — `assessment: verification`,
+       copied off a SARS letter — reads as `unknown` with the reader's own text
+       kept in `<key>Raw` (load.js), and is written back exactly as it was
+       until the reader picks another value: the vocab() contract every table
+       cell already had, the raw winning only while the value is still the
+       fallback it produced. "Exactly as it was" by leaving the key out of the
+       patch, so patchFrontmatter keeps the line verbatim — quoting and all,
+       which matters the moment the word holds a colon. Before this the key was
+       always patched, and an edit to any row on the page wrote `unknown` over
+       the reader's word (2026-10-07 round-trip audit). */
+    const keepWord = key => t[`${key}Raw`] != null && t[key] === 'unknown';
     const fm = patchFrontmatter(t.fmRaw || '', {
       kind: 'tax', tax_year: year,
-      taxpayer_type: t.taxpayer_type, assessment: t.assessment,
+      ...(keepWord('taxpayer_type') ? {} : { taxpayer_type: t.taxpayer_type }),
+      ...(keepWord('assessment') ? {} : { assessment: t.assessment }),
       // Quoted: these are free-text fields. An unquoted "ITA34: 2026/0031"
       // makes the whole block unparseable to Obsidian while this plugin's own
       // first-colon parser still reads it, so the damage stays invisible here.
@@ -629,9 +680,25 @@ module.exports = function registerTax(ctx) {
     const loc = locale();
     /* ISSUE 59/63 — see views/plan.js for the same pair and the same reason:
        an unreadable cell goes back verbatim, never as 0.00 and never as a
-       coerced status word. */
-    const cash = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : Number(r[key] || 0).toFixed(2));
-    const word = (r, key) => (r[`${key}Raw`] != null ? escMd(r[`${key}Raw`]) : r[key]);
+       coerced status word. This comment said so while the code below did two
+       things plan.js had already stopped doing (2026-10-07 round-trip audit),
+       and both now match it:
+
+       Preferred only while the row still HOLDS the value the raw produced —
+       0 for an amount, the column's fallback for a status. The status pills,
+       the upload that stamps "uploaded" and the Figures editor all assign the
+       value in place; preferring the raw unconditionally showed each of those
+       edits on screen and then threw it away on Save.
+
+       NOT through escMd. The raw arrives from parseMdTable still `\|`-escaped
+       and load.js keeps it that way, so escaping it again added one backslash
+       per save — `\|`, `\\|`, `\\\|` — until a cell that was merely
+       unparseable was unreadable. table-schema.js's money()/vocab() writes
+       the raw back bare for exactly this reason. */
+    const cash = (r, key) => (r[`${key}Raw`] != null && !(r[key] || 0)
+      ? r[`${key}Raw`] : Number(r[key] || 0).toFixed(2));
+    const word = (r, key, fallback) => (r[`${key}Raw`] != null && r[key] === fallback
+      ? r[`${key}Raw`] : r[key]);
     /* ISSUE 67 — the intro paragraph is locale-derived (loc.authority,
        loc.yearSpan), so it is regenerated fresh every save — a household that
        switches country must see the new one, not a sentence frozen from the
@@ -651,12 +718,14 @@ module.exports = function registerTax(ctx) {
       '## Progress', '',
       '| Step | Status | Due | Notes |',
       '|------|--------|-----|-------|'];
-    for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${word(s, 'status')} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
+    // `due` is plain text in memory (load.js reads it through unescMd), so
+    // escMd here is the one escape it gets — the pair that keeps it stable.
+    for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${word(s, 'status', 'todo')} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
     lines.push(...extrasAfter('progress'));
     lines.push('', '## Documents', '',
       '| Document | Source | Status | File | Notes |',
       '|----------|--------|--------|------|-------|');
-    for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${word(d, 'status')} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+    for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${word(d, 'status', 'needed')} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
     lines.push(...extrasAfter('documents'));
     // Emit the header even when empty so the section is discoverable in the
     // raw file rather than appearing only once a figure is added.
@@ -732,10 +801,16 @@ module.exports = function registerTax(ctx) {
       { key: 'amount', label: 'Amount', type: 'text', placeholder: '0.00' },
     ]);
     if (!r || !r.code.trim()) return;
-    const n = Number((r.amount || '').replace(/[^\d.-]/g, ''));
+    /* Same reader as the table cell and the loader. Left blank, the figure is
+       still added, to be filled in from the table — the field is optional and
+       a blank TEXT field is what the reader left. Text with no number in it
+       adds nothing and says so, rather than a figure of 0 nobody typed. */
+    const raw = (r.amount || '').trim();
+    const amount = raw === '' ? 0 : normalizeAmount(raw);
+    if (amount === null) return toast('Amount must be a number', true);
     T().figures.push({
       code: r.code.trim(), description: (r.description || '').trim(),
-      source: (r.source || '').trim(), amount: Number.isFinite(n) ? n : 0,
+      source: (r.source || '').trim(), amount,
     });
     mark(); renderTax();
   }

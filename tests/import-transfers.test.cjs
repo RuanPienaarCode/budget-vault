@@ -110,40 +110,59 @@ const hit = (desc, self) => counterpartyAccount(desc, ACCOUNTS, self);
    The suggestion therefore cannot be computed once. It has to be recomputed
    whenever the believed account changes — while never overwriting a row the
    reader has already decided on, the way nearAuto and `manual` already protect
-   the import tick and the category. */
+   the import tick and the category.
+
+   Since the 2026-10-07 audit (L4B-TXT-COUNTERPARTY) a row is pre-EXCLUDED
+   only when the account it names holds the other leg — the same amount the
+   other way, a few days either side — handed in as `legsOf`; a number alone
+   only suggests (tests/import-transfer-needs-other-leg.test.cjs). So the
+   rows here carry amounts and dates, and the vault's legs are supplied. The
+   statement's OWN account is given a look-alike leg on purpose: that is the
+   self-match this section exists for, and it is what the self-skip must
+   still remove once the account is known. */
 {
   const rows = () => ([
-    { desc: 'IB TRANSFER FROM 1122334455', excluded: false, transferTo: '' },
-    { desc: 'IB TRANSFER TO 9876543210', excluded: false, transferTo: '' },
-    { desc: 'SALARY ACME PAYROLL', excluded: false, transferTo: '' },
+    { date: '2026-07-10', desc: 'IB TRANSFER FROM 1122334455', amount: 500, excluded: false, transferTo: '' },
+    { date: '2026-07-10', desc: 'IB TRANSFER TO 9876543210', amount: -800, excluded: false, transferTo: '' },
+    { date: '2026-07-25', desc: 'SALARY ACME PAYROLL', amount: 20000, excluded: false, transferTo: '' },
   ]);
+  const LEGS = new Map([
+    ['Transaction Account', [{ date: '2026-07-10', desc: 'an unrelated -500 in the statement’s own account', amount: -500 }]],
+    ['Emergency Fund', [{ date: '2026-07-11', desc: 'IB TRANSFER FROM 1122334455', amount: 800 }]],
+  ]);
+  const legsOf = a => LEGS.get(a.name) || [];
 
   // Detection failed: selfLabel is ''. This is the state runImport builds in.
-  const guessed = applyCounterparties(rows(), ACCOUNTS, '');
+  const guessed = applyCounterparties(rows(), ACCOUNTS, '', legsOf);
   eq(guessed[0].excluded, true,
     'with no known self, a row naming the statement’s own account matches itself');
 
   // The review screen settles on the real account — by pick, by new account, or
   // by the default at import.js:337. The suggestion must follow it.
-  const settled = applyCounterparties(guessed, ACCOUNTS, 'Transaction Account');
+  const settled = applyCounterparties(guessed, ACCOUNTS, 'Transaction Account', legsOf);
   eq(settled[0].excluded, false,
     'once the account is known, a row naming it is the statement’s own and not a transfer');
   eq(settled[0].transferTo, '', 'and its "transfer" badge goes with it');
-  eq(settled[1].excluded, true, 'a row naming a DIFFERENT account is still a transfer');
+  eq(settled[1].excluded, true, 'a row naming a DIFFERENT account, whose other leg is there, is still a transfer');
   eq(settled[1].transferTo, 'Emergency Fund', 'and still says which one');
   eq(settled[2].excluded, false, 'ordinary income is untouched throughout');
 
   // Idempotent: renderImportReview runs on every account switch and every
   // "show more", so a second pass at the same label must change nothing.
-  const again = applyCounterparties(settled, ACCOUNTS, 'Transaction Account');
+  const again = applyCounterparties(settled, ACCOUNTS, 'Transaction Account', legsOf);
   eq(again.map(r => r.excluded), [false, true, false],
     're-rendering at the same account changes nothing');
 
+  // No legs to look at: the number suggests, and nothing is pre-excluded.
+  const bare = applyCounterparties(rows(), ACCOUNTS, 'Transaction Account');
+  eq(bare.map(r => [r.excluded, r.transferTo]), [[false, ''], [false, 'Emergency Fund'], [false, '']],
+    'without the other leg a counterparty is badged, never pre-excluded');
+
   // A decision the reader has made outranks the suggestion, in both directions.
   const held = applyCounterparties(
-    [{ desc: 'IB TRANSFER TO 9876543210', excluded: false, transferTo: '', manualExclude: true },
-     { desc: 'SALARY ACME PAYROLL', excluded: true, transferTo: '', manualExclude: true }],
-    ACCOUNTS, 'Transaction Account');
+    [{ date: '2026-07-10', desc: 'IB TRANSFER TO 9876543210', amount: -800, excluded: false, transferTo: '', manualExclude: true },
+     { date: '2026-07-25', desc: 'SALARY ACME PAYROLL', amount: 20000, excluded: true, transferTo: '', manualExclude: true }],
+    ACCOUNTS, 'Transaction Account', legsOf);
   eq(held[0].excluded, false, 'a transfer the reader un-excluded stays un-excluded');
   eq(held[1].excluded, true, 'and a row the reader excluded by hand stays excluded');
 }

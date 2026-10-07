@@ -84,8 +84,10 @@ non-English locale would take the image path for the sake of a space.
    which shifts every offset a PDF's xref and a ZIP's central directory depend
    on. The file would exist, have a plausible size, and open nowhere.
 3. **Output is deterministic.** No clock inside the writers — `created` is
-   injected — so the same model produces the same bytes and a golden test is
-   possible.
+   injected, and so is `utcOffset`, the zone that clock was read in (the
+   workbook stores the UTC instant, the PDF its local time with the offset;
+   7 Oct 2026 audit) — so the same model produces the same bytes and a golden
+   test is possible.
 4. **One model, every rendering.** PDF, workbook and CSV are arrangements of the
    single object `buildModel()` returns; none of them derives a figure. This is
    ADR-0006's discipline applied to documents.

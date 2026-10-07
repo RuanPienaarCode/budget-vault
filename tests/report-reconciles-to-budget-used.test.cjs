@@ -28,9 +28,12 @@
      · the "% used" is sharePercentLabel() of budgetUsed(p).used — the same
        label the hero's tag and the Budget page's tile print;
      · every amount held out of, or added into, that numerator is NAMED: the
-       assume-spent provision (bud.total.spentNoteAssumed) and the set-aside
-       (dash.stat.setAsideMoved), the same two sentences the Budget page's
-       totals strip already prints;
+       assume-spent provision (bud.total.spentNoteAssumed, the Budget page's
+       sentence) and the set-aside paid (dash.stat.setAside, the fragment the
+       hero prints beside this same sub-line). Until 2026-10-07 the set-aside
+       rode in the "saved so far" sentence; that sentence states the PLAN now
+       (REPORT-3, tests/report-saved-so-far.test.cjs), so the paid figure
+       keeps its own words;
      · the JSON sibling carries the identical figures as data, so the two
        documents one click produces cannot disagree with each other.
 
@@ -120,7 +123,7 @@ class PinnedDate extends RealDate {
     const sum = ctx.periodSummary(PERIOD);
     const bt = ctx.budgetTotals(PERIOD);
     const bu = ctx.budgetUsed(PERIOD);
-    expected = { sum, bt, bu, moved: ctx.movedToFunds(PERIOD) };
+    expected = { sum, bt, bu, moved: ctx.movedToFunds(PERIOD), planned: ctx.planFigures(PERIOD).setAside };
 
     /* Fixture check, and the negative control for the whole suite: on this
        household the ADR-0005 pair and the pair the report already printed are
@@ -147,7 +150,7 @@ class PinnedDate extends RealDate {
     global.Date = RealDate;
   }
 
-  const { sum, bt, bu, moved } = expected;
+  const { sum, bt, bu, moved, planned } = expected;
 
   /* ---- 1. nothing the document already carried is traded away ----------- */
   {
@@ -174,8 +177,10 @@ class PinnedDate extends RealDate {
     const pct = sharePercentLabel(bu.used, '.');
     ok(md.includes(i18n.t('bud.total.spentNoteAssumed', { pct, amount: money(bu.assumed) })),
       `"% used" is the label the hero and the Budget tile print (${pct}%), and the assume-spent provision added into it is named`);
-    ok(md.includes(i18n.t('dash.stat.setAsideMoved', { amount: money(bu.setAside, 0), moved: money(moved, 0) })),
-      'the set-aside held OUT of that numerator is named, in the Budget page\'s own sentence');
+    ok(md.includes(i18n.t('dash.stat.setAside', { amount: money(bu.setAside, 0) })),
+      'the set-aside held OUT of that numerator is named, in the hero\'s own fragment');
+    ok(md.includes(i18n.t('dash.stat.ofWhichSetAside', { amount: money(planned, 0), moved: money(moved, 0) })),
+      'and the "saved so far" sentence beside it states the PLANNED set-aside, as the hero does');
   }
 
   /* ---- 4. the reconciliation actually closes ---------------------------- */
@@ -195,6 +200,7 @@ class PinnedDate extends RealDate {
     near(iv.budget_used.used_pct, bu.used * 100, 'JSON budget_used.used_pct is the same share, unrounded');
     near(iv.budget_used.set_aside, bu.setAside, 'JSON names the set-aside held out');
     near(iv.budget_used.set_aside_moved, moved, 'JSON names what actually moved into the funds');
+    near(iv.budget_used.set_aside_planned, planned, 'and what the plan set aside (REPORT-3)');
     near(iv.budget_used.assumed, bu.assumed, 'JSON names the assume-spent provision');
     near(iv.spend, sum.spend, 'and JSON still carries gross spend');
     near(iv.budget_spend, bt.spend + bt.setAside, 'and the whole plan');

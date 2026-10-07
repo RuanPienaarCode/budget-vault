@@ -80,8 +80,8 @@ const hasCls = (el, cls) => el.className.split(/\s+/).includes(cls);
     }
     global.Date = PinnedDate;
 
-    /* Original 12000, 0% interest, R500/mo, opened 2024-01-01. By 2026-08-15,
-       31 whole calendar months have elapsed (24 of them enough to clear the
+    /* Original 12000, 1% interest, R500/mo, opened 2024-01-01. By 2026-08-15,
+       31 whole calendar months have elapsed (25 of them enough to clear the
        loan on schedule) — the schedule expects R0 owed. The file still says
        R8 000 — a R8 000 gap, far past the material threshold
        (max(50, original*0.02) = R240), so the derivation note renders. */
@@ -90,7 +90,7 @@ const hasCls = (el, cls) => el.className.split(/\s+/).includes(cls);
       [`${B}/Debts.md`]: '---\nkind: debts\n---\n\n'
         + '| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n'
         + '|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n'
-        + '| Card | Bank A | credit card | 8000.00 | 12000.00 | 0.00 | 500.00 | 0.00 | 2024-01-01 | | active | |\n',
+        + '| Card | Bank A | credit card | 8000.00 | 12000.00 | 1.00 | 500.00 | 0.00 | 2024-01-01 | | active | |\n',
     };
 
     const ctx = makeCtx(FILES);

@@ -4,14 +4,15 @@
 
 const { el, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
-const { patchFrontmatter, yamlStr } = require('../markdown');
+const { patchFrontmatter, yamlStr, parseMdTableWithSeparator } = require('../markdown');
 const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
 const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
-const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths } = require('../exporter');
+const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths, appendTransactionsLog } = require('../exporter');
 const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf } = require('../currency');
-const { applySplit, splitRole, splitShortfall, SPLIT_PARENT } = require('../tx-role');
+const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart } = require('../tx-role');
+const { prepareRules, matchRule } = require('../rules');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
 
@@ -52,16 +53,71 @@ module.exports = function registerTransactions(ctx) {
      so re-picking the same transaction keeps only the final choice. */
   const pendingLearns = new Map();
 
+  /* How many of the vault's transactions a rule DECIDES: the rows whose
+     description that rule would win if they were imported today. The number
+     the rule-fix dialog states, because without it the dialog cannot tell a
+     one-off exception from a merchant filed wrong (2026-10-07 audit,
+     MT-RULEFIX-REACH: on the vault audited, one tap on one row repointed a
+     rule deciding hundreds of transactions, nearly all of them stored under
+     its old category).
+
+     Counted with the REAL matcher (rules.js) over the whole rule set, so a
+     longer rule that wins some of these descriptions takes them out of the
+     count — the same winner an import would pick, not a second tie-break.
+     The stored category does not enter into it: a row filed elsewhere by hand
+     is still one the rule decides at the next import.
+
+     A split PART is not counted (tx-role.js). It is the reader's own slice of
+     a bank line, categorised in the split dialog, and no rule ever filed it;
+     its parent — the line the bank printed — is counted once, like any other.
+     Excluded rows are counted: excluded means "out of the budget totals", and
+     the rule still decided their category.
+
+     Each description is matched once, and only after the rule's own pattern
+     has been seen to hit it: descriptions repeat, and the full rule set is
+     several hundred patterns on a real vault. Published so a test can drive
+     the real count (tests/transactions-rule-reach.test.cjs). */
+  function ruleReach(rule) {
+    const key = String((rule && rule.pattern) ?? '').trim().toLowerCase();
+    if (!key) return 0;
+    const alone = prepareRules([rule]);
+    const all = prepareRules(S.rules);
+    const decided = new Map();   // description -> does this rule win it
+    let n = 0;
+    for (const f of Object.values(S.txFiles)) {
+      for (const r of f.rows) {
+        if (isSplitPart(r)) continue;
+        let wins = decided.get(r.desc);
+        if (wins === undefined) {
+          wins = !!matchRule(r.desc, alone) && (matchRule(r.desc, all) || {}).p === key;
+          decided.set(r.desc, wins);
+        }
+        if (wins) n++;
+      }
+    }
+    return n;
+  }
+
   // TODO(i18n): still plain English — see the same note above
   // categoriseFilteredTransactions for why (tests/i18n.test.cjs's invariant 6
   // fails the build on a key this file cannot also add to lang/en.js). Keys
   // wanted:
-  //   tx.ruleFix.title    "Update the matching rule too?"
-  //   tx.ruleFix.msg      "Rows matching "{pattern}" are currently categorised
-  //                        as {old}. Also change that rule to {new}, so it
-  //                        gets this right next time too?"
-  //   tx.ruleFix.confirm  "Update rule"
-  //   tx.ruleFix.done     "Rule "{pattern}" now points to {new}."
+  //   tx.ruleFix.title      "Update the matching rule too?"
+  //   tx.ruleFix.msg        "Rows matching "{pattern}" are filed as {old} by a
+  //                          rule. {reach} Update it to {new} only if they all
+  //                          belong there. If this one is an exception, choose
+  //                          Just this row."
+  //   tx.ruleFix.reach      {count} plural —
+  //                          one:   "It decides 1 of your transactions, and
+  //                                  every future import like it."
+  //                          other: "It decides {count} of your transactions,
+  //                                  and every future import of them."
+  //   tx.ruleFix.reachNone  "It decides none of the transactions already in
+  //                          your vault, only future imports." (its own key, so
+  //                          no language's zero rule has to carry it)
+  //   tx.ruleFix.keep       "Just this row"
+  //   tx.ruleFix.confirm    "Update the rule"
+  //   tx.ruleFix.done       "Rule "{pattern}" now points to {new} (it was {old})."
   /* The correction path learnRules deliberately has none of ("an established
      rule is never silently overwritten" — categories.js). A recategorisation
      here that disagrees with the rule CURRENTLY governing the description is
@@ -72,18 +128,49 @@ module.exports = function registerTransactions(ctx) {
      mentions. Declining leaves the rule exactly as it was — this row's own
      category is unaffected either way, since the caller has already set
      r.cat by the time this runs; the only thing on offer here is whether the
-     RULE follows it too. */
+     RULE follows it too.
+
+     The dialog says how far the rule reaches, and the SAFE answer is the
+     default (2026-10-07 audit, MT-RULEFIX-REACH). It used to ask "Also
+     change that rule to B, so it gets this right next time too?" over
+     [Cancel] [Update rule] — no reach, and a cancel button that read as
+     "undo my edit". A one-off exception and a merchant filed wrong looked
+     identical, and the button on offer was the one that refiles every future
+     import.
+
+     "Just this row" is confirmModal's cancel side, deliberately: Escape,
+     tapping outside and closing the dialog all resolve there, so every way of
+     NOT answering keeps the rule. It is also drawn as the call to action
+     (`primary: 'cancel'`), with "Update the rule" plain beside it: the
+     dialog's own default look used to dress the confirm side as a warning and
+     leave the safe answer unstyled, so the one button that stood out was the
+     one that refiles every future import.
+
+     A split PART never reaches this (see the category control in
+     renderTransactions): it is the reader's slice of a bank line, filed in
+     the split dialog, and its merchant's rule was never what filed it.
+
+     No Undo on the success toast: the app's toast is text only. It names the
+     category the rule had instead, which is the way back — recategorise a row
+     to it and accept the same offer. */
   async function offerRuleCorrection(desc, newCat) {
     const rule = governingRule(desc);
     if (!rule || rule.category === newCat) return;
+    const old = rule.category;
+    const n = ruleReach(rule);
+    const reach = n === 0 ? 'It decides none of the transactions already in your vault, only future imports.'
+      : n === 1 ? 'It decides 1 of your transactions, and every future import like it.'
+        : `It decides ${n} of your transactions, and every future import of them.`;
     const go = await confirmModal(app, {
       title: 'Update the matching rule too?',
-      message: `Rows matching "${rule.pattern}" are currently categorised as ${rule.category}. `
-        + `Also change that rule to ${newCat}, so it gets this right next time too?`,
-      confirmText: 'Update rule',
+      message: `Rows matching "${rule.pattern}" are filed as ${old} by a rule. ${reach} `
+        + `Update it to ${newCat} only if they all belong there. If this one is an exception, choose Just this row.`,
+      cancelText: 'Just this row',
+      confirmText: 'Update the rule',
+      primary: 'cancel',
     });
     if (!go) return;
-    if (await correctRule(rule, newCat)) toast(`Rule "${rule.pattern}" now points to ${newCat}.`);
+    if (await correctRule(rule, newCat)) toast(`Rule "${rule.pattern}" now points to ${newCat} (it was ${old}).`);
   }
 
   /* Not ctx.dirtyFlag: dirtiness here is per transaction FILE (f.dirty), and
@@ -200,13 +287,23 @@ module.exports = function registerTransactions(ctx) {
       return true;
     });
     const filters = [];
-    if (acc) filters.push(`account: ${acc}`);
-    if (cat) filters.push(`category: ${cat === '__none__' ? 'Uncategorised' : cat === MISSING ? 'Missing categories' : cat}`);
-    if (q) filters.push(`search: "${$('#txSearch').value.trim()}"`);
+    /* `names` — the same filters as short phrases for the export's FILE NAME
+       (exporter.js exportPaths): a filtered export named by its range alone
+       was silently replaced by the next unfiltered one (2026-10-07 audit,
+       L4A-01). Each carries its kind, so an account and a category of one
+       name never share a path, and the search is the folded text the filter
+       actually matches with, so "Shell" and "shell" — one selection — are one
+       file. The Dashboard's scope is one phrase: its two halves below are one
+       drill-through, never applied apart. Literal English, never i18n. */
+    const names = [];
+    const catName = cat === '__none__' ? 'Uncategorised' : cat === MISSING ? 'Missing categories' : cat;
+    if (acc) { filters.push(`account: ${acc}`); names.push(`account ${acc}`); }
+    if (cat) { filters.push(`category: ${catName}`); names.push(`category ${catName}`); }
+    if (q) { filters.push(`search: "${$('#txSearch').value.trim()}"`); names.push(`search ${q}`); }
     /* Named for the export and the bulk actions, which describe what is on
        screen: a file or a confirmation that omitted this would list a filter
        narrower than the one that was applied. */
-    if (scoped) filters.push('the rows the Dashboard counts: inside the budget, home currency, not paid from a savings fund');
+    if (scoped) { filters.push('the rows the Dashboard counts: inside the budget, home currency, not paid from a savings fund'); names.push('Dashboard rows'); }
     if (today !== null) filters.push('dated up to today only');
     return {
       rows,
@@ -217,6 +314,7 @@ module.exports = function registerTransactions(ctx) {
       token: `${acc}|${cat}|${q}|${whole}|${S.period}|${inBudgetFor !== null ? 'in' : 'all'}`,
       range: whole ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
       filters,
+      names,
     };
   }
 
@@ -400,8 +498,22 @@ module.exports = function registerTransactions(ctx) {
              quieter about teaching them than the page that only ever adds new
              ones. First-time categorisation (origCat was empty) still teaches
              the auto-categoriser, same as it always has — that half of this
-             was never the problem. */
-          if (v && !origCat) {
+             was never the problem.
+
+             A split PART is neither: it never teaches and never asks
+             (tx-role.js isSplitPart). It is the reader's own slice of one bank
+             line, and every part of that line shares its description with a
+             different category, so a part left at "— none —" in the split
+             dialog and categorised here became a rule for the whole merchant
+             on Save — the thing splitTransaction's own note says must not
+             happen — and changing a part's category offered to refile every
+             future import of that merchant to one slice's category (2026-10-07
+             audit, carry-overs). pendingLearns is left exactly as it was:
+             it is keyed by description, and an ordinary row of the same
+             merchant may have a first pick waiting in it. */
+          if (isSplitPart(r)) {
+            // a part teaches nothing and asks nothing
+          } else if (v && !origCat) {
             pendingLearns.set(r.desc, v);
           } else {
             pendingLearns.delete(r.desc);
@@ -493,8 +605,19 @@ module.exports = function registerTransactions(ctx) {
     // above matches it, and handled anyway so the two can never drift into a
     // dead button that spreads null into the file's rows.
     if (!rows) return toast(i18n.t('tx.split.part'), true);
-    // Same file: every part shares the parent's date, so it shares its month.
-    item._file.rows.push(...rows);
+    /* Same file: every part shares the parent's date, so it shares its month.
+       Spliced in directly under the parent rather than pushed onto the end:
+       the parent-then-parts reading order this page keeps (filteredRows), and
+       the place the parts belong in the file — the serializer keeps the
+       month's own order now instead of re-sorting it (L3-22, see placeRows),
+       so the end of the array would have been the end of the file. A parent
+       the app itself has not placed yet (imported, not saved since) hands its
+       parts the same status, so they are placed by date right behind it. */
+    const f = item._file;
+    const at = f.rows.indexOf(r);
+    if (at < 0 || unplaced.has(r)) for (const p of rows) unplaced.add(p);
+    if (at < 0) f.rows.push(...rows);
+    else f.rows.splice(at + 1, 0, ...rows);
     item._file.dirty = true;
     $('#txSave').disabled = false;
     /* Deliberately NOT fed to pendingLearns: the parts share one description
@@ -866,16 +989,17 @@ module.exports = function registerTransactions(ctx) {
     });
     if (!go) return;
 
-    /* The backup, before anything is touched. Appended by hand rather than
-       through a writer that could overwrite: read what is there, keep it, and
-       add today's rows under it. transactionsCsv owns the column shape, so the
-       log reads the same as an export and can be imported straight back in. */
+    /* The backup, before anything is touched. Appended rather than through a
+       writer that could overwrite: read what is there, keep it, and add
+       today's rows under it — UNDER ITS OWN HEADER, by column name
+       (exporter.js appendTransactionsLog). The rows used to go in today's
+       export layout whatever header the log already had, so a log begun
+       before the Currency column filed every later Amount under "Currency"
+       (2026-10-07 audit, L4a). The log reads like an export and can be
+       imported straight back in, which matches columns by name too. */
     try {
-      const csv = transactionsCsv(rows, rowSymbol);
       const existing = await readFile(DELETED_LOG);
-      await writeFile(DELETED_LOG, existing
-        ? existing.replace(/\n*$/, '\n') + csv.split('\n').slice(1).join('\n')
-        : csv);
+      await writeFile(DELETED_LOG, appendTransactionsLog(existing, rows, rowSymbol));
     } catch (e) {
       return toast(i18n.t('tx.bulk.backupFailed', { error: (e && e.message) || e }), true);
     }
@@ -910,63 +1034,212 @@ module.exports = function registerTransactions(ctx) {
     toast(i18n.t('tx.bulk.done', { count: removed, files, path: DELETED_LOG }));
   }
 
+  /* ------------------------- where a row goes in its file ---------------------
+     The rows already in a month file stay in the file's own order; a row the
+     APP adds goes in at its date.
+
+     The serializer used to finish with `f.rows.sort((a, b) =>
+     a.date.localeCompare(b.date))`, in place, on every write. Its job — it is
+     in the first release, with no note — is the rows this app appends: an
+     import, Add transaction and a split all add to the END of the month's
+     rows, and the sort put them in date order. But it reordered the reader's
+     rows too. A card statement prints each fee straight after the charge it
+     belongs to, dated a day or two later, so on the vault this was audited
+     against a Save moved every fee away from its charge in three card months
+     (2026-10-07 audit, L3-22): a rewrite of a synced file, and a file that no
+     longer reads the way the bank printed it.
+
+     So only a row that is NEW to the file is placed: after the last row dated
+     on or before it. On a file already in date order that is exactly where
+     the old sort put it — the golden gate's bytes do not move — and a file
+     with no order of its own yet (a new month) still comes out in date order,
+     whatever order the statement arrived in.
+
+     Which rows are new is known three ways, because the adding paths differ:
+       - a model that is NOT the month's live one (the import commit and Add
+         transaction both write `{ ...existing, rows: existing.rows.concat(
+         added) }`) — every row the live month does not hold;
+       - no live month at all — every row;
+       - `unplaced`: rows written by one of those copies and THEN pushed onto
+         the end of the live month (both paths mirror into memory after the
+         write). Without it, the month's next save would read that end-of-array
+         position as the reader's order and move the row the import had just
+         put in its place. Cleared once the live month itself is written,
+         because from then on memory holds the rows in file order.
+     A split's parts are spliced in directly under their parent instead (see
+     splitTransaction), which is already their place in the file. */
+  const unplaced = new WeakSet();
+  function placeRows(rows, isNew) {
+    const out = rows.filter(r => !isNew(r));
+    for (const r of rows) {
+      if (!isNew(r)) continue;
+      let i = out.length;
+      while (i > 0 && String(out[i - 1].date ?? '').localeCompare(String(r.date ?? '')) > 0) i--;
+      out.splice(i, 0, r);
+    }
+    return out;
+  }
+
+  /* ------------------ what a month file holds besides its rows ---------------
+     A month file is the household's file, not only the app's table. Until the
+     2026-10-07 audit the serializer rebuilt it from
+     `['---', fm, '---', '', header, sep, ...rows]`, so anything written around
+     the table — "Reconciled against the September statement on 2 October"
+     above it, a `## Queries` list under it, a second table — was deleted by
+     the next write of that month: a one-cell recategorise and Save, an Add
+     transaction, an import into the month, a bulk delete, an import's Undo
+     (L3-02: 0 of 3 such lines kept on every one of those paths). The same
+     write swapped the file's own separator row for the app's long one, which
+     on the vault audited was the one transaction file a Save with nothing
+     changed still rewrote (L3-22: `|---|---|---|---:|---|---|`).
+
+     CONTRACT 1 (fix wave 2, with the tables lane — load.js
+     verbatimAroundTable is the other half, tests/tx-file-lead-trail-sep and
+     tests/transactions-file-prose-kept pin both): every month arrives with
+     three pieces of its own text, LF-normalised, and this writes back
+       '---\n' + fm + '\n---\n' + (lead || '\n') + header + '\n'
+         + (sep || default) + '\n' + rows + trail
+     — the contract's formula exactly as the fix wave wrote it down, which is
+     the one both halves follow:
+       lead   the text between the fence's line break and the header line,
+              its own last line break included: '\n' for the one blank line
+              every file this app writes carries; '' when the header follows
+              the fence, written as that usual blank line; the whole text
+              above the table for a file with no frontmatter, so the fence
+              this adds is never glued onto the reader's first line; the
+              whole file for a month with no table, so its first row lands
+              under the prose.
+       trail  everything after the last row's line break.
+       sep    the file's own separator row — used only while its cell count
+              still matches the header being written. A split adds the
+              seventh column; a six-cell separator under a seven-cell header
+              is not a table Obsidian will render, so that one save writes the
+              default for every column instead.
+     Absent, '' or not a string, each piece falls back to exactly what this
+     wrote before the contract existed — a blank line under the fence, the
+     default separator, nothing after the rows — so a month with none of the
+     three is byte-identical to every file already on disk, and a month the
+     app creates is written the way new months always were. */
+  function leadBlock(lead, hadTable) {
+    if (typeof lead !== 'string' || lead === '') return '\n';
+    /* Only a month with no table hands over a lead like this: all of it is
+       lead, and the file may end without a line break. The app is ADDING the
+       table there, so it adds it the way it renders — the header never glued
+       onto the reader's last word, and one blank line under their last line
+       of prose (a table written straight under a paragraph line is not a
+       table to a Markdown renderer). A month that brought its own table
+       (`hadTable`: it had a separator row) is left exactly as the reader laid
+       it out. */
+    const text = lead.endsWith('\n') ? lead : `${lead}\n`;
+    if (hadTable) return text;
+    const lines = text.split('\n');
+    return lines[lines.length - 2].trim() ? `${text}\n` : text;
+  }
+  function ownSeparator(sep, header) {
+    if (typeof sep !== 'string') return null;
+    const line = sep.replace(/\r$/, '');
+    if (!line.trim()) return null;
+    /* Judged with the loader's own table reader, so "is this still the
+       separator of this header" is the same question load.js asks. */
+    const probe = parseMdTableWithSeparator(`${header}\n${line.trim()}`);
+    return probe.sep && probe.header && probe.sep.length === probe.header.length ? line : null;
+  }
+
   function serializeTxFile(f) {
     // Preserve the file's own frontmatter (tags, any hand-added keys); patch only
     // the account label + month. amountRaw !== null means the loader could not
     // strictly parse that cell — write it back verbatim rather than corrupting it.
     const fm = patchFrontmatter(f.fmRaw || '', { account: yamlStr(f.label), month: f.month });
-    /* The Split column is written ONLY into files that contain a split. Adding
-       it unconditionally would rewrite every transaction file in the vault with
+    /* The Split column is written only into files that NEED it. Adding it
+       unconditionally would rewrite every transaction file in the vault with
        an empty seventh column the first time anything saved — a diff in every
        month of every account, in a folder the user reads and syncs, to record
        nothing. A file with no split keeps the exact six-column shape it has
-       always had. */
-    /* Escaping, number formatting and the splitRole write (only two strings
-       can ever occupy that cell, so writes always round-trip) live in the
+       always had.
+
+       "Needs it" is any of three things. A row carries a role. The file was
+       LOADED with a Split column (load.js's splitHeaderPresent): that column
+       is the reader's, and dropping it the moment no row held a role took a
+       hand-typed `todo` and its column with it (2026-10-07 audit, L3-10) — it
+       also fixes where an extra column sits, see ISSUE 69 below. Or a row
+       still carries a Split word of its own: the schema's Split column keeps
+       a word that is not a role as `splitRaw` and writes it back while the
+       row has no role (table-schema.js), which needs a column to land in. */
+    /* Escaping, number formatting and the splitRole write live in the
        schema's column declarations — the same ones the loader reads with
-       (table-schema.js, ADR-0003). This file keeps its own document shape:
-       patched frontmatter, no title, no prose, so it consumes only the line
-       builders rather than mdTableFile. A never-split file keeps the exact
-       six-column shape it has always had by slicing the schema, not by
-       hand-writing a second header. */
+       (table-schema.js, ADR-0003). This file keeps its own document shape —
+       patched frontmatter, then the household's own lead, the table and its
+       trail (CONTRACT 1 above) — so it consumes only the line builders rather
+       than mdTableFile. A never-split file keeps the exact six-column shape
+       it has always had by slicing the schema, not by hand-writing a second
+       header. */
     const hasSplit = f.rows.some(r => splitRole(r.split));
     /* ISSUE 69 — a hand-added column (a running Balance) past what this
        schema knows about, carried through via extraCells/extraCols the same
        way table-schema.js's mdTableFile does for the four flat tables. An
        extra column FIXES where Split sits on disk (position 6) even on a
-       save where every split has since been cleared — dropping Split here
+       save where every split has since been cleared — dropping Split there
        would shift the reader's own column into Split's old slot instead of
-       merely losing an empty one. */
+       merely losing an empty one. splitHeaderPresent now keeps the column for
+       that reason and for L3-10's, with or without an extra column. */
     const extraCols = f.extraCols;
-    const keepSplit = hasSplit || (extraCols && f.splitHeaderPresent);
+    const keepSplit = hasSplit || !!f.splitHeaderPresent
+      || f.rows.some(r => r.splitRaw != null && String(r.splitRaw).trim() !== '');
     const schema = keepSplit ? SCHEMAS.transactions
       : { ...SCHEMAS.transactions, columns: SCHEMAS.transactions.columns.slice(0, 6) };
-    const [header, sep] = extraCols ? headerLinesWithExtras(schema, extraCols) : headerLines(schema);
-    const lines = ['---', fm, '---', '', header, sep];
-    f.rows.sort((a, b) => a.date.localeCompare(b.date));
+    const [header, defaultSep] = extraCols ? headerLinesWithExtras(schema, extraCols) : headerLines(schema);
+    const sep = ownSeparator(f.sep, header) || defaultSep;
+    const lines = [header, sep];
+    /* File order kept, new rows placed — see placeRows above. Still applied
+       to f.rows in place, as the sort was, so the live month holds its rows
+       in the order they were written. */
+    const live = (S.txFiles || {})[`${f.label}/${f.month}`];
+    const isLive = !!live && (live === f || live.rows === f.rows);
+    const inFile = live && !isLive ? new Set(live.rows) : null;
+    const isNew = r => unplaced.has(r) || (isLive ? false : inFile ? !inFile.has(r) : true);
+    const ordered = placeRows(f.rows, isNew);
+    for (const r of ordered) { if (isLive) unplaced.delete(r); else if (isNew(r)) unplaced.add(r); }
+    for (let i = 0; i < ordered.length; i++) f.rows[i] = ordered[i];
     for (const r of f.rows) lines.push(extraCols ? rowLineWithExtras(schema, r, extraCols) : rowLine(schema, r));
-    lines.push('');
-    return lines.join('\n');
+    const hadTable = typeof f.sep === 'string' && f.sep.trim() !== '';
+    return `---\n${fm}\n---\n${leadBlock(f.lead, hadTable)}${lines.join('\n')}\n${typeof f.trail === 'string' ? f.trail : ''}`;
   }
 
   /* Manual entry — cash spends, transfers, savings deposits, anything that
      never reaches a bank CSV. Written to disk immediately (same lockstep
-     pattern as the CSV import commit), so there's nothing extra to save. */
+     pattern as the CSV import commit), so there's nothing extra to save.
+
+     Except into a month with UNSAVED edits, which it refuses. The write is the
+     whole month file from its live model, so an unsaved recategorise or
+     Excluded tick in that month went to disk with the new row — Save never
+     pressed, "Reload from disk" no longer a way back from it (2026-10-07
+     audit, L3-26). The delete, the split and the un-split on this page stay in
+     memory for exactly that reason. Writing the new row onto the file's
+     on-disk content instead would need the month as it was last read, which
+     only the loader knows how to read; refusing is the choice that cannot lose
+     either change. The reader's entry is kept (addDraft) and fills the dialog
+     the next time it opens, so a refusal costs a Save and a tap, not retyping.
+     An edit in another month never blocks — only the month written matters. */
+  let addDraft = null;
   async function addTransaction() {
     const labels = [...new Set([
       ...S.accounts.map(a => a.tx_label || a.name),
       ...Object.values(S.txFiles).map(f => f.label)])].sort();
     if (!labels.length) return toast(i18n.t('tx.add.noAccount'), true);
+    const draft = addDraft;
+    addDraft = null;
+    const kept = (key, fallback) => (draft && draft[key] != null ? draft[key] : fallback);
     const r = await askFields(app, i18n.t('tx.add.title'), [
-      { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: todayIso() },
-      { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder') },
-      { key: 'label', label: i18n.t('tx.field.account'), type: 'select', options: labels, value: $('#txAccount').value || labels[0] },
-      { key: 'dir', label: i18n.t('tx.field.direction'), type: 'select', value: 'out', options: [
+      { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', todayIso()) },
+      { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder'), value: kept('desc', undefined) },
+      { key: 'label', label: i18n.t('tx.field.account'), type: 'select', options: labels,
+        value: draft && labels.includes(draft.label) ? draft.label : ($('#txAccount').value || labels[0]) },
+      { key: 'dir', label: i18n.t('tx.field.direction'), type: 'select', value: kept('dir', 'out'), options: [
         { value: 'out', label: i18n.t('tx.dir.out') }, { value: 'in', label: i18n.t('tx.dir.in') }] },
-      { key: 'amount', label: i18n.t('tx.field.amount'), type: 'number', placeholder: '0.00', desc: i18n.t('tx.field.amountDesc') },
+      { key: 'amount', label: i18n.t('tx.field.amount'), type: 'number', placeholder: '0.00', desc: i18n.t('tx.field.amountDesc'), value: kept('amount', undefined) },
       { key: 'cat', label: i18n.t('tx.field.category'), type: 'select', options: [
-        { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: '' },
-      { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder') },
+        { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: kept('cat', '') },
+      { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder'), value: kept('note', undefined) },
     ]);
     if (!r) return;
     const date = r.date.trim();
@@ -989,6 +1262,10 @@ module.exports = function registerTransactions(ctx) {
     // disk doesn't have. serializeTxFile gets a cloned rows array (concat), so
     // a failed write leaves the live model untouched.
     const existing = S.txFiles[key];
+    if (existing && existing.dirty) {
+      addDraft = r;
+      return toast(i18n.t('tx.add.dirty', { file: txFileRel(label, month) }), true);
+    }
     const fileModel = existing
       ? { ...existing, rows: existing.rows.concat([row]) }
       : { label, month, rows: [row], dirty: false, fmRaw: TX_FM };
@@ -1056,11 +1333,20 @@ module.exports = function registerTransactions(ctx) {
      produce a file that matches neither the vault nor what the reader is about
      to save, and the disagreement would only surface later, in a spreadsheet,
      with nothing to explain it. */
+  /* io.js destinationProblem's answer, in the Report's own words — the same
+     three sentences views/report.js's folderProblem shows under its field. */
+  function destinationReason(p) {
+    if (p.kind === 'traversal') return i18n.t('report.field.folderTraversal');
+    if (p.kind === 'configDir') return i18n.t('bx.problem.configDir', { folder: p.folder });
+    if (p.kind === 'hidden') return i18n.t('bx.problem.hiddenFolder', { folder: p.folder });
+    return i18n.t('report.field.folderManaged', { folder: p.folder });
+  }
+
   async function exportTransactions() {
     if (Object.values(S.txFiles).some(f => f.dirty)) {
       return toast(i18n.t('tx.export.dirty'), true);
     }
-    const { rows, range, filters } = filteredRows();
+    const { rows, range, filters, names } = filteredRows();
     if (!rows.length) return toast(i18n.t('tx.export.empty'), true);
 
     /* Ask where, every time, with last time's answer prefilled.
@@ -1083,7 +1369,40 @@ module.exports = function registerTransactions(ctx) {
     }]);
     if (!answer) return;                       // cancelled — say nothing, do nothing
 
-    const paths = exportPaths(range, answer.folder);
+    /* Named after the active filters as well as the range — see exportPaths. */
+    const paths = exportPaths(range, answer.folder, names);
+    /* Refused BEFORE the first write, for the reasons the Report and the
+       budget export already refuse (2026-10-07 audit, TX-EXPORT-DEST). This
+       export had none of them: into <budget>/Categories the next vault load
+       read the exported .md files back as two new categories (the same for
+       Accounts, Plans, Notes, Transactions — the 2026-08-29 M1 shape), and
+       into .obsidian/plugins/budget-app it wrote four files the file
+       explorer never shows — each with a success toast, and the folder then
+       remembered as the default. io.js's destinationProblem is the one check
+       every export shares (case-folded, NFC, ".." refused rather than
+       rebased); asked of the folder as TYPED, because exportPaths drops a
+       ".." segment and so cannot be what is checked, and of the folder the
+       files would land in. */
+    const problem = ctx.destinationProblem(answer.folder) || ctx.destinationProblem(paths.dir);
+    if (problem) return toast(destinationReason(problem), true);
+    /* An export REPLACES what is at its paths — that is its contract, and what
+       someone who has just fixed a category and exported again wants. It is
+       also how the reader's own Household/Categories.md was overwritten with
+       nothing but a success toast. So the files already there are named, and
+       nothing is written until the reader agrees — the budget export lists
+       the same thing in its dialog, in the same words. Asked the way the
+       filesystem answers (io.js vaultPathTaken: case-folded, NFC), because
+       `exports/` and `Exports/` are one folder on the phone this ships to. */
+    const taken = [paths.txCsv, paths.txMd, paths.catCsv, paths.catMd].filter(p => ctx.vaultPathTaken(p));
+    if (taken.length) {
+      const go = await confirmModal(app, {
+        title: i18n.t('tx.export.title'),
+        message: i18n.t('bx.replaces', { count: taken.length, files: taken.join(', ') }),
+        confirmText: i18n.t('bx.go'),
+        cancelText: i18n.t('bx.cancel'),
+      });
+      if (!go) return;
+    }
     /* nowLocalMinute(), not `new Date().toISOString()` — the same M3 fix
        views/report.js took in the 2026-08-29 audit, applied to the OTHER
        document this app writes a `generated:` stamp into. toISOString() is
@@ -1139,5 +1458,5 @@ module.exports = function registerTransactions(ctx) {
      on a collision, so a name only fails on the device. */
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
     deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
-    exportTransactions, syncOptions, filteredRows, setTxInBudgetOnly });
+    exportTransactions, syncOptions, filteredRows, setTxInBudgetOnly, ruleReach });
 };

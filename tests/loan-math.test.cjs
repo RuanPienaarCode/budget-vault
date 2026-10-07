@@ -144,6 +144,67 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   eq(L.amortise(0, 11, 0, 0).length, 0, 'an empty loan has an empty schedule');
 }
 
+/* ---- an instalment always covers its own first month's interest ----
+   The instalment is rounded to whole units because that is the figure the
+   page prints. Round an R40 loan over 30 years at 11% (exact instalment
+   R0.38) and the instalment is R0: the page read "Monthly instalment R 0"
+   while R0.37 of interest a month built on a balance that never fell, and the
+   forced last row then settled R1 068 of it in month 360. A rounded figure
+   that does not pay the interest is not an instalment for that loan, so it is
+   lifted to the smallest whole unit that does — with a cent of capital on a
+   loan that amortises, and none on an interest-only one (balloon = the whole
+   loan), whose exact instalment IS its interest. Every loan whose rounded
+   instalment already pays that — every amortising loan of a realistic size,
+   all the default figures — is untouched, which the sweep below pins. */
+{
+  const tiny = L.totalsFor(40, 11, 360);
+  ok(tiny.payment >= 1, `an R40 loan gets a whole-unit instalment, not R${tiny.payment}`);
+  ok(tiny.payment >= 40 * 0.11 / 12 + 0.01, 'one that covers its first month\'s interest by at least a cent');
+  const rows = L.amortise(40, 11, 360, tiny.payment);
+  ok(rows.every(r => r.closing <= r.opening), 'so the balance never grows');
+  eq(rows[rows.length - 1].closing, 0, 'and the loan is repaid');
+  ok(tiny.termMonths < 360, 'early, which the realised term already says rather than the asked-for one');
+  ok(tiny.totalInterest < 40, `and the interest is no longer more than the loan (${tiny.totalInterest.toFixed(2)})`);
+
+  const zeroRate = L.totalsFor(10, 0, 60);
+  ok(zeroRate.payment >= 1 && zeroRate.termMonths === 10,
+    'a 0% R10 loan pays R1 a month for ten months rather than R0 for 59 and R10 in the last');
+
+  /* Interest-only: rounded below the interest it is lifted onto it, and a
+     whole-unit interest is left alone — the cent of capital is not owed. */
+  eq(L.totalsFor(140000, 11, 60, 140000).payment, 1284, 'R1 283.33 of interest is not rounded down to R1 283');
+  eq(L.totalsFor(140000, 7.5, 60, 140000).payment, 875, 'R875.00 of interest stays R875');
+  const io = L.amortise(140000, 11, 60, 1284, 140000);
+  ok(io.every(r => r.capital === 0 && r.closing === 140000), 'so an interest-only schedule carries no capital at all, in any year');
+
+  let lifted = 0, untouched = 0;
+  for (const p of [10, 40, 99, 1000, 15000, 315000, 1350000]) {
+    for (const rate of [0, 4, 11, 24]) {
+      for (const n of [12, 60, 240, 360]) {
+        for (const bPct of [0, 0.3, 1]) {
+          const b = Math.round(p * bPct);
+          const t = L.totalsFor(p, rate, n, b);
+          const owedCents = Math.round(p * rate / 1200 * 100) + (b < p ? 1 : 0);
+          assert.ok(Math.round(t.payment * 100) >= owedCents,
+            `instalment ${t.payment} pays the first month's interest${b < p ? ' and a cent' : ''} on ${p}@${rate}%/${n} balloon ${b}`);
+          assert.ok(Number.isInteger(t.payment), `and is a whole unit: ${t.payment}`);
+          if (Math.round(Math.round(t.exact) * 100) >= owedCents) {
+            assert.strictEqual(t.payment, Math.round(t.exact), `a loan whose rounded instalment already pays that keeps it: ${p}@${rate}%/${n} balloon ${b}`);
+            untouched++;
+          } else {
+            assert.strictEqual(t.payment, Math.ceil(owedCents / 100), `and one that does not gets the smallest whole unit that does: ${p}@${rate}%/${n} balloon ${b}`);
+            lifted++;
+          }
+        }
+      }
+    }
+  }
+  checks += 4;
+  /* Lifted: the tiny loans, a few long low-capital ones, and interest-only
+     loans whose interest would have rounded DOWN below itself. */
+  ok(lifted > 0 && untouched > 100, `the sweep reached both kinds (lifted ${lifted}, untouched ${untouched})`);
+}
+
 /* ---- a 0% loan never reports interest, in either direction ----
    The true answer at i = 0 is exactly 0, but `exact` (the unrounded
    instalment) is rarely an integer, so rounding it to the instalment shown

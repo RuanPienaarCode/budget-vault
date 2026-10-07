@@ -6,9 +6,11 @@
 
    The stored data model stays country-agnostic: `taxpayer_type` is always
    provisional|standard|unknown and `assessment` is always
-   submit-requested|auto-assessed|unknown — profiles only change the LABELS
-   shown for those values and what a new tax year is seeded with, so
-   switching country never breaks files written under another one.
+   submit-requested|auto-assessed|assessed|unknown — profiles only change the
+   LABELS shown for those values and what a new tax year is seeded with, so
+   switching country never breaks files written under another one. (A word a
+   reader typed outside those sets reads as `unknown` and is written back as
+   typed — load.js / views/tax.js.)
 
    The chosen country is stored as `country:` in the budget folder's
    Settings.md (vault-synced, like `currency`); a missing key means South
@@ -157,9 +159,17 @@ const genericTax = (authority) => ({
      count as income are both country-specific, so a generic profile has
      nothing safe to assert. Countries with a profile override this. */
   figureChecks() { return []; },
+  /* Every profile's seasonMsgs answers ASSESSED with its own branch, first.
+     Until 7 Oct 2026 none did: an assessed year fell through to the copy for a
+     year nobody had checked yet (here, "check whether you need to file"), and
+     on the South African profile a household holding its ITA34 was told to
+     check its auto-assessment status — the figures audit found it on a real
+     Tax/<year>.md. tests/tax-assessed-season-copy.test.cjs holds every profile
+     to it, so a profile added later cannot miss the branch either. */
   seasonMsgs(t) {
     const msgs = [];
-    if (t.assessment === 'submit-requested') msgs.push('A return is required — work through the steps below.');
+    if (t.assessment === 'assessed') msgs.push('Your tax authority has assessed this year. Check the notice against your own figures below — if something is wrong or missing, ask for a correction within the time the notice allows.');
+    else if (t.assessment === 'submit-requested') msgs.push('A return is required — work through the steps below.');
     else if (t.assessment === 'auto-assessed') msgs.push('Marked as no return required this year — keep the documents anyway in case that changes.');
     else msgs.push('Check with your tax authority whether you need to file a return this year.');
     if (t.taxpayer_type === 'provisional') msgs.push('Self-employment or untaxed income usually means extra payments during the year — check your authority\'s schedule.');
@@ -281,7 +291,13 @@ const PROFILES = {
     },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'submit-requested') {
+      /* Assessed first — see genericTax's seasonMsgs. This is the profile the
+         audit caught: an ITA34 in hand, and the card said "Check your
+         auto-assessment status". The steps it points at are the seeded ones
+         (check the ITA34, decide on a Request for Correction). */
+      if (t.assessment === 'assessed') {
+        msgs.push('SARS has assessed this year — your ITA34 is in. Check it against your own figures below: if something is missing or wrong, decide on a Request for Correction or an objection within the time SARS allows.');
+      } else if (t.assessment === 'submit-requested') {
         msgs.push('SARS has asked for a return — you were not auto-assessed. Work through the steps below and file the ITR12 on eFiling.');
       } else if (t.assessment === 'auto-assessed') {
         msgs.push('SARS auto-assessed this year. Check the assessment on eFiling — if income is missing or you disagree, file an ITR12 before the deadline; otherwise nothing more may be needed.');
@@ -380,7 +396,9 @@ const PROFILES = {
     figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'auto-assessed') msgs.push('Marked as not required to file — most people with income above the standard deduction still are, so keep the documents in case that changes.');
+      // Assessed first — see genericTax's seasonMsgs for why every profile has it.
+      if (t.assessment === 'assessed') msgs.push('The IRS has sent a notice about this year\'s return. Check it against your own figures below and respond by the date on the letter — it explains what to do if you disagree.');
+      else if (t.assessment === 'auto-assessed') msgs.push('Marked as not required to file — most people with income above the standard deduction still are, so keep the documents in case that changes.');
       else msgs.push('Work through the steps below and file Form 1040 by the April deadline. An extension (Form 4868) extends filing to October, but any balance is still due in April.');
       if (t.taxpayer_type === 'provisional') msgs.push('You also make quarterly estimated payments — the 1040-ES steps are below.');
       else if (t.taxpayer_type === 'unknown') msgs.push('Freelance or side income with no withholding usually means quarterly estimated payments (Form 1040-ES).');
@@ -460,7 +478,9 @@ const PROFILES = {
     figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'submit-requested') msgs.push('HMRC expects a Self Assessment return — file the SA100 online by 31 January and pay what\'s due the same day.');
+      // Assessed first — see genericTax's seasonMsgs for why every profile has it.
+      if (t.assessment === 'assessed') msgs.push('HMRC has calculated your tax for this year. Check the calculation against your own figures below — if something is wrong, you can amend the return on gov.uk within the time HMRC allows.');
+      else if (t.assessment === 'submit-requested') msgs.push('HMRC expects a Self Assessment return — file the SA100 online by 31 January and pay what\'s due the same day.');
       else if (t.assessment === 'auto-assessed') msgs.push('PAYE should settle your tax this year. Keep the documents anyway — untaxed income over the allowances would mean registering for Self Assessment.');
       else msgs.push('Use the "Check if you need to send a Self Assessment tax return" tool on gov.uk — register by 5 October if you do.');
       if (t.taxpayer_type === 'provisional') msgs.push('Payments on account may be due on 31 January and 31 July if your last bill was over £1,000.');
@@ -534,7 +554,9 @@ const PROFILES = {
     figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'auto-assessed') msgs.push('Lodge a non-lodgment advice on myGov so the ATO knows no return is coming.');
+      // Assessed first — see genericTax's seasonMsgs for why every profile has it.
+      if (t.assessment === 'assessed') msgs.push('The ATO has issued your notice of assessment. Check it against your own figures below — if something is wrong, you can request an amendment through myTax on myGov.');
+      else if (t.assessment === 'auto-assessed') msgs.push('Lodge a non-lodgment advice on myGov so the ATO knows no return is coming.');
       else msgs.push('Wait for pre-fill to complete (usually late July) before lodging through myTax on myGov — lodge by 31 October, or engage a tax agent before then for a later deadline.');
       if (t.taxpayer_type === 'provisional') msgs.push('PAYG instalments are usually paid quarterly through the year — the ATO issues the activity statements.');
       return msgs;
@@ -594,7 +616,9 @@ const PROFILES = {
     figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'auto-assessed') msgs.push('Even with no tax owing, filing keeps benefit and credit payments (GST/HST credit, CCB) flowing — consider filing anyway.');
+      // Assessed first — see genericTax's seasonMsgs for why every profile has it.
+      if (t.assessment === 'assessed') msgs.push('The CRA has sent your notice of assessment. Check it against your own figures below — if you disagree, you can ask for a change to your return or file an objection by the deadline the notice gives.');
+      else if (t.assessment === 'auto-assessed') msgs.push('Even with no tax owing, filing keeps benefit and credit payments (GST/HST credit, CCB) flowing — consider filing anyway.');
       else msgs.push('Work through the steps below and file by 30 April. Self-employed filers have until 15 June, but any balance is still due 30 April.');
       if (t.taxpayer_type === 'provisional') msgs.push('The CRA may require quarterly instalments if you owe more than $3,000 in two consecutive years.');
       return msgs;
@@ -658,7 +682,9 @@ const PROFILES = {
     figureChecks() { return []; },
     seasonMsgs(t) {
       const msgs = [];
-      if (t.assessment === 'submit-requested') msgs.push('The annual IIT reconciliation (汇算清缴) is required — complete it in the 个人所得税 app between 1 March and 30 June of the following year.');
+      // Assessed first — see genericTax's seasonMsgs for why every profile has it.
+      if (t.assessment === 'assessed') msgs.push('This year\'s annual reconciliation is settled. Check the result against your own figures below — if something is wrong, you can submit a correction in the 个人所得税 app.');
+      else if (t.assessment === 'submit-requested') msgs.push('The annual IIT reconciliation (汇算清缴) is required — complete it in the 个人所得税 app between 1 March and 30 June of the following year.');
       else if (t.assessment === 'auto-assessed') msgs.push('You appear exempt from the annual reconciliation (single employer, income within the threshold, or tax already settled monthly). Keep records anyway — a second income source can change that.');
       else msgs.push('Check in the 个人所得税 app whether you need the annual reconciliation — multiple income sources or under-withheld tax usually mean yes.');
       if (t.taxpayer_type === 'provisional') msgs.push('Business or labour-service income is usually prepaid monthly or quarterly and trued up in the annual reconciliation.');

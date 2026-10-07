@@ -63,7 +63,24 @@ function amortise(principal, annualRatePct, months, payment, balloon = 0) {
     if (m === n || closing <= b) { capital = bal - b; closing = b; }
     rows.push({ month: m, opening: bal, interest, capital, closing });
     bal = closing;
-    if (bal <= b) break;
+    /* Only a loan with NO balloon ends early. Reaching a floor of zero means
+       the loan is repaid; reaching a balloon floor means nothing of the kind.
+       A balloon is due at the END of the term, and the exact annuity is built
+       so the balance never touches it before month n — so a balance at the
+       balloon early is always the rounded instalment's overshoot, never the
+       loan finishing, and the balloon still carries its interest every month
+       until it falls due.
+
+       This used to break here for any balloon, and on an interest-only loan —
+       the vehicle calculator's balloon clamped to the whole finance amount,
+       R105 000 on R105 000 — the 50c by which R963 exceeds R962.50 of
+       interest put the balance under the balloon in MONTH 1. The schedule
+       stopped after one row, and every total read off it went with it: Total
+       interest R963 against the R57 750 that sixty months cost, on 1 243 of
+       the calculator's 12 960 reachable settings. A balloon loan now runs its
+       term: once the balance is at the balloon the clamp above holds it
+       there, interest-only, until the last month settles it. */
+    if (b <= 0 && bal <= 0) break;
   }
   return rows;
 }
@@ -94,7 +111,9 @@ function byYear(rows) {
    balloon (rounding leaves a few cents of drift over 240 months, and a
    schedule ending at "R 3 outstanding" reads as a bug), so the final payment
    is not a full instalment. And it BREAKS EARLY when the rounded instalment
-   overshoots, so a small principal over a long term clears before month n.
+   overshoots, so a small principal over a long term clears before month n —
+   a loan with no balloon only; a balloon loan always runs its term (see the
+   break in amortise()).
 
    Both make the schedule cost less than `payment * n`, and neither reached the
    figure printed above it. R15 000 at 11% over 360 months announced R36 480 of
@@ -120,10 +139,33 @@ function byYear(rows) {
    assumed. */
 function totalsFor(principal, annualRatePct, months, balloon = 0) {
   const exact = monthlyPayment(principal, annualRatePct, months, balloon);
-  const payment = Math.round(exact);
   const n = Math.round(Number(months) || 0);
   const b = Math.min(Math.max(Number(balloon) || 0, 0), principal);
   const p = Number(principal) || 0;
+  /* Rounded to whole units, because that is the instalment the page prints —
+     but never to a figure that does not pay the first month's interest. An
+     R40 loan over 30 years at 11% has an exact instalment of R0.38; rounded,
+     that was R0, so the page read "Monthly instalment R 0" while R0.37 of
+     interest a month built on a balance that never fell, and the forced last
+     row settled R1 068 of it in month 360. A rounded figure that leaves the
+     interest unpaid is not an instalment for that loan, so it is lifted to
+     the smallest whole unit that covers the interest and a cent of capital.
+
+     An interest-only loan — the balloon clamped to the whole amount financed
+     — has no capital to repay before the end, so its floor is the interest
+     itself: rounded below it (R1 283.33 to R1 283) the balance grew past the
+     balloon by a few cents every month and the schedule printed negative
+     capital in every year; a whole-unit interest (R875.00) stays R875.
+     Compared in whole cents, so binary noise on an exact interest cannot
+     tip it either way. Every loan whose rounded instalment already pays its
+     interest — every amortising loan the vehicle calculator can reach, and
+     all the default figures on the page — is untouched. */
+  const interestCents = Math.round(p * Math.max(0, (Number(annualRatePct) || 0) / 100 / 12) * 100);
+  // Interest-only when the balloon is the loan to the cent: "price × 40%" and
+  // "price − price × 60%" can differ in the last binary place.
+  const floorCents = interestCents + (b < p - 0.005 ? 1 : 0);
+  let payment = Math.round(exact);
+  if (p > 0 && n > 0 && Math.round(payment * 100) < floorCents) payment = Math.ceil(floorCents / 100);
   const rows = amortise(p, annualRatePct, n, payment, b);
   const totalInterest = rows.reduce((sum, r) => sum + r.interest, 0);
   return {

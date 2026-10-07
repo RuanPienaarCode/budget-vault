@@ -224,14 +224,19 @@ const SPLIT_ROWS = [
   ok(!/Totals cover/.test(md), 'with nothing excluded the caveat is not printed at all');
 }
 
-/* ---- 5. a pipe cannot break the table ---- */
+/* ---- 5. a pipe cannot break the table ----
+
+   Since the 2026-10-07 audit (L4B-MD-INJECT) the row template escapes text
+   cells with markdown.js's escMdText, which writes a pipe as `&#124;` —
+   rendered as a pipe, splitting no cell, and leaving no `|` inside a cell at
+   all. So the row splits on every `|`, with no lookbehind (house rule: none
+   in tests either; it is a parse-time SyntaxError on iOS before 16.4, and a
+   pattern in the repo is a pattern someone copies into src/). */
 {
   const md = transactionsMarkdown(ROWS, { range: 'Aug 2026', filters: [], generated: 'x' }, money);
   const line = md.split('\n').find(l => l.includes('ROLL'));
-  ok(line.includes('PAY \\| ROLL'), 'a pipe in a description is escaped');
-  // (?<!\\) is a plain node-side test helper, not shipped src/ — src/ itself
-  // never uses lookbehind (it is a parse-time SyntaxError before iOS 16.4).
-  eq(line.split(/(?<!\\)\|/).length - 2, TX_HEAD_LEN, `so the row still has exactly ${TX_HEAD_LEN} cells (Split is the last)`);
+  ok(line.includes('PAY &#124; ROLL'), 'a pipe in a description is escaped, as &#124;');
+  eq(line.split('|').length - 2, TX_HEAD_LEN, `so the row still has exactly ${TX_HEAD_LEN} cells (Split is the last)`);
 }
 
 /* ---- 5b. a wrapped cell cannot break the table either ----

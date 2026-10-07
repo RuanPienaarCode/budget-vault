@@ -246,7 +246,11 @@ const DATA = {
   eq(rent.budget, 9000); eq(rent.actual, 9000); eq(rent.remaining, 0);
   ok(md.includes(money(9000)), 'the budget table shows the same rand figure');
 
-  eq(json.net_worth, { net: 250000, assets: 300000, liabilities: 50000 }, 'net worth passes through raw');
+  /* `unconfirmed_balances` (2026-10-07, REPORT-1) is null here: this
+     hand-built DATA never went through buildReportData, so the staleness
+     operands never reached it — unknown, which is not the same as "nothing
+     stale" (tests/report-caveats-carried.test.cjs covers the real path). */
+  eq(json.net_worth, { net: 250000, assets: 300000, liabilities: 50000, unconfirmed_balances: null }, 'net worth passes through raw');
   ok(md.includes(money(250000)) && md.includes(money(300000)) && md.includes(money(50000)),
     'and the same three figures appear formatted in the Markdown');
 
@@ -283,6 +287,9 @@ const DATA = {
 
   eq(json.health_score, {
     score: 72, months: 3.4, target_months: 6, savings_rate_pct: 12.5, interest_share_pct: 2.1,
+    /* REPORT-1 (2026-10-07) — null for the same reason as net_worth's
+       unconfirmed_balances above: DATA.health carries no period count. */
+    counted_periods: null,
     /* ISSUE 57. Present and EMPTY on a single-currency household — the point
        of the field is that a machine reader is never handed a score with no
        way to ask what it was measured without, and "no answer" and "nothing

@@ -63,17 +63,31 @@ const sumInterest = rows => rows.reduce((s, r) => s + r.interest, 0);
    two figures are now the same sum, so any drift at all means they have been
    derived twice again. */
 {
-  let cases = 0;
+  let cases = 0, balloonCases = 0;
   for (const p of [1000, 11000, 15000, 250000, 315000, 1350000]) {
     for (const rate of [0, 4, 11, 18.5, 24]) {
       for (const n of [6, 54, 60, 120, 240, 360]) {
-        for (const bPct of [0, 0.3]) {
+        /* 1 is the balloon clamped to the whole loan — the vehicle calculator
+           reaches it whenever the deposit leaves less financed than the
+           balloon percentage of the price asks for (see section 6). */
+        for (const bPct of [0, 0.3, 1]) {
           const b = Math.round(p * bPct);
           const { t, rows } = scheduleOf(p, rate, n, b);
           assert.strictEqual(t.totalInterest, sumInterest(rows),
             `headline interest === schedule interest for ${p}@${rate}%/${n} balloon ${b}`);
           assert.strictEqual(t.termMonths, rows.length,
             `realised term === schedule length for ${p}@${rate}%/${n} balloon ${b}`);
+          /* A balloon is due at the END of the term, so a balloon loan runs
+             every month it was given and never dips under the balloon — the
+             schedule used to stop the first month the rounded instalment
+             nudged the balance below it, which on an interest-only loan is
+             month 1 (section 6). */
+          if (b > 0) {
+            assert.strictEqual(rows.length, n, `a balloon loan runs its whole term: ${p}@${rate}%/${n} balloon ${b}`);
+            assert.ok(rows.every(r => r.closing >= b - 1e-9 && r.interest >= 0),
+              `and never dips under its balloon or reports negative interest: ${p}@${rate}%/${n} balloon ${b}`);
+            balloonCases++;
+          }
           /* Total cash out = every row's interest and capital, plus the
              balloon settled at the end. Which reduces to principal + interest,
              and that reduction is worth pinning: it is the reason the 0% case
@@ -86,8 +100,9 @@ const sumInterest = rows => rows.reduce((s, r) => s + r.interest, 0);
       }
     }
   }
-  checks += 3;
-  ok(cases > 300, `the sweep really covered the space (${cases} loans)`);
+  checks += 5;
+  ok(cases > 500, `the sweep really covered the space (${cases} loans)`);
+  ok(balloonCases > 300, `including the balloon loans (${balloonCases})`);
 }
 
 /* ---- 3. a 0% loan borrows exactly what it repays — structurally now ----
@@ -132,6 +147,42 @@ const sumInterest = rows => rows.reduce((s, r) => s + r.interest, 0);
   ok(withBalloon.payment < without.payment, 'a balloon lowers the instalment');
   ok(withBalloon.totalInterest > without.totalInterest, 'and costs more interest overall');
   eq(withBalloon.totalRepaid > without.totalRepaid, true, 'and more money in total');
+}
+
+/* ---- 6. a balloon as large as the loan is interest-only, for the whole term ----
+
+   The vehicle calculator quotes the balloon as a share of the PRICE and clamps
+   it to the amount financed, so a big deposit makes the balloon the whole loan:
+   R350 000, 70% down, 40% balloon finances R105 000 with a R105 000 balloon.
+   The exact instalment is then pure interest (R962.50 at 11%), the rounded one
+   is R963, and the 50c over put the balance a hair under the balloon in month
+   1 — which the early exit read as "cleared". The schedule stopped after one
+   row and every total read off it went with it: Total interest R963 against
+   the R57 750 sixty months of interest actually cost, Total repaid R105 963,
+   one schedule row. 1 243 of 12 960 reachable calculator settings stopped in
+   month 1; the worst understated interest by R109 754.
+
+   The closed form is n·PMT + B − P with the exact instalment. The rounded
+   instalment differs from it by under a rand a month, so the schedule's own
+   total may differ from the closed form by at most that, every month. */
+{
+  const cases = [
+    { p: 350000 - 350000 * 0.70, b: Math.min(350000 * 0.40, 350000 - 350000 * 0.70), rate: 11, n: 60 },
+    // The audit's worst case: R140 000 financed, the same R140 000 balloon, 72 months.
+    { p: 140000, b: 140000, rate: 13.25, n: 72 },
+  ];
+  for (const { p, b, rate, n } of cases) {
+    eq(b, p, `fixture: the balloon is the whole financed amount (${p})`);
+    const { t, rows } = scheduleOf(p, rate, n, b);
+    const closedInterest = n * L.monthlyPayment(p, rate, n, b) + b - p;
+    eq(rows.length, n, `the schedule runs all ${n} months, not one`);
+    eq(t.termMonths, n, 'and the realised term says so');
+    eq(rows[rows.length - 1].closing, b, 'landing on the balloon');
+    near(t.totalInterest, closedInterest, n * Math.abs(t.payment - t.exact),
+      `total interest is ${n} months of it (closed form ${closedInterest.toFixed(2)}), not one`);
+    near(t.totalRepaid, p + closedInterest, n * Math.abs(t.payment - t.exact),
+      'and total repaid is the loan plus that interest');
+  }
 }
 
 console.log(`PASS  loan-schedule-identity.test.cjs  (${checks} checks)`);

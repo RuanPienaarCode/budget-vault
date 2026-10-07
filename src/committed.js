@@ -142,12 +142,36 @@ function cashOnHand(accounts) {
 
 /* ---------------------------- commitments ------------------------------- */
 
+/* The day an account's figures are known up to: its newest imported row on
+   or before today, or the day its balance was confirmed, whichever is later.
+   A balance typed on the 3rd already holds a debit order taken on the 1st,
+   so holding that order again would subtract it twice. A confirmation dated
+   after today is the typo reconcile() refuses, so it proves nothing. Null
+   when neither field is there: a caller that never passes them keeps the
+   behaviour it always had. */
+function knownTo(a, today) {
+  const usable = d => isRealIsoDate(d) && (!today || d <= today);
+  const imported = usable(a && a.importedTo) ? a.importedTo : '';
+  const confirmed = usable(a && a.balanceDate) ? a.balanceDate : '';
+  return (imported > confirmed ? imported : confirmed) || null;
+}
+
+/* The account a service is paid from: whichever folder holds its most recent
+   real charge (`charged` is in date order). `accountOfRow` is the view's map
+   from every row it handed over to the account entry that owns it; with no
+   map, or a row from a folder no account claims, there is no account to read
+   a date off and the answer is null rather than a guess. */
+function payerOf(charged, accountOfRow) {
+  if (!accountOfRow || !charged.length) return null;
+  return accountOfRow.get(charged[charged.length - 1]) || null;
+}
+
 /* Services expected between `from` and `to` inclusive.
 
    `rows` is every transaction in the vault, so a service's charge history is
    its whole history — the price and cadence come from all of it. Whether it has
    ALREADY landed is a separate question asked only of this period. */
-function serviceCommitments({ services, rows, from, to, periodStart }) {
+function serviceCommitments({ services, rows, from, to, periodStart, accountOfRow }) {
   const out = [];
   const history = rows || [];
   for (const s of services || []) {
@@ -182,6 +206,23 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
     const amount = derived ? stats.recent : Math.abs(s.amount || 0);
     if (!amount) continue;
 
+    /* NOT IMPORTED YET. A charge due between the period start and today that
+       never arrived is missing only once its account has been imported past
+       its day. Before that it is in neither bucket — not in cash, since no
+       statement holding it has been imported, and not still to come, since
+       its date has passed — and "actually free" counted it as spendable. On
+       a real household on a 7 October, three debit orders due on the 1st, on
+       accounts last imported on the 26th and the 29th, were counted nowhere.
+       So it is held, as its own `basis`, with the date its account is known
+       to: always priced from its charges, since the account comes from one. */
+    const payer = payerOf(charged, accountOfRow);
+    const asOf = payer ? knownTo(payer, from) : null;
+    const held = (dueOn, n) => ({
+      kind: 'service', name: s.name, detail: s.provider || '',
+      due: dueOn, amount: amount * n, occurrences: n, unit: amount,
+      basis: 'not-imported', account: payer.name, asOf,
+    });
+
     /* ADR-0007 · How many charges remain (ISSUE 47). Sub-monthly services are
        walked date by date; monthly and annual keep the one-charge-per-period
        rule exactly. */
@@ -190,7 +231,12 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
       /* Unchanged since 1.20 apart from that window: at most one charge per
          period, so evidence of one is evidence there is nothing left to come. */
       if (charged.some(c => c.date >= periodStart)) continue;
-      if (!due || due < from || due > to) continue;
+      if (!due || due > to) continue;
+      if (due < from) {
+        /* Held only while its account's records are OLDER than its day. */
+        if (due >= periodStart && asOf && asOf < due) out.push(held(due, 1));
+        continue;
+      }
       out.push({
         kind: 'service', name: s.name, detail: s.provider || '',
         due, amount, occurrences: 1, unit: amount,
@@ -198,6 +244,14 @@ function serviceCommitments({ services, rows, from, to, periodStart }) {
       });
       continue;
     }
+
+    /* The same question per occurrence: the cadence dates between the period
+       start and yesterday that no charge cleared, after the account's date. */
+    const past = asOf && periodStart < from
+      ? remainingCharges({ anchor: seen && seen.last, next: s.next, step, from: periodStart,
+        to: isoFromDayNumber(isoDayNumber(from) - 1), charges: charged }).filter(d => d > asOf)
+      : [];
+    if (past.length) out.push(held(past[0], past.length));
 
     const dates = remainingCharges({ anchor: seen && seen.last, next: s.next, step, from, to, charges: charged });
     if (!dates.length) continue;
@@ -363,12 +417,15 @@ function cardsOwed(accounts) {
 /* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
    `cardRows` from settle-monthly cards, `incomeRows` from in-budget accounts
    only; `free` may be negative, `perDay` is null on the last day. */
-function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, cardRefundRows, periodStart, periodEnd, today }) {
+function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, cardRefundRows, accountOfRow, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
   /* The window starts today, not at the period start: a charge dated earlier
-     that never arrived is not "still coming", it is missing, and this card is
-     not the place to argue about it. */
+     that never arrived is not "still coming". It is missing once its account
+     has been imported past its day, and this card is not the place to argue
+     about that; until then serviceCommitments holds it as not imported yet,
+     which needs the view's `accountOfRow` and each account's `importedTo`
+     and `balanceDate`. */
   const from = now && now > periodStart ? now : periodStart;
 
   const { cash, counted, staleCounted, unknown, unreadable, earmarked, earmarkedFrom, contributors, outside } = cashOnHand(accounts);
@@ -389,8 +446,20 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
   const confirmDay = { count: sameDayCount, net: Math.round(sameDayNet * 100) / 100 || 0 };
 
   const periodDays = daysBetween(periodStart, periodEnd) + 1;
+  /* How fresh `cash` is: the EARLIEST day the imported accounts behind it
+     are known up to, so nothing after it is in the figure. Only accounts
+     that reached `cash` — an empty or opted-out one cannot age a total it is
+     not in — and only those something is imported into: a hand-kept wallet
+     confirmed in June has no import to date the figure by, and printing its
+     June over a cheque account imported yesterday misreads the whole total.
+     Its age is what the "unconfirmed" count already says. Null when none. */
+  const knownDates = contributors
+    .filter(a => isRealIsoDate(a.importedTo))
+    .map(a => knownTo(a, now)).filter(Boolean);
+  const cashAsOf = knownDates.length ? knownDates.reduce((m, d) => (d < m ? d : m)) : null;
+
   const items = [
-    ...serviceCommitments({ services, rows, from, to, periodStart }),
+    ...serviceCommitments({ services, rows, from, to, periodStart, accountOfRow }),
     ...debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today: now }),
     ...cardCommitments({ accounts, from, to }),
   ].sort((a, b) => (b.amount - a.amount));
@@ -457,6 +526,7 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
   return {
     cash,
     cashKnown: counted > 0,
+    cashAsOf,
     countedAccounts: counted,
     /* Of the counted accounts, those whose stated balance is stale. */
     staleCounted,
@@ -514,6 +584,8 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
       service: items.filter(i => i.kind === 'service').length,
       debt: items.filter(i => i.kind === 'debt').length,
       card: items.filter(i => i.kind === 'card').length,
+      /* Of those, the ones held because their account is not imported yet. */
+      notImported: items.filter(i => i.basis === 'not-imported').length,
     },
   };
 }

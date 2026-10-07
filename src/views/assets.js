@@ -24,7 +24,9 @@ const i18n = require('../i18n');
 const { daysSince, isStaleValuation: staleValuationOf } = require('../reconcile');
 const { symbolOf, isForeign } = require('../currency');
 const { todayIso } = require('../dates');
-const { assetTotal, foreignTotals } = require('../worth');
+/* typedBelowZero / flooredEntry / shownFigure: a negative typed into Value is
+   kept and shown, while every total keeps flooring it — see worth.js. */
+const { assetTotal, foreignTotals, typedBelowZero, flooredEntry, shownFigure } = require('../worth');
 
 /* Kinds of possession, in the order a household usually meets them. Stored
    verbatim in the Type column; an unknown value from a hand-edited file is
@@ -219,9 +221,18 @@ module.exports = function registerAssets(ctx) {
      exactly the bug fix 6 closes. */
   function renderAssetStale() {
     const wrap = $('#assetStale'); wrap.empty();
-    const stale = S.assets.filter(isStaleValuation);
+    /* AHEAD of today is not OLD. isStaleValuation counts a future date as
+       not current — rightly, a valuation dated next year is a typo and needs
+       a fresh number as much as an old one does, so the badge above still
+       counts it — but this caveat worded every row it caught as "over a year
+       old": a house valued "2027-01-01" read "This value is over a year old"
+       directly above its own row caption, "valued ahead of today". Each date
+       is now said as what it is, in the caption's own words. */
+    const aheadOfToday = a => { const d = daysSince(a.valued); return d !== null && d < 0; };
+    const stale = S.assets.filter(a => isStaleValuation(a) && !aheadOfToday(a));
+    const ahead = S.assets.filter(aheadOfToday);
     const unreadable = S.assets.filter(dateUnreadable);
-    if (!stale.length && !unreadable.length) return;
+    if (!stale.length && !ahead.length && !unreadable.length) return;
 
     const bits = [];
     if (stale.length) {
@@ -240,6 +251,14 @@ module.exports = function registerAssets(ctx) {
         ? (S.assets.length === 1 ? 'This value is' : 'Every value here is')
         : `${stale.length} of ${S.assets.length} values are`;
       bits.push(`${subject} over a year old` +
+        (share > 0.5 ? ` — ${Math.round(share * 100)}% of the total` : ''));
+    }
+    if (ahead.length) {
+      // Same share rule as the sentence above: a net worth resting on a
+      // typo'd date should say how much of it does.
+      const share = assetTotal(ahead, S.settings.currency)
+        / (assetTotal(S.assets, S.settings.currency) || 1);
+      bits.push(`${ahead.length} ${ahead.length === 1 ? 'has' : 'have'} a Valued date ahead of today` +
         (share > 0.5 ? ` — ${Math.round(share * 100)}% of the total` : ''));
     }
     if (unreadable.length) {
@@ -269,6 +288,14 @@ module.exports = function registerAssets(ctx) {
       const body = el('tbody', {});
       for (const a of S.assets) {
         const age = valuedAge(a);
+        /* Beside the Value field, updated in place by its own editor (the row
+           is not rebuilt on a value edit — see renderAssetKpis). Empty unless
+           the figure was typed below zero. */
+        const belowZeroNote = el('div', { class: 'text-muted', style: 'font-size:11.5px' });
+        const syncBelowZero = () => {
+          belowZeroNote.textContent = typedBelowZero(a, 'value') !== null ? 'counts as 0 in the totals' : '';
+        };
+        syncBelowZero();
         body.append(el('tr', {},
           el('td', { style: 'font-weight:600' }, a.name, ctx.noteButton('asset', a.name),
             /* The row's own currency, where it differs. The Value cell is a
@@ -291,7 +318,7 @@ module.exports = function registerAssets(ctx) {
               ? [el('option', { value: a.type, selected: '' }, a.type)] : []),
             ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, k)))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
-            class: 'form-control form-control-sm', value: a.value || '',
+            class: 'form-control form-control-sm', value: shownFigure(a, 'value'),
             'aria-label': `Value of ${a.name}`,
             // Routed through normalizeAmount, matching addAsset — an invalid
             // cell (an SA-locale phone's numeric keypad writes "15 000 000,00"
@@ -308,9 +335,16 @@ module.exports = function registerAssets(ctx) {
                  read (table-schema.js's money()); the writer prefers it over a
                  fabricated 0 so a save cannot erase what the reader typed.
                  A number typed HERE supersedes that text, so the sibling is
-                 cleared — the same thing views/budgets.js does with amountRaw. */
-              a.value = Math.max(0, value); a.valueRaw = null; mark(); renderAssetKpis();
-            } })),
+                 cleared — the same thing views/budgets.js does with amountRaw.
+
+                 Except a number below zero, which this used to floor with
+                 Math.max(0, …) and save as 0.00 over the reader's figure,
+                 saying nothing while the field still showed what they typed.
+                 The total still floors it (worth.js's assetTotal); the figure
+                 itself is kept, in valueRaw, and the row says it counts as 0. */
+              const kept = flooredEntry(value, e.target.value);
+              a.value = kept.value; a.valueRaw = kept.raw; mark(); renderAssetKpis(); syncBelowZero();
+            } }), belowZeroNote),
           /* Editing the value does NOT stamp this date. A valuation is a
              separate act from correcting a typo, and stamping today on every
              keystroke would make the staleness column agree with itself
@@ -401,9 +435,11 @@ module.exports = function registerAssets(ctx) {
     /* Deliberately not unique — "Car" once per car is the normal case. Nothing
        downstream keys by name: the chart groups by kind and focus restores by
        row index. */
+    // Kept as typed below zero, as the table's own Value field keeps it.
+    const kept = flooredEntry(value, r.value);
     S.assets.push({
       name: r.name.trim(), type: r.type || 'other',
-      value: Math.max(0, value), valued: (r.valued || '').trim(), notes: '',
+      value: kept.value, ...(kept.raw !== null ? { valueRaw: kept.raw } : {}), valued: (r.valued || '').trim(), notes: '',
       /* Normalised to '' when it merely restates the household's symbol, so
          a table only grows the Currency column when a row genuinely differs
          — see usedColumns() in table-schema.js. */

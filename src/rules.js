@@ -9,6 +9,24 @@
 
    Pure — no DOM, no obsidian import. */
 
+const { stripControls } = require('./csv');
+
+/* One whitespace-separated token of a description that identifies the
+   transaction rather than the merchant: a masked card number, a statement
+   reference, a phone or meter number, a caps-and-digits ref code.
+   learnPattern trims these off the end so a rule generalises to next month's
+   statement. dedupe.js reads the same tokens for the opposite purpose: two
+   rows from one merchant that carry different references are two
+   transactions. One predicate for both, so they cannot disagree about what a
+   reference is. */
+function isReferenceToken(w) {
+  const digits = (w.match(/\d/g) || []).length;
+  return /\*{2,}/.test(w) ||                                 // masked card: 000000******0000
+    /\d{4,}/.test(w) ||                                      // long digit run: refs, phone, meter numbers
+    (digits > 0 && digits / w.length >= 0.4) ||              // digit-heavy token: X0000000
+    (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODREF0000000
+}
+
 /* Trim trailing reference noise (masked card numbers, statement refs, phone /
    meter numbers, caps+digit ref codes) from a transaction description so a
    learned categorisation rule generalises to next month's version of the same
@@ -29,16 +47,30 @@ function learnPattern(desc) {
   for (;;) {
     const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
     if (!m) break;
-    const w = m[2];
-    const digits = (w.match(/\d/g) || []).length;
-    const noise = /\*{2,}/.test(w) ||                          // masked card: 000000******0000
-      /\d{4,}/.test(w) ||                                      // long digit run: refs, phone, meter numbers
-      (digits > 0 && digits / w.length >= 0.4) ||              // digit-heavy token: X0000000
-      (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODREF0000000
-    if (!noise) break;
+    if (!isReferenceToken(m[2])) break;
     s = m[1];
   }
   return s.length >= 4 ? s : capped;
+}
+
+/* The text a rule is matched on, for a pattern and for the description it is
+   matched against alike: trimmed, lower-cased, and without the C0 control
+   characters csvCell strips (src/csv.js). Every reader of a rule goes
+   through here: prepareRules, matchRule, learnRules' duplicate check,
+   governingRule and rule-cleanup.js. A reader that normalised differently
+   would see a different rule set from the matcher's.
+
+   The control-character fold is new, and it is the reason this function
+   exists. Since the 2026-10-07 audit (L4A-11) csvCell drops those characters
+   when it writes the rules file, so a rule learned from a description
+   carrying a NUL is saved without the NUL. If the matcher kept the NUL in the
+   description, the saved rule would never match the merchant it was learned
+   from, and each later import would learn it again. That is the same
+   dead-copy growth the formula guard caused before uncsvCell existed.
+   Folding the same characters on both sides keeps the saved rule and the
+   description equal. */
+function ruleText(s) {
+  return stripControls(s).trim().toLowerCase();
 }
 
 /* Normalise the rule list ONCE per pass, not once per row. Rules grow with the
@@ -46,7 +78,7 @@ function learnPattern(desc) {
    51ms at 1,200 rows and 2,000 rules on desktop, several hundred on a phone. */
 function prepareRules(rules) {
   return (rules || [])
-    .map(r => ({ p: (r.pattern ?? '').trim().toLowerCase(), category: r.category }))
+    .map(r => ({ p: ruleText(r.pattern), category: r.category }))
     .filter(r => r.p);
 }
 
@@ -87,8 +119,53 @@ function hits(d, p) {
   }
 }
 
+/* Does ONE prepared pattern match ONE description, by matchRule's own test?
+   Both arguments are already ruleText()-normalised. Exported so
+   rule-cleanup.js asks "which descriptions does this rule match" the way the
+   matcher answers it, rather than with a bare includes() that ignores the
+   word boundaries above. */
+function patternMatches(d, p) {
+  return d === p || hits(d, p);
+}
+
+/* Can `general` answer for `specific` on every description, ever? That is,
+   does every description the matcher lets `specific` match also match
+   `general`? Both are ruleText()-normalised patterns.
+
+   rule-cleanup.js deletes a rule only when what answers in its place passes
+   this. Its own comment says why: the replay proves the deletion is safe for
+   the statements already imported, and this proves it for the ones still to
+   come. It used to ask `specific.includes(general)`. That was the right
+   question before ISSUE 71 and the wrong one after: a SHORT `general` only
+   matches on word boundaries, so `tool` sits inside `toolshed depot` and
+   matches none of the descriptions that pattern does (2026-10-07 audit,
+   TIDY-COVER).
+
+   So a short `general` has to sit inside `specific` with a boundary on both
+   sides that every matching description keeps. Inside `specific` the
+   neighbouring character is fixed. At an edge of `specific` it is whatever
+   the description has there: a boundary when `specific` is short itself
+   (it matches on boundaries too), and anything at all when `specific` is
+   long and matches as a bare substring. `fees` therefore covers `vat fees
+   charged` and `fees 2`, and does not cover `fees monthly`, because
+   `xfees monthly` matches that one and not `fees`. */
+const WORD_CHAR = /[a-z0-9]/;
+function patternCovers(general, specific) {
+  if (!general || !specific) return false;
+  if (general === specific) return true;
+  if (general.length >= SHORT) return specific.includes(general);
+  const edgeIsBoundary = specific.length < SHORT;
+  for (let at = specific.indexOf(general); at >= 0; at = specific.indexOf(general, at + 1)) {
+    const end = at + general.length;
+    const before = at > 0 ? !WORD_CHAR.test(specific[at - 1]) : edgeIsBoundary;
+    const after = end < specific.length ? !WORD_CHAR.test(specific[end]) : edgeIsBoundary;
+    if (before && after) return true;
+  }
+  return false;
+}
+
 function matchRule(desc, rules) {
-  const d = (desc ?? '').toString().trim().toLowerCase();
+  const d = ruleText(desc);
   let best = null, bestLen = 0;
   for (const r of rules) {
     if (r.p === d) return r;
@@ -102,4 +179,7 @@ function autoCategorise(desc, rules) {
   return r ? r.category : '';
 }
 
-module.exports = { learnPattern, prepareRules, matchRule, autoCategorise };
+module.exports = {
+  learnPattern, prepareRules, matchRule, autoCategorise,
+  ruleText, patternMatches, patternCovers, isReferenceToken,
+};

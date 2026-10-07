@@ -40,7 +40,6 @@ const { askBudgetExport, showBudgetExportDone } = require('../budget-export-moda
 const { buildXlsx } = require('../xlsx');
 const { PAGE, docEncodable, helveticaMeasure, layoutDocument, renderVectorPdf, renderImagePdf } = require('../pdf');
 const { canvasMeasure, rasterisePages } = require('../pdf-raster');
-const { managedFolderMatch } = require('../report');
 const { symbolOf } = require('../currency');
 const { nowLocalMinute, todayIso, isRealIsoDate } = require('../dates');
 const { typeOrder } = require('../groups');
@@ -59,8 +58,12 @@ const DOC_LABEL_KEYS = [
 ];
 
 module.exports = function registerBudgetExport(ctx) {
+  /* vaultPathTaken / destinationProblem — src/io.js's case-folded "is this
+     path already used?" and its one answer to "may an export be written into
+     the folder the reader typed?" (bound there to this vault's config folder
+     and budget folder). The Report reads the same two. */
   const {
-    S, app, plugin, money, toast, writeVaultFile, writeVaultBinary, fileAtVaultPath,
+    S, app, plugin, money, toast, writeVaultFile, writeVaultBinary, fileAtVaultPath, vaultPathTaken, destinationProblem,
     currentPeriod, shiftPeriod, periodRange, periodMonthName, periodTitle, periodSummary, txInPeriod,
     periodsForMonths, earliestDataMonth, budgetVsActualRows, categoryActualsInRange, txInRange, locale,
   } = ctx;
@@ -90,18 +93,53 @@ module.exports = function registerBudgetExport(ctx) {
     return out;
   };
 
-  /* Obsidian's own config folder (".obsidian" unless the vault renamed it).
-     io.js's guardedVaultPath keeps a write inside the VAULT, and the config
-     folder is inside the vault — so a typed ".obsidian/plugins" was a legal
-     destination: a real file, a success toast, and nothing visible anywhere,
-     since the file explorer hides that folder. Compared by SEGMENT, so
-     ".obsidian-notes" is still an ordinary folder. */
-  const configDir = () => String((app.vault && app.vault.configDir) || '.obsidian');
-  const inConfigDir = dir => {
-    const segs = String(dir || '').split('/').filter(Boolean);
-    const cfg = configDir().split('/').filter(Boolean);
-    return cfg.length > 0 && cfg.every((seg, i) => (segs[i] || '').toLowerCase() === seg.toLowerCase());
-  };
+  /* Why the folder cannot take an export, in this dialog's words — or null.
+
+     io.js's guardedVaultPath keeps a write inside the VAULT, and plenty inside
+     the vault is still no destination. This used to be two checks of its own:
+     Obsidian's config folder by its first segments, and load.js's managed
+     folders by name. So "x/.obsidian", ".trash" and ".obsidian-notes" were
+     all accepted — every one a folder Obsidian never indexes (any segment
+     starting with a dot hides the path, app.js 1.13.7), so the export landed
+     where Open and Reveal can never find it — and ".." was dropped by
+     budgetExportPaths, so "../outside" quietly wrote to outside/. Now it is
+     io.js's destinationProblem — traversal, config folder, managed folder,
+     case-folded and NFC, the rule the Report already words — asked of the
+     folder as TYPED (before budgetExportPaths sanitises away the ".." it
+     should refuse) and of the folder actually written, a hidden segment
+     included (one rule, vault-path.js hiddenSegment). Shared by describe() and
+     runBudgetExport(), so the dialog and the write cannot disagree. */
+  function folderProblem(typed, dir) {
+    const p = destinationProblem(typed) || destinationProblem(dir);
+    if (p && p.kind === 'traversal') return i18n.t('report.field.folderTraversal');
+    if (p && p.kind === 'configDir') return i18n.t('bx.problem.configDir', { folder: p.folder });
+    if (p && p.kind === 'hidden') return i18n.t('bx.problem.hiddenFolder', { folder: p.folder });
+    return p ? i18n.t('report.field.folderManaged', { folder: p.folder }) : null;
+  }
+
+  /* `path` as the vault already spells it, when a file differing only by
+     case is there.
+
+     macOS and iOS resolve paths case-insensitively; Obsidian's index does
+     not. An "exports/budget … - summary.csv" from an earlier export IS the
+     file "Exports/Budget … - Summary.csv" names on those devices — and the
+     write did not even replace it: writeVaultFile missed the index's exact
+     key, called vault.create, and Vault.create (app.js 1.13.7) asks the
+     ADAPTER whether the path exists — case-insensitively there — and throws
+     "File already exists.", so the export stopped half-way (2026-10-07
+     audit, L4A-07 a). An export replaces what is at its path; this finds the
+     file that IS at its path, so the preview can name it and the write can
+     modify it. Asked only when vaultPathTaken says the path is used and the
+     exact key is not; Obsidian's own getAbstractFileByPathInsensitive does
+     the finding, and an Obsidian without it keeps the path as asked (the
+     preview still names it — vaultPathTaken is the warning). views/report.js
+     carries the same four lines for the same reason. */
+  function onDisk(path) {
+    if (fileAtVaultPath(path) || !vaultPathTaken(path)) return path;
+    const v = app.vault;
+    const hit = v && typeof v.getAbstractFileByPathInsensitive === 'function' ? v.getAbstractFileByPathInsensitive(path) : null;
+    return hit && hit.path && fileAtVaultPath(hit.path) ? hit.path : path;
+  }
 
   /* Every category a TRANSACTION can carry — transfers included, though they
      are never a budget row (figures.js drops them). The first checklist left
@@ -165,8 +203,15 @@ module.exports = function registerBudgetExport(ctx) {
     });
   }
 
+  /* The paths a click writes — budgetExportPaths' names, each as the vault
+     already spells it (onDisk) — and the ordered list of the ones the chosen
+     formats produce. describe() previews exactly this list and
+     runBudgetExport() writes exactly these paths. */
   function filesFor(answer, model) {
-    const paths = budgetExportPaths(model, answer.folder);
+    const named = budgetExportPaths(model, answer.folder);
+    const csv = {};
+    for (const k of Object.keys(named.csv)) csv[k] = onDisk(named.csv[k]);
+    const paths = { ...named, pdf: onDisk(named.pdf), xlsx: onDisk(named.xlsx), csv };
     const out = [];
     if (answer.formats.includes('pdf')) out.push(paths.pdf);
     if (answer.formats.includes('xlsx')) out.push(paths.xlsx);
@@ -199,10 +244,10 @@ module.exports = function registerBudgetExport(ctx) {
        Budgets/ … is parsed back in as vault data on the next load. None of
        these three is a .md, but the Rules CSV lives in a managed folder and a
        refusal that is one rule everywhere is easier to trust than one with
-       exceptions. */
-    const managed = managedFolderMatch(paths.dir, plugin.settings.budgetFolder);
-    if (managed) return { problem: i18n.t('report.field.folderManaged', { folder: managed }) };
-    if (inConfigDir(paths.dir)) return { problem: i18n.t('bx.problem.configDir', { folder: configDir() }) };
+       exceptions. folderProblem() covers that, the config folder, a "..", and
+       every folder Obsidian hides — see its header. */
+    const folderBad = folderProblem(answer.folder, paths.dir);
+    if (folderBad) return { problem: folderBad };
     const catCount = Math.max(model.summary.rows.length, model.exact ? model.exact.rows.length : 0);
     if (!catCount) return { problem: i18n.t('bx.problem.noRows') };
     return {
@@ -213,9 +258,28 @@ module.exports = function registerBudgetExport(ctx) {
          also how a hand-edited "Budget June 2026.xlsx" kept in the same folder
          would be lost without a word. views/tax.js can refuse to overwrite; an
          export cannot, so it says which files are already there, per file,
-         before the click. */
-      replaces: list.filter(p => !!fileAtVaultPath(p)),
+         before the click. Asked the filesystem's way — vaultPathTaken folds
+         case and Unicode form, as macOS and iOS do — because the exact-key
+         lookup this used missed the case-variant file the click then hit
+         (2026-10-07 audit, L4A-07 a); `list` already carries the spelling the
+         vault has for it, so the name shown is the reader's own file's. */
+      replaces: list.filter(p => vaultPathTaken(p)),
     };
+  }
+
+  /* When the files were made, as both writers take it: `created` the
+     household's wall-clock minute (the same `generated` the document prints)
+     and `utcOffset` the zone that clock was read in, in minutes east of UTC.
+     Both writers used to be handed the wall time alone and stamped it as UTC
+     — an export made at 14:00 in Johannesburg claimed 14:00Z (2026-10-07
+     audit, L4A-09). The offset is read off THAT minute, as a local date, not
+     off a second look at the clock, so the two can never straddle a DST
+     change between them. */
+  function stampOf(model) {
+    const created = model.generated.replace(' ', 'T');
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(created);
+    const utcOffset = m ? -new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTimezoneOffset() : undefined;
+    return { created, utcOffset };
   }
 
   /* One PDF, by whichever backend can carry its text. docEncodable() decides:
@@ -231,7 +295,7 @@ module.exports = function registerBudgetExport(ctx) {
     const plainMoney = typeof ctx.moneyIn === 'function' ? v => String(ctx.moneyIn('', v)).trim() : null;
     const doc = modelToDoc(model, { money, rowMoney, plainMoney, labels: docLabels() });
     const page = doc.landscape ? PAGE.A4_LANDSCAPE : PAGE.A4;
-    const meta = { title: `${doc.title} ${model.rangeLabel}`.trim(), created: model.generated.replace(' ', 'T'), producer: 'Budget Vault' };
+    const meta = { title: `${doc.title} ${model.rangeLabel}`.trim(), ...stampOf(model), producer: 'Budget Vault' };
     const pageLabel = (n, m) => i18n.t('bx.doc.pageOf', { n, m });
     if (docEncodable(doc)) {
       return { bytes: renderVectorPdf(layoutDocument(doc, { measure: helveticaMeasure, page, pageLabel }), { meta }), raster: false };
@@ -252,10 +316,10 @@ module.exports = function registerBudgetExport(ctx) {
       const model = modelFor(answer, true);
       const { paths } = filesFor(answer, model);
       /* Refused here as well as in describe(): the dialog's refusal can be
-         bypassed by anything that calls this directly; the write cannot. */
-      if (inConfigDir(paths.dir) || managedFolderMatch(paths.dir, plugin.settings.budgetFolder)) {
-        throw new Error(`Refused export into ${paths.dir}`);
-      }
+         bypassed by anything that calls this directly; the write cannot. The
+         reason travels in the error, so the failure toast says why. */
+      const folderBad = folderProblem(answer.folder, paths.dir);
+      if (folderBad) throw new Error(folderBad);
       if (answer.formats.includes('pdf')) {
         const pdf = await pdfBytes(model);
         raster = pdf.raster;
@@ -263,7 +327,7 @@ module.exports = function registerBudgetExport(ctx) {
       }
       if (answer.formats.includes('xlsx')) {
         const sheets = modelToSheets(model, { symbolFor: rowSymbol, labels: docLabels() });
-        written.push(await writeVaultBinary(paths.xlsx, buildXlsx(sheets, { created: model.generated.replace(' ', 'T') })));
+        written.push(await writeVaultBinary(paths.xlsx, buildXlsx(sheets, stampOf(model))));
       }
       if (answer.formats.includes('csv')) {
         for (const f of modelToCsv(model, { symbolFor: rowSymbol })) written.push(await writeVaultFile(paths.csv[f.kind], f.text));

@@ -58,11 +58,17 @@
    machine parsing `health_score.score` never looks at `.note`; a human or
    an AI answering one does, and is exactly who these two fields are for. */
 
-const { escMd } = require('./markdown');
+/* escMdText — the escape for text in a GENERATED note (2026-10-07 audit,
+   MD-INJECT). escMd stays for this file's own translated labels; every name a
+   household or a bank statement supplies goes through escMdText. See its
+   header in src/markdown.js. */
+const { escMd, escMdText } = require('./markdown');
 const { safeName, txHeaderLines, transactionRow } = require('./exporter');
 /* budgetSpent/budgetUsedShare — ADR-0005's one rule, reached rather than
-   re-spelled. See ADR-0007's entry for this file. */
-const { budgetRowStatus, budgetSpent, budgetUsedShare } = require('./money-flow');
+   re-spelled. See ADR-0007's entry for this file. categoryGap is the one gap
+   identity (gross spend = rows + uncategorised + netted), reached for the
+   multi-period merge below rather than summed per period. */
+const { budgetRowStatus, budgetSpent, budgetUsedShare, categoryGap: gapOf } = require('./money-flow');
 const { growthRate } = require('./savings-math');
 const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
@@ -141,16 +147,27 @@ function pathSegs(p) {
    createReport() throws if it is reached anyway. Segment-by-segment, the
    same shape io.js's own guardedPath uses to refuse a write escaping the
    budget folder the OTHER direction (out, not in) — string prefix comparison
-   alone would wrongly catch "Budget/CategoriesOfSpending" as "Budget/Categories". */
+   alone would wrongly catch "Budget/CategoriesOfSpending" as "Budget/Categories".
+
+   Segments are compared CASE-FOLDED and in NFC (2026-10-07 audit, L4A-03).
+   The exact comparison let "Budget/categories" through, and macOS, iOS and
+   iCloud Drive resolve that path onto the real Categories/ folder: the
+   report landed there and the next load parsed it as a category — the M1
+   bug this guard exists to stop, one keystroke away. The match returns the
+   CANONICAL name ('Categories'), so the refusal names the folder the reader
+   knows. The same fold as io.js's foldSeg, which src/io.js's
+   destinationProblem — the shared destination check, built on this
+   function — uses for the config folder. */
+const foldName = s => String(s ?? '').normalize('NFC').toLowerCase();
 function managedFolderMatch(dir, budgetFolder) {
   const dirSegs = pathSegs(dir);
   const baseSegs = pathSegs(budgetFolder);
   if (dirSegs.length <= baseSegs.length) return null;
   for (let i = 0; i < baseSegs.length; i++) {
-    if (dirSegs[i] !== baseSegs[i]) return null;
+    if (foldName(dirSegs[i]) !== foldName(baseSegs[i])) return null;
   }
-  const name = dirSegs[baseSegs.length];
-  return MANAGED_SUBFOLDERS.includes(name) ? name : null;
+  const name = foldName(dirSegs[baseSegs.length]);
+  return MANAGED_SUBFOLDERS.find(m => foldName(m) === name) || null;
 }
 
 /* Named by WHAT SPAN IT COVERS, not by when it was generated — same
@@ -203,6 +220,66 @@ function mergeCategoryRows(periodRows, fields) {
   return [...byCat.values()];
 }
 
+/* Spend by category over a SELECTION of periods, net of refunds across the
+   whole selection — 2026-10-07 audit, REPORT-2, the owner's decision.
+
+   This used to be mergeCategoryRows over each period's donut rows
+   (categorySpendRows). That function drops a category from any period whose
+   refunds outweighed its charges — right for one period's donut, which has
+   nothing to draw for it — so a refund landing a period AFTER the purchase
+   never netted at all, while "Budget vs Actual" in the same document adds
+   each period's SIGNED actual and does net it. One category, two totals: on
+   the vault this was found on, a 12-month report printed five categories
+   with two totals each, one of them at roughly twice its Budget-vs-Actual
+   figure in the first table.
+
+   So the signed per-category figure (periodSummary().byCat — the very number
+   categorySpendRows reads) is summed over the selection FIRST, and a category
+   is a row only if it is still an outflow over the whole of it: the
+   Budget-vs-Actual rule. Which categories may be rows at all — named,
+   neither income nor transfer — is NOT re-decided here: a category is a
+   candidate exactly when the donut showed it in at least one of the periods.
+   That loses nothing: a category that ends the selection as an outflow was an
+   outflow in at least one period, so the donut listed it there.
+
+   The sign test is taken in whole cents. Float addition of cents leaves
+   residue (−10 + 1,13 + 8,87 = −1.8e-15), and a charge refunded to the cent
+   across periods must leave no "R 0,00" row behind it; the amount itself is
+   the unrounded sum, so a single period's rows are byte-for-byte the donut's.
+
+   The gap — what the table does not account for, as "uncategorised" and
+   "netted inside its own category" — is money-flow.js's ONE identity
+   (categoryGap), applied once over the merged rows and the summed gross and
+   uncategorised spend. Summing each period's own gap, as before, described
+   the old rows: the refund this merge now nets inside its category was never
+   in it, and a later period's refund excess vanished without a word.
+
+   `periods`: one entry per period, oldest first, each
+   { split: categorySpendRows(p), byCat: periodSummary(p).byCat,
+     spend: periodSummary(p).spend, uncatSpend: periodSummary(p).uncatSpend }.
+   Returns { rows: [{ cat, amount }] largest first, gap: { uncat, netted } }.
+   Pure; tests/report-multi-period-category.test.cjs drives it directly and
+   through the real views. */
+function mergeSpendByCategory(periods) {
+  const list = periods || [];
+  const cats = [];
+  const seen = new Set();
+  for (const p of list) {
+    for (const r of p.split || []) if (!seen.has(r.cat)) { seen.add(r.cat); cats.push(r.cat); }
+  }
+  const rows = [];
+  for (const cat of cats) {
+    let net = 0;
+    for (const p of list) net += Number((p.byCat || {})[cat]) || 0;
+    if (Math.round(net * 100) < 0) rows.push({ cat, amount: -net });
+  }
+  rows.sort((a, b) => b.amount - a.amount);
+  let spend = 0, uncatSpend = 0;
+  for (const p of list) { spend += Number(p.spend) || 0; uncatSpend += Number(p.uncatSpend) || 0; }
+  const gap = gapOf({ spend, uncatSpend, rows });
+  return { rows, gap: { uncat: gap.uncat, netted: gap.netted } };
+}
+
 /* One row of the two two-column money tables below (Income vs Spend,
    Savings). `label` is already-translated text; `value` is a formatted
    money string. Kept this small rather than a generic table builder because
@@ -232,6 +309,47 @@ function currencyLine(pairs, key = 'acct.hero.otherCurrencies') {
       list: pairs.map(([sym, v]) => `${sym} ${Math.round(v)}`).join(' · '),
     }).trim()
     : '';
+}
+
+/* "Built from N balances nobody has confirmed recently — the oldest D days ago.
+   Transactions since then add up to R X more." — the sentence the Dashboard
+   prints under its net worth (#dashStale, views/dashboard.js renderStale) and
+   the Savings page under its own (#savingsStale), now under this document's
+   too (2026-10-07 audit, REPORT-1). The house rule is that an exported
+   document carries the caveat its on-screen twin prints beside the number,
+   and this section printed the very figure the Dashboard's tile prints with
+   none of it.
+
+   Composed from the Dashboard's own keys over the Dashboard's own operands —
+   stalenessSummary() and bookFigures().drift, carried in `st` by
+   views/report.js — in the Dashboard's own order: the line and its age, the
+   distance the rows since then have moved the total, the accounts held out
+   of that distance for being in another currency, and the rows held out of
+   it for carrying no readable date. Not a call into the view (a DOM module
+   this pure file cannot require), so tests/report-caveats-carried.test.cjs
+   renders the Dashboard beside the report and holds the two sentences equal:
+   if either page rewords it, that suite says so. Empty when nothing is
+   stale, as the Dashboard prints nothing then. */
+function staleBalancesLine(st, money) {
+  if (!st || !st.count) return '';
+  const age = st.oldestDays === null || st.oldestDays === undefined
+    ? i18n.t('dash.stale.noDate')
+    : i18n.t('dash.stale.oldest', { days: st.oldestDays, count: st.oldestDays });
+  const line = st.count === st.total
+    ? i18n.t('dash.stale.all', { count: st.total })
+    : i18n.t('dash.stale.some', { stale: st.count, total: st.total });
+  const moved = Number(st.movedSince) || 0;
+  const movedNote = Math.abs(moved) >= 1
+    ? i18n.t(moved > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: money(Math.abs(moved), 0) })
+    : '';
+  const foreignNote = st.foreignAccounts
+    ? ' ' + i18n.t('dash.foreignExcluded', { count: st.foreignAccounts, symbols: (st.foreignSymbols || []).join(' · ') })
+    : '';
+  /* The Dashboard's unreadableNote(): silent rather than a raw key until a
+     language table carries the sentence. */
+  const undated = st.undatedRows ? i18n.t('acct.deck.why.unreadable', { count: st.undatedRows }) : '';
+  const undatedNote = undated && undated !== 'acct.deck.why.unreadable' ? ' ' + undated : '';
+  return i18n.t('dash.stale.line', { line, age }) + movedNote + foreignNote + undatedNote;
 }
 
 function kvTable(rows) {
@@ -291,7 +409,10 @@ function budgetTable(rows, money) {
     /* Phase 3 of ADR-0006: the same rule the Dashboard's table reads, so an
        assume-spent row cannot be "unbudgeted" here and budgeted there. */
     const { remaining, unbudgeted } = budgetRowStatus(r);
-    out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${escMd(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
+    /* escMdText, not escMd: a category name and a custom group's name are
+       the household's own text in a GENERATED note — see escMdText's header
+       (src/markdown.js) for what a "<" or a "![" did here before. */
+    out.push(`| ${escMdText(r.cat)}${r.orphaned ? ' *' : ''} | ${escMdText(r.type || '')} | ${r.budget ? money(r.budget) : '—'} | ${money(r.actual)} | ${(r.budget || unbudgeted) ? money(remaining) : ''} |`);
   }
   return out;
 }
@@ -339,7 +460,7 @@ function budgetTable(rows, money) {
 function categoryTable(rows, money) {
   const out = ['', `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.amount')} | ${i18n.t('report.col.percent')} |`,
     '|---|---:|---:|'];
-  for (const r of rows) out.push(`| ${escMd(r.cat)}${r.orphaned ? ' *' : ''} | ${money(r.amount)} | ${r.pct}% |`);
+  for (const r of rows) out.push(`| ${escMdText(r.cat)}${r.orphaned ? ' *' : ''} | ${money(r.amount)} | ${r.pct}% |`);
   return out;
 }
 
@@ -353,7 +474,7 @@ function debtTable(rows, money) {
      IT already prints '—' for the very same missing figure. A reader who sees
      a dash under Rate and R0.00 under Monthly interest is being told the
      second was worked out from the first. */
-  for (const d of rows) out.push(`| ${escMd(d.name)} | ${money(d.balance)} | ${d.rate ? `${d.rate}%` : '—'} | ${d.rate ? money(d.interest) : '—'} |`);
+  for (const d of rows) out.push(`| ${escMdText(d.name)} | ${money(d.balance)} | ${d.rate ? `${d.rate}%` : '—'} | ${d.rate ? money(d.interest) : '—'} |`);
   return out;
 }
 
@@ -403,11 +524,41 @@ function prepareReportData(data) {
       used: budgetUsedShare(data.budgetUsed),
     }
     : data.budgetUsed;
+  /* What Net holds that Income and Spend do not — 2026-10-07 audit, REPORT-4.
+     The Income & Spend table prints the three one above the other, and a
+     reader subtracts; they were never built to subtract. Under the BUDGET
+     lens (ledger.js tally) Net is EVERY counted row, Income only the rows
+     under income-typed categories, Spend every non-income outflow gross. So
+     Net − (Income − Spend) is exactly the money that came IN under something
+     other than an income category, and it has two names: money in with no
+     recognised category (`uncountedIncome` — periodFigures' own figure, the
+     one the Dashboard hero's "not counted as income" line prints) and refunds
+     (what remains: an inflow under a known category that is neither income
+     nor transfer, which is ledger.js's isRefund to the row). On the vault this
+     was found on, a 12-month report's Net sat more than a whole month's income
+     away from Income − Spend — about two fifths of it uncategorised money in,
+     the rest refunds — and nothing in it said so.
+
+     Refunds are the residue of an identity, not a second count — every
+     operand is the period seam's own, summed over the selection — rounded to
+     the cent because a residue of floats is not money.
+     tests/report-net-explained.test.cjs holds it against isRefund over the
+     very rows the tally kept. Null when `uncountedIncome` is absent (a
+     hand-built fixture): an absent operand leaves the fact absent, the way it
+     does for budgetUsed above, rather than calling the whole gap refunds. */
+  const netIncludes = Number.isFinite(data.uncountedIncome)
+    ? {
+      refunds: Math.round(((Number(data.net) || 0) - ((Number(data.income) || 0) - (Number(data.spend) || 0))
+        - data.uncountedIncome) * 100) / 100 || 0,
+      uncounted: data.uncountedIncome,
+    }
+    : null;
   return {
     ...data,
     spendByCategory: spendByCategory.map((r, i) => ({ ...r, pct: pct[i] })),
     savings,
     budgetUsed,
+    netIncludes,
   };
 }
 
@@ -423,14 +574,20 @@ function prepareReportData(data) {
      periodCount: number,              // R5 — how many periods were merged; the rename
                                         // caveat below only ever prints when this is > 1
      income, spend, net: number,       // periodSummary(), summed across the selection
+     uncountedIncome: number,          // periodFigures(p).uncountedIncome, summed: money in
+                                        // with no recognised category. prepareReportData
+                                        // derives `netIncludes` from it (REPORT-4)
      budgetIncome, budgetSpend: number,// budgetTotals(), summed the same way; budgetSpend
                                         // is the WHOLE plan (spend + set-aside envelopes)
-     budgetUsed: { spend, setAside, assumed, budgeted, moved },  // F10 — ADR-0005's
-                                        // OPERANDS, summed per period off ctx.budgetUsed(p)
-                                        // and ctx.movedToFunds(p). `spent` and `used` are
-                                        // NOT the caller's to supply: prepareReportData
-                                        // below derives both through money-flow.js's one
-                                        // rule, the way it already owns `pct` and `rate`.
+     budgetUsed: { spend, setAside, assumed, budgeted, moved, setAsidePlanned },  // F10 —
+                                        // ADR-0005's OPERANDS, summed per period off
+                                        // ctx.budgetUsed(p) and ctx.movedToFunds(p), plus
+                                        // planFigures(p).setAside summed (`setAsidePlanned`,
+                                        // the Y of "R X of R Y saved so far" — REPORT-3).
+                                        // `spent` and `used` are NOT the caller's to
+                                        // supply: prepareReportData below derives both
+                                        // through money-flow.js's one rule, the way it
+                                        // already owns `pct` and `rate`.
      categories: [{ cat, budget, actual, type, orphaned }],  // budgetVsActualRows(),
                                                      // merged, typeRank-sorted (see
                                                      // budgetTable); orphaned = !catKnown(cat)
@@ -456,8 +613,15 @@ function prepareReportData(data) {
                                         // states a rate — health-math.js's rule, and
                                         // `coverage` {shown,total,missing} is how much of
                                         // the book a stated figure actually covers
-     netWorth: { net, assets, liabilities },
-     health: null | { score, band, months, target, savingsRatePct, interestSharePct },
+     netWorth: { net, assets, liabilities, stale },
+                                        // `stale` (REPORT-1): the Dashboard's #dashStale
+                                        // operands — { count, total, oldestDays } from
+                                        // stalenessSummary() and { movedSince,
+                                        // foreignAccounts, undatedRows } from
+                                        // bookFigures().drift, plus foreignSymbols
+     health: null | { score, band, months, target, savingsRatePct, interestSharePct,
+                      countedPeriods },  // countedPeriods: the completed periods the
+                                        // score averaged over (REPORT-1)
      transactions: null | rows[],      // detail mode only, exporter.js row shape
    }
 
@@ -541,20 +705,52 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.budgetIncome'), money(budgetIncome)],
       [i18n.t('report.col.budgetSpend'), money(budgetSpend)],
     ]));
+  /* REPORT-4 (2026-10-07 audit) — the two things Net holds that Income and
+     Spend do not, named under the table they qualify. See prepareReportData's
+     note on `netIncludes`. Each only when it reaches a whole currency unit:
+     below that there is nothing to report but rounding. */
+  const ni = data.netIncludes;
+  if (ni) {
+    const why = [];
+    if (ni.refunds >= 1) why.push(i18n.t('report.net.refunds', { amount: money(ni.refunds) }));
+    if (ni.uncounted >= 1) why.push(i18n.t('report.net.uncounted', { amount: money(ni.uncounted) }));
+    if (why.length) out.push('', why.join(' '));
+  }
   /* ADR-0007 · The exported report states the app's own budget-used pair. The
      whole-plan rows above stay; ADR-0005's pair joins them in the hero's and
      the Budget tile's own sentences, every held-out amount named. */
   const bu = budgetUsed;
+  const parts = [];
   if (bu && ((bu.spent || 0) > 0 || (bu.budgeted || 0) > 0)) {
     const usedPct = bu.used === null || bu.used === undefined ? null : sharePercentLabel(bu.used, '.');
-    const parts = [i18n.t('dash.hero.sub', { spent: money(bu.spent), budgeted: money(bu.budgeted) })];
+    parts.push(i18n.t('dash.hero.sub', { spent: money(bu.spent), budgeted: money(bu.budgeted) }));
     if ((bu.assumed || 0) > 0) parts.push(i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(bu.assumed) }));
     else if (usedPct !== null) parts.push(i18n.t('bud.total.spentNote', { pct: usedPct }));
-    if ((bu.setAside || 0) > 0) {
-      parts.push(i18n.t('dash.stat.setAsideMoved', { amount: money(bu.setAside, 0), moved: money(bu.moved || 0, 0) }));
-    }
-    out.push('', parts.join(' · '));
+    /* The set-aside PAID this selection, held out of the numerator above —
+       the fragment the Dashboard hero prints beside this same sub-line
+       (dash.stat.setAside), so gross Spend less it, plus the provision, is
+       still the figure the sentence states, from the document alone. Until
+       2026-10-07 the "saved so far" sentence below carried this figure as its
+       Y; that sentence is about the PLAN now, and this figure keeps its own
+       words rather than vanishing with the change. */
+    if ((bu.setAside || 0) >= 1) parts.push(i18n.t('dash.stat.setAside', { amount: money(bu.setAside, 0) }));
   }
+  /* "R X of R Y saved so far" — 2026-10-07 audit, REPORT-3. Y is the saving
+     the household PLANNED (planFigures(p).setAside, summed over the
+     selection), X what moved into its funds: the meaning 1.49.1's changelog
+     gave the sentence, and the one the Dashboard hero prints, under the
+     hero's own key and the hero's gate — whenever the plan sets anything
+     aside, paid or not. It filled Y with the set-aside PAID and printed
+     nothing until something had been: on the vault this was found on, a
+     3-month report said every rand of the saving was in ("R X of R X") while
+     a quarter of the plan was still to go, and a current-month report said
+     nothing at all beside a Dashboard reading "R 0 of R Y saved so far".
+     Moved stays the FIRST figure: scripts/reconcile-page.cjs reads the two
+     by position inside the Budget page's twin of this sentence. */
+  if (bu && (bu.setAsidePlanned || 0) > 0) {
+    parts.push(i18n.t('dash.stat.ofWhichSetAside', { amount: money(bu.setAsidePlanned, 0), moved: money(bu.moved || 0, 0) }));
+  }
+  if (parts.length) out.push('', parts.join(' · '));
   /* period.js's periodSummary() returns `foreign` WITH the figures rather
      than beside them, and says in its own comment that every tile, table,
      chart and aria-label built from this object is expected to say something
@@ -602,7 +798,7 @@ function financialReportMarkdown(data, money) {
       amount: money(fundedFromSavings.spend), count: fundedFromSavings.count,
     }));
   }
-  const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMd(r.cat));
+  const orphanedNames = spendByCategory.filter(r => r.orphaned).map(r => escMdText(r.cat));
   if (orphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: orphanedNames.join(', ') }));
   /* L1, 2026-08-29 audit (Phase 4b) — see categoryTable's own header above
      for the full reasoning: this table is deliberately never collapsed, so
@@ -616,7 +812,7 @@ function financialReportMarkdown(data, money) {
   out.push('', `## ${i18n.t('report.section.budgetActual')}`);
   if (categories.length) out.push(...budgetTable(categories, money));
   else out.push('', i18n.t('report.budget.empty'));
-  const budgetOrphanedNames = categories.filter(r => r.orphaned).map(r => escMd(r.cat));
+  const budgetOrphanedNames = categories.filter(r => r.orphaned).map(r => escMdText(r.cat));
   if (budgetOrphanedNames.length) out.push('', i18n.t('report.category.orphaned', { names: budgetOrphanedNames.join(', ') }));
 
   /* R5, 2026-08-29 audit — mergeCategoryRows (this file, above) keys on the
@@ -732,7 +928,7 @@ function financialReportMarkdown(data, money) {
       out.push('', i18n.t('report.debt.interestNone'));
     } else if (cov && cov.missing > 0) {
       out.push('', i18n.t('report.debt.interestPartial',
-        { shown: cov.shown, total: cov.total, missing: cov.missing }));
+        { count: cov.missing, shown: cov.shown, total: cov.total, missing: cov.missing }));
     }
   }
   if (debtForeign) out.push('', debtForeign);
@@ -744,6 +940,11 @@ function financialReportMarkdown(data, money) {
       [i18n.t('report.col.owned'), money(netWorth.assets)],
       [i18n.t('report.col.owed'), money(netWorth.liabilities)],
     ]));
+  /* REPORT-1 — how old the balances under these three figures are, and how
+     far the rows since then have already moved them: the Dashboard's sentence
+     under the same net worth. See staleBalancesLine. */
+  const staleLine = staleBalancesLine(netWorth.stale, money);
+  if (staleLine) out.push('', staleLine);
   /* Built since issue #28 and never emitted — the line existed, correct, at
      the top of this function, and no `out.push` ever carried it into the
      document. So the fix that was supposed to stop this section printing a
@@ -758,6 +959,16 @@ function financialReportMarkdown(data, money) {
      new to measure gets no section rather than a page of dashes. */
   if (health) {
     out.push('', `## ${i18n.t('report.section.health')}`, i18n.t('report.asOf'));
+    /* REPORT-1 — the score, the saving rate and the interest share below are
+       AVERAGES, and the Dashboard's health card and the Score page both say
+       over how many completed periods. This section said "as of today" and
+       nothing else. Same key and same gate as the card: no line at all when
+       the count never reached this object (a hand-built fixture). */
+    if (health.countedPeriods !== null && health.countedPeriods !== undefined) {
+      out.push('', health.countedPeriods
+        ? i18n.t('dash.health.sub', { count: health.countedPeriods })
+        : i18n.t('dash.health.subNone'));
+    }
     const rows = [[i18n.t('report.health.score'), health.score !== null ? String(health.score) : '—']];
     if (health.months !== null) rows.push([i18n.t('report.health.months'), `${health.months.toFixed(1)} / ${health.target}`]);
     /* ISSUE 37, and the reason it belongs in the exported document too: the
@@ -817,6 +1028,15 @@ function financialReportMarkdown(data, money) {
        a €900 charge prints in euro instead of being stamped "R -900,00" — an
        amount of rand that never moved. */
     for (const r of transactions) {
+      /* MD-INJECT (2026-10-07 audit) — the row's own text is escaped for a
+         generated note by the shared row template itself now:
+         exporter.transactionRow runs escMdText over every text cell, once.
+         The Description is whatever the bank or the payer wrote. This loop
+         escaped its own copy first while that was still to land; doing both
+         would double every backslash, which
+         tests/report-markdown-escape.test.cjs pins against. The amount and
+         currency cells are the app's own figures and are left to the
+         formatters. */
       out.push(transactionRow(r, (v, row) => (row && row.currency && row.currency !== household
         ? `${row.currency} ${Number(v).toFixed(2)}` : money(v)),
       /* The Currency CELL, from the same per-row field the formatter beside
@@ -884,7 +1104,30 @@ function budgetUsedFact(bu) {
     used_pct: used,
     set_aside: (bu && bu.setAside) || 0,
     set_aside_moved: (bu && bu.moved) || 0,
+    /* REPORT-3 — the Y of "R X of R Y saved so far": the set-aside the plan
+       holds, summed over the selection. `set_aside` above is the set-aside
+       PAID, the ADR-0005 operand; the Markdown names both. */
+    set_aside_planned: (bu && bu.setAsidePlanned) || 0,
     assumed: (bu && bu.assumed) || 0,
+  };
+}
+
+/* REPORT-1 — the Dashboard's staleness caveat as data. Null when the operands
+   never reached `data` (a hand-built fixture); otherwise always the full
+   object, zeroed when nothing is stale, so a consumer tests `count > 0`
+   rather than whether the key exists. `moved_since` is SIGNED (what the rows
+   dated after the stated balances add up to, household currency only);
+   `foreign_accounts` and `undated_rows` are what that figure could not
+   include. */
+function unconfirmedFact(st) {
+  if (!st) return null;
+  return {
+    count: st.count || 0,
+    total: st.total || 0,
+    oldest_days: st.oldestDays === undefined ? null : st.oldestDays,
+    moved_since: Number(st.movedSince) || 0,
+    foreign_accounts: st.foreignAccounts || 0,
+    undated_rows: st.undatedRows || 0,
   };
 }
 
@@ -914,7 +1157,7 @@ function financialReportJson(data) {
     generated, periodLabel, rangeNote, detail, periodCount, currency,
     income, spend, net, budgetIncome, budgetSpend,
     categories, spendByCategory, categoryGap, fundedFromSavings, scheduled, savings, debts, netWorth, health, transactions,
-    otherCurrencies, foreign, budgetUsed,
+    otherCurrencies, foreign, budgetUsed, netIncludes,
   } = data;
 
   const shape = {
@@ -944,6 +1187,11 @@ function financialReportJson(data) {
       /* ADR-0007 · The exported report states the app's own budget-used pair.
          Added beside the whole-plan figures above, never swapped for them. */
       budget_used: budgetUsedFact(budgetUsed),
+      /* REPORT-4 — what `net` holds that `income` and `spend` do not, the
+         two figures the Markdown names under its table: net = income − spend
+         + refunds + uncategorised_in, to the cent. Null only when the
+         operand never reached `data` (see prepareReportData). */
+      net_includes: netIncludes ? { refunds: netIncludes.refunds, uncategorised_in: netIncludes.uncounted } : null,
       /* ISSUE 28 — the same fact the Markdown sibling states in prose
          (dash.foreignExcluded), as raw data. Always present and zeroed on a
          single-currency vault rather than absent, matching every other count
@@ -1059,7 +1307,12 @@ function financialReportJson(data) {
         },
       }
       : null,
-    net_worth: { net: netWorth.net, assets: netWorth.assets, liabilities: netWorth.liabilities },
+    net_worth: {
+      net: netWorth.net, assets: netWorth.assets, liabilities: netWorth.liabilities,
+      /* REPORT-1 — the facts behind the staleness sentence the Markdown
+         prints under these figures. See unconfirmedFact. */
+      unconfirmed_balances: unconfirmedFact(netWorth.stale),
+    },
     /* The household's NET position in every other currency — accounts plus
        assets minus debts, per symbol, never converted (worth.js's
        otherCurrencyNet, the same list the Net Worth section's caveat prints).
@@ -1073,6 +1326,11 @@ function financialReportJson(data) {
       ? {
         score: health.score, months: health.months, target_months: health.target,
         savings_rate_pct: health.savingsRatePct, interest_share_pct: health.interestSharePct,
+        /* REPORT-1 — how many completed periods the score, the saving rate
+           and the interest share are averaged over; the number in the
+           Markdown's "Averaged over your last N completed periods". Null when
+           it never reached `data`. */
+        counted_periods: health.countedPeriods === undefined ? null : health.countedPeriods,
         /* ISSUE 57. The same two exclusions the Markdown prose states, as data
            — a machine reader must not be handed a score with no field saying
            what it was measured without. */
@@ -1091,6 +1349,6 @@ function financialReportJson(data) {
 }
 
 module.exports = {
-  REPORT_DIR, REPORT_SPLIT_SLICES, reportPaths, mergeCategoryRows, managedFolderMatch,
+  REPORT_DIR, REPORT_SPLIT_SLICES, reportPaths, mergeCategoryRows, mergeSpendByCategory, managedFolderMatch,
   prepareReportData, financialReportMarkdown, financialReportJson, copyBody,
 };

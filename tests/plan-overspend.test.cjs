@@ -29,14 +29,40 @@
    than min()'d at a call site: two figures for the same thing derived by two
    different rules is this repo's recurring bug shape.
 
+   AMENDED 7 Oct 2026 — those two lines were plan-wide sums, and "not in a
+   bucket AND not yet gone" is a statement about each BUCKET. The figures audit
+   gave the counter-example: a pot of 10 000 in three buckets of 3 000, bucket
+   A spent 4 500 and B 1 000. Plan-wide, 5 500 gone against 9 000 placed looks
+   like nothing went past the buckets, so the page offered "Left to place
+   R 1 000,00" and a button to put it in a new bucket. But B and C still claim
+   their 2 000 + 3 000, and the 1 500 A ran over came out of somewhere: the
+   true figure is −500. So every bucket now claims max(its amount, what has gone
+   from it), and money gone from no bucket at all is claimed by nobody but
+   still gone:
+
+     claimed   = Σ max(bucket amount, bucket spent) + spent from no bucket
+     placeable = pot − claimed                 what can still be placed
+     overspend = claimed − allocated           what went past its own bucket
+     committed = claimed − spent               placed and not yet gone
+
+   On a plan with one bucket (and on every plan where no bucket has run over)
+   these are exactly the old figures — section 3 below still holds the old
+   identities for that case. This test's own worked example moves: the second
+   car repair is 8 678 past the Subaru bucket (not the 5 377 net of the other
+   buckets' untouched money), and 11 240 can be placed, not 14 541 — the
+   R 3 301 difference is Baby Items, Church Camp and R 1 of Oral hygiene, placed
+   and still unspent. The header's own sentence ("placing money requires BOTH")
+   gives 11 240; the old sums simply could not see per-bucket money.
+
      node tests/plan-overspend.test.cjs        # non-zero exit on failure */
 
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 
-const { planSummary, envelopeBar, round2 } = require('../src/plan-math');
+const { planSummary, barSegments, envelopeBar, round2 } = require('../src/plan-math');
 const registerPlan = require('../src/views/plan');
+const i18n = require('../src/i18n');
 
 let checks = 0;
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -79,14 +105,69 @@ const R = planSummary(REPORTED);
 eq(R.pot, 48200, 'pot: the two payouts');
 eq(R.allocated, 28282, 'allocated: the five buckets');
 eq(R.spent, 33659, 'spent: the five items, second repair included');
-eq(R.committed, 0, 'committed clamps: nothing placed remains unspent');
 eq(R.free, 19918, 'free is still pot minus allocated — a true fact about the buckets');
 eq(R.left, 14541, 'left is still pot minus spent');
 
-/* The two new ones, and the point of the whole exercise. */
-eq(R.overspend, 5377, 'R 5 377 went past what the buckets held — the figure the page never named');
-eq(R.placeable, 14541, 'only R 14 541 can still be placed, not the R 19 918 the hero used to offer');
+/* Per bucket (amended 7 Oct 2026, see the header). Worked by hand:
+     Subaru Repair  15 412 placed, 24 090 gone  -> claims 24 090, 8 678 over
+     Oral hygiene    5 200 placed,  5 199 gone  -> claims  5 200, R 1 still spoken for
+     Emergency fund  4 370 placed,  4 370 gone  -> claims  4 370
+     Baby Items      1 300 placed,      0 gone  -> claims  1 300, all spoken for
+     Church Camp     2 000 placed,      0 gone  -> claims  2 000, all spoken for
+   claimed 36 960; placeable 48 200 − 36 960 = 11 240. */
+eq(R.committed, 3301,
+  'spoken for is per bucket: Baby Items, Church Camp and R 1 of Oral hygiene are placed and unspent — '
+  + 'the plan-wide clamp used to call that R 0');
+eq(R.overspend, 8678,
+  'R 8 678 went past the bucket it came out of — the second repair, which no bucket held; '
+  + 'not the R 5 377 left after netting it against other buckets\' untouched money');
+eq(R.placeable, 11240,
+  'only R 11 240 can still be placed: not the R 19 918 free, and not the R 14 541 left either, '
+  + 'because R 3 301 of what is left is still spoken for');
 ok(R.placeable < R.free, 'an overspent plan can place strictly less than is unbucketed — the bug in one line');
+eq(round2(R.free - R.overspend), R.placeable, 'placeable is free less what went past its bucket');
+eq(round2(R.left - R.committed), R.placeable, 'and equally, what is left less what is still spoken for');
+
+/* ------------------------------------------------------------------ *
+ * 1b. One bucket overspent while the others are not (figures audit,   *
+ *     7 Oct 2026, L2a-08)                                              *
+ * ------------------------------------------------------------------ */
+
+/* The counter-example the plan-wide sums could not see. Worked by hand:
+   pot 10 000; A, B and C hold 3 000 each; A has 4 500 gone, B 1 000, C none.
+     claims: A 4 500, B 3 000, C 3 000 = 10 500  -> placeable −500
+     A ran 1 500 past its bucket                   -> overspend 1 500
+     B still holds 2 000, C 3 000                  -> committed 5 000
+   Plan-wide this read as 5 500 gone of 9 000 placed: "R 1 000 left to place". */
+const AUDIT = {
+  sources: [{ name: 'Bonus', amount: 10000, status: 'received' }],
+  envelopes: [{ name: 'A', amount: 3000 }, { name: 'B', amount: 3000 }, { name: 'C', amount: 3000 }],
+  items: [
+    { name: 'a1', envelope: 'A', amount: 3000, spent: 4500 },
+    { name: 'b1', envelope: 'B', amount: 1000, spent: 1000 },
+  ],
+};
+{
+  const q = planSummary(AUDIT);
+  eq([q.pot, q.allocated, q.spent, q.free, q.left], [10000, 9000, 5500, 1000, 4500],
+    'precondition: the plan-wide sums are what they always were');
+  eq(q.placeable, -500, 'nothing is left to place — A\'s overrun ate the unplaced 1 000 and 500 of what B and C still claim');
+  eq(q.overspend, 1500, 'A ran 1 500 past its bucket, and the page must say so even though 5 500 < 9 000');
+  eq(q.committed, 5000, 'B and C still hold 5 000 between them');
+}
+
+/* Money gone from no bucket at all (an item whose bucket was renamed or
+   deleted by hand in the file) is claimed by nobody — but it has gone. */
+{
+  const q = planSummary({
+    sources: [{ amount: 1000 }],
+    envelopes: [{ name: 'Kept', amount: 600 }],
+    items: [{ envelope: 'Kept', amount: 600, spent: 100 }, { envelope: 'Gone', amount: 300, spent: 300 }],
+  });
+  eq(q.placeable, 100, 'pot 1 000 − Kept\'s 600 − 300 spent from no bucket');
+  eq(q.overspend, 300, 'spending from no bucket is spending past every bucket');
+  eq(q.committed, 500, 'Kept still holds 500');
+}
 
 /* ------------------------------------------------------------------ *
  * 2. The definitions, held apart from the worked example              *
@@ -153,7 +234,12 @@ for (const [k, v] of Object.entries(empty)) {
  * ------------------------------------------------------------------ */
 
 /* Same deterministic generator as tests/plan.test.cjs, same reason: a failure
-   must be reproducible from the seed rather than vanish on the next run. */
+   must be reproducible from the seed rather than vanish on the next run.
+
+   These plans name no bucket and no item's bucket, so every item belongs to
+   the one unnamed bucket and the whole plan is a single bucket — the case in
+   which the per-bucket figures (header, amended 7 Oct 2026) are exactly the
+   old plan-wide ones. Section 3c below is the many-bucket case. */
 let seed = 20260913;
 const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
 const cents = () => Math.round(rnd() * 5000000) / 100;
@@ -189,13 +275,57 @@ for (let n = 0; n < 400; n++) {
     assert.strictEqual(round2(q.free - q.placeable), q.overspend,
       `free overstates placeable by exactly the overspend (n=${n})`);
     assert.strictEqual(q.committed, 0,
-      `an overspent plan has nothing left spoken for (n=${n})`);
+      `an overspent ONE-bucket plan has nothing left spoken for (n=${n})`);
   } else {
     assert.strictEqual(q.placeable, q.free,
       `with nothing overspent, placeable is free untouched (n=${n})`);
   }
 }
 checks += 7;
+
+/* ------------------------------------------------------------------ *
+ * 3c. Many buckets: the per-bucket definitions, against an oracle      *
+ * ------------------------------------------------------------------ */
+
+/* The definitions spelled out directly from the header — per bucket, by name,
+   with items whose bucket does not exist counted as spent from no bucket — and
+   compared with what planSummary returns. Bucket names are drawn from a small
+   set so plans routinely have overspent, underspent, empty and missing
+   buckets side by side, which is where the plan-wide sums went wrong. */
+for (let n = 0; n < 600; n++) {
+  const names = ['A', 'B', 'C', 'D'];
+  const envelopes = names.slice(0, 1 + Math.floor(rnd() * 4)).map(name => ({ name, amount: cents() }));
+  const items = Array.from({ length: Math.floor(rnd() * 10) }, () => ({
+    envelope: names[Math.floor(rnd() * 5)] || 'Nowhere',     // index 4 is a bucket that does not exist
+    amount: cents(), spent: rnd() < 0.3 ? 0 : cents(),
+  }));
+  const p = { sources: [{ amount: cents() }, { amount: cents() }], envelopes, items };
+  const q = planSummary(p);
+
+  let claimed = 0, over = 0, held = 0;
+  for (const e of envelopes) {
+    const s = items.filter(i => i.envelope === e.name).reduce((t, i) => t + i.spent, 0);
+    claimed += Math.max(e.amount, s); over += Math.max(0, s - e.amount); held += Math.max(0, e.amount - s);
+  }
+  const fromNowhere = items.filter(i => !envelopes.some(e => e.name === i.envelope)).reduce((t, i) => t + i.spent, 0);
+  claimed += fromNowhere; over += fromNowhere;
+
+  assert.strictEqual(q.placeable, round2(q.pot - claimed), `placeable = pot − Σ bucket claims (n=${n})`);
+  assert.strictEqual(q.overspend, round2(over), `overspend = Σ per-bucket overrun + spent from no bucket (n=${n})`);
+  assert.strictEqual(q.committed, round2(held), `committed = Σ per-bucket unspent (n=${n})`);
+  assert.strictEqual(round2(q.free - q.overspend), q.placeable, `free − overspend = placeable (n=${n})`);
+  assert.strictEqual(round2(q.left - q.committed), q.placeable, `left − committed = placeable (n=${n})`);
+  assert.ok(q.placeable <= round2(Math.min(q.free, q.left)) + 0.005,
+    `placeable never exceeds what is unbucketed or what is left (n=${n})`);
+  const b = barSegments(q);
+  assert.strictEqual(round2(b.spent + b.committed + b.free), q.pot > 0 ? q.pot : 0,
+    `the bar still sums to the pot (n=${n})`);
+  for (const k of ['spent', 'committed', 'free']) assert.ok(b[k] >= 0, `bar ${k} is never negative (n=${n})`);
+  if (q.placeable >= 0 && q.pot > 0) {
+    assert.strictEqual(b.free, q.placeable, `the bar's free segment is what can still be placed (n=${n})`);
+  }
+}
+checks += 9;
 
 /* ------------------------------------------------------------------ *
  * 3b. envelopeBar — one bucket's own split, as three drawable widths  *
@@ -281,22 +411,21 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
        the hero's big figure, because the reader cannot place it. */
     ok(!/19918/.test(fig.replace(/\s/g, '')),
       `the hero must not offer the R 19 918 that overspending already took (got "${fig}")`);
-    ok(/14541/.test(fig.replace(/\s/g, '')),
-      `the hero must lead with the R 14 541 that can actually be placed (got "${fig}")`);
+    ok(/11240/.test(fig.replace(/\s/g, '')),
+      `the hero must lead with the R 11 240 that can actually be placed (got "${fig}")`);
 
     /* THE SECOND FIGURE, at a size a reader can see, and WHICH figure it is.
        "Still left to spend" used to be a small italic subtotal rendered only
        when it disagreed with the hero — the thing reported as too small. It is
-       a hero figure of its own now, EXCEPT here: on an overspent plan
-       `placeable` collapses onto `left`, so printing it would show R 14 541
-       twice side by side. The slot carries the overspend instead, which is the
-       second most important fact in that state and the one that explains the
-       first. `left` is not lost — it IS the first figure. */
+       a hero figure of its own now, EXCEPT on an overspent plan, where the
+       slot carries the overspend instead: the second most important fact in
+       that state, and the one that explains why the first figure is smaller
+       than the buckets suggest. */
     const second = pot.querySelector('.pot-fig-2');
     ok(second, 'the second hero figure is drawn');
-    ok(/5377/.test((second.textContent || '').replace(/\s/g, '')),
+    ok(/8678/.test((second.textContent || '').replace(/\s/g, '')),
       `an overspent plan puts the overspend in the second slot (got "${second.textContent}")`);
-    ok(!/14541/.test((second.textContent || '').replace(/\s/g, '')),
+    ok(!/11240/.test((second.textContent || '').replace(/\s/g, '')),
       'and NOT the same number the first figure is already showing');
     ok(second._cls.has('text-danger'), 'in danger red, because it is an alarm');
     ok(!pot.querySelector('.sk2-left'),
@@ -304,12 +433,50 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
 
     /* THE OVERSPEND, named in the key and again in the loud card. Before this
        fix neither mentioned it, because both keyed off free < 0. */
-    ok(/5377/.test(hero.replace(/\s/g, '')), 'the R 5 377 overspend appears in the hero key');
+    ok(/8678/.test(hero.replace(/\s/g, '')), 'the R 8 678 overspend appears in the hero key');
+    ok(/3301/.test(hero.replace(/\s/g, '')),
+      'and "Spoken for" names the R 3 301 still in untouched buckets, rather than R 0,00');
     const loud = $('#planFree');
     ok(!loud._cls.has('hidden'), 'the loud card shows on an overspent plan');
-    ok(/5377/.test((loud.textContent || '').replace(/\s/g, '')),
+    ok(/8678/.test((loud.textContent || '').replace(/\s/g, '')),
       'and states the overspend in figures');
     ok(loud._cls.has('is-over'), 'in its alarmed state, not its cheerful one');
+  }
+
+  /* ---- one bucket overspent while the others are not (L2a-08) ----
+     The audit's counter-example, rendered. The page used to lead with "Left to
+     place R 1 000,00", head the loud card "R 1 000,00 is not spoken for" and
+     offer to put it in a new bucket — money A's overrun had already taken. */
+  {
+    const named = full('Audit', 'Audit', {
+      sources: AUDIT.sources.map(s => ({ kind: 'Bonus', date: '2026-08-01', notes: '', ...s })),
+      envelopes: AUDIT.envelopes.map(e => ({ note: '', tint: '', ...e })),
+      items: AUDIT.items.map(i => ({ status: 'done', category: '', notes: '', ...i })),
+    });
+    const { $ } = await mountPlan(named);
+    const pot = $('#planPot');
+    const eyebrow = (pot.querySelector('.pot-eyebrow') || {}).textContent || '';
+    const fig = ((pot.querySelector('.pot-fig') || {}).textContent || '').replace(/\s/g, '');
+    ok(eyebrow !== i18n.t('plan.hero.leftToPlace'), `the hero must not say "Left to place" (got "${eyebrow}")`);
+    ok(/500/.test(fig) && !/1000/.test(fig), `the hero names the R 500 the buckets are past, not R 1 000 (got "${fig}")`);
+    ok((pot.querySelector('.pot-fig') || { _cls: new Set() })._cls.has('text-danger'), 'in its alarm colour');
+    /* Neither existing alarm label is TRUE here: 5 500 has gone of a 10 000
+       pot, and 9 000 is placed of it. What is true is that the buckets still
+       claim more than the plan has left. */
+    ok(eyebrow !== i18n.t('plan.hero.overSpent') && eyebrow !== i18n.t('plan.hero.overPlaced'),
+      `nor that more was spent or placed than the plan holds — neither is true (got "${eyebrow}")`);
+    const loud = $('#planFree');
+    const loudText = loud.textContent || '';
+    ok(loud._cls.has('is-over'), 'the loud card is in its alarmed state');
+    ok(!/is not spoken for/.test(loudText), `and no longer calls R 1 000 "not spoken for" (got "${loudText}")`);
+    ok(/1500/.test(loudText.replace(/\s/g, '')), 'it names the R 1 500 that went past bucket A');
+    ok(!/The buckets hold R 9000\.00 but R 5500\.00 has actually gone/.test(loudText),
+      'and never claims more has gone than the buckets hold, when less has');
+    ok(!loud.querySelectorAll('BUTTON').some(b => /new spending bucket/.test(b.textContent)),
+      'nor offers to put money that is already gone into a new bucket');
+    /* Last, because it reads a string that exists only once en.js carries the key. */
+    eq(eyebrow, i18n.t('plan.hero.overClaimed'), 'it says the buckets now claim more than is left');
+    ok(eyebrow !== 'plan.hero.overClaimed', 'in words, not a bare i18n key');
   }
 
   /* ---- a healthy plan is left exactly as it was ---- */

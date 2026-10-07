@@ -32,6 +32,10 @@ const near = (a, b, tol, m) => { assert.ok(Math.abs(a - b) <= tol, `${m} (got ${
   /* An uncategorised debit is more likely a bill than a treat — it counts, so
      the cover figure errs toward fewer months, never more. */
   eq(essentialTotal({ Mystery: 500 }, typeOf), 500, 'unknown category type counts as essential');
+  /* And a row with NO category, the way the HOUSEHOLD tally hands it in since
+     2026-10-07: one bucket under the empty name, whose type is null (audit
+     L2a-05 — this rule was never reached by a blank row before). */
+  eq(essentialTotal({ '': 300, Coffee: 800 }, typeOf), 300, 'the uncategorised bucket counts as essential too');
   eq(essentialTotal({}, typeOf), 0, 'no spend, no essentials');
 }
 

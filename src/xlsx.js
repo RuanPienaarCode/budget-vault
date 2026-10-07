@@ -92,7 +92,11 @@ function capCell(value) {
   return out + '\u2026';
 }
 
-function escXml(value) {
+/* The characters of `value` XML 1.0 can carry, in order — everything else
+   dropped. Its own function (escXml below was this scan with the escaping
+   folded in) because sheetName must check a name AFTER this step, not before:
+   see its header. */
+function stripIllegal(value) {
   const s = value === null || value === undefined ? '' : String(value);
   let out = '';
   for (let i = 0; i < s.length; i++) {
@@ -110,6 +114,15 @@ function escXml(value) {
     }
     if (code >= 0xDC00 && code <= 0xDFFF) continue; // a lone low surrogate — dropped
     if (!bmpCharIsLegal(code)) continue; // a C0 control (other than \t\n\r) — dropped
+    out += s.charAt(i);
+  }
+  return out;
+}
+
+function escXml(value) {
+  const s = stripIllegal(value);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
     const ch = s.charAt(i);
     if (ch === '&') out += '&amp;';
     else if (ch === '<') out += '&lt;';
@@ -133,29 +146,55 @@ const SHEET_NAME_BAD_CHARS = /[[\]:*?/\\]/g;
        own quoting of a sheet name inside a formula reference)
      - unique CASE-INSENSITIVELY within the workbook — "Budget" and "budget"
        collide even though they are different JS strings.
+     - not "History", in any case — Excel reserves it for its own
+       change-tracking sheet and refuses a workbook that uses it
    `taken` is a Set the caller owns across every sheet in one workbook; this
    function adds the lower-cased form of whatever name it returns, so a
    caller only has to pass the same Set into every call to get disambiguation
-   across the whole book, exactly the way buildXlsx below does it. */
+   across the whole book, exactly the way buildXlsx below does it.
+
+   EVERY RULE RUNS ON THE NAME THAT WILL BE WRITTEN. This used to test for
+   emptiness, length and uniqueness first and leave the XML-illegal characters
+   for workbookXml's escXml to strip afterwards — so a name made only of
+   control characters passed as non-empty and went out as name="", and one
+   that was unique only by such a character collided with its neighbour once
+   stripped (2026-10-07 audit, L4A-10, with "History" let through as well).
+   Latent while every caller passes a fixed English literal, which is exactly
+   when a promise like "every rule here is Excel's own" should be made true.
+   Tab, LF and CR are legal XML but become spaces: an attribute value reads
+   them as spaces anyway, so that is the name Excel would see. A cut at 31
+   never splits a surrogate pair, for the same reason — the stray half would
+   be stripped after the check. tests/xlsx-sheet-names.test.cjs pins it. */
+const RESERVED_SHEET_NAME = 'history';
 function sheetName(raw, taken) {
   taken = taken || new Set();
-  let name = (raw === null || raw === undefined ? '' : String(raw)).replace(SHEET_NAME_BAD_CHARS, ' ').trim();
+  let name = stripIllegal(raw).replace(/[\t\n\r]/g, ' ').replace(SHEET_NAME_BAD_CHARS, ' ').trim();
   name = stripEdgeApostrophes(name);
-  if (name.length > SHEET_NAME_MAX) name = stripEdgeApostrophes(name.slice(0, SHEET_NAME_MAX));
+  if (name.length > SHEET_NAME_MAX) name = stripEdgeApostrophes(capUnits(name, SHEET_NAME_MAX));
   if (!name) name = 'Sheet';
 
+  const free = c => !taken.has(c.toLowerCase()) && c.toLowerCase() !== RESERVED_SHEET_NAME;
   let candidate = name;
   let n = 2;
-  while (taken.has(candidate.toLowerCase())) {
+  while (!free(candidate)) {
     const suffix = ` (${n})`;
     const base = name.length + suffix.length > SHEET_NAME_MAX
-      ? name.slice(0, SHEET_NAME_MAX - suffix.length)
+      ? capUnits(name, SHEET_NAME_MAX - suffix.length)
       : name;
     candidate = base + suffix;
     n++;
   }
   taken.add(candidate.toLowerCase());
   return candidate;
+}
+
+/* The first `n` UTF-16 units of `s`, one fewer when the cut would leave the
+   high half of a surrogate pair at the end. */
+function capUnits(s, n) {
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xD800 && last <= 0xDBFF ? cut.slice(0, -1) : cut;
 }
 
 function stripEdgeApostrophes(s) {
@@ -356,11 +395,32 @@ function workbookRelsXml(sheetCount) {
   return XML_DECL + `<Relationships xmlns="${NS_PKG_REL}">${rels.join('')}</Relationships>`;
 }
 
-function coreXml(creator, created) {
-  // created is 'YYYY-MM-DDTHH:MM' (no seconds, no zone) — W3CDTF wants both,
-  // so ':00Z' is appended rather than left ambiguous about which zone a bare
-  // local time would otherwise imply.
-  const iso = `${created}:00Z`;
+/* `created` is a wall-clock minute ('YYYY-MM-DDTHH:MM'); `utcOffset` is the
+   zone that clock was read in, in minutes east of UTC. W3CDTF wants seconds
+   and a zone, and the zone is where this went wrong: it always appended
+   ':00Z', declaring the time UTC — while the view hands in nowLocalMinute(),
+   the household's LOCAL clock. A workbook exported at 14:00 in Johannesburg
+   said it was made at 14:00Z, two hours in the future (2026-10-07 audit,
+   L4A-09). With the offset the minute is converted to the UTC instant and
+   written with 'Z' — what Excel itself writes into core.xml, and the one
+   form every reader of the part (openpyxl's included) parses the same way.
+   Without one, `created` is taken to BE UTC, which is the contract this
+   function always had, so its bytes for such a caller do not move. Pure
+   arithmetic — Date.UTC reads no clock and no zone. */
+function zoneMinutes(utcOffset) {
+  if (typeof utcOffset !== 'number' || !Number.isFinite(utcOffset) || Math.abs(utcOffset) > 18 * 60) return null;
+  return Math.round(utcOffset);
+}
+function w3cdtf(created, utcOffset) {
+  const off = zoneMinutes(utcOffset);
+  if (off === null) return `${created}:00Z`;
+  const m = CREATED_PARTS.exec(created);
+  const instant = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])) - off * 60000;
+  return `${new Date(instant).toISOString().slice(0, 19)}Z`;
+}
+
+function coreXml(creator, created, utcOffset) {
+  const iso = w3cdtf(created, utcOffset);
   return XML_DECL
     + '<cp:coreProperties '
     + 'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
@@ -381,6 +441,7 @@ function appXml(creator) {
 }
 
 const CREATED_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+const CREATED_PARTS = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
 function buildXlsx(sheets, opts) {
   opts = opts || {};
@@ -399,7 +460,10 @@ function buildXlsx(sheets, opts) {
   const entries = [
     { name: '[Content_Types].xml', data: contentTypesXml(sheets.length) },
     { name: '_rels/.rels', data: ROOT_RELS_XML },
-    { name: 'docProps/core.xml', data: coreXml(creator, created) },
+    /* The zone reaches core.xml only. The ZIP entries keep `created` as LOCAL
+       wall time: DOS time has no zone field, and every unzip tool shows it as
+       the local time it is. */
+    { name: 'docProps/core.xml', data: coreXml(creator, created, opts.utcOffset) },
     { name: 'docProps/app.xml', data: appXml(creator) },
     { name: 'xl/workbook.xml', data: workbookXml(names) },
     { name: 'xl/_rels/workbook.xml.rels', data: workbookRelsXml(sheets.length) },

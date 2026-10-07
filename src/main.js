@@ -23,12 +23,18 @@ class BudgetPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this._lastWrite = 0;   // shared write-guard timestamp (see io.js stampWrite)
+    /* The privacy splash's session flag, shared by every Budget view and the
+       headless API: false until "Enter budget" is tapped in this session.
+       setBudgetUnlocked() below is how the gate moves it; api.js's header
+       has the whole contract. */
+    this.budgetUnlocked = false;
     /* Headless read API for a sibling plugin — app.plugins.plugins['budget-app'].api.
-       Built here (not lazily on first access) so `registerEvent` below is called
-       during onload, which is where Obsidian expects it and where its own
-       auto-unregister-on-unload bookkeeping is wired up. api.js builds its own
-       ctx (io + period + load + trend-math + figures — no view, no DOM) on
-       first real use. */
+       Built here, before any view can exist, so the gate's hook always has an
+       API to tell. Building it reads nothing and registers no vault handler:
+       api.js registers its watcher when a sibling first subscribes
+       (registerEvent works at any point while the plugin is loaded and is
+       still undone at unload), and builds its own ctx (io + period + load +
+       trend-math + figures — no view, no DOM) on first real use. */
     this.api = buildApi(this);
     this.registerView(VIEW_TYPE, leaf => new BudgetView(leaf, this));
     this.addRibbonIcon('wallet', 'Open budget', () => this.activateView());
@@ -182,11 +188,35 @@ class BudgetPlugin extends Plugin {
     await io.writeFile('Settings.md', text);
   }
 
+  /* The privacy gate's way to the plugin-level session flag: controller.js
+     calls this from unlockGate (true) and lockGate (false), and the headless
+     API answers { locked: true } while the flag is false and the splash
+     setting is on. Through the API rather than a bare assignment, so a sibling
+     plugin already showing a figure is told the lock moved (api.js's
+     header). */
+  setBudgetUnlocked(open) {
+    this.api._setUnlocked(open);
+  }
+
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+  /* Every write of data.json passes through here: saveSettings() above, and
+     Obsidian 1.13's declarative settings tab, whose
+     PluginSettingTab.setControlValue writes with plugin.saveData(settings)
+     directly (read in the 1.13.7 app.js). That is the path the Privacy splash
+     toggle takes on 1.13, and it never reaches saveSettings(). settings-tab.js
+     tells open VIEWS about the toggle (applyPrivacyLock); with no view open,
+     this is the only place a toggled privacyLock reaches the headless API, so
+     a sibling showing a figure hears that the splash went on. Checked before
+     the write: the new value is already live in memory, and stays live if the
+     write fails (settings.err.save). */
+  async saveData(data) {
+    if (this.api) this.api._syncLock();
+    return super.saveData(data);
   }
 }
 

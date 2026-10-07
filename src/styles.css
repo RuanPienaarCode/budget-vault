@@ -69,6 +69,10 @@
   --ink-dim:           #4b5262;
   --ink-faint:         #5f6779;   /* AA on --body-bg; was #7b8494 */
   --line-soft:         rgba(15,23,32,.055);
+  /* Text laid over the primary/accent fill. Light reads white on the deep
+     emerald (7.68:1); the dark block below sets a near-black ink instead. A
+     rule reading this in both themes was undefined in light (2026-10-07 audit). */
+  --ink-on-accent:     #fff;
 
   /* The soft ring on a focused field. A literal rather than a color-mix of
      --color-primary so it needs no iOS-15 fallback; kept in sync with it by
@@ -371,6 +375,43 @@
   --checkbox-border-color: var(--border-color);
   --checkbox-border-color-hover: var(--color-primary);
   --checkbox-marker-color: var(--surface);
+  /* The same bleed through Obsidian's heading and emphasis variables. app.css
+     styles bare tags from theme variables — `h1 { color: var(--h1-color);
+     font-family: var(--h1-font) }` (h2-h6 alike), `b, strong { color:
+     var(--bold-color); font-weight: calc(var(--font-weight) +
+     var(--bold-modifier)) }`, `i, em { color: var(--italic-color) }` — and
+     those rules reach this plugin's page titles (the h1 shell.js gives every
+     view), the account drawer's h3 and the import help's strong and em, none
+     of which has a plugin colour or face of its own. Obsidian's default theme
+     declares them `inherit` on <body> — which, by the rule below, leaves
+     them empty — so nothing showed; a community theme or Style Settings that
+     colours headings repainted them in ITS colour and font, and
+     under a mismatched Theme setting that is a dark theme's pale heading on
+     this plugin's light page.
+
+     Pinned to currentColor, NOT to `inherit`. A CSS-wide keyword written into
+     a custom property applies to the property itself: `--h1-color: inherit`
+     here would copy the theme's value straight down from <body> and pin
+     nothing — measured in Chromium with a theme setting the heading red, the
+     red came through untouched. currentColor is resolved where it is used,
+     and `color: currentColor` IS inherit — exactly what the default theme
+     renders, now under every theme. Headings take this root's own face, and
+     bold stays the default theme's 200 above the text around it. */
+  --h1-color: currentColor;
+  --h2-color: currentColor;
+  --h3-color: currentColor;
+  --h4-color: currentColor;
+  --h5-color: currentColor;
+  --h6-color: currentColor;
+  --h1-font: var(--font-sans);
+  --h2-font: var(--font-sans);
+  --h3-font: var(--font-sans);
+  --h4-font: var(--font-sans);
+  --h5-font: var(--font-sans);
+  --h6-font: var(--font-sans);
+  --bold-color: currentColor;
+  --bold-modifier: 200;
+  --italic-color: currentColor;
 }
 .budget-app-root.bud-dark { color-scheme: dark; }
 
@@ -1379,8 +1420,12 @@
    from. No transition on the reveal (the detail line is just present or
    not), so there is nothing here that needs a reduced-motion guard. */
 .budget-app-root .caveat-chip { display: inline-block; }
+/* min-height: a one-line chip measured 21px tall, under the 24px WCAG 2.2 AA
+   target floor (2.5.8) — and this chip exists to be tapped. A chip whose text
+   wraps is already taller and does not notice the floor. */
 .budget-app-root .caveat-chip-btn {
   font: inherit; font-size: 11.5px; line-height: 1.3; cursor: pointer;
+  min-height: 24px;
   padding: 2px 9px; border-radius: 999px;
   border: 1px solid var(--color-primary); background: var(--color-primary-light);
   color: var(--color-primary);
@@ -1833,8 +1878,12 @@
 /* ============================================================
    STATUS PILLS + GOALS (Owed Money, Savings)
    ============================================================ */
+/* The pill is the control on Owed, Debts and Tax — a tap cycles the status —
+   and it measured 20px tall. min-height lifts it to the 24px floor without
+   touching its padding; inline-flex already centres the label in the extra. */
 .budget-app-root .status-pill {
   display: inline-flex; align-items: center; gap: 6px;
+  min-height: 24px;
   padding: 0.25rem 0.7rem; border-radius: 999px;
   font-size: 0.73rem; font-weight: 600; line-height: 1;
   border: 0; cursor: pointer; font-family: var(--font-sans);
@@ -2442,9 +2491,17 @@
     overflow: visible;
     text-overflow: clip;
     white-space: normal;
-    overflow-wrap: break-word;   /* Safari 15.0-15.3 has no `anywhere` */
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;   /* Safari 15.0-15.3 has no `anywhere` — it is added below */
     line-height: 1.25;
+  }
+  /* The second half of that fallback, in a block of its own. It used to be a
+     second overflow-wrap in the same rule — the classic fallback shape, and
+     the browser reads it correctly — but a repeated property in one
+     declaration block is a finding on the community scorecard, and 1.49.0's
+     four of them cost the listing three lint findings it did not have at
+     1.48.0. An engine that cannot parse `anywhere` never enters this block. */
+  @supports (overflow-wrap: anywhere) {
+    .budget-app-root .donut-legend .dl-name { overflow-wrap: anywhere; }
   }
 }
 /* Why the baseline column is a part-month while the period is still running.
@@ -2604,13 +2661,24 @@
    Obsidian's own form chrome rather than the plugin's palette, because in a
    modal the host's theme is the right one to match. */
 .budget-split-head { margin-bottom: 12px; }
-.budget-split-desc { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.budget-split-desc { font-weight: 600; font-size: 14px; overflow-wrap: break-word; }
 .budget-split-meta { font-size: 12.5px; opacity: .65; margin-top: 2px; }
 .budget-split-parts { display: flex; flex-direction: column; gap: 8px; }
 .budget-split-part { display: flex; gap: 8px; align-items: center; }
 .budget-split-amt { width: 90px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
 .budget-split-cat { flex: 0 1 150px; min-width: 0; }
 .budget-split-note { flex: 1 1 auto; min-width: 0; }
+/* Both widths again, spelled to tie Obsidian's own
+   `.is-mobile input[type='text'] { width: 100% }` (0,2,1), which out-ranks the
+   lone classes above (0,1,0) on every mobile device. In a row that does not
+   wrap — an iPad, or a phone held sideways, both past the 480px rule below —
+   the amount field took the whole row and, being flex:none, never gave any of
+   it back: the category picker and the note kept nothing but their own
+   padding (48px and 32px measured), so a part could not be given a category.
+   A tie is enough because a plugin's stylesheet loads after app.css. The note
+   goes back to `auto` so its flex-basis is its own width, not the row's. */
+.budget-split-part input.budget-split-amt { width: 90px; }
+.budget-split-part input.budget-split-note { width: auto; }
 .budget-split-del { flex: none; padding: 0 8px; opacity: .6; cursor: pointer; }
 .budget-split-del:hover { opacity: 1; }
 .budget-split-add { margin-top: 10px; font-size: 13px; cursor: pointer; }
@@ -2632,9 +2700,9 @@
 .budget-tidy-row + .budget-tidy-row {
   border-top: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
 }
-.budget-tidy-pattern { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.budget-tidy-pattern { font-size: 13px; font-weight: 600; overflow-wrap: break-word; }
 .budget-tidy-empty { font-style: italic; opacity: .7; font-weight: 500; }
-.budget-tidy-why { font-size: 12px; opacity: .68; margin-top: 1px; overflow-wrap: anywhere; }
+.budget-tidy-why { font-size: 12px; opacity: .68; margin-top: 1px; overflow-wrap: break-word; }
 .budget-tidy-hint { margin-top: 10px; font-size: 12px; line-height: 1.45; opacity: .65; }
 
 /* Re-slice rows reuse the tidy list's box and separators — same modal furniture,
@@ -2645,7 +2713,7 @@
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; cursor: pointer;
 }
 .budget-reslice-row input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
-.budget-reslice-cat { flex: 1 1 auto; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.budget-reslice-cat { flex: 1 1 auto; font-size: 13px; font-weight: 600; overflow-wrap: break-word; }
 /* Tabular figures so the old and new columns line up down the list — a column
    of amounts that jitters is materially harder to scan for the one that looks
    wrong, which is the entire job being asked of the reader here. */
@@ -2655,6 +2723,21 @@
 .budget-reslice-new { font-weight: 600; }
 .budget-reslice-row .budget-tidy-why { flex: 1 1 100%; margin-left: 26px; }
 .budget-reslice-bulk { display: flex; justify-content: flex-end; margin-top: 8px; }
+/* overflow-wrap: anywhere is iOS 15.4+, and an engine that does not know a
+   value drops the whole declaration — on 15.0-15.3 these four rules had no
+   overflow-wrap at all, and a long unbroken token (a pasted reference, a
+   merchant string with no spaces) ran straight out of the dialog. So each rule above says
+   break-word, which every engine on the floor has, and the newer value is
+   added only where it parses. The difference is worth having: break-word
+   breaks the token when it overflows, anywhere also lets the flex row count
+   it as breakable when it sizes the line. A block of its own rather than a
+   second declaration in each rule: the scorecard flags a repeated property. */
+@supports (overflow-wrap: anywhere) {
+  .budget-split-desc,
+  .budget-tidy-pattern,
+  .budget-tidy-why,
+  .budget-reslice-cat { overflow-wrap: anywhere; }
+}
 @media (max-width: 480px) {
   .budget-tidy-list { max-height: 40vh; }
   /* The amounts drop under the category rather than squeezing beside it — at
@@ -2726,7 +2809,7 @@
 }
 .budget-export-cat { display: flex; align-items: center; gap: 10px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
 .budget-export-cat input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
-.budget-export-cat span { overflow-wrap: anywhere; }
+.budget-export-cat span { overflow-wrap: break-word; }
 .budget-export-preview {
   margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; font-size: 12.5px; line-height: 1.5;
   background: var(--background-secondary, rgba(128,128,128,.1));
@@ -2736,15 +2819,23 @@
    draws above every setting-item, which here would rule off the preview from
    the button it explains. */
 .budget-export-actions { border-top: 0; padding-top: 6px; }
-.budget-export-files { white-space: pre-line; overflow-wrap: anywhere; opacity: .75; font-variant-numeric: tabular-nums; }
+.budget-export-files { white-space: pre-line; overflow-wrap: break-word; opacity: .75; font-variant-numeric: tabular-nums; }
 .budget-export-problem { color: var(--text-error, #d33); font-weight: 600; }
-.budget-export-replaces { margin-top: 6px; color: var(--text-warning, #b7791f); overflow-wrap: anywhere; }
+.budget-export-replaces { margin-top: 6px; color: var(--text-warning, #b7791f); overflow-wrap: break-word; }
 .budget-export-done { margin: 0 0 4px; }
 .budget-export-done-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; }
 .budget-export-done-row + .budget-export-done-row {
   border-top: 1px solid var(--background-modifier-border, rgba(128,128,128,.18));
 }
-.budget-export-done-path { flex: 1 1 auto; font-size: 13px; overflow-wrap: anywhere; }
+.budget-export-done-path { flex: 1 1 auto; font-size: 13px; overflow-wrap: break-word; }
+/* Same iOS 15.0-15.3 fallback as the split and tidy dialogs above: these hold
+   vault paths and file names, the longest unbroken tokens this plugin prints. */
+@supports (overflow-wrap: anywhere) {
+  .budget-export-cat span,
+  .budget-export-files,
+  .budget-export-replaces,
+  .budget-export-done-path { overflow-wrap: anywhere; }
+}
 @media (pointer: coarse) {
   .budget-export-modal button.budget-export-pill { min-height: 44px; padding: 8px 16px; }
   .budget-export-cat { padding: 10px; }
@@ -2915,8 +3006,10 @@
   .budget-app-root #budTable tbody tr:not(.type-row) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 12px;
-    row-gap: 4px;
+    /* The shorthand, not column-gap + row-gap: the scorecard's lint reads
+       column-gap as a multi-column-layout property and flags it, even on a
+       grid, where the two spellings mean exactly the same thing. */
+    gap: 4px 12px;
     align-items: center;
     padding: 0.7rem 0.25rem;
     border-bottom: 1px solid var(--border-color);
@@ -2933,11 +3026,13 @@
   }
   /* A cell's own label (dom.js tableCells). Visual only: the clipped thead
      keeps role=columnheader, so the alt-text form (Safari 17.4+) stops
-     VoiceOver reading the column name twice; older engines keep the first. */
+     VoiceOver reading the column name twice; older engines keep the plain
+     form. The alt-text form sits in its own @supports block rather than as a
+     second `content` in this rule, because a repeated property in one block
+     is a finding on the community scorecard. */
   .budget-app-root #txTable tbody td[data-label]::before,
   .budget-app-root #budTable tbody td[data-label]::before {
     content: attr(data-label);
-    content: attr(data-label) / "";
     display: block;
     margin-bottom: 2px;
     font-size: 0.68rem;
@@ -2946,13 +3041,17 @@
     text-transform: uppercase;
     color: var(--text-muted);
   }
+  @supports (content: "a" / "") {
+    .budget-app-root #txTable tbody td[data-label]::before,
+    .budget-app-root #budTable tbody td[data-label]::before { content: attr(data-label) / ""; }
+  }
 
   /* ---- Transactions: description + amount / date + account / category +
           exclude / note + actions ---- */
-  .budget-app-root #txTable tbody td:nth-child(2) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #txTable tbody td:nth-child(2) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; }
   .budget-app-root #txTable tbody td:nth-child(5) { grid-column: 2; grid-row: 1; text-align: right; }
   .budget-app-root #txTable tbody td:nth-child(1) { grid-column: 1; grid-row: 2; font-size: 0.8rem; }
-  .budget-app-root #txTable tbody td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; font-size: 0.8rem; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #txTable tbody td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; font-size: 0.8rem; overflow-wrap: break-word; }
   .budget-app-root #txTable tbody td:nth-child(4) { grid-column: 1; grid-row: 3; }
   .budget-app-root #txTable tbody td:nth-child(6) {
     grid-column: 2; grid-row: 3;
@@ -2966,7 +3065,7 @@
   .budget-app-root #txTable tbody td:nth-child(7) input { min-width: 100%; box-sizing: border-box; }
 
   /* ---- Budget: category + type / amount + actual / notes / actions ---- */
-  .budget-app-root #budTable tbody td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; overflow-wrap: anywhere; }
+  .budget-app-root #budTable tbody td:nth-child(1) { grid-column: 1; grid-row: 1; font-weight: 600; overflow-wrap: break-word; }
   .budget-app-root #budTable tbody td:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
   .budget-app-root #budTable tbody td:nth-child(3) { grid-column: 1; grid-row: 2; text-align: left; }
   .budget-app-root #budTable tbody td:nth-child(3) .bud-amt-wrap { align-items: flex-start; }
@@ -2978,6 +3077,17 @@
     display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
   }
   .budget-app-root #budTable tbody td:nth-child(6):empty { display: none; }
+
+  /* break-word in the three placements above (description, account, budget
+     category) is the iOS 15.0-15.3 floor; anywhere, which also lets a long
+     unbroken description shrink the card's first column instead of widening
+     it, is added only where the engine parses it. Its own block for the same
+     scorecard reason as the label above. */
+  @supports (overflow-wrap: anywhere) {
+    .budget-app-root #txTable tbody td:nth-child(2),
+    .budget-app-root #txTable tbody td:nth-child(3),
+    .budget-app-root #budTable tbody td:nth-child(1) { overflow-wrap: anywhere; }
+  }
 
   /* Group bars ("Income", "Fixed"...) keep their full-width band. */
   .budget-app-root #budTable tbody tr.type-row { display: block; }
@@ -3118,8 +3228,8 @@
      rule keeps flex-start deliberately (ticks must line up with a wrapped
      label's FIRST line, see its comment) and sits later in the file at the
      same specificity, so an align-items here would silently lose the tie
-     anyway. 13px + 17px tick + 13px = 43, and min-height carries the last
-     pixel with no stretch worth centering. */
+     anyway. 13px + 18px (the tick's layout box: 24px less its -3px margins)
+     + 13px = 44, exactly the min-height, so nothing stretches. */
   .budget-app-root .env-item { min-height: 44px; padding-block: 13px; }
 
   /* Native-appearance checkboxes render no pseudo either, so the control
@@ -3274,6 +3384,15 @@
      focus ring entirely; see the file header on why that is not cosmetic. */
   .budget-app-root .score-ring-row:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .score-ring-mid:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 50%; }
+
+  /* The export dialog's pills and links. Body-mounted, so outside the app
+     root and ringed in Obsidian's accent like the modals beside it — and for
+     that reason missed here when the dialog shipped: the parity guard only
+     looked at selectors under the root. On an iPad with a keyboard on 15.0-15.3
+     the format and range pills had no focus indicator at all, because
+     Obsidian's own `button { outline: none }` had already removed the native one. */
+  .budget-export-modal button.budget-export-pill:focus,
+  .budget-export-modal button.budget-export-link:focus { outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button
@@ -3581,9 +3700,14 @@
 }
 .budget-app-root .env > * { position: relative; }
 .budget-app-root .env-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+/* The rename target. Its 11px label made a 16px-tall button, under the 24px
+   WCAG 2.2 AA floor (2.5.8). Padding grows the target and the equal negative
+   margin gives the room straight back, so the hit area is 26px while the
+   label, and the header row it sits in, do not move by a pixel. */
 .budget-app-root .env-name {
   font: inherit; font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
-  font-weight: 600; color: var(--ink-faint); background: none; border: 0; padding: 0;
+  font-weight: 600; color: var(--ink-faint); background: none; border: 0;
+  padding: 5px 0; margin-block: -5px;
   cursor: pointer; text-align: left;
 }
 .budget-app-root .env-name:hover { color: var(--text-primary); text-decoration: underline; }
@@ -3619,9 +3743,14 @@
   line-height: 1.05; color: var(--text-primary); font-variant-numeric: tabular-nums;
 }
 .budget-app-root .env-rail { margin-top: 16px; }
+/* 24px tall for the finger (WCAG 2.2 target floor), 8px of it painted: the
+   padding is hit area, and the track is clipped to the content box. Nothing
+   may set the `background` shorthand here, inline or not — it resets the clip
+   (views/plan.js paints its overspent fill with background-image). */
 .budget-app-root .env-slider {
-  -webkit-appearance: none; appearance: none; width: 100%; height: 8px;
-  border-radius: 999px; background: rgba(127, 127, 127, .2); outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none; width: 100%; height: 24px; padding-block: 8px;
+  border-radius: 999px; background-color: rgba(127, 127, 127, .2); background-clip: content-box;
+  outline: none; cursor: pointer;
 }
 /* A 22px thumb because this is dragged with a thumb on a phone, not a mouse —
    below about 20px the control is reliably missable at arm's length. */
@@ -3660,8 +3789,13 @@
 .budget-app-root .env-item {
   display: flex; align-items: flex-start; flex-wrap: wrap; gap: 2px 10px; font-size: 12.5px;
 }
+/* 24px: the WCAG 2.2 AA target floor (2.5.8), the same floor the native
+   checkboxes were raised to — and this is the Plan's checkbox. It was 17px.
+   The -3px block margins keep its layout box at 18px, the height of the name
+   beside it, so the larger tick stays centred on the label's FIRST line (the
+   reason the row is flex-start, below) and no row in the list grows. */
 .budget-app-root .ei-tick {
-  width: 17px; height: 17px; border-radius: 5px; flex: none; cursor: pointer;
+  width: 24px; height: 24px; margin-block: -3px; border-radius: 5px; flex: none; cursor: pointer;
   border: 1px solid var(--border-color); background: transparent;
   display: grid; place-items: center; font-size: 10px; line-height: 1;
   color: var(--text-muted); padding: 0;
@@ -3673,8 +3807,13 @@
    was squeezed to its narrowest fitting width by the amount beside it, so
    "Books and sensory toys" wrapped onto four lines in a card with room to
    spare. It takes the slack; the amount keeps its nowrap and stays right. */
+/* The item's edit target, 18px tall at rest. Same move as .env-name: 4px of
+   padding top and bottom makes the hit area 26px, and the matching negative
+   margin hands the space back, so neither a one-line name nor a wrapped one
+   moves, and the 9px between rows still keeps neighbouring targets apart. */
 .budget-app-root .ei-name {
-  font: inherit; font-size: 12.5px; background: none; border: 0; padding: 0;
+  font: inherit; font-size: 12.5px; background: none; border: 0;
+  padding: 4px 0; margin-block: -4px;
   cursor: pointer; text-align: left; color: var(--text-primary);
   flex: 1 1 55%; min-width: 0;
 }
@@ -3873,7 +4012,7 @@
   .budget-app-root .env:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color)); }
   .budget-app-root .env-share { background: color-mix(in srgb, var(--text-primary) 9%, transparent); }
   .budget-app-root .kind { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
-  .budget-app-root .env-slider { background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+  .budget-app-root .env-slider { background-color: color-mix(in srgb, var(--text-primary) 10%, transparent); }
   .budget-app-root .plan-free { background: color-mix(in srgb, var(--color-gold) 7%, transparent); }
   .budget-app-root .plan-free.is-over { background: color-mix(in srgb, var(--color-danger) 7%, transparent); }
 }
@@ -4620,7 +4759,15 @@
   border-radius: 0;
   border: none;
   border-top: 1px solid var(--border-color, var(--line-soft, rgba(127,127,127,.18)));
-  background: var(--background-secondary, rgba(127,127,127,.03));
+  /* The plugin's own card surface — never Obsidian's --background-secondary.
+     That variable belongs to the HOST theme, and nothing inside this root
+     redefines it, so the sheet painted Obsidian's grey behind this palette's
+     ink: with the plugin on Light under a dark Obsidian, #12151c text on
+     #262626 — the balance in this sheet read at 1.21:1 (1.10:1 on an iPhone,
+     whose dark base is #1e1e1e). --surface is the surface every palette's
+     three text tokens are held to AA against, in both modes, by
+     tests/palette.test.cjs. */
+  background: var(--surface);
 }
 .budget-app-root .sav-detail.hidden { display: none; }
 /* The hidden name anchor `.mini .l` picks up styles.css's uppercase/spaced
@@ -4990,6 +5137,98 @@
   margin-left: 8px;
 }
 .budget-app-root .acct-row-why { display: block; font-size: 12px; color: var(--text-muted); margin: 2px 0 6px; white-space: normal; }
+
+/* ---- Accounts at a phone width -------------------------------------------
+   The 760px rule near the top of the Accounts section promises "a phone gets
+   the name, the balance and the state". The per-row actions broke that: the
+   state cell kept the pill, the reason and two or three buttons on ONE nowrap
+   line, so at 390px the table measured 827px inside a 380px scroller — the
+   pill cut to "doesn'" at the screen edge, Review / "Use R …" / Ignore at x
+   625-876, and the drawer under the row (colspan=8, so as wide as the table)
+   put Delete at x 739. Everything worked, behind a sideways swipe nobody is
+   told to make.
+
+   Under 760px the state cell wraps and the actions take a line of their own
+   under the pill and its reason. That alone fits the table from 760px down
+   to 500px (measured), and with the table the drawer, which is only ever as
+   wide as the table it spans. Declared after the base rules above on purpose:
+   these selectors tie them on specificity, so source order decides. */
+@media (max-width: 760px) {
+  .budget-app-root .acct-col-state { white-space: normal; }
+  .budget-app-root .acct-row-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; }
+  .budget-app-root .acct-pill + .acct-row-acts { margin-left: 0; }
+  .budget-app-root .acct-row-why { flex: 1 1 100%; margin: 0; }
+}
+/* A phone has room for fewer than four table columns. Two of them are money
+   that must not wrap — the balance, and the one-tap "Use R …" fix, whose
+   figure is grouped with ordinary spaces and would split mid-number —
+   so as a TABLE the row cannot get under ~400px however it wraps. The name
+   column's 210px floor (see #acctTable td:first-child above) is lifted here:
+   it exists so the name is not the only column left to squeeze, and with the
+   state cell wrapping it no longer is.
+
+   The layout that actually fits is a card per row — name and balance on the
+   first line, the state and its actions on the line below — which is a grid
+   on the <tr>. A grid row is no longer a row to VoiceOver, so Transactions
+   and Budget stamp explicit ARIA roles on their stacked tables (dom.js
+   tableCells), and this layout waits for the same: it is gated on
+   [role='table'] and applies the moment the Accounts view stamps them. Until
+   then the table keeps its table semantics, and the rules above at least put
+   every control within a short swipe of the screen. */
+@media (max-width: 600px) {
+  .budget-app-root .acct-col-state .acct-pill { white-space: normal; }
+  .budget-app-root #acctTable th:first-child,
+  .budget-app-root #acctTable td:first-child { min-width: 0; }
+
+  .budget-app-root #acctTable[role='table'],
+  .budget-app-root #acctTable[role='table'] > thead,
+  .budget-app-root #acctTable[role='table'] > tbody { display: block; width: 100%; }
+  /* The third track is the notes chip's. A floor rather than auto, so the
+     balance beside it ends at the same x on every card, whichever row has a
+     note count and whichever has none. */
+  .budget-app-root #acctTable[role='table'] tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(3rem, auto);
+    gap: 0 8px;   /* not column-gap — see the stacked Transactions rows */
+    align-items: center;
+  }
+  /* Placed by column position, as the stacked Transactions rows are: name,
+     balance and notes on the first line, the state cell spanning the second.
+     The three dropped columns keep their display:none from the 760px rule. */
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(1),
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(2),
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(7),
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(8) { display: block; min-width: 0; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(2) { grid-column: 2; grid-row: 1; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(8) { grid-column: 3; grid-row: 1; width: auto; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(7) { grid-column: 1 / -1; grid-row: 2; padding-top: 0; }
+  /* The header keeps its sort buttons — on this page they are the only sort
+     control there is — and visually drops the State label, whose column is
+     now the second line of every card. Clipped rather than display:none so
+     the cells under it keep a column name. */
+  .budget-app-root #acctTable[role='table'] thead tr { border-bottom: 1px solid var(--border-color); }
+  .budget-app-root #acctTable[role='table'] thead th { border-bottom: 0; }
+  .budget-app-root #acctTable[role='table'] thead tr > :nth-child(7) {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* One rule under the card rather than one under each cell, and the state
+     rail on the card's whole edge rather than on the name cell alone. */
+  .budget-app-root #acctTable[role='table'] tr.acct-row { border-bottom: 1px solid var(--border-color); }
+  .budget-app-root #acctTable[role='table'] tr.acct-row > td { border-bottom: 0; }
+  .budget-app-root #acctTable[role='table'] tr.acct-row td:first-child { box-shadow: none; }
+  .budget-app-root #acctTable[role='table'] tr.acct-row.is-flag { box-shadow: inset 3px 0 0 var(--color-warning); }
+  .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-danger); }
+  /* Group bars, the empty state and the drawer span the card. Last, so it
+     outranks the nth-child(1) placement above at equal specificity. */
+  .budget-app-root #acctTable[role='table'] td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }
+}
 
 /* Plan view, phone gutter: the sections arrived with three different left
    edges (14px sources, 20px pot, 0px buckets and their header), which is what

@@ -9,13 +9,15 @@
         correctly (committed >= repayments >= interest — interest is a
         SUBSET of the repayment cash flow, never an addend on top of it; see
         the note in money-flow.js on why the literal sum is the wrong check)
-     3. the two "lefts" reconcile: budget-left + never-budgeted ==
-        income-not-spent (income - spentTotal), unconditionally
+     3. the "lefts" reconcile: budget-left + set-aside-still-to-move +
+        never-budgeted == income - gross spend - the assume-spent provision,
+        unconditionally (three lefts since 2026-10-07; never-budgeted is
+        income less the WHOLE plan — tests/never-budgeted-whole-plan.test.cjs)
      4. zero-income and no-budget inputs do not throw or divide by zero
      5. rail segment widths sum to 100 and fills sum to the score
      6. the PRINTED figures (bands.display / lefts.display) reconcile the way
         the raw ones do — whole rand, bands summing to the rounded headline,
-        "together" the exact sum of its two printed parts
+        "together" the exact sum of its printed parts
 
      node tests/money-flow.test.cjs
 */
@@ -74,12 +76,15 @@ const base = {
     'the four sub-chips never add up to more than committed itself');
 }
 
-/* ---- 3. the two lefts reconcile, unconditionally ---- */
+/* ---- 3. the lefts reconcile, unconditionally ---- */
 {
-  for (const extra of [{}, { savingContribution: 9000 }, { budgeted: 50000 }, { budgeted: 0 }]) {
+  for (const extra of [{}, { savingContribution: 9000 }, { budgeted: 50000 }, { budgeted: 0 },
+    { budgetSetAside: 4000, setAsideSpent: 1500 }, { budgetSetAside: 4000, setAsideSpent: 1500, assumedSpent: 600 }]) {
     const f = periodFlow({ ...base, ...extra });
-    close(f.lefts.leftInBudget + f.lefts.neverBudgeted, f.income - f.budget.spentTotal,
-      'budget-left + never-budgeted == income-not-spent');
+    const L = f.lefts;
+    close(L.leftInBudget + L.setAsideToMove + L.neverBudgeted, L.together, 'the lefts sum to together');
+    close(L.together, f.income - f.budget.spentTotal - (extra.assumedSpent || 0),
+      'together == income − gross spend − the assume-spent provision');
   }
 }
 

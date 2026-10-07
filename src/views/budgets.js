@@ -7,7 +7,7 @@ const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
    setup wizard — see the header of budget-file.js for why it stopped being
    inline here. */
-const { serializeBudgetFile, budgetRangeNote } = require('../budget-file');
+const { serializeBudgetFile, budgetFileRows, budgetRangeNote } = require('../budget-file');
 /* Row order must agree with serializeBudgetFile() and the Dashboard: a custom
    group slots in before `expense` and an undeclared type sorts LAST. Plain
    indexOf() over the built-in order cannot express that — it returns -1 for
@@ -53,6 +53,17 @@ const { assumedActual } = require('../money-flow');
 // Kept as its own require (not folded into the one above): tests/vocabulary.test.cjs
 // matches that exact line verbatim as the assume-spent seam's import shape.
 const { budgetStripGap } = require('../money-flow');
+
+/* A row brought in from ANOTHER period's file (Copy previous period, Bring
+   over) carries that period's modelled fields and nothing else. Its extra
+   cells (2026-10-07 audit, L3-25) belong to that file's own hand-added
+   columns; written into this period they would sit under whatever header
+   this file has there, as somebody else's figures. */
+function fromAnotherPeriod(r) {
+  const out = { ...r };
+  delete out.extraCells;
+  return out;
+}
 
 /* What an INCOME row says about its plan, on the Budget page and the
    Dashboard's budget table alike (2026-09-29 audit). Three states, not two:
@@ -271,7 +282,7 @@ module.exports = function registerBudgets(ctx) {
           d.notes = r.notes; d.inFile = true; brought++;
         }
       } else {
-        draft.push({ ...r, amount: 0, amountRaw: null, inFile: true });
+        draft.push({ ...fromAnotherPeriod(r), amount: 0, amountRaw: null, inFile: true });
         brought++;
       }
     }
@@ -496,11 +507,22 @@ module.exports = function registerBudgets(ctx) {
        Same key as the hero's, so the two cannot word one fact differently, and
        appended rather than substituted because all three omissions can be true
        at once. */
-    /* ADR-0005: the tile no longer counts set-aside as spent, and says so the
-       way the Dashboard hero does. */
-    if (used.setAside > 0) {
-      addPart('bud-note-setaside', sep() + i18n.t('dash.stat.setAsideMoved', {
-        amount: money(used.setAside, 0), moved: money(movedToFunds(S.period), 0),
+    /* "R X of R Y saved so far" — X what moved into the funds this period, Y
+       the saving the PLAN holds: planFigures' setAside over the same draft
+       the Budgeted tile names it from ("… planned for savings"). That is the
+       meaning 1.49.1's changelog gave the sentence and the one the Dashboard hero
+       prints, under the hero's own key and the hero's gate — the plan sets
+       something aside, paid or not (2026-10-07 audit, REPORT-3, the owner's
+       decision).
+       It used to fill Y with the set-aside PAID (budgetUsed's setAside) and
+       to stay silent until something had been, so the tile could say "R X of
+       R X saved so far" — every rand in — with a quarter of the plan still to
+       go, and nothing at all on the first day of a period. Moved stays the
+       FIRST figure: scripts/reconcile-page.cjs reads the two by position
+       inside this fragment. */
+    if ((plan.setAside || 0) > 0) {
+      addPart('bud-note-setaside', sep() + i18n.t('dash.stat.ofWhichSetAside', {
+        amount: money(plan.setAside, 0), moved: money(movedToFunds(S.period), 0),
       }));
     }
     const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
@@ -555,9 +577,19 @@ module.exports = function registerBudgets(ctx) {
         : i18n.t('dash.stat.allocated', { pct: allocPct });
     const budgetedParts = [];
     if (budgetedNote) budgetedParts.push({ fig: 'bud-budgeted-note', text: budgetedNote });
+    /* PLANNED, and worded so (2026-10-07 audit: two rules, one wording).
+       "{amount} for savings" is the Dashboard hero's and the Report's words
+       for the set-aside PAID this period (budgetUsed's setAside). This tile
+       printed the same words — under its own key — with the set-aside the
+       PLAN holds, so a household that planned R2 000 and had paid R500 read
+       "R 2 000 for savings" here and "R 500 for savings" on the Dashboard.
+       The tile keeps the planned figure, because it is breaking the plan
+       total down (Total budgeted less this is the spending budget the spent
+       tile's % is of) and because this page's own "R X of R Y saved so far"
+       already names the same planned Y — so it changes its words instead. */
     if (plan.setAside > 0) {
       budgetedParts.push({ fig: 'bud-budgeted-setaside',
-        text: (budgetedNote ? ' · ' : '') + i18n.t('bud.total.ofWhichSetAside', { amount: money(plan.setAside) }) });
+        text: (budgetedNote ? ' · ' : '') + i18n.t('bud.total.setAsidePlanned', { amount: money(plan.setAside) }) });
     }
     /* Every tile names itself. The unallocated one is conditional (a running
        period with no income row omits it), so addressing any of these by
@@ -849,6 +881,19 @@ module.exports = function registerBudgets(ctx) {
     // Mirrors dashboard.js's renderBudgetTable: a vault with no categories at
     // all used to leave a header bar sitting over an empty <tbody>.
     if (!draft.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, i18n.t('dash.table.empty'))));
+    /* Rows of this period's file that have no category (2026-10-07 audit,
+       L3-12). load.js keeps them beside the period's rows rather than in them
+       — every figure keys budget rows by category, and the blank one is where
+       uncategorised spend lives — and the Save writes them back where they
+       were. So nothing on any page counts them, and this is the one place
+       that says so, with the amount it is not counting: the app argues, it
+       never silently drops. */
+    const unnamed = ((S.budgetMeta || {})[S.period] || {}).unnamed || [];
+    if (unnamed.length) {
+      const total = unnamed.reduce((t, r) => t + (Number(r.amount) || 0), 0);
+      body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted', 'data-fig': 'bud-unnamed' },
+        i18n.t('bud.unnamed.note', { count: unnamed.length, amount: money(total) }))));
+    }
     t.append(body);
     /* Phone width stacks each row into a card (dom.js tableCells). */
     tableCells(t, [i18n.t('bud.col.category'), i18n.t('bud.col.type'), i18n.t('bud.col.amount'),
@@ -882,6 +927,10 @@ module.exports = function registerBudgets(ctx) {
       // exactly what a brand-new period's fixed shape already means.
       leadRaw: (meta && meta.leadRaw) ?? null,
       trailRaw: (meta && meta.trailRaw) ?? null,
+      /* 2026-10-07 round-trip audit: the file's own row order (L3-22), its
+         rows with no category (L3-12) and its hand-added columns (L3-25) —
+         see load.js. All absent for a period whose file was never loaded. */
+      ...budgetFileShape(meta),
       rangeNote: budgetRangeNote({
         monthStartDay: S.settings.month_start_day,
         intervalDays: ctx.intervalDays(),
@@ -906,9 +955,20 @@ module.exports = function registerBudgets(ctx) {
     } catch (e) {
       return toast(i18n.t('bud.err.save', { error: e.message || e }), true);
     }
+    /* The file's order is now the order just written, so a second Save before
+       the next load keeps the rows this one placed where it placed them. */
+    if (meta) {
+      meta.order = budgetFileRows({ rows: draft, groups: S.settings.groups, ...budgetFileShape(meta) })
+        .map(r => r.category || null);
+    }
     budDirty = false;
     $('#budSave').disabled = true;
     toast(i18n.t('bud.saved', { period: S.period }));
+  }
+
+  /* The parts of a period file's shape load.js recorded beside its rows. */
+  function budgetFileShape(meta) {
+    return { order: (meta && meta.order) || null, unnamed: (meta && meta.unnamed) || [], extraCols: (meta && meta.extraCols) || null };
   }
 
   /* Flip a category's assume-spent flag and persist it to its own note.
@@ -1016,8 +1076,10 @@ module.exports = function registerBudgets(ctx) {
         // overwrite an amount already set here.
         if (!d.inFile && !d.amount && !(d.notes && d.notes.trim())) {
           d.amount = r.amount; d.amountRaw = r.amountRaw ?? null; d.notes = r.notes; d.inFile = true; copied++;
+          // The same figure, so the same spelling of it (L3-17, budget-file.js amountCell).
+          if (r.amountText != null) d.amountText = r.amountText;
         }
-      } else { draft.push({ ...r, inFile: true }); copied++; }
+      } else { draft.push({ ...fromAnotherPeriod(r), inFile: true }); copied++; }
     }
     if (copied) { budDirty = true; $('#budSave').disabled = false; }
     renderBudgets();

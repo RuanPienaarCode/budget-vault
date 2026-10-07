@@ -113,6 +113,15 @@ function formatMoney(symbol, v, decimals, loc) {
    cell, which the vault reports as a modify of the whole file with no way to
    know what changed inside it. Those are caught after the fact by the
    "unmatched" badge on the Notes page instead. */
+/* Does a vault event touch the budget folder? A rename hands over the file at
+   its NEW path and the path it left, so a file moved OUT of the folder counts
+   by its old path (2026-10-07 audit; api.js's watcher had the same blind
+   spot). modify/create/delete hand over the file alone. */
+function fsChangeInBudget(basePath, file, oldPath) {
+  const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
+  return under(file && file.path) || under(oldPath);
+}
+
 function classifyRename(basePath, oldPath, newPath, categories) {
   const bp = basePath;
   const kindOf = p => {
@@ -376,7 +385,8 @@ function mountApp(view) {
     txFolders: [],             // account names whose Transactions/ folder exists on disk
     txFolderPaths: {},         // ISSUE 97 — label -> the folder path it was READ from, so writers never assemble one
     txFoldersIgnored: [],      // ISSUE 97 — Transactions/ folder paths whose leaf name a shallower folder already claimed
-    rules: [],                 // {pattern, category}
+    rules: [],                 // {pattern, category, extra} — extra: the row's own cells past category
+    rulesHeader: null,         // Data/Categorisation Rules.csv's own header row, written back by categories.js rulesCsv
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
     assetsFm: '',              // Assets.md verbatim frontmatter, re-emitted by the serializer
     // ISSUE 67/69 — <x>Lead/<x>Trail: raw text around the table (a paragraph
@@ -542,7 +552,7 @@ function mountApp(view) {
   /* After load (it reads S.settings) and before every view that might print a
      converted figure. Registering it does NOT touch the network — see its own
      header; nothing happens at all until exchange_rates is switched on. */
-  registerFxLive(ctx);      // fxTable, fxState, refreshRates, fxConvert
+  registerFxLive(ctx);      // fxTable, refreshRates, fxConvert
   registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
   registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
   // After trend-math, whose periodsForMonths it uses, and before the two views
@@ -762,6 +772,12 @@ function mountApp(view) {
   function lockGate() {
     if (locked) return;
     locked = true;
+    /* The plugin-level half of the gate (main.js setBudgetUnlocked, api.js's
+       header): from here the headless API answers { locked: true }, so a
+       sibling plugin's card cannot show what this cover is hiding. Guarded so
+       a stand-in plugin that mounts this shell without main.js does not throw
+       here. */
+    if (typeof plugin.setBudgetUnlocked === 'function') plugin.setBudgetUnlocked(false);
     closeDrawer();
     $('#splashGate').classList.remove('hidden');
     // inert, not just visually covered — otherwise Tab walks through the
@@ -777,6 +793,8 @@ function mountApp(view) {
   async function unlockGate() {
     if (!locked) return;
     locked = false;
+    // lockGate's hook, the other way: the headless API answers again.
+    if (typeof plugin.setBudgetUnlocked === 'function') plugin.setBudgetUnlocked(true);
     $('#splashGate').classList.add('hidden');
     setInert($('.topbar'), false);
     setInert($('.bud-scroll'), false);
@@ -850,19 +868,17 @@ function mountApp(view) {
       if (S.loaded) toast('Reloaded — files changed in the vault');
     }, delay);
   }
-  const onFsChange = (file) => {
-    const path = file?.path || '';
-    const bp = ctx.basePath();
-    if (path !== bp && !path.startsWith(bp + '/')) return;
+  const onFsChange = (file, oldPath) => {
+    if (!fsChangeInBudget(ctx.basePath(), file, oldPath)) return;
     if (Date.now() - ctx.lastWriteAt() < 2000) return;
     /* No hasDirty() gate here — scheduleReload owns that decision now, so the
        change is remembered and retried instead of being dropped at the door. */
     scheduleReload(800);
   };
-  view.registerEvent(vault.on('modify', onFsChange));
-  view.registerEvent(vault.on('create', onFsChange));
-  view.registerEvent(vault.on('delete', onFsChange));
-  view.registerEvent(vault.on('rename', onFsChange));
+  view.registerEvent(vault.on('modify', file => onFsChange(file)));
+  view.registerEvent(vault.on('create', file => onFsChange(file)));
+  view.registerEvent(vault.on('delete', file => onFsChange(file)));
+  view.registerEvent(vault.on('rename', (file, oldPath) => onFsChange(file, oldPath)));
 
   /* An account or category note renamed in Obsidian's OWN file explorer.
      Obsidian repairs every `[[wikilink]]` pointing at it, which covers the
@@ -1183,4 +1199,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, reloadFromDisk, applyInputMode, wireDropZone };
+module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, reloadFromDisk, applyInputMode, wireDropZone };

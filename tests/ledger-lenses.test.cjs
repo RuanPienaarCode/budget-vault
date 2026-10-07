@@ -113,8 +113,9 @@ function oracleKeeps(ctx, lensName, t, paired) {
   switch (lensName) {
     case 'BUDGET': return !t.excluded && !nonBudget && !foreign && !earmarkedOut && !transfer;
     case 'TREND': return !t.excluded && !nonBudget && !foreign && !earmarkedOut && !transfer;
-    case 'HOUSEHOLD': return !foreign && !transfer && !supersededBySplit(t)
-      && !paired.has(`${t.label}|${t.date}|${(t.amount || 0).toFixed(2)}|${t.desc || ''}`);
+    /* The pass-through pairs are ROWS (2026-10-07, audit L2a-09): a key here
+       would drop an identical unpaired twin alongside its paired double. */
+    case 'HOUSEHOLD': return !foreign && !transfer && !supersededBySplit(t) && !paired.has(t);
     case 'ACCOUNT': return !supersededBySplit(t);
     case 'MERCHANT': return !isSplitPart(t);
     default: throw new Error(lensName);

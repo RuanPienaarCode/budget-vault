@@ -565,7 +565,7 @@ module.exports = function registerScore(ctx) {
           g.kind === 'fund' ? i18n.t('dash.health.why.fixFund', { amount, target })
             : g.kind === 'monthly' ? i18n.t('dash.health.why.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
               : g.kind === 'interest' ? i18n.t('dash.health.why.fixInterest', { amount })
-                : g.kind === 'trim' ? i18n.t('dash.health.why.fixTrim', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
+                : g.kind === 'trim' ? i18n.t('dash.health.why.fixTrimHousehold', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
                   : i18n.t('dash.health.why.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple })));
       }
 
@@ -678,10 +678,21 @@ module.exports = function registerScore(ctx) {
         : i18n.t('score.now.debt', { pct: pct(M.interestShare) });
     }
     if (key === 'spending') {
+      /* The fixed-bills and living-costs shares divide by HOUSEHOLD income
+         (health-math.js healthMetrics: their numerators keep Excluded rows and
+         accounts outside the budget), while the saving line above divides by
+         budget income, the Dashboard's. Both used to read "of income"; on the
+         audited vault the household base was a fifth larger and nothing said
+         which was which (2026-10-07, audit L2a-06). The decision taken: keep
+         the household base and name it, with its size, so the reader can see
+         why these do not divide by the Dashboard's income. */
       const bits = [];
-      if (M.fixedShare !== null) { bits.push(i18n.t('score.now.fixed', { pct: pct(M.fixedShare) })); }
-      if (M.consumptionShare !== null) { bits.push(i18n.t('score.now.living', { pct: pct(M.consumptionShare) })); }
+      if (M.fixedShare !== null) { bits.push(i18n.t('score.now.fixedHousehold', { pct: pct(M.fixedShare) })); }
+      if (M.consumptionShare !== null) { bits.push(i18n.t('score.now.livingHousehold', { pct: pct(M.consumptionShare) })); }
       if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }
+      if ((M.fixedShare !== null || M.consumptionShare !== null) && M.monthlyHouseholdIncome !== null) {
+        bits.push(i18n.t('score.now.householdIncome', { amount: money(M.monthlyHouseholdIncome, 0) }));
+      }
       return bits.length ? bits.join(' · ') : null;
     }
     if (M.netWorthMultiple === null) return null;
@@ -739,9 +750,20 @@ module.exports = function registerScore(ctx) {
        screen, so it asks the snapshot for that one. */
     const F = periodFigures(cur);
     const summary = F.summary;
-    const spend = F.trend;
     const budget = F.budget;
     const fixedCats = new Set(S.categories.filter(c => c.fixed).map(c => c.name));
+    /* What was PAID under each category so far: the BUDGET lens's gross
+       outgoings over the window `summary` covers (periodWindowAsOf — the start
+       of the period to today while it runs). The bands are cut out of
+       summary.spend, which is that lens's gross figure as of today, so
+       committed and the savings-typed slice must share its lens, sign rule and
+       window. The TREND map read here until 2026-10-07 netted refunds and ran
+       to the END of the period: a rent refund landed in living costs (on the
+       audited vault), and a debit order dated later in the month was
+       committed before it was paid (audit L2a-07). views/debts.js reads "paid
+       vs planned" the same way. */
+    const win = ctx.periodWindowAsOf(cur);
+    const grossOutByCat = win ? ctx.tally(ctx.ledger(win.start, win.stop), ctx.LENSES.BUDGET).grossOutByCat : {};
 
     /* Contributions into savings/investment accounts THIS period — the same
        signal health-data.js averages over six periods for the score's own
@@ -769,7 +791,7 @@ module.exports = function registerScore(ctx) {
       income: summary.income, spentTotal: summary.spend, setAsideSpent: summary.setAside,
       assumedSpent: F.used.assumed,
       budgeted: budget.spend, budgetSetAside: budget.setAside,
-      spendByCat: spend.whole, fixedCats, catType, savingContribution, debts: S.debts,
+      grossOutByCat, fixedCats, catType, savingContribution, debts: S.debts,
       /* The household's own symbol, so this card's "of which interest" holds
          foreign debts out exactly the way the breakdown beneath it (and the
          Debt page it links to) already does — see money-flow.js's own note on
@@ -793,17 +815,36 @@ module.exports = function registerScore(ctx) {
      minus sign in front of it — the mockup's fix is to say the same fact the
      other way round, "R X over budget", never a negative rand. Only the
      WORDING changes; `lefts.leftInBudget`/`lefts.display` themselves are
-     money-flow's own figures, untouched. */
+     money-flow's own figures, untouched. The same honesty applies to a plan
+     that claims more than its income (2026-10-07, audit L2a-03): never
+     budgeted then reads negative, and is said as "R X budgeted beyond income".
+     The set-aside the plan still has to move joins the sentence when there is
+     some, so the parts named here are the parts of the chip's Together. */
   function flowASub(lefts) {
+    const beyond = lefts.neverBudgeted < -0.005;
+    const parts = [];
     if (lefts.leftInBudget < -0.005) {
-      return i18n.t('score.flow.subA.overBudget', {
-        amount: money(Math.abs(lefts.display.leftInBudget), 0),
-        neverBudgeted: money(lefts.display.neverBudgeted, 0),
-      });
+      parts.push(beyond
+        ? i18n.t('score.flow.subA.overAllocated', {
+          amount: money(Math.abs(lefts.display.leftInBudget), 0), beyond: money(Math.abs(lefts.display.neverBudgeted), 0),
+        })
+        : i18n.t('score.flow.subA.overBudget', {
+          amount: money(Math.abs(lefts.display.leftInBudget), 0),
+          neverBudgeted: money(lefts.display.neverBudgeted, 0),
+        }));
+    } else {
+      parts.push(beyond
+        ? i18n.t('score.flow.sub.overAllocated', {
+          inBudget: money(lefts.display.leftInBudget, 0), beyond: money(Math.abs(lefts.display.neverBudgeted), 0),
+        })
+        : i18n.t('score.flow.sub.notYetSpent', {
+          inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
+        }));
     }
-    return i18n.t('score.flow.sub.notYetSpent', {
-      inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
-    });
+    if (lefts.setAsideToMove > 0.005) {
+      parts.push(i18n.t('score.flow.sub.setAsideToMove', { amount: money(lefts.display.setAsideToMove, 0) }));
+    }
+    return parts.join(' · ');
   }
 
   function buildFlowRows(flow) {
@@ -844,8 +885,9 @@ module.exports = function registerScore(ctx) {
 
     /* Variant A's honest-overspend row (redesign): when this period actually
        spent more than came in — `lefts.together` is money-flow's own
-       `income - spentTotal` identity, always exact — "Not yet spent" is
-       replaced outright rather than shown reading zero next to a positive
+       `income − gross spend − assume-spent provision` identity (since
+       2026-10-07, when the set-aside got its own left), always exact —
+       "Not yet spent" is replaced outright rather than shown reading zero next to a positive
        "money in" figure that implies there is still something left. Nothing
        here recomputes the deficit: `overspend` is just `-together`, the
        same figure `periodDeficit` already argues about elsewhere in the app. */
@@ -1143,13 +1185,22 @@ module.exports = function registerScore(ctx) {
       wrap.append(buildChip(i18n.t('score.flow.chip.committed'), committedRows));
     }
 
-    /* Kept unconditionally — budgeted can be non-zero even on a period with
+    /* The whole plan beside the share of income it is, then the spending
+       budget beside what was spent against it and the share used — each
+       percentage under the two figures it divides. Until 2026-10-07 the first
+       row read "Spending budget" over the WHOLE plan (1.49.0 renamed the label,
+       not the figure), so printed Spent ÷ printed Spending budget was not the
+       printed Budget used — five points apart on the audited vault (L2a-02).
+       "Total budgeted" is the Budget page's own name for the whole plan, so
+       one figure carries one name in every language.
+       Kept unconditionally — budgeted can be non-zero even on a period with
        no income or no spend yet, and that comparison is exactly what a
        reader opening the page early in a period wants to see. */
-    const budgetRows = [[i18n.t('score.flow.chip.budgeted'), money(bud.budgeted, 0)]];
+    const budgetRows = [[i18n.t('bud.total.budgeted'), money(bud.budgeted, 0)]];
     if (bud.allocatedOfIncome !== null) {
       budgetRows.push([i18n.t('score.flow.chip.allocatedOfIncome'), `${sharePercentLabel(bud.allocatedOfIncome, locale().decimal)}%`]);
     }
+    budgetRows.push([i18n.t('score.flow.chip.budgeted'), money(bud.budgetSpend, 0)]);
     /* ADR-0005: the rand figure beside "Budget used" is the same `spent` the
        Dashboard hero and the Budget page print — not gross spend. */
     budgetRows.push([i18n.t('score.flow.chip.spent'), money(bud.spent, 0)]);
@@ -1172,21 +1223,31 @@ module.exports = function registerScore(ctx) {
     wrap.append(buildChip(i18n.t('score.flow.chip.budget'), budgetRows,
       bud.budgetUsed !== null ? i18n.t('score.flow.chip.budgetUsedNote') : null));
 
-    /* Same rule as committed: real when any of the three differs from zero —
+    /* Same rule as committed: real when any of them differs from zero —
        an over-budget period reads leftInBudget negative, which is a fact
        worth a row — silent when the household's plan, its spend and its
        income all landed on nothing this period. */
-    const leftsAllZero = Math.abs(lefts.leftInBudget) < 0.005
+    const leftsAllZero = Math.abs(lefts.leftInBudget) < 0.005 && Math.abs(lefts.setAsideToMove) < 0.005
       && Math.abs(lefts.neverBudgeted) < 0.005 && Math.abs(lefts.together) < 0.005;
     if (!leftsAllZero) {
       /* Display figures, not raw — "Together" must be the visible sum of the
-         two rows above it, which independent money(v, 0) rounding broke by a
-         rand. money-flow.js's displayLefts note has the arithmetic. */
-      wrap.append(buildChip(i18n.t('score.flow.chip.lefts'), [
-        [i18n.t('score.flow.chip.leftInBudget'), money(lefts.display.leftInBudget, 0)],
-        [i18n.t('score.flow.chip.neverBudgeted'), money(lefts.display.neverBudgeted, 0)],
-        [i18n.t('score.flow.chip.together'), money(lefts.display.together, 0)],
-      ]));
+         rows above it, which independent money(v, 0) rounding broke by a
+         rand. money-flow.js's displayLefts note has the arithmetic.
+
+         The set-aside row (2026-10-07, audit L2a-03) shows whenever the plan
+         sets money aside or money went out under a set-aside category, so the
+         rows still add up to Together; without it "Income never budgeted"
+         counted the plan's savings envelopes as income nobody had planned. A
+         plan claiming more than its income reads negative there — said in
+         words ("Budgeted beyond income") and kept signed, so the column still
+         adds up. Every part a reader adds is on screen. */
+      const showSetAside = bud.setAside > 0.005 || Math.abs(lefts.setAsideToMove) >= 0.005;
+      const leftRows = [[i18n.t('score.flow.chip.leftInBudget'), money(lefts.display.leftInBudget, 0)]];
+      if (showSetAside) { leftRows.push([i18n.t('score.flow.chip.setAsideToMove'), money(lefts.display.setAsideToMove, 0)]); }
+      leftRows.push([lefts.neverBudgeted < -0.005 ? i18n.t('score.flow.chip.overAllocated') : i18n.t('score.flow.chip.neverBudgeted'),
+        money(lefts.display.neverBudgeted, 0)]);
+      leftRows.push([i18n.t('score.flow.chip.together'), money(lefts.display.together, 0)]);
+      wrap.append(buildChip(showSetAside ? i18n.t('score.flow.chip.leftsThree') : i18n.t('score.flow.chip.lefts'), leftRows));
     }
 
     return wrap;
@@ -1205,6 +1266,7 @@ module.exports = function registerScore(ctx) {
        [label, value] pairs (tests/vocabulary.test.cjs matches their source),
        and a label is unique within this chip. */
     const chipFigs = title === i18n.t('score.flow.chip.budget') ? {
+      [i18n.t('bud.total.budgeted')]: 'score-whole-plan',
       [i18n.t('score.flow.chip.budgeted')]: 'score-budgeted',
       [i18n.t('score.flow.chip.allocatedOfIncome')]: 'score-allocated',
       [i18n.t('score.flow.chip.spent')]: 'score-spent',

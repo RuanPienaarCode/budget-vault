@@ -34,13 +34,15 @@ const { splitRole, SPLIT_PARENT, SPLIT_PART } = require('./tx-role');
    Stamps
    ------------------------------------------------------------------------ */
 
-/* The key two rows must share to be the two legs of one pass-through. Kept
-   identical to health-data.js's former rowKey so the pairing is unchanged. */
-const rowKey = r => `${r.label}|${r.date}|${(r.amount || 0).toFixed(2)}|${r.desc || ''}`;
-
 /* Pass-through pairing, exactly as health-data.js did it: among EXCLUDED
    rows, an outflow on one label and an equal inflow on another, each used at
-   most once. Returns the keys of every paired row. */
+   most once. Returns the paired ROWS themselves, and stamp() marks a row by
+   identity. Until 2026-10-07 this returned their keys (label|date|amount|
+   description) and stamp() marked every row whose key was paired, so two
+   identical Excluded rows on one account — two R500 gifts on the same day,
+   written the same way — both vanished when only one of them had an opposite
+   leg, and real household spending left the Score's essential and consumption
+   figures (audit L2a-09). tests/passthrough-pairs-by-row.test.cjs. */
 function passthroughPairs(rows) {
   const drop = new Set();
   const ex = (rows || []).filter(r => r && r.excluded
@@ -54,7 +56,7 @@ function passthroughPairs(rows) {
       if (a.label === b.label) { continue; }
       if (Math.abs(a.amount + b.amount) > 0.005) { continue; }
       used[i] = true; used[j] = true;
-      drop.add(rowKey(a)); drop.add(rowKey(b));
+      drop.add(a); drop.add(b);
       break;
     }
   }
@@ -107,7 +109,7 @@ function stamp(rows, env) {
       transfer: type === 'transfer',
       splitPart: role === SPLIT_PART,
       splitParent: role === SPLIT_PARENT,
-      passthrough: paired.has(rowKey(r)),
+      passthrough: paired.has(r),
       setAside: amount < 0 && isSetAsideType(type),
       fixed: fixed.has(cat),
     });
@@ -146,8 +148,18 @@ const LENSES = Object.freeze({
      R900 purchase split 600/300 read R1 800 in the Score's consumption and
      essential spend on 1.38.0. The parent is not a pass-through (same label,
      so the pairing never saw it); it is a row superseded by its parts, and
-     it is dropped by name. tests/ledger-lenses.test.cjs §5b pins it. */
-  HOUSEHOLD: Object.freeze({ name: 'HOUSEHOLD', drop: Object.freeze(['foreign', 'transfer', 'passthrough', 'splitParent']), sign: 'net' }),
+     it is dropped by name. tests/ledger-lenses.test.cjs §5b pins it.
+     `uncategorised: 'spend'` (2026-10-07, audit L2a-05): the blank category is
+     one more bucket of the net reading here, netted like any named one, so an
+     uncategorised outgoing reaches the essential and consumption slices —
+     essentialTotal's own rule ("an uncategorised debit is far more likely a
+     bill than a treat"), which no blank row ever reached because the net
+     reading skipped the blank bucket for every lens — on the audited vault,
+     six trailing periods of it. The other lenses name categories in their
+     maps and disclose uncategorised money beside them (uncatSpend /
+     uncatIncome), as before.
+     tests/household-essential-counts-uncategorised.test.cjs. */
+  HOUSEHOLD: Object.freeze({ name: 'HOUSEHOLD', drop: Object.freeze(['foreign', 'transfer', 'passthrough', 'splitParent']), sign: 'net', uncategorised: 'spend' }),
   /* "What did this one account do." Every row moves the balance, whatever
      the budget thinks of it; only a split's superseded parent is not money.
      The Accounts page's flow chips and sparkline. */
@@ -245,16 +257,19 @@ function tally(stamped, lens) {
   }
   /* The net reading: per category first, then the category's own sign.
      A named category that netted a refund contributes nothing to spend, not
-     a negative slice; an income-typed or uncategorised bucket is not spend. */
+     a negative slice; an income-typed bucket is not spend, and neither is the
+     uncategorised one unless the lens says it is (HOUSEHOLD's `uncategorised:
+     'spend'` — there it lands under the empty name, whose type is null). */
   /* A plain object, as periodSpend's `whole` always was — tests and the trend
      chart compare it structurally. `byCat` above stays null-prototyped, as
      summaryInRange's did, for the category-named-"constructor" case. */
   const spendByCat = {};
+  const blankIsSpend = lens.uncategorised === 'spend';
   let consumption = 0, fixed = 0, netIncome = 0;
   for (const [cat, amt] of Object.entries(byCat)) {
     const type = typeOf[cat];
     if (cat && type === 'income' && amt > 0) netIncome += amt;
-    if (!cat || type === 'income' || type === 'transfer' || amt >= 0) continue;
+    if ((!cat && !blankIsSpend) || type === 'income' || type === 'transfer' || amt >= 0) continue;
     spendByCat[cat] = -amt;
     if (!isSetAsideType(type)) consumption += -amt;
     if (fixedCat[cat]) fixed += -amt;
@@ -281,4 +296,4 @@ function lensDifference(stamped, a, b) {
   return out;
 }
 
-module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, rowKey, keeps, dropsAnyOf, isRefund };
+module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, keeps, dropsAnyOf, isRefund };

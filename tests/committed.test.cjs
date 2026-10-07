@@ -350,7 +350,7 @@ const card = {
   eq(L.short, false, 'not short');
   eq(L.days, 12, '13 Aug to 25 Aug is 12 days');
   eq(Math.round(L.perDay), 816, 'per-day divides what is free by the days left');
-  eq(L.counts, { service: 0, debt: 1, card: 0 }, 'the counts describe what was actually counted');
+  eq(L.counts, { service: 0, debt: 1, card: 0, notImported: 0 }, 'the counts describe what was actually counted');
   eq(L.items.length, 1, 'RULE 5: every counted charge is disclosed');
 }
 {
@@ -374,7 +374,7 @@ const card = {
   eq(L.cash, 10748, 'cash is the cheque account; the funds are out on `budget: false`');
   eq(L.countedAccounts, 1, 'one account contributed — the empty cash tin and the card did not');
   eq(L.committed, 8874, 'the outstanding card is what is still to leave the cheque account');
-  eq(L.counts, { service: 0, debt: 0, card: 1 }, 'counted as a card settlement, not as a debt instalment');
+  eq(L.counts, { service: 0, debt: 0, card: 1, notImported: 0 }, 'counted as a card settlement, not as a debt instalment');
   eq(L.free, 1874, 'free is what survives settling the card — not the full 10,748');
   eq(L.items.length, 1, 'RULE 5 holds for the card too: the settlement is disclosed');
 }

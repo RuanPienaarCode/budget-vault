@@ -330,6 +330,34 @@ function chargeStatus(stats, cycle, today) {
   return { state: gap > cycleDays * 2 ? 'overdue' : 'active', daysSince: gap };
 }
 
+/* How far a charge may sit from the listed price and still agree with it.
+
+   4%, not 2%: a subscription billed in another currency moves a little every
+   month with the exchange rate, and flagging that as the reader's error each
+   time would train them to ignore the flag entirely. Wide enough to absorb a
+   currency wobble, narrow enough that a real price change — a fibre line R40
+   above its listed figure — still shows.
+
+   The floor of 2 is the household's money: the few-rand wobble a cheap
+   subscription moves by, which 4% of R15 would flag. It used to be 2 units of
+   ANY currency, which stopped being harmless when the Services page learned
+   to price-check a service in its own currency (2026-10-07 audit, SVC-1): a
+   subscription listed at $15.99 and billed $17.99 — a 12.5% rise, R36 a
+   month — read as agreeing, because $2 is "within 2". So the floor applies
+   where a service is in the household's own currency, which a blank Currency
+   cell means (ADR-0004; the Services page writes the household's own symbol
+   back as blank), and nowhere else: this app has no measure of what a trivial
+   amount of another currency is, and the 4% band means the same thing in all
+   of them. Every household-currency verdict is the one this always gave
+   (tests/services-price-floor-currency.test.cjs sweeps it against the
+   released formula). */
+const PRICE_BAND = 0.04;
+const HOUSEHOLD_FLOOR = 2;
+function agreementBand(service, stated) {
+  const ownCurrency = String((service && service.currency) || '').trim();
+  return ownCurrency ? stated * PRICE_BAND : Math.max(HOUSEHOLD_FLOOR, stated * PRICE_BAND);
+}
+
 /* What the service SAYS against what the statements show. `null` where there is
    nothing to compare, so a caller never renders a difference it cannot support. */
 function comparePrice(service, stats) {
@@ -343,13 +371,104 @@ function comparePrice(service, stats) {
   return {
     stated, actual, diff, varies: false,
     pct: stated ? diff / stated : null,
-    /* 4%, not 2%: a subscription billed in another currency moves a little
-       every month with the exchange rate, and flagging that as the reader's
-       error each time would train them to ignore the flag entirely. Wide enough
-       to absorb a currency wobble, narrow enough that a real price change —
-       a fibre line R40 above its listed figure — still shows. */
-    agrees: Math.abs(diff) <= Math.max(2, stated * 0.04),
+    agrees: Math.abs(diff) <= agreementBand(service, stated),
   };
+}
+
+/* ------------------- the Services page's own two readings -------------------
+
+   2026-10-07 audit, SVC-2 and SVC-3. Both are ADDED beside the functions they
+   refine rather than folded into them, and that is load-bearing: committed.js
+   prices the Dashboard's "still committed" off comparePrice's inputs and dates
+   it off nextExpected, one cycle from the last charge, and its figures are
+   pinned by the reconciliation. The Services page asks a different question —
+   "what should the reader put in this row" — so it gets its own two answers,
+   and the Dashboard's stay exactly as they were. */
+
+/* The price a merchant has SETTLED on, or null.
+
+   chargeStats' `varies` refuses a price whose last three charges spread by more
+   than 15%, which is right for prepaid top-ups and for two products billed
+   under one name — and wrong for the commonest change there is, a price that
+   moved and then held. A fibre line billed 799, 799, 649, 649 has a last three
+   of 799 / 649 / 649: a 23% spread, reported "varies" under a tooltip blaming
+   top-ups, while the two newest charges agreed to the cent.
+
+   So: when the LAST TWO charges are within 4% of each other, they are the
+   price (their median). Two, not one — a single new amount is as likely a
+   pro-rata or a double bill as a new price, which is the reason chargeStats
+   reads three. 4% is the band comparePrice already allows a listed price, so a
+   merchant counts as having settled by the same tolerance it is judged by.
+
+   Date order, datable rows only, for the reason chargeStats' own header gives:
+   rows reach this account-major, so a merchant billed from two accounts
+   arrives interleaved, and the caller's order is not the merchant's history. */
+const SETTLED_BAND = 0.04;
+function settledPrice(charges) {
+  const dated = (charges || []).filter(c => c && isRealIsoDate(c.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (dated.length < 2) return null;
+  const a = Math.abs(dated[dated.length - 2].amount);
+  const b = Math.abs(dated[dated.length - 1].amount);
+  const mid = (a + b) / 2;
+  if (!(mid > 0)) return null;
+  return Math.abs(a - b) / mid <= SETTLED_BAND ? mid : null;
+}
+
+/* comparePrice, with the settled price above taking the place of a "varies"
+   refusal. Everywhere comparePrice HAD an answer this returns that answer
+   unchanged; where it refused, and the last two charges agree, the verdict is
+   comparePrice's own, asked of the settled figure — one agreement rule, not a
+   second spelling of the 4% band. `settled: true` lets the caller say what the
+   verdict rests on. `charges` are the ones `stats` was computed from. */
+function comparePriceNow(service, stats, charges) {
+  const base = comparePrice(service, stats);
+  if (!base || !base.varies) return base;
+  const settled = settledPrice(charges);
+  if (settled == null) return base;
+  return { ...comparePrice(service, { ...stats, varies: false, recent: settled }), settled: true };
+}
+
+/* `n` cycles on from `iso`, ANCHORED on iso rather than on the previous step:
+   the 31st stepped one month at a time through February comes back to the 31st
+   in March instead of drifting to the 28th for good. n = 1 is nextExpected's
+   own step, for every cycle (tests/services-next-billing-hint.test.cjs pins
+   the agreement); the clamps are the same ones, for the same short months. */
+function addCycles(iso, cycle, n) {
+  const step = STEP_DAYS[cycle];
+  if (step) return isoFromDayNumber(isoDayNumber(iso) + step * n);
+  const [y, m, d] = iso.split('-').map(Number);
+  let ny = y + n, nm = m;
+  if (cycle !== 'annual') {
+    const k = (m - 1) + n;
+    ny = y + Math.floor(k / 12);
+    nm = (k % 12) + 1;
+  }
+  const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+}
+
+/* The next billing date to OFFER the reader: the first cycle date, stepped
+   from the last charge, that is not already in the past.
+
+   nextExpected answers "when was the next charge due", and the Services page
+   offered that as a correction even when it had passed — "due 2026-10-01" on
+   7 October, for every service whose newest statement was not imported yet.
+   A next billing date in the past is not a correction, it is a second fossil.
+
+   Returns { date, first, skipped, last } so the caller can say what the date
+   rests on: `last` is the charge it steps from, `first` the date nextExpected
+   gives, `skipped` how many cycle dates had already passed. null wherever
+   nextExpected is null. `today` must be YYYY-MM-DD; without one nothing is
+   stepped. Terminates because every step moves the date strictly forward. */
+function nextDue(stats, cycle, today) {
+  const first = nextExpected(stats, cycle);
+  if (!first) return null;
+  let date = first, skipped = 0;
+  if (ISO_DATE.test(today || '')) {
+    while (date < today) { skipped++; date = addCycles(stats.last, cycle, skipped + 1); }
+  }
+  return { date, first, skipped, last: stats.last };
 }
 
 /* ------------------------- repeating INCOME ----------------------------- */
@@ -450,4 +569,7 @@ module.exports = {
      precisely the shape this repo keeps finding. */
   STEP_DAYS,
   findRecurringCredit,
+  /* 2026-10-07 audit — the Services page's readings, added beside the ones
+     committed.js consumes rather than changing them (see their header). */
+  settledPrice, comparePriceNow, nextDue,
 };

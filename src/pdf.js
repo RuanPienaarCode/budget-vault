@@ -52,13 +52,14 @@
    transactions, a year of budgets) run to a few KB uncompressed, nowhere
    near where stream compression would matter.
 
-   Built as raw bytes (a plain JS array of 0-255 values, turned into a
-   Uint8Array once at the end), never as a JS string pushed through
-   TextEncoder. TextEncoder is UTF-8; a cp1252 byte like 0xE9 (é) is not a
-   valid UTF-8 lead byte on its own, so encoding a WinAnsi string through it
-   would corrupt every accented character AND, because the corruption
-   changes byte lengths, shift every xref offset written after it — two
-   independent failures from one wrong call.
+   Built as raw bytes (Uint8Array chunks, copied once into one preallocated
+   Uint8Array at the end — see ByteBuf below for why not a plain array),
+   never as a JS string pushed through TextEncoder. TextEncoder is UTF-8; a
+   cp1252 byte like 0xE9 (é) is not a valid UTF-8 lead byte on its own, so
+   encoding a WinAnsi string through it would corrupt every accented
+   character AND, because the corruption changes byte lengths, shift every
+   xref offset written after it — two independent failures from one wrong
+   call.
 
    Pure — no DOM, no `require('obsidian')`, no Node/Electron API. `Uint8Array`
    is a plain JS type; nothing here needs Buffer. `created` (a timestamp) is
@@ -515,13 +516,56 @@ function layoutDocument(doc, opts) {
 }
 
 /* -------------------------------------------------------------------------
-   Byte-level PDF assembly, shared by both backends. */
+   Byte-level PDF assembly, shared by both backends.
+
+   CHUNKS, COPIED ONCE. This used to be a plain JS array that every byte was
+   push()ed into, one at a time, turned into a Uint8Array at the end. For the
+   vector path that is a few kilobytes and nobody would notice. The RASTER
+   path is the one that pays: each page is a ~500 KB JPEG, and every byte of
+   every JPEG went through push() — measured in macOS JavaScriptCore at ~21-26
+   bytes of resident memory per PDF byte (2026-10-07 audit, L5-04), so a
+   sixty-page "everything" export of about 30 MB needed some 630-760 MB just
+   to be assembled. The 2 GB iPhones that stop at iOS 15 are this plugin's
+   floor, and a WebView iOS kills for memory reloads with nothing written and
+   nothing said.
+
+   So a buffer is now a list of Uint8Array chunks and a running length: a
+   JPEG goes in BY REFERENCE (no copy), a string becomes one small chunk, and
+   toUint8Array() allocates the final size once and set()s every chunk into
+   it — the shape zip.js's writer already has. A ByteBuf can be appended to
+   another ByteBuf, which lets an image object reach the file without an
+   intermediate copy of its JPEG. The bytes are the bytes the array writer
+   produced: ascii() keeps its `& 0xff`, and a plain number array handed to
+   bytes() is converted by Uint8Array's own ToUint8, exactly what
+   `new Uint8Array(array)` did to the old one. tests/pdf-byte-assembly.test.cjs
+   pins both — a golden sha256 of a vector and a raster document from the old
+   writer, and a 24 MB raster PDF assembled inside a 64 MB JS heap. */
 class ByteBuf {
-  constructor() { this._b = []; }
-  ascii(str) { for (let i = 0; i < str.length; i++) this._b.push(str.charCodeAt(i) & 0xff); return this; }
-  bytes(arr) { for (let i = 0; i < arr.length; i++) this._b.push(arr[i]); return this; }
-  get length() { return this._b.length; }
-  toUint8Array() { return new Uint8Array(this._b); }
+  constructor() { this._chunks = []; this._len = 0; }
+  ascii(str) {
+    const s = String(str);
+    const a = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 0xff;
+    return this._push(a);
+  }
+  bytes(src) {
+    if (src instanceof ByteBuf) {
+      for (const c of src._chunks) this._push(c);
+      return this;
+    }
+    return this._push(src instanceof Uint8Array ? src : Uint8Array.from(src));
+  }
+  _push(chunk) {
+    if (chunk.length) { this._chunks.push(chunk); this._len += chunk.length; }
+    return this;
+  }
+  get length() { return this._len; }
+  toUint8Array() {
+    const out = new Uint8Array(this._len);
+    let p = 0;
+    for (const c of this._chunks) { out.set(c, p); p += c.length; }
+    return out;
+  }
 }
 function asciiBytes(str) { return new ByteBuf().ascii(str).toUint8Array(); }
 
@@ -555,11 +599,10 @@ function bytesToHex(arr) {
   return s;
 }
 
-/* An Info string that cannot be written as WinAnsi (the raster path exists
-   precisely because a title can be, say, Chinese) falls back to a UTF-16BE
-   hex string with a BOM — the one string encoding the PDF spec defines for
-   exactly this case, so the metadata survives even when the page content is
-   a raster image because the text could not be drawn as vector glyphs. */
+/* A UTF-16BE hex string with a BOM — the one string encoding the PDF spec
+   defines for text of any script, so the metadata survives even when the
+   page content is a raster image because the text could not be drawn as
+   vector glyphs. See writeInfoField for which strings take it. */
 function utf16beHexBytes(str) {
   const units = [];
   for (const ch of String(str || '')) {
@@ -576,11 +619,35 @@ function utf16beHexBytes(str) {
   return bytes;
 }
 
+/* An Info string is a literal only when every character is plain ASCII;
+   anything above 0x7E goes UTF-16BE.
+
+   The page CONTENT is WinAnsi because the content stream names
+   /WinAnsiEncoding fonts. An /Info string is not drawn with any font: a
+   reader decodes a literal there as PDFDocEncoding, which agrees with WinAnsi
+   on ASCII and parts of Latin-1 and DISAGREES in 0x80-0x9F. So the old rule —
+   "can it be encoded in WinAnsi?" — wrote a fortnightly range label's en dash
+   ("Sep – Oct 2026", WinAnsi 0x96) as a byte every reader showed as "Œ" in
+   the title bar and the document's properties (2026-10-07 audit, L4A-08).
+   ASCII is the only range the two encodings share without exception, so it
+   is the only one written as a literal; an ordinary English title therefore
+   keeps exactly the bytes it always had. Normalised first, as the page text
+   is, so a no-break space from a locale formatter does not by itself force
+   the hex form. tests/export-metadata.test.cjs reads both forms back, with
+   pdfinfo where the machine has it. */
+function plainAscii(str) {
+  for (const ch of normalizeText(str)) {
+    const cp = ch.codePointAt(0);
+    if (cp < 0x20 || cp > 0x7e) return false;
+  }
+  return true;
+}
+
 function writeInfoField(buf, key, value) {
   buf.ascii(key + ' ');
   const s = String(value || '');
   if (!s) { buf.ascii('()'); return; }
-  if (canEncode(s)) {
+  if (plainAscii(s)) {
     buf.ascii('(');
     buf.bytes(winAnsiBytesEscaped(s));
     buf.ascii(')');
@@ -589,10 +656,34 @@ function writeInfoField(buf, key, value) {
   }
 }
 
-function pdfDateFromInjected(created) {
+/* Minutes east of UTC, or null when the caller handed no usable zone. Real
+   zones run from UTC-12 to UTC+14; anything past ±18 h (ISO 8601's own
+   bound) is not a zone, and writing it would make a date no reader parses. */
+function zoneMinutes(utcOffset) {
+  if (typeof utcOffset !== 'number' || !Number.isFinite(utcOffset) || Math.abs(utcOffset) > 18 * 60) return null;
+  return Math.round(utcOffset);
+}
+
+/* `created` is the household's WALL CLOCK ('YYYY-MM-DDTHH:MM', from
+   nowLocalMinute) and `utcOffset` the zone that clock was read in. This used
+   to write the wall time with no zone at all, which readers take as UTC: an
+   export made at 14:00 in Johannesburg said 14:00Z, two hours ahead of the
+   moment it was made (2026-10-07 audit, L4A-09). Now the offset is written
+   the way the spec spells it — D:YYYYMMDDHHmmSS followed by +HH'mm', -HH'mm'
+   or Z — so the time a reader shows is local time AND the right instant, the
+   form Acrobat itself writes. With no offset handed in the date is exactly
+   what it always was, so a caller that has none states nothing new and the
+   byte-golden tests built on that form stand. */
+function pdfDateFromInjected(created, utcOffset) {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(created || ''));
   if (!m) return 'D:19700101000000';
-  return `D:${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}00`;
+  const local = `D:${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}00`;
+  const off = zoneMinutes(utcOffset);
+  if (off === null) return local;
+  if (off === 0) return `${local}Z`;
+  const a = Math.abs(off);
+  const p2 = n => String(n).padStart(2, '0');
+  return `${local}${off < 0 ? '-' : '+'}${p2(Math.floor(a / 60))}'${p2(a % 60)}'`;
 }
 
 /* Header + object table + xref + trailer, identical between the vector and
@@ -667,7 +758,7 @@ function renderVectorPdf(pages, opts) {
   writeInfoField(infoBuf, '/Title', meta.title || '');
   infoBuf.ascii(' ');
   writeInfoField(infoBuf, '/Producer', meta.producer || 'budget-vault');
-  infoBuf.ascii(` /CreationDate (${pdfDateFromInjected(meta.created)}) >>`);
+  infoBuf.ascii(` /CreationDate (${pdfDateFromInjected(meta.created, meta.utcOffset)}) >>`);
   objs[INFO] = infoBuf.toUint8Array();
 
   for (let i = 0; i < n; i++) {
@@ -711,7 +802,7 @@ function renderImagePdf(images, opts) {
   writeInfoField(infoBuf, '/Title', meta.title || '');
   infoBuf.ascii(' ');
   writeInfoField(infoBuf, '/Producer', meta.producer || 'budget-vault');
-  infoBuf.ascii(` /CreationDate (${pdfDateFromInjected(meta.created)}) >>`);
+  infoBuf.ascii(` /CreationDate (${pdfDateFromInjected(meta.created, meta.utcOffset)}) >>`);
   objs[INFO] = infoBuf.toUint8Array();
 
   for (let i = 0; i < n; i++) {
@@ -725,7 +816,9 @@ function renderImagePdf(images, opts) {
     );
     imgObj.bytes(jpeg);
     imgObj.ascii('\nendstream');
-    objs[imgNum(i)] = imgObj.toUint8Array();
+    /* The ByteBuf itself, not a copy of it: assemblePdf appends its chunks,
+       so each JPEG is copied exactly once — into the finished file. */
+    objs[imgNum(i)] = imgObj;
 
     const contentStr = `q\n${fmtNum(pageDims.width)} 0 0 ${fmtNum(pageDims.height)} 0 0 cm\n/Im0 Do\nQ`;
     const contentObj = new ByteBuf();

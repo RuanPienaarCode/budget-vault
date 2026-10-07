@@ -15,8 +15,84 @@
    boot-time writers already hold. */
 
 const { normalizePath, TFile, TFolder } = require('obsidian');
-const { collapsePath } = require('./vault-path');
+const { collapsePath, hiddenSegment } = require('./vault-path');
 const { patchFrontmatter } = require('./markdown');
+
+/* One path segment as macOS, iOS and iCloud Drive compare it: case-folded and
+   in NFC. Those filesystems are case-insensitive AND normalisation-insensitive
+   — `Categories` and `categories` are one folder, and so are a composed and a
+   decomposed "é" — while every lookup Obsidian offers is an exact-key match.
+   ISSUE 64 taught pathTaken this for one filename; the helpers below apply it
+   to every segment of a vault-root path. */
+const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
+
+/* destinationProblem(folder, { configDir, budgetFolder }) — may an export
+   write into the folder the reader TYPED? The one answer for every export
+   that takes a destination: the Report uses it; the Transactions export and
+   the budget export are to adopt it rather than keep their partial copies.
+
+   Returns null when the folder is acceptable, or a plain object naming the
+   problem — never a sentence, because io.js speaks no language and each page
+   words the refusal in its own (views/report.js maps `kind` to a key):
+
+     { kind: 'traversal' }                   a segment made only of dots ("..",
+                                             "...") — refused, NEVER rebased.
+                                             reportPaths() used to drop it, so
+                                             "../outside" wrote to vault-root
+                                             outside/, which is the silent
+                                             correction guardedVaultPath's own
+                                             header says this app refuses
+     { kind: 'configDir', folder: <configDir> }
+                                             inside Obsidian's config folder
+                                             (".obsidian" unless the vault
+                                             renamed it): a real file, a
+                                             success toast, and nothing the
+                                             file explorer will ever show
+     { kind: 'managed', folder: 'Categories' | 'Accounts' | 'Budgets' |
+                                'Plans' | 'Tax' | 'Transactions' | 'Notes' }
+                                             inside the budget folder, at or
+                                             below a folder load.js reads, so
+                                             the next load parses the export
+                                             back in as data (src/report.js
+                                             M1). `folder` is the canonical
+                                             name, for the message
+
+   Checked in that order, so a traversal is reported before whatever it might
+   collapse onto. The folder is read the way the writers read it: `/` and `\`
+   both separate (normalizePath turns one into the other), every segment is
+   trimmed, empty and single-dot segments mean nothing ("./Budget/Categories"
+   IS Budget/Categories — dropping "." is not a rebase, keeping it would be a
+   bypass). Config and managed folders are compared segment by segment,
+   case-folded and in NFC (foldSeg above): ".Obsidian/x" and
+   "budget/categories" are refused on the filesystems that would resolve
+   them onto the real folder, and ".obsidian-notes" or
+   "Budget/CategoriesOfSpending" are ordinary folders. An empty folder is
+   null — the caller applies its own default. `configDir` defaults to
+   ".obsidian" and `budgetFolder` to the vault root; makeIo() below publishes
+   a copy bound to the live vault's config folder and the configured budget
+   folder, which is the one a view should call.
+
+   Pure apart from reading src/report.js's managed-folder list — required
+   lazily, because io.js is the first module every boot path loads and the
+   report's module graph (twelve language tables among it) has no business
+   loading with it. */
+function destinationProblem(folder, { configDir, budgetFolder } = {}) {
+  const segs = String(folder ?? '').replace(/\\/g, '/').split('/')
+    .map(s => s.trim()).filter(s => s && s !== '.');
+  if (!segs.length) return null;
+  if (segs.some(s => /^\.{2,}$/.test(s))) return { kind: 'traversal' };
+  const cfg = String(configDir || '.obsidian');
+  const cfgSegs = cfg.split('/').map(s => s.trim()).filter(Boolean);
+  if (cfgSegs.length && cfgSegs.length <= segs.length && cfgSegs.every((c, i) => foldSeg(segs[i]) === foldSeg(c))) {
+    return { kind: 'configDir', folder: cfg };
+  }
+  const { managedFolderMatch } = require('./report');
+  const managed = managedFolderMatch(segs.join('/'), budgetFolder || '');
+  if (managed) return { kind: 'managed', folder: managed };
+  // Any other dot-segment: Obsidian indexes nothing under it (vault-path.js).
+  const hidden = hiddenSegment(segs.join('/'));
+  return hidden ? { kind: 'hidden', folder: hidden } : null;
+}
 
 function makeIo({ vault, plugin }) {
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
@@ -105,15 +181,26 @@ function makeIo({ vault, plugin }) {
      write-guard stamping, but SKIPS a file that already exists — re-running
      the wizard (or racing device sync) must never overwrite real data. Same
      ring as writeVaultFile because the wizard's folder is typed by the person
-     sitting there, not built from synced data. Returns whether it wrote. */
+     sitting there, not built from synced data. Returns whether it wrote.
+
+     "Already exists" is asked the filesystem's way (vaultPathTaken, below).
+     The exact-key getAbstractFileByPath it used read `Budget/settings.md` as
+     absent beside a requested `Budget/Settings.md` — one file on APFS and iOS
+     — and wrote over the household's own settings (2026-10-07 audit, L4A-07).
+     And a create that THROWS returns false now. The catch said "raced into
+     existence" and fell through to `return true`, so a refused create was
+     reported as a write — and onboarding.js's celebration screen reads this
+     value (budgetWritten) to tell the household their first budget was
+     saved. Raced or refused, this call wrote nothing. */
   async function createVaultFileIfAbsent(rel, content) {
     const path = guardedVaultPath(rel);
-    if (vault.getAbstractFileByPath(path)) return false;
+    if (vaultPathTaken(path)) return false;
     stampWrite();
     await ensureFolder(path.split('/').slice(0, -1).join('/'));
-    try { await vault.create(path, content); } catch (e) { /* raced into existence */ }
+    let wrote = true;
+    try { await vault.create(path, content); } catch (e) { wrote = false; }
     stampWrite();
-    return true;
+    return wrote;
   }
   /* Guarded folder creation for user-named destinations (the wizard's
      scaffold). ensureFolder itself stays unguarded because every existing
@@ -264,6 +351,57 @@ function makeIo({ vault, plugin }) {
     const want = full.slice(cut + 1).toLowerCase();
     return (folder.children || []).some(c => String(c.name || '').toLowerCase() === want);
   }
+  /* pathTaken's VAULT-ROOT twin: is `rel` (a path from the vault root, the
+     convention writeVaultFile/fileAtVaultPath use) already used — by a file
+     OR a folder, since neither leaves room to create a file — asked the way
+     the filesystem answers rather than the way Obsidian's index does?
+
+     Every segment is compared through foldSeg (case-folded, NFC), not only
+     the filename as pathTaken does, because the vault-root destinations are
+     typed folders and a folder can differ by case as easily as a file can:
+     an export into `Exports/` lands on disk in an existing `exports/`.
+
+     Walks from the deepest prefix the index knows EXACTLY — usually the
+     parent, so it costs one folder's children — and only from the vault root
+     (vault.getRoot()) when not even the first segment matches exactly. A
+     vault that cannot hand back its root (the bare-node harness) then
+     answers false for a folder-CASE variant at the very top; the filename
+     and every deeper segment still fold. A FILE where a folder segment
+     should be is not "taken" (nothing can be created there, and the write
+     will say so). A path guardedVaultPath refuses — one escaping the vault —
+     is false: it is refused, not occupied.
+
+     Returns a boolean. createVaultFileIfAbsent uses it; the budget export's
+     "this replaces …" list is to adopt it (2026-10-07 audit, L4A-07 a),
+     where fileAtVaultPath's exact lookup missed `exports/…summary.csv` that
+     the click then overwrote. fileAtVaultPath itself stays exact: it hands
+     back the TFile to OPEN, and folding there would open a different key. */
+  function vaultPathTaken(rel) {
+    let path;
+    try { path = guardedVaultPath(rel); } catch (e) { return false; }
+    if (vault.getAbstractFileByPath(path)) return true;
+    const segs = path.split('/');
+    let i = segs.length - 1;
+    let folder = null;
+    for (; i > 0; i--) {
+      folder = vault.getFolderByPath(segs.slice(0, i).join('/'));
+      if (folder) break;
+    }
+    if (!folder) {
+      folder = typeof vault.getRoot === 'function' ? vault.getRoot() : null;
+      i = 0;
+    }
+    if (!folder) return false;
+    for (; i < segs.length; i++) {
+      const want = foldSeg(segs[i]);
+      const hit = (folder.children || []).find(c => foldSeg(c.name) === want);
+      if (!hit) return false;
+      if (i === segs.length - 1) return true;
+      if (!(hit instanceof TFolder)) return false;
+      folder = hit;
+    }
+    return false;
+  }
   function mdFilesIn(rel) {
     const f = vault.getFolderByPath(relPath(rel));
     if (!f) return [];
@@ -332,7 +470,14 @@ function makeIo({ vault, plugin }) {
 
   return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
-    createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath,
+    createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath, vaultPathTaken,
+    /* destinationProblem (module level, above) bound to THIS vault: its own
+       config folder (vault.configDir, read at call time) and the configured
+       budget folder. `opts` still overrides either, for a caller that knows
+       better. Same contract and return as the unbound function. */
+    destinationProblem: (folder, opts) => destinationProblem(folder, {
+      configDir: vault.configDir, budgetFolder: plugin.settings.budgetFolder, ...(opts || {}),
+    }),
     lastWriteAt: () => plugin._lastWrite || 0,
   };
 }
@@ -343,3 +488,4 @@ function registerIo(ctx) {
 
 module.exports = registerIo;
 module.exports.makeIo = makeIo;
+module.exports.destinationProblem = destinationProblem;

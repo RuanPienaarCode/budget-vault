@@ -17,6 +17,9 @@ const { currenciesIn, isForeign, symbolOf } = require('./currency');
 /* ADR-0007 · Net worth reads outstanding from owed-math: a part-recovered
    loan (R2 000 lent, R500 back) is R1 500, subtracted in one place. */
 const { outstandingOf, isSettled } = require('./owed-math');
+/* THE parser for a typed amount — typedBelowZero reads a kept raw with it,
+   the same way the editors that wrote the raw did. */
+const { normalizeAmount } = require('./amount');
 
 /* Only `active` debts count. A debt marked paid is history; leaving it in
    reports a bond as still owed years after it was settled. */
@@ -61,6 +64,42 @@ function foreignTotals(rows, household, valueKey) {
     by.set(sym, (by.get(sym) || 0) + Math.max(0, Number(r[valueKey]) || 0));
   }
   return [...by].map(([sym, v]) => [sym, (Math.round(v * 100) / 100) || 0]);
+}
+
+/* The figure typed into one of these ledgers' money cells when it was BELOW
+   ZERO, else null. Every total here still floors those cells; what changed
+   (2026-10-07) is that the editors keep the figure — they used to save 0.00
+   over an overpaid card's -250 with nothing on screen — and the row says it
+   counts as 0. Two shapes: a FLOORED column (Assets Value; Debts Balance,
+   Rate, Payment, Extra) holds the floored 0 and the typed text in
+   `<key>Raw`; Owed Amount, not floored, holds the typed number, as the loader
+   has always read it. Raw first: unreadable text is not a negative. */
+function typedBelowZero(row, key) {
+  if (!row) return null;
+  const raw = row[key + 'Raw'];
+  const v = raw != null ? normalizeAmount(raw) : row[key];
+  return typeof v === 'number' && v < 0 ? v : null;
+}
+
+/* What a typed figure leaves in a FLOORED column: `value`, the floored number
+   every total reads, and `raw`, the typed text when flooring changed it, else
+   null (a figure typed here supersedes any raw the loader kept). That is the
+   state the loader reads back from the cell the serializer writes — money()
+   writes `<key>Raw` while the field holds the 0 it produced — so a figure
+   means the same before and after a reload. Math.max turns "-0" into 0. */
+function flooredEntry(value, text) {
+  return value < 0
+    ? { value: 0, raw: String(text == null ? '' : text).trim() }
+    : { value: Math.max(0, value), raw: null };
+}
+
+/* What an editor's field shows for that cell: the typed figure when it was
+   below zero, the stored one otherwise, and '' for a stored 0 as these
+   inputs have always drawn it. A redraw built from the stored 0 alone used to
+   blank a field whose figure was still on disk. */
+function shownFigure(row, key) {
+  const typed = typedBelowZero(row, key);
+  return typed !== null ? typed : (row && row[key]) || '';
 }
 
 /* ADR-0007 · Net worth splits accounts by sign, keeps the ledgers separable,
@@ -211,4 +250,5 @@ function otherCurrencyNet(w, accountOthers) {
 
 module.exports = {
   worth, activeDebts, assetTotal, owedTotal, foreignTotals, otherCurrencyNet, cardOverlap, accountGroups, debtsByType, assetsByType,
+  typedBelowZero, flooredEntry, shownFigure,
 };

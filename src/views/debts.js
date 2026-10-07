@@ -12,7 +12,10 @@ const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
 const { MONTHS } = require('../constants');
 const { amortise, monthlyInterest, simulate, priorityOrder, addMonths, humanMonths, expectedBalance } = require('../debt-math');
-const { activeDebts, cardOverlap } = require('../worth');
+/* typedBelowZero / flooredEntry / shownFigure: a negative typed into one of
+   the four money cells is kept and shown while every total floors it — see
+   worth.js, and editMoney below. */
+const { activeDebts, cardOverlap, typedBelowZero, flooredEntry, shownFigure } = require('../worth');
 /* The canonical "what does this month's interest cost" rule (see its own
    header): this file used to re-spell the aggregate inline and printed R0,00
    on a book where every Rate cell was blank, while the score withheld the
@@ -50,13 +53,65 @@ module.exports = function registerDebts(ctx) {
      toast and nothing to undo it. The reader had typed NOTHING.
 
      null from normalizeAmount means "no number in there": leave the stored
-     figure alone, say so, and redraw so the field shows what is actually saved
-     rather than the text the browser could not parse. A reader who genuinely
-     means nought still types 0, and 0 parses. */
+     figure alone, say so, and put it back in the field rather than leave the
+     text the browser could not parse. A reader who genuinely means nought
+     still types 0, and 0 parses. The "put it back" is explicit now: this used
+     to call after() — refreshAll, which redraws the DERIVED cells and not the
+     input — so the field stayed blank while the old figure was the one the
+     next save wrote, and the page was marked unsaved for a change that never
+     happened.
+
+     Below zero is KEPT, not floored away. Math.max(0, v) used to save 0.00
+     over a typed -250 — a credit balance on an overpaid card is a real thing
+     to write down — with nothing on screen to say so while the field still
+     showed "-250". flooredEntry() leaves the floored 0 in the field, so every
+     total, projection and ratio on the page reads exactly what it always
+     did, and keeps the typed text in `<key>Raw`, which the serializer writes
+     back while the field still holds that 0. The row says it counts as 0. */
   const editMoney = (row, key, label, e, after) => {
     const v = normalizeAmount(e.target.value);
-    if (v === null) { toast(`${label} must be a number`, true); after(); return; }
-    row[key] = Math.max(0, v); row[key + 'Raw'] = null; after();
+    if (v === null) { toast(`${label} must be a number`, true); e.target.value = String(shownFigure(row, key)); return; }
+    const kept = flooredEntry(v, e.target.value);
+    row[key] = kept.value; row[key + 'Raw'] = kept.raw; after();
+  };
+
+  /* The note beside a money field typed below zero. A Rate below zero is
+     floored to 0, and a rate of 0 is no rate at all (rateUnknown, below), so
+     it says that rather than "counts as 0". */
+  const belowZeroText = key => (key === 'rate' ? 'counts as no rate' : 'counts as 0 in the totals');
+
+  /* DEBT-1. A debt whose rate is unknown is not projected. Debts.md's Rate
+     column reads a blank cell as 0 and the add dialog used to pre-fill '0',
+     and health-math's Interest tile has read that 0 as UNKNOWN since 1.35.0
+     ("covers 1 of 2 debts · 1 has no rate") — while every projection on this
+     same page took it as a real 0% loan. A R900 000 bond with no rate showed
+     "Interest still to pay R 0" and "Clear by Sep 2034", was ranked cheapest
+     at 0.00% in the attack order, and set a Debt-free headline with no word
+     that its cost had been assumed away; at any plausible rate the same
+     payment takes about twice as long.
+
+     The SAME rule as the tile, asked of one row — debtInterestCoverage over a
+     one-debt list — rather than a second spelling of "rate > 0" that could
+     drift from it. A paid debt is not active, so it is never "unknown"; it is
+     not projected anyway. A genuine 0% deal reads as unknown too, as it
+     already does on the tile: a projection the page cannot tell from a
+     missing rate is not one it can make. */
+  const rateUnknown = d => debtInterestCoverage([d]).missing > 0;
+
+  /* A row's OWN figures in its OWN symbol (OWED-1) — views/assets.js's aMoney()
+     on this page. Every cross-debt figure here is household-currency only by
+     construction (active() below), but the TABLE lists every debt, and a euro
+     bond's row read "Interest still to pay R 29 575" and "on this plan it
+     would be R … by now" in the household's symbol. */
+  const dMoney = (d, v, dp = 2) => (isForeign(d, S.settings.currency) && typeof ctx.moneyIn === 'function'
+    ? ctx.moneyIn(symbolOf(d, S.settings.currency), v, dp)
+    : money(v, dp));
+
+  /* "Bond" / "Bond and Car" / "Bond, Car and Loan" — the debts a projection
+     left out, named in a sentence. */
+  const nameList = list => {
+    const names = list.map(d => d.name);
+    return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   };
 
   /* Copies, each stamped with a stable `key`, because two debts can share a
@@ -224,11 +279,22 @@ module.exports = function registerDebts(ctx) {
        renderDebtPlan's own `base` — two cheap simulate() calls over a
        household's handful of debts costs nothing, and sharing one across two
        functions is exactly the kind of coupling this fix removes. */
-    const base = simulate(list, { strategy: 'minimum' });
-    tile('Debt-free', base.settled && base.months ? monthLabel(addMonths(base.months, todayForMonths())) : (total > 0 ? 'not at this payment' : '—'),
-      base.settled && base.months ? 'grad-txt' : (total > 0 ? 'text-danger' : ''),
-      base.settled && base.months ? `${humanMonths(base.months)} — at your recorded payments and extras, no what-if`
-        : (total > 0 ? 'not within 50 years at the payments entered' : 'no debt tracked'));
+    /* DEBT-1: over the debts whose rate is known (rateUnknown above), and the
+       caption says what that leaves out — a date that silently treated a
+       rate-less bond as interest-free was the headline promise of the page.
+       A fully rated book takes neither branch and reads exactly as before. */
+    const rated = list.filter(d => !rateUnknown(d));
+    const unrated = list.length - rated.length;
+    const ratedTotal = rated.reduce((s, d) => s + d.balance, 0);
+    const base = simulate(rated, { strategy: 'minimum' });
+    const dated = base.settled && base.months;
+    const excludes = unrated ? ` · excludes ${unrated} debt${unrated === 1 ? '' : 's'} with no rate` : '';
+    tile('Debt-free', dated ? monthLabel(addMonths(base.months, todayForMonths())) : (ratedTotal > 0 ? 'not at this payment' : '—'),
+      dated ? 'grad-txt' : (ratedTotal > 0 ? 'text-danger' : ''),
+      dated ? `${humanMonths(base.months)} — at your recorded payments and extras, no what-if${excludes}`
+        : ratedTotal > 0 ? `not within 50 years at the payments entered${excludes}`
+          : unrated ? 'add a rate to any debt to project a date'
+            : 'no debt tracked');
   }
 
   /* ------------------------------ the plan -------------------------------
@@ -237,14 +303,33 @@ module.exports = function registerDebts(ctx) {
      is a number with nothing to compare to, and the whole card is just a
      bill. */
   function renderDebtPlan() {
-    const list = active();
+    /* DEBT-1: the plan, the curve and the attack order run over the debts
+       whose rate is known, and name the rest. A rate-less debt was listed
+       at "0.00%" — ranked the cheapest debt in the book, so avalanche put it
+       last in line for spare money — and cleared on a 0% schedule: an
+       ordering of a household that does not exist. Its payment is not pooled
+       either: a plan that cannot price the debt cannot say when its payment
+       would come free. */
+    const all = active();
+    const list = all.filter(d => !rateUnknown(d));
+    const unrated = all.filter(rateUnknown);
+    const one = unrated.length === 1;
     const wrap = $('#debtPlan'); wrap.empty();
     const order = $('#debtOrder'); order.empty();
 
-    if (!list.length) {
+    if (!all.length) {
       $('#debtCurve').empty();
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         'Add a debt below and this becomes a payoff plan — how long each method takes, and what it saves.'));
+      return;
+    }
+    if (!list.length) {
+      $('#debtCurve').empty();
+      wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
+        `Add the interest rate to ${one ? 'the debt' : 'each debt'} below and this becomes a payoff plan. `
+        + `A debt with no rate cannot be projected, so ${nameList(unrated)} ${one ? 'is' : 'are'} not planned here.`));
+      order.append(el('div', { class: 'text-muted', style: 'font-size:12.5px' },
+        `Not ranked: ${nameList(unrated)} — no rate stated, so ${one ? 'its' : 'their'} cost cannot be compared.`));
       return;
     }
 
@@ -301,6 +386,10 @@ module.exports = function registerDebts(ctx) {
       grid.append(card);
     }
     wrap.append(grid);
+    if (unrated.length) {
+      wrap.append(el('p', { class: 'text-muted', style: 'margin:12px 0 0;font-size:12.5px' },
+        `Not in this plan: ${nameList(unrated)} — no rate stated. Add the rate to include ${one ? 'it' : 'them'}.`));
+    }
 
     /* The page had NO disclaimer at all while projecting payoff dates fifty
        years out, quoting total interest in the hundreds of thousands, ranking
@@ -353,6 +442,10 @@ module.exports = function registerDebts(ctx) {
         el('span', { class: 'do-d' }, at ? `clear ${monthLabel(addMonths(at, todayForMonths()))}` : 'not clearing')));
     }
     order.append(ol);
+    if (unrated.length) {
+      order.append(el('div', { class: 'text-muted', style: 'margin-top:8px;font-size:12.5px' },
+        `Not ranked: ${nameList(unrated)} — no rate stated, so ${one ? 'its' : 'their'} cost cannot be compared.`));
+    }
   }
 
   /* --------------------- payments seen in transactions -------------------
@@ -605,8 +698,17 @@ module.exports = function registerDebts(ctx) {
         const clearCell = el('td', {});
         const interestCell = el('td', { class: 'num' });
         const barFill = el('i', { class: 'cat-bar-fill' });
+        /* One note per money field, beside it, refreshed in place with the
+           derived cells — empty unless that figure was typed below zero. */
+        const belowZero = {};
+        for (const k of ['balance', 'rate', 'payment', 'extra']) {
+          belowZero[k] = el('div', { class: 'text-muted', style: 'font-size:11.5px' });
+        }
 
         function refreshRow() {
+          for (const k of Object.keys(belowZero)) {
+            belowZero[k].textContent = typedBelowZero(d, k) !== null ? belowZeroText(k) : '';
+          }
           const paidOff = d.original > 0 ? Math.min(100, Math.max(0, ((d.original - d.balance) / d.original) * 100)) : 0;
           barFill.style.width = `${paidOff}%`;
           payoffCell.empty();
@@ -622,8 +724,13 @@ module.exports = function registerDebts(ctx) {
              questioned it. Only shown when it MATERIALLY disagrees: a schedule
              is an estimate (a missed payment, a rate change, a fee), so small
              differences are noise and flagging them would train the reader to
-             ignore the line that matters. */
-          if (d.status !== 'paid') {
+             ignore the line that matters.
+
+             Not for a debt with no rate (DEBT-1): the schedule is worked
+             forward at the rate, and at a missing one it was worked at 0% —
+             "on this plan it would be R249 500 by now" for a bond that has
+             been accruing interest all along. */
+          if (d.status !== 'paid' && !rateUnknown(d)) {
             const exp = expectedBalance(d, todayIso());
             if (exp) {
               const gap = d.balance - exp.expected;
@@ -636,30 +743,40 @@ module.exports = function registerDebts(ctx) {
                 // where this table is read — caveatChip (dom.js) makes it
                 // reachable by tap there too.
                 payoffCell.append(el('div', { class: 'debt-implied' }, caveatChip(
-                  `on this plan it would be ${money(exp.expected, 0)} by now`,
-                  `From ${money(d.original)} at ${d.rate}% paying ${money(committed(d))} a month since ${d.start}, `
-                    + `the schedule puts this at ${money(exp.expected)} after ${exp.months} months. `
-                    + `Your figure is ${money(Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.`)));
+                  `on this plan it would be ${dMoney(d, exp.expected, 0)} by now`,
+                  `From ${dMoney(d, d.original)} at ${d.rate}% paying ${dMoney(d, committed(d))} a month since ${d.start}, `
+                    + `the schedule puts this at ${dMoney(d, exp.expected)} after ${exp.months} months. `
+                    + `Your figure is ${dMoney(d, Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.`)));
               }
             }
           }
 
-          const a = amortise(d.balance, d.rate, committed(d));
           clearCell.empty(); interestCell.empty();
           if (d.status === 'paid') {
             clearCell.append(el('span', { class: 'text-success' }, 'settled'));
             interestCell.append(el('span', { class: 'text-muted' }, '—'));
-          } else if (!a.settled) {
-            /* Did not close inside the 600-month horizon amortise runs to. That
-               covers a payment genuinely below the interest AND one just above
-               it that simply takes decades, so this says what is known rather
-               than asserting the interest is winning. */
-            clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'not in 50 yrs' : 'no payment'));
-            interestCell.append(el('span', { class: 'text-danger num' }, `+${money(monthlyInterest(d.balance, d.rate), 0)}/mo`));
+          } else if (rateUnknown(d)) {
+            /* DEBT-1: no date and no interest figure for a debt whose rate is
+               unknown — "Interest still to pay R 0" is the false claim the
+               Interest tile above was taught not to make in 1.35.0. Said in
+               the row, with the one thing that would make it knowable. */
+            clearCell.append(el('span', { class: 'text-muted' }, 'rate unknown'),
+              el('div', { class: 'text-muted', style: 'font-size:11.5px' }, 'add the rate to project this debt'));
+            interestCell.append(el('span', { class: 'text-muted' }, '—'));
           } else {
-            clearCell.append(el('span', {}, monthLabel(addMonths(a.months, todayForMonths()))),
-              el('div', { class: 'text-muted', style: 'font-size:11.5px' }, humanMonths(a.months)));
-            interestCell.append(money(a.interest, 0));
+            const a = amortise(d.balance, d.rate, committed(d));
+            if (!a.settled) {
+              /* Did not close inside the 600-month horizon amortise runs to. That
+                 covers a payment genuinely below the interest AND one just above
+                 it that simply takes decades, so this says what is known rather
+                 than asserting the interest is winning. */
+              clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'not in 50 yrs' : 'no payment'));
+              interestCell.append(el('span', { class: 'text-danger num' }, `+${dMoney(d, monthlyInterest(d.balance, d.rate), 0)}/mo`));
+            } else {
+              clearCell.append(el('span', {}, monthLabel(addMonths(a.months, todayForMonths()))),
+                el('div', { class: 'text-muted', style: 'font-size:11.5px' }, humanMonths(a.months)));
+              interestCell.append(dMoney(d, a.interest, 0));
+            }
           }
         }
 
@@ -686,20 +803,22 @@ module.exports = function registerDebts(ctx) {
           el('td', {}, el('div', { style: 'font-weight:600' }, d.name, ctx.noteButton('debt', d.name)),
             el('div', { class: 'text-muted', style: 'font-size:11.5px' },
               [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.balance || '',
+          /* All four money cells go through editMoney — see its comment for
+             why the parse and the `<key>Raw` handling belong together — and
+             draw through shownFigure, so a figure kept below zero is redrawn
+             as itself rather than as the blank its floored 0 would give. */
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'balance'),
             style: 'width:120px', 'aria-label': `Balance owed on ${d.name}`,
-            /* All four money cells go through editMoney — see its comment for
-               why the parse and the `<key>Raw` clearing belong together. */
-            onchange: e => editMoney(d, 'balance', 'Balance', e, refreshAll) })),
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.rate || '',
+            onchange: e => editMoney(d, 'balance', 'Balance', e, refreshAll) }), belowZero.balance),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'rate'),
             style: 'width:84px', 'aria-label': `Annual interest rate on ${d.name}`,
-            onchange: e => editMoney(d, 'rate', 'Rate', e, refreshAll) })),
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.payment || '',
+            onchange: e => editMoney(d, 'rate', 'Rate', e, refreshAll) }), belowZero.rate),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'payment'),
             style: 'width:110px', 'aria-label': `Monthly payment on ${d.name}`,
-            onchange: e => editMoney(d, 'payment', 'Payment', e, refreshAll) })),
-          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.extra || '',
+            onchange: e => editMoney(d, 'payment', 'Payment', e, refreshAll) }), belowZero.payment),
+          el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'extra'),
             style: 'width:100px', 'aria-label': `Extra paid each month on ${d.name}`,
-            onchange: e => editMoney(d, 'extra', 'Extra', e, refreshAll) })),
+            onchange: e => editMoney(d, 'extra', 'Extra', e, refreshAll) }), belowZero.extra),
           // A category that no longer exists in Categories/ (renamed, or a
           // hand-edited Debts.md) still gets an option of its own. Without it
           // the select falls back to "— none —" and shows a link that IS on
@@ -787,7 +906,13 @@ module.exports = function registerDebts(ctx) {
          the true original loan. */
       { key: 'original', label: 'What did you originally borrow?', type: 'number', value: '',
         desc: 'Optional — leave blank to start the "Paid off" progress bar from today\'s balance instead.' },
-      { key: 'rate', label: 'Interest rate (% a year)', type: 'number', value: '0' },
+      /* Blank, not '0' (DEBT-1). A pre-filled 0 was saved by every reader who
+         did not have the statement to hand, and a rate of 0 then read as a
+         0% loan to every projection on this page. Blank is the honest
+         default: it is stored as the 0 a blank cell reads as, which this page
+         treats as UNKNOWN — and says so — rather than as interest-free. */
+      { key: 'rate', label: 'Interest rate (% a year)', type: 'number', value: '',
+        desc: 'Leave blank if you do not know it yet — the page then says the rate is unknown instead of projecting this debt as interest-free.' },
       { key: 'payment', label: 'Monthly payment', type: 'number', value: '0' },
       { key: 'category', label: 'Budget category (links its transactions)', type: 'select', options: ['', ...S.categories.map(c => c.name)], value: '' },
       /* ISSUE 30 — see views/assets.js. Blank means the household's currency,
@@ -804,22 +929,36 @@ module.exports = function registerDebts(ctx) {
        and focus restores by row index, so nothing downstream needs the name to
        be distinct. */
     const name = r.name.trim();
-    const balance = normalizeAmount(r.balance), rate = normalizeAmount(r.rate), payment = normalizeAmount(r.payment);
+    // A blank rate is an answer — "not known yet" (see the field above) — and
+    // only typed, unparseable text is an error.
+    const rateText = (r.rate || '').toString().trim();
+    const balance = normalizeAmount(r.balance), rate = rateText ? normalizeAmount(rateText) : 0, payment = normalizeAmount(r.payment);
     if ([balance, rate, payment].some(v => v === null)) return toast('Balance, rate and payment must be numbers', true);
     // Blank is the expected case (see the field's `desc` above) — only a
     // typed, unparseable value is an error, not an empty box.
     const originalRaw = (r.original || '').toString().trim();
     const originalTyped = originalRaw ? normalizeAmount(originalRaw) : null;
     if (originalRaw && originalTyped === null) return toast('Original amount must be a number', true);
+    /* Below zero is kept as typed, exactly as the table's own fields keep it
+       (editMoney) — floored in the field, the text in `<key>Raw` — rather
+       than silently zeroed. */
+    const typed = {
+      balance: flooredEntry(balance, r.balance), rate: flooredEntry(rate, rateText),
+      payment: flooredEntry(payment, r.payment),
+    };
+    const raws = {};
+    for (const [k, e] of Object.entries(typed)) if (e.raw !== null) raws[k + 'Raw'] = e.raw;
+    const originalKept = originalTyped !== null ? flooredEntry(originalTyped, originalRaw) : null;
+    if (originalKept && originalKept.raw !== null) raws.originalRaw = originalKept.raw;
     S.debts.push({
       // '' when it merely restates the household symbol — see usedColumns().
       currency: (r.currency || '').trim() === (S.settings.currency || '') ? '' : (r.currency || '').trim(),
       name, lender: (r.lender || '').trim(), type: r.type || 'other',
-      balance: Math.max(0, balance),
+      balance: typed.balance.value,
       // The real original loan when given; otherwise seeded from the balance
       // so the "paid off" bar still has a baseline from day one — see
       // refreshRow(), which now also names that baseline on screen.
-      original: originalTyped !== null ? Math.max(0, originalTyped) : Math.max(0, balance),
+      original: originalKept ? originalKept.value : Math.max(0, balance),
       /* ISSUE 68's flag, set HERE as well as in load.js's post() step. A debt
          loaded from disk gets it there; one added through this form did not, so
          a blank Original — the expected case — seeded `original` from the
@@ -828,7 +967,8 @@ module.exports = function registerDebts(ctx) {
          distinction was gone for good. `false` is what makes the serializer
          write an empty cell instead of a claim nobody made. */
       originalStated: originalTyped !== null,
-      rate: Math.max(0, rate), payment: Math.max(0, payment), extra: 0,
+      rate: typed.rate.value, payment: typed.payment.value, extra: 0,
+      ...raws,
       start: todayIso(),
       category: (r.category || '').trim(), status: 'active', notes: '',
     });

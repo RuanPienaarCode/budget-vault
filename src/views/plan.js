@@ -33,7 +33,7 @@ const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
-const { planSummary, barSegments, SOURCE_KINDS, sharePct,
+const { planSummary, barSegments, SOURCE_KINDS, sharePct, envelopeShares,
   envelopeOverState, envelopeBar, round2 } = require('../plan-math');
 const i18n = require('../i18n');
 
@@ -45,7 +45,17 @@ module.exports = function registerPlan(ctx) {
   /* Which spending bucket is open in the accordion — collapsed-list-with-one-
      open, per the redesign. Lives here (not on the plan object) because it is
      purely a view-state choice, never written to disk; reset whenever the
-     open bucket stops existing (deleted, or a different plan switched in). */
+     open bucket stops existing (deleted, or a different plan switched in).
+
+     THREE kinds of value, and the third is the 2026-10-07 fix. A bucket's
+     name: that bucket is open. null: nobody has chosen yet, so the guard in
+     renderEnvelopes opens the first one. NONE_OPEN: the reader pressed
+     Collapse and wants every bucket closed. Collapse used to write null, which
+     the guard read as "nothing chosen" and answered by reopening the first
+     bucket — so collapsing the first bucket left it open, and collapsing any
+     other jumped the first one open under the reader's pointer. A Symbol, so
+     no bucket name typed into a file can ever be mistaken for it. */
+  const NONE_OPEN = Symbol('no spending bucket open');
   let expandedEnvelope = null;
 
   /* Built once, by re-parenting the SAME button elements shell.js/controller.js
@@ -91,10 +101,13 @@ module.exports = function registerPlan(ctx) {
     renderPlanPicker();
     if (!has) return;
     const sum = planSummary(p);
+    /* One partition of the pot for every badge and the loud card's "% of the
+       plan", computed once per render — see envelopeShares in plan-math.js. */
+    const shares = envelopeShares(p.envelopes.map(e => e.amount), sum.pot);
     renderPot(p, sum);
     renderSources(p, sum);
-    renderEnvelopes(p, sum);
-    renderFree(p, sum);
+    renderEnvelopes(p, sum, shares);
+    renderFree(p, sum, shares);
   }
 
   /* The plan's own name becomes the page title, per the redesign — the static
@@ -162,22 +175,32 @@ module.exports = function registerPlan(ctx) {
     const seg = barSegments(sum);
     const pct = v => (sum.pot > 0 ? (v / sum.pot) * 100 : 0);
     const over = sum.placeable < 0;
-    /* WHICH KIND of "past the end" this is, because the two need different
+    /* WHICH KIND of "past the end" this is, because each needs different
        words: buckets claiming more than came in is an allocation someone can
        simply take back, whereas money already out of the account is not. When
        both are true the spending is the one worth saying, because it is the
-       one that cannot be undrawn. */
-    const overLabel = sum.overspend > 0.005
-      ? i18n.t('plan.hero.overSpent') : i18n.t('plan.hero.overPlaced');
+       one that cannot be undrawn.
+
+       And a THIRD kind since 7 Oct 2026, now that placeable is taken bucket by
+       bucket: one bucket ran past what it held, nothing has gone past the pot
+       and nothing is placed past it, yet the buckets still claim more than is
+       left (pot 10 000, three buckets of 3 000, one 4 500 spent: R 500 short).
+       "Spent more than this plan holds" and "Placed more than this plan holds"
+       would both be false there, so the label says the true thing. Each label
+       now keys off the fact it states rather than off the overspend, which
+       could not tell these apart. */
+    const overLabel = sum.left < -0.005 ? i18n.t('plan.hero.overSpent')
+      : sum.free < -0.005 ? i18n.t('plan.hero.overPlaced')
+        : i18n.t('plan.hero.overClaimed');
     /* WHAT THE SECOND SLOT CARRIES, which is not always the same figure.
 
        "Still left" is the second thing a reader wants — except on an overspent
-       plan, where it is arithmetically forced to equal the first: once the
-       buckets have been run past, `placeable` collapses onto `left` and the
-       hero would print one number twice. In that state the second most
-       important fact is not what remains but how far past the buckets the
-       money went, so the slot swaps to it. Nothing is lost by the swap: `left`
-       is still on screen, as the first figure. */
+       plan. There the second most important fact is not what remains but how
+       far past its bucket the money went: it is what explains why the first
+       figure is smaller than the buckets suggest, so the slot swaps to it.
+       (When no bucket still holds unspent money, `placeable` lands exactly on
+       `left`, and the swap is also what stops the hero printing one number
+       twice.) `left` is not lost: the loud card below says it in words. */
     const showOverspend = sum.overspend > 0.005;
     const showLeft = !showOverspend && sum.spent >= 0.005;
 
@@ -219,8 +242,8 @@ module.exports = function registerPlan(ctx) {
       el('div', { class: 'plan-split', role: 'img',
         'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
           `${money(sum.committed)} allocated but unspent, ${money(sum.free)} not yet allocated. ` +
-          `${money(sum.left)} still left, ${money(sum.placeable)} of it still placeable.` +
-          (sum.overspend > 0.005 ? ` ${money(sum.overspend)} has been spent beyond what the buckets hold.` : '') },
+          `${money(sum.left)} still left, ${money(Math.max(0, sum.placeable))} of it still placeable.` +
+          (sum.overspend > 0.005 ? ` ${money(sum.overspend)} was spent past what its bucket held.` : '') },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
         el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
@@ -344,8 +367,12 @@ module.exports = function registerPlan(ctx) {
      the lot. expandedEnvelope is pure view state (declared at the top of this
      module) so switching plans or deleting the open bucket can never leave it
      pointing at something that no longer exists — the guard below resets it
-     to the first bucket whenever that happens. */
-  function renderEnvelopes(p, sum) {
+     to the first bucket whenever that happens. A reader's Collapse (NONE_OPEN)
+     is a choice, not a stale pointer, and the guard leaves it alone.
+
+     `shares` is the render's one partition of the pot (envelopeShares), read
+     by position: badge i is envelope i's slice of it. */
+  function renderEnvelopes(p, sum, shares) {
     $('#planEnvSub').textContent = p.envelopes.length
       ? `${p.envelopes.length} spending bucket${p.envelopes.length === 1 ? '' : 's'} · ${money(sum.allocated)} placed of ${money(sum.pot)}`
       : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
@@ -358,11 +385,12 @@ module.exports = function registerPlan(ctx) {
           'No spending buckets yet.'));
         return;
       }
-      if (expandedEnvelope && !p.envelopes.some(e => e.name === expandedEnvelope)) expandedEnvelope = null;
-      if (!expandedEnvelope) expandedEnvelope = p.envelopes[0].name;
-      for (const e of p.envelopes) {
-        host.append(e.name === expandedEnvelope ? envelopeCard(p, e, sum) : envelopeSummaryRow(p, e, sum));
-      }
+      if (typeof expandedEnvelope === 'string' && !p.envelopes.some(e => e.name === expandedEnvelope)) expandedEnvelope = null;
+      if (expandedEnvelope === null) expandedEnvelope = p.envelopes[0].name;
+      p.envelopes.forEach((e, i) => {
+        host.append(e.name === expandedEnvelope
+          ? envelopeCard(p, e, sum, shares.shares[i]) : envelopeSummaryRow(p, e, sum, shares.shares[i]));
+      });
     });
   }
 
@@ -395,7 +423,7 @@ module.exports = function registerPlan(ctx) {
      open every row to find it. Two lines now, not one: the placed amount is
      the headline figure on the right, and what is actually left sits under the
      name, where it does not have to compete with it for the same eye. */
-  function envelopeSummaryRow(p, env, sum) {
+  function envelopeSummaryRow(p, env, sum, share) {
     const items = p.items.filter(i => i.envelope === env.name);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
@@ -424,7 +452,7 @@ module.exports = function registerPlan(ctx) {
         el('span', { class: `env-sum-rem num ${rem.cls}` }, rem.text)),
       barEl,
       el('span', { class: 'env-sum-amt num' }, money(env.amount)),
-      el('span', { class: 'env-sum-pct num' }, `${sharePct(env.amount, sum.pot)}%`));
+      el('span', { class: 'env-sum-pct num' }, `${share}%`));
   }
 
   /* Right-hand side of the rail note: up to two status flags rather than one
@@ -462,12 +490,16 @@ module.exports = function registerPlan(ctx) {
      render and on every drag tick, for the same reason as railFlags above. */
   function overFillStyle(state, amount, spent, pctOf) {
     if (!state.isOverspent) return null;
-    return `background:linear-gradient(90deg, rgba(127,127,127,.2) 0%, rgba(127,127,127,.2) ${pctOf(amount)}%, ` +
+    /* background-image, never the `background` shorthand: the shorthand
+       resets background-clip, and the slider's 24px hit area would paint red
+       top to bottom. The colour under the gradient is cleared so the grey
+       parts read as they always did. */
+    return `background-image:linear-gradient(90deg, rgba(127,127,127,.2) 0%, rgba(127,127,127,.2) ${pctOf(amount)}%, ` +
       `var(--color-danger) ${pctOf(amount)}%, var(--color-danger) ${pctOf(spent)}%, ` +
-      `rgba(127,127,127,.2) ${pctOf(spent)}%, rgba(127,127,127,.2) 100%)`;
+      `rgba(127,127,127,.2) ${pctOf(spent)}%, rgba(127,127,127,.2) 100%);background-color:transparent`;
   }
 
-  function envelopeCard(p, env, sum) {
+  function envelopeCard(p, env, sum, share) {
     const items = p.items.filter(i => i.envelope === env.name);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
@@ -487,7 +519,12 @@ module.exports = function registerPlan(ctx) {
     const pctOf = v => (sliderMax > 0 ? Math.max(0, Math.min(100, (v / sliderMax) * 100)) : 0);
 
     const amtEl = el('div', { class: 'env-amt num' }, money(env.amount));
-    const shareEl = el('span', { class: 'env-share num' }, `${sharePct(env.amount, sum.pot)}%`);
+    const shareEl = el('span', { class: 'env-share num' }, `${share}%`);
+    /* The drag's badge: the SAME partition the render takes, with this
+       bucket's live amount in its place — so what the badge reads mid-drag is
+       what the release re-renders, not Math.round of this one slice alone. */
+    const at = p.envelopes.indexOf(env);
+    const liveShare = v => envelopeShares(p.envelopes.map((e, i) => (i === at ? v : e.amount)), sum.pot).shares[at];
 
     const initialFill = overFillStyle(state, env.amount, spent, pctOf);
     const slider = el('input', {
@@ -514,7 +551,7 @@ module.exports = function registerPlan(ctx) {
     slider.addEventListener('input', () => {
       const v = Number(slider.value);
       amtEl.textContent = money(v);
-      shareEl.textContent = `${sharePct(v, sum.pot)}%`;
+      shareEl.textContent = `${liveShare(v)}%`;
 
       const liveState = envelopeOverState(v, items, spent);
       card.classList.toggle('is-overspent', liveState.isOverspent);
@@ -548,7 +585,9 @@ module.exports = function registerPlan(ctx) {
     /* Delete moves out of the footer into the expanded header's own overflow
        spot — the redesign's rule that a destructive action never sits beside
        an everyday one (Save/rename here). Collapse is the header's other new
-       control: tapping it (or another row) is how the accordion closes. */
+       control: tapping it (or another row) is how the accordion closes — and
+       it writes NONE_OPEN, not null, because null is what the guard in
+       renderEnvelopes answers by opening the first bucket. */
     card = el('div', {
       class: `env${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       style: `--tint:${env.tint || 'transparent'}`,
@@ -557,7 +596,7 @@ module.exports = function registerPlan(ctx) {
       el('div', { class: 'env-top' },
         el('button', { class: 'env-collapse', type: 'button',
           'aria-label': i18n.t('plan.env.collapseAria', { name: env.name }),
-          onclick: () => { expandedEnvelope = null; renderPlan(); } },
+          onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); } },
           icoEl(['chevron-down', 'chevron-up'])),
         el('button', { class: 'env-name', type: 'button',
           'aria-label': `Rename spending bucket ${env.name}`,
@@ -628,8 +667,15 @@ module.exports = function registerPlan(ctx) {
      comfortably positive — got the CHEERFUL card inviting the reader to place
      more. That was the loudest part of the 13 Sep 2026 report: the one card on
      the page whose whole job is to raise its voice sat there encouraging the
-     reader to spend money that was already gone. */
-  function renderFree(p, sum) {
+     reader to spend money that was already gone.
+
+     `overspend` is per bucket since 7 Oct 2026 (plan-math.js), so the alarmed
+     state is reached whenever ANY bucket has run past what it held — including
+     a plan that has spent less in total than it placed. Its words are written
+     to be true there too: the old opening, "The buckets hold R 9 000 but
+     R 5 500 has actually gone", was a sentence about two plan-wide totals and
+     reads as nonsense when the second is the smaller. */
+  function renderFree(p, sum, shares) {
     const card = $('#planFree');
     const overspent = sum.overspend > 0.005;
     const overplaced = sum.free < -0.005;
@@ -645,26 +691,35 @@ module.exports = function registerPlan(ctx) {
     card.empty();
 
     const heading = overspent
-      ? `${money(sum.overspend)} more has been spent than these buckets hold`
+      ? `${money(sum.overspend)} was spent past what its bucket held`
       : overplaced
         ? `${money(-sum.free)} more is placed than this plan holds`
         : `${money(sum.free)} is not spoken for`;
     /* The percentage is of the figure the heading just quoted, not always of
        `free` — quoting one number and then taking a share of a different one
-       is how the rest of this repo's two-figures-one-rule bugs started. */
-    const shareOf = overspent ? sum.overspend : Math.abs(sum.free);
+       is how the rest of this repo's two-figures-one-rule bugs started. The
+       unplaced remainder (the heading's figure in both other states) is the
+       last slice of the same partition the bucket badges come from, so the
+       badges and this card add up to the pot; the overspend is not a slice of
+       the pot and is rounded on its own. */
+    const pctOfPlan = overspent ? sharePct(sum.overspend, sum.pot) : Math.abs(shares.unplaced);
     /* "of which R 9 341,00 can still be placed" beside "that leaves R 9 341,00"
-       is the same number twice in one sentence — and on an overspent plan it
-       always IS the same number, because placeable collapses onto left the
-       moment committed clamps to zero. So the clause changes rather than the
-       figure being printed again. */
+       is the same number twice in one sentence — and it IS the same number
+       whenever nothing is still spoken for (every bucket spent through or
+       past), because placeable is left less what is spoken for. So the clause
+       changes rather than the figure being printed again. */
     const allUnplaced = Math.abs(sum.placeable - sum.left) < 0.005;
+    /* The contrast with what the buckets alone suggest is only said when it
+       is a different figure: on a fully placed plan both read R 0,00. */
+    const shownPlaceable = allUnplaced ? sum.left : Math.max(0, sum.placeable);
+    const contrast = Math.abs(shownPlaceable - sum.free) >= 0.005
+      ? ` — not the ${money(sum.free)} the buckets alone suggest` : '';
     const body = overspent
-      ? `The buckets hold ${money(sum.allocated)} but ${money(sum.spent)} has actually gone. `
+      ? 'The extra came out of money this plan had not placed, or had placed in another bucket. '
         + `That leaves ${money(sum.left)} in this plan, `
         + (allUnplaced ? 'all of it unplaced'
           : `of which ${money(Math.max(0, sum.placeable))} can still be placed`)
-        + ` — not the ${money(sum.free)} the buckets alone suggest. `
+        + `${contrast}. `
         + 'Raise the bucket that ran over, or record where the extra came from.'
       : overplaced
         ? 'The spending buckets add up to more than the money coming in. Take some back out, or add the source that covers it.'
@@ -672,7 +727,7 @@ module.exports = function registerPlan(ctx) {
 
     card.append(
       el('h2', {}, heading),
-      el('div', { class: 'free-fig num' }, `${sharePct(shareOf, sum.pot)}% of the plan`),
+      el('div', { class: 'free-fig num' }, `${pctOfPlan}% of the plan`),
       el('p', {}, body),
       el('div', { class: 'free-acts' },
         /* The button offers `placeable`, never `free` — it was the second
@@ -742,6 +797,11 @@ module.exports = function registerPlan(ctx) {
       // orphan every item in it — they would vanish from the page while still
       // sitting in the file.
       for (const i of p.items) if (i.envelope === env.name) i.envelope = name;
+      /* And so does the accordion's open bucket. Left on the old name, the
+         guard in renderEnvelopes saw a bucket that no longer exists and opened
+         the FIRST one — the card moved under the reader's pointer, and the
+         2026-10-07 audit's next amount edit landed on the wrong bucket. */
+      if (expandedEnvelope === env.name) expandedEnvelope = name;
       env.name = name;
     }
     env.note = (r.note || '').trim();
@@ -823,7 +883,27 @@ module.exports = function registerPlan(ctx) {
     mark(); renderPlan();
   }
 
+  /* ONE dirty flag and one Save button for the page, and both only ever
+     describe the plan ON SCREEN. So no path may switch to another plan while
+     the flag is set: the edits would stay in memory on a plan nobody is
+     looking at, the next save (of the other plan) would clear the only flag
+     that knew about them, and the next reload would drop them without a word.
+     The picker always refused; New plan did not, by either of its two switch
+     paths — found by the 2026-10-07 runtime audit, which saved the new plan,
+     went back to the old one, and found its edit on screen with Save disabled
+     and nothing on disk. Both routes ask this one function, so the refusal
+     has one rule and one set of words. deletePlan does not: what it removes
+     is the plan the flag describes. */
+  function refuseWhileDirty() {
+    if (!S.planDirty) return false;
+    toast('Save this plan first', true);
+    return true;
+  }
+
   async function newPlan() {
+    /* Before the dialog, not after it: asking for a name and then refusing to
+       use it would make the reader type it twice. */
+    if (refuseWhileDirty()) return;
     const r = await askFields(app, 'New plan', [
       { key: 'name', label: 'What is this money for?', type: 'text',
         placeholder: 'Baby & catch-up',
@@ -833,8 +913,9 @@ module.exports = function registerPlan(ctx) {
     const name = r.name.trim();
     const key = safeSeg(name);
     if (!key) return toast('That name has nothing a filename can keep', true);
-    // Already open in memory — switch to it rather than making a second one.
-    if (S.plans[key]) { S.planName = key; return renderPlan(); }
+    // Already open in memory — switch to it rather than making a second one,
+    // through the same guarded switch, on the same condition, the picker uses.
+    if (S.plans[key]) { if (key !== S.planName) changePlan(key); return; }
     /* A file on disk that the loader did not pick up means something else owns
        that path — refuse rather than overwrite it on the first save. */
     // ISSUE 64: pathTaken, not fileAt — the filesystem is case-insensitive.
@@ -844,6 +925,7 @@ module.exports = function registerPlan(ctx) {
     S.plans[key] = { file: key, name, fmRaw: '', started: todayIso(), status: 'active',
       sources: [], envelopes: [], items: [] };
     S.planName = key;
+    expandedEnvelope = null;
     mark(); renderPlan();
   }
 
@@ -893,12 +975,13 @@ module.exports = function registerPlan(ctx) {
     clearDirty();
     S.planName = Object.keys(S.plans)
       .sort((a, b) => S.plans[a].name.localeCompare(S.plans[b].name))[0] || null;
+    expandedEnvelope = null; // a different plan's buckets — the accordion guard re-opens the first one
     renderPlan();
     toast(`Deleted plan “${p.name}”`);
   }
 
   function changePlan(key) {
-    if (S.planDirty) return toast('Save this plan first', true);
+    if (refuseWhileDirty()) return;
     S.planName = key;
     expandedEnvelope = null; // a different plan's buckets — the accordion guard re-opens the first one
     renderPlan();

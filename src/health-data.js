@@ -32,9 +32,9 @@ const { daysBetween } = require('./dates');
 /* Which row is which, for pairing. `label` is the transactions folder the row
    was read from, so it identifies the ACCOUNT without needing the account
    object — and two legs of one movement always sit in different ones. */
-/* rowKey and passthroughPairs moved verbatim to src/ledger.js in Phase 2 of
-   ADR-0006; the comments above them stay as the record of why pairing
-   exists. */
+/* passthroughPairs moved verbatim to src/ledger.js in Phase 2 of ADR-0006
+   (it pairs ROWS since 2026-10-07, not label|date|amount|description keys —
+   audit L2a-09); the comments above stay as the record of why pairing exists. */
 
 /* ADR-0007 · Pass-through pairing: excluded rows that cancel each other. An
    excluded row is dropped only when an equal and opposite excluded row sits in

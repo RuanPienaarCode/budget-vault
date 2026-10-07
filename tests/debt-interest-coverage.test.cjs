@@ -312,16 +312,32 @@ function tileOf(nodes, label) {
     const sec = debtSection(md);
     const expected = monthlyInterest(900000, 10.5);
     ok(interestRow(md).includes(money(expected)), 'a partial book prints the interest it can prove');
-    /* No `count` here, deliberately: report.debt.interestNone and
-       report.debt.interestPartial are PLAIN strings in all twelve tables, not
-       plural entries, so they take only the three interpolated values. Passing
-       a `count` they do not use would be harmless and misleading — it would
-       read as if this sentence had a singular form to get wrong. */
-    ok(sec.includes(i18n.t('report.debt.interestPartial', { shown: 1, total: 2, missing: 1 })),
+    /* report.debt.interestPartial is a plural entry on `missing`, the number
+       its verb agrees with (2026-10-07 audit: English read "1 state no
+       rate"). One rateless debt here, so the SINGULAR is the form pinned, in
+       English by its literal text: the i18n.t comparison alone would pass in a
+       language whose two forms read the same. */
+    ok(sec.includes(i18n.t('report.debt.interestPartial', { count: 1, shown: 1, total: 2, missing: 1 })),
       'beside a sentence saying how much of the book it covers');
+    ok(sec.includes('Interest this month covers 1 of 2 debts; 1 states no rate.'),
+      'and in English the verb agrees with one rateless debt');
     ok(!sec.includes(i18n.t('report.debt.interestNone')), 'and not the withheld sentence as well');
     near(json.debts.interest, expected, 0.01, 'the JSON carries the same figure the Markdown formats');
     eq(json.debts.rate_coverage, { shown: 1, total: 2, missing: 1 }, 'and the same coverage');
+    /* The per-debt rows read the rate by the coverage's own predicate
+       (2026-10-07 audit): a debt counted as `missing` above must not carry a
+       stated 0 in its own row, which a parsing consumer would read as an
+       interest-free loan. */
+    const rowOf = name => (json.debts.rows || []).find(r => r.name === name) || {};
+    eq(rowOf('Bond').rate, 10.5, 'a stated rate travels into its JSON row as stated');
+    eq(rowOf('Car').rate, null, 'an unstated rate is null in its JSON row: unknown, not 0%');
+  }
+
+  /* ---- 3b'. two rateless debts: the plural form ---- */
+  {
+    const { md } = await mountReport(SOME3);
+    ok(debtSection(md).includes('Interest this month covers 1 of 3 debts; 2 state no rate.'),
+      'two rateless debts take the plural verb');
   }
 
   /* ---- 3c. fully rated: unchanged, and no new sentence ---- */
@@ -331,7 +347,7 @@ function tileOf(nodes, label) {
     const sum = monthlyInterest(900000, 10.5) + monthlyInterest(164000, 12.25);
     ok(interestRow(md).includes(money(sum)), 'a fully-rated book prints exactly what it always did');
     ok(!sec.includes(i18n.t('report.debt.interestNone')), 'no withheld sentence');
-    ok(!sec.includes(i18n.t('report.debt.interestPartial', { shown: 2, total: 2, missing: 0 })),
+    ok(!sec.includes(i18n.t('report.debt.interestPartial', { count: 0, shown: 2, total: 2, missing: 0 })),
       'and no coverage caveat when there is nothing left uncovered');
     near(json.debts.interest, sum, 0.01, 'JSON agrees');
     eq(json.debts.rate_coverage, { shown: 2, total: 2, missing: 0 }, 'coverage says the book is complete');
