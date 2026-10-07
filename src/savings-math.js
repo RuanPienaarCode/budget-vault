@@ -11,6 +11,10 @@
 
 const { ISO_DATE, todayIso, isRealIsoDate } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
+/* reconcile() is the one reading of "what this account holds now" — period.js's
+   impliedAccounts() is a map over it — so totalReturn measures growth on it
+   rather than rolling a stated balance forward by a rule of its own. */
+const { reconcile } = require('./reconcile');
 
 /* ADR-0007 · poolCatType is built once and shared byte-for-byte. Passing
    ctx.catType instead reverts that one screen to the old rule (two call
@@ -31,6 +35,14 @@ function classifyRow(r, typeOf) {
   return (typeOf ? typeOf(r.cat) : null) === 'interest' ? 'growth' : 'contribution';
 }
 
+/* The upper bound, one predicate for splitFlows and monthlyFlows so the two
+   cannot window differently. Only a REAL date after `to` is held out — what
+   reconcile() calls `ahead`, money in no balance yet. A date that names no day
+   is not "after" anything; it cannot be placed at all, so it keeps the path it
+   had before this bound existed: counted, and folded into the chart's first
+   point (degenerate-vaults' NC3 holds that path). */
+const pastAsOf = (r, to) => !!to && r.date > to && isRealIsoDate(r.date);
+
 /* Split one account's rows. `typeOf(categoryName)` returns the category's type
    or null. Rows are [{ date, amount, cat }] — the shape the loader produces. */
 function splitFlows(rows, typeOf, opts) {
@@ -42,7 +54,7 @@ function splitFlows(rows, typeOf, opts) {
     const kind = classifyRow(r, typeOf);
     if (!kind) continue;
     if (from && r.date < from) continue;
-    if (to && r.date > to) continue;
+    if (pastAsOf(r, to)) continue;
     count++;
     /* The earliest row that actually COUNTED, reported here rather than
        recomputed by callers — the filtering above (usable amount, split parent,
@@ -141,18 +153,44 @@ function nextMonth(m) {
 
 /* ADR-0007 · Total return: basis 'measured' | 'stated' | 'none'; trust 'ok' |
    'history-gap' (first row > HISTORY_GAP_DAYS after inception) |
+   'no-records' (none at all, opened longer ago than that) |
    'pre-inception' | 'none'. */
 function totalReturn(account, rows, typeOf, opts) {
   const a = account || {};
-  const today = (opts && opts.today) || todayIso();
-  const balance = typeof a.balance === 'number' ? a.balance : 0;
+  const asked = (opts && opts.today) || '';
+  const today = ISO_DATE.test(asked) ? asked : todayIso();
+  const stated = typeof a.balance === 'number' ? a.balance : 0;
+
+  /* ONE AS-OF, today, for both sides of `growth = balance − capital`. A balance
+     stated on the 12th cannot hold a debit order dated the 3rd of the next
+     month, yet the capital sum counted it: growth came out a whole debit order short on the card, the tile,
+     the Accounts drawer and the Report — and a withdrawal flipped the error to
+     an overstatement. So the balance is the stated one rolled forward by
+     reconcile(), as impliedAccounts() rolls it for every other page, and the
+     capital stops at the same day. Decided 7 Oct 2026 (the audit's default).
+     Hand it the account AS LOADED (S.accounts), never an impliedAccounts()
+     copy: that one is rolled forward already and would be rolled twice. */
+  const rec = reconcile(a, rows, today);
+  const balance = rec.state === 'drift' ? rec.implied : stated;
 
   /* ADR-0007 · Capital sums are windowed from inception; the first-row test is
      not. Unwindowed sums counted pre-inception contributions twice (a fund
      that earned R200 reported R0); `all` must see the whole record. */
   const all = splitFlows(rows, typeOf);
   const from = ISO_DATE.test(a.inception_date || '') ? a.inception_date : '';
-  const f = from ? splitFlows(rows, typeOf, { from }) : all;
+  /* `held` answers the basis question — does the vault hold ANY row for this
+     account since it opened, a scheduled one included — so a debit order
+     captured in advance cannot turn a fund into a 'stated' one. `f` is the
+     capital, bounded at today: a real date after it is in no balance yet. */
+  const held = from ? splitFlows(rows, typeOf, { from }) : all;
+  const f = splitFlows(rows, typeOf, { from, to: today });
+
+  /* What the figure was measured on travels with it, so a page printing the
+     typed balance beside it can say why the two differ. */
+  const measuredOn = {
+    balance, statedBalance: stated, balanceBasis: rec.state === 'drift' ? 'implied' : 'stated',
+    sinceStated: rec.state === 'drift' ? rec.count : 0, asOf: today,
+  };
 
   /* fmNum writes null for an absent key and a number for a written one, so a
      deliberate `starting_amount: 0` — an account opened empty and funded by
@@ -160,7 +198,7 @@ function totalReturn(account, rows, typeOf, opts) {
   const hasBaseline = typeof a.starting_amount === 'number';
   /* ADR-0007 · Stated baseline: a written `total_invested: 0` is real; the
      same `typeof` rule accountFlows applies, from which this had drifted. */
-  const stated = !hasBaseline && !f.count && typeof a.total_invested === 'number';
+  const statedBasis = !hasBaseline && !held.count && typeof a.total_invested === 'number';
 
   let basis, baseline, capitalIn, postedGrowth;
   if (hasBaseline) {
@@ -168,7 +206,7 @@ function totalReturn(account, rows, typeOf, opts) {
     baseline = a.starting_amount;
     capitalIn = baseline + f.contributions - f.withdrawals;
     postedGrowth = f.growth;
-  } else if (stated) {
+  } else if (statedBasis) {
     basis = 'stated';
     baseline = a.total_invested;
     capitalIn = baseline;
@@ -177,7 +215,7 @@ function totalReturn(account, rows, typeOf, opts) {
     return {
       basis: 'none', trust: 'none', baseline: null, capitalIn: null, growth: null,
       postedGrowth: 0, undatedGrowth: 0, returnPct: null, annualisedPct: null,
-      years: null, since: null, gapDays: null, balance,
+      years: null, since: null, gapDays: null, ...measuredOn,
       contributions: f.contributions, withdrawals: f.withdrawals,
       growthCategories: f.growthCategories, count: f.count,
     };
@@ -217,15 +255,22 @@ function totalReturn(account, rows, typeOf, opts) {
        inception, so asking `f` would always answer "on or after inception"
        and the gap could never be seen. */
     const g = daysBetween(a.inception_date, all.first || today);
-    if (g !== null && g > HISTORY_GAP_DAYS) { trust = 'history-gap'; gapDays = g; }
+    /* No row at all is not a late START: there is no first record to be late.
+       It is the same overstatement (nothing put in is visible, so all of it
+       reads as growth) and is flagged at the same threshold, under its own
+       name — "records begin N days after it opened" was printed for a fund
+       holding no records whatever. */
+    if (all.first === null) {
+      if (g !== null && g > HISTORY_GAP_DAYS) { trust = 'no-records'; gapDays = g; }
+    } else if (g !== null && g > HISTORY_GAP_DAYS) { trust = 'history-gap'; gapDays = g; }
     /* ADR-0007 · Records before the opening date are named, not swallowed. Gated
        on all.first being real: with no rows `g` is measured from today, not a row. */
-    else if (all.first !== null && g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
+    else if (g !== null && g < 0) { trust = 'pre-inception'; gapDays = g; }
   }
 
   return {
     basis, trust, baseline, capitalIn, growth, postedGrowth, undatedGrowth,
-    returnPct, annualisedPct, years, since, gapDays, balance,
+    returnPct, annualisedPct, years, since, gapDays, ...measuredOn,
     contributions: f.contributions, withdrawals: f.withdrawals,
     growthCategories: f.growthCategories, count: f.count,
   };
@@ -245,7 +290,7 @@ function monthlyFlows(rows, typeOf, opts) {
     /* ADR-0007 · monthlyFlows windows exactly as splitFlows does; a non-ISO date
        cell once put R200 in the bands the total had already called undated. */
     if (from && r.date < from) continue;
-    if (to && r.date > to) continue;
+    if (pastAsOf(r, to)) continue;
     const m = monthOf(r.date);          // '' when the date is not a real ISO date
     if (!out.has(m)) out.set(m, { capital: 0, posted: 0 });
     const b = out.get(m);
@@ -282,11 +327,14 @@ function growthTotals(entries, typeOf, opts) {
 }
 
 function growthSeries(entries, typeOf, opts) {
-  const today = (opts && opts.today) || todayIso();
+  /* Normalised the way totalReturn normalises it: the bands below are cut at
+     this date, and must be cut where the capital sum was. */
+  const asked = (opts && opts.today) || '';
+  const today = ISO_DATE.test(asked) ? asked : todayIso();
   const maxMonths = (opts && opts.maxMonths) || 60;
 
   const deltas = new Map();
-  let firstMonth = '', undated = 0, included = 0, excluded = 0, closing = 0;
+  let firstMonth = '', undated = 0, included = 0, excluded = 0, closing = 0, rolled = 0;
 
   /* Money that counts toward the total but carries no placeable date. Held
      here and folded into the first point once that point is known — the same
@@ -319,14 +367,18 @@ function growthSeries(entries, typeOf, opts) {
        (a `starting_amount: 0` account once broke closing = Σ balances). */
     if (!chartable(a, r)) { excluded++; continue; }
     included++;
+    /* The balance growth was measured ON — implied as of today — so closing
+       is Σ implied balances and the identity holds on the cards' own basis. */
     closing += r.balance;
+    rolled += r.balance - r.statedBalance;   // how far that is from the balances typed
     bump(at, 'capital', r.baseline);
     /* Windowed exactly as totalReturn windows its capital sum — see the note
        in monthlyFlows. The baseline already contains everything before the
        opening date, so counting those rows again in the bands would draw money
-       the total does not have. */
+       the total does not have; a row after today is in no balance yet, so it
+       is in no band either. */
     const from = ISO_DATE.test(a.inception_date || '') ? a.inception_date : '';
-    for (const [m, b] of monthlyFlows(rows, typeOf, from ? { from } : undefined)) {
+    for (const [m, b] of monthlyFlows(rows, typeOf, { from, to: today })) {
       bump(m, 'capital', b.capital);
       bump(m, 'posted', b.posted);
     }
@@ -334,7 +386,7 @@ function growthSeries(entries, typeOf, opts) {
   }
 
   if (!firstMonth) {
-    return { points: [], undated: 0, closing: 0, included, excluded, truncatedFrom: '' };
+    return { points: [], undated: 0, closing: 0, included, excluded, truncatedFrom: '', rolled: 0 };
   }
 
   /* Everything that could not be dated joins the first point. */
@@ -371,7 +423,7 @@ function growthSeries(entries, typeOf, opts) {
     if (m >= kept[0]) points.push({ month: m, capital, posted });
   }
 
-  return { points, undated, closing, included, excluded, truncatedFrom };
+  return { points, undated, closing, included, excluded, truncatedFrom, rolled: Math.round(rolled * 100) / 100 || 0 };
 }
 
 

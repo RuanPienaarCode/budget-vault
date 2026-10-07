@@ -8,11 +8,11 @@ const { parseNum, normalizeAmount } = require('./amount');
 const { normalizeCode, normalizeCadence } = require('./fx');
 const { parseFrontmatter, parseMdTable, parseMdTableWithSeparator, unescMd,
   splitAroundTable, extraContent } = require('./markdown');
-const { parseCsv } = require('./csv');
+const { parseCsv, uncsvCell } = require('./csv');
 /* One declaration per flat table drives this loader's reads AND the views'
    writes — ADR-0003. The generic reader is called here ONLY; downstream
    consumers of transaction rows still go through tx-role.js. */
-const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf } = require('./table-schema');
+const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
 const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
@@ -48,17 +48,74 @@ function fmBool(v) {
 
 /* ISSUE 67/69 — the four flat single-table files (Assets/Debts/Owed/Services)
    share one shape: frontmatter, a lead paragraph the view owns, one table,
-   nothing after it — except when a household has hand-added something in
-   either of those last two spots, which is exactly what mdTableFile's
-   leadRaw/trailRaw/extraCols now carry back out. Read once here rather than
-   four times: `text` null (file never written) means every field stays null
-   or empty, which is what a brand-new file's serializer already treats as
-   "generate the fixed shape fresh". */
+   nothing after it — except what a household hand-added in those last two
+   spots, which mdTableFile's leadRaw/trailRaw/extraCols carry back out.
+   `text` null (file never written) leaves every field null or empty, which a
+   brand-new file's serializer treats as "generate the fixed shape fresh".
+   L3-20 (2026-10-07 audit): lead/trail come back in the file's OWN line
+   ending (its first break decides), so a CRLF file is not written back half
+   LF. `tx` is CONTRACT 1 with serializeTxFile — see verbatimAroundTable. */
 function tableParts(text) {
-  if (!text) return { lead: null, trail: null, header: undefined, sep: null, dataRows: [] };
+  if (!text) {
+    return { lead: null, trail: null, header: undefined, sep: null, dataRows: [], tx: { lead: '', trail: '', sep: '' } };
+  }
+  const eol = lineEndingOf(text) || '\n';
+  const inFileEol = s => (eol === '\n' ? s : s.split('\n').join(eol));
   const { before, after } = splitAroundTable(parseFrontmatter(text).body);
   const { header, sep, dataRows } = parseMdTableWithSeparator(text);
-  return { lead: before, trail: after, header, sep, dataRows };
+  return { lead: inFileEol(before), trail: inFileEol(after), header, sep, dataRows, tx: verbatimAroundTable(text) };
+}
+
+/* CONTRACT 1 (2026-10-07 audit, L3-02 + L3-22's separator half): a month
+   file's text the transactions serializer does not model. `lead` is the text
+   from the fence's line break up to the header line, `trail` everything after
+   the last row's line break, `sep` the separator row as written (each '' if
+   none), so '---\n' + fm + '\n---\n' + (lead || '\n') + header + '\n' + sep +
+   '\n' + rows + trail is the file again. No table: all of it is lead. No
+   frontmatter: lead starts at the top. LF-normalised and BOM-free, because the
+   serializer writes '\n' throughout (a CRLF piece in an LF file is L3-20). */
+function verbatimAroundTable(text) {
+  const t = (text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text).replace(/\r\n/g, '\n');
+  const { body } = parseFrontmatter(t);
+  let rest = body;
+  if (body.length !== t.length) {          // a frontmatter block was consumed: skip the rest of its closing line
+    const nl = body.indexOf('\n');
+    rest = nl < 0 ? '' : body.slice(nl + 1);
+  }
+  const lines = rest.split('\n');
+  const start = lines.findIndex(l => l.trim().startsWith('|'));
+  if (start < 0) return { lead: rest, trail: '', sep: '' };
+  let end = start;
+  while (end < lines.length && lines[end].trim().startsWith('|')) end++;
+  const next = start + 1 < end ? lines[start + 1] : '';
+  return {
+    lead: lines.slice(0, start).map(l => l + '\n').join(''),
+    trail: lines.slice(end).join('\n'),
+    sep: /^\|[\s:|-]+\|$/.test(next.trim()) ? next : '',
+  };
+}
+
+/* One flat table's rows, read the way all four are read. `known` is the
+   FILE's own column count (knownColumns, L3-21): a cell past it is the
+   household's own column and is carried, never interpreted.
+
+   A row with a blank FIRST cell is kept (L3-12). "R500 owed for the flat
+   deposit, name to follow" is precisely the row a household types by hand,
+   and `if (!c[0]) continue` used to drop it here — so the next save of the
+   page, for an edit to any OTHER row, deleted it, amount and all. Nothing
+   that reads these rows keys them by name (owed-math and worth key by
+   currency, debt-math by row, a service's merchant tokens drop short and
+   empty words), so a nameless row is listed and counted like any other. A
+   row with nothing in ANY cell is still not a row. */
+function readFlatTable(schema, text) {
+  const { lead, trail, header, sep, dataRows } = tableParts(text);
+  const known = knownColumns(schema, header, dataRows);
+  const rows = [];
+  for (const c of dataRows) {
+    if (c.every(x => !x)) continue;
+    rows.push(attachExtraCells(rowToObject(schema, c.slice(0, known)), known, c));
+  }
+  return { rows, lead, trail, extraCols: extraColsOf(known, header, sep, dataRows) };
 }
 
 module.exports = function registerLoad(ctx) {
@@ -288,15 +345,37 @@ module.exports = function registerLoad(ctx) {
          paragraph a household added above or below the table has nowhere
          else to live and was being destroyed on the next save. */
       const { before, after } = splitAroundTable(body);
-      S.budgetMeta[period] = { raw, rel: f.path.slice(basePath().length + 1), leadRaw: before, trailRaw: after };
-      const rows = parseMdTable(text);
-      S.budgets[period] = rows.slice(1).map(c => {
+      /* 2026-10-07 round-trip audit — what a Budget Save must give back, read
+         here, written by budget-file.js. extraCols/extraCells (L3-25): a column
+         added after Notes is carried the ISSUE 69 way; c[0]..c[3] were all
+         this read, so the column went at the next Save. order (L3-22): each
+         row's category in file order, null for a nameless one; only new rows
+         are placed by the type-then-name rule (every row was re-sorted).
+         unnamed (L3-12): a row with no category is kept BESIDE the rows, not in
+         them — every reader keys budget rows by category and byCat[''] holds
+         uncategorised spend, so in S.budgets it would claim that spend as its
+         Actual (and persistedRows() deleted it at Save). The Budget page says
+         it is counted nowhere. A row with nothing in any cell is not kept. */
+      const { header, sep, dataRows } = parseMdTableWithSeparator(text);
+      const rows = [], unnamed = [], order = [];
+      for (const c of dataRows) {
+        if (c.every(x => !x)) continue;
         const amt = parseNum(c[2]);
         // type is unescMd'd for the same reason category and notes are: the
         // serializer escapes it, so a household group named with a pipe must
         // come back as the name the user typed, not as `needs\|wants`.
-        return { category: unescMd(c[0]), type: unescMd(c[1] || ''), amount: amt.value, amountRaw: amt.ok ? null : amt.raw, notes: unescMd(c[3] || '') };
-      });
+        const row = attachExtraCells({ category: unescMd(c[0]), type: unescMd(c[1] || ''), amount: amt.value, amountRaw: amt.ok ? null : amt.raw, notes: unescMd(c[3] || '') }, 4, c);
+        /* L3-17: an amount two decimals cannot hold keeps its own text, the
+           money() rule in table-schema.js. */
+        if (amt.ok && keepsDigits(amt.value)) row.amountText = String(c[2]).trim();
+        if (row.category) { rows.push(row); order.push(row.category); }
+        else { unnamed.push(row); order.push(null); }
+      }
+      S.budgets[period] = rows;
+      S.budgetMeta[period] = {
+        raw, rel: f.path.slice(basePath().length + 1), leadRaw: before, trailRaw: after,
+        extraCols: extraColsOf(4, header, sep, dataRows), order, unnamed,
+      };
     }
 
     S.txFiles = {};
@@ -358,13 +437,18 @@ module.exports = function registerLoad(ctx) {
          6-column file with a hand-added Balance column also has 7 cells on
          disk, and treating position 6 as Split there would read the reader's
          figure through splitRole and lose it outright. */
-      const { header, sep, dataRows } = parseMdTableWithSeparator(text);
+      const { header, sep, dataRows, tx } = tableParts(text);
       const splitCol = SCHEMAS.transactions.columns[6];
       const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
       const known = hasSplitHeader ? 7 : 6;
       S.txFiles[`${acct.name}/${month}`] = {
         label: acct.name, month, dirty: false, fmRaw: raw,
         rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — the path it was READ from
+        /* CONTRACT 1, the loader's half: the prose around the table and the
+           file's own separator, which the next write of the month deleted or
+           rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
+           tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
+        lead: tx.lead, trail: tx.trail, sep: tx.sep,
         extraCols: extraColsOf(known, header, sep, dataRows),
         /* ISSUE 69 — serializeTxFile decides per save whether a row still
            needs Split at all; when this file ALSO carries an extra column
@@ -386,10 +470,23 @@ module.exports = function registerLoad(ctx) {
       };
     });
 
+    /* Data/Categorisation Rules.csv, the one CSV this app writes AND reads.
+       Every cell goes through uncsvCell, the reader's half of csvCell's
+       formula guard: without it a learned rule starting with = + - @ came
+       back with the guard's apostrophe and never matched its merchant again,
+       and each import appended another dead copy (2026-10-07 audit, L3-06).
+       The header row and each rule's cells past its category are kept, so
+       categories.js rulesCsv can write the household's own columns back
+       instead of rebuilding the file from two (L3-14). */
     S.rules = [];
+    S.rulesHeader = null;
     const rulesCsv = await readFile('Data/Categorisation Rules.csv');
-    if (rulesCsv) for (const row of parseCsv(rulesCsv).slice(1)) {
-      if (row.length >= 2 && row[0]) S.rules.push({ pattern: row[0], category: row[1] });
+    if (rulesCsv) {
+      const rows = parseCsv(rulesCsv).map(row => row.map(uncsvCell));
+      if (rows.length) S.rulesHeader = rows[0];
+      for (const row of rows.slice(1)) {
+        if (row.length >= 2 && row[0]) S.rules.push({ pattern: row[0], category: row[1], extra: row.slice(2) });
+      }
     }
 
     S.owed = []; S.owedDirty = false;
@@ -397,27 +494,18 @@ module.exports = function registerLoad(ctx) {
     // Keep the file's own frontmatter verbatim (tags etc.) for write-back.
     S.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
     {
-      const known = SCHEMAS.owed.columns.length;
-      const { lead, trail, header, sep, dataRows } = tableParts(owedTxt);
-      S.owedLead = lead; S.owedTrail = trail;
-      S.owedExtraCols = extraColsOf(known, header, sep, dataRows);
-      for (const c of dataRows) {
-        if (!c[0]) continue;
-        S.owed.push(attachExtraCells(rowToObject(SCHEMAS.owed, c), known, c));
-      }
+      const t = readFlatTable(SCHEMAS.owed, owedTxt);
+      S.owedLead = t.lead; S.owedTrail = t.trail; S.owedExtraCols = t.extraCols;
+      S.owed.push(...t.rows);
     }
 
     S.debts = []; S.debtsDirty = false;
     const debtTxt = await readFile('Debts.md');
     S.debtsFm = (debtTxt && parseFrontmatter(debtTxt).raw) || 'kind: debts';
     {
-      const known = SCHEMAS.debts.columns.length;
-      const { lead, trail, header, sep, dataRows } = tableParts(debtTxt);
-      S.debtsLead = lead; S.debtsTrail = trail;
-      S.debtsExtraCols = extraColsOf(known, header, sep, dataRows);
-      for (const c of dataRows) {
-        if (!c[0]) continue;
-        const d = attachExtraCells(rowToObject(SCHEMAS.debts, c), known, c);
+      const t = readFlatTable(SCHEMAS.debts, debtTxt);
+      S.debtsLead = t.lead; S.debtsTrail = t.trail; S.debtsExtraCols = t.extraCols;
+      for (const d of t.rows) {
         /* post() — the one fix-up a single cell cannot express (ADR-0003).
            Original is null when absent: a file written before the column
            existed, or a debt added without one. Fall back to the balance so
@@ -437,28 +525,18 @@ module.exports = function registerLoad(ctx) {
     const assetTxt = await readFile('Assets.md');
     S.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
     {
-      const known = SCHEMAS.assets.columns.length;
-      const { lead, trail, header, sep, dataRows } = tableParts(assetTxt);
-      S.assetsLead = lead; S.assetsTrail = trail;
-      S.assetsExtraCols = extraColsOf(known, header, sep, dataRows);
-      for (const c of dataRows) {
-        if (!c[0]) continue;
-        S.assets.push(attachExtraCells(rowToObject(SCHEMAS.assets, c), known, c));
-      }
+      const t = readFlatTable(SCHEMAS.assets, assetTxt);
+      S.assetsLead = t.lead; S.assetsTrail = t.trail; S.assetsExtraCols = t.extraCols;
+      S.assets.push(...t.rows);
     }
 
     S.services = []; S.servicesDirty = false;
     const svcTxt = await readFile('Services.md');
     S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
     {
-      const known = SCHEMAS.services.columns.length;
-      const { lead, trail, header, sep, dataRows } = tableParts(svcTxt);
-      S.servicesLead = lead; S.servicesTrail = trail;
-      S.servicesExtraCols = extraColsOf(known, header, sep, dataRows);
-      for (const c of dataRows) {
-        if (!c[0]) continue;
-        S.services.push(attachExtraCells(rowToObject(SCHEMAS.services, c), known, c));
-      }
+      const t = readFlatTable(SCHEMAS.services, svcTxt);
+      S.servicesLead = t.lead; S.servicesTrail = t.trail; S.servicesExtraCols = t.extraCols;
+      S.services.push(...t.rows);
     }
     /* ADR-0007 · Plans: one file per plan, sliced by heading. The section names are
        load-bearing (plan.js writes them). */
@@ -577,8 +655,16 @@ module.exports = function registerLoad(ctx) {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
         leadRaw: tax67.lead, extras: tax67.extras,
-        taxpayer_type: ['provisional', 'standard'].includes(fm.taxpayer_type) ? fm.taxpayer_type : 'unknown',
-        assessment: ['auto-assessed', 'submit-requested', 'assessed'].includes(fm.assessment) ? fm.assessment : 'unknown',
+        /* The two frontmatter vocabularies go through cellVocab, the reader
+           the tables below already use: case is folded (`Provisional` is a
+           provisional taxpayer), and a word outside the vocabulary reads as
+           `unknown` with the reader's own text kept in `<key>Raw`, which
+           views/tax.js writes back untouched. An exact-match allow-list used to
+           turn both into `unknown` — on screen, where za then counted a
+           provisional taxpayer down to the standard deadline, and on disk at
+           the next save of the page (2026-10-07 round-trip audit). */
+        ...cellVocab('taxpayer_type', fm.taxpayer_type, ['provisional', 'standard', 'unknown'], 'unknown'),
+        ...cellVocab('assessment', fm.assessment, ['auto-assessed', 'submit-requested', 'assessed', 'unknown'], 'unknown'),
         deadline_standard: fm.deadline_standard || '',
         deadline_provisional: fm.deadline_provisional || '',
         // Assessment outcome — only meaningful once `assessment` is 'assessed'.
@@ -591,7 +677,11 @@ module.exports = function registerLoad(ctx) {
         assessment_incomeRaw: assessIncome.raw,
         steps: parseMdTable(section(body, 'progress')).slice(1).filter(c => c[0]).map(c => ({
           step: unescMd(c[0]), ...cellVocab('status', c[1], ['todo', 'busy', 'done', 'n/a'], 'todo'),
-          due: (c[2] || '').trim(), notes: unescMd(c[3] || ''),
+          // unescMd, not a bare trim: views/tax.js writes this through escMd,
+          // and a read that does not reverse it re-escaped the cell on every
+          // save (`June \| maybe` gained a backslash per save) — ISSUE 76's
+          // plan.js fix, which never reached this table.
+          due: unescMd(c[2] || ''), notes: unescMd(c[3] || ''),
         })),
         docs: parseMdTable(section(body, 'documents')).slice(1).filter(c => c[0]).map(c => ({
           name: unescMd(c[0]), source: unescMd(c[1] || ''),

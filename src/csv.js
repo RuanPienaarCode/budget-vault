@@ -56,7 +56,9 @@ function parseDelimited(text, delim) {
 /* Comma-delimited, always. This is the app's OWN files — Data/Categorisation
    Rules.csv, written by csvCell — where the delimiter is known and sniffing it
    would be a way to corrupt a rule whose pattern happens to contain a
-   semicolon. Foreign statements go through parseStatement instead. */
+   semicolon. Foreign statements go through parseStatement instead. Each cell
+   it returns still carries csvCell's formula guard; uncsvCell below takes it
+   off. */
 const parseCsv = text => parseDelimited(text, ',');
 
 /* Which character separates the fields of a statement we did not write?
@@ -92,16 +94,75 @@ function sniffDelimiter(text) {
   return best;
 }
 
+/* C0 control characters, except tab, LF and CR (those three are legal inside
+   a quoted cell and can be real text). A NUL in a bank description reached
+   both export CSVs and python's csv module refused the whole file with "line
+   contains NUL" (2026-10-07 audit, L4A-11). The XLSX writer already dropped
+   these and the PDF writer already stripped them, so the CSVs were the only
+   files that kept them. Exported because rules.js folds the same characters
+   out of what it matches, for the reason given at its ruleText(). */
+const CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+const stripControls = s => String(s ?? '').replace(CONTROLS, '');
+
+/* Does a cell need the formula guard? A cell is a live formula in Excel and
+   LibreOffice when it starts with = + - @, or with a tab or CR. The guard
+   used to check the first character only, which let two shapes through
+   (2026-10-07 audit, CSV-VARIANTS):
+     ` =1+1`   leading whitespace (a space, a no-break space, an ideographic
+               space), which a reader that trims before it parses removes
+     `＝1+1`   the full-width signs ＝ ＋ － ＠, for a reader that folds
+               full-width input to ASCII
+   The audit printed the bytes and did not run a spreadsheet, so which
+   readers actually evaluate these is unconfirmed. Guarding them costs one
+   apostrophe on a cell that starts that way, and no real description in the
+   audited vault did. So the guard checks the first character that is not
+   whitespace, and the full-width signs with the ASCII ones.
+
+   Leading apostrophes are skipped before the test. That keeps the guard
+   reversible: a cell that already starts with `'` and then a formula sign
+   gets a second apostrophe, so uncsvCell can always remove exactly the one
+   csvCell added and never one that was part of the text. */
+const FORMULA_START = /^(?:[\t\r]|\s*[=+\-@＝＋－＠])/;
+const needsGuard = s => FORMULA_START.test(s.replace(/^'+/, ''));
+
 /* Quote a value for a CSV cell. Beyond the usual quote/comma/newline rules,
-   a leading =, +, -, @, tab or CR makes the cell a live formula in Excel and
-   LibreOffice. The categorisation rules file is written from bank statement
-   descriptions — which anyone who can send the user a payment reference gets
-   to influence — and it is explicitly a file the user opens in a spreadsheet.
-   Prefix those with an apostrophe so they stay inert. */
+   a cell that would start a live formula (needsGuard above) gets an
+   apostrophe in front so it stays inert. The categorisation rules file is
+   written from bank statement descriptions — which anyone who can send the
+   user a payment reference gets to influence — and it is explicitly a file
+   the user opens in a spreadsheet.
+
+   A cell holding a ; or a tab is quoted as well as one holding a comma. A
+   reader in a semicolon locale, or one that splits on tabs, would otherwise
+   cut `x;=1+1` into a second cell starting with `=`. Quoted, any of them
+   keeps it whole, and parseCsv reads it back the same. Control characters go
+   first, so a NUL cannot hide a formula sign from the guard and then drop
+   out.
+
+   Numbers never come through here: exporter.js amountCell and
+   budget-export.js num() write amounts raw, because a guarded "-250.50" is
+   text and every SUM over the column skips it. */
 function csvCell(v) {
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /["',\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  let s = stripControls(v);
+  if (needsGuard(s)) s = `'${s}`;
+  return /["',;\t\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-module.exports = { parseDelimited, parseCsv, sniffDelimiter, csvCell };
+/* The reader's half of csvCell's formula guard. Strip ONE leading apostrophe
+   when what follows is a cell the guard would have guarded, and nothing
+   else. A spreadsheet treats that apostrophe as a text marker and hides it,
+   so this is the same reading, not a new rule.
+
+   It used to have no reader half at all (2026-10-07 audit, L3-06). The rules
+   file is the one CSV this app writes AND reads, so a rule learned from
+   `@PARKING …` went to disk as `'@PARKING …`, came back from parseCsv with
+   the apostrophe, and never matched its own merchant again. The next import
+   then learned the description afresh and appended another dead copy, one
+   per import. An apostrophe that guards nothing (`'tis`, `O'Brien`) is text
+   and is left alone. */
+function uncsvCell(s) {
+  const v = String(s ?? '');
+  return v[0] === "'" && needsGuard(v.slice(1)) ? v.slice(1) : v;
+}
+
+module.exports = { parseDelimited, parseCsv, sniffDelimiter, csvCell, uncsvCell, stripControls };

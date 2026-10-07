@@ -23,7 +23,7 @@ const { askFields, confirmModal } = require('../modal');
 const { yamlStr } = require('../markdown');
 const { todayIso } = require('../dates');
 const {
-  NOTES_DIR, KIND_LABELS, NOTE_KINDS, hasOwnNote, isTracked,
+  NOTES_DIR, KIND_LABELS, NOTE_KINDS, noteForLink, isTracked,
   uniqueNotePath, serializeNote, notesFor, sortNotes, isOrphan, fold,
 } = require('../note-file');
 
@@ -348,13 +348,20 @@ module.exports = function registerNotes(ctx) {
     const text = await readFile(note.rel);
     if (text == null) return false;
     const { raw, body } = splitFm(text);
+    /* noteForLink, not `hasOwnNote(kind)` alone: that was a second rule for
+       this key, and it wrote `[[Kids/School]]` — a link that resolves to
+       nothing, since that category lives at Categories/Kids-School.md — where
+       creating the same note writes none (2026-10-07 audit, L3-16). */
+    const link = noteForLink(kind, subject);
     const updates = {
       note_kind: kind,
       note_subject: yamlStr(subject),
       /* null REMOVES the key — patchFrontmatter's contract. Moving a note from
          an account to a debt has to take the wikilink with it, or the graph
-         keeps a link to a note the file no longer claims any relationship to. */
-      note_for: subject && hasOwnNote(kind) ? yamlStr(`[[${subject}]]`) : null,
+         keeps a link to a note the file no longer claims any relationship to.
+         The same goes for a subject whose name cannot resolve as a link: the
+         old link goes, and nothing phantom takes its place. */
+      note_for: link ? yamlStr(link) : null,
     };
     await ctx.patchFile(note.rel, raw, body, updates);
     return true;
@@ -433,18 +440,42 @@ module.exports = function registerNotes(ctx) {
      A count, and a way in. Rendered next to an account/debt/service name so
      "find the notes I made about this" does not start on a different page.
      Returns a single button either way: no notes yet means "write the first
-     one", which is the same gesture. */
+     one", which is the same gesture.
+
+     The count is read when it is USED, not once at render. It used to be
+     captured as the host page drew the chip, and the click acted on that
+     captured number — so after the first note was written the chip went on
+     reading "Write a note about <the account>", and a second tap opened a
+     second New note dialog (2026-10-07 audit, L6-02). Nothing re-renders the host
+     page after the plugin's own write: addNote refreshes the Notes page only,
+     and the vault watcher deliberately ignores our own writes (controller.js).
+     So the click asks S.notes at the moment of the tap, and the chip that
+     started a note repaints itself once the note exists. A repaint rather
+     than ctx.render(): the chip is the only thing on those five pages that
+     reads S.notes, and a full re-render would throw away the reader's place
+     on the page — an open drawer, an expanded caveat — to change one number.
+
+     ONE painter for the chip's state, run at render and again after its note
+     lands, so the label, the title, the style and the count cannot be written
+     two ways. */
   function noteButton(kind, subject) {
-    const n = notesFor(S.notes, kind, subject).length;
-    const b = el('button', {
-      type: 'button', class: 'note-chip' + (n ? ' has-notes' : ''),
-      'aria-label': n ? `${n} note${n === 1 ? '' : 's'} about ${subject}` : `Write a note about ${subject}`,
-      title: n ? `${n} note${n === 1 ? '' : 's'} about ${subject}` : `Write a note about ${subject}`,
-    }, icoEl(['notebook-pen', 'sticky-note', 'file-text']), ...(n ? [String(n)] : []));
-    b.addEventListener('click', e => {
+    const count = () => notesFor(S.notes, kind, subject).length;
+    const b = el('button', { type: 'button', class: 'note-chip' });
+    const paint = () => {
+      const n = count();
+      const what = n ? `${n} note${n === 1 ? '' : 's'} about ${subject}` : `Write a note about ${subject}`;
+      b.classList.toggle('has-notes', n > 0);
+      b.setAttribute('aria-label', what);
+      b.setAttribute('title', what);
+      b.empty();
+      b.append(icoEl(['notebook-pen', 'sticky-note', 'file-text']), ...(n ? [String(n)] : []));
+    };
+    paint();
+    b.addEventListener('click', async e => {
       e.stopPropagation();          // these sit inside rows and cards that are themselves clickable
-      if (n) showNotesFor(kind, subject);
-      else addNote(kind + SEP + subject);
+      if (count()) return showNotesFor(kind, subject);
+      await addNote(kind + SEP + subject);
+      paint();
     });
     return b;
   }

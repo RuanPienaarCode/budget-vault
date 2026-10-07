@@ -34,6 +34,9 @@
    tests/fx.test.cjs, and so the network call has exactly one home. */
 
 const { isForeign } = require('./currency');
+/* Pure as well — the local calendar date of an instant, for requestAllowed's
+   "once a local day". */
+const { isoOf } = require('./dates');
 
 /* The ISO code for each country profile this app ships (src/locale.js's
    PROFILES). A SEED for the wizard's code field, and nothing more — the
@@ -113,6 +116,52 @@ function refreshDue(table, todayIso, cadence) {
   return age === null || age < 0 || age >= refreshAfterDays(cadence);
 }
 
+/* How long after a FAILED request the app waits before asking again: fifteen
+   minutes, doubling with every failure in a row, and never longer than the
+   refresh interval itself — so a long outage still gets one try a day at a
+   daily cadence, and a household that just came back online waits minutes,
+   not a day. */
+const RETRY_AFTER_FAILURE_MS = 15 * 60 * 1000;
+
+/* May the app send a request NOW? Asked after refreshDue says the table is
+   due — and it is the half that question cannot answer, because refreshDue
+   compares the PROVIDER'S date with the device's local one, and the answer
+   that just arrived can itself be due: east of Greenwich before the
+   provider's 00:02 UTC update (01:30 in Johannesburg, 12:30 in Auckland),
+   with a provider stuck on an old date or one dated in the future, or
+   offline. refreshRates() runs after every vault reload, so each of those
+   asked again on every reload — 5 requests over 5 reloads in the 2026-10-07
+   audit, against fx-live.js's promise of one lookup per interval.
+
+   `state` is what the caller remembers, every time an epoch millisecond (or
+   absent): lastSuccessAt — the last request that brought back a usable
+   table; lastFailureAt and failures — the last failed one and how many have
+   failed in a row.
+     - After a success: no request until the refresh interval has passed,
+       counted in LOCAL calendar days (dates.js's isoOf), the unit refreshDue
+       and the cadence setting are counted in — so "daily" is once a local
+       day, whatever the hour the last one happened to be.
+     - After a failure: RETRY_AFTER_FAILURE_MS, doubling, capped at the
+       interval.
+     - A stamp in the future is not believed, as a rate dated in the future
+       is not (refreshDue, stalenessOf): it means a wrong clock on whichever
+       device wrote it, and believing it would stop this one asking at all. */
+function requestAllowed(state, nowMs, cadence) {
+  const s = state || {};
+  const days = refreshAfterDays(cadence);
+  const believable = t => typeof t === 'number' && Number.isFinite(t) && t <= nowMs;
+  if (believable(s.lastSuccessAt)) {
+    const age = daysBetweenIso(isoOf(new Date(s.lastSuccessAt)), isoOf(new Date(nowMs)));
+    if (age !== null && age < days) return false;
+  }
+  const failures = Math.max(0, Math.floor(Number(s.failures) || 0));
+  if (failures > 0 && believable(s.lastFailureAt)) {
+    const wait = Math.min(RETRY_AFTER_FAILURE_MS * Math.pow(2, Math.min(failures, 30) - 1), days * 86400000);
+    if (nowMs - s.lastFailureAt < wait) return false;
+  }
+  return true;
+}
+
 /* Whole days between two ISO dates, or null if either is not a real date.
    UTC throughout, for the same reason the rest of this app is: a rate dated
    "2026-08-29" is not a moment, and pulling it through a local timezone is how
@@ -161,6 +210,33 @@ function codeOf(a, household) {
   return normalizeCode(h.code);
 }
 
+/* The widest gap between two currencies this file will believe: a trillion
+   to one.
+
+   A provider can always lie with a plausible number, and nothing here can
+   catch a rate that is wrong by a few percent. What can be refused is a rate
+   no currency has ever had — and those are not hypothetical. The 2026-10-07
+   audit fed the real chain two: `CNY: 5e-324` (the smallest double there is,
+   finite and above zero, so it passed), under which one yuan bought Infinity
+   rand and the Accounts hero printed the converted household total as
+   "R 0,00"; and `CNY: 1e300`, under which ¥3 956 "converted" to R 0 and
+   vanished from the total without a word. Both were written to the cache and
+   read back on every launch.
+
+   The widest real gap is far inside this bound. A Gulf dinar against the
+   Iranian rial is a few hundred thousand to one; the bolívar in its 2021
+   hyperinflation reached a few million to the dollar. A trillion leaves five
+   orders of magnitude above the worst of those. A currency that really did go
+   further — Zimbabwe's dollar in 2008 did — would get its table refused,
+   which degrades to the un-converted split: the behaviour this feature is
+   opt-in on top of, never a wrong number.
+
+   One rule for any cross-rate, wherever it is asked: normalizeTable applies
+   it to the WIDEST pair a table implies, rateBetween to every answer it
+   gives. */
+const MAX_CROSS_RATE = 1e12;
+const plausibleRate = r => Number.isFinite(r) && r > 0 && r <= MAX_CROSS_RATE && r >= 1 / MAX_CROSS_RATE;
+
 /* A rate table, validated into the one shape the rest of this file accepts:
      { base: 'IDR', date: '2026-08-29', rates: { CNY: 0.000379, ... } }
    `rates` maps a code to "one unit of BASE is this many units of the code".
@@ -189,6 +265,16 @@ function normalizeTable(raw) {
        special-cased in rateBetween(), so the table is complete on its own and
        a caller reading it directly cannot miss the identity. */
   rates[base] = 1;
+  /* The widest cross-rate this table implies — its largest rate over its
+     smallest, the base's 1 included, so it bounds every pair at once — must be
+     one a currency could have (MAX_CROSS_RATE). Refused WHOLE, not by dropping
+     the one bad code: a provider that answers 1e300 for the yuan has said
+     nothing a reader should trust about the dollar either. Zero, negative and
+     non-numeric values above are different: those are "no rate", which a
+     provider sends for a code it does not quote, and they are dropped alone as
+     they always were. */
+  const values = Object.values(rates);
+  if (!plausibleRate(Math.max(...values) / Math.min(...values))) return null;
   return Object.keys(rates).length > 1 ? { base, date, rates } : null;
 }
 
@@ -202,19 +288,29 @@ function rateBetween(from, to, table) {
   if (f === t) return 1;
   const rf = table.rates[f], rt = table.rates[t];
   if (!Number.isFinite(rf) || !Number.isFinite(rt) || rf <= 0) return null;
-  return rt / rf;
+  /* The same bound normalizeTable holds a whole table to, for a table handed
+     in directly without it: rt / rf of a denormal is Infinity, and of 1e300
+     is a rate that turns any balance into nothing. */
+  const r = rt / rf;
+  return plausibleRate(r) ? r : null;
 }
 
 /* One amount, converted, rounded to the cent. null when it cannot be done —
    never 0, and never the un-converted amount passed through. Returning the
    input unchanged would be the single most dangerous thing this file could
    do: ¥3 956 silently becoming "Rp 3 956" is exactly the bug that started
-   all of this, wearing a conversion's clothes. */
+   all of this, wearing a conversion's clothes.
+
+   A product that overflows is null too. The rate is bounded, but the amount
+   is the household's own, and a balance typed with a stray exponent times a
+   believable rate can still leave the doubles — an Infinity that
+   formatAmount would print as "R 0,00". */
 function convert(amount, from, to, table) {
   const r = rateBetween(from, to, table);
   const v = Number(amount);
   if (r === null || !Number.isFinite(v)) return null;
-  return (Math.round(v * r * 100) / 100) || 0;
+  const cents = Math.round(v * r * 100) / 100;
+  return Number.isFinite(cents) ? (cents || 0) : null;
 }
 
 /* Is this rate table old enough that a figure derived from it should say so?
@@ -255,8 +351,18 @@ function convertAccounts(accounts, household, table, todayIso) {
     const code = codeOf(a, h);
     if (code && code === home) { out.home += v; continue; }
     const inHome = code ? convert(v, code, home, table) : null;
-    if (inHome === null) {
-      /* No code, or no rate for it. Named, never counted — at par or at all. */
+    /* A balance that is not zero (to the cent, in its own currency) and comes
+       out as zero after conversion has not been converted — it has gone
+       missing. That happens when the balance is worth less than half a cent
+       of the household's currency at the rate given: at a real rate, a few
+       rupiah left in a dormant account; at a wrong one that still passes
+       MAX_CROSS_RATE (1e-11 rand a yuan), every balance a household holds.
+       Either way "not converted" is true, where "converted: R 0,00" is the
+       silence this array exists to prevent. */
+    const vanished = inHome === 0 && Math.round(v * 100) !== 0;
+    if (inHome === null || vanished) {
+      /* No code, no rate for it, or a conversion to nothing. Named, never
+         counted — at par or at all. */
       out.unconvertible.push({ account: a, symbol: (a && a.currency) || '' });
       continue;
     }
@@ -288,6 +394,8 @@ function canConvert(settings, table) {
 
 module.exports = {
   STALE_AFTER_DAYS, REFRESH_AFTER_DAYS, normalizeCadence, refreshAfterDays, refreshDue,
+  RETRY_AFTER_FAILURE_MS, requestAllowed,
   codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
   rateBetween, convert, stalenessOf, convertAccounts, canConvert,
+  MAX_CROSS_RATE,
 };

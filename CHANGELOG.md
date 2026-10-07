@@ -3,6 +3,95 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.50.0 — 2026-10-07
+
+A full audit of 1.49.1 — figures, saves, exports, iOS and the headless API —
+found 97 issues. Every one is fixed with a guard test, or settled by a rule
+written down in ADR-0007. Adding up the raw files still matched to the cent;
+what changed are the rules some figures are built on, what a save did to the
+files you wrote, and what the exports and the API carried.
+
+### Changed
+
+- **The privacy lock covers the headless API.** While the budget is locked and
+  has not been opened this session, `api.currentPeriod()` answers
+  `{ locked: true }` and reads nothing. A period with no budget answers
+  `noBudget: true` with `left: null`, and the API's notes are the Dashboard
+  hero's own caveat lines. Update Vista at the same time: an older Vista shows
+  "Left to spend R 0" for a period with no budget.
+- **A debt with no stated rate reads "rate unknown"** and is no longer
+  projected as a 0% loan: no interest still to pay, no clear-by date, no place
+  in the attack order. A rate of 0 reads the same way, as the Interest tile
+  already did.
+- **A figure typed below zero is kept** in the field and the file. Totals
+  count it as 0, and the row says so.
+- **The Score names its base:** fixed bills and living costs read "of
+  household income", and the page states what household income averages.
+- **Where the money went shows three kinds of money left** — inside the
+  spending budget, set aside but still to move, never budgeted — and says
+  when the plan is budgeted beyond income.
+- **Charges not yet imported are held as committed**, not dropped, and money
+  left states the date its cash is as of.
+- **Savings growth** subtracts the capital counted to the date of the stated
+  balance; the account drawer says what growth is measured on, and a fund
+  with no transactions says so.
+- **Uncategorised outgoings count as essential spend** in emergency cover.
+- **Every export and the Report refuse** a folder whose name starts with a
+  dot, Obsidian's config folder, a folder the budget manages and a `..` path,
+  and name the files they would replace. A filtered Transactions export is
+  named after its filter.
+- **Add transaction and an import refuse to write into a month with unsaved
+  edits.** Your entry is kept for the next time you open the dialog.
+- **An import pre-excludes a transfer only when it finds the other leg** —
+  same amount, opposite sign, within four days. Otherwise it suggests
+  "transfer?" and keeps the row counted.
+
+### Fixed
+
+- A save no longer rewrites what you wrote. A month keeps its own separator
+  row and the prose around its table; a file with no frontmatter gets its
+  fence on a line of its own; frontmatter comment lines, hand-added columns,
+  CRLF line endings in the flat tables, amounts with more than two decimals,
+  words such as "cancelled" or "x", rows without a name and a budget file's
+  own row order all survive. A save that changes nothing changes no bytes.
+- An account save no longer erases `budget: true`.
+- Tax: an amount typed with a decimal comma was stored 100 times too large;
+  cells no longer gain a backslash on every save; a taxpayer type or
+  assessment word is no longer replaced with "unknown"; an assessed year gets
+  the right season copy.
+- Rules: a learned rule starting with `=`, `+`, `-` or `@` no longer dies on
+  the first save, and the rules file keeps its own columns and order.
+- Plan: "New plan" keeps the unsaved-edit guard; Collapse collapses; envelope
+  shares sum to 100%; a plan whose buckets claim more than is left offers
+  nothing to place.
+- Report: one total per category across periods; Net explains its gap to
+  Income − Spend; the Net Worth and Health sections carry their on-screen
+  caveats; Copy runs inside the tap on iPhone; generated notes escape
+  markdown.
+- Exports: one rounding rule (half a cent away from zero) for the CSV, the
+  workbook and the PDF; the running period is labelled "(in progress)"; PDF
+  titles keep non-ASCII characters; creation times carry the time zone; sheet
+  names are always valid; very long names fall back to a short tag; a large
+  PDF is assembled without copying every page.
+- Exchange rates: an absurd rate table is refused whole, a balance that
+  converts to nothing is named as not converted, and rates are fetched once
+  per interval with a back-off after a failure.
+- Services: a price is checked only against charges in its own currency, and
+  the 2-unit agreement floor applies to the household's own currency only.
+- Light theme: an expanded caveat chip is readable, and the Savings account
+  sheet no longer takes the host theme's background.
+- iOS 15: `overflow-wrap` and focus-ring fallbacks; tap targets of at least
+  24px, the Plan bucket slider included; on a phone the Accounts rows become
+  cards with their table roles stamped.
+- A file renamed out of the budget folder is noticed.
+- Notes: the chip counts a note just written, its second tap opens the Notes
+  page, and a repointed note never gets a link that cannot resolve.
+- Deleting a category checks its file before the dialog; an import's Undo
+  removes a month file it created.
+
+New strings in all twelve languages; the non-English wording is not yet
+native-reviewed.
+
 ## 1.49.1 — 2026-09-29
 
 ### Changed

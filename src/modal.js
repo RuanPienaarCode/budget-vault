@@ -108,7 +108,19 @@ function askFields(app, title, fields) {
 }
 
 /* Yes/no confirmation. Resolves true only if the user clicks the confirm
-   button; closing/cancelling resolves false. iOS-safe (no window.confirm). */
+   button; closing/cancelling resolves false. iOS-safe (no window.confirm).
+
+   `primary` says which answer the dialog offers as the one to press. The
+   default, 'confirm', is the shape every caller had: the confirm button drawn
+   as a warning, because confirming is the risky act and declining is just
+   leaving. 'cancel' is for the question whose SAFE answer is the one the
+   reader should reach for — the Transactions page's "Update the matching rule
+   too?", where "Just this row" keeps the rule and "Update the rule" refiles
+   every future import of that merchant. There the cancel button carries
+   Obsidian's call-to-action style and the confirm button is plain: neither
+   the default nor dressed as a warning, just the deliberate second choice.
+   Which answer resolves true never changes — only the confirm button does
+   (2026-10-07 audit, RULEFIX carry-over). */
 class ConfirmModal extends Modal {
   constructor(app, opts, resolve) {
     super(app);
@@ -117,12 +129,19 @@ class ConfirmModal extends Modal {
     this.answer = false;
   }
   onOpen() {
-    const { title, message, confirmText = 'Discard', cancelText = 'Cancel' } = this.opts;
+    const { title, message, confirmText = 'Discard', cancelText = 'Cancel', primary = 'confirm' } = this.opts;
+    const safeFirst = primary === 'cancel';
     if (title) this.titleEl.setText(title);
     this.contentEl.createEl('p', { text: message });
     new Setting(this.contentEl)
-      .addButton(b => b.setButtonText(cancelText).onClick(() => this.close()))
-      .addButton(b => b.setButtonText(confirmText).setWarning().onClick(() => { this.answer = true; this.close(); }));
+      .addButton(b => {
+        b.setButtonText(cancelText).onClick(() => this.close());
+        if (safeFirst) b.setCta();
+      })
+      .addButton(b => {
+        b.setButtonText(confirmText).onClick(() => { this.answer = true; this.close(); });
+        if (!safeFirst) b.setWarning();
+      });
   }
   onClose() { this.contentEl.empty(); this.resolve(this.answer); }
 }

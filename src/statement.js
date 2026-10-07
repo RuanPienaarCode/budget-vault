@@ -15,8 +15,9 @@
    read is testable without one. */
 
 const { normalizeAmount } = require('./amount');
-const { isRealIsoDate } = require('./dates');
+const { isRealIsoDate, daysBetween } = require('./dates');
 const { parseDelimited, sniffDelimiter } = require('./csv');
+const { isSplitPart } = require('./tx-role');
 
 /* Parse a foreign statement: sniff the delimiter, then read it. */
 const parseStatement = text => parseDelimited(text, sniffDelimiter(text));
@@ -185,13 +186,63 @@ function counterpartyAccount(desc, accounts, selfLabel) {
    `manual` on the category: once the reader has decided, a re-render leaves
    their decision alone, in either direction. Without it this would trade a
    silent wrong exclusion for a silently reverted correction, since the review
-   re-renders on every account switch and every "show more". */
-function applyCounterparties(items, accounts, selfLabel) {
+   re-renders on every account switch and every "show more".
+
+   A NUMBER SUGGESTS; ONLY THE OTHER LEG DECIDES (2026-10-07 audit,
+   L4B-TXT-COUNTERPARTY). Whoever types the EFT reference writes the
+   description, and an account number is exactly what a household hands out
+   to be paid into: a client paying R5 000 with the household's Savings number
+   as the reference arrived pre-excluded as a "transfer to Savings", and
+   income counted half of what came in unless the reader unticked it. So the
+   row is pre-excluded only when the account it names holds the OPPOSITE leg —
+   the same amount the other way, dated within TRANSFER_LEG_DAYS — which is
+   money that left one of the household's accounts and arrived in another,
+   something no reference can fake. Without it the row keeps `transferTo` (the
+   review badges it and says why) and stays counted, Excluded one tick away.
+
+   `legsOf(account)` hands back the rows already in the vault for that account
+   — the caller's, because this module never reads the vault. Omitted, there
+   is no evidence, so nothing is pre-excluded: the safe side, since a missed
+   transfer is a figure the reader can see and fix and a wrongly excluded
+   payment is income that silently is not there. One leg answers for one row
+   per pass (two identical transfers need two legs); `transferLeg` carries the
+   proving leg's date so the review can cite it. */
+/* Window for a transfer's two legs: the same day inside one bank, and up to
+   a long weekend between two — an EFT made on a Friday lands on the Tuesday.
+   The same slack src/dedupe.js allows a re-dated charge (NEAR_DAYS), chosen
+   for the same reason: a bank's own dating, not the household's. */
+const TRANSFER_LEG_DAYS = 4;
+
+/* The other leg of `item` among `rows`: the same amount to the cent, the
+   opposite sign, dated within TRANSFER_LEG_DAYS either way, not already
+   `taken` by an earlier row. The nearest in date wins. A split PART is the
+   reader's own slice of a line and never a bank leg (tx-role.js); its parent
+   is the line the bank printed, and is. Returns the row, or null. */
+function oppositeLeg(item, rows, taken) {
+  const want = -Math.round(Number(item && item.amount) * 100);
+  if (!want || !Number.isFinite(want)) return null;
+  let best = null, bestGap = Infinity;
+  for (const r of rows || []) {
+    if (!r || isSplitPart(r) || (taken && taken.has(r))) continue;
+    if (Math.round(Number(r.amount) * 100) !== want) continue;
+    const days = daysBetween(item.date, r.date);
+    if (days == null) continue;
+    const gap = Math.abs(days);
+    if (gap <= TRANSFER_LEG_DAYS && gap < bestGap) { best = r; bestGap = gap; }
+  }
+  return best;
+}
+
+function applyCounterparties(items, accounts, selfLabel, legsOf) {
+  const taken = new Set();
   for (const it of items || []) {
     if (it.manualExclude) continue;
     const other = counterpartyAccount(it.desc, accounts, selfLabel);
-    it.excluded = !!other;
+    const leg = other && typeof legsOf === 'function' ? oppositeLeg(it, legsOf(other), taken) : null;
+    if (leg) taken.add(leg);
+    it.excluded = !!leg;
     it.transferTo = other ? (other.tx_label || other.name) : '';
+    it.transferLeg = leg ? leg.date : '';
   }
   return items;
 }
@@ -612,7 +663,7 @@ function sameAccountNumber(a, b) {
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
-  counterpartyAccount, applyCounterparties, reconcileAmounts,
+  counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts,
   detectHeaderlessColumns, detectStatementColumns,
   statementAccountNumber, sameAccountNumber,
 };

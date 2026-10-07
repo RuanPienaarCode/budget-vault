@@ -75,8 +75,29 @@ const DIFFERENT = [
   ['Card Purchase GROCER ONE', 'Card Purchase MEGAMART'],
   ['POS Purchase VILLAGE STORE', 'POS Purchase PARKING CO'],
   ['Internet Payment TO ALICE', 'Internet Payment TO BOBBY'],
+  /* Two debit orders from ONE provider, for two different products, on the
+     same day for the same amount (2026-10-07 audit, OOL-3; synthetic names,
+     real SHAPE). Both normalise to a string that starts with the provider's
+     nine-letter name, which clears MIN_PREFIX on its own, so they read as
+     the same charge and the second one was unticked as a near-duplicate.
+     What tells them apart is the reference each one carries: two different
+     contract numbers. When both descriptions carry a reference and each has
+     one the other lacks, they are two transactions. */
+  ['ALDERFUND ALDERFUND 00123456DO', 'ALDER FUNDIP111222-333444-DO'],
+  ['ALDERFUND 00123456DO', 'ALDERFUND 00987654DO'],
 ];
 for (const [a, b] of DIFFERENT) ok(!descsLikelySame(a, b), `should NOT match: "${a}" vs "${b}"`);
+
+/* The reference test only ever says "different", and only when the two
+   references disagree on BOTH sides. A shared reference, or a reference on
+   one side only, which is the pending to settled rewrite this module exists
+   for (TERM0099 becomes the town), leaves the merchant-stem test to decide. */
+const SAME_WITH_REFS = [
+  ['ALDERFUND 00123456DO CITYVILLE', 'ALDERFUND 00123456DO'],          // same reference, rewritten around it
+  ['ALDERFUND 00123456DO', 'ALDERFUND 00123456DO AUTH778899'],         // one side adds a reference
+  ['ALDERFUND TERM0099', 'ALDERFUND CITYVILLE'],                       // reference on one side only
+];
+for (const [a, b] of SAME_WITH_REFS) ok(descsLikelySame(a, b), `should still match: "${a}" vs "${b}"`);
 
 /* The verb-prefix strip must not stop a genuine pending->settled rewrite from
    matching just because both sides happen to share the same bank verb —
@@ -158,6 +179,12 @@ const RANGE = { min: '2026-06-01', max: '2026-06-30' };
   ok(hitA, 'first row matches');
   consumed.add(hitA.id);
   ok(!findNearDuplicate(b, index, LABEL, new Set(), consumed, RANGE), 'a consumed vault row cannot be matched twice');
+}
+{ // two debit orders, one provider, one day, one amount, different references
+  const index = idx([{ date: '2026-06-01', desc: 'ALDERFUND ALDERFUND 00123456DO', amount: -350.00 }]);
+  const item = { date: '2026-06-01', desc: 'ALDER FUNDIP111222-333444-DO', amount: -350.00 };
+  ok(!findNearDuplicate(item, index, LABEL, new Set(), new Set(), RANGE),
+    'a second debit order with its own contract reference is not a near-duplicate of the first');
 }
 { // different account, same amount and merchant → never a match
   const index = idx([{ date: '2026-06-08', desc: 'GROCER ONE TERM0099', amount: -250.00 }]);

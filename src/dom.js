@@ -139,10 +139,25 @@ function caveatChip(shortText, detailText) {
     type: 'button', class: 'caveat-chip-btn', title: detailText, 'aria-expanded': 'false',
   }, shortText);
   const detail = el('div', { class: 'caveat-chip-detail hidden' }, detailText);
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', e => {
+    /* The tap is the chip's, never the row's around it. On the Accounts page
+       the "ignored" chip sits inside a table row whose own click opens the
+       row's drawer: the click bubbled, the drawer opened, the re-render threw
+       the just-expanded chip away, and the reason never showed — the one
+       thing this component exists to make reachable by tap (audit of
+       7 Oct 2026). Guarded, because a caller may fire the handler bare. */
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     const open = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', open ? 'false' : 'true');
     detail.classList.toggle('hidden', open);
+  });
+  /* The two keys that press a button are the chip's too. A native <button>
+     turns Enter and Space into a click, stopped above; the keydown itself
+     still bubbles, and an ancestor acting on Enter without checking its own
+     target would act on it as well. Every other key passes, so Escape and Tab
+     still reach the page. */
+  btn.addEventListener('keydown', e => {
+    if (e && (e.key === 'Enter' || e.key === ' ') && typeof e.stopPropagation === 'function') e.stopPropagation();
   });
   return el('span', { class: 'caveat-chip' }, btn, detail);
 }

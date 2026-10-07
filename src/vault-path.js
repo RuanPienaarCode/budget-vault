@@ -53,4 +53,21 @@ function collapsePath(p) {
   return out.join('/');
 }
 
-module.exports = { safeSeg, collapsePath };
+/* The first segment of a typed folder that Obsidian hides, or null.
+
+   Obsidian indexes no path with a segment that starts with a dot — app.js
+   1.13.7 calls a path hidden when ANY segment startsWith(".") and reconciles
+   it as deleted — so an export written to ".trash", "Notes/.archive" or
+   "x/.obsidian" is a real file that the file explorer, Open and Reveal can
+   never reach (2026-10-07 audit). The config folder has its own refusal and
+   wording (io.js destinationProblem asks it first); this is every other dot-folder, and it
+   catches ".obsidian-notes" as well, which used to pass the config check by
+   design and is just as invisible. A segment of dots only is a traversal,
+   destinationProblem's to refuse, and "." means nothing — both skipped here.
+   Separators read the way the writers read them: "/" and "\". */
+function hiddenSegment(folder) {
+  const segs = String(folder ?? '').replace(/\\/g, '/').split('/').map(s => s.trim());
+  return segs.find(s => s.startsWith('.') && !/^\.+$/.test(s)) || null;
+}
+
+module.exports = { safeSeg, collapsePath, hiddenSegment };

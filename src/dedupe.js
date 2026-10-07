@@ -35,6 +35,7 @@
    would collide on their shared 14-character prefix. */
 
 const { isSplitPart } = require('./tx-role');
+const { isReferenceToken } = require('./rules');
 
 /* Window the bank actually needs: pending→settled has never been observed
    beyond 2 days in this vault's four years of statements; 4 is slack. */
@@ -115,6 +116,50 @@ function commonPrefixLen(a, b) {
   return i;
 }
 
+/* The references a description carries: every whitespace-separated token
+   rules.js isReferenceToken calls reference noise (a contract or policy
+   number, a masked card, a caps-and-digits ref code), normalised the way
+   normDesc normalises the whole string, so `IP111222-333444-DO` and
+   `IP111222333444DO` are one reference. */
+function referenceTokens(s) {
+  const out = new Set();
+  for (const w of String(s == null ? '' : s).split(/\s+/)) {
+    if (w && isReferenceToken(w)) {
+      const t = normDesc(w);
+      if (t) out.add(t);
+    }
+  }
+  return out;
+}
+
+/* Two descriptions that each carry a reference the other does not are two
+   transactions, however much merchant name they share.
+
+   Found on a real vault (2026-10-07 audit, OOL-3): one investment provider
+   debited two products on the same day for the same amount, eleven months
+   running, with descriptions shaped like `PROVIDER PROVIDER 01234567DO` and
+   `PRO VIDERIP111222-333444-DO`. Both normalise to a string that opens with
+   the provider's nine-letter name, which clears MIN_PREFIX on its own, so
+   the second debit order of every pair was unticked as a near-duplicate of
+   the first. It was labelled and never skipped, but an unticked real row is
+   exactly the import this module is most careful not to lose.
+
+   Deliberately narrow. It only ever answers "different", and only when the
+   references disagree on BOTH sides. One side carrying a reference the other
+   lacks is the pending to settled rewrite this module exists to catch
+   (`GROCER ONE TERM0099` settles as `GROCER ONE CITYVILLE`), and so is a
+   settled row that adds an auth code beside the reference it already had.
+   Both still go to the merchant-stem test. MIN_PREFIX is unchanged: the
+   tightest genuine pair on record is still 9 characters. */
+function referencesDisagree(a, b) {
+  const ra = referenceTokens(a), rb = referenceTokens(b);
+  if (!ra.size || !rb.size) return false;
+  let aOnly = false, bOnly = false;
+  for (const t of ra) if (!rb.has(t)) { aOnly = true; break; }
+  for (const t of rb) if (!ra.has(t)) { bOnly = true; break; }
+  return aOnly && bOnly;
+}
+
 /* Same merchant, allowing for the bank's own rewriting. Equality after
    stripping punctuation covers the whitespace-only variants Discovery emits
    ("Pay *Plato" vs "Pay   *Plato"); the prefix rule covers the rest — but the
@@ -122,11 +167,14 @@ function commonPrefixLen(a, b) {
    the raw ones, or the bank's own boilerplate is what gets "matched". Full
    equality is still checked on the UNSTRIPPED strings first: two identical
    verb-less descriptions ("Intl payment fee MUSICCO" vs itself) must not
-   depend on the strip list knowing about them. */
+   depend on the strip list knowing about them. Between the two sits the
+   reference test above: two different references settle it before a shared
+   merchant name can. */
 function descsLikelySame(a, b) {
   const x = normDesc(a), y = normDesc(b);
   if (!x || !y) return false;
   if (x === y) return true;
+  if (referencesDisagree(a, b)) return false;
   const sx = normDesc(stripVerbPrefix(a)), sy = normDesc(stripVerbPrefix(b));
   if (!sx || !sy) return false;
   return commonPrefixLen(sx, sy) >= MIN_PREFIX;

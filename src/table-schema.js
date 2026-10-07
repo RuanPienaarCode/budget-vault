@@ -98,9 +98,55 @@ function extraColsOf(known, header, sep, dataRows) {
   for (const c of dataRows) maxLen = Math.max(maxLen, c.length - known);
   if (maxLen <= 0) return null;
   return {
+    /* How many of the schema's own columns THIS file carries before its extra
+       ones — see knownColumns(). mdTableFile writes at least that many, so
+       the household's column stays where the file put it. */
+    known,
     headers: Array.from({ length: maxLen }, (_, i) => extraHeaders[i] ?? ''),
     sep: Array.from({ length: maxLen }, (_, i) => extraSep[i] ?? '---'),
   };
+}
+
+/* How many of a flat table's columns a FILE carries — the `known` the loader
+   reads rows and extra cells with (2026-10-07 round-trip audit, L3-21).
+
+   The frozen prefix is positional, as it always was. The optional tail
+   (currency, appended by ADR-0004, written only by a file that uses it) is
+   different: on most files on disk that slot is simply the next free column,
+   which is exactly where a household puts a column of its own. Read by
+   position, an Assets.md with a sixth column headed `Insured` had every
+   `yes`/`no` read as the asset's currency — both assets "foreign", out of
+   net worth — and the next save renamed the header to `Currency`.
+   load.js already settles the identical question for a transaction file's
+   Split column by reading the file's own header; this is the same rule for
+   the tail (the owner's default): a slot is the schema's column only when
+   the header cell there NAMES it (trimmed, case-folded). Any other header is
+   the household's column, carried verbatim by attachExtraCells/extraColsOf.
+   Where the header stops short of the slot (or leaves it blank), the slot is
+   the schema's only while no row writes anything in it — blank reads the
+   same either way, and that keeps a file with a trailing empty cell
+   byte-stable rather than growing an unnamed column on its next save. */
+function knownColumns(schema, header, dataRows) {
+  const cols = schema.columns;
+  let k = cols.length - (schema.optionalTail || 0);
+  while (k < cols.length) {
+    const h = String((header || [])[k] ?? '').trim();
+    if (h) { if (h.toLowerCase() !== cols[k].header.toLowerCase()) break; }
+    else if ((dataRows || []).some(c => String(c[k] ?? '').trim() !== '')) break;
+    k++;
+  }
+  return k;
+}
+
+/* The line ending a block of text uses, read off its FIRST line break: '\r\n',
+   '\n', or null for text with no line break at all. One rule for the loader
+   (which records a file's own ending, L3-20) and mdTableFile (which writes
+   every line with it). */
+function lineEndingOf(text) {
+  const s = typeof text === 'string' ? text : '';
+  const i = s.indexOf('\n');
+  if (i < 0) return null;
+  return i > 0 && s[i - 1] === '\r' ? '\r\n' : '\n';
 }
 
 /* ISSUE 69. headerLines()/rowLine() with the extra columns appended after the
@@ -201,24 +247,66 @@ const verbatim = (key, header) => ({
    "15 000 000,00" into it) read as 0 AND cleared the raw beside it — so the
    preserved text this whole contract exists to protect went to 0.00 on disk
    with nothing said about it. A cell that yields no number must leave the
-   stored figure alone; see the editMoney comment in views/debts.js. */
+   stored figure alone; see the editMoney comment in views/debts.js.
+
+   TWO MORE KINDS OF CELL the write used to overwrite (2026-10-07 round-trip
+   audit), both kept the same way:
+
+   A NEGATIVE IN A FLOORED COLUMN (L3-11). `floor` clamps at read, because
+   every floored column is arithmetic input where a negative means nothing —
+   but the clamped 0 was all the row kept, so `-250.00` on an overpaid store
+   card or `-500.00` on a timeshare whose levies exceed its resale became
+   `0.00` on disk at the next save of the page. The owner's decision: keep
+   what was typed, clamp only in the arithmetic. The field still holds the
+   floored number, so every total is exactly what it was; `<key>Raw` holds the
+   typed text whenever flooring changed it. The editors on the Owed, Assets
+   and Debts pages are the other half of that contract (they set both when a
+   negative is typed, and say beside the row that it counts as 0).
+
+   A FIGURE TWO DECIMALS CANNOT HOLD (L3-17). toFixed(2) rounded `11.125` — a
+   prime-linked rate exactly as a contract states it — to `11.13` on a save
+   triggered by any other row. Such a cell keeps its own text in `<key>Text`.
+   Not `<key>Raw`: a raw has always meant "the reader typed something this
+   column could not hold" (unreadable, or floored), and a readable number
+   with a third decimal is neither — a reader of `<key>Raw` must not have to
+   tell them apart. A cell two decimals CAN hold (`100`, `7.5`, `1 234,56`)
+   keeps no text and is rewritten canonically exactly as before, so no file on
+   disk changes bytes because of this.
+
+   ONE WRITE RULE for all of them, the contract stated above: the kept text
+   goes back only while the field still holds the number that text produces
+   (valueOf, the read's own arithmetic). For an unreadable cell and a floored
+   negative that number is 0 — precisely the old `!(r[key] || 0)` test — and
+   for a kept third decimal it is the figure itself, so an edit to any other
+   value is written at two decimals like every figure the app sets. */
+/* True when rewriting `v` at two decimals would change the figure. */
+const keepsDigits = v => Number.isFinite(v) && Number(v.toFixed(2)) !== v;
+
 const money = (key, header, { floor = false, guarded = false } = {}) => {
   const rawKey = key + 'Raw';
+  const textKey = key + 'Text';
+  const valueOf = t => { const v = parseNum(t || '0').value || 0; return floor ? Math.max(0, v) : v; };
   return {
     key, header, align: 'right',
     read: c => {
       const a = parseNum(c || '0');
       const v = floor ? Math.max(0, a.value || 0) : (a.value || 0);
+      const typed = String(c ?? '').trim();
       /* `!a.raw` is the blank-but-present cell — parseNum trims, so a cell of
          nothing but spaces arrives here as ''. Absent has always meant 0.00 on
          these tables and there is no reader's text to protect, so it must not
          be preserved: writing '' back would leave an empty cell where every
          other row states a figure. */
-      return a.readable || !a.raw ? { [key]: v } : { [key]: v, [rawKey]: a.raw };
+      if (!a.readable) return a.raw ? { [key]: v, [rawKey]: a.raw } : { [key]: v };
+      if (floor && (a.value || 0) < 0) return { [key]: v, [rawKey]: typed };
+      return keepsDigits(v) ? { [key]: v, [textKey]: typed } : { [key]: v };
     },
-    write: r => (r[rawKey] != null && !(r[key] || 0)
-      ? r[rawKey]
-      : (guarded ? (r[key] || 0) : r[key]).toFixed(2)),
+    write: r => {
+      const held = r[key] || 0;
+      if (r[rawKey] != null && held === valueOf(r[rawKey])) return r[rawKey];
+      if (r[textKey] != null && held === valueOf(r[textKey])) return r[textKey];
+      return (guarded ? (r[key] || 0) : r[key]).toFixed(2);
+    },
   };
 };
 
@@ -324,6 +412,50 @@ const vocab = (key, header, match, other) => {
   };
 };
 
+/* A yes/no cell read as a BOOLEAN — vocab()'s contract for the two columns
+   whose value is true/false rather than one of two words.
+
+   Both were declared by hand without it, and both destroyed what was typed
+   (2026-10-07 round-trip audit). Services.md `Active` read "anything but
+   `no` is active" and wrote `yes`/`no`: `cancelled` and `paused` were
+   counted as committed spending on the Dashboard, and the next save of the
+   page wrote `yes` over them (L3-09). A transaction's `Excluded` read true
+   for exactly `yes`: a hand-typed `x` or `true` loaded as NOT excluded — a
+   windfall the household had marked was counted as income — and the next
+   write of the month blanked the mark (L3-10).
+
+   `on` and `off` are the words that read as true and false; anything else
+   reads as `absent`, the value an empty cell has always meant on that column,
+   so an unknown word keeps exactly the reading it had before. The canonical
+   spellings (`words`, what the app itself writes) keep no raw, so every file
+   already on disk writes the bytes it always did; any other non-blank cell
+   keeps its text in `<key>Raw`, written back while the field still holds the
+   value that text produces — the toggle on the page still wins. */
+const flag = (key, header, { on, off = [], absent, words }) => {
+  const rawKey = key + 'Raw';
+  const [yesWord, noWord] = words;
+  const valueOf = w => {
+    const f = String(w).trim().toLowerCase();
+    return on.includes(f) ? true : off.includes(f) ? false : absent;
+  };
+  return {
+    key, header, align: 'left',
+    read: c => {
+      const raw = (c || '').trim();
+      if (!raw) return { [key]: absent };
+      const v = valueOf(raw);
+      return raw.toLowerCase() === (v ? yesWord : noWord) ? { [key]: v } : { [key]: v, [rawKey]: raw };
+    },
+    write: r => (r[rawKey] != null && valueOf(r[rawKey]) === !!r[key] ? r[rawKey] : (r[key] ? yesWord : noWord)),
+  };
+};
+
+/* The words fmBool() in load.js reads a frontmatter flag with, so a table
+   cell and a frontmatter key read the same word the same way. Each flag
+   column adds its own column-specific words below. */
+const TRUE_WORDS = ['yes', 'true', 'on', '1'];
+const FALSE_WORDS = ['no', 'false', 'off', '0'];
+
 /* The currency an entity's own amounts are stated in — a DISPLAY symbol, the
    same thing an account's `currency:` frontmatter is, and governed by the same
    rules in src/currency.js: it never converts and never excludes.
@@ -408,23 +540,26 @@ const SCHEMAS = {
       vocabSet('cycle', 'Cycle', CYCLES, 'monthly'),
       verbatim('next', 'Next billing'),
       text('category', 'Category'),
-      {
-        // Active is a yes/no cell read as a boolean: only an explicit "no"
-        // deactivates — an absent cell on an old file means what it always
-        // meant, an active service.
-        key: 'active', header: 'Active', align: 'left',
-        read: c => ({ active: (c || 'yes').trim().toLowerCase() !== 'no' }),
-        write: r => (r.active ? 'yes' : 'no'),
-      },
+      /* Active is a yes/no cell read as a boolean. An absent cell on an old
+         file means what it always meant, an active service — and so does a
+         word this list does not know. The words a household writes for a
+         service that has stopped (`cancelled`, `paused`, …) read as inactive
+         and are kept as typed; see flag(). */
+      flag('active', 'Active', {
+        on: [...TRUE_WORDS, 'active'],
+        off: [...FALSE_WORDS, 'cancelled', 'canceled', 'paused', 'inactive'],
+        absent: true, words: ['yes', 'no'],
+      }),
       text('notes', 'Notes'),
       currency(),
     ],
   },
 
   /* Debts.md — the twelve-column cautionary tale CLAUDE.md names. Money
-     columns floor at 0: every figure here is arithmetic input to the payoff
-     maths, so a rejected cell falls back to 0 and is rewritten canonically
-     rather than preserved verbatim. */
+     columns floor at 0 for the arithmetic: every figure here is input to the
+     payoff maths, where a negative means nothing. What the household TYPED is
+     still what goes back to disk — an unreadable cell, a negative and a third
+     decimal are each kept by money()'s rules. */
   debts: {
     file: 'Debts.md',
     /* `currency` is appended and optional — see usedColumns(). */
@@ -448,11 +583,15 @@ const SCHEMAS = {
            fabricated 0 and keeps `originalRaw` so the next save writes the
            reader's text back instead of "0.00" over it. */
         key: 'original', header: 'Original', align: 'right',
+        /* Floored like the balance beside it, so it keeps a typed negative and
+           a third decimal by money()'s rules too (L3-11, L3-17). */
         read: c => {
           if (c === undefined || c === '') return { original: null };
           const a = parseNum(c);
           const v = Math.max(0, a.value || 0);
-          return a.readable || !a.raw ? { original: v } : { original: v, originalRaw: a.raw };
+          if (!a.readable) return a.raw ? { original: v, originalRaw: a.raw } : { original: v };
+          if ((a.value || 0) < 0) return { original: v, originalRaw: String(c).trim() };
+          return keepsDigits(v) ? { original: v, originalText: String(c).trim() } : { original: v };
         },
         /* ISSUE 68. A cell the household left EMPTY goes back empty. load.js's
            post() fills `original` from the balance so the payoff maths has a
@@ -475,10 +614,14 @@ const SCHEMAS = {
            S.debts is filled in exactly two places, load.js's post() and
            addDebt(), and both leave a number behind — so this is the guard
            for the third writer, not a fix for a live crash. */
-        write: r => (r.originalStated === false ? ''
-          : r.originalRaw != null && !(r.original || 0) ? r.originalRaw
-            : r.original == null ? ''
-              : r.original.toFixed(2)),
+        write: r => {
+          if (r.originalStated === false) return '';
+          const held = r.original || 0;
+          const valueOf = t => Math.max(0, parseNum(t).value || 0);
+          if (r.originalRaw != null && held === valueOf(r.originalRaw)) return r.originalRaw;
+          if (r.originalText != null && held === valueOf(r.originalText)) return r.originalText;
+          return r.original == null ? '' : r.original.toFixed(2);
+        },
       },
       money('rate', 'Rate', { floor: true }),
       money('payment', 'Payment', { floor: true }),
@@ -513,19 +656,46 @@ const SCHEMAS = {
            write side puts the verbatim raw back rather than corrupting a
            figure the user typed. */
         key: 'amount', header: 'Amount', align: 'right',
-        read: c => { const a = parseNum(c); return { amount: a.value, amountRaw: a.ok ? null : a.raw }; },
-        write: r => (r.amountRaw != null ? r.amountRaw : r.amount.toFixed(2)),
+        /* `amountText`: a strictly-parsed cell two decimals cannot hold
+           (`-912.345` off a fuel slip) keeps its own text, written back while
+           the amount is still the one it produced — money()'s L3-17 rule. A
+           cell the strict parser rejected already goes back verbatim through
+           amountRaw, so this only ever applies to an `ok` cell. */
+        read: c => {
+          const a = parseNum(c);
+          const out = { amount: a.value, amountRaw: a.ok ? null : a.raw };
+          if (a.ok && keepsDigits(a.value)) out.amountText = String(c).trim();
+          return out;
+        },
+        write: r => (r.amountRaw != null ? r.amountRaw
+          : r.amountText != null && parseNum(r.amountText).value === r.amount ? r.amountText
+            : r.amount.toFixed(2)),
       },
-      {
-        key: 'excluded', header: 'Excluded', align: 'left',
-        read: c => ({ excluded: (c || '').toLowerCase() === 'yes' }),
-        write: r => (r.excluded ? 'yes' : ''),
-      },
+      /* `excluded` means "out of the budget totals" (CLAUDE.md). `yes` and a
+         blank cell are what the app writes; `x`, `true`, `1`, `on` read as
+         excluded and are kept as typed; any other word reads as not excluded,
+         as before, and is kept rather than blanked. See flag(). */
+      flag('excluded', 'Excluded', { on: [...TRUE_WORDS, 'x'], absent: false, words: ['yes', ''] }),
       text('note', 'Note'),
       {
+        /* Read through splitRole, the single door — only `parent` and `part`
+           are roles. A cell holding anything else (`todo`, `check`) used to be
+           ERASED by this read, so nothing downstream could ever write it back
+           (L3-10). It now keeps its text in `splitRaw`, written back while the
+           row still has no role; whether the Split column is written at all is
+           serializeTxFile's decision, not this column's. The raw is the cell as
+           parseMdTable gave it (still \|-escaped), so it goes back unescaped
+           exactly as vocab()'s raw does. */
         key: 'split', header: 'Split', align: 'left',
-        read: c => ({ split: splitRole(c) }),
-        write: r => splitRole(r.split),
+        read: c => {
+          const role = splitRole(c);
+          const raw = (c || '').trim();
+          return raw && !role ? { split: role, splitRaw: raw } : { split: role };
+        },
+        write: r => {
+          const role = splitRole(r.split);
+          return r.splitRaw != null && !role ? r.splitRaw : role;
+        },
       },
     ],
   },
@@ -583,18 +753,37 @@ function usedColumns(schema, rows) {
    this schema does not model, `used` stays the FULL schema rather than
    usedColumns()'s trimmed one, because a row already holding data past the
    optional tail fixes that tail's position on disk whether or not this
-   particular save would otherwise have dropped it. */
+   particular save would otherwise have dropped it.
+
+   L3-21: "the FULL schema" became "as many columns as the FILE carries"
+   (extraCols.known, from knownColumns) — or more, the day a row starts using
+   the optional column. Writing the full schema regardless put a Currency
+   column in front of a household's own column that had been sitting in its
+   slot; the header now says Currency only when the file did, or when a row
+   has one to state. An extraCols object without `known` (built before it
+   existed) still gets the full schema, as before.
+
+   L3-20: every line is written with the line ending the captured text
+   carries (load.js joins a CRLF file's lead and trail with '\r\n'). The
+   frontmatter used to be split on '\n' alone and the rest joined with '\n',
+   so a CRLF file came back with two line-ending styles in it. An LF file —
+   every file this plugin creates — writes exactly the bytes it always did. */
 function mdTableFile({ fm, fallback, title, prose, schema, rows, leadRaw, trailRaw, extraCols }) {
-  const used = { ...schema, columns: extraCols ? schema.columns : usedColumns(schema, rows) };
+  const fileCols = extraCols && Number.isInteger(extraCols.known) ? extraCols.known : schema.columns.length;
+  const used = { ...schema, columns: extraCols
+    ? schema.columns.slice(0, Math.max(fileCols, usedColumns(schema, rows).length))
+    : usedColumns(schema, rows) };
   const leadLines = withLeadExtra(leadRaw, freshLeadLines(title, prose));
   const [header, sep] = extraCols ? headerLinesWithExtras(used, extraCols) : headerLines(used);
-  const lines = ['---', ...(fm || fallback).split('\n'), '---', ...leadLines, header, sep];
+  const lines = ['---', ...(fm || fallback).split(/\r?\n/), '---', ...leadLines, header, sep];
   for (const r of rows) lines.push(extraCols ? rowLineWithExtras(used, r, extraCols) : rowLine(used, r));
   lines.push(...(trailRaw ? trailRaw.split(/\r?\n/) : ['']));
-  return lines.join('\n');
+  const eol = lineEndingOf(leadRaw) || lineEndingOf(trailRaw) || lineEndingOf(fm) || '\n';
+  return lines.join(eol);
 }
 
 module.exports = {
   SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,
   attachExtraCells, extraColsOf, headerLinesWithExtras, rowLineWithExtras,
+  knownColumns, lineEndingOf, keepsDigits,
 };

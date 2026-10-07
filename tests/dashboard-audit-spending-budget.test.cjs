@@ -140,7 +140,7 @@ const files = () => ({
     const path = require('path');
     const dir = path.join(__dirname, '..', 'src', 'lang');
     const en = require(path.join(dir, 'en.js'));
-    for (const key of ['bud.total.ofWhichSetAside', 'dash.stat.ofWhichSetAside', 'dash.hero.sub', 'dash.stat.used', 'bud.total.spentNote']) {
+    for (const key of ['bud.total.setAsidePlanned', 'dash.stat.ofWhichSetAside', 'dash.hero.sub', 'dash.stat.used', 'bud.total.spentNote']) {
       for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js') && n !== 'en.js')) {
         const v = require(path.join(dir, f))[key];
         ok(v && v !== en[key], `${f} has its own ${key}`);

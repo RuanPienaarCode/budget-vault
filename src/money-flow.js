@@ -134,7 +134,7 @@ function budgetStripGap({ spend, namedNetSpend, uncatSpend, unknownSpend } = {})
 }
 
 function periodFlow({
-  income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, fixedCats, catType,
+  income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, grossOutByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
 } = {}) {
   const inc = Number(income) > 0 ? Number(income) : 0;
@@ -142,7 +142,14 @@ function periodFlow({
   const bud = Math.max(0, Number(budgeted) || 0);
   const saving = Math.max(0, Number(savingContribution) || 0);
   const fixed = fixedCats instanceof Set ? fixedCats : new Set(fixedCats || []);
-  const byCat = spendByCat || {};
+  /* ADR-0007 · periodFlow inputs. Committed and the savings-typed slice are cut
+     out of `spent`, which is GROSS (the BUDGET lens, as of today), so they read
+     that lens's gross outgoings per category over the same window:
+     `grossOutByCat`. The TREND net map (`spendByCat`) is still taken from a
+     caller that hands nothing else; read here until 2026-10-07, it moved a
+     refund inside a fixed category into living costs (a rent refund on the
+     audited vault, L2a-07). tests/flow-committed-gross.test.cjs. */
+  const byCat = grossOutByCat || spendByCat || {};
 
   let committed = 0, debtRepayments = 0, housing = 0, subscriptions = 0, committedSavingsTyped = 0;
   /* ADR-0007 · Savings-typed spend tracked before living, fixed-flagged or
@@ -188,8 +195,19 @@ function periodFlow({
      remaining line — R1 900 against R3 400 on one household. */
   const spentByRule = budgetSpent({ spend: spent, setAside: setAsideSpent, assumed: assumedSpent });
   const leftInBudget = bud - spentByRule;
-  const neverBudgeted = inc - bud;
-  const together = leftInBudget + neverBudgeted;
+  /* Three lefts since 2026-10-07 (audit L2a-03), each plan − actual under the
+     BUDGET lens. `neverBudgeted` is income the WHOLE plan never claimed: as
+     `inc − bud` it counted the set-aside envelopes as unclaimed beside a "share
+     of income budgeted" that counts them — over 100% next to a positive "never
+     budgeted" on the audited vault, negative by this rule. The set-aside
+     envelopes less the set-aside already SENT (ADR-0005's own `setAside` term)
+     is the third: an investment debit order to an account the vault does not
+     hold never reaches the Saving band, and is not still to move. Together =
+     income − gross spend − the assume-spent provision; a part keeps its sign. */
+  const setAside = Math.max(0, Number(budgetSetAside) || 0);
+  const setAsideToMove = setAside - Math.max(0, Number(setAsideSpent) || 0);
+  const neverBudgeted = inc - (bud + setAside);
+  const together = leftInBudget + setAsideToMove + neverBudgeted;
 
   /* Against the income the PLAN states, via the shared rule above — NOT
      against `inc`, which is what has landed so far. Dividing by `inc` made
@@ -198,7 +216,6 @@ function periodFlow({
   /* ISSUE 40 follow-up: the WHOLE plan, so this agrees with the Dashboard hero
      and the Budget page. `budgetUsed` below keeps `bud` (spend envelopes
      alone) — see the header for why one budget needs two denominators. */
-  const setAside = Math.max(0, Number(budgetSetAside) || 0);
   const allocatedOfIncome = allocatedShare({
     budgeted: bud + setAside, budgetIncome, actualIncome: inc, periodFinished,
   });
@@ -232,9 +249,10 @@ function periodFlow({
      "38 730 − 653 = 38 078" adds up; the raw identity is untouched. */
   const displayLefts = {
     leftInBudget: roundRand(leftInBudget),
+    setAsideToMove: roundRand(setAsideToMove),
     neverBudgeted: roundRand(neverBudgeted),
   };
-  displayLefts.together = displayLefts.leftInBudget + displayLefts.neverBudgeted;
+  displayLefts.together = displayLefts.leftInBudget + displayLefts.setAsideToMove + displayLefts.neverBudgeted;
 
   return {
     income: inc,
@@ -251,7 +269,7 @@ function periodFlow({
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
     budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, spent: spentByRule, allocatedOfIncome, budgetUsed },
-    lefts: { leftInBudget, neverBudgeted, together, display: displayLefts },
+    lefts: { leftInBudget, setAsideToMove, neverBudgeted, together, display: displayLefts },
   };
 }
 

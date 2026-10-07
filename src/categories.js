@@ -5,17 +5,18 @@
 const { el } = require('./dom');
 const { parseFrontmatter, yamlStr } = require('./markdown');
 const { csvCell } = require('./csv');
-const { learnPattern, prepareRules, autoCategorise, matchRule } = require('./rules');
+const { learnPattern, prepareRules, autoCategorise, matchRule, ruleText } = require('./rules');
 const { safeSeg } = require('./vault-path');
 const { typeOrder, typeRank } = require('./groups');
 const { todayIso } = require('./dates');
 const { askFields, confirmModal, askRulesCleanup } = require('./modal');
 const { analyseRules } = require('./rule-cleanup');
+const { supersededBySplit } = require('./tx-role');
 /* Namespace import: `t` is a local in several files of this app. */
 const i18n = require('./i18n');
 
 module.exports = function registerCategories(ctx) {
-  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder } = ctx;
+  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder, trashFile } = ctx;
 
   /* Bumped whenever the category list changes (create/delete). Selects built
      earlier compare against this on open and rebuild their options if stale —
@@ -204,17 +205,19 @@ module.exports = function registerCategories(ctx) {
     for (const f of Object.values(S.txFiles)) {
       for (const r of f.rows) if (r.cat === name) used++;
     }
-    const ok = await confirmModal(app, {
-      title: 'Delete category',
-      message: `Delete "${name}"? ` +
-        (used ? `${used} existing transaction${used === 1 ? '' : 's'} keep the name and will show it as "(missing)" until re-categorised. ` : '') +
-        'Past budget files are not changed, and the category file goes to your vault trash.',
-      confirmText: 'Delete',
-    });
-    if (!ok) return false;
-    // The filename is the sanitised name; older or hand-made files may differ,
-    // so fall back to scanning frontmatter `name` for an exact match — which
-    // also covers files written before safeSeg was used here.
+    /* The file is resolved BEFORE the confirm, and that TFile is what gets
+       trashed, through io.trashFile (2026-10-07 audit, L3-18). The lookup
+       used to run after the dialog, which is the exact pattern io.trashFile's
+       header warns about: a path re-resolved after a dialog the reader spends
+       seconds in either no longer exists, or now points at a DIFFERENT file.
+       In the audit's reproduction the category note was renamed while the
+       dialog was open and a shopping list arrived at the old path. The
+       shopping list went to the trash, and the toast said the category had
+       been deleted. Notes, plans and tax years already resolved first.
+
+       The filename is the sanitised name; older or hand-made files may
+       differ, so fall back to scanning frontmatter `name` for an exact match
+       — which also covers files written before safeSeg was used here. */
     const safe = safeSeg(name);
     /* ISSUE 97 — the loaded record knows the path it came from; only fall back
        to assembling one for a name no loaded category claims. The scan below
@@ -227,7 +230,32 @@ module.exports = function registerCategories(ctx) {
         if ((fm.name || f.basename) === name) { file = f; break; }
       }
     }
-    if (file) await vault.trash(file, false);
+    const ok = await confirmModal(app, {
+      title: 'Delete category',
+      message: `Delete "${name}"? ` +
+        (used ? `${used} existing transaction${used === 1 ? '' : 's'} keep the name and will show it as "(missing)" until re-categorised. ` : '') +
+        'Past budget files are not changed, and the category file goes to your vault trash.',
+      confirmText: 'Delete',
+    });
+    if (!ok) return false;
+    if (file) {
+      /* Still the file the vault holds? A TFile follows its file through a
+         rename, so a category renamed while the dialog was open is still
+         this object, at its new path. A file deleted and replaced in that
+         time (a sync, another pane) is a NEW TFile, and the one held here
+         would trash whatever now sits at its path. The vault knows which
+         object it holds, so ask it, and refuse rather than guess. */
+      if (vault.getFileByPath(file.path) !== file) {
+        toast(`The file for "${name}" was moved or replaced while this dialog was open, so nothing was deleted.`, true);
+        return false;
+      }
+      try {
+        await trashFile(file);
+      } catch (e) {
+        toast(`Could not delete that category: ${(e && e.message) || e}`, true);
+        return false;
+      }
+    }
     S.categories = S.categories.filter(c => c.name !== name);
     catsVersion++;
     toast(`Deleted category "${name}"`);
@@ -250,7 +278,9 @@ module.exports = function registerCategories(ctx) {
      rule pointing at the same category, so this is the difference between a
      file that stabilises and one that grows with the history forever. */
   async function learnRules(pairs) {
-    const have = new Set(S.rules.map(r => r.pattern.trim().toLowerCase()));
+    // ruleText: the matcher's own normalisation, so "already have it" means
+    // exactly what prepareRules will make of the pattern.
+    const have = new Set(S.rules.map(r => ruleText(r.pattern)));
     // Prepared once, then extended as we go: a rule learned earlier in this
     // same batch must be able to make a later one redundant.
     const matcher = prepareRules(S.rules);
@@ -258,7 +288,7 @@ module.exports = function registerCategories(ctx) {
     for (const { desc, cat } of pairs) {
       if (!cat) continue;
       const pattern = learnPattern(desc);
-      const key = pattern.trim().toLowerCase();
+      const key = ruleText(pattern);
       if (!key || have.has(key)) continue;
       if (autoCategorise(pattern, matcher) === cat) { have.add(key); continue; }
       S.rules.push({ pattern, category: cat });
@@ -266,10 +296,18 @@ module.exports = function registerCategories(ctx) {
       have.add(key);
       added++;
     }
-    if (added) {
-      S.rules.sort((a, b) => a.pattern.localeCompare(b.pattern, undefined, { sensitivity: 'base' }));
-      await writeRulesCsv();
-    }
+    /* Appended, never re-sorted (2026-10-07 audit, L3-13). This sorted the
+       whole set alphabetically before every write. But order decides which
+       rule wins when two matches are the same length (rules.js matchRule
+       keeps the first), so one unrelated learn could change how a merchant
+       was filed on every import after it. The audit's reproduction moved a
+       two-shop description from Liquor to Food that way. In the guard test
+       (tests/rules-csv-roundtrip.test.cjs), CORNER (Food) is listed above
+       CELLAR (Liquor) on purpose; the sort put CELLAR first after one learn,
+       and a description holding both moved to Liquor. The file's own order
+       is the household's, and a learned rule goes at the end, where it
+       outranks nothing it ties with. */
+    if (added) await writeRulesCsv();
     return added;
   }
 
@@ -296,7 +334,7 @@ module.exports = function registerCategories(ctx) {
   function governingRule(desc) {
     const matched = matchRule(desc, prepareRules(S.rules));
     if (!matched) return null;
-    return S.rules.find(r => r.pattern.trim().toLowerCase() === matched.p) || null;
+    return S.rules.find(r => ruleText(r.pattern) === matched.p) || null;
   }
 
   /* Repoint an EXISTING rule at a new category. The one correction path
@@ -319,12 +357,25 @@ module.exports = function registerCategories(ctx) {
   /* One serializer for the rules file, so learning, tidying and the pre-tidy
      backup can never write it three different ways. Takes the rules rather
      than reading S.rules, so the backup can serialize the set as it was
-     BEFORE the delete without a second copy of this. */
+     BEFORE the delete without a second copy of this.
+
+     The file's own header, and every cell past a rule's category, are
+     written back as they were read (load.js keeps them as S.rulesHeader and
+     each rule's `extra`). This used to rebuild the file from two columns
+     under a fresh `pattern,category` header, so a household's `why` column
+     was deleted by the first learn (2026-10-07 audit, L3-14). The file is
+     one they open in a spreadsheet, which is where a column like that gets
+     added. A rule learned this session has no `extra`, so it gets empty
+     cells up to the header's width and lines up with the rest. A loaded row
+     that was shorter than the header is written back exactly as short. */
+  const RULES_HEAD = ['pattern', 'category'];
   function rulesCsv(rules) {
-    const body = rules.length
-      ? rules.map(r => [r.pattern, r.category].map(csvCell).join(',')).join('\n') + '\n'
-      : '';
-    return 'pattern,category\n' + body;
+    const head = Array.isArray(S.rulesHeader) && S.rulesHeader.length ? S.rulesHeader : RULES_HEAD;
+    const pad = Math.max(0, head.length - RULES_HEAD.length);
+    const line = cells => cells.map(csvCell).join(',');
+    const body = rules.map(r =>
+      line([r.pattern, r.category, ...(Array.isArray(r.extra) ? r.extra : new Array(pad).fill(''))]));
+    return line(head) + '\n' + (body.length ? body.join('\n') + '\n' : '');
   }
 
   function writeRulesCsv() {
@@ -346,9 +397,18 @@ module.exports = function registerCategories(ctx) {
      the delete is abandoned if that write fails: a tidy that cannot leave a
      way back does not happen. */
   async function cleanupRules() {
+    /* Each description goes in with the category its row is filed under,
+       which is the household's own evidence that a broad rule spans more
+       than one kind of spending (rule-cleanup.js `ambiguous`). A split
+       parent's category is left out: its parts carry that money under the
+       categories the reader chose, and the parent's own label is the one
+       those parts replaced (tx-role.js). Its description stays, because it
+       is still the line the bank printed and the next import will match. */
     const descs = [];
     for (const f of Object.values(S.txFiles || {})) {
-      for (const row of f.rows || []) if (row.desc) descs.push(row.desc);
+      for (const row of f.rows || []) {
+        if (row.desc) descs.push({ desc: row.desc, cat: supersededBySplit(row) ? '' : row.cat });
+      }
     }
     if (!S.rules.length && !descs.length) {
       toast('No budget data loaded yet.', true);

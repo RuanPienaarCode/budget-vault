@@ -38,7 +38,9 @@ Two more stamps carry a row's classification rather than a veto: `catType`
 ## The lenses
 
 A lens is data, not a loop: the list of stamps it drops, and the sign rule it
-sums under. Three lenses cover every walk that exists on 1.38.0.
+sums under — and, since 2026-10-07, whether its net reading counts the
+uncategorised bucket as spending (see the amendment of that date). Three lenses
+cover every walk that exists on 1.38.0.
 
 **BUDGET** — "how did I do against my plan". Drops `excluded`, `nonBudget`,
 `foreign`, `earmarkedOut`, `transfer`. Gross sign rule: an outflow is spend in
@@ -52,8 +54,10 @@ sign rules are the one documented difference between them.
 `transfer`, `passthrough` and `splitParent`; keeps `excluded` and `nonBudget`
 rows because a bill paid from a joint account the household marked out of the
 budget is still a bill the emergency fund must cover. Net sign rule per
-category, then flipped. This is `healthSnapshot`'s household walk today, and it
-feeds the Score's essential, consumption, fixed and saving-rate pillars.
+category, then flipped; the blank category is one more category here (amendment,
+2026-10-07). This is `healthSnapshot`'s household walk today, and it feeds the
+Score's essential, consumption and fixed pillars (the saving rate left this lens
+on 29 Sep 2026 — see that amendment).
 
 **ACCOUNT** — "what did this one account do". Drops only `splitPart`. Every
 row moves the balance, whatever the budget thinks of it. This is `splitFlows`
@@ -213,12 +217,25 @@ is read as what the household stated it to be, a veto, not inferred intent.
 
 **Consequences, stated rather than hidden.**
 
-- Every ratio in `healthMetrics` divides by the one `avg.income`, so the debt
-  interest share, the instalment share, the fixed and consumption shares and the
-  net-worth multiple now divide by budget income as well. Their numerators
-  (fixed, consumption, essential) remain HOUSEHOLD-lens spend, Excluded rows
-  kept, so on a household that Excludes real bills the spending shares read
-  higher than before. That mismatch is open for Ruan (see the change's report).
+- The debt interest share, the instalment share and the net-worth multiple
+  divide by budget income too (`avg.income`). The two SPENDING shares do not:
+  fixed bills and living costs, and the "under 70% of your income" trim built
+  from them, divide by household income (`avg.householdIncome`, the HOUSEHOLD
+  lens's net income, Excluded rows and accounts outside the budget kept),
+  because their numerators are HOUSEHOLD-lens spend with the same rows kept.
+  Over budget income they read living costs above 100% of income on the real
+  vault and zeroed that part of the score. Shipped in the same release;
+  `tests/lane-int-health-scopes.test.cjs` pins each ratio's base. (This bullet
+  said until 2026-10-07 that every ratio divides by budget income, which was the
+  first draft of the change, not what shipped.)
+- On 2026-10-07 the question that left open — should the spending shares
+  divide by the saving rate's income? — was settled on the audit's default:
+  keep household income, and NAME it. The Score says "of household income"
+  beside both shares and in the trim, and states what household income averages
+  and that it counts money kept out of the budget, so a reader holding the
+  Dashboard's income can see why the percentages do not divide by it. On the
+  audited vault the household base was about a fifth larger, and the page had
+  called both "income". `tests/score-household-income-named.test.cjs`.
 - The Score's saving line used to say one-off windfalls count. They no longer do.
 - The Savings page growth chart is unchanged: it answers "what went into the
   fund", and a lump sum did. `splitFlows` and `monthlyFlows` keep their
@@ -226,6 +243,45 @@ is read as what the household stated it to be, a veto, not inferred intent.
 - Fixtures: the committed ledgers do not move (their households hold no
   windfall); `tests/lane-r-moved-to-funds.test.cjs` and
   `tests/lane-r-saving-rate.test.cjs` pin the rule on a synthetic household.
+
+## Amendment, 7 Oct 2026: the HOUSEHOLD reading counts uncategorised money, and pairs rows
+
+Two corrections from the 7 Oct 2026 audit, both in the lens the Score reads.
+The instruction for the audit's questions was "go with the defaults".
+
+**Uncategorised money is spending under HOUSEHOLD.** `essentialTotal` has always
+counted an unknown or blank type as essential — "an uncategorised debit is far
+more likely a bill than a treat", so the cover figure errs toward fewer months,
+never more — but no blank row ever reached it: the tally's net reading skipped
+the blank bucket for every lens. On the audited vault every uncategorised
+household outgoing in six trailing periods was dropped, so the Score read more
+months of cover than the documented rule gives. The lens now
+carries a third datum, `uncategorised: 'spend'`, and only HOUSEHOLD sets it: the
+blank category is one more bucket of its net reading, netted like any named one
+(an uncategorised refund lowers it), landing in `spendByCat` under the empty
+name, whose type is null, so it is essential spend and consumption. HOUSEHOLD
+keeps Excluded rows, so an uncategorised purchase paid from a sinking fund and
+marked Excluded counts too — the audit's default. A pass-through
+pair is dropped before the bucket is formed. BUDGET, TREND, ACCOUNT and MERCHANT
+are unchanged: their category maps name categories, and uncategorised money is
+disclosed beside them (`uncatSpend`, `uncatIncome`).
+`tests/household-essential-counts-uncategorised.test.cjs`.
+
+**A pass-through pair drops two rows, not two keys.** `passthroughPairs` found
+the pairs correctly but handed back `label|date|amount|description` keys, and
+`stamp()` dropped every row whose key was paired. Two identical Excluded rows on
+one account — two R 500 gifts on one day, written the same way — share a key, so
+pairing one of them dropped both and real spending left the Score. It returns
+the paired rows now, and `stamp()` marks by identity. No real vault the audit
+read holds such a collision; the rule was wrong regardless.
+`tests/passthrough-pairs-by-row.test.cjs`.
+
+**What moved.** Essential spend, living costs and everything built from them —
+the cover months, the reserves gap, the living-costs share and the trim, on the
+Score, on the Dashboard's health card (the same snapshot) and in the Report's
+health section — rise by the uncategorised outgoings a household has. The
+committed fixture households' moves are listed, figure by figure, in the change
+that re-blesses the numbers ledger.
 
 ## What this does not change
 

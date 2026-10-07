@@ -7,7 +7,7 @@ const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
-const { matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice } = require('../recurring');
+const { matchCharges, chargeStats, nextDue, chargeStatus, comparePriceNow } = require('../recurring');
 const { isSplitPart } = require('../tx-role');
 const { symbolOf, isForeign } = require('../currency');
 /* Namespace import, this repo's convention wherever a bare `t` could be
@@ -116,72 +116,104 @@ module.exports = function registerServices(ctx) {
      per service. */
   function chargeIndex() {
     const rows = [];
-    /* ISSUE 28/30. Two pools, not one, and the split is the whole fix.
+    /* ISSUE 28/30. Pools by currency, not one pool, and the split is the
+       whole fix.
 
-       `Services.md` has no currency column, so `s.amount` is always in the
-       household's currency. The charges it is compared against are raw
-       amounts from whichever account they landed in. Compared blind, a
-       Netflix subscription listed at R199 and really billed $15.99 on a
-       dollar card produced `agrees: false`, `diff: -183.01` and a GREEN
-       "really R 16" pill reading "Your bank is charging R 15.99, not
-       R 199.00" — a 92% price cut, asserted as fact, on a price that never
-       moved. The 4% band below was widened to absorb a currency wobble; it
-       cannot absorb a 12x symbol mismatch.
+       The charges a listed price is compared against are raw amounts from
+       whichever account they landed in. Compared blind, a Netflix
+       subscription listed at R199 and really billed $15.99 on a dollar card
+       produced `agrees: false`, `diff: -183.01` and a GREEN "really R 16" pill
+       reading "Your bank is charging R 15.99, not R 199.00" — a 92% price
+       cut, asserted as fact, on a price that never moved. The 4% band in
+       comparePrice was widened to absorb a currency wobble; it cannot absorb a
+       12x symbol mismatch.
 
-       So PRICE is compared only against charges in the household's own
-       currency, and LIVENESS still follows every charge whatever its
-       currency — "did this merchant bill me" is a question about events, not
-       amounts, and a subscription paid from a euro card is no less alive. A
-       service with only foreign charges gets no price verdict at all and
-       says so, rather than a confident wrong one.
+       So PRICE is compared only against charges in the SERVICE'S OWN currency
+       (its Currency cell, ADR-0004; blank is the household's), and LIVENESS
+       still follows every charge whatever its currency — "did this merchant
+       bill me" is a question about events, not amounts, and a subscription
+       paid from a euro card is no less alive. A service with no charges in its
+       own currency gets no price verdict at all and says so, rather than a
+       confident wrong one.
+
+       2026-10-07 audit, SVC-1: this used to compare against the HOUSEHOLD'S
+       currency, under a comment saying Services.md had no currency column —
+       written before ADR-0004 gave it one. The totals learned the column
+       (monthlySplit, above); the price check did not, so a service listed as
+       "$ 20.00" and charged in rand on a rand card was told "really R 360 —
+       Your bank is charging R 360,00, not R 20,00".
 
        Parts are skipped, parents are kept: this is asking what the MERCHANT
        charged, and a split is the reader slicing one charge into categories
        after the fact. Feeding both would show a subscription being billed twice
        a month, and — worse, because it is silent — would drag the median of the
-       last three charges that comparePrice() and nextExpected() are built on. */
-    const homeRows = [];
+       last three charges the price and the next date are built on. */
+    const home = S.settings.currency;
+    const homeSym = symbolOf(null, home);
+    const pools = new Map();   // symbol -> the rows charged in it
     for (const f of Object.values(S.txFiles)) {
       const acct = typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(f.label) : null;
-      const foreign = isForeign(acct, S.settings.currency);
+      const foreign = isForeign(acct, home);
+      const sym = foreign ? symbolOf(acct, home) : homeSym;
+      if (!pools.has(sym)) pools.set(sym, []);
+      const pool = pools.get(sym);
       for (const r of f.rows) {
         if (isSplitPart(r)) continue;
-        const stamped = foreign ? { ...r, _symbol: symbolOf(acct, S.settings.currency) } : r;
+        const stamped = foreign ? { ...r, _symbol: sym } : r;
         rows.push(stamped);
-        if (!foreign) homeRows.push(stamped);
+        pool.push(stamped);
       }
     }
     const today = todayIso();
     const out = new Map();
     for (const s of S.services) {
+      const own = isForeign(s, home) ? symbolOf(s, home) : homeSym;
       const m = matchCharges(s, rows);
-      const home = matchCharges(s, homeRows);
+      const same = matchCharges(s, pools.get(own) || []);
       /* `current`, not `charges`: what the merchant takes NOW. The dominant
          group by lifetime total can be a description the merchant abandoned,
          and committed.js already prices the same service off `current` — read
          through `charges` here, the Services page priced a service at the old
          description while the Dashboard committed the current price (2026-09-29 audit). */
-      const stats = chargeStats(home.current || home.charges);
-      /* The symbols this service was actually billed in, other than the
-         household's — named on the row so a reader can see WHY no price
-         verdict is offered rather than just noticing one is missing. */
-      const foreignSymbols = [...new Set(m.charges.map(r => r._symbol).filter(Boolean))];
+      const priced = same.current || same.charges;
+      const stats = chargeStats(priced);
+      /* EVERY charge the merchant's tokens hit, in any currency and under any
+         of its descriptions. Liveness, "not seen" and the next date are all
+         questions about these events, so they are answered from this ONE
+         reading — 2026-10-07 audit, SVC-4: "not seen" and the hint's tooltip
+         were read from the PRICE stats, which are null for a service billed
+         only abroad, so the badge claimed charges that had matched were
+         missing and the tooltip threw on `null.day`, leaving the page
+         half-built. */
+      const seen = chargeStats(m.all);
+      const status = chargeStatus(seen, s.cycle, today);
+      /* The symbols this service was actually billed in, other than its own —
+         named on the row so a reader can see WHY no price verdict is offered
+         rather than just noticing one is missing. */
+      const otherSymbols = [...new Set((m.all || []).map(r => r._symbol || homeSym).filter(x => x !== own))];
       out.set(s, {
         stats,
-        foreignSymbols,
+        seen,
+        symbol: own,
+        otherSymbols,
         /* Charges exist, but none of them in a currency this figure can be
            compared against. */
-        priceUncomparable: !home.charges.length && m.charges.length > 0,
+        priceUncomparable: !same.charges.length && m.charges.length > 0,
         // Liveness follows the MERCHANT — every description the tokens hit —
         // because a renamed debit order is not a cancellation.
-        status: chargeStatus(chargeStats(m.all), s.cycle, today),
-        price: comparePrice(s, stats),
+        status,
+        /* comparePriceNow, not comparePrice: a price that moved and then held
+           for two charges is a price, not "varies" (SVC-2, see recurring.js).
+           committed.js keeps comparePrice's own reading. */
+        price: comparePriceNow(s, stats, priced),
         /* Anchored on the merchant, like the liveness pill above and for the
            same reason: the next charge follows the LAST one under any of its
            names. Read through the dominant group alone, a renamed debit order
            projects its due date from a charge months old — which is how
-           committed.js came to drop a live service from "What's left". */
-        next: nextExpected(chargeStats(m.all), s.cycle),
+           committed.js came to drop a live service from "What's left".
+           nextDue, not nextExpected: the hint OFFERS this date, so it is
+           stepped past dates that have already gone (SVC-3, recurring.js). */
+        next: nextDue(seen, s.cycle, today),
         related: m.related,
       });
     }
@@ -222,7 +254,10 @@ module.exports = function registerServices(ctx) {
      an annual plan is silent for eleven months by design. */
   function svcFlags(s, c) {
     const out = [];
-    if (!c.stats) {
+    /* "Not seen" is a claim about EVERY charge, so it is read from every
+       charge (c.seen) — never from the price stats, which are empty whenever
+       the charges are in another currency (SVC-4). */
+    if (!c.seen) {
       out.push(el('span', { class: 'category-badge badge-dup',
         title: `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.` },
       'not seen'));
@@ -230,41 +265,84 @@ module.exports = function registerServices(ctx) {
     }
     if (s.active && c.status && c.status.state === 'overdue') {
       const months = Math.round(c.status.daysSince / 30);
+      // c.seen.last: the charge the overdue reading itself was measured from.
       out.push(el('span', { class: 'category-badge badge-transfer',
-        title: `Last charged ${c.stats.last}. Still marked active — has it been cancelled?` },
+        title: `Last charged ${c.seen.last}. Still marked active — has it been cancelled?` },
       `last charged ${months}mo ago`));
     }
-    if (c.price && c.price.varies) {
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: 'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.' },
-      'varies'));
-    } else if (c.price && !c.price.agrees) {
-      const d = c.price.diff;
-      out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`,
-        title: `Your bank is charging ${money(c.price.actual)}, not ${money(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.` },
-      `really ${money(c.price.actual, 0)}`));
-    } else if (c.priceUncomparable) {
+    /* A price verdict is printed in the service's OWN currency — the one both
+       sides of the comparison are now in (SVC-1). money() for the household's,
+       so the common path stays on the formatter every other figure uses. */
+    const fmt = c.symbol && c.symbol !== symbolOf(null, S.settings.currency)
+      ? (v, dp) => moneyIn(c.symbol, v, dp) : money;
+    /* Tested FIRST. It was the last branch of this chain, after an early
+       `return` on missing price stats that every uncomparable service took —
+       so the neutral badge below was unreachable, and the row said "not seen"
+       about charges that had matched (SVC-4). */
+    if (c.priceUncomparable) {
       /* Neutral, not a warning: nothing is wrong with this service, the app
          simply cannot check its price. Saying so beats both alternatives —
          a silent blank reads as "checked and fine", and the old behaviour
          asserted a price change that never happened. */
       out.push(el('span', { class: 'category-badge badge-dup',
-        title: `This service is billed in ${c.foreignSymbols.join(' · ')}, and the amount on this page is in ${S.settings.currency}. `
+        title: `This service is billed in ${c.otherSymbols.join(' · ')}, and the amount on this page is in ${c.symbol}. `
           + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.' },
-      `billed in ${c.foreignSymbols.join(' · ')}`));
+      `billed in ${c.otherSymbols.join(' · ')}`));
+    } else if (c.price && c.price.varies) {
+      out.push(el('span', { class: 'category-badge badge-dup',
+        title: 'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.' },
+      'varies'));
+    } else if (c.price && !c.price.agrees) {
+      const d = c.price.diff;
+      /* A settled price (SVC-2) says so: the verdict rests on the last two
+         charges agreeing, after earlier ones at another price, and the reader
+         deciding whether to update their figure deserves to know that. */
+      const basis = c.price.settled
+        ? `Your last two charges were ${fmt(c.price.actual)}, not ${fmt(c.price.stated)} — the price looks to have changed.`
+        : `Your bank is charging ${fmt(c.price.actual)}, not ${fmt(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.`;
+      out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`, title: basis },
+      `really ${fmt(c.price.actual, 0)}`));
     }
     return out;
   }
 
-  /* A one-tap "use the date the charges imply". Only offered when it differs
-     from what is already there, so a correct row shows nothing. */
-  function svcNextHint(s, c) {
+  /* The date the charges imply, if it is one worth offering — or null.
+
+     Offered rather than written, because the reader may be tracking a plan
+     change the history cannot know about. So it is held back whenever taking
+     it could only make the row worse (2026-10-07 audit, SVC-3):
+       - it already matches what is stored, so a correct row shows nothing;
+       - it is EARLIER than a real date the reader typed: the old hint offered
+         2026-09-05 over a stored 2026-10-05, inviting them to replace a right
+         answer with one already in the past;
+       - the service has gone quiet for more than two cycles. Its row already
+         asks whether it has been cancelled, and a date stepped forward to
+         today would answer that question for the reader. */
+  function offeredNext(s, c) {
+    if (!c.next) return null;
+    if (c.status && c.status.state === 'overdue') return null;
+    const d = c.next.date;
+    if (d === s.next) return null;
+    if (ISO_DATE.test(s.next || '') && d < s.next) return null;
+    return d;
+  }
+
+  /* A one-tap "use the date the charges imply". The tooltip states what the
+     date is built from — the charge it steps from and the cycle — taken from
+     the same reading the date is (c.next), so the two cannot name different
+     charges again (SVC-3: the date followed an add-on charged on the 28th
+     while the tooltip quoted the main charge on the 5th). The cadence is
+     worded by the cycle; "around day N each week" read a day-of-the-MONTH
+     median as if a week had thirty days. */
+  function svcNextHint(s, c, date) {
     const stale = !s.next || s.next < todayIso();
-    const btn = el('button', { type: 'button', class: 'svc-next-hint',
-      title: `Billed around day ${c.stats.day} each ${CYCLE_NOUN[s.cycle] || 'month'}; last charged ${c.stats.last}.`,
-      'aria-label': `Set next billing for ${s.name} to ${c.next}` },
-    icoEl(['calendar-check', 'calendar']), stale ? `due ${c.next}` : c.next);
-    btn.addEventListener('click', () => { s.next = c.next; mark(); renderServices(); });
+    const { last, first, skipped } = c.next;
+    const title = `Last charged ${last}, billed every ${CYCLE_NOUN[s.cycle] || 'month'}, so the next charge is due ${date}.`
+      + (skipped ? ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.` : '');
+    const btn = el('button', { type: 'button', class: 'svc-next-hint', title,
+      'aria-label': `Set next billing for ${s.name} to ${date}` },
+    icoEl(['calendar-check', 'calendar']), stale ? `due ${date}` : date);
+    btn.addEventListener('click', () => { s.next = date; mark(); renderServices(); });
     return btn;
   }
 
@@ -286,6 +364,7 @@ module.exports = function registerServices(ctx) {
         for (const s of groups[cat]) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
+          const hintDate = offeredNext(s, c);
           body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
             el('td', { style: 'font-weight:600' }, s.name, ctx.noteButton('service', s.name), ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
@@ -299,7 +378,7 @@ module.exports = function registerServices(ctx) {
                  disk with nothing said about it. */
               onchange: e => {
                 const v = normalizeAmount(e.target.value);
-                if (v === null) { toast('Amount must be a number', true); refresh(); return; }
+                if (v === null) { toast('Amount must be a number', true); e.target.value = s.amount || ''; return; }
                 s.amount = v; s.amountRaw = null; refresh();
               } })),
             /* ISSUE 33. Driven off table-schema's CYCLES, so the picker can
@@ -319,8 +398,9 @@ module.exports = function registerServices(ctx) {
                the vault this was built against was months old. The charge
                history already knows: billed on the 2nd, last seen 2 July, so
                next is 2 August. Offered rather than written, because the reader
-               may be tracking a plan change the history cannot know about. */
-            ...(c.next && c.next !== s.next ? [svcNextHint(s, c)] : [])),
+               may be tracking a plan change the history cannot know about —
+               see offeredNext for when it is held back. */
+            ...(hintDate ? [svcNextHint(s, c, hintDate)] : [])),
             el('td', {}, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
               onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
             el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,

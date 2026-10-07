@@ -376,7 +376,11 @@ module.exports = {
   'bud.total.incomeNote': '{amount} received so far',
   'bud.total.budgeted': 'Total budgeted',
   'bud.total.budgetedNote': '{pct}% of planned income',
-  'bud.total.ofWhichSetAside': '{amount} for savings',
+  'bud.total.setAsidePlanned': '{amount} planned for savings',
+  'bud.unnamed.note': {
+    one: '{count} row in this period\'s file has no category ({amount}). It stays in the file, but no figure counts it until it has one.',
+    other: '{count} rows in this period\'s file have no category ({amount} in total). They stay in the file, but no figure counts them until each has one.',
+  },
   'bud.total.over': 'Over-budgeted',
   'bud.total.overNote': 'budgeted beyond income',
   'bud.total.left': 'Left to budget',
@@ -586,6 +590,11 @@ module.exports = {
 
   'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
   'tx.add.title': 'Add transaction',
+  /* 2026-10-07 audit, L3-26. Add transaction writes the whole month file, so
+     into a month with unsaved edits it would have saved them too; it refuses
+     instead, and the entry is kept for the next time the dialog opens. {file}
+     is the month file's path, e.g. Transactions/Cheque/2026-09.md. */
+  'tx.add.dirty': '{file} has changes you have not saved, and adding a transaction writes that whole file — so it would save them too. Save or reload first; your entry is kept for when you open Add transaction again.',
   'tx.field.date': 'Date',
   'tx.field.desc': 'Description',
   'tx.field.descPlaceholder': 'e.g. Cash — vegetables at the market',
@@ -698,6 +707,8 @@ module.exports = {
     other: 'This replaces {count} files that are already there: {files}',
   },
   'bx.problem.configDir': 'That is inside {folder}, where Obsidian keeps its own settings — files there do not show in your vault. Choose a different folder.',
+  // {folder} is the one folder name in the path that starts with a dot (".trash", ".archive") — Obsidian hides every such folder
+  'bx.problem.hiddenFolder': '"{folder}" starts with a dot, and Obsidian hides every folder like that — files saved there would not show in your vault. Choose a different folder.',
   'bx.problem.noPeriods': 'There is no finished period with data yet — switch "Include the current period" on.',
   'bx.problem.noCats': 'Choose at least one category.',
   'bx.problem.noRows': 'Nothing to export — no budget or spending in the chosen categories for this range.',
@@ -1061,6 +1072,17 @@ module.exports = {
   'acct.drawer.toGo': 'To go',
   'acct.drawer.invested': 'Total invested',
   'acct.drawer.growth': 'Growth',
+  /* Audit of 7 Oct 2026 (Savings + Accounts). The drawer's growth on one basis:
+     Put in + Growth = the balance it is measured on, and the file's own
+     total_invested captioned as the file's. Then the owner-scoped counts, and
+     the "Needs a look" table's own grouping (acct.table.grouped stays: it is
+     still right for every other filter). */
+  'acct.drawer.putIn': 'Put in',
+  'acct.drawer.measuredOn': 'Growth is measured on',
+  'acct.drawer.investedFile': 'Total invested (account file)',
+  'acct.hero.factsScope': 'These counts are for “{owner}” only — the total above covers every account.',
+  'acct.deck.clearOwner': 'Nothing for “{owner}” needs a decision',
+  'acct.table.byReason': ' · grouped by reason',
   'acct.drawer.monthly': 'Monthly',
   'acct.drawer.flow': 'This period',
   'acct.drawer.rows': { one: '{count} transaction', other: '{count} transactions' },
@@ -1372,6 +1394,25 @@ module.exports = {
   'score.flow.chip.leftInBudget': 'Left in the spending budget',
   'score.flow.chip.neverBudgeted': 'Income never budgeted',
   'score.flow.chip.together': 'Together',
+  /* 2026-10-07 audit (L2a-03): "never budgeted" is income the WHOLE plan never
+     claimed, so the plan's set-aside gets its own left, and a plan claiming more
+     than its income says so in words. The two sub-line variants are the
+     over-allocated twins of score.flow.sub.notYetSpent / score.flow.subA.overBudget;
+     setAsideToMove is appended to either after " · ". */
+  'score.flow.chip.leftsThree': 'Money left — three kinds',
+  'score.flow.chip.setAsideToMove': 'Set aside, still to move',
+  'score.flow.chip.overAllocated': 'Budgeted beyond income',
+  'score.flow.sub.overAllocated': '{inBudget} still inside the spending budget · {beyond} budgeted beyond income',
+  'score.flow.subA.overAllocated': '{amount} over the spending budget · {beyond} budgeted beyond income',
+  'score.flow.sub.setAsideToMove': '{amount} still to move into savings',
+  /* 2026-10-07 audit (L2a-06): the fixed-bills and living-costs shares, and the
+     trim built from them, divide by HOUSEHOLD income, and now say so; the saving
+     line keeps "of income" (budget income). These replace score.now.fixed,
+     score.now.living and dash.health.why.fixTrim on the Score. */
+  'score.now.fixedHousehold': 'fixed bills {pct} of household income',
+  'score.now.livingHousehold': 'living costs {pct} of household income',
+  'score.now.householdIncome': 'household income averages {amount} a month, counting money kept out of the budget',
+  'dash.health.why.fixTrimHousehold': 'Spend {amount} less a month on day-to-day living to bring it under {pct}% of your household income.',
   'score.ring.aria': 'Score {score} of 100. {parts}.',
   'score.ring.showAll': 'Show all five parts',
   'score.ring.hint': 'Tap a part to see it on its own.',
@@ -1441,6 +1482,27 @@ module.exports = {
   'dash.left.expected': 'expected {date}',
   'dash.left.overdue': 'was due {date}',
   'dash.left.thisPeriod': 'due this period',
+  /* 2026-10-07 audit. A debit order whose due date has passed while its
+     account has not been imported up to that day: held in "still
+     committed" rather than dropped. {date} is the ISO due date, as in
+     dash.left.expected / dash.left.overdue; the count is how many such
+     orders, beside "N debit orders" under "still committed". */
+  'dash.left.notImported': 'due {date} — not imported yet',
+  'dash.left.notImportedCount': { one: '{count} not imported yet', other: '{count} not imported yet' },
+  /* The Dashboard's "Owed to you" tile (dash.pos.*): money owed TO the
+     household in another currency, held out of the tile's figure. {list} is
+     the amounts in their own symbols, joined with " · ". Leading space: it
+     is appended to the tile's sub-line and its aria-label, like
+     acct.hero.otherCurrencies on the net-worth tile beside it. */
+  'dash.pos.owedOtherCurrencies': ' Plus {list} owed in other currencies, not converted.',
+  /* The same tile when NOTHING is outstanding in the household's own
+     currency but money is still out in another: the tile's own sentence
+     rather than "Nothing outstanding." followed by the list, which denied the
+     money and then named it. {symbol} is the household's currency symbol;
+     {list} as above. The sub-line is followed by dash.pos.owedOldest when a
+     lending date is known; the second key is the tile's aria-label. */
+  'dash.pos.owedOnlyOther': 'Nothing outstanding in {symbol} · {list} owed in other currencies, not converted',
+  'dash.pos.owedSayOnlyOther': 'Nothing outstanding in {symbol}. {list} owed to you in other currencies, not converted. Open Owed Money.',
   'dash.left.lastCharged': 'usually about {amount}',
   'dash.left.times': '{count} × {amount}',
   'dash.left.asListed': 'as listed, no charge history',
@@ -1495,6 +1557,16 @@ module.exports = {
   'report.field.folder': 'Folder',
   'report.field.folderDesc': 'Where the note is written — remembered for next time.',
   'report.field.folderManaged': 'This is inside {folder}, a folder this app manages — a report saved here would be read back in as data (for example, a new category) the next time the vault loads. Choose a different folder.',
+  /* 2026-10-07 audit. The Report's folder field refuses a ".." segment rather
+     than quietly dropping it (which wrote "../outside" to vault-root
+     outside/). Shown under the field, Create disabled. */
+  'report.field.folderTraversal': 'A ".." in this path points outside the folder it sits in, and this app will not guess where you meant. Type the folder as a path from the top of your vault.',
+  /* 2026-10-07 audit. Under the Report's Income & Spend table: the two things
+     Net holds that Income and Spend do not, so Income − Spend ≠ Net is
+     explained in the document. {amount} is money; printed only when it
+     reaches a whole currency unit; joined with a space when both appear. */
+  'report.net.refunds': 'Net includes {amount} in refunds, which Spend above does not take off.',
+  'report.net.uncounted': 'Net includes {amount} that came in without a recognised category, which Income above leaves out.',
   'report.period.current': 'Current month',
   'report.period.current.desc': 'This budget period only.',
   'report.period.3m': 'Last 3 months',
@@ -1605,7 +1677,7 @@ module.exports = {
      on-screen twin compresses into a chip — a reader holding the exported note
      has no tile to hover. */
   'report.debt.interestNone': 'Interest this month is not shown, because no debt states a rate.',
-  'report.debt.interestPartial': 'Interest this month covers {shown} of {total} debts; {missing} state no rate.',
+  'report.debt.interestPartial': { one: 'Interest this month covers {shown} of {total} debts; {missing} states no rate.', other: 'Interest this month covers {shown} of {total} debts; {missing} state no rate.' },
   'report.col.debt': 'Debt',
   'report.col.balance': 'Balance',
   'report.col.rate': 'Rate',
@@ -1639,6 +1711,7 @@ module.exports = {
   'plan.hero.leftToPlace': "Left to place",
   'plan.hero.overPlaced': "Placed more than this plan holds",
   'plan.hero.overSpent': "Spent more than this plan holds",
+  'plan.hero.overClaimed': "More is spoken for than is left",
   'plan.hero.ofPot': "of {pot} in this plan",
   'plan.hero.allIn': "all of it is in the account today",
   'plan.hero.noneIn': "none of it has arrived yet",

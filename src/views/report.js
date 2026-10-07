@@ -67,7 +67,7 @@ const { debtInterestCoverage } = require('../health-math');
 const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
 const {
-  REPORT_DIR, reportPaths, mergeCategoryRows, managedFolderMatch,
+  REPORT_DIR, reportPaths, mergeCategoryRows, mergeSpendByCategory,
   financialReportMarkdown, financialReportJson, copyBody,
 } = require('../report');
 /* Namespace import: see views/dashboard.js's own comment on why every view
@@ -89,10 +89,17 @@ module.exports = function registerReport(ctx) {
 
      budgetUsed/movedToFunds — ADR-0005's one period-level reading and the
      funds aggregate the Dashboard hero and the Budget page print beside their
-     own set-aside sentence, so this document states the same pair they do. */
+     own set-aside sentence, so this document states the same pair they do.
+
+     destinationProblem — src/io.js's one answer to "may a file be written
+     into the folder the reader typed?", bound there to this vault's config
+     folder and the configured budget folder.
+
+     vaultPathTaken — io.js's "is this path already used?", asked the way
+     macOS and iOS answer it (case-folded, NFC); see onDisk() below. */
   const {
     S, $, app, plugin, money, toast,
-    fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder,
+    fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder, destinationProblem, vaultPathTaken,
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
     periodsForMonths, earliestDataMonth, periodSummary, catKnown,
     accountIndex, planFigures, healthSnapshot, txInPeriod,
@@ -226,6 +233,33 @@ module.exports = function registerReport(ctx) {
     return reportPaths(filenameLabel(periods), folder ?? (plugin.settings.reportFolder || REPORT_DIR));
   }
 
+  /* Why the destination cannot be written to, in this page's words — or null.
+
+     M1 (2026-08-29) refused only the folders load.js reads back in, and by
+     exact name. The 2026-10-07 audit found the three ways past it: the same
+     folder in another case ("Budget/categories", which macOS and iOS resolve
+     onto the real Categories/ — L4A-03), Obsidian's own config folder
+     (".obsidian/plugins/budget-app": a real file, a success toast, and
+     nothing the file explorer will ever show), and a ".." segment, which
+     reportPaths() silently dropped, so "../outside" wrote to vault-root
+     outside/. src/io.js's destinationProblem() is the one check for all
+     three, shared with the other exports; this only words its answer.
+
+     Asked of the folder as TYPED, before reportPaths() sanitises it — the
+     sanitising is what used to swallow the "..", so it cannot be what is
+     checked — and of the directory actually written, in case sanitising ever
+     lands on a refused folder by another route. `dir` may be omitted by a
+     caller that has not computed it. */
+  function folderProblem(dir) {
+    const typed = folder ?? (plugin.settings.reportFolder || REPORT_DIR);
+    const p = destinationProblem(typed) || (dir ? destinationProblem(dir) : null);
+    if (!p) return null;
+    if (p.kind === 'traversal') return i18n.t('report.field.folderTraversal');
+    if (p.kind === 'configDir') return i18n.t('bx.problem.configDir', { folder: p.folder });
+    if (p.kind === 'hidden') return i18n.t('bx.problem.hiddenFolder', { folder: p.folder });
+    return i18n.t('report.field.folderManaged', { folder: p.folder });
+  }
+
   /* A report already sitting on disk for the exact selection on screen is
      shown, not hidden behind a button that looks like it has nothing to do
      yet — the brief that shaped this page is explicit that pretending
@@ -235,17 +269,40 @@ module.exports = function registerReport(ctx) {
      SAME path again — so a report just created by this session stays
      copyable without a round trip back to disk — but resets it the moment
      the path changes underneath it (a period/detail/folder/format edit). */
+  /* Found the way the FILESYSTEM finds it (2026-10-07 audit, carried from
+     Phase 1). This asked Obsidian's index for the exact path, and on macOS
+     and iOS "reports/september 2026 financial report.md" — saved while the
+     folder field said "reports" — IS the file this selection names: the page
+     said nothing, the button said Create, and the click then failed, because
+     Vault.create (app.js 1.13.7) asks the case-insensitive adapter whether
+     the path exists and throws "File already exists.". vaultPathTaken is the
+     warning; onDisk() is the name the vault already has for that file, so
+     Open, Copy and Re-create all address the file that is really there. */
   function refreshResult() {
     const { mdPath, jsonPath } = currentPaths();
     const keep = (key, path) => {
       const prior = result && result[key];
       return (prior && prior.path === path) ? prior : null;
     };
-    const mdFile = fileAtVaultPath(mdPath);
-    const jsonFile = fileAtVaultPath(jsonPath);
-    const md = mdFile ? (keep('md', mdPath) || { path: mdPath, text: null }) : null;
-    const json = jsonFile ? (keep('json', jsonPath) || { path: jsonPath, text: null }) : null;
+    const mdAt = onDisk(mdPath);
+    const jsonAt = onDisk(jsonPath);
+    const md = vaultPathTaken(mdPath) ? (keep('md', mdAt) || { path: mdAt, text: null }) : null;
+    const json = vaultPathTaken(jsonPath) ? (keep('json', jsonAt) || { path: jsonAt, text: null }) : null;
     result = (md || json) ? { md, json, generatedAt: result && result.generatedAt } : null;
+  }
+
+  /* `path` as the vault already spells it, when a file differing only by
+     case is there — the four lines views/budget-export.js's onDisk() carries,
+     for the same reason (see its header): an exact-key miss on a
+     case-insensitive filesystem is not an absent file, and writing it through
+     vault.create throws. Asked only when vaultPathTaken says the path is used
+     and the exact key is not; Obsidian's own getAbstractFileByPathInsensitive
+     finds it, and without that lookup the path stays as asked. */
+  function onDisk(path) {
+    if (fileAtVaultPath(path) || !vaultPathTaken(path)) return path;
+    const v = app.vault;
+    const hit = v && typeof v.getAbstractFileByPathInsensitive === 'function' ? v.getAbstractFileByPathInsensitive(path) : null;
+    return hit && hit.path && fileAtVaultPath(hit.path) ? hit.path : path;
   }
 
   /* ------------------------------- render --------------------------------
@@ -339,12 +396,12 @@ module.exports = function registerReport(ctx) {
        existing `#reportExistsNote` pattern on this page) rather than a new
        static element. createReport() below refuses the write a second time,
        independently — this line can be bypassed by editing state directly in
-       a test harness; the write-time refusal cannot. */
-    const managedConflict = managedFolderMatch(dir, plugin.settings.budgetFolder);
-    $('#reportFolderDesc').textContent = managedConflict
-      ? i18n.t('report.field.folderManaged', { folder: managedConflict })
-      : i18n.t('report.field.folderDesc');
-    $('#reportFolderDesc').classList.toggle('text-danger', !!managedConflict);
+       a test harness; the write-time refusal cannot. Since 2026-10-07 the
+       refusal is folderProblem()'s, which covers the config folder, case
+       variants and ".." as well — see its header. */
+    const problem = folderProblem(dir);
+    $('#reportFolderDesc').textContent = problem || i18n.t('report.field.folderDesc');
+    $('#reportFolderDesc').classList.toggle('text-danger', !!problem);
 
     const existing = [
       (result && result.md) ? i18n.t('report.format.md') : null,
@@ -352,7 +409,7 @@ module.exports = function registerReport(ctx) {
     ].filter(Boolean);
     $('#reportExistsNote').textContent = existing.length ? i18n.t('report.exists', { formats: existing.join(', ') }) : '';
     $('#reportCreateLabel').textContent = i18n.t(existing.length ? 'report.recreate' : 'report.create');
-    $('#reportCreate').disabled = !!managedConflict;
+    $('#reportCreate').disabled = !!problem;
 
     /* What the note will actually contain — a straight list of the sections
        src/report.js's financialReportMarkdown()/financialReportJson() write,
@@ -472,7 +529,12 @@ module.exports = function registerReport(ctx) {
        that cannot span currencies. */
     const home = w.active.filter(d => !isForeign(d, S.settings.currency));
     const away = w.active.filter(d => isForeign(d, S.settings.currency));
-    const rows = home.map(d => ({ name: d.name, balance: d.balance || 0, rate: d.rate || 0, interest: monthlyInterest(d.balance, d.rate) }));
+    /* A rate the coverage below counts as missing is null here, not 0: the
+       Markdown prints '—' either way, but the JSON row would otherwise state
+       an interest-free loan (2026-10-07 audit). Same predicate, one rule. */
+    const rows = home.map(d => ({ name: d.name, balance: d.balance || 0,
+      rate: debtInterestCoverage([d], S.settings.currency).missing ? null : d.rate,
+      interest: monthlyInterest(d.balance, d.rate) }));
     /* Per SYMBOL, not a bare count — the same shape worth.js's own
        foreignTotals() returns and the same shape the Net Worth disclosure
        below reads, so src/report.js prints ONE sentence for both rather than
@@ -525,6 +587,10 @@ module.exports = function registerReport(ctx) {
       target: snap.target,
       savingsRatePct: H.savingsRate !== null ? H.savingsRate * 100 : null,
       interestSharePct: H.interestShare !== null ? H.interestShare * 100 : null,
+      /* REPORT-1 (2026-10-07 audit) — the completed periods the averages
+         above were taken over: the Dashboard health card's and the Score
+         page's "Averaged over your last N completed periods". */
+      countedPeriods: H.countedPeriods,
       /* ISSUE 57. What this score was computed WITHOUT. The screen says it —
          the Score hero prints "N accounts in other currencies … are not in
          these figures" — and this function dropped it on the floor, so the
@@ -551,15 +617,24 @@ module.exports = function registerReport(ctx) {
        ADR-0005's operands, summed per period the additive way every figure
        here is; the share is derived once, in prepareReportData. */
     let setAsideSpend = 0, assumedSpend = 0, budgetSpendOnly = 0, movedSoFar = 0;
+    /* REPORT-3 (2026-10-07 audit) — the set-aside the PLAN holds, the Y of
+       "R X of R Y saved so far": planFigures(p).setAside, the figure the
+       Dashboard hero prints, summed over the selection. */
+    let setAsidePlanned = 0;
+    /* REPORT-4 — money in with no recognised category (periodFigures'
+       uncountedIncome), summed: one of the two things Net holds that Income
+       and Spend do not. src/report.js's prepareReportData names the other. */
+    let uncountedIncome = 0;
     /* C2 in the 2026-08-29 audit — the exact three-line gap
-       views/dashboard.js's own donut discloses beside itself
-       (dashboard.js:1717-1719, "what this donut does NOT show"), run once
-       per period and summed the same additive way mergeCategoryRows already
-       sums budget/actual/amount below: the SAME rule per period, never a
-       second guess at what it means. `spendRows` is kept per period so
-       spendByCategory's own merge (below) does not call categorySpendRows()
-       a second time for figures already in hand. */
-    let uncat = 0, netted = 0;
+       views/dashboard.js's own donut discloses beside itself ("what this
+       donut does NOT show"). Each period's split travels with its SIGNED
+       per-category figures and its gross and uncategorised spend, so
+       mergeSpendByCategory (src/report.js) can net a refund across the whole
+       selection and take the gap once, over the rows it actually prints —
+       REPORT-2, 2026-10-07: summing each period's donut rows and each
+       period's gap left a refund in a later period un-netted, and the
+       category with two totals in one document. */
+    const splitByPeriod = [];
     /* ISSUE 58. Rows dated later this period, which periodSummary stopped
        counting when the running period gained its as-of boundary. The report's
        Transaction Detail still lists them, so this document showed twelve rows
@@ -573,7 +648,6 @@ module.exports = function registerReport(ctx) {
        this is the copy that LEAVES the app, read by someone who cannot see
        either screen. */
     let fundedSpend = 0, fundedCount = 0;
-    const spendRowsByPeriod = [];
     /* periodSummary() returns `foreign` WITH the figures rather than beside
        them, and period.js's own comment says every tile, table, chart and
        aria-label built from that object is expected to say something when
@@ -599,6 +673,7 @@ module.exports = function registerReport(ctx) {
       const F = periodFigures(p);
       const sum = F.summary;
       income += sum.income; spend += sum.spend; net += sum.net;
+      uncountedIncome += F.uncountedIncome || 0;
       for (const l of (sum.foreign && sum.foreign.labels) || []) foreignLabels.add(l);
       for (const sym of (sum.foreign && sum.foreign.symbols) || []) {
         if (!foreignSymbols.includes(sym)) foreignSymbols.push(sym);
@@ -610,6 +685,7 @@ module.exports = function registerReport(ctx) {
          The table lists every envelope, so the total states every envelope. */
       const plan = F.plan;
       budgetIncome += plan.income; budgetSpend += plan.total;
+      setAsidePlanned += plan.setAside || 0;
       /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
          numerator and its denominator can never come from two calls. */
       const bu = F.used;
@@ -618,11 +694,7 @@ module.exports = function registerReport(ctx) {
       budgetSpendOnly += bu.budgeted || 0;
       movedSoFar += movedToFunds(p) || 0;
 
-      const spendRows = F.split;
-      spendRowsByPeriod.push(spendRows);
-      const gap = F.gap;             // Phase 3 of ADR-0006: one owner for the split's gap
-      uncat += gap.uncat;
-      netted += gap.netted;
+      splitByPeriod.push({ split: F.split, byCat: sum.byCat, spend: sum.spend, uncatSpend: sum.uncatSpend });
       const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
       fundedSpend += ff.spend || 0; fundedCount += ff.count || 0;
       const sch = sum.scheduled || { income: 0, spend: 0, count: 0 };
@@ -655,10 +727,11 @@ module.exports = function registerReport(ctx) {
        deliberately different questions); applying it directly to the merged
        row is what the row actually shown here, in THIS table, is — not a
        wider per-period set that could also hold an income-side orphan never
-       drawn as a spend row at all. */
-    const spendByCategory = mergeCategoryRows(spendRowsByPeriod, ['amount'])
-      .sort((a, b) => b.amount - a.amount)
-      .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
+       drawn as a spend row at all. The rows themselves are
+       mergeSpendByCategory's — net of refunds across the whole selection,
+       largest first; a single period's are the donut's exactly. */
+    const merged = mergeSpendByCategory(splitByPeriod);
+    const spendByCategory = merged.rows.map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
 
     /* ISSUE 28 (2026-08-29 audit). The Report's Net Worth section printed a
        total that added unlike currencies and — alone among the three surfaces
@@ -668,7 +741,22 @@ module.exports = function registerReport(ctx) {
        twins did. Same rule as those twins now, and `otherCurrencies` travels
        into the document so the section can say what it holds. */
     // ISSUE 44 — the exported net worth is the on-screen one: the implied balance book.
-    const { accounts: homeAccounts, others: reportOthers } = ctx.bookFigures().balances.implied;
+    const book = ctx.bookFigures();
+    const { accounts: homeAccounts, others: reportOthers } = book.balances.implied;
+    /* REPORT-1 (2026-10-07 audit) — the operands of the sentence the
+       Dashboard prints under this same net worth (#dashStale): how many
+       balances nobody has confirmed recently and the oldest age
+       (stalenessSummary, which bookFigures runs over S.accounts exactly as the
+       Dashboard does), and how far the rows since then have moved them, with
+       what that distance could not include (bookFigures().drift — the pass
+       the Dashboard reads). The other-currency symbols are the Dashboard's
+       list too: every foreign account, not only the drifting ones. */
+    const cur = S.settings.currency;
+    const stale = {
+      count: book.stale.stale, total: book.stale.total, oldestDays: book.stale.oldestDays,
+      movedSince: book.drift.drift, foreignAccounts: book.drift.driftForeign, undatedRows: book.drift.driftUnplaced,
+      foreignSymbols: [...new Set(S.accounts.filter(a => isForeign(a, cur)).map(a => symbolOf(a, cur)))],
+    };
     /* ISSUE 39 — receivables, so the exported net worth is the on-screen one. */
     const w = worth(homeAccounts, S.debts, S.assets, S.settings.currency, S.owed);
     return {
@@ -711,20 +799,24 @@ module.exports = function registerReport(ctx) {
       foreign: { count: foreignLabels.size, symbols: foreignSymbols },
       household: S.settings.currency || '',
       income, spend, net, budgetIncome, budgetSpend,
+      /* REPORT-4 — an operand; prepareReportData names what Net holds that
+         Income and Spend do not from it. */
+      uncountedIncome,
       /* ADR-0005's OPERANDS, not its answers — prepareReportData derives
          `spent` and `used` from exactly these, so the percentage and the rand
-         figure beside it are one reading. See ADR-0007's src/report.js entry. */
+         figure beside it are one reading. See ADR-0007's src/report.js entry.
+         `setAsidePlanned` rides along for the "saved so far" sentence. */
       budgetUsed: {
         spend, setAside: setAsideSpend, assumed: assumedSpend,
-        budgeted: budgetSpendOnly, moved: movedSoFar,
+        budgeted: budgetSpendOnly, moved: movedSoFar, setAsidePlanned,
       },
       categories, spendByCategory,
-      categoryGap: { uncat, netted },
+      categoryGap: merged.gap,
       fundedFromSavings: { spend: fundedSpend, count: fundedCount },
       scheduled: { income: aheadIncome, spend: aheadSpend, count: aheadCount },
       savings: savingsSummary(),
       debts: debtsSummary(w),
-      netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities },
+      netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities, stale },
       health: healthSummary(),
       /* Each row stamped with the symbol of the account whose folder it lives
          in, so neither the markdown table nor the JSON can print a euro
@@ -770,9 +862,11 @@ module.exports = function registerReport(ctx) {
          that calls it directly) would otherwise still write. Thrown, not
          toasted directly — the whole-body try/catch below is what turns this
          into the SAME createFailed toast every other failure in this
-         function produces, not a second, differently-shaped error path. */
-      const conflict = managedFolderMatch(paths.dir, plugin.settings.budgetFolder);
-      if (conflict) throw new Error(i18n.t('report.field.folderManaged', { folder: conflict }));
+         function produces, not a second, differently-shaped error path. The
+         same folderProblem() the page shows before the click (config folder,
+         case variants and ".." included — see its header). */
+      const problem = folderProblem(paths.dir);
+      if (problem) throw new Error(problem);
       /* Explicit, not left to writeVaultFile's own internal ensureFolder —
          both now run (ensureFolder is idempotent: it checks
          getAbstractFileByPath and returns immediately if the folder is
@@ -791,16 +885,20 @@ module.exports = function registerReport(ctx) {
          already accepts for its own four sequential writes: the ones that
          landed are real files, and a single toast at the end must not read
          as though NOTHING happened when something did. */
+      /* Each written where the vault already has it (onDisk): a report saved
+         earlier under another case is the same file on macOS and iOS, and
+         "Re-create (overwrite)" means modifying it, not a create that throws
+         "File already exists." beside it. */
       if (formats.has('md')) {
         const md = financialReportMarkdown(data, money);
         try {
-          written.md = { path: await writeVaultFile(paths.mdPath, md), text: md };
+          written.md = { path: await writeVaultFile(onDisk(paths.mdPath), md), text: md };
         } catch (e) { errors.push(e.message || String(e)); }
       }
       if (formats.has('json')) {
         const json = financialReportJson(data);
         try {
-          written.json = { path: await writeVaultFile(paths.jsonPath, json), text: json };
+          written.json = { path: await writeVaultFile(onDisk(paths.jsonPath), json), text: json };
         } catch (e) { errors.push(e.message || String(e)); }
       }
       if (!written.md && !written.json) {
@@ -892,13 +990,54 @@ module.exports = function registerReport(ctx) {
      session. `strip` trims the Markdown down to its copy-ready body (see
      copyBody's own header); the JSON file has no frontmatter to strip, so
      copyReportJson passes it through untouched. Whole-body try/catch — same
-     reasoning as createReport()/openReport() above. */
+     reasoning as createReport()/openReport() above.
+
+     THE CLIPBOARD CALL STARTS INSIDE THE TAP — 2026-10-07 audit, L5-05.
+     WebKit, which is every iPhone and iPad, refuses a clipboard write made
+     outside the user gesture that caused it ("A call to clipboard.write or
+     clipboard.writeText outside the scope of a user gesture … will result in
+     the immediate rejection of the promise" — webkit.org, blog post 10855).
+     This used to `await readVaultFile()` — a round trip over the native
+     bridge — and only then call writeText, so on a phone a report from an
+     earlier session copied nowhere and said "Could not copy" while desktop
+     Chromium copied it fine. So nothing is awaited before the clipboard is
+     asked: text already in memory goes to writeText at once, and text still
+     on disk goes to clipboard.write with a ClipboardItem whose text is a
+     PROMISE of the read — the shape WebKit documents for exactly this
+     (ClipboardItem with promised data, Safari 13.1, under the iOS 15 floor).
+     Where ClipboardItem is missing, or an engine refuses a promised item,
+     the read-then-writeText path still runs: desktop Chromium accepts it, and
+     on anything that does not the reader is told it failed rather than
+     shown a success. "Copied" is said only once the text itself has
+     resolved, so a report that vanished between render and tap is never
+     reported as copied. tests/report-copy-in-gesture.test.cjs models the
+     gesture and holds each branch. */
   async function copyEntry(entry, strip) {
     try {
       if (!entry) return;
-      let text = entry.text;
-      if (text == null) text = await readVaultFile(entry.path);
-      await navigator.clipboard.writeText(strip ? copyBody(text) : text);
+      const shape = t => (strip ? copyBody(t) : t);
+      const clip = navigator.clipboard;
+      let copying;
+      if (entry.text != null) {
+        copying = clip.writeText(shape(entry.text));
+      } else {
+        const text = readVaultFile(entry.path).then(t => {
+          if (t == null) throw new Error(i18n.t('report.openFailed'));
+          return shape(t);
+        });
+        const Item = typeof ClipboardItem === 'function' ? ClipboardItem : null;
+        if (Item && typeof clip.write === 'function') {
+          const blob = text.then(s => new Blob([s], { type: 'text/plain' }));
+          /* Handled here as well as by write(): an engine that refuses the item
+             without waiting for it must not leave this rejection unhandled. */
+          blob.catch(() => {});
+          copying = Promise.all([clip.write([new Item({ 'text/plain': blob })]), text])
+            .catch(() => text.then(s => clip.writeText(s)));
+        } else {
+          copying = text.then(s => clip.writeText(s));
+        }
+      }
+      await copying;
       toast(i18n.t('report.copied'));
     } catch (e) {
       toast(i18n.t('report.copyFailed', { error: e.message || e }), true);

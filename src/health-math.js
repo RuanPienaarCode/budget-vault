@@ -24,7 +24,9 @@ const { NON_ESSENTIAL_TYPES } = require('./vocabulary');
    shape periodSpend returns). An unknown or blank type counts as essential
    deliberately: an uncategorised debit is far more likely a bill than a treat,
    and guessing the other way would report more months of cover than the
-   household may actually have. */
+   household may actually have. The HOUSEHOLD tally hands its uncategorised
+   bucket in under the empty name (type null) since 2026-10-07; before that no
+   blank row ever reached this rule (audit L2a-05). */
 function essentialTotal(byCategory, typeOf, alsoNonEssential) {
   /* `alsoNonEssential` is the vault's own nonessential_groups list
      (src/groups.js): it can only ADD to the built-in set, so a setting can

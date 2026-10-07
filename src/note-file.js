@@ -79,6 +79,23 @@ const hasOwnNote = kind => LINKED_KINDS.has(kind);
 const LINK_HOSTILE = /[[\]|#^]/;
 const linkResolves = name => !!name && safeSeg(name) === name && !LINK_HOSTILE.test(name);
 
+/* THE note_for rule, for every writer of the key: the wikilink a note about
+   (kind, subject) carries, or '' where it would not resolve.
+
+   One function because there were two rules. Creating a note asked
+   hasOwnNote AND linkResolves (noteFmLines below); re-pointing one — the
+   "Change subject" picker and repointNotes, which the vault rename watcher
+   calls — asked hasOwnNote alone, so moving a note onto the category
+   "Kids/School" wrote `[[Kids/School]]`, the exact phantom the creation rule
+   was written to prevent (2026-10-07 audit, L3-16). Which rule a note obeyed
+   depended on which path had last touched it. Kind and subject are normalised
+   here, the way noteFmLines always did, so neither caller can drift by
+   passing them raw. */
+function noteForLink(kind, subject) {
+  const subj = (subject ?? '').toString().trim();
+  return subj && hasOwnNote(normalizeKind(kind)) && linkResolves(subj) ? `[[${subj}]]` : '';
+}
+
 /* A kind whose subject has to NAME SOMETHING THAT EXISTS, so a note pointing
    at a name that has since gone is a broken link worth showing.
 
@@ -186,8 +203,10 @@ function noteFmLines({ kind, subject, created }) {
      So the key is written only when the subject is its own filename and
      carries nothing Obsidian's link syntax would eat. Suppressing it costs a
      backlink; emitting it costs a permanent phantom node, and the backlink was
-     the entire reason for the key. */
-  if (subj && hasOwnNote(k) && linkResolves(subj)) lines.push(`note_for: ${yamlStr(`[[${subj}]]`)}`);
+     the entire reason for the key. The rule itself is noteForLink, above, so
+     the re-point path in views/notes.js applies the same one. */
+  const link = noteForLink(k, subj);
+  if (link) lines.push(`note_for: ${yamlStr(link)}`);
   lines.push(`created: ${created}`);
   return lines;
 }
@@ -305,7 +324,7 @@ function isOrphan(note, known) {
 
 module.exports = {
   NOTES_DIR, NOTE_KINDS, KIND_LABELS, TITLE_MAX,
-  hasOwnNote, isTracked, normalizeKind, unwrapLink,
+  hasOwnNote, isTracked, normalizeKind, unwrapLink, noteForLink,
   noteFileName, uniqueNotePath, noteFmLines, serializeNote,
   noteExcerpt, parseNote, notesFor, sortNotes, isOrphan, fold,
 };

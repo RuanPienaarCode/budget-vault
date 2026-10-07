@@ -3,12 +3,14 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
-const { el, icoEl, keepScroll, caveatChip } = require('../dom');
+const { el, icoEl, keepScroll, caveatChip, tableCells } = require('../dom');
 /* The ring reuses the Dashboard's own chart primitives rather than a second
    donut implementation — same arc maths, same tooltip, same theme lookup, so
    the two rings on this app cannot drift apart visually. */
 const { createChart, arcPath, tip, themeColors } = require('../chart');
-const { normalizeAmount } = require('../amount');
+/* parseNum beside it: saveAccount reads the file's own balance cell back the way
+   load.js does, to tell a changed balance from one merely re-spelled. */
+const { normalizeAmount, parseNum } = require('../amount');
 /* The readable-balance rule is figures.js's, not this page's own copy. */
 const { balanceReadable } = require('../figures');
 /* A display symbol per account, and the disclosure when a total spans more
@@ -17,7 +19,9 @@ const { balanceReadable } = require('../figures');
    display-only by design (tests/currency.test.cjs's own §7 pins that), so the
    ACTUAL splitting of a total into "primary sum" + "foreign side figures" is
    this view's arithmetic, not that module's. */
-const { symbolOf, splitByCurrency: splitAccounts, primaryTotal } = require('../currency');
+/* isForeign beside them for the money sorters below: they ask splitByCurrency's
+   own question of one account at a time. */
+const { symbolOf, isForeign, splitByCurrency: splitAccounts, primaryTotal } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -29,7 +33,7 @@ const { symbolOf, splitByCurrency: splitAccounts, primaryTotal } = require('../c
    account than the Savings page does (exactly the two-call-sites-drift bug
    the comment above already names one instance of). */
 const { totalReturn, poolCatType } = require('../savings-math');
-const { yamlStr } = require('../markdown');
+const { yamlStr, parseFrontmatter } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
 const i18n = require('../i18n');
@@ -319,6 +323,48 @@ module.exports = function registerAccounts(ctx) {
     inception_date: a => a.inception_date || null,
   };
   const EDITABLE_KEYS = Object.keys(FM_WRITERS);
+
+  /* The three keys the tile itself changes, and the line each is written as.
+     Kept apart from FM_WRITERS for the reason that table gives — the balance
+     has its own affordance and its own date stamp — and, unlike those keys,
+     not handed over by the caller: saveAccount checks all three against the
+     FILE on every save and writes only the ones it does not already say. */
+  const TILE_WRITERS = {
+    // The original cell, untouched, when the loader could not strictly parse
+    // it and the user has not since edited the balance.
+    balance: a => (a.balanceRaw != null ? a.balanceRaw : a.balance.toFixed(2)),
+    balance_updated: a => a.balance_updated || null,
+    // null REMOVES the key: in-budget is the default, so an account that has
+    // never been excluded keeps a frontmatter block free of a line saying
+    // nothing.
+    budget: a => (a.in_budget ? null : 'false'),
+  };
+  const TILE_KEYS = Object.keys(TILE_WRITERS);
+
+  /* Does the file already SAY what the model holds for one tile key? Read the
+     way load.js reads it: parseNum for the balance — whose `readable` keeps an
+     unreadable cell from matching the fabricated zero the model holds in its
+     place — the bare string for the date, and load.js's own false|no|off|0
+     test for the flag (its `in_budget` line is this one's twin; change both or
+     neither). When it does, the line stays exactly as the reader wrote it.
+
+     The reason this exists, measured on 7 Oct 2026: every save used to write
+     all three, so "Ignore" re-spelled `balance: 640` as `640.00`, and
+     `budget: a.in_budget ? null : 'false'` DELETED an explicit `budget: true`
+     — the household's opt-out from the earmark rule (ADR-0007) — on every
+     Confirm balance, Use this, edit, mute toggle and account-number adoption,
+     moving a fund's outgoings out of the budget with nothing on screen. */
+  function sameOnFile(k, a) {
+    const fm = parseFrontmatter(`---\n${a.fmRaw || ''}\n---\n`).fm;
+    if (k === 'balance') {
+      const cur = parseNum(fm.balance || '0');
+      if (cur.value !== a.balance) return false;
+      return cur.readable ? balanceReadable(a) : a.balanceRaw === cur.raw;
+    }
+    if (k === 'balance_updated') return (fm.balance_updated || '') === (a.balance_updated || '');
+    if (k === 'budget') return !/^(false|no|off|0)$/i.test(String(fm.budget ?? '').trim()) === !!a.in_budget;
+    return false;
+  }
 
   /* Blank → null (field left empty); unparseable → NaN. Callers decide which of
      the two they accept — the balance prompt rejects both, the optional fields
@@ -630,9 +676,9 @@ module.exports = function registerAccounts(ctx) {
     }
     /* Only the fields this dialog actually SHOWED are read back. A field the
        type hid was never on screen, so treating its absent result as "the user
-       cleared it" would write a decision nobody made — and saveAccount patches
-       every EDITABLE_KEY from the model, so the untouched ones round-trip
-       unchanged on their own. */
+       cleared it" would write a decision nobody made — and only the keys whose
+       line differs from the model's are handed to saveAccount (below), so the
+       untouched ones stay exactly as the file spells them. */
     const nums = {};
     for (const k of shown) {
       // The two dates and the earmark are not amounts — the earmark's control
@@ -645,6 +691,9 @@ module.exports = function registerAccounts(ctx) {
     }
     // Validate everything BEFORE assigning any of it: a half-applied edit would
     // be written to disk by the save below with no way to tell what changed.
+    // `before` is what the file holds (the model as loaded or last saved): the
+    // yardstick for "changed", and what a failed write puts back.
+    const before = { ...a };
     a.type = r.type;
     a.institution = (r.institution || '').trim();
     /* Only when the control was actually on screen. Same rule the optional
@@ -660,10 +709,18 @@ module.exports = function registerAccounts(ctx) {
     /* Serialised in WARNINGS order rather than the order the toggles happened
        to be flipped, so switching one off and back on again does not rewrite
        the line and show up as a diff in a file the reader syncs. `true` when
-       every one is muted — shorter to read, and what a hand-editor writes. */
+       every one is muted — shorter to read, and what a hand-editor writes.
+       And not rewritten at all when the SET is the one the file already mutes:
+       `[no-folder, no-transactions]` is the reader's own spelling of
+       `[notx, nofolder]`, and an OK nobody changed anything in used to replace
+       it — on the vault this was measured against, that and re-quoting were
+       twelve of eighteen account files rewritten by an unchanged dialog. */
     const mute = WARNINGS.filter(w => (r.ignore_warnings || []).includes(w));
-    a.ignore_warnings = mute.length === WARNINGS.length ? 'true'
-      : mute.length ? `[${mute.join(', ')}]` : '';
+    const muted = mutedWarnings(a);
+    if (mute.length !== muted.size || mute.some(w => !muted.has(w))) {
+      a.ignore_warnings = mute.length === WARNINGS.length ? 'true'
+        : mute.length ? `[${mute.join(', ')}]` : '';
+    }
     a.in_budget = r.budget !== 'no';
     Object.assign(a, nums);
     if (shown.includes('target_date')) a.target_date = (r.target_date || '').trim();
@@ -679,7 +736,20 @@ module.exports = function registerAccounts(ctx) {
           : null;
     }
 
-    if (!(await saveAccount(a, EDITABLE_KEYS))) return;
+    /* The keys whose line is now different, and no others: FM_WRITERS renders
+       before and after the same way, so `30000` read back as 30000 is not
+       "changed" into `30000.00`, and an unquoted institution is not re-quoted
+       by a dialog that left it alone. The budget flag needs no entry here —
+       saveAccount checks it against the file on every save. */
+    const changed = EDITABLE_KEYS.filter(k => FM_WRITERS[k](a) !== FM_WRITERS[k](before));
+    if (!(await saveAccount(a, changed))) {
+      /* Back out, as acceptImplied does. Handing over only what changed makes
+         this load-bearing: a model left holding the failed edit would read as
+         unchanged on the retry, which would then write nothing and toast a
+         success over a file that never moved. */
+      Object.assign(a, before);
+      return;
+    }
     // ctx.render, not renderAccounts: a type change moves the account between
     // groups here AND changes whether Savings & Investments shows it at all.
     ctx.render();
@@ -793,7 +863,12 @@ module.exports = function registerAccounts(ctx) {
   /* ------------------------------- band 1 --------------------------------
      One figure, and the ring that says what it is made of. */
 
-  function renderSummary(rows) {
+  /* `rows` is every account; `scoped` is the ones the owner filter leaves on
+     view (the same rows when no filter is on). The FIGURE stays every
+     account's — it is the household's net, and "Whose it is" below cuts it by
+     owner — while every COUNT follows the filter, so the hero, the deck, the
+     chips and the table agree on how many want a look. */
+  function renderSummary(rows, scoped = rows) {
     const wrap = $('#acctSummary');
     if (!wrap) return;
     wrap.empty();
@@ -901,8 +976,13 @@ module.exports = function registerAccounts(ctx) {
     })() : '';
     const w = worth(primary, null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
-    const attention = rows.filter(wantsALook).length;
-    const oldest = rows.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
+    /* Counted over `scoped`, not `rows`. Filtered to one owner, these used to
+       count the whole vault while the "Needs a look" chip under them counted
+       that owner's — on the vault measured on 7 Oct 2026, "Needs attention 15"
+       above a chip reading 2, and a deck whose "Show them" opened a table of
+       2. One scope; the line under the facts says which. */
+    const attention = scoped.filter(wantsALook).length;
+    const oldest = scoped.reduce((m, r) => (r.days !== null && r.days > m ? r.days : m), -1);
 
     /* Only qualify the figure when there IS something elsewhere for it to
        disagree with. On a vault with no assets and no debts the pages report
@@ -976,16 +1056,23 @@ module.exports = function registerAccounts(ctx) {
     const fact = (label, value, cls) => facts.append(el('div', { class: 'acct-fact' },
       el('div', { class: 'acct-fact-l' }, label),
       el('div', { class: `acct-fact-v${cls ? ' ' + cls : ''}` }, value)));
-    fact(i18n.t('acct.hero.count'), String(S.accounts.length));
+    fact(i18n.t('acct.hero.count'), String(scoped.length));
     fact(i18n.t('acct.kpi.attention'), String(attention), attention > 0 ? 'text-warning' : '');
     /* Only when there ARE muted accounts. A page that permanently advertised
        "0 ignored" would be teaching every reader about a setting most of them
        will never use — and a zero here is not news, it is the default. */
-    const muted = rows.filter(r => r.muted).length;
+    const muted = scoped.filter(r => r.muted).length;
     if (muted) fact(i18n.t('acct.hero.muted'), String(muted));
     fact(i18n.t('acct.hero.oldest'),
       oldest < 0 ? i18n.t('acct.hero.oldestNone') : i18n.t('acct.hero.oldestDays', { count: oldest }));
     hero.append(facts);
+    /* Named once, here, whenever the counts above are an owner's: the net
+       figure over them is still everyone's, and two numbers in one card on two
+       scopes with nothing to say so is the contradiction this replaced. */
+    if (view().owner !== null) {
+      hero.append(el('div', { class: 'hero-sub hero-sub--ahead' },
+        i18n.t('acct.hero.factsScope', { owner: ownerLabel(view().owner, declaredOwners()) })));
+    }
 
     const split = whoseItIs();
     const overlap = overlapNote();
@@ -1302,6 +1389,8 @@ module.exports = function registerAccounts(ctx) {
      only job now is to say how many accounts want a look and offer the one
      door into them; the table (already filterable to "Needs a look") is
      where the reader actually acts. */
+  /* `rows` is what the owner filter leaves on view — the deck's "Show them"
+     opens the table under that same filter, so it counts what it will show. */
   function renderDeck(rows) {
     const wrap = $('#acctDeck');
     if (!wrap) return;
@@ -1317,10 +1406,16 @@ module.exports = function registerAccounts(ctx) {
          empty div would paint a bordered amber box with no content in it. */
       if (!S.accounts.length) { wrap.className = ''; return; }
       wrap.className = 'acct-deck is-clear acct-deck--banner mb-4';
+      /* Filtered to one owner, "Everything agrees with your transactions"
+         would be a claim about accounts this view is not showing — so the
+         all-clear names whose it is. */
+      const owner = view().owner;
       wrap.append(
         el('div', { class: 'acct-deck-h' },
           el('span', { class: 'acct-deck-dot' }),
-          el('h2', {}, i18n.t('acct.deck.clear'))),
+          el('h2', {}, owner !== null
+            ? i18n.t('acct.deck.clearOwner', { owner: ownerLabel(owner, declaredOwners()) })
+            : i18n.t('acct.deck.clear'))),
         el('div', { class: 'acct-deck-sub' }, i18n.t('acct.deck.clearSub')));
       return;
     }
@@ -1370,11 +1465,30 @@ module.exports = function registerAccounts(ctx) {
     { key: 'flag', label: i18n.t('acct.filter.flag'), test: wantsALook, warn: true },
   ];
 
+  /* The money sorters never rank one currency against another. "Sort by
+     Balance" compared raw numbers, so a €640 wallet sat between R1 000 and
+     R500 as though it held R640 (audit of 7 Oct 2026). The household's own
+     accounts sort by value in the direction chosen; every other currency
+     follows them, one symbol at a time in the order the hero names them
+     (`symOrder`, splitByCurrency's), each sorted the same way inside itself.
+     Converting at a rate would rank a derived figure, and this page keeps a
+     conversion to its own labelled line (ISSUE 31). The period-flow column
+     is money in the account's own symbol too, so it takes the same rule. */
+  const moneyOrder = amountOf => (x, y, dir, symOrder) => {
+    const home = S.settings.currency;
+    const fx = isForeign(x.a, home), fy = isForeign(y.a, home);
+    if (fx !== fy) return fx ? 1 : -1;
+    if (fx) {
+      const d = symOrder.indexOf(symbolOf(x.a, home)) - symOrder.indexOf(symbolOf(y.a, home));
+      if (d) return d;
+    }
+    return (amountOf(x) - amountOf(y)) * dir;
+  };
   const SORTERS = {
-    name:    (x, y) => x.a.name.localeCompare(y.a.name),
-    balance: (x, y) => x.a.balance - y.a.balance,
-    flow:    (x, y) => x.flow - y.flow,
-    stale:   (x, y) => staleRank(x) - staleRank(y),
+    name:    (x, y, dir) => x.a.name.localeCompare(y.a.name) * dir,
+    balance: moneyOrder(r => r.a.balance),
+    flow:    moneyOrder(r => r.flow),
+    stale:   (x, y, dir) => (staleRank(x) - staleRank(y)) * dir,
   };
 
   /* The owner filter, applied on its own axis. Kept separate from FILTERS()
@@ -1385,6 +1499,7 @@ module.exports = function registerAccounts(ctx) {
 
   function visibleRows(rows) {
     const v = view();
+    const symOrder = splitByCurrency(S.accounts).others.map(([sym]) => sym);
     const f = FILTERS().find(x => x.key === v.filter) || FILTERS()[0];
     const q = (v.q || '').trim().toLowerCase();
     return rows
@@ -1394,7 +1509,7 @@ module.exports = function registerAccounts(ctx) {
          first thing a reader tries, and it landing on "0 rows" while a chip
          with that exact name sits above it reads as a broken search. */
       .filter(r => !q || `${r.a.name} ${r.a.institution || ''} ${r.a.type} ${ownerLabel(r.a.owner, declaredOwners())}`.toLowerCase().includes(q))
-      .sort((x, y) => (SORTERS[v.sort] || SORTERS.balance)(x, y) * v.dir);
+      .sort((x, y) => (SORTERS[v.sort] || SORTERS.balance)(x, y, v.dir, symOrder));
   }
 
   function setOwnerFilter(key) {
@@ -1769,15 +1884,27 @@ module.exports = function registerAccounts(ctx) {
        reasoning as goalCell() above: the old gate hid Growth from an account on
        basis 'measured' (starting_amount, no total_invested at all) and from one
        on basis 'stated' at an explicit total_invested of 0 (a real baseline
-       since A1). "Total invested" stays keyed to `a.total_invested` itself
-       rather than r.tr.capitalIn — it is naming a specific frontmatter figure,
-       and showing it for a 'measured' account that never had one would put a
-       number under a label the account's own file does not support. */
-    if (r.tr && r.tr.basis !== 'none') {
-      if (a.total_invested != null) {
-        f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
-      }
+       since A1).
+
+       ONE BASIS, and the drawer says which. "Total invested" (the file's own
+       figure) used to sit directly above a Growth measured against the capital
+       the TRANSACTIONS add up to — on the vault the audit ran against (7 Oct
+       2026) the pair overshot the balance beside it by thousands with nothing
+       saying why. So a measured account shows the capital growth is measured
+       against ("Put in"), the growth, and — when the measure is the implied
+       balance rather than the one typed — that balance on its own line: the
+       three add up, as the Savings card's do. The file's `total_invested` is
+       still shown there, captioned as the file's. On a 'stated' account the
+       file's figure IS the capital, so it keeps its own label and the pair adds
+       up to the balance as typed. */
+    if (r.tr && r.tr.basis === 'stated') {
+      f(i18n.t('acct.drawer.invested'), acctMoney(a, a.total_invested));
       f(i18n.t('acct.drawer.growth'), acctMoney(a, r.tr.growth));
+    } else if (r.tr && r.tr.basis !== 'none') {
+      f(i18n.t('acct.drawer.putIn'), acctMoney(a, r.tr.capitalIn));
+      f(i18n.t('acct.drawer.growth'), acctMoney(a, r.tr.growth));
+      if (r.tr.balanceBasis === 'implied') f(i18n.t('acct.drawer.measuredOn'), acctMoney(a, r.tr.balance));
+      if (a.total_invested != null) f(i18n.t('acct.drawer.investedFile'), acctMoney(a, a.total_invested));
     }
     if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), acctMoney(a, a.monthly_contribution));
     if (r.act.count) {
@@ -2146,15 +2273,31 @@ module.exports = function registerAccounts(ctx) {
         for (const r of shown) emit(r);
       }
       table.append(body);
+      /* The phone card layout (<600px, src/styles.css) lays each row out as a
+         grid, and WebKit drops the implicit table roles from a <tr> that is no
+         longer a table row — so VoiceOver on an iPhone would stop reading the
+         page as a table. Stamped explicitly, as Transactions and Budget do; the
+         stylesheet gates the cards on #acctTable[role='table'], so the layout
+         can never arrive without the semantics. No data-labels: the card keeps
+         its own header row and its own State label (7 Oct 2026 audit, L6-03). */
+      tableCells(table, []);
     });
 
     const sub = $('#acctTblSub');
     if (sub) {
+      /* What the table above actually does. Filtered to "Needs a look" it is
+         grouped by REASON whatever the kind toggle says (the branch above), and
+         the line used to report the toggle instead: "grouped by kind" over the
+         groups "The balance disagrees with the transactions" and "Nothing
+         imports into these". Its own key, because the old one's eleven
+         translations say "kind" — which stays right for every other filter. */
+      const grouping = v.filter === 'flag' && shown.length ? i18n.t('acct.table.byReason')
+        : v.grouped ? i18n.t('acct.table.grouped') : i18n.t('acct.table.flat');
       sub.textContent =
         (shown.length === S.accounts.length
           ? i18n.t('acct.table.subAll', { count: S.accounts.length })
           : i18n.t('acct.table.subSome', { shown: shown.length, total: S.accounts.length }))
-        + i18n.t(v.grouped ? 'acct.table.grouped' : 'acct.table.flat')
+        + grouping
         + i18n.t('acct.table.sortedBy', { column: i18n.t(`acct.sort.${v.sort}`) });
     }
     const toggle = $('#acctGroupToggle');
@@ -2184,8 +2327,12 @@ module.exports = function registerAccounts(ctx) {
     /* Owner chips FIRST: that pass is what clears a filter pointing at an owner
        this vault no longer distinguishes, and everything below reads v.owner. */
     renderOwnerFilters(rows);
-    renderSummary(rows);
-    renderDeck(rows);
+    /* One scope for every count on the page: the accounts the owner filter
+       leaves on view. The kind chips and the table already counted within it;
+       the hero's facts and the deck now do too. */
+    const scoped = rows.filter(ownerMatch);
+    renderSummary(rows, scoped);
+    renderDeck(scoped);
     renderFilters(rows);
     renderTable(rows);
   }
@@ -2206,11 +2353,14 @@ module.exports = function registerAccounts(ctx) {
     return { used, pct, over, near: !over && pct >= 85, available: a.credit_limit - used };
   }
   /* `keys` names the extra frontmatter fields to write from the model — the
-     edit form passes EDITABLE_KEYS, everything else passes nothing. The balance,
-     its date and the budget flag are always patched, because they are the only
-     three the tile itself can change.
+     edit form passes the ones whose line it changed, Ignore and the import pass
+     the one key each is about, everything else passes nothing. The balance, its
+     date and the budget flag — the only three the tile itself can change — are
+     always CHECKED, against the file rather than the model, and written only
+     where the file says something else (sameOnFile).
 
-     Returns true on a write that landed, false on one that did not. This is
+     Returns true on a write that landed, or when the file already said all of
+     it; false on one that did not. This is
      the ONE save function in the app with no dirty flag or Save button of its
      own — every edit here writes through immediately from five different
      callers (editBalance, acceptImplied, editAccount, toggleBudget,
@@ -2231,27 +2381,27 @@ module.exports = function registerAccounts(ctx) {
   // to "Could not save {name} ({error}) — nothing was written to the file;
   // try the same action again." This page has no dirty flag and no Save
   // button of its own (see this function's own header above) — every dialog
-  // here writes through immediately, and neither branch below reverts the
-  // in-memory model on a failed write (acceptImplied does; editBalance and
-  // editAccount do not), so what actually happened on a failure is: the file
-  // is untouched, and reopening the same dialog and saving again is a real,
-  // working retry. The old text said what failed and stopped there — it
-  // never told the reader the retry exists at all.
+  // here writes through immediately. On a failed write the file is untouched
+  // and the retry is real either way: acceptImplied and editAccount put the
+  // model back (editAccount must — it hands over only what differs from the
+  // model, so a model left holding the failed edit would make the retry a
+  // no-op), and editBalance's three keys are compared against the FILE, so a
+  // model left holding the failed figure still differs from it. The old text
+  // said what failed and stopped there — it never told the reader the retry
+  // exists at all.
   async function saveAccount(a, keys = []) {
     // Everything NOT patched — block-style tags, aliases, any hand-added key —
     // is left byte for byte. The body was already preserved via a.body.
     if (a.fmRaw) {
-      const updates = {
-        // Write the original cell back untouched when the loader could not
-        // strictly parse it and the user has not since edited the balance.
-        balance: a.balanceRaw != null ? a.balanceRaw : a.balance.toFixed(2),
-        balance_updated: a.balance_updated || null,
-        // null REMOVES the key: in-budget is the default, so an account that
-        // has never been excluded keeps a frontmatter block free of a line
-        // saying nothing.
-        budget: a.in_budget ? null : 'false',
-      };
+      /* The tile's keys against the file, the caller's keys as handed over —
+         see sameOnFile for why the first three are never written blind. */
+      const updates = {};
+      for (const k of TILE_KEYS) if (!sameOnFile(k, a)) updates[k] = TILE_WRITERS[k](a);
       for (const k of keys) updates[k] = FM_WRITERS[k](a);
+      /* Nothing differs: the file already says all of it, and a write would
+         only touch a synced file to say it again. Reported as landed — it
+         has, in the only sense a caller can mean. */
+      if (!Object.keys(updates).length) return true;
       /* Re-capture the returned block. Every patch is computed against fmRaw,
          so leaving it at the block read from disk at LOAD time makes each save
          undo the one before it: edit the credit limit, then click the balance,
@@ -2264,6 +2414,11 @@ module.exports = function registerAccounts(ctx) {
         toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
         return false;
       }
+      /* The model says what the loader would now read: a `budget:` line is
+         stated exactly when one was written. period.js's earmark rule and
+         committed.js both read this flag, so leaving it at its load-time value
+         made the session's figures disagree with the next reload's. */
+      if (Object.prototype.hasOwnProperty.call(updates, 'budget')) a.in_budget_stated = updates.budget != null;
       return true;
     }
     // Legacy fallback: no captured frontmatter (a file the loader never saw) —
@@ -2424,6 +2579,19 @@ module.exports = function registerAccounts(ctx) {
     // Match the setup wizard: pre-create the account's transactions folder so
     // it's importable and visible in the file explorer right away.
     await ensureFolder(relPath(`Transactions/${name}`));
+    /* …and record it the way load.js would on the next read: the leaf name in
+       S.txFolders, the budget-relative path in S.txFolderPaths. Nothing else
+       would — our own writes are not re-read by the watcher — so a folder made
+       here was invisible to the rest of the session: the new account read
+       "nothing imports into this account", and deleting it said "It has no
+       transactions folder" and left the folder behind (audit of 7 Oct 2026).
+       Only when the folder really exists and no folder already holds the
+       label: an orphan of the same name was recorded by the loader already. */
+    const rel = `Transactions/${name}`;
+    if (ctx.folderAt(rel) && (S.txFolderPaths || {})[name] === undefined) {
+      S.txFolderPaths = { ...(S.txFolderPaths || {}), [name]: rel };
+      S.txFolders = [...(S.txFolders || []), name];
+    }
     S.accounts.push(acct);
     S.accounts.sort((a, b) => a.name.localeCompare(b.name));
     ctx.render();   // not renderAccounts — three other pages have this button too

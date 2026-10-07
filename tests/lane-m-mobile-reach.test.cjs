@@ -81,7 +81,10 @@ ok(/position:\s*sticky/.test(sticky[0]) && /background-color:/.test(sticky[0]), 
 /* --- 4. legend names wrap ---------------------------------------------------- */
 const name = (phone560.match(/\.donut-legend \.dl-name\s*\{[^}]*\}/) || [''])[0];
 ok(/white-space:\s*normal/.test(name) && !/text-overflow:\s*ellipsis/.test(name), 'legend names wrap on a phone');
-ok(/overflow-wrap:\s*break-word;\s*[^}]*overflow-wrap:\s*anywhere/.test(name), '`anywhere` has a Safari 15.0-15.3 fallback ahead of it');
+/* Since the 7 Oct 2026 audit the fallback is no longer two declarations in
+   one block (the store scorecard flags a repeated property): break-word is the
+   unconditional floor, and anywhere sits in its own @supports twin. */
+ok(/overflow-wrap:\s*break-word/.test(name) && /@supports\s*\(overflow-wrap:\s*anywhere\)\s*\{\s*\.budget-app-root \.donut-legend \.dl-name\s*\{\s*overflow-wrap:\s*anywhere/.test(phone560), '`anywhere` sits behind @supports, after a break-word floor for Safari 15.0-15.3');
 ok(/\.donut-legend li \.dl-link\s*\{\s*gap:\s*7px/.test(phone560), 'the linked legend gets the 7px gap its own comment asked for');
 
 /* --- iOS 15 floor for what this lane added ---------------------------------- */

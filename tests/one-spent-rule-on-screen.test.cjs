@@ -105,8 +105,12 @@ async function renderDash(files, { period = PERIOD, today = TODAY } = {}) {
   });
   ok(Math.abs(flow.lefts.leftInBudget - 3400) < 1e-9,
     `Score "Left in the budget" is the hero's remaining, not budgeted less gross (got ${flow.lefts.leftInBudget})`);
-  ok(Math.abs((flow.lefts.leftInBudget + flow.lefts.neverBudgeted) - (flow.income - flow.budget.spent)) < 1e-9,
-    'and the two lefts still reconcile — against the one numerator now');
+  /* Three lefts since the 7 Oct 2026 audit (L2a-03): set-aside still to move
+     is its own left, so "never budgeted" is income less the WHOLE plan, and
+     the three reconcile to income less gross spend and the assume-spent
+     provision — the sum the Score prints as "Together". */
+  ok(Math.abs((flow.lefts.leftInBudget + flow.lefts.setAsideToMove + flow.lefts.neverBudgeted) - (flow.income - flow.budget.spentTotal - used.assumed)) < 1e-9,
+    'and the three lefts still reconcile — to income less gross spend and the assume-spent provision');
 
   /* ---- 6. the trend chart compares like with like ---------------------- */
   const trend = t('#trendChart');

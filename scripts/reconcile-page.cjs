@@ -36,17 +36,32 @@ const { dispatchedViews, pinClock, mountFor, harvestView } = require('../tests/h
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
 
-/* ---- reading a real vault ---------------------------------------------- */
+/* ---- reading a real vault ----------------------------------------------
+   The vault as { path: text }, read the way Obsidian holds it, because that is
+   what every page reads: markdown, the `.csv` files (the loader reads
+   Data/Categorisation Rules.csv), and every folder that would otherwise vanish.
+   A folder with nothing the loader reads in it — empty, or holding only a PDF —
+   is kept as `<folder>/.folder`, the in-memory vault's own marker
+   (tests/helpers/harness.cjs). Until 2026-10-07 this kept `.md` alone: the
+   census printed "rules: 0" for a vault holding hundreds, and an account whose
+   Transactions folder was empty read "no folder" instead of "no transactions
+   yet" — so on the audited vault the reconciliation's Accounts page counted
+   two muted accounts as needing attention that the app does not (audit H-1).
+   Dot-files and dot-folders stay out, as they stay out of Obsidian's tree. */
 function readVault(root) {
   const out = {};
   const walk = (dir, prefix) => {
+    let kept = 0;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       if (e.name.startsWith('.')) continue;
       const abs = path.join(dir, e.name);
       const rel = prefix ? `${prefix}/${e.name}` : e.name;
-      if (e.isDirectory()) walk(abs, rel);
-      else if (e.name.endsWith('.md')) out[rel] = fs.readFileSync(abs, 'utf8');
+      if (e.isDirectory()) { walk(abs, rel); kept++; }
+      else if (e.name.endsWith('.md') || e.name.endsWith('.csv')) { out[rel] = fs.readFileSync(abs, 'utf8'); kept++; }
     }
+    /* A kept sub-folder carries its own marker if it needs one, and its path
+       alone makes this folder exist in the in-memory tree. */
+    if (!kept && prefix) out[`${prefix}/.folder`] = '';
   };
   walk(root, '');
   return out;
@@ -409,7 +424,7 @@ function globals(ctx, S, period, today) {
       current: {
         period: ctx.currentPeriod(),
         income: FC.summary.income, spent: FC.used.spent, used: FC.used.used,
-        budgeted: FC.budget.spend + FC.budget.setAside, allocated: FC.plan.allocated,
+        budgeted: FC.budget.spend + FC.budget.setAside, budgetSpend: FC.budget.spend, allocated: FC.plan.allocated,
       },
       /* periodFigures' OWN plan snapshot, carried through rather than
          re-derived. ADR-0007 registers `unallocated` as income − total; this
@@ -1116,14 +1131,15 @@ function runChecks(G, pages) {
        fragments the note carries. Addressed by ordinal across the whole note
        before, which is why both were passing by coincidence. */
     const setAsideNote = new RegExp(`^${strip}/@bud-note-setaside$`);
-    /* The sentence is drawn when `used.setAside > 0` (budgets.js), and the
-       moved-to-funds figure rides inside it — so ITS gate is set-aside, not
-       itself: a household that moved money to a fund without spending any
-       set-aside has a moved figure and, correctly, no sentence. */
+    /* The sentence is drawn when the PLAN holds a set-aside (budgets.js, since
+       the 7 Oct 2026 audit's REPORT-3 — it used to be the set-aside SPENT), and
+       the moved-to-funds figure rides inside it — so ITS gate is the plan's
+       set-aside, not itself: a household that moved money to a fund without
+       planning any set-aside has a moved figure and, correctly, no sentence. */
     /* The note reads "R {moved} of R {setAside} saved so far" (1.49.1): moved is
-       the first figure, the set-aside the second. */
-    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'budgetUsed(p).setAside', re: setAsideNote, globalValue: U.setAside, globalSource: 'budgetUsed.setAside', index: 1, renderedFrom: 0.005 });
-    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 0, renderedFrom: 0.005, renderedWhen: U.setAside });
+       the first figure, the plan's set-aside the second. */
+    dom({ page: BP, name: `${strip}: set-aside note`, formula: 'planFigures(p).setAside', re: setAsideNote, globalValue: B.setAside, globalSource: 'budgetTotals.setAside (the plan)', index: 1, renderedFrom: 0.005 });
+    dom({ page: BP, name: `${strip}: moved to funds`, formula: 'movedToFunds(p)', re: setAsideNote, globalValue: G.moved, globalSource: 'movedToFunds(p)', index: 0, renderedFrom: 0.005, renderedWhen: B.setAside });
   }
 
   /* ---- score ---------------------------------------------------------- */
@@ -1139,8 +1155,15 @@ function runChecks(G, pages) {
   const CU = F.current;
   dom({ page: SC, name: 'Flow: income in', formula: 'periodSummary(currentPeriod).income',
     re: /\/@score-flow-in$/, globalValue: CU.income, globalSource: `periodFigures(currentPeriod ${CU.period}).summary.income` });
-  dom({ page: SC, name: 'Budget chip: budgeted (whole plan)', formula: 'budgetTotals(currentPeriod).spend + setAside',
-    re: /\/@score-budgeted$/, globalValue: CU.budgeted, globalSource: `budgetTotals(currentPeriod ${CU.period})` });
+  /* "Spending budget" is the spend envelopes, the denominator of the "Budget
+     used" printed under it; the whole plan is its own row, "Total budgeted",
+     beside the share of income it is (2026-10-07, audit L2a-02). This check
+     passed the whole plan under the spending-budget label until then — the
+     instrument agreeing with the screen about the wrong figure. */
+  dom({ page: SC, name: 'Budget chip: budgeted (spending budget)', formula: 'budgetTotals(currentPeriod).spend',
+    re: /\/@score-budgeted$/, globalValue: CU.budgetSpend, globalSource: `budgetTotals(currentPeriod ${CU.period}).spend` });
+  dom({ page: SC, name: 'Budget chip: total budgeted (whole plan)', formula: 'budgetTotals(currentPeriod).spend + setAside',
+    re: /\/@score-whole-plan$/, globalValue: CU.budgeted, globalSource: `budgetTotals(currentPeriod ${CU.period})` });
   dom({ page: SC, name: 'Budget chip: allocated of income', formula: 'periodFigures(currentPeriod).plan.allocated', kind: 'percent',
     re: /\/@score-allocated$/, globalValue: CU.allocated == null ? null : CU.allocated * 100, globalSource: 'plan.allocated (allocatedShare)', renderedFrom: 0 });
   dom({ page: SC, name: 'Budget chip: spent', formula: 'budgetUsed(currentPeriod).spent',
@@ -1368,7 +1391,22 @@ function runChecks(G, pages) {
     C.add({ page: P, name: 'Σ sources = pot', formula: 'the pot is the sum of its sources', pageValue: srcs.reduce((a, b) => a + b, 0), pageSource: `Σ ${srcs.length} sources`, globalValue: figValue(pot), globalSource: 'planPot pot-sub', tol: figTol(pot) });
     const envs = C.figs(P, /^planEnvelopes\/.*env-sum-amt|^planEnvelopes\/div\.env\/button\.env-amt-btn\/div\.env-amt/, 'money').map(figValue);
     const free = C.fig(P, /^planFree\/h2/);
-    C.add({ page: P, name: 'Σ envelopes + free = pot', formula: 'every rand in the pot has a job or is free', pageValue: envs.reduce((a, b) => a + b, 0) + (figValue(free) || 0), pageSource: `Σ ${envs.length} envelopes + free`, globalValue: figValue(pot), globalSource: 'planPot pot-sub', tol: figTol(pot) });
+    /* The Free card's heading holds a different figure in each of its three
+       states (views/plan.js renderFree): the free amount ("… is not spoken
+       for"), the over-placed amount as a positive magnitude ("… more is placed
+       than this plan holds", i.e. free is NEGATIVE), or — once any bucket has
+       run over, which the 7 Oct 2026 audit's per-bucket rule (L2a-08) makes
+       reachable whenever one does — the OVERSPEND ("… was spent past what its
+       bucket held"), with free not printed at all. Reading the heading as free
+       in every state added the overspend as if it were unplaced money. The card
+       is English-only today, so its own words tell the states apart. */
+    const freeCtx = free && free.context ? `${free.context.own || ''} ${free.context.parent || ''}` : '';
+    const overspentCard = /spent past what its bucket held/.test(freeCtx);
+    const overplacedCard = /more is placed than this plan holds/.test(freeCtx);
+    if (!overspentCard) {
+      const freeSigned = (figValue(free) || 0) * (overplacedCard ? -1 : 1);
+      C.add({ page: P, name: 'Σ envelopes + free = pot', formula: 'every rand in the pot has a job or is free', pageValue: envs.reduce((a, b) => a + b, 0) + freeSigned, pageSource: `Σ ${envs.length} envelopes ${overplacedCard ? '− over-placed' : '+ free'}`, globalValue: figValue(pot), globalSource: 'planPot pot-sub', tol: figTol(pot) });
+    }
   }
   {
     const L = 'loans';
@@ -1762,5 +1800,7 @@ if (require.main === module) (async () => {
    real vault — see tests/reconcile-gate.test.cjs. runChecks and makeChecker are
    exported for tests/reconcile-checker-fixes.test.cjs, which needs to hand a
    check a TAMPERED page and see it fail: a check that has only ever been shown
-   passing has not been shown to check anything. */
-module.exports = { reconcile, householdVault, runChecks, makeChecker };
+   passing has not been shown to check anything. readVault is exported for
+   tests/reconcile-reads-vault-tree.test.cjs, which reads a folder off disk the
+   way --vault does. */
+module.exports = { reconcile, householdVault, runChecks, makeChecker, readVault };

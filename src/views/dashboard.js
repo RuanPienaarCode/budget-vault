@@ -9,7 +9,7 @@ const i18n = require('../i18n');
 const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
-const { todayIso } = require('../dates');
+const { todayIso, isRealIsoDate } = require('../dates');
 const { balanceReadable } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
@@ -512,8 +512,38 @@ module.exports = function registerDashboard(ctx) {
            the dimension it should always have had and then group on it,
            rather than to teach committed.js a new rule. */
         currency: symbolOf(a, S.settings.currency),
+        /* The two dates committed.js's knownTo() reads to tell a debit order
+           that is MISSING from one that is NOT IMPORTED YET (2026-10-07
+           audit): the newest row in this account's own folders on or before
+           today — filled in just below — and the confirmed balance date as
+           the file states it. Facts handed over, like `stale`; what they
+           mean is decided there. */
+        importedTo: '',
+        balanceDate: a.balance_updated || '',
       };
     });
+
+    /* Which account every row belongs to, and how far each account's rows
+       reach (2026-10-07 audit). On a real household on 7 October three debit
+       orders due on the 1st, on accounts last imported on the 26th and the
+       29th, were in neither cash nor "still committed": committed.js dropped
+       every due date before today as missing. It can only hold one as "not
+       imported yet" if it knows which account the charge came from and how
+       far that account's rows go. Folders resolve through accountForLabel,
+       the rule every other reader uses; a folder no account claims maps to
+       nothing, as it reaches no balance either. Every row counts towards the
+       date, Excluded or not: it was imported, which is all the date claims. */
+    const asOfToday = todayIso();
+    const entryOf = new Map(S.accounts.map((a, i) => [a, accounts[i]]));
+    const accountOfRow = new Map();
+    for (const f of Object.values(S.txFiles)) {
+      const entry = entryOf.get(accountForLabel(f.label));
+      if (!entry) continue;
+      for (const r of f.rows) {
+        accountOfRow.set(r, entry);
+        if (isRealIsoDate(r.date) && r.date <= asOfToday && r.date > entry.importedTo) entry.importedTo = r.date;
+      }
+    }
 
     /* ISSUE 30, second pass. These three transaction lists carry the SAME
        dimension the accounts are grouped on below, and they were the half of
@@ -714,6 +744,7 @@ module.exports = function registerDashboard(ctx) {
           debts: fxOf(S.debts.filter(d => d.status !== 'paid'), sym),
           ...txOf(sym),
           settleRows: settleRowsFx(sym),
+          accountOfRow,
           periodStart: start, periodEnd: end, today: todayIso(),
         }),
       }))
@@ -729,6 +760,7 @@ module.exports = function registerDashboard(ctx) {
       services: homeish(S.services), debts: homeish(S.debts),
       ...txOf(home),
       settleRows,
+      accountOfRow,
       periodStart: start, periodEnd: end, today: todayIso(),
     });
 
@@ -769,6 +801,14 @@ module.exports = function registerDashboard(ctx) {
        not one of the 2. `staleCounted` is a subset of `countedAccounts` by
        construction. */
     cashParts.push(i18n.t('dash.left.counted', { count: L.countedAccounts }));
+    /* How fresh the figure is (2026-10-07 audit): the earliest day its
+       accounts are known up to, so nothing after it is in this cash — on the
+       vault this was found on, a month's same window held five figures of
+       spending not imported yet. Silent when that day is today. Printed as
+       an ISO date, like the due dates in the list below, so the two can be
+       compared at a glance, and in the Accounts page's own words for a
+       balance's date (`as of {date}`), borrowed rather than reworded. */
+    if (L.cashAsOf && L.cashAsOf < asOfToday) cashParts.push(i18n.t('acct.badge.asOf', { date: L.cashAsOf }));
     if (L.staleCounted) cashParts.push(i18n.t('dash.left.unconfirmed', { count: L.staleCounted }));
     if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
     /* A balance nobody could read is held out of the figure the way the
@@ -814,6 +854,10 @@ module.exports = function registerDashboard(ctx) {
     const comParts = [];
     if (L.counts.service) comParts.push(i18n.t('dash.left.orders', { count: L.counts.service }));
     if (L.counts.debt) comParts.push(i18n.t('dash.left.instalments', { count: L.counts.debt }));
+    /* Of those, how many are held only because their account is not imported
+       past their due date — said on the tile, not only inside the collapsed
+       list below, because they move the figure beside it. */
+    if (L.counts.notImported) comParts.push(i18n.t('dash.left.notImportedCount', { count: L.counts.notImported }));
 
     const freeParts = [];
     if (L.days !== null) freeParts.push(i18n.t('dash.left.days', { count: L.days }));
@@ -920,6 +964,9 @@ module.exports = function registerDashboard(ctx) {
       const gm = (v) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(g.sym, v, 0) : `${g.sym} ${Math.round(v)}`);
       const parts = [
         g.L.cashKnown ? i18n.t('dash.left.cash') + ' ' + gm(g.L.cash) : null,
+        /* This band's cash has its own as-of, read off ITS accounts. */
+        g.L.cashKnown && g.L.cashAsOf && g.L.cashAsOf < asOfToday
+          ? i18n.t('acct.badge.asOf', { date: g.L.cashAsOf }) : null,
         /* Named for the same reason the home chain names it: this band's cash
            less its committed does not reach its free figure without it, and a
            term that moves a total silently is the exclusion currency.js forbids. */
@@ -1127,9 +1174,15 @@ module.exports = function registerDashboard(ctx) {
            quietly mis-tense it. `missed` is stamped in committed.js where the
            comparison is made, so the claim and the sentence explaining it come
            from one reading of the date. */
-        const when = it.due
-          ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: it.due })
-          : i18n.t('dash.left.thisPeriod');
+        /* 2026-10-07 audit. A debit order whose day has passed while its
+           account's rows stop short of it is neither "expected" nor "was
+           due": committed.js cannot know whether it went off, only that no
+           statement holding that day has been imported, and it says so. */
+        const when = it.basis === 'not-imported'
+          ? i18n.t('dash.left.notImported', { date: it.due })
+          : it.due
+            ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: it.due })
+            : i18n.t('dash.left.thisPeriod');
         /* ISSUE 47. A weekly service commits several charges in one period, so
            the row states the CADENCE — "4 × R250" — rather than a single
            R1 000 debit nobody will ever find on a statement. `dash.left
@@ -1137,8 +1190,10 @@ module.exports = function registerDashboard(ctx) {
            multi-occurrence item that is `unit`, never the total. */
         const many = (it.occurrences || 1) > 1;
         const each = it.unit != null ? it.unit : it.amount;
+        /* A not-imported item is always priced from its charges (its account
+           is read off one), so it reads like any charged order. */
         const src = many ? i18n.t('dash.left.times', { count: it.occurrences, amount: money(each, 0) })
-          : it.basis === 'charged' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
+          : it.basis === 'charged' || it.basis === 'not-imported' ? i18n.t('dash.left.lastCharged', { amount: money(it.amount, 0) })
           : it.basis === 'stated' ? i18n.t('dash.left.asListed')
             : it.basis === 'settled' ? i18n.t('dash.left.settledInFull')
               : i18n.t('dash.left.contracted');
@@ -1352,17 +1407,46 @@ module.exports = function registerDashboard(ctx) {
     /* The one figure on this card that is money coming TOWARDS the household,
        so it is never red — outstanding is a warning at most. Age rather than a
        due date, for the reason owed-math.js sets out. */
+    /* What the figure leaves out, named (2026-10-07 audit). owedSummary()
+       holds a loan in another currency OUT of `outstanding` and hands it back
+       in `otherCurrencies` for the caller to state, and the Owed page's tile
+       states it. This one dropped the list, so "2 outstanding" counted a euro
+       loan whose amount appeared in no figure and no sentence. Same sentence
+       shape as `otherLine` on the net-worth tile above, and into the
+       aria-label with the figure, for the reason that tile gives. */
+    const owedOthers = owed.otherCurrencies || [];
+    const owedOtherList = owedOthers.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
+    const owedOtherLine = owedOthers.length
+      ? i18n.t('dash.pos.owedOtherCurrencies', { list: owedOtherList }) : '';
+    /* Nothing out in the household's own currency, but money out in another.
+       The figure is right — nothing is outstanding in rand — but the words
+       were not: this fell to the "nothing out" branch and then appended the
+       list, so a screen reader was handed "Nothing outstanding. Open Owed
+       Money. Plus € 300 owed in other currencies, not converted." — a
+       sentence that denies the money and then names it — and the sub-line
+       read "R 2 000 recovered Plus € 300 owed …" under R 0. Its own
+       sentence instead, naming the currency "nothing" is in and leading with
+       what IS out; the age stays, because how long money has been gone is
+       counted in every currency (owed-math.js, "pressure before money"). */
+    const owedOnlyOther = !(owed.outstanding > 0) && owedOthers.length > 0;
     posTile(grid, {
       label: i18n.t('dash.pos.owed'), value: money(owed.outstanding, 0), fig: 'pos-owed',
       cls: owed.outstanding > 0 ? 'text-warning' : '',
-      sub: owed.outstanding > 0
-        ? i18n.t('dash.pos.owedOpen', { count: owed.open })
+      sub: owedOnlyOther
+        ? i18n.t('dash.pos.owedOnlyOther', { symbol: S.settings.currency, list: owedOtherList })
           + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
-        : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')),
+        : (owed.outstanding > 0
+          ? i18n.t('dash.pos.owedOpen', { count: owed.open })
+            + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
+          : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')))
+          + owedOtherLine,
       view: 'owed',
-      say: owed.outstanding > 0
-        ? i18n.t('dash.pos.owedSay', { amount: money(owed.outstanding), count: owed.open })
-        : i18n.t('dash.pos.owedSayNone'),
+      say: owedOnlyOther
+        ? i18n.t('dash.pos.owedSayOnlyOther', { symbol: S.settings.currency, list: owedOtherList })
+        : (owed.outstanding > 0
+          ? i18n.t('dash.pos.owedSay', { amount: money(owed.outstanding), count: owed.open })
+          : i18n.t('dash.pos.owedSayNone'))
+          + owedOtherLine,
     });
 
     /* Uncoloured, deliberately. The Savings page leaves its Savings and
@@ -1593,12 +1677,16 @@ module.exports = function registerDashboard(ctx) {
     /* ADR-0007 · Hero spent is the one numerator. Headline, meter and tag read
        budgetUsed().spent; the sub-line and stat printed GROSS beside them.
        The three adjustments that make them differ are named, not subtracted. */
-    const { netted: nettedRefunds } = F.gap;
-    const spentNoteParts = [
-      used.setAside >= 1 ? i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }) : '',
-      used.assumed >= 1 ? i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }) : '',
-      nettedRefunds >= 1 ? i18n.t('dash.hero.nettedOff', { amount: money(nettedRefunds, 0) }) : '',
-    ].filter(Boolean);
+    /* Every qualifier printed beside the figure — these three, and the
+       scheduled-ahead, funded-from-savings and foreign lines below — comes
+       from ONE builder, heroQualifiers() at the foot of this file, so the
+       headless API (src/api.js) can hand a sibling plugin the sentences that
+       qualify this figure rather than its own copy of one of them (2026-10-07
+       audit). Grouped here by the line each one prints on. */
+    const qualifiers = heroQualifiers(F, money);
+    const linesOf = line => qualifiers.filter(q => q.line === line).map(q => q.text);
+    const subLine = parts => (parts.length ? el('div', { class: 'hero-sub hero-sub--ahead' }, parts.join(' · ')) : '');
+    const spentNoteParts = [...linesOf('spent')];
     /* ISSUE 40. The stat column states the WHOLE plan (R14 500) while the hero
        above it now measures against the spend envelopes alone (R10 500). Both
        are right for their own question and the card must not leave a reader to
@@ -1650,9 +1738,6 @@ module.exports = function registerDashboard(ctx) {
        category, already netted off that category's own actual, and calling
        them uncounted income would be the noise that stops people reading the
        line at all. Silent under a currency unit, where only rounding lives. */
-    const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
-    const sched = sum.scheduled || { income: 0, spend: 0 };
-    const scheduledAhead = (sched.income || 0) + (sched.spend || 0);
     const inUncounted = (sum.uncatIncome || 0) + ((sum.unknown && sum.unknown.income) || 0);
     /* ISSUE 28. Every figure on this hero — available, income, budgeted, spent
        and the meter — is built from periodSummary, which now holds foreign
@@ -1660,11 +1745,7 @@ module.exports = function registerDashboard(ctx) {
        fine; held out SILENTLY is not, and this is the most-read card in the
        app, so the sentence goes here rather than only on the page where the
        accounts live. */
-    const foreignNote = sum.foreign && sum.foreign.count
-      ? i18n.t('dash.foreignExcluded', {
-        count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
-      })
-      : '';
+    const foreignNote = linesOf('foreign').join(' · ');
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
@@ -1771,9 +1852,7 @@ module.exports = function registerDashboard(ctx) {
         el('div', { class: 'hero-sub', 'data-fig': 'hero-budget' }, noBudget
           ? i18n.t('dash.stat.spent')
           : i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
-        spentNoteParts.length
-          ? el('div', { class: 'hero-sub hero-sub--ahead' }, spentNoteParts.join(' · '))
-          : '',
+        subLine(spentNoteParts),
         /* ISSUE 35. The window this card's figures stop at, and what is on the
            other side of it.
 
@@ -1786,22 +1865,12 @@ module.exports = function registerDashboard(ctx) {
            told how much of the month is not yet in these numbers, not asked to
            reconcile a second net. Silent on a finished period, where there is
            no other side. */
-        scheduledAhead > 0
-          ? el('div', { class: 'hero-sub hero-sub--ahead' },
-            i18n.t('dash.scheduledAhead', { amount: money(scheduledAhead, 0) }))
-          : '',
+        subLine(linesOf('scheduled')),
         /* ISSUE 41. Money that left an earmarked fund. Held out of the budget
            comparison above — a pram bought from the baby fund is not the
            grocery envelope being blown — and therefore said out loud, because
-           a figure this card stopped counting is an exclusion like any other.
-           `count` is passed as well as `amount`: i18n.t() picks its plural off
-           `count` alone. */
-        fromFunds.count > 0
-          ? el('div', { class: 'hero-sub hero-sub--ahead' },
-            i18n.t('dash.fundedFromSavings', {
-              amount: money(fromFunds.spend, 0), count: fromFunds.count,
-            }))
-          : '',
+           a figure this card stopped counting is an exclusion like any other. */
+        subLine(linesOf('funds')),
         /* A meter of spent against nothing is a full bar with no meaning. */
         noBudget ? '' : meter),
       statCol));
@@ -2739,6 +2808,51 @@ module.exports = function registerDashboard(ctx) {
      and never calls reconcile(). */
   ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote });
 };
+
+/* The qualifiers the hero prints beside its figure, as ONE list (2026-10-07
+   audit). renderHero used to spell six sentences inline and the headless API
+   (src/api.js) kept its own copy of one of them, so a sibling plugin was
+   handed "left to spend" without five of the sentences this card prints
+   beside it. Pure of the DOM and of ctx: `F` is periodFigures(p) and
+   `money(v, decimals)` the caller's formatter — ctx.money here, the API's own
+   there — so both get the same words in the household's language.
+
+   In print order, each { key, line, text } plus the raw figure it states.
+   `line` is where the hero puts it: 'spent' (one line, joined with ' · '),
+   'scheduled', 'funds', and 'foreign' (the stat column). `count` is passed
+   beside `amount` on the funds line because i18n.t() picks a plural off
+   `count` alone. Thresholds are the hero's own: a qualifier under one
+   currency unit is rounding, and says nothing. */
+function heroQualifiers(F, money) {
+  const sum = (F && F.summary) || {};
+  const used = (F && F.used) || {};
+  const out = [];
+  const add = (key, line, text, figure) => out.push({ key, line, text, ...figure });
+  if (used.setAside >= 1) {
+    add('setAside', 'spent', i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }), { amount: used.setAside });
+  }
+  if (used.assumed >= 1) {
+    add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }), { amount: used.assumed });
+  }
+  const netted = (F && F.gap && F.gap.netted) || 0;
+  if (netted >= 1) add('netted', 'spent', i18n.t('dash.hero.nettedOff', { amount: money(netted, 0) }), { amount: netted });
+  const sched = sum.scheduled || { income: 0, spend: 0 };
+  const ahead = (sched.income || 0) + (sched.spend || 0);
+  if (ahead > 0) add('scheduledAhead', 'scheduled', i18n.t('dash.scheduledAhead', { amount: money(ahead, 0) }), { amount: ahead });
+  const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
+  if (fromFunds.count > 0) {
+    add('fundedFromSavings', 'funds', i18n.t('dash.fundedFromSavings', {
+      amount: money(fromFunds.spend, 0), count: fromFunds.count,
+    }), { amount: fromFunds.spend, count: fromFunds.count });
+  }
+  if (sum.foreign && sum.foreign.count) {
+    add('foreign', 'foreign', i18n.t('dash.foreignExcluded', {
+      count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
+    }), { count: sum.foreign.count, symbols: [...sum.foreign.symbols] });
+  }
+  return out;
+}
+module.exports.heroQualifiers = heroQualifiers;
 
 /* Exposed for a direct, DOM-free unit test of the rounding algorithm itself —
    the six-equal / three-equal / exact-tie / single-slice / zero-slice cases

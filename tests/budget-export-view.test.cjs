@@ -76,7 +76,8 @@ const text = (ctx, p) => ctx.vault._store.get(p);
     const base = 'Exports/Budget June 2026 to July 2026';
     const budget = text(ctx, `${base} - Budget.csv`).split('\n');
     const screen = ctx.budgetVsActualRows('2026-07').find(r => r.cat === 'Groceries');
-    const line = budget.find(l => l.startsWith('July 2026,') && l.includes(',Groceries,'));
+    // July is the running period, and the CSV says so on its own label (L4A-05, tests/export-csv-caveats.test.cjs)
+    const line = budget.find(l => l.startsWith('July 2026 (in progress),') && l.includes(',Groceries,'));
     ok(line, 'July Groceries is in the long-format CSV');
     const cells = line.split(',');
     eq(Number(cells[7]), screen.actual, 'CSV Actual === budgetVsActualRows(p).actual, the figure the Budget page prints');
@@ -86,7 +87,7 @@ const text = (ctx, p) => ctx.vault._store.get(p);
       'June row: dates, budget, actual, remaining and the budget note');
 
     const summary = text(ctx, `${base} - Summary.csv`).split('\n');
-    eq(summary[0], 'Category,Type,Currency,June 2026,July 2026,Total,Average,Budgeted', 'one column per period');
+    eq(summary[0], 'Category,Type,Currency,June 2026,July 2026 (in progress),Total,Average,Budgeted', 'one column per period, the running one marked');
     ok(summary.includes('Groceries,expense,R,2100.50,1700.00,3800.50,1900.25,9500.00'), 'month columns, total, average, budgeted');
 
     const txs = text(ctx, `${base} - Transactions.csv`);
@@ -155,7 +156,14 @@ const text = (ctx, p) => ctx.vault._store.get(p);
     ctx.app.vault.configDir = '.obsidian';
     ok(ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian/plugins' }).problem, 'a folder inside the config directory is refused');
     ok(ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian' }).problem, 'and the directory itself');
-    ok(!ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian-notes' }).problem, 'a folder that merely STARTS with the same characters is not — segments, not prefixes');
+    /* ".obsidian-notes" used to be accepted here as "an ordinary folder" — the
+       config check compares SEGMENTS, not prefixes, and still does. It is
+       refused now for a different reason: any segment starting with a dot is
+       one Obsidian never indexes (tests/export-destination.test.cjs). */
+    const cfgWords = i18n => i18n.t('bx.problem.configDir', { folder: '.obsidian' });
+    const notes = ctx.describeBudgetExport({ ...ANSWER, folder: '.obsidian-notes' }).problem;
+    ok(notes && notes !== cfgWords(require('../src/i18n')), 'a folder that merely STARTS like the config folder is not refused AS the config folder — segments, not prefixes');
+    ok(!ctx.describeBudgetExport({ ...ANSWER, folder: 'obsidian-notes' }).problem, 'and the same name without the dot is an ordinary folder');
     let err = null;
     try { await ctx.runBudgetExport({ ...ANSWER, folder: '.obsidian', formats: ['csv'] }); } catch (e) { err = e; }
     ok(err, 'and the write refuses a second time, independently of the dialog');

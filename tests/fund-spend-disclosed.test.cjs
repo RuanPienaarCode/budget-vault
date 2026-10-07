@@ -81,7 +81,11 @@ atAuditDate(async () => {
        differently — asserted by the shared key above, not by a copy of the
        sentence. And the separator: no digit may butt onto a word. */
     const flat = flatOf($('#budTotalsTop'));
-    ok(/used · R 5000\.00 more/.test(flat),
+    /* Since the 7 Oct 2026 audit (REPORT-3) the "R X of R Y saved so far"
+       sentence prints whenever the PLAN holds a set-aside, so on this fixture
+       it sits between "…used" and this fragment — the separator is what is
+       pinned, not which fragment precedes it. */
+    ok(/ · R 5000\.00 more/.test(flat),
       `the fragment is separated from the sentence it follows — got: ${flat}`);
     ok(!/usedR /.test(flat), 'and never runs onto the end of it');
   }

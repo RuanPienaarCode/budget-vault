@@ -62,19 +62,36 @@ function parseProviderPayload(json) {
   });
 }
 
+/* An epoch millisecond as an ISO instant, or '' when it is not one a Date can
+   hold (toISOString throws past ±8.64e15). */
+function isoInstant(ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || Math.abs(ms) > 8.64e15) return '';
+  return new Date(ms).toISOString();
+}
+
 /* The cache file, as markdown. Frontmatter for the provenance a machine reads
    back; a table underneath for the human who opens it wondering where a number
    on their Accounts page came from. Both are generated together so they can
    never disagree — the file is rewritten whole on every refresh, never
-   patched. */
-function serializeRates(table) {
+   patched.
+
+   `fetched` is the instant the request that produced this file was MADE —
+   what fx.js's requestAllowed() gates the next request on, so the "one lookup
+   per interval" promise holds for a re-opened view, a restarted app and the
+   other device sharing this vault, not only inside one session (2026-10-07
+   audit, L4B-FX-CADENCE). `date` says what day the RATES are for; `fetched`
+   says when this app last asked — two different facts, and a stuck provider
+   is exactly the case where they differ. Written only when given, so a file
+   serialized without one is byte-for-byte what it always was. */
+function serializeRates(table, fetchedAt) {
   const codes = Object.keys(table.rates).sort();
   const rows = codes.map(c => `| ${c} | ${table.rates[c]} |`).join('\n');
+  const stamp = isoInstant(fetchedAt);
   return `---
 base: ${yamlStr(table.base)}
 date: ${yamlStr(table.date)}
 source: ${yamlStr(PROVIDER_NAME)}
----
+${stamp ? `fetched: ${yamlStr(stamp)}\n` : ''}---
 
 # Exchange rates
 
@@ -99,14 +116,20 @@ ${rows}
    one or the other: the table is what a person edits when they want to pin a
    rate by hand, and a reader who corrects a number in the table and finds the
    app ignoring it would rightly conclude the file is decoration. */
-function parseRatesFile(text) {
-  if (!text) return null;
+/* One frontmatter field of the cache file, unquoted, or '' — the one reader
+   both parseRatesFile and parseFetchedAt use. null when there is no
+   frontmatter at all. */
+function frontmatterField(text, name) {
   const fm = /^---\n([\s\S]*?)\n---/.exec(text);
   if (!fm) return null;
-  const field = name => {
-    const m = new RegExp(`^${name}:\\s*"?([^"\\n]*)"?\\s*$`, 'm').exec(fm[1]);
-    return m ? m[1].trim() : '';
-  };
+  const m = new RegExp(`^${name}:\\s*"?([^"\\n]*)"?\\s*$`, 'm').exec(fm[1]);
+  return m ? m[1].trim() : '';
+}
+
+function parseRatesFile(text) {
+  if (!text || typeof text !== 'string') return null;
+  if (frontmatterField(text, 'base') === null) return null;
+  const field = name => frontmatterField(text, name);
   const rates = {};
   /* Rows after the header separator. The `---|---:` line and the header row
      both fail normalizeCode's three-letter test, so they need no special case
@@ -118,6 +141,18 @@ function parseRatesFile(text) {
   return normalizeTable({ base: field('base'), date: field('date'), rates });
 }
 
+/* The cache file's `fetched` stamp as an epoch millisecond, or null — absent
+   (a file written before the stamp existed), unreadable, or no frontmatter.
+   Whether a readable stamp is BELIEVED (a future one is not) is fx.js's
+   requestAllowed()'s call, not this reader's. */
+function parseFetchedAt(text) {
+  if (!text || typeof text !== 'string') return null;
+  const raw = frontmatterField(text, 'fetched');
+  if (!raw) return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 /* Fetch, validate, write, return. Returns null on ANY failure — no network, a
    provider outage, a malformed payload — and never throws at the caller. A
    null here means the app keeps whatever cached table it already had, and if
@@ -127,6 +162,7 @@ function parseRatesFile(text) {
 async function fetchRates(io, baseCode) {
   const base = normalizeCode(baseCode);
   if (!base) return null;
+  const requestedAt = Date.now();
   let json = null;
   try {
     const res = await requestUrl({ url: endpointFor(base), method: 'GET' });
@@ -137,7 +173,7 @@ async function fetchRates(io, baseCode) {
   const table = parseProviderPayload(json);
   if (!table) return null;
   try {
-    await io.writeFile(RATES_FILE, serializeRates(table));
+    await io.writeFile(RATES_FILE, serializeRates(table, requestedAt));
   } catch (e) {
     /* The rates are good even if the write failed — a read-only vault or a
        sync conflict should not cost the reader this session's conversion. */
@@ -145,15 +181,28 @@ async function fetchRates(io, baseCode) {
   return table;
 }
 
-async function readCachedRates(io) {
+/* The cache as fx-live reads it at the start of a session: the table, and
+   the `fetched` stamp beside it. One read of the file for both, and each
+   half degrades to null on its own — an unreadable stamp leaves a good table
+   good. */
+async function readCache(io) {
+  let text = null;
   try {
-    return parseRatesFile(await io.readFile(RATES_FILE));
+    text = await io.readFile(RATES_FILE);
   } catch (e) {
-    return null;
+    return { table: null, fetchedAt: null };
   }
+  let table = null, fetchedAt = null;
+  try { table = parseRatesFile(text); } catch (e) { table = null; }
+  try { fetchedAt = parseFetchedAt(text); } catch (e) { fetchedAt = null; }
+  return { table, fetchedAt };
+}
+
+async function readCachedRates(io) {
+  return (await readCache(io)).table;
 }
 
 module.exports = {
   RATES_FILE, PROVIDER_NAME, endpointFor,
-  parseProviderPayload, serializeRates, parseRatesFile, fetchRates, readCachedRates,
+  parseProviderPayload, serializeRates, parseRatesFile, parseFetchedAt, fetchRates, readCache, readCachedRates,
 };

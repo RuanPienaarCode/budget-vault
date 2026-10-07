@@ -44,7 +44,7 @@
    src/csv.js, so the parameter was scaffolding for a constraint that no longer
    exists. `money` further down is still injected, for a real reason: it is the
    view's own locale-aware formatter, not a fixed escaping rule. */
-const { csvCell } = require('./csv');
+const { csvCell, parseCsv } = require('./csv');
 const { stamp, tally, LENSES } = require('./ledger');
 /* splitRole only — this module reads it exactly the way serializeTxFile does
    (src/views/transactions.js's `roleOf`), never as a third hand-copy of
@@ -125,7 +125,18 @@ function txHeaderLines() {
    cell" case, proven against the same fixture value
    tests/vault-roundtrip.test.cjs uses ("multi<br>line" on disk, "multi\nline"
    in state). */
-const { escMd } = require('./markdown');
+const { escMd, escMdText } = require('./markdown');
+/* escMdText — the escape for text in a GENERATED note (markdown.js). The two
+   Markdown files this module writes are generated notes Obsidian renders, and
+   the text in them is the household's and the bank's: a Description is
+   whatever the payer typed as the EFT reference. With escMd alone,
+   `EFT ![x](https://attacker.example/p.png)` made Obsidian fetch that URL
+   every time the exported note was opened, `![[Settings]]` transcluded a note,
+   `#word` joined the tag index, and a category "Home <Garden>" lost "<Garden>"
+   to the HTML parser (2026-10-07 audit, L4B-MD-INJECT). Its output is a fixed
+   point of escMd (no pipe, no line break left), so nothing here or in a
+   caller can double it. The vault's own month files stay on escMd: theirs is a
+   round-trip format (unescMd reads it back) and a separate decision. */
 
 /* Where exports land. A folder of its own so an export is never mistaken for
    one of the vault's own data files, and so deleting the lot is one action. */
@@ -186,10 +197,10 @@ function amountCell(row) {
    produces a valid nine-column file — the column is present, blank — and
    both writers below default the same way so the CSV and the Markdown cannot
    disagree about a row's currency. */
-function transactionsCsv(rows, symbolFor) {
-  const head = TX_HEAD;
-  const sym = symbolFor || (() => '');
-  const body = rows.map(r => [
+/* One row's finished cells, in TX_HEAD order — the one place the CSV row shape
+   is spelled, shared by the export and the bulk-delete log below. */
+function txCsvCells(r, sym) {
+  return [
     csvCell(r.date),
     csvCell(r.desc),
     csvCell(r.label),
@@ -199,8 +210,50 @@ function transactionsCsv(rows, symbolFor) {
     csvCell(r.excluded ? 'yes' : ''),
     csvCell(r.note || ''),
     csvCell(splitRole(r.split)),
-  ].join(','));
+  ];
+}
+
+function transactionsCsv(rows, symbolFor) {
+  const head = TX_HEAD;
+  const sym = symbolFor || (() => '');
+  const body = rows.map(r => txCsvCells(r, sym).join(','));
   return [head.map(csvCell).join(','), ...body].join('\n') + '\n';
+}
+
+/* The bulk-delete log (views/transactions.js, Data/Deleted transactions.csv):
+   rows appended UNDER THE LOG'S OWN HEADER, mapped by column name.
+
+   The log is the way back from a bulk delete — the vault trash cannot undo a
+   row removed from a file — and it used to take today's column layout on
+   trust: new rows in transactionsCsv's current order under whatever header
+   the log already had. A log begun before the Currency column existed has
+   eight columns, so from then on every Amount sat under "Currency", every
+   Excluded under "Amount", and the importer, which reads a CSV by header name,
+   would have brought the deleted rows back with the wrong figures (2026-10-07
+   audit, L4a).
+
+   So each value goes under its own name. A column the log does not have is
+   appended at the END of its header — never inserted, so no column already
+   there moves and every row written before keeps its meaning, reading blank in
+   the new column. One log, rather than a second file started whenever the
+   layout differs: the delete's dialog names one path, and that is where the
+   way back has to be. A log already in today's layout is appended to byte for
+   byte as it always was. */
+function appendTransactionsLog(existing, rows, symbolFor) {
+  const sym = symbolFor || (() => '');
+  if (!existing || !existing.trim()) return transactionsCsv(rows, sym);
+  const cut = existing.indexOf('\n');
+  const headLine = (cut < 0 ? existing : existing.slice(0, cut)).replace(/\r$/, '');
+  const names = (parseCsv(headLine)[0] || []).map(n => String(n).trim());
+  const same = names.length === TX_HEAD.length && names.every((n, i) => n === TX_HEAD[i]);
+  const body = rows.map(r => txCsvCells(r, sym));
+  if (same) return existing.replace(/\n*$/, '\n') + body.map(c => c.join(',')).join('\n') + (body.length ? '\n' : '');
+  const header = names.concat(TX_HEAD.filter(h => !names.includes(h)));
+  const at = header.map(h => TX_HEAD.indexOf(h));
+  const lines = body.map(cells => at.map(i => (i < 0 ? '' : cells[i])).join(','));
+  const rest = cut < 0 ? '' : existing.slice(cut + 1);
+  const head = header.length === names.length ? headLine : header.map(csvCell).join(',');
+  return `${head}\n${rest}`.replace(/\n*$/, '\n') + lines.join('\n') + (lines.length ? '\n' : '');
 }
 
 function categoriesCsv(categories) {
@@ -247,9 +300,18 @@ function categoriesCsv(categories) {
    to '' rather than the household symbol for the same reason transactionsCsv
    defaults that way: a caller that knows nothing about currencies writes an
    empty cell, never a symbol it invented. */
+/* Every text cell goes through escMdText, ONCE, here — for the export and for
+   the Report's detail table alike, which is why the Report no longer escapes
+   its own copy first (that would double every backslash). The date is a cell
+   a household can hand-type too, so it gets the same treatment; an ISO date
+   holds nothing it would change. The currency cell is the household's own
+   configured symbol, printed as part of a figure — escMdText's header keeps
+   those out, and `$` there could never open inline maths — so it stays on
+   escMd, which keeps it inside its cell. Amount, Excluded and Split are the
+   app's own values. */
 function transactionRow(r, money, symbolFor) {
   const sym = symbolFor ? symbolFor(r) : (r && r._symbol) || '';
-  return `| ${r.date} | ${escMd(r.desc)} | ${escMd(r.label)} | ${escMd(r.cat)} | ${escMd(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMd(r.note)} | ${splitRole(r.split)} |`;
+  return `| ${escMdText(r.date)} | ${escMdText(r.desc)} | ${escMdText(r.label)} | ${escMdText(r.cat)} | ${escMd(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMdText(r.note)} | ${splitRole(r.split)} |`;
 }
 
 /* `money(amount, row)` is the view's own formatter, injected because the
@@ -299,7 +361,10 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
     '',
     `**${range}** · ${rows.length} row${rows.length === 1 ? '' : 's'}`,
   ];
-  if (filters.length) out.push('', 'Filtered by: ' + filters.join(' · '));
+  /* Each filter repeats an account or category name, or the search text the
+     reader typed — the same household text the rows hold, escaped the same
+     way. */
+  if (filters.length) out.push('', 'Filtered by: ' + filters.map(escMdText).join(' · '));
   out.push(
     '',
     `Money in **${money(inTotal)}** · money out **${money(outTotal)}** · net **${money(inTotal + outTotal)}**`,
@@ -332,10 +397,14 @@ function categoriesMarkdown(categories, generated) {
   }
   const out = ['---', 'generated: ' + generated, '---', '', '# Categories', '',
     `${list.length} categor${list.length === 1 ? 'y' : 'ies'}`, ''];
+  /* The same generated-note escape as the transaction rows: a category's name
+     and type are the household's text, and its colour is too — "#22c55e" in a
+     rendered cell is a TAG, so every exported Categories.md filed itself under
+     one tag per colour. */
   for (const [type, cats] of [...byType].sort((a, b) => a[0].localeCompare(b[0]))) {
-    out.push(`## ${type}`, '', '| Name | Colour |', '|------|--------|');
+    out.push(`## ${escMdText(type)}`, '', '| Name | Colour |', '|------|--------|');
     for (const c of cats.sort((a, b) => a.name.localeCompare(b.name))) {
-      out.push(`| ${escMd(c.name)} | ${escMd(c.color)} |`);
+      out.push(`| ${escMdText(c.name)} | ${escMdText(c.color)} |`);
     }
     out.push('');
   }
@@ -355,14 +424,61 @@ function categoriesMarkdown(categories, generated) {
    dots into dashes, and io.js's guardedVaultPath refuses anything that still
    resolves outside the vault. Two rings, because this path is user input and
    the file write is the thing that cannot be taken back. */
-function exportPaths(range, folder) {
+/* WHAT is in them includes the filter (2026-10-07 audit, L4A-01). Named by
+   range alone, an export of one category and the next, unfiltered export of
+   the same period landed on one path: the filtered file was replaced without
+   a word, and nothing in the CSV ever said it had been filtered. The budget
+   export calls that shape data loss and names its files after the categories
+   picked (src/budget-export.js budgetExportPaths); this is the same rule for
+   this export's filters.
+
+   `filters` are the active filters as short phrases, each with its kind
+   ("account Cheque", "category Fuel", "search shell") — an account and a
+   category can share a name, and without the kind the two selections would
+   share a path. Up to three are named; past that, or when the names would
+   make a file name too long to write (a long search phrase), the name counts
+   them and adds a short tag of WHICH, so two different selections never meet
+   on one path and the same selection still lands on, and replaces, its own
+   earlier file. Literal English words, never i18n — the budget export's own
+   note on file names explains how a translated word put one selection on two
+   paths. The Categories files are the whole category list whatever the
+   filter, so they keep their names.
+
+   The tag is budgetExportPaths' own djb2-over-the-sorted-list rule, spelled
+   again here because budget-export.js does not export it (that module
+   requires this one, so it can adopt this copy).
+
+   The named form is measured in UTF-8 BYTES, not characters: a file name's
+   limit is 255 bytes on the filesystems this ships to, and a category named
+   in Chinese or Devanagari spends three bytes a character — the budget
+   export's uncapped names reached ENAMETOOLONG that way (L4A-12). 60 bytes
+   of filter beside the range and "Transactions " keeps the whole name far
+   inside the limit. TextEncoder is in every engine this supports (iOS 15
+   WebKit included). */
+const NAMED_FILTERS_MAX = 3;
+const NAMED_FILTERS_BYTES = 60;
+function pickTag(sorted) {
+  let h = 5381;
+  for (const ch of sorted.join('\u0000')) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
+  return h.toString(36).padStart(4, '0');
+}
+function filterTag(filters) {
+  const list = (filters || []).map(f => String(f ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!list.length) return '';
+  const named = list.join(', ');
+  if (list.length <= NAMED_FILTERS_MAX && new TextEncoder().encode(named).length <= NAMED_FILTERS_BYTES) return `(${named})`;
+  return `(${list.length} ${list.length === 1 ? 'filter' : 'filters'} ${pickTag(list.slice().sort())})`;
+}
+
+function exportPaths(range, folder, filters) {
   const dir = String(folder || EXPORT_DIR).split('/')
     /* Dropped, not sanitised: turning "../../secrets" into "export/export/
        secrets" would honour a traversal attempt by inventing two folders for
        it. Removing the segments resolves it to the folder actually named. */
     .filter(seg => seg.trim() && !/^\.+$/.test(seg.trim()))
     .map(safeName).join('/') || EXPORT_DIR;
-  const base = `${dir}/Transactions ${safeName(range)}`;
+  const tag = filterTag(filters);
+  const base = `${dir}/Transactions ${safeName(range)}${tag ? ` ${safeName(tag)}` : ''}`;
   return {
     dir,
     txCsv: `${base}.csv`,
@@ -374,7 +490,8 @@ function exportPaths(range, folder) {
 
 module.exports = {
   EXPORT_DIR, safeName,
-  transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths,
+  transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths, filterTag,
+  appendTransactionsLog,
   /* txHeaderLines and transactionRow: published so views/report.js's own
      transaction-detail table (src/report.js) is built from the SAME column
      order and row template as this file's own export, rather than a fourth

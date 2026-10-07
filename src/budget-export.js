@@ -134,6 +134,53 @@ function datePresets({ today, taxYearRange }) {
   return out;
 }
 
+/* ONE ROUNDING, for every rendering. Half a cent rounds AWAY FROM ZERO, on
+   the DECIMAL value of the figure.
+
+   The three renderings of one model used to round three ways: the workbook
+   with Math.round(v * 100) / 100, the CSV with toFixed(2), the PDF through
+   formatAmount (toFixed too). An Average over two periods lands on half a
+   cent whenever the total is an odd number of cents, and there they split —
+   R0,03 over two months printed 0.01 in the CSV and the PDF and 0.02 in the
+   workbook; 21.7% of two-period cent totals disagreed, and on the first real
+   vault checked one category's This-tax-year Average differed by R0,01
+   between files written by the same click (2026-10-07 audit, L4A-04). Both
+   old rules were also wrong on their own terms: 0.015, 2.675 and 1.005 are
+   stored a hair BELOW their half, so toFixed printed 0.01, 2.67 and 1.00, and
+   Math.round(1.005 * 100) is 100.
+
+   The owner's ruling: half-up on the decimal value, one helper all three
+   share. The figure is first read at fifteen significant digits — the most a
+   double carries faithfully, which is exactly what strips the binary
+   residue (0.01499999999999999944 reads as 0.0150000000000000) — and then
+   rounded in decimal by moving the point in the STRING ("…e2"), so no
+   multiplication reintroduces the residue it just removed. Away from zero
+   for negatives, because that is Excel's own ROUND and what "half-up" means
+   for money; never -0. Non-finite values pass through: each rendering already
+   says what it does with those, and this is not the place to change it.
+   Values past 1e15 have no cents left to round in a double and come back as
+   they went in. tests/export-one-average.test.cjs sweeps every cent total
+   from -R5 to R5 over 2-12 periods against an integer-cents reference. */
+function roundCents(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return n;
+  const a = Math.abs(n);
+  if (a < 1e-6) return 0;
+  if (a >= 1e15) return n;
+  const r = Number(`${Math.round(Number(`${a.toPrecision(15)}e2`))}e-2`);
+  return n < 0 && r !== 0 ? -r : r;
+}
+/* A money figure as every rendering prints it: unreadable is 0, as the CSV,
+   the workbook and formatAmount have each always treated it. */
+const cents = v => roundCents(Number(v) || 0);
+/* A budget row with its three money figures rounded where they ENTER the
+   model, so every sum below adds up exactly the numbers a reader will see —
+   a subtotal over two hand-typed 10.005 rows is 20.02, the sum of the two
+   printed 10.01s, not 20.01. Rounding a value read off the row is not
+   re-deriving it: `remaining` is still figures.js's own. */
+const centsRow = r => ({ ...r, budget: cents(r.budget), actual: cents(r.actual), remaining: cents(r.remaining) });
+const centsSummary = s => (s ? { ...s, income: cents(s.income), spend: cents(s.spend), uncatSpend: cents(s.uncatSpend) } : null);
+
 /* Per-type subtotals over the rows actually shown. `remaining` comes from
    budgetRowStatus over the summed operands — the row rule, applied to a row
    that happens to be a sum — so a subtotal can never disagree with the lines
@@ -146,7 +193,9 @@ function subtotalsOf(rows) {
     cur.actual += Number(r.actual) || 0;
     byType.set(r.type, cur);
   }
-  return [...byType.values()].map(s => ({ ...s, remaining: budgetRowStatus(s).remaining }));
+  return [...byType.values()].map(s => ({
+    ...s, budget: cents(s.budget), actual: cents(s.actual), remaining: cents(budgetRowStatus(s).remaining),
+  }));
 }
 
 /* `categories`: null means "no filter"; an ARRAY means "exactly these", and an
@@ -165,7 +214,11 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
   const only = Array.isArray(categories) ? new Set(categories) : null;
   const keep = cat => !only || only.has(cat);
 
-  const shown = list.map(p => (p.rows || []).filter(r => keep(r.cat)));
+  /* Rounded on the way IN (centsRow, roundCents above) and every derived
+     figure on the way OUT, so each number the renderings print is one this
+     model already holds — they format, they never round again by a rule of
+     their own. */
+  const shown = list.map(p => (p.rows || []).filter(r => keep(r.cat)).map(centsRow));
 
   /* Summary rows keyed by category, in first-seen order — which is figures.js's
      own type-then-name order within each period, so income stays above
@@ -191,9 +244,12 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     }
   });
   const n = list.length || 1;
+  /* The Average is the figure the old renderings split on: the rounded total
+     over the periods, rounded once more by the same rule. */
   const finish = s => {
-    const total = s.byPeriod.reduce((t, v) => t + v, 0);
-    return { ...s, total, average: total / n };
+    const byPeriod = s.byPeriod.map(cents);
+    const total = cents(byPeriod.reduce((t, v) => t + v, 0));
+    return { ...s, byPeriod, budget: cents(s.budget), total, average: cents(total / n) };
   };
   /* Grouped by TYPE, then by name. The first version kept first-seen order on
      the theory that it WAS type order — true only while every category exists
@@ -224,14 +280,17 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
       /* The period's own income/spend/uncategorised line is a statement about
          the WHOLE period. Under a category filter it would sit above a table
          it no longer describes, so it is withheld rather than mislabelled. */
-      summary: only ? null : (p.summary || null),
+      summary: only ? null : centsSummary(p.summary),
     }))
     : [];
 
   const txSource = exact ? (exact.txs || []) : list.reduce((all, p) => all.concat(p.txs || []), []);
-  const transactions = includeTx ? txSource.filter(t => !only || only.has(t.cat)) : null;
+  /* Listed, never summed — but printed three times, so rounded once like
+     every other figure: a hand-typed 3-decimal amount used to print 10.00 in
+     the CSV (exporter.js's toFixed) and 10.01 in the workbook. */
+  const transactions = includeTx ? txSource.filter(t => !only || only.has(t.cat)).map(t => ({ ...t, amount: cents(t.amount) })) : null;
 
-  const exactRows = exact ? (exact.rows || []).filter(r => keep(r.cat)) : null;
+  const exactRows = exact ? (exact.rows || []).filter(r => keep(r.cat)).map(centsRow) : null;
 
   const foreignSymbols = [...new Set(list.reduce((all, p) =>
     all.concat(((p.summary || {}).foreign || {}).symbols || []), []))];
@@ -254,7 +313,7 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
          of it is uncategorised. Withheld under a category filter for the
          reason the period headline is: it describes money the table no longer
          shows. */
-      totals: only ? null : (exact.summary || null),
+      totals: only ? null : centsSummary(exact.summary),
       periodFrom: first ? first.start : null, periodTo: last ? last.end : null,
     } : null,
     inProgress: inProgress && list.some(p => p.key === inProgress) ? inProgress : null,
@@ -267,8 +326,10 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
 
 /* Raw, two decimals, never through csvCell — exporter.js's amountCell argues
    this at length: csvCell's formula guard turns "-250.50" into "'-250.50",
-   which a spreadsheet reads as text and every SUM silently skips. */
-const num = v => (Number(v) || 0).toFixed(2);
+   which a spreadsheet reads as text and every SUM silently skips. Through
+   `cents` first, the helper every rendering shares: on a figure the model
+   already rounded, toFixed(2) then prints exactly its two decimals. */
+const num = v => cents(v).toFixed(2);
 const csvLines = (head, body) => [head.map(csvCell).join(','), ...body].join('\n') + '\n';
 
 /* NO SUBTOTAL ROWS in either CSV. A CSV is pivot-table input; a "Total" line
@@ -276,9 +337,27 @@ const csvLines = (head, body) => [head.map(csvCell).join(','), ...body].join('\n
    column. The workbook and the PDF carry subtotals, because those are read by
    a person. `Currency` rides on every row for the reason exporter.js gives
    for its own: the caveat IS the number's unit, and the file outlives the app. */
+/* THE CAVEATS, WHERE A PIVOT CANNOT TRIP OVER THEM. The PDF and the workbook
+   from the same click say three things beside the figures; the CSVs used to
+   say none (2026-10-07 audit, L4A-05), and a CSV is the copy most likely to be
+   read by something that never saw the other two. The owner's ruling: mark
+   the running period where it is named, and keep the rest out of the data.
+     - in progress: the running period's own LABEL says so — its column header
+       in the Summary CSV, its Period value in the Budget CSV. No column is
+       added or moved and no number changes, and every row of that period
+       carries the same label, so grouping, pivoting and SUM by Period work
+       exactly as before; only the part that IS partial is marked.
+     - money in another currency held out: the FILE NAME of each figure CSV
+       says so (budgetExportPaths). A program never reads a file name as data.
+     - a category pick: already in every file name, and the Category column
+       names each row.
+   English, like every header and file name here. */
+const IN_PROGRESS = ' (in progress)';
+
 function modelToCsv(model, { symbolFor } = {}) {
   const cur = model.currency;
   const files = [];
+  const label = p => (p.key === model.inProgress ? `${p.name}${IN_PROGRESS}` : p.name);
   if (model.exact) {
     /* From/To on every row, and To is `through`: the day the figure really
        runs to. A row that said 2027-02-28 in September 2026 would be claiming
@@ -295,15 +374,20 @@ function modelToCsv(model, { symbolFor } = {}) {
   if (!model.exact || model.periods.length) files.push({
     kind: 'summary',
     text: csvLines(
-      ['Category', 'Type', 'Currency', ...model.periods.map(p => p.name), 'Total', 'Average', 'Budgeted'],
+      ['Category', 'Type', 'Currency', ...model.periods.map(label), 'Total', 'Average', 'Budgeted'],
       model.summary.rows.map(r => [csvCell(r.cat), csvCell(r.type || ''), csvCell(cur),
         ...r.byPeriod.map(num), num(r.total), num(r.average), num(r.budget)].join(','))),
   });
-  if (model.content === 'full') {
+  /* Only when there is a period table to put in it — the same test the
+     dialog's preview makes (views/budget-export.js filesFor). This used to be
+     `content === 'full'` alone, so a date range no period ends inside wrote a
+     header-only Budget.csv the preview never named (2026-10-07 audit,
+     L4A-13): the empty file the Summary rule above refuses, by a second route. */
+  if (model.content === 'full' && model.budgets.length) {
     const body = [];
     for (const b of model.budgets) {
       for (const r of b.rows) {
-        body.push([csvCell(b.period.name), csvCell(b.period.start || ''), csvCell(b.period.end || ''),
+        body.push([csvCell(label(b.period)), csvCell(b.period.start || ''), csvCell(b.period.end || ''),
           csvCell(r.cat), csvCell(r.type || ''), csvCell(cur),
           num(r.budget), num(r.actual), num(r.remaining), csvCell(r.notes || '')].join(','));
       }
@@ -418,11 +502,12 @@ const showsRemaining = r => Number(r.budget) > 0 || !!r.unbudgeted;
    evaluates, so the quote prefix csvCell needs would only corrupt the name. */
 function modelToSheets(model, { symbolFor, labels } = {}) {
   const L = labelsOf(labels);
-  /* Rounded to cents on the way in. The model's sums are honest floating
-     point — 0.1 + 0.2 + 0.3 is 0.6000000000000001 — and the money FORMAT hides
-     that in the cell, but the formula bar does not, and neither does anyone's
-     `=C2=D2`. The CSV has always rounded (toFixed(2)); this is the same figure. */
-  const cents = v => Math.round((Number(v) || 0) * 100) / 100;
+  /* A cell holds the figure the model rounded — the money FORMAT would hide
+     0.6000000000000001 in the cell, but the formula bar does not, and neither
+     does anyone's `=C2=D2`. This used to round by a rule of its own,
+     Math.round(v * 100) / 100, under a comment saying the CSV's toFixed(2)
+     gave "the same figure"; on half a cent it did not (L4A-04, roundCents
+     above). `cents` is now the one helper the CSV and the PDF share too. */
   const m = v => ({ v: cents(v), s: 'money' });
   const mb = v => ({ v: cents(v), s: 'moneyBold' });
   const head = cells => cells.map(v => ({ v, s: 'head' }));
@@ -485,8 +570,12 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
    on A4 shrink past reading, and an "all" export can be sixty. */
 function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   const L = labelsOf(labels);
-  const fmt = money || (v => num(v));
-  const rfmt = rowMoney || ((v) => fmt(v));
+  /* Every amount reaches the injected formatter through `cents`, the helper
+     the CSV and the workbook print through — formatAmount's toFixed then
+     prints a figure that is already rounded, so the PDF cannot split from
+     the other two on half a cent (L4A-04). */
+  const fmt = v => (money ? money(cents(v)) : num(v));
+  const rfmt = (v, row) => (rowMoney ? rowMoney(cents(v), row) : fmt(v));
   const headline = t => fill(L.periodLine, { income: fmt(t.income), spend: fmt(t.spend) })
     + ((Number(t.uncatSpend) || 0) ? fill(L.periodUncat, { uncat: fmt(t.uncatSpend) }) : '');
   const wide = model.periods.length > PDF_MAX_PERIOD_COLS;
@@ -515,7 +604,7 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
      every one of two hundred cells cost it a font size and truncated the
      category names ("Discovery 32 Day notice sa…"). With a plain formatter
      handed in, the cells carry the number and the unit is said ONCE, above. */
-  const cell = plainMoney || fmt;
+  const cell = v => (plainMoney ? plainMoney(cents(v)) : fmt(v));
   for (const g of grouped(model.summary.rows, model.summary.subtotals)) {
     const x = g.row || g.sub;
     if (g.sub) boldRows.push(rows.length);
@@ -580,6 +669,12 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   };
 }
 
+/* ------------------------------ destinations -------------------------------- */
+
+/* hiddenSegment lives in vault-path.js: the one rule every export and the
+   Report ask through io.js destinationProblem (2026-10-07 audit). */
+const { hiddenSegment } = require('./vault-path');
+
 /* ------------------------------- file names -------------------------------- */
 
 /* Named by WHAT IS IN THEM — exportPaths()'s own rule — so re-exporting the
@@ -597,6 +692,23 @@ function pickTag(sortedCats) {
   return h.toString(36).padStart(4, '0');
 }
 
+/* Bytes of `s` in UTF-8 — what a filesystem's 255-per-name limit counts. By
+   hand rather than TextEncoder only because a string's length in bytes is
+   four comparisons per character, not an allocation. */
+function utf8Length(s) {
+  let n = 0;
+  for (const ch of String(s)) {
+    const cp = ch.codePointAt(0);
+    n += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+  return n;
+}
+/* The longest file name (the part after the last "/") an export may write.
+   APFS, iOS, ext4 and NTFS all stop at 255 — APFS and ext4 counting UTF-8
+   BYTES — and an iCloud or Dropbox sync can add a conflict suffix to a name
+   that was already at the edge. 200 leaves that room. */
+const LEAF_MAX_BYTES = 200;
+
 function budgetExportPaths(model, folder) {
   const dir = String(folder || EXPORT_DIR).split('/')
     .filter(seg => seg.trim() && !/^\.+$/.test(seg.trim()))
@@ -609,24 +721,51 @@ function budgetExportPaths(model, folder) {
      path, and one would silently overwrite the other — so it carries a short
      tag of WHICH ones, over the SORTED list so the same pick ticked in another
      order still lands on, and replaces, its own earlier file. */
+  /* …and the limit is on the NAME, not on the count. Three long names (one
+     of 200 characters) made leaves of 262-268 bytes: the dialog previewed
+     them, the PDF and the workbook landed, and the CSVs failed with
+     ENAMETOOLONG — a partial export (2026-10-07 audit, L4A-12). So when the
+     LONGEST leaf this export could write would pass LEAF_MAX_BYTES, the names
+     give way to the count-and-tag form. Measured over every file the export
+     could write, not the ticked formats, so a PDF-only and a CSV-only export
+     of one selection still share a name and still replace each other; in
+     bytes, because that is what the filesystem counts — a CJK name is three
+     bytes a character. */
   const cats = (model.categories || []).slice().sort();
-  const filterTag = !model.filtered ? ''
-    : (cats.length && cats.length <= 3 ? `(${cats.join(', ')})` : `(${cats.length} categories ${pickTag(cats)})`);
-  const name = safeName([
+  const counted = `(${cats.length} ${cats.length === 1 ? 'category' : 'categories'} ${pickTag(cats)})`;
+  /* Money in another currency that EVERY figure here holds out, named on the
+     CSVs that hold those figures — see modelToCsv's header (L4A-05). The PDF
+     and the workbook say it in a sentence inside, so their names do not
+     move; the Transactions CSV lists each row in its own currency and holds
+     nothing out. Through safeName like every other part of a name: a symbol
+     is typed by the household, and the Peruvian "S/." would otherwise put a
+     folder separator into a file name. */
+  const held = (model.foreignSymbols || []).length ? ` (${safeName(model.foreignSymbols.join(', '))} not included)` : '';
+  const nameWith = tag => safeName([
     model.content === 'full' ? 'Budget' : 'Budget summary',
     model.rangeLabel,
-    filterTag,
+    tag,
   ].filter(Boolean).join(' '));
-  const base = `${dir}/${name}`;
-  return {
-    dir, base,
-    pdf: `${base}.pdf`,
-    xlsx: `${base}.xlsx`,
-    csv: { exact: `${base} - Exact dates.csv`, summary: `${base} - Summary.csv`, budget: `${base} - Budget.csv`, transactions: `${base} - Transactions.csv` },
+  const pathsFor = name => {
+    const base = `${dir}/${name}`;
+    return {
+      dir, base,
+      pdf: `${base}.pdf`,
+      xlsx: `${base}.xlsx`,
+      csv: {
+        exact: `${base} - Exact dates${held}.csv`, summary: `${base} - Summary${held}.csv`,
+        budget: `${base} - Budget${held}.csv`, transactions: `${base} - Transactions.csv`,
+      },
+    };
   };
+  const longestLeaf = p => Math.max(...[p.pdf, p.xlsx, ...Object.values(p.csv)].map(x => utf8Length(x.slice(x.lastIndexOf('/') + 1))));
+  if (!model.filtered) return pathsFor(nameWith(''));
+  const named = pathsFor(nameWith(cats.length && cats.length <= 3 ? `(${cats.join(', ')})` : counted));
+  return longestLeaf(named) <= LEAF_MAX_BYTES ? named : pathsFor(nameWith(counted));
 }
 
 module.exports = {
   RANGE_KEYS, PDF_MAX_PERIOD_COLS, LABELS,
   exportPeriods, periodsEndingIn, datePresets, buildModel, modelToCsv, modelToSheets, modelToDoc, budgetExportPaths,
+  roundCents, hiddenSegment,
 };

@@ -223,9 +223,10 @@ const rowsIn = (S, key) => S.txFiles[key].rows.length;
 
   answers.confirm = true;
   await ctx.undoImport();
-  eq(rowsIn(S, 'Card/2026-07'), 0, 'the imported rows are gone from the model');
-  ok(!ctx.vault._store.get(`${B}/Transactions/Card/2026-07.md`).includes('| Fuel |'),
-    'and from the file — an undo of a write has to be a write');
+  // The import CREATED Card/2026-07, so its Undo takes the file back rather than leaving it header-only (L3-19, tests/import-undo-removes-created-file).
+  eq(S.txFiles['Card/2026-07'], undefined, 'the imported rows are gone from the model, with the month the import made');
+  eq(ctx.vault._store.has(`${B}/Transactions/Card/2026-07.md`), false,
+    'and from the vault — the file goes to the trash, never left behind header-only');
   eq(S.lastImport, null, 'the offer is spent');
   eq(rowsIn(S, 'Cheque/2026-07'), 5, 'nothing outside the import was touched');
   const msg = seen.confirms[seen.confirms.length - 1].message;

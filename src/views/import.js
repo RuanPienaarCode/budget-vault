@@ -19,7 +19,7 @@ const i18n = require('../i18n');
 const { el } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
-  statementAccountNumber, sameAccountNumber } = require('../statement');
+  statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
@@ -43,7 +43,8 @@ function decideDayFirst(rawDates, householdDayFirst) {
 }
 
 module.exports = function registerImport(ctx) {
-  const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel, txFileRel } = ctx;
+  const { S, $, app, money, toast, writeFile, currentPeriod, periodRange, periodTitle, deferredCatSelect, serializeTxFile, locale, learnRules, txSegment, accountForLabel, txFileRel,
+    pathTaken, fileAt, trashFile } = ctx;
 
   /* The formatter for a previewed row, rebound whenever the destination
      account changes (see renderPreview). Defaults to money() so any path that
@@ -65,6 +66,16 @@ module.exports = function registerImport(ctx) {
 
   function dedupIndex() {
     return buildIndex(S.txFiles);
+  }
+  /* The rows already in the vault for an account — what applyCounterparties
+     looks in for the OTHER leg of a transfer before it pre-excludes a row
+     (statement.js; 2026-10-07 audit, L4B-TXT-COUNTERPARTY). period.js's
+     accountIndex, the one account → rows join, built once per call and late
+     bound because period.js registers on its own. Without it there is no
+     evidence, and the safe answer is that nothing is pre-excluded. */
+  function legsOfAccounts() {
+    const idx = typeof ctx.accountIndex === 'function' ? ctx.accountIndex() : new Map();
+    return acct => (idx.get(acct) || {}).rows || [];
   }
   function detectAccountLabel(filename, rows) {
     // Discovery-style "Label_12345_..." or a bare account number ("12345678901.csv",
@@ -298,13 +309,16 @@ module.exports = function registerImport(ctx) {
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
     /* Moving your own money between your own accounts is not income and not
        spend, so a recognised counterparty arrives pre-excluded rather than
-       counted. Pre-EXCLUDED, not pre-categorised: there is no transfer category
-       in this app's vocabulary, and "vetoed from income and spend totals" is
-       exactly what an excluded transaction means. A suggestion, never a
-       decision — the review's exclude tick is live on this row like any other,
-       and `transferTo` is carried only so the reader can see WHY it arrived
-       ticked. renderImportReview runs this again whenever the account changes. */
-    applyCounterparties(items, S.accounts, label0);
+       counted — when the other account holds the other leg of it. A number in
+       the description alone only SUGGESTS: whoever typed the reference wrote
+       it, and an account number is what a household gives out to be paid
+       (statement.js applyCounterparties). Pre-EXCLUDED, not pre-categorised:
+       there is no transfer category in this app's vocabulary, and "vetoed from
+       income and spend totals" is exactly what an excluded transaction means.
+       Never a decision — the review's exclude tick is live on this row like
+       any other, and `transferTo` is carried so the reader can see WHY it is
+       badged. renderImportReview runs this again whenever the account changes. */
+    applyCounterparties(items, S.accounts, label0, legsOfAccounts());
     /* Prove the sign convention against the statement's own balance column.
        This is what lets a bank nobody has tested import safely: if its single
        Amount column lists debits as positive, the balances say so and every
@@ -623,7 +637,7 @@ module.exports = function registerImport(ctx) {
        self-transfer suggestion is a function of that account, so it is
        recomputed every render rather than left as parse-time guesswork; rows
        the reader has decided on carry manualExclude and are skipped. */
-    applyCounterparties(p.items, S.accounts, p.label);
+    applyCounterparties(p.items, S.accounts, p.label, legsOfAccounts());
 
     /* ISSUE 53. The account is settled by the line above, so the sign verdict
        is re-decided here from the SAME account — not from the parse-time guess.
@@ -790,10 +804,20 @@ module.exports = function registerImport(ctx) {
           el('div', { class: 'imp-near-why' }, pendingWhy),
         ] : []), ...(it.transferTo ? [
           // Named, not silent: a row that arrives excluded must say what made
-          // it so, or the reader finds a missing figure later with no trail.
-          el('span', { class: 'category-badge badge-transfer',
-            title: `The description names your ${it.transferTo} account, so this looks like money moved between your own accounts rather than income or spend. Untick Exclude to count it.` },
-          'transfer'),
+          // it so, or the reader finds a missing figure later with no trail —
+          // and a row that only LOOKS like a transfer must say why it was
+          // left counted, so the reader can make the call the app would not.
+          /* The closing sentence follows the tick as it stands, so a row the
+             reader has decided on never reads as the opposite of its box. */
+          it.transferLeg
+            ? el('span', { class: 'category-badge badge-transfer',
+              title: `The description names your ${it.transferTo} account, and ${it.transferTo} already has the same amount the other way on ${it.transferLeg} — money moved between your own accounts rather than income or spend. `
+                + (it.excluded ? 'So it arrives excluded; untick Exclude to count it.' : 'You have chosen to count it anyway.') },
+            'transfer')
+            : el('span', { class: 'category-badge badge-transfer',
+              title: `The description quotes the number of your ${it.transferTo} account, but ${it.transferTo} has no matching amount the other way within ${TRANSFER_LEG_DAYS} days — and anyone paying you can type that number as their reference. `
+                + (it.excluded ? 'You have excluded it as a transfer.' : 'So it is counted as income or spend, not as a transfer; tick Exclude if it really was money moved between your own accounts.') },
+            'transfer?'),
         ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewMoney(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`),
@@ -845,6 +869,23 @@ module.exports = function registerImport(ctx) {
     const ident = acctIdentity(p);
     if (ident.state === 'mismatch') {
       return toast(`That statement belongs to account ${ident.ours}, not ${ident.acct.name} (${ident.theirs}) — nothing was imported`, true);
+    }
+    /* Not into a month with unsaved edits (2026-10-07 audit, L3-26). Each
+       month is written whole from its live model, so an unsaved recategorise
+       there went to disk with the imported rows — Save never pressed, and
+       "Reload from disk" no longer a way back from it. Refused for the whole
+       import rather than for the one month: half a statement landing is a
+       state the reader has to untangle, and nothing is lost by waiting — the
+       review stays on screen exactly as it is, the edits stay unsaved. Asked
+       before the account-number offer below, so a refused import writes
+       nothing at all. Only the months this import writes are looked at. */
+    const unsaved = [...new Set(toAdd.map(it => it.date.slice(0, 7)))]
+      .filter(month => (S.txFiles[`${label}/${month}`] || {}).dirty)
+      .map(month => txFileRel(label, month));
+    if (unsaved.length) {
+      return toast(`${unsaved.join(', ')} ${unsaved.length === 1 ? 'has' : 'have'} changes you have not saved. `
+        + 'Importing writes each month file whole, so it would save them too — Save or reload them on the '
+        + 'Transactions page first, then Import rows again. Nothing was imported.', true);
     }
     if (ident.state === 'adopt') {
       /* Asked once, on the first import into an account that has no number.
@@ -913,6 +954,13 @@ module.exports = function registerImport(ctx) {
         const fileModel = existing
           ? { ...existing, rows: existing.rows.concat(rows) }
           : { label, month, rows, dirty: false, fmRaw: TX_FM };
+        /* Whether THIS write brings the month file into existence — the fact
+           undoImport needs to take it back rather than leave a header-only
+           file behind (2026-10-07 audit, L3-19). Asked of the vault, case-folded
+           the way the filesystem answers (io.js pathTaken), as well as of the
+           model: a month that reached disk some other way since the last load
+           is not one this import made, and must never be trashed by its Undo. */
+        const created = !existing && !pathTaken(txFileRel(label, month));
         await writeFile(txFileRel(label, month), serializeTxFile(fileModel));
         if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
         S.txFiles[key].rows.push(...rows);
@@ -924,7 +972,7 @@ module.exports = function registerImport(ctx) {
           // and the near pass must be able to match a later rewrite of it.
           addToIndex(p.index, e.src.date, e.src.desc, e.src.amount, lab);
         }
-        landed.push({ key, month, rows });
+        landed.push({ key, month, rows, created });
         done += rows.length;
       }
     } catch (err) {
@@ -996,7 +1044,19 @@ module.exports = function registerImport(ctx) {
       if (!file) continue;
       const live = new Set(file.rows);
       const doomed = new Set(f.rows.filter(row => live.has(row)));
-      if (doomed.size) targets.push({ file, doomed, dirty: file.dirty });
+      /* `emptied` — a month this import CREATED, left with nothing but its own
+         rows. Taking those back means taking the file back too: rewriting it
+         header-only left a month file the import had invented, and a second
+         Undo could not remove it (2026-10-07 audit, L3-19). A created month
+         that has since gained a row of the reader's own (Add transaction, a
+         split's parts) is not emptied, and is rewritten like any other. */
+      const emptied = !!f.created && file.rows.every(row => doomed.has(row));
+      /* The file to trash is taken HERE, before the confirmation below, as a
+         TFile — io.js trashFile's own rule: a path re-resolved after a dialog
+         may name nothing by then, or a different file, while a TFile survives
+         a rename. The account, plan, tax-year and note deletes do the same. */
+      const tfile = emptied ? fileAt(txFileRel(file.label, file.month)) : null;
+      if (doomed.size) targets.push({ key: f.key, file, doomed, dirty: file.dirty, emptied, tfile });
     }
     const total = targets.reduce((n, t) => n + t.doomed.size, 0);
     if (!total) {
@@ -1007,13 +1067,19 @@ module.exports = function registerImport(ctx) {
     /* Unsaved edits in the same months go to disk with the undo, because the
        write below serialises the whole file from memory. Said out loud rather
        than discovered afterwards: it is a save the reader did not press Save
-       for, and on this page there is always the possibility of one. */
-    const alsoSaves = targets.some(t => t.dirty);
+       for, and on this page there is always the possibility of one. A month
+       going to the trash writes nothing, so it cannot carry an edit out. */
+    const rewritten = targets.filter(t => !t.emptied).length;
+    const trashed = targets.length - rewritten;
+    const alsoSaves = targets.some(t => t.dirty && !t.emptied);
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const acts = [];
+    if (rewritten) acts.push(`rewrite ${plural(rewritten, 'monthly file')}`);
+    if (trashed) acts.push(`move the ${plural(trashed, 'file')} this import created to the vault's trash`);
     const go = await confirmModal(app, {
       title: 'Undo this import',
-      message: `Remove the ${total} row${total === 1 ? '' : 's'} imported into ${r.label}`
-        + (r.filename ? ` from ${r.filename}` : '') + ', and rewrite '
-        + `${targets.length} monthly file${targets.length === 1 ? '' : 's'}? `
+      message: `Remove the ${plural(total, 'row')} imported into ${r.label}`
+        + (r.filename ? ` from ${r.filename}` : '') + `, and ${acts.join(', and ')}? `
         + 'Categorisation rules learned during the import are kept — they cost nothing and '
         + 'are useful whichever account the statement really belongs to.'
         + (alsoSaves ? ' Unsaved edits you have made in those same months will be written out too.' : ''),
@@ -1024,17 +1090,25 @@ module.exports = function registerImport(ctx) {
     let undone = 0, files = 0;
     try {
       for (const t of targets) {
-        const keep = t.file.rows.filter(row => !t.doomed.has(row));
-        /* Written from a MODEL rather than by mutating first: a write that
-           fails must leave the row in memory as well as on disk, or the app
-           starts reporting a total the file does not hold. Same lockstep rule
-           commitImport follows in the other direction. */
-        await writeFile(txFileRel(t.file.label, t.file.month),
-          serializeTxFile({ ...t.file, rows: keep }));
-        t.file.rows = keep;
-        // Disk now matches memory for this file, including whatever unsaved
-        // edits it carried — so it is genuinely clean, not merely written.
-        t.file.dirty = false;
+        if (t.emptied) {
+          /* io.js trashFile: the vault's own .trash, recoverable from inside
+             Obsidian — never the system trash. A file already gone by now is
+             simply no longer there to take back (trashFile says false), and
+             memory follows the disk either way. */
+          await trashFile(t.tfile);
+          delete S.txFiles[t.key];
+        } else {
+          const keep = t.file.rows.filter(row => !t.doomed.has(row));
+          /* Written from a MODEL rather than by mutating first: a write that
+             fails must leave the row in memory as well as on disk, or the app
+             starts reporting a total the file does not hold. Same lockstep rule
+             commitImport follows in the other direction. */
+          await writeFile(txFileRel(t.file.label, t.file.month), serializeTxFile({ ...t.file, rows: keep }));
+          t.file.rows = keep;
+          // Disk now matches memory for this file, including whatever unsaved
+          // edits it carried — so it is genuinely clean, not merely written.
+          t.file.dirty = false;
+        }
         undone += t.doomed.size;
         files++;
       }

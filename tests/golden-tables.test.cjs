@@ -13,7 +13,7 @@
    migration completes, an intentional format change bumps these literals
    together with a changelog entry saying files will rewrite.)
 
-   TWO INTENTIONAL CHANGES HAVE BEEN MADE SINCE, each recorded here rather
+   THREE INTENTIONAL CHANGES HAVE BEEN MADE SINCE, each recorded here rather
    than left for a future reader to find by archaeology.
 
    ISSUE 68 — the `Car` row's `Original` cell. The fixture leaves it BLANK, and
@@ -36,6 +36,16 @@
    cell is written differently, and a `monthly` or `annual` row round-trips
    byte for byte as it always did. The rewrite is one comment line in
    Services.md on that file's next save, and CHANGELOG.md says so.
+
+   2026-10-07 AUDIT (L3-22, CONTRACT 1) — a transactions month keeps its OWN
+   separator row. Both fixture months are written with the short
+   `|---|---|---|---:|---|---|` row, and the serializer used to replace it with
+   its padded default on every save: a whole-file rewrite the household never
+   asked for, on every month it touched. The separator now goes back as the
+   file wrote it, while its cell count still matches the header written. The
+   diff is one line in each of GOLDEN.tx6 and GOLDEN.tx7 and nothing else;
+   the four flat-table literals are unchanged, and a month written with the
+   padded row still gets the padded row back.
 
    That is the whole permitted shape of an update to this file: a stated
    reason, a bounded diff, and a changelog entry. A literal edited to make a
@@ -70,8 +80,8 @@ const GOLDEN = {
   owed: "---\nkind: owed\naliases: [debts]\n---\n\n# Owed Money\n\nMoney owed to the household. `status` is `outstanding` or `paid`.\n`Repaid` is how much has come back; `Lent` is when it went out.\n\n| Person | Amount | Description | Due date | Status | Repaid | Lent |\n|--------|-------:|-------------|----------|--------|-------:|------|\n| Sam \\| Pete | 250.00 | lunch \\| coffee | 2026-08-01 | outstanding | 0.00 |  |\n| Thabo | 1500.00 | space-grouped | 2026-09-01 | outstanding | 0.00 |  |\n| Nadia | 4000.00 | part repaid |  | outstanding | 1000.00 |  |\n",
   services: "---\nkind: services\n---\n\n# Services & Subscriptions\n\nRecurring services and subscriptions. `cycle` is one of: weekly, fortnightly, monthly, annual.\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|------|----------|-------:|-------|--------------|----------|--------|-------|\n| Netflix \\| HD | Netflix | 199.00 | monthly | 2026-08-05 | Groceries | yes | family \\| plan |\n| Insurance | Broker | 1299.00 | monthly | 2026-08-15 |  | yes | space-grouped |\n",
   debts: "---\nkind: debts\naliases: [liabilities]\n---\n\n# Debts\n\nMoney the household owes. `rate` is the annual interest rate as a percentage,\n`payment` the contracted monthly amount and `extra` anything paid on top of it.\n`status` is `active` or `paid`.\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|------|--------|------|--------:|---------:|-----:|--------:|------:|------------|----------|--------|-------|\n| Visa \\| Gold | Bank \\| A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | Groceries | active | revolving \\| card |\n| Car | WesBank | vehicle | 1234.56 |  | 11.25 | 1500.00 | 0.00 | 2023-01-15 |  | paid | multi<br>line |\n",
-  tx6: "---\naccount: \"FNB Cheque\"\nmonth: 2026-07\n---\n\n| Date | Description | Category | Amount | Excluded | Note |\n|------|-------------|----------|-------:|----------|------|\n| 2026-07-01 | Woolworths Gardens | Groceries | -249.99 |  |  |\n| 2026-07-02 | PnP \\| Sandton | Groceries | -1000.00 | yes | split \\| two cards |\n| 2026-07-04 | Legacy cell | Groceries | 1 234,56 |  |  |\n",
-  tx7: "---\naccount: \"FNB Cheque\"\nmonth: 2026-08\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|------|-------------|----------|-------:|----------|------|-------|\n| 2026-08-04 | Virgin Active | Gym | -600.00 |  |  |  |\n| 2026-08-07 | Checkers Hyper | Groceries | -1000.00 | yes | Split into 3 | parent |\n| 2026-08-07 | Checkers Hyper | Groceries | -600.00 |  |  | part |\n",
+  tx6: "---\naccount: \"FNB Cheque\"\nmonth: 2026-07\n---\n\n| Date | Description | Category | Amount | Excluded | Note |\n|---|---|---|---:|---|---|\n| 2026-07-01 | Woolworths Gardens | Groceries | -249.99 |  |  |\n| 2026-07-02 | PnP \\| Sandton | Groceries | -1000.00 | yes | split \\| two cards |\n| 2026-07-04 | Legacy cell | Groceries | 1 234,56 |  |  |\n",
+  tx7: "---\naccount: \"FNB Cheque\"\nmonth: 2026-08\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n| 2026-08-04 | Virgin Active | Gym | -600.00 |  |  |  |\n| 2026-08-07 | Checkers Hyper | Groceries | -1000.00 | yes | Split into 3 | parent |\n| 2026-08-07 | Checkers Hyper | Groceries | -600.00 |  |  | part |\n",
 };
 
 (async () => {

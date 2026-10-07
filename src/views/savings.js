@@ -830,6 +830,39 @@ module.exports = function registerSavings(ctx) {
           + 'counted as growth instead. Import the account\'s earlier statements, or correct its '
           + 'opening date, and the split corrects itself.')));
     }
+    /* The same overstatement with no records at all — and said as that. This
+       used to share the history-gap sentence, measuring the "gap" to today, so
+       a fund the vault holds no transactions for read "records begin N days
+       after it opened": a claim about records that do not exist. */
+    if (r.trust === 'no-records') {
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        `no transactions recorded in the ${r.gapDays} days since it opened — growth may be overstated`,
+        'Nothing in the vault records money going into this account since its opening date, so anything '
+          + 'added since then is counted as growth instead. Import its statements and the split corrects itself.')));
+    }
+
+    /* What the figure is MEASURED ON, whenever that is not the balance the
+       reader typed. Growth is what the account holds less what went into it,
+       both as of today — and a balance stated on the 12th cannot hold the
+       debit order of the 3rd of next month, so savings-math.js rolls it
+       forward with reconcile(), the same figure the reconciliation line below
+       offers. Said here because the row above shows the TYPED balance, and a
+       put-in-plus-growth that adds up to some other number with nothing beside
+       it is the page arguing with itself. On a market-linked fund the roll
+       forward is a floor, so the growth since that date is named as missing
+       rather than implied to be measured. */
+    if (r.balanceBasis === 'implied') {
+      const n = r.sinceStated, date = a.balance_updated;
+      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
+        `measured on ${acctMoney(a, r.balance, 0)} — your ${date} balance plus ${n} transaction${n === 1 ? '' : 's'} since`,
+        `Growth is what the account holds less what was put in, both as of today. The balance you gave is dated ${date}, `
+          + `so the ${n === 1 ? 'transaction' : `${n} transactions`} recorded since then ${n === 1 ? 'is' : 'are'} added to it first — `
+          + 'the same figure the reconciliation below offers.'
+          + (accountType(a) === 'investment'
+            ? ` On a fund whose value moves with the market, growth since ${date} that no transaction recorded is not in `
+              + 'it yet: confirm the balance and it is.'
+            : ''))));
+    }
 
     /* The mirror case. Transactions exist BEFORE the stated opening date, so
        either that date is wrong or the starting amount is not the balance at
@@ -983,6 +1016,14 @@ module.exports = function registerSavings(ctx) {
         s.truncatedFrom ? `from ${s.truncatedFrom}` : null,
         foreignEntries.length
           ? `${foreignEntries.length} in another currency, not drawn here`
+          : null,
+        /* The total is the balances growth was measured ON — as of today, the
+           typed ones rolled forward by the rows since — while every card below
+           prints the typed one. Named, rounded to the rand like the KPI drift
+           line above, so the two never disagree on screen without a reason. */
+        Math.abs(s.rolled) >= 1
+          ? `as of today — ${money(Math.abs(s.rolled), 0)} ${s.rolled > 0 ? 'more' : 'less'} than the stated balances, `
+            + 'from transactions recorded since'
           : null,
       ].filter(Boolean).join(' · ');
     }

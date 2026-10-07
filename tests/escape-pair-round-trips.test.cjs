@@ -126,4 +126,108 @@ eq(/date: unescMd\(c\[3\] \|\| ''\)/.test(loadSrc), true,
 eq(/tint: unescMd\(c\[3\] \|\| ''\)/.test(loadSrc), true,
   "plan envelopes[].tint is read through unescMd, not a bare trim");
 
-console.log(`PASS — every escaped cell reads back through the escape's inverse, and stays put across saves (${checks} checks).`);
+/* ---- 4: the two inputs that broke a row (2026-10-07 audit, L4A-06) ------ */
+
+/* escMd escaped `|` and CRLF/LF and nothing else, which left two inputs that
+   end a markdown table row early while this module's own reader saw nothing
+   wrong:
+
+     - a lone CR (`\r` with no `\n` after it). CommonMark ends a line on it,
+       so `old mac\rline ending` cut its row in two and the table stopped
+       there; parseMdTable splits on `\r?\n` and read it as one line.
+     - a backslash right before a pipe. `a\|b` became `a\\|b` — and `\\` is
+       an ESCAPED BACKSLASH, so the pipe after it is a bare cell boundary: one
+       cell too many for every reader that counts backslashes the CommonMark
+       way. splitBarePipes treats any backslash-before-pipe as an escape, so
+       the app read one cell and never noticed. The vault's own month files,
+       the Transactions export and the Report's detail table all went through
+       it.
+
+   So a lone CR becomes `<br>` like any other line ending, and every
+   backslash in a run that ends at a pipe is doubled before the pipe is
+   escaped: `a\|b` is written `a\\\|b`, an escaped backslash and an escaped
+   pipe, which is ONE cell under either way of reading a table. unescMd
+   decodes an odd run back exactly. An even run is what the old escMd wrote
+   (`a\\|b` for a typed `a\|b`) and keeps its old reading, so a month file
+   already on disk loads exactly as it did and heals on its next save.
+
+   Two splitters, because the claim is "one cell under BOTH": this module's
+   own (any backslash before a pipe escapes it) and the CommonMark one (only
+   an odd run of backslashes does), written out here as the oracle. */
+const commonMarkCells = row => {
+  let t = row.trim();
+  if (t.startsWith('|')) t = t.slice(1);
+  const cells = [];
+  let cur = '';
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === '\\') {
+      let j = i;
+      while (t[j] === '\\') j++;
+      cur += t.slice(i, j);
+      if (t[j] === '|' && (j - i) % 2 === 1) { cur += '|'; i = j; } else i = j - 1;
+      continue;
+    }
+    if (t[i] === '|') { cells.push(cur.trim()); cur = ''; continue; }
+    cur += t[i];
+  }
+  if (cur.trim() !== '') cells.push(cur.trim());
+  return cells;
+};
+
+eq(escMd('old mac\rline ending'), 'old mac<br>line ending', 'a lone CR becomes <br>, like CRLF and LF');
+eq(unescMd(escMd('old mac\rline ending')), 'old mac\nline ending', 'and reads back as a line break');
+eq(escMd('path a\\|b'), 'path a\\\\\\|b', 'a backslash before a pipe is itself escaped: a\\|b is written a\\\\\\|b');
+eq(unescMd(escMd('path a\\|b')), 'path a\\|b', 'and reads back as typed');
+eq(escMd('a\\\\|b'), 'a\\\\\\\\\\|b', 'every backslash in the run is doubled (two typed, four written, then the escaped pipe)');
+eq(unescMd(escMd('a\\\\|b')), 'a\\\\|b', 'and the run reads back at its own length');
+eq(unescMd('path a\\\\|b'), 'path a\\|b', 'a cell the OLD escMd wrote for a\\|b (an even run) still reads as a\\|b');
+eq(escMd(unescMd('path a\\\\|b')), 'path a\\\\\\|b', 'and its next save writes the form both readers agree on');
+eq(cellsOf(`| x | ${escMd('path a\\|b')} | y |`).length, 3, 'this module\'s reader: one cell');
+eq(commonMarkCells(`| x | ${escMd('path a\\|b')} | y |`).length, 3, 'the CommonMark reader: one cell too');
+eq(commonMarkCells('| x | path a\\\\|b | y |').length, 4, 'and the old output really did split under the CommonMark reader');
+
+/* Exhaustive over every string of up to five symbols drawn from the ones
+   that matter here — a letter, a space, a pipe, a backslash, CR, LF, and a
+   literal <br> — so a run, a CRLF, a lone CR, a pipe at either end and
+   every adjacency between them are all covered.
+
+   SHIPPED_* are escMd/unescMd exactly as 1.49.1 released them, frozen here as
+   the reference for the byte-identity half of this claim. Never update them:
+   their whole value is that they are the old bytes. */
+const SHIPPED_ESC = s => (s ?? '').toString().replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim();
+const SHIPPED_UNESC = s => (s ?? '').replace(/<br>/g, '\n').replace(/\\\|/g, '|').trim();
+const ALPHABET = ['a', ' ', '|', '\\', '\r', '\n', '<br>'];
+const norm = s => s.replace(/\r\n|\r/g, '\n').replace(/<br>/g, '\n').trim();
+const touchedShape = s => /\r(?!\n)/.test(s) || /\\\|/.test(s);   // a lone CR, or a backslash right before a pipe
+const runOfTwoBeforePipe = s => /\\\\\|/.test(s);
+let corpus = [''];
+let all = [''];
+for (let len = 1; len <= 5; len++) {
+  corpus = corpus.flatMap(p => ALPHABET.map(c => p + c));
+  all = all.concat(corpus);
+}
+let rowsChecked = 0, unchanged = 0;
+for (const s of all) {
+  const e = escMd(s);
+  assert.ok(!/[\r\n]/.test(e), `escMd output stays on one line — ${JSON.stringify(s)}`);
+  const row = `| x | ${e} | y |`;
+  assert.strictEqual(cellsOf(row).length, 3, `one cell for this module's reader — ${JSON.stringify(s)}`);
+  assert.strictEqual(commonMarkCells(row).length, 3, `one cell for a CommonMark reader — ${JSON.stringify(s)}`);
+  assert.strictEqual(unescMd(cellsOf(row)[1]), norm(s), `read back as typed (line endings normalised, trimmed) — ${JSON.stringify(s)}`);
+  const e2 = escMd(unescMd(e));
+  assert.strictEqual(escMd(unescMd(e2)), e2, `a fixed point from the second save — ${JSON.stringify(s)}`);
+  if (!touchedShape(s)) {
+    assert.strictEqual(e, SHIPPED_ESC(s), `byte-identical to the shipped escMd when neither shape is present — ${JSON.stringify(s)}`);
+    unchanged++;
+  }
+  if (!runOfTwoBeforePipe(s)) {
+    const disk = SHIPPED_ESC(s);
+    assert.strictEqual(unescMd(disk), SHIPPED_UNESC(disk), `a cell the shipped escMd wrote loads exactly as before — ${JSON.stringify(s)}`);
+  }
+  rowsChecked++;
+}
+eq(rowsChecked, all.length, `every one of ${all.length} strings checked`);
+eq(unchanged > 0 && unchanged === all.filter(s => !touchedShape(s)).length, true,
+  `and every one holding neither shape (${unchanged}) was held to the shipped bytes, not skipped`);
+
+console.log(`PASS — every escaped cell reads back through the escape's inverse, and stays put across saves (${checks} checks, ${rowsChecked} strings swept).`);
