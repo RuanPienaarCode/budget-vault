@@ -146,9 +146,9 @@ async function mount(files = FILES, period = '2026-07') {
     /* July's real spend is R3 000 of groceries; the carried row adds R2 500.
        Before the flag existed this tile read R 3000.00 while the table below it
        claimed R6 500 was budgeted and R2 500 of that was still unspent. */
-    ok(totals.includes('R 5500.00'),
+    ok(totals.includes('R 5500'),
       'Total spent = real transactions (3000) + assume-spent rows (2500)');
-    ok(totals.includes('R 2500.00'),
+    ok(totals.includes('R 2500'),
       'and the tile discloses how much of itself came from an assume-spent row');
   }
 

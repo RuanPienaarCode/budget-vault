@@ -46,7 +46,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 /* Blanked, not stripped, so offsets and the brace walk below are unchanged. */
-const css = (read('src/styles.css') + read('src/styles-presets.css'))
+const css = require('./helpers/css-sources.cjs').assembled()
   .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
 
 let fail = 0;
@@ -58,26 +58,38 @@ const check = (msg, cond) => {
 
 /* ---- split the stylesheet into "inside the fallback" and "everything else" ----
    Brace-matched rather than line-counted: the block contains nested rules, and
-   a line-range would silently rot the first time a rule is added to it. */
+   a line-range would silently rot the first time a rule is added to it.
+
+   ALL fallback blocks count, not the first: the legacy sheet carries one and the
+   statement foundation (src/statement/foundation.css) carries its own for the rings
+   it added, so each file keeps the :focus twin of a ring next to the ring. */
 const OPENER = '@supports not selector(:focus-visible)';
-const at = css.indexOf(OPENER);
-if (at === -1) {
-  console.log('\nFAIL — no `@supports not selector(:focus-visible)` block in src/styles.css.\n' +
+const blocks = [];
+for (let from = 0, at; (at = css.indexOf(OPENER, from)) !== -1; from = at + OPENER.length) {
+  const open = css.indexOf('{', at);
+  let depth = 0, end = -1;
+  for (let i = open; i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end === -1) { console.log('\nFAIL — unbalanced braces after a fallback block.'); process.exit(1); }
+  blocks.push({ at, open, end });
+}
+if (!blocks.length) {
+  console.log('\nFAIL — no `@supports not selector(:focus-visible)` block in the stylesheet.\n' +
     'Either the fallback was deleted (every :focus-visible ring is now missing on iOS 15.0-15.3),\n' +
     'or it was reworded — in which case update OPENER here so the guard keeps watching it.');
   process.exit(1);
 }
-const open = css.indexOf('{', at);
-let depth = 0, end = -1;
-for (let i = open; i < css.length; i++) {
-  if (css[i] === '{') depth++;
-  else if (css[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-}
-check('the @supports block closes (balanced braces)', end !== -1);
-if (end === -1) { console.log('\nFAIL — unbalanced braces after the fallback block.'); process.exit(1); }
+check('the @supports blocks close (balanced braces)', true);
 
-const inside = css.slice(open + 1, end);
-const outside = css.slice(0, at) + css.slice(end + 1);
+let inside = '', outside = '', cursor = 0;
+for (const b of blocks) {
+  outside += css.slice(cursor, b.at);
+  inside += css.slice(b.open + 1, b.end) + '\n';
+  cursor = b.end + 1;
+}
+outside += css.slice(cursor);
 
 /* ---- collect the two selector sets ----
    A selector runs from a boundary — the start, a brace, or the comma before it
@@ -105,7 +117,7 @@ check('the fallback block is not empty', fallback.size > 0);
 /* ---- the parity assertions ---- */
 for (const sel of live) {
   check(`"${sel}" has a :focus-visible ring but NO :focus fallback — ` +
-        'invisible focus on iOS 15.0-15.3. Add it to the @supports block in src/styles.css.',
+        'invisible focus on iOS 15.0-15.3. Add it to the @supports not selector(:focus-visible) block in the same stylesheet file.',
     fallback.has(sel));
 }
 for (const sel of fallback) {

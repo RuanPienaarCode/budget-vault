@@ -641,7 +641,6 @@
 
 .budget-app-root .drawer-section-label {
   font-size: 11px; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-light);
   padding: 12px 14px 4px;
 }
@@ -809,7 +808,7 @@
   .budget-app-root .hero { padding: 28px 24px; }
 }
 
-.budget-app-root .hero-lbl { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-light); font-weight: 600; }
+.budget-app-root .hero-lbl { font-size: 12px; color: var(--text-light); font-weight: 600; }
 .budget-app-root .hero-num {
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -1030,7 +1029,7 @@
 .budget-app-root .stat-col { display: flex; flex-direction: column; gap: 2px; }
 .budget-app-root .stat { padding: 16px 0; border-bottom: 1px solid var(--border-color); display: flex; align-items: baseline; justify-content: space-between; }
 .budget-app-root .stat:last-child { border-bottom: 0; }
-.budget-app-root .stat .sl { font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-light); font-weight: 600; }
+.budget-app-root .stat .sl { font-size: 12px; color: var(--text-light); font-weight: 600; }
 .budget-app-root .stat .sv { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; text-align: right; }
 .budget-app-root .stat .st { font-size: 12px; margin-top: 4px; color: var(--text-muted); text-align: right; }
 .budget-app-root .grad-txt {
@@ -1048,8 +1047,6 @@
 .budget-app-root .table thead th {
   font-size: 0.72rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--text-muted);
   border: none;
   border-bottom: 1px solid var(--border-color);
@@ -1085,8 +1082,6 @@
 .budget-app-root .table .type-row td {
   font-size: 0.74rem;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
   color: var(--text-primary);
   padding: 0.6rem 1rem;
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
@@ -1297,7 +1292,7 @@
   background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   border: 1px solid var(--border-color);
 }
-.budget-app-root .mini .l { font-size: 11px; letter-spacing: .9px; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+.budget-app-root .mini .l { font-size: 11px; color: var(--ink-faint); font-weight: 600; }
 .budget-app-root .mini .v { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 6px; cursor: pointer; }
 /* The account-balance value is a <button> (keyboard/SR accessible) — make it
    render like the block value it replaced, not an inline-flex button. */
@@ -1512,7 +1507,7 @@
   margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color);
 }
 .budget-app-root .acct-fact-l {
-  font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
+  font-size: 11px;
   color: var(--ink-faint); font-weight: 600;
 }
 .budget-app-root .acct-fact-v {
@@ -1813,7 +1808,7 @@
 .budget-app-root .acct-drawer-h h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
 .budget-app-root .acct-drawer-v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .budget-app-root .acct-drawer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; margin-bottom: 4px; }
-.budget-app-root .acct-drawer-l { font-size: 10.5px; letter-spacing: .9px; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+.budget-app-root .acct-drawer-l { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; }
 .budget-app-root .acct-drawer-val { font-size: 14px; font-weight: 600; margin-top: 3px; }
 .budget-app-root .acct-drawer-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .budget-app-root .acct-drawer-act {
@@ -1916,7 +1911,7 @@
 .budget-app-root .debt-plan.is-chosen { border-color: var(--color-primary); box-shadow: var(--shadow-md); }
 .budget-app-root .debt-plan .dp-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .budget-app-root .debt-plan .dp-tag {
-  font-size: 10px; letter-spacing: .8px; text-transform: uppercase; font-weight: 700;
+  font-size: 10px; font-weight: 700;
   color: var(--color-primary); background: var(--color-primary-light);
   border-radius: 999px; padding: 2px 8px;
 }
@@ -2110,7 +2105,7 @@
 }
 .budget-app-root .bud-totals-bottom { margin: 14px 0 0; }
 .budget-app-root .bud-total-l {
-  font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;
+  font-size: 12px;
   color: var(--text-light); font-weight: 600;
 }
 .budget-app-root .bud-total-v {
@@ -2456,7 +2451,7 @@
 .budget-app-root .donut-legend .dl-delta.is-flat { color: var(--ink-faint); font-weight: 500; }
 .budget-app-root .donut-legend .dl-delta.is-new { color: var(--ink-faint); font-weight: 500; }
 .budget-app-root .donut-legend .donut-legend-head {
-  font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 10.5px;
   color: var(--ink-faint); padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
 }
 /* The legend has already wrapped below the donut at this width, and six columns
@@ -3037,8 +3032,6 @@
     margin-bottom: 2px;
     font-size: 0.68rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     color: var(--text-muted);
   }
   @supports (content: "a" / "") {
@@ -3590,7 +3583,7 @@
 /* ---- the pot: one number, and the bar that says what happened to it ---- */
 .budget-app-root .pot { padding: 30px 34px 28px; }
 .budget-app-root .pot-eyebrow {
-  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  font-size: 11px;
   color: var(--ink-faint); font-weight: 700;
 }
 .budget-app-root .pot-fig {
@@ -3653,7 +3646,7 @@
 /* The kind is a grouping aid; the source's NAME is what is worth reading, so
    this stays deliberately quiet. Free text — the dropdown only seeds it. */
 .budget-app-root .kind {
-  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 10px; font-weight: 700;
   padding: 2px 7px; border-radius: 6px; white-space: nowrap;
   background: rgba(127, 127, 127, .16); color: var(--color-accent);
 }
@@ -3705,7 +3698,7 @@
    margin gives the room straight back, so the hit area is 26px while the
    label, and the header row it sits in, do not move by a pixel. */
 .budget-app-root .env-name {
-  font: inherit; font-size: 11px; letter-spacing: .9px; text-transform: uppercase;
+  font: inherit; font-size: 11px;
   font-weight: 600; color: var(--ink-faint); background: none; border: 0;
   padding: 5px 0; margin-block: -5px;
   cursor: pointer; text-align: left;
@@ -4142,7 +4135,7 @@
 
 .budget-app-root .score-win-ribbon {
   display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
-  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 10px; font-weight: 700;
   background: var(--color-warning-light); color: var(--color-warning-ink);
   vertical-align: middle;
 }
@@ -4203,7 +4196,7 @@
    variables only, same discipline as the rest of this section. */
 .budget-app-root .score-flow-card { overflow: hidden; }
 .budget-app-root .score-flow-top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
-.budget-app-root .score-flow-eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; }
+.budget-app-root .score-flow-eyebrow { font-size: 11px; color: var(--ink-faint); font-weight: 700; }
 .budget-app-root .score-flow-in { font-size: 30px; font-weight: 750; letter-spacing: -.02em; }
 .budget-app-root .score-flow-in small { font-size: .42em; font-weight: 600; color: var(--text-muted); margin-left: 8px; letter-spacing: 0; }
 
@@ -4380,7 +4373,7 @@
 .budget-app-root .score-hero.is-steady .score-ring-num { color: var(--color-warning-ink); }
 .budget-app-root .score-hero.is-attention .score-ring-num { color: var(--color-danger-ink); }
 .budget-app-root .score-ring-num small { font-size: .26em; font-weight: 600; color: var(--text-muted); margin-left: 5px; letter-spacing: 0; }
-.budget-app-root .score-ring-band { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-top: 7px; }
+.budget-app-root .score-ring-band { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-top: 7px; }
 .budget-app-root .score-ring-band.is-part { text-transform: none; letter-spacing: .01em; font-size: 13px; font-weight: 650; color: var(--text-primary); }
 .budget-app-root .score-ring-mid.is-part .score-ring-num { color: var(--text-primary); font-size: 40px; }
 
@@ -4420,7 +4413,7 @@
 .budget-app-root .score-ring-row.is-full .score-ring-row-pts { color: var(--color-primary); }
 .budget-app-root .score-ring-row.is-none .score-ring-row-pts { color: var(--color-danger-ink); }
 .budget-app-root .score-ring-row-tag {
-  font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  font-size: 9.5px; font-weight: 700;
   color: var(--color-primary); margin-left: 7px; white-space: nowrap; vertical-align: 1px;
 }
 

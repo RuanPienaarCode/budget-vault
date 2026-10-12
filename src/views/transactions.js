@@ -16,6 +16,9 @@ const { prepareRules, matchRule } = require('../rules');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
 
+/* A category colour that may be written into a style attribute (see catDots). */
+const DOT_HEX = /^#[0-9a-fA-F]{3,8}$/;
+
 module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
@@ -47,6 +50,22 @@ module.exports = function registerTransactions(ctx) {
     if (!sym || sym === (S.settings || {}).currency || typeof ctx.moneyIn !== 'function') return money(v);
     return ctx.moneyIn(sym, v);
   };
+  /* The symbol rowMoney() actually PRINTS for this row, by the same test: the
+     account's own symbol or code when it differs from the household's, the
+     household's otherwise. The statement stylesheet shrinks the first letter of
+     an amount cell to make the currency symbol small and muted, which is only
+     right when that first letter IS the whole symbol — so the cell carries
+     .st-cur1 (appended after `num`, never before it: the figures harness reads
+     the cell by its first class) exactly when this is one code point, the rule
+     controller.js's applyCurrencyClass() uses for the household. "USD 12,00" or
+     "Rp 5" gets no class and keeps one even figure. */
+  const rowPrintedSymbol = r => {
+    const sym = r ? rowSymbol(r) : '';
+    return !sym || sym === (S.settings || {}).currency || typeof ctx.moneyIn !== 'function'
+      ? String((S.settings || {}).currency || '').trim()
+      : String(sym).trim();
+  };
+  const rowSymbolIsOneChar = r => Array.from(rowPrintedSymbol(r)).length === 1;
 
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
@@ -468,6 +487,15 @@ module.exports = function registerTransactions(ctx) {
          and the show-more row — would have to be kept in step with it. */
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.actions'))))));
     const body = el('tbody', {});
+    /* The colour dot before a category name (statement type, Oct 2026). The
+       colour is the category file's own, the one the donut already draws, and
+       it travels as a CSS custom property on the category CELL, never on a
+       figure's node. The value is user-writable front matter, so only a plain
+       hex is let into a style attribute: anything else (a stray ";" or a
+       url()) would otherwise write extra declarations. A category with no file,
+       or no usable colour, simply gets no dot. */
+    const catDots = new Map();
+    for (const c of S.categories || []) if (c && c.name && DOT_HEX.test(String(c.color || ''))) catDots.set(c.name, c.color);
     for (const item of list) {
       const r = item._row;
       const mark = () => { item._file.dirty = true; $('#txSave').disabled = false; };
@@ -479,13 +507,13 @@ module.exports = function registerTransactions(ctx) {
       // just below.
       const origCat = r.cat;
       body.append(el('tr', {},
-        el('td', { class: 'text-muted', style: 'white-space:nowrap' }, r.date),
+        el('td', { class: 'text-muted' }, r.date),
         el('td', {}, r.desc),
         el('td', { class: 'text-muted' }, item.label),
         // deferredCatSelect: a button until first use. See categories.js — at a
         // full page of rows this is the difference between 0 and 100 native
         // selects, and a select is the priciest control in a mobile WebView.
-        el('td', {}, deferredCatSelect(r.cat, v => {
+        el('td', catDots.has(r.cat) ? { 'data-dot': '', style: `--cat-dot:${catDots.get(r.cat)}` } : {}, deferredCatSelect(r.cat, v => {
           r.cat = v;
           /* Learning is scoped to rows that arrived UNCATEGORISED, not every
              edit. This page is where a reader CORRECTS a category — often a
@@ -524,12 +552,17 @@ module.exports = function registerTransactions(ctx) {
           }
           mark();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
-        el('td', { class: `num${r.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, rowMoney(r.amount, r)),
+        /* Weight, colour and the sign of an income row are the statement
+           stylesheet's (src/statement/transactions.css): spending sits at 500
+           in the text colour, income is green. No inline weight here, because
+           an inline style would beat the stylesheet. `num` stays the first
+           class: the figures harness addresses this cell as td.num[4]. */
+        el('td', { class: `num${r.amount > 0 ? ' text-success' : ''}${rowSymbolIsOneChar(r) ? ' st-cur1' : ''}` }, rowMoney(r.amount, r)),
         el('td', {}, excludedCell(item, mark)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
-        el('td', { style: 'white-space:nowrap' }, splitButton(item), deleteButton(item))));
+        el('td', {}, splitButton(item), deleteButton(item))));
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {

@@ -286,13 +286,13 @@ function provenFalse(desc, exactShape, mangled) {
    tests/cross-page-consistency.test.cjs's header for the general policy this
    follows. ======================================================================= */
 {
-  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.income'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv grad-txt' \}, money\(sum\.income\)\)/
+  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.income'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv grad-txt' \}, money\(sum\.income, 0\)\)/
     .test(live.dashboard),
     'Total income (Dashboard): the hero\'s Income stat is bound to periodSummary().income (actual, received)');
 
-  ok(live.budgets.includes("label: i18n.t('bud.total.income'), value: money(income), grad: true,"),
+  ok(live.budgets.includes("label: i18n.t('bud.total.income'), value: money(income, 0), grad: true,"),
     'Total income (Budget): the tile is bound to the LOCAL `income` accumulator — the sum of this period\'s budgeted income rows, not the actual figure');
-  ok(live.budgets.includes("note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },"),
+  ok(live.budgets.includes("note: i18n.t('bud.total.incomeNote', { amount: money(sum.income, 0) }) },"),
     'Total income (Budget): the declared half — the tile\'s own note discloses periodSummary().income, the SAME figure the Dashboard hero shows, right under the budgeted one');
 }
 
@@ -318,10 +318,10 @@ function provenFalse(desc, exactShape, mangled) {
    the gap survived ADR-0005 and two releases.
    ======================================================================= */
 {
-  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.spent'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv' \}, money\(used\.spent\)\)/
+  ok(/el\('div', \{\}, el\('div', \{ class: 'sl' \}, i18n\.t\('dash\.stat\.spent'\)\)\),\s*\n\s*el\('div', \{\}, el\('div', \{ class: 'sv' \}, money\(used\.spent, 0\)\)/
     .test(live.dashboard),
     'Total spent (Dashboard): the hero\'s Spent stat is bound to budgetUsed().spent, the one rule');
-  ok(live.dashboard.includes("i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })"),
+  ok(live.dashboard.includes("i18n.t('dash.hero.sub', { spent: money(used.spent, 0), budgeted: money(bud.spend, 0) })"),
     'Total spent (Dashboard): and so is the sub-line above it, measured against the spend envelopes');
   ok(live.dashboard.includes('const spentNoteParts = ['),
     'Total spent (Dashboard): the declared half — set-aside, the assume-spent provision and netted refunds are named beside the figure rather than left to subtraction');
@@ -336,7 +336,7 @@ function provenFalse(desc, exactShape, mangled) {
     'Total spent (Budget): the tile reads the one rule, measured over the unsaved draft');
   ok(live.budgets.includes('const spent = used.spent;'),
     'Total spent (Budget): and prints that reading, not a second one');
-  ok(live.budgets.includes("label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,"),
+  ok(live.budgets.includes("label: i18n.t('bud.total.spent'), value: money(spent, 0), over: used.budgeted > 0 && spent > used.budgeted,"),
     'Total spent (Budget): the tile actually renders that figure, red against the same denominator the percentage uses');
   /* The note is assembled as named fragments now — each carries a data-fig so
      the reconciliation can address "the set-aside figure" rather than "the

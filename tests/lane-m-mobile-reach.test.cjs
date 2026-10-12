@@ -28,9 +28,10 @@ let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
 const ROOT = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(ROOT, 'src/styles.css'), 'utf8');
+/* The whole assembled stylesheet (tests/helpers/css-sources.cjs), so a phone rule
+   written into a statement lane file is held to the same promises. */
+const src = require('./helpers/css-sources.cjs').assembled();
 const built = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
-const presets = fs.readFileSync(path.join(ROOT, 'src/styles-presets.css'), 'utf8');
 
 /* Comments blanked (same length) so a selector quoted in prose is not a rule. */
 const blank = s => s.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
@@ -52,8 +53,8 @@ const phone = top.filter(b => /^@media\s*\(max-width:\s*600px\)$/.test(b.head)).
 const phone560 = top.filter(b => /^@media\s*\(max-width:\s*560px\)$/.test(b.head)).map(b => b.body).join('\n');
 ok(phone.length > 0, 'found the 600px media blocks');
 
-/* The build is current: root styles.css is exactly the two source halves. */
-ok(built === src + presets, 'root styles.css is the built src/styles.css + presets (run npm run build)');
+/* The build is current: root styles.css is exactly the assembled sources. */
+ok(built === src, 'root styles.css is the assembled sources of scripts/css-sources.cjs (run npm run build)');
 
 /* --- desktop is untouched: nothing new sits outside a media block ----------- */
 const outsideMedia = top.filter(b => !b.head.startsWith('@')).map(b => b.head).join('\n');

@@ -1,0 +1,369 @@
+/* Statement lane: dashboard-lane owns this file (Dashboard page restyle). */
+/* The Dashboard keeps its layout, card order and colours; this lane sets the type
+   (mockup: _preview/option3-mockup.html, Dashboard). Later than foundation.css at
+   equal specificity, so it wins by order. Selectors that would also reach the
+   Accounts hero (.hero-num, .stat) are scoped to the Dashboard's own containers
+   (#heroCard, #healthBody, #leftBody, #dashPositionKpis). */
+
+
+/* ------------------------------------------------------------
+   0. ONE FACT PER LINE
+   dashboard.js builds a footnote as <span class="fact"> blocks with a hidden
+   separator between them (a leaf-by-leaf reader still sees "a · b").
+   ------------------------------------------------------------ */
+.budget-app-root .fact { display: block; }
+.budget-app-root .fact-sep { display: none; }
+
+/* ------------------------------------------------------------
+   1. HERO
+   ------------------------------------------------------------ */
+.budget-app-root #heroCard .hero-grid > * { min-width: 0; }
+.budget-app-root #heroCard .hero-greet {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin-bottom: 18px;
+}
+.budget-app-root #heroCard .hero-lbl {
+  font-size: var(--st-body);
+  font-weight: var(--st-weight-label);
+  color: var(--text-muted);
+}
+
+/* The one number the page is about. A solid emerald first (legible in light and
+   dark on every engine); the soft gradient only where the engine can clip a
+   background to text. */
+.budget-app-root #heroCard .hero-num {
+  font-size: var(--st-statement);
+  line-height: .92;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-statement);
+  margin: 10px 0 0 -.04em;
+  background: none;
+  color: var(--color-primary);
+}
+.budget-app-root #heroCard .hero-num small {
+  font-size: var(--st-cur-statement);
+  font-weight: 400;
+  margin-right: .3em;
+}
+.budget-app-root #heroCard .hero-num.is-long { font-size: var(--st-display); }
+.budget-app-root #heroCard .hero-num.is-long small { font-size: var(--st-cur-display); }
+.budget-app-root #heroCard .hero-num.hero-num--negative {
+  color: var(--color-danger-ink);
+  -webkit-text-fill-color: var(--color-danger-ink);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .budget-app-root #heroCard .hero-num:not(.hero-num--negative) {
+    background: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 38%, var(--color-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: .06em;
+  }
+}
+
+.budget-app-root #heroCard .hero-sub {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-top: 20px;
+  max-width: none;
+}
+.budget-app-root #heroCard .hero-sub--ahead {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+.budget-app-root #heroCard .hero-meter {
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 20px;
+  max-width: none;
+}
+.budget-app-root #heroCard .hero-meter i { border-radius: 999px; }
+
+/* Total income / Budgeted / Total spent: a label on the left, a figure-small
+   figure on the right, one fact per line under it. */
+.budget-app-root #heroCard .stat { padding: 18px 0; }
+.budget-app-root #heroCard .stat:first-child { padding-top: 0; }
+.budget-app-root #heroCard .stat .sl {
+  font-size: var(--st-label);
+  font-weight: var(--st-weight-label);
+  color: var(--text-muted);
+}
+.budget-app-root #heroCard .stat .sv.grad-txt {
+  background: none;
+  color: var(--color-primary);
+}
+.budget-app-root #heroCard .stat .st {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  margin-top: 6px;
+  color: var(--text-light);
+}
+.budget-app-root #heroCard .stat .st .tag.warn { font-weight: 600; color: var(--color-warning-ink); }
+
+/* ------------------------------------------------------------
+   2. FINANCIAL HEALTH
+   Score first and a little wider; the three inputs beside it at figure size.
+   Tones are today's: green good, amber fair, rose poor.
+   ------------------------------------------------------------ */
+.budget-app-root #healthBody .health-grid {
+  grid-template-columns: minmax(0, 1.12fr) repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.budget-app-root #healthBody .health-fig {
+  padding: 22px 22px 20px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+}
+.budget-app-root #healthBody .health-fig-btn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  height: 100%;
+  text-align: left;
+}
+.budget-app-root #healthBody .health-fig .ll {
+  font-size: var(--st-label);
+  font-weight: var(--st-weight-label);
+  margin-top: 12px;
+}
+.budget-app-root #healthBody .health-fig .lm {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.budget-app-root #healthBody .health-fig:not(.is-score) .lm { color: var(--text-light); }
+.budget-app-root #healthBody .health-fig .lv small {
+  font-size: 16px;
+  font-weight: var(--st-weight-label);
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+.budget-app-root #healthBody .health-meter { margin-top: 14px; }
+.budget-app-root #healthBody .health-fig:not(.is-score) .lm.text-danger { color: var(--color-danger-ink); }
+
+/* The score is the card's conclusion: score size, its label and band word pinned
+   to the foot of the slab. */
+.budget-app-root #healthBody .health-fig.is-score { padding: 24px; }
+.budget-app-root #healthBody .health-fig.is-score .health-fig-btn { justify-content: space-between; }
+.budget-app-root #healthBody .health-fig.is-score .lv {
+  font-size: var(--st-score);
+  line-height: .9;
+  letter-spacing: var(--st-track-score);
+}
+.budget-app-root #healthBody .health-fig.is-score .ll {
+  font-size: var(--st-body);
+  margin-top: 14px;
+}
+.budget-app-root #healthBody .health-fig.is-score .lm {
+  font-size: 14px;
+  font-weight: var(--st-weight-label);
+}
+@media (max-width: 1100px) {
+  .budget-app-root #healthBody .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .budget-app-root #healthBody .health-fig.is-score { grid-column: 1 / -1; }
+  .budget-app-root #healthBody .health-fig.is-score .health-fig-btn {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 20px;
+  }
+  .budget-app-root #healthBody .health-fig.is-score .ll { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  .budget-app-root #healthBody .health-grid { grid-template-columns: minmax(0, 1fr); }
+  .budget-app-root #healthBody .health-fig.is-score .health-fig-btn {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0;
+  }
+  .budget-app-root #healthBody .health-fig.is-score .ll { margin-top: 14px; }
+}
+
+/* ------------------------------------------------------------
+   3. MONEY LEFT THIS PERIOD
+   in your accounts - still committed = actually free. "Actually free" is the
+   display figure on its tinted block; the other terms are figure size.
+   ------------------------------------------------------------ */
+.budget-app-root #leftBody .left-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.75fr);
+  gap: 12px;
+}
+.budget-app-root #leftBody .left-grid--n4 {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.75fr);
+}
+.budget-app-root #leftBody .left-grid--n5 {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.75fr);
+}
+.budget-app-root #leftBody .left-fig { padding: 12px 8px; }
+.budget-app-root #leftBody .left-fig .lv {
+  font-size: var(--st-figure);
+  line-height: 1;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-figure);
+}
+.budget-app-root #leftBody .left-fig .ll {
+  font-size: var(--st-body);
+  font-weight: var(--st-weight-label);
+  margin-top: 10px;
+}
+.budget-app-root #leftBody .left-fig .lm {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  margin-top: 4px;
+  color: var(--text-light);
+}
+.budget-app-root #leftBody .left-op {
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 0;
+}
+
+.budget-app-root #leftBody .left-fig.is-free,
+.budget-app-root #leftBody .left-fig.is-short {
+  padding: 26px 28px;
+  border-radius: 24px;
+}
+.budget-app-root #leftBody .left-fig.is-free .lv,
+.budget-app-root #leftBody .left-fig.is-short .lv {
+  font-size: var(--st-display);
+  line-height: .95;
+  letter-spacing: var(--st-track-display);
+  --st-cur: var(--st-cur-display);
+  --st-cur-gap: var(--st-cur-gap-display);
+}
+.budget-app-root #leftBody .left-fig.is-free .ll {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.budget-app-root #leftBody .left-fig.is-short .ll {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-danger-ink);
+}
+.budget-app-root #leftBody .left-fig.is-free .lm,
+.budget-app-root #leftBody .left-fig.is-short .lm { color: var(--text-muted); }
+/* Seven digits or more step the figure down a size so it stays inside its block. */
+.budget-app-root #leftBody .left-fig .lv.is-long { font-size: var(--st-figure-sm); letter-spacing: var(--st-track-figure-sm); }
+.budget-app-root #leftBody .left-fig.is-free .lv.is-long,
+.budget-app-root #leftBody .left-fig.is-short .lv.is-long {
+  font-size: var(--st-figure);
+  letter-spacing: var(--st-track-figure);
+  --st-cur: var(--st-cur-figure);
+  --st-cur-gap: var(--st-cur-gap-figure);
+}
+/* With four or five terms in the strip the free block is narrower; it keeps the
+   display look at a size that fits. */
+.budget-app-root #leftBody .left-grid--n4 .left-fig.is-free .lv,
+.budget-app-root #leftBody .left-grid--n4 .left-fig.is-short .lv,
+.budget-app-root #leftBody .left-grid--n5 .left-fig.is-free .lv,
+.budget-app-root #leftBody .left-grid--n5 .left-fig.is-short .lv {
+  font-size: var(--st-figure);
+  letter-spacing: var(--st-track-figure);
+  --st-cur: var(--st-cur-figure);
+  --st-cur-gap: var(--st-cur-gap-figure);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .budget-app-root #leftBody .left-fig.is-free .lv {
+    background: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 38%, var(--color-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    padding-bottom: .06em;
+  }
+}
+@media (max-width: 860px) {
+  .budget-app-root #leftBody .left-grid,
+  .budget-app-root #leftBody .left-grid--n4,
+  .budget-app-root #leftBody .left-grid--n5 { grid-template-columns: minmax(0, 1fr); }
+  .budget-app-root #leftBody .left-op { display: none; }
+  .budget-app-root #leftBody .left-fig { padding: 12px 4px; }
+  .budget-app-root #leftBody .left-fig.is-free,
+  .budget-app-root #leftBody .left-fig.is-short { padding: 20px 16px; }
+}
+.budget-app-root #leftBody .left-fx { font-size: var(--st-small); }
+.budget-app-root #leftBody .left-owed,
+.budget-app-root #leftBody .left-incoming .li-s,
+.budget-app-root #leftBody .left-cycle .lc-t { font-size: 14px; }
+.budget-app-root #leftBody .left-cycle .lc-s,
+.budget-app-root #leftBody .left-src,
+.budget-app-root #leftBody .left-disc .dd { font-size: var(--st-small); }
+.budget-app-root #leftBody .left-disc { font-size: 14px; }
+.budget-app-root #leftBody .left-open > summary { font-size: 14px; }
+
+/* ------------------------------------------------------------
+   4. SPENDING TREND (full width, as today) - legend and tooltip type
+   ------------------------------------------------------------ */
+.budget-app-root .legend { font-size: var(--st-small); color: var(--text-muted); }
+.budget-app-root .trend-tip-row { font-size: var(--st-small); }
+.budget-app-root .trend-tip-delta { font-size: var(--st-small); }
+
+/* ------------------------------------------------------------
+   5. WHERE IT WENT - calm headings, tabular figures, rose for the rise
+   ------------------------------------------------------------ */
+.budget-app-root .donut-legend { font-size: 14px; }
+.budget-app-root .donut-legend .dl-val,
+.budget-app-root .donut-legend .dl-base,
+.budget-app-root .donut-legend .dl-pct,
+.budget-app-root .donut-legend .dl-delta { font-variant-numeric: tabular-nums lining-nums; }
+.budget-app-root .donut-legend .dl-val {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+/* Room for the name. Beside the donut the Dashboard legend gets whatever is
+   left of the card: at 700-900px that is about 430px, and the five fixed
+   columns (figure, share, 3M average, change, note button) take roughly 360 of
+   it, leaving the name 80-90px: "Debt Repayments" (106px) lost its tail. The
+   legend asks for 470px, so when the donut and 470px do not fit side by side
+   the legend takes its own row under the donut, as it already does on a phone;
+   beside the donut the name has at least 110px. Alone on its row (a phone) the
+   legend still shrinks to the card, so the phone layout is unchanged. */
+.budget-app-root #dashSplit .donut-legend { flex-basis: 470px; }
+/* When the legend does drop under the donut at a desktop width, the donut sits
+   in the middle of its row, as it already does from 700px down. */
+.budget-app-root #dashSplit .donut-wrap { justify-content: center; }
+.budget-app-root .donut-legend .donut-legend-head { font-size: var(--st-small); color: var(--text-light); }
+.budget-app-root .donut-note { font-size: var(--st-small); }
+
+/* ------------------------------------------------------------
+   6. BUDGET VS ACTUAL - the table keeps its structure and its cents
+   ------------------------------------------------------------ */
+.budget-app-root #dashBudget td.num { font-variant-numeric: tabular-nums lining-nums; }
+.budget-app-root #dashBudget td:nth-child(3) { font-weight: 600; }
+.budget-app-root #dashBudget td .text-muted { font-size: var(--st-small); }
+.budget-app-root #dashBudget td.text-danger { font-weight: 600; }
+
+/* ------------------------------------------------------------
+   7. WHERE YOU STAND - four tiles at figure-small, the symbol muted
+   ------------------------------------------------------------ */
+.budget-app-root #dashPositionKpis .mini .v {
+  font-size: var(--st-figure-sm);
+  line-height: 1.05;
+  letter-spacing: var(--st-track-figure-sm);
+  margin-top: 12px;
+  min-width: 0;
+}
+.budget-app-root #dashPositionKpis .mini .v.grad-txt {
+  background: none;
+  color: var(--color-primary);
+}
+.budget-app-root #dashPositionKpis .mini .l { font-size: var(--st-label); color: var(--text-muted); }
+.budget-app-root #dashPositionKpis .mini .s {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  margin-top: 12px;
+  color: var(--text-light);
+}

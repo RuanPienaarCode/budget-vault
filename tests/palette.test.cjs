@@ -44,7 +44,14 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
 const root = path.join(__dirname, '..');
-const baseCss = fs.readFileSync(path.join(root, 'src', 'styles.css'), 'utf8');
+/* Every HAND-WRITTEN source (tests/helpers/css-sources.cjs): the legacy sheet,
+   the statement foundation and the page lanes, in cascade order, without the
+   generated palette blocks, which this file checks separately against their
+   seeds. The palette's base blocks are the FIRST rules for their selectors in
+   it, which is where the legacy sheet keeps them; the "no hardcoded brand colour
+   outside the palette blocks" scan below now also covers the statement files. */
+const baseCss = require('./helpers/css-sources.cjs').sources()
+  .filter(s => s.rel !== 'src/styles-presets.css').map(s => s.text).join('');
 
 /* Parse a `{ --a: x; --b: y }` rule body into a token map. */
 function tokensOf(css, selector) {

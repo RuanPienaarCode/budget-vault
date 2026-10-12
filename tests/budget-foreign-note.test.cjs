@@ -103,7 +103,7 @@ function spentTile($) {
     ctx.renderBudgets();
     const tile = spentTile($);
     ok(tile, 'the Budget page draws its Total spent tile');
-    eq(tile.value, 'R 1200.00',
+    eq(tile.value, 'R 1200',
       'the figure is the rand spending alone — periodSummary already holds the euro row out');
     ok(/another currency|other currencies/.test(tile.note),
       `and the tile SAYS the figure leaves something out — got "${tile.note}"`);

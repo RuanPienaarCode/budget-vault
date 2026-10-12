@@ -453,7 +453,7 @@ module.exports = function registerBudgets(ctx) {
        fragment ran straight onto the end of the sentence:
        "45% of budget usedR 5000,00 more went out of your funds". */
     const spentNote = assumed > 0
-      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed) })
+      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed, 0) })
       : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '');
 
     /* The note is assembled as NAMED fragments rather than one string. The
@@ -470,8 +470,8 @@ module.exports = function registerBudgets(ctx) {
     /* ' · ' exactly when something already stands to the left of this
        fragment — the tile's own sentence, or an earlier fragment. */
     const sep = () => ((spentNote || gapParts.length) ? ' · ' : '');
-    if (gapUncat >= 1) addPart('bud-note-uncat', i18n.t('dash.split.uncatNote', { amount: money(gapUncat) }));
-    if (gapNetted >= 1) addPart('bud-note-netted', i18n.t('dash.split.nettedNote', { amount: money(gapNetted) }));
+    if (gapUncat >= 1) addPart('bud-note-uncat', i18n.t('dash.split.uncatNote', { amount: money(gapUncat, 0) }));
+    if (gapNetted >= 1) addPart('bud-note-netted', i18n.t('dash.split.nettedNote', { amount: money(gapNetted, 0) }));
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
        accounts for what this tile's gross figure holds that the table below it
        nets away, and this accounts for what periodSummary never counted at
@@ -528,7 +528,7 @@ module.exports = function registerBudgets(ctx) {
     const fromFunds = sum.fundedFromSavings || { spend: 0, count: 0 };
     if (fromFunds.count) {
       addPart('bud-note-funds', sep() + i18n.t('dash.fundedFromSavings', {
-        amount: money(fromFunds.spend), count: fromFunds.count,
+        amount: money(fromFunds.spend, 0), count: fromFunds.count,
       }));
     }
 
@@ -552,13 +552,17 @@ module.exports = function registerBudgets(ctx) {
     if (plan.unallocated !== null) {
       const unallocated = plan.unallocated;
       unallocatedTile = {
-        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated)),
+        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated), 0),
         /* One name for both branches. The tile prints a MAGNITUDE and the
            label carries the direction, so a reconciliation must compare it to
            |unallocated| — reading it as a signed figure is how the check on
            this tile came to disagree with the page by exactly twice itself. */
         fig: 'bud-unallocated',
         over: unallocated < 0,
+        /* The page's statement figure (Statement type, Oct 2026). `pos` is the
+           one state that earns the gradient; zero and over keep their plain and
+           red inks. */
+        left: true, pos: unallocated > 0,
         note: unallocated < 0 ? i18n.t('bud.total.overNote')
           : (plan.incomeBase > 0 ? i18n.t('bud.total.leftNote') : ''),
       };
@@ -589,24 +593,53 @@ module.exports = function registerBudgets(ctx) {
        already names the same planned Y — so it changes its words instead. */
     if (plan.setAside > 0) {
       budgetedParts.push({ fig: 'bud-budgeted-setaside',
-        text: (budgetedNote ? ' · ' : '') + i18n.t('bud.total.setAsidePlanned', { amount: money(plan.setAside) }) });
+        text: (budgetedNote ? ' · ' : '') + i18n.t('bud.total.setAsidePlanned', { amount: money(plan.setAside, 0) }) });
     }
     /* Every tile names itself. The unallocated one is conditional (a running
        period with no income row omits it), so addressing any of these by
        position means the tile after it is read as the tile before it the
        moment a household differs from the one the reader had in mind. */
     return [
-      { label: i18n.t('bud.total.income'), value: money(income), grad: true, fig: 'bud-income',
-        note: i18n.t('bud.total.incomeNote', { amount: money(sum.income) }) },
-      { label: i18n.t('bud.total.budgeted'), value: money(budgeted), fig: 'bud-budgeted',
+      { label: i18n.t('bud.total.income'), value: money(income, 0), grad: true, fig: 'bud-income',
+        note: i18n.t('bud.total.incomeNote', { amount: money(sum.income, 0) }) },
+      { label: i18n.t('bud.total.budgeted'), value: money(budgeted, 0), fig: 'bud-budgeted',
         note: budgetedParts.map(x => x.text).join(''),
         noteParts: budgetedParts },
       ...(unallocatedTile ? [unallocatedTile] : []),
-      { label: i18n.t('bud.total.spent'), value: money(spent), over: used.budgeted > 0 && spent > used.budgeted,
+      { label: i18n.t('bud.total.spent'), value: money(spent, 0), over: used.budgeted > 0 && spent > used.budgeted,
         fig: 'bud-spent', note: spentNote + gapText(),
         noteParts: [...(spentNote ? [{ fig: 'bud-note-spent', text: spentNote }] : []), ...gapParts] },
     ];
   }
+
+  /* One note line per fact (Statement type, Oct 2026). The strings are the
+     ones the strip already built; only the layout changes. The ' · ' a fragment
+     was joined with moves OUT of the fragment into a sibling span the
+     stylesheet hides: it stays in the tile's text (a reader of the text still
+     gets "used · R 5 000 more went out..." and never "usedR 5 000"), and the
+     fragment itself keeps its figures as plain text at the address they had,
+     which is how the figures ledger finds them. `splitInner` is for the one
+     fragment whose OWN string holds two facts ("45% of spending budget used ·
+     includes R 1 900 already spent"): a line break replaces its separator. In
+     the others an inner ' · ' belongs to the sentence (the foreign-account
+     list is "£ · €") and is left alone. */
+  const NOTE_SEP = ' · ';
+  function noteFragment(pt) {
+    const lead = pt.text.startsWith(NOTE_SEP);
+    const rest = lead ? pt.text.slice(NOTE_SEP.length) : pt.text;
+    const out = [];
+    (pt.fig === 'bud-note-spent' ? rest.split(NOTE_SEP) : [rest]).forEach((piece, i) => {
+      if (i) out.push(el('br'));
+      out.push(piece);
+    });
+    return [...(lead ? [el('span', { class: 'bud-sep' }, NOTE_SEP)] : []), el('span', { 'data-fig': pt.fig }, ...out)];
+  }
+
+  /* Seven or more digits: a totals figure steps down a size (.is-long in
+     statement/budget.css) rather than overflowing its tile. Counts
+     digits, so the symbol, the grouping and a decimal comma do not move the
+     threshold. The same rule as views/dashboard.js's longFig. */
+  const longFig = text => ((String(text).match(/\d/g) || []).length >= 7 ? ' is-long' : '');
 
   // Same three tiles above and below the table, so the totals are in reach
   // from either end of a long category list.
@@ -617,16 +650,16 @@ module.exports = function registerBudgets(ctx) {
       if (!host) continue;
       host.empty();
       for (const t of tiles) {
-        host.append(el('div', { class: 'bud-total' },
+        host.append(el('div', { class: `bud-total${t.left ? ' bud-total-left' : ''}${t.pos ? ' is-pos' : ''}` },
           el('div', { class: 'bud-total-l' }, t.label),
-          el('div', { class: `bud-total-v${t.grad ? ' grad-txt' : ''}${t.over ? ' over' : ''}`,
+          el('div', { class: `bud-total-v${t.grad ? ' is-income' : ''}${t.left ? ' is-left' : ''}${t.pos ? ' is-pos' : ''}${t.over ? ' over' : ''}${longFig(t.value)}`,
             ...(t.fig ? { 'data-fig': t.fig } : {}) }, t.value),
           /* A tile whose note is one plain sentence names the note itself; the
              spent tile's note is many fragments and names each of them. */
           t.note ? el('div', { class: 'bud-total-n',
             ...(t.fig && !(t.noteParts && t.noteParts.length) ? { 'data-fig': `${t.fig}-note` } : {}) },
             ...(t.noteParts && t.noteParts.length
-              ? t.noteParts.map(pt => el('span', { 'data-fig': pt.fig }, pt.text))
+              ? t.noteParts.flatMap(noteFragment)
               : [t.note])) : ''));
       }
     }
@@ -656,6 +689,8 @@ module.exports = function registerBudgets(ctx) {
     /* The Dashboard table's rows, over the unsaved draft. */
     const rowOf = new Map(budgetVsActualRows(S.period, { rows: draft }).map(r => [r.cat, r]));
     const t = $('#budTable'); t.empty();
+    /* The statement stylesheet addresses this table by class (see budget.css). */
+    t.classList.add('bud-table');
     t.append(el('thead', {}, el('tr', {},
       el('th', { scope: 'col' }, i18n.t('bud.col.category')), el('th', { scope: 'col' }, i18n.t('bud.col.type')),
       el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.amount')), el('th', { scope: 'col', class: 'num' }, i18n.t('bud.col.actual')), el('th', { scope: 'col' }, i18n.t('bud.col.notes')),
@@ -696,7 +731,10 @@ module.exports = function registerBudgets(ctx) {
     const sortedTypes = [...groups.keys()].sort((a, b) => typeRank(a, order) - typeRank(b, order));
     for (const type of sortedTypes) {
       const catRows = groups.get(type).sort((a, b) => a.category.localeCompare(b.category));
-      body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '6' }, typeGroupLabel(type))));
+      /* The dot takes its colour from `data-type` in budget.css; a custom group
+         (or an undeclared type) falls to the neutral dot. */
+      body.append(el('tr', { class: 'type-row', 'data-type': type },
+        el('td', { colspan: '6' }, el('span', { class: 'bud-grp-dot', 'aria-hidden': 'true' }), typeGroupLabel(type))));
       for (const d of catRows) {
         /* Actual and remaining come from the row budgetVsActualRows handed
            back, not from a rule of this page's own. An assume-spent row is its
@@ -736,7 +774,7 @@ module.exports = function registerBudgets(ctx) {
                about. Mirrors dashboard.js's renderBudgetTable. */
             if (row.unbudgeted) {
               remainingEl.textContent = i18n.t('bud.remaining.over', { amount: money(actual) });
-              remainingEl.className = 'bud-remaining over';
+              remainingEl.className = 'bud-remaining over st-over';
             } else {
               remainingEl.textContent = ''; remainingEl.className = 'bud-remaining';
             }
@@ -755,7 +793,7 @@ module.exports = function registerBudgets(ctx) {
           remainingEl.textContent = row.remaining < 0
             ? i18n.t('bud.remaining.over', { amount: money(-row.remaining) })
             : i18n.t('bud.remaining.left', { amount: money(row.remaining) });
-          remainingEl.className = 'bud-remaining' + (row.remaining < 0 ? ' over' : '');
+          remainingEl.className = 'bud-remaining' + (row.remaining < 0 ? ' over st-over' : '');
         };
         updateRemaining();
         /* Actual cell — kept as element references so an amount edit can
@@ -814,7 +852,7 @@ module.exports = function registerBudgets(ctx) {
             // Income and transfers are never "already spent" — offering the
             // toggle there would only invite a state with no meaning.
             type === 'income' || type === 'transfer' ? '' : el('button', {
-              class: `btn-ghost btn-ghost-sm${assumed ? ' bud-assume-on' : ''}`, type: 'button',
+              class: `btn-ghost btn-ghost-sm bud-act bud-act-assume${assumed ? ' bud-assume-on' : ''}`, type: 'button',
               'aria-pressed': assumed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
               title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
@@ -835,7 +873,7 @@ module.exports = function registerBudgets(ctx) {
               // state is unstyled beyond aria-pressed for now. The class is
               // still applied, mirroring bud-assume-on, so styling it later
               // is a CSS-only change with nothing to wire up in this file.
-              class: `btn-ghost btn-ghost-sm${fixed ? ' bud-fixed-on' : ''}`, type: 'button',
+              class: `btn-ghost btn-ghost-sm bud-act bud-act-fixed${fixed ? ' bud-fixed-on' : ''}`, type: 'button',
               'aria-pressed': fixed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.fixed', { category: d.category }),
               title: i18n.t(fixed ? 'bud.title.fixedOff' : 'bud.title.fixedOn'),
@@ -866,9 +904,9 @@ module.exports = function registerBudgets(ctx) {
                categories.js). The confirm dialog is the real safety net here;
                the row button is only ever the entry point to it. */
             d.inFile
-              ? el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
+              ? el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-clear', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
               : '',
-            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
+            el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
               if (await promptDeleteCategory(d.category)) {
                 const draft = budgetDraft();
                 const i = draft.indexOf(d);

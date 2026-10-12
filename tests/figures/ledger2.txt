@@ -1,11 +1,11 @@
 ## dashboard
 number	13 100	-	heroCard/div.hero-grid/div[0]/div.hero-num[1]
-money	R 1 500,00	1500	heroCard/@hero-budget
-money	R 14 600,00	14600	heroCard/@hero-budget
-money	R 30 000,00	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
-money	R 14 600,00	14600	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
-percent	49%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 1 500,00	1500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
+money	R 1 500	1500	heroCard/@hero-budget
+money	R 14 600	14600	heroCard/@hero-budget
+money	R 30 000	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
+money	R 14 600	14600	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
+percent	49%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact
+money	R 1 500	1500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
 percent	10%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
 number	46	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
 number	1,1	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
@@ -17,14 +17,14 @@ percent	0,4%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-bt
 money	R 133	133.33333333333334	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lm[2]
 number	6	-	healthSub/
 money	R 63 500	63500	leftBody/@left-cash
-number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
+number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[0]
 money	R 15 000	15000	leftBody/@left-earmarked
 money	R 2 000	2000	leftBody/@left-committed
-number	2	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
-number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
+number	2	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[0]
+number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[2]
 money	R 46 500	46500	leftBody/@left-free
-number	22	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
-money	R 2 114	2113.6363636363635	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
+number	22	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[0]
+money	R 2 114	2113.6363636363635	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[2]
 number	4	-	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
 money	R 300	300	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
 money	R 1 200	1200	leftBody/details.left-open/table.left-disc/tr[0]/td.da[1]
@@ -256,19 +256,19 @@ money	R 9 000,00	9000	budTable/tbody/tr[5]/td.num[2]/div.bud-amt-wrap/div.bud-re
 money	R 0,00	0	budTable/tbody/tr[5]/td.num[3]
 money	R 200,00	200	budTable/tbody/tr[6]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 0,00	0	budTable/tbody/tr[6]/td.num[3]
-money	R 30 000,00	30000	budTotalsTop/@bud-income
-money	R 30 000,00	30000	budTotalsTop/@bud-income-note
-money	R 14 600,00	14600	budTotalsTop/@bud-budgeted
+money	R 30 000	30000	budTotalsTop/@bud-income
+money	R 30 000	30000	budTotalsTop/@bud-income-note
+money	R 14 600	14600	budTotalsTop/@bud-budgeted
 percent	49%	-	budTotalsTop/@bud-budgeted-note
-money	R 15 400,00	15400	budTotalsTop/@bud-unallocated
-money	R 1 500,00	1500	budTotalsTop/@bud-spent
+money	R 15 400	15400	budTotalsTop/@bud-unallocated
+money	R 1 500	1500	budTotalsTop/@bud-spent
 percent	10%	-	budTotalsTop/@bud-note-spent
-money	R 30 000,00	30000	budTotalsBottom/@bud-income
-money	R 30 000,00	30000	budTotalsBottom/@bud-income-note
-money	R 14 600,00	14600	budTotalsBottom/@bud-budgeted
+money	R 30 000	30000	budTotalsBottom/@bud-income
+money	R 30 000	30000	budTotalsBottom/@bud-income-note
+money	R 14 600	14600	budTotalsBottom/@bud-budgeted
 percent	49%	-	budTotalsBottom/@bud-budgeted-note
-money	R 15 400,00	15400	budTotalsBottom/@bud-unallocated
-money	R 1 500,00	1500	budTotalsBottom/@bud-spent
+money	R 15 400	15400	budTotalsBottom/@bud-unallocated
+money	R 1 500	1500	budTotalsBottom/@bud-spent
 percent	10%	-	budTotalsBottom/@bud-note-spent
 
 ## plan

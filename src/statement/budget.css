@@ -1,0 +1,288 @@
+/* Statement lane: budget-lane owns this file (Budget page restyle). */
+
+/* The Budget page keeps its layout: one card, header and actions, a totals
+   band, the grouped table, the same band again underneath. What changes is the
+   type (Statement type, October 2026, "Option 3"):
+
+     - "Left to budget" is the page's statement figure, at display size, in the
+       soft emerald gradient when there is money left to give a job. Zero and
+       over-budgeted keep the plain and red inks they always had.
+     - the other three totals are figure-small, a fact per line underneath;
+     - the table has calm sentence-case headings, a coloured dot on each group
+       bar, tabular figures, a rose "over", a quiet "already spent" chip, and
+       row buttons that stay in their own slots whichever of them a row has.
+
+   Every rule is scoped to the root. Colours are tokens (the palette test
+   forbids a hex here). The table is addressed by its .bud-table class, never by
+   its id: tests/lane-m-mobile-reach keeps every #budTable rule inside the
+   phone breakpoint. The desktop table polish sits at 601px and up; the stacked
+   phone cards in src/styles.css ("Transactions + Budget: stacked rows") are
+   left exactly as they are. */
+
+/* ------------------------------------------------------------
+   1. TOTALS BAND (above and below the table)
+   ------------------------------------------------------------ */
+.budget-app-root .bud-totals {
+  display: flex;
+  padding: 24px 8px;
+  margin: 0 0 8px;
+  border: 0;
+  border-radius: 24px;
+  background: rgba(127, 127, 127, .07);
+  /* The layout answers to the WINDOW's width, not the pane's: a narrow Obsidian
+     pane inside a wide window still gets the 80px figure and the one-row band,
+     and the left tile (min-width: min-content, below) then cannot shrink to
+     fit. Scrolling inside the band keeps that overflow in the card instead of
+     past its edge. */
+  overflow-x: auto;
+}
+.budget-app-root .bud-totals-bottom { margin: 8px 0 0; }
+.budget-app-root .bud-total {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 20px;
+}
+/* The wide column is the statement figure's; the last tile (Total spent) has
+   the longest notes, so it takes a little more than the plain ones. The figure
+   is nowrap, so min-content keeps a large number from being clipped. */
+.budget-app-root .bud-total-left { flex: 1.9 1 0; min-width: min-content; }
+.budget-app-root .bud-total:last-child { flex-grow: 1.2; }
+.budget-app-root .bud-total + .bud-total { border-left: 1px solid var(--border-color); }
+
+.budget-app-root .bud-total-l {
+  font-size: var(--st-label);
+  font-weight: var(--st-weight-label);
+  color: var(--text-muted);
+}
+.budget-app-root .bud-total-left.is-pos .bud-total-l {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.budget-app-root .bud-total-v {
+  margin-top: 6px;
+  white-space: nowrap;
+}
+.budget-app-root .bud-total-v.is-income { color: var(--color-primary); }
+
+/* "Left to budget": display size on top, figure size underneath. */
+.budget-app-root #budTotalsTop .bud-total-v.is-left {
+  font-size: var(--st-display);
+  line-height: .95;
+  letter-spacing: var(--st-track-display);
+  --st-cur: var(--st-cur-display);
+  --st-cur-gap: var(--st-cur-gap-display);
+}
+.budget-app-root #budTotalsBottom .bud-total-v.is-left {
+  font-size: var(--st-figure);
+  line-height: 1;
+  letter-spacing: var(--st-track-figure);
+  --st-cur: var(--st-cur-figure);
+}
+/* Seven digits or more step the figure down one size so it stays inside its
+   tile (views/budgets.js adds .is-long, counting digits as the Dashboard's
+   longFig does). Display becomes figure, figure becomes figure-small, and the
+   symbol size and gap follow the size they now are. The three plain tiles
+   (income, budgeted, spent) are already figure-small, so they step to a
+   smaller clamp: at 1101px, where the four tiles sit in one row, an eight-digit
+   "R 24 691 356" at 32px is 185px in a tile with about 169px of room. */
+.budget-app-root .bud-total-v.is-long:not(.is-left) {
+  font-size: clamp(22px, 2.3vw, 26px);
+}
+.budget-app-root #budTotalsTop .bud-total-v.is-left.is-long {
+  font-size: var(--st-figure);
+  line-height: 1;
+  letter-spacing: var(--st-track-figure);
+  --st-cur: var(--st-cur-figure);
+  --st-cur-gap: var(--st-cur-gap-figure);
+}
+.budget-app-root #budTotalsBottom .bud-total-v.is-left.is-long {
+  font-size: var(--st-figure-sm);
+  line-height: 1.05;
+  letter-spacing: var(--st-track-figure-sm);
+  --st-cur: var(--st-cur-figure-sm);
+}
+.budget-app-root .bud-total-v.is-left.is-pos {
+  color: var(--color-primary);
+  width: fit-content;
+  padding-bottom: .06em;
+}
+/* The gradient is an enhancement over the solid colour above, so an engine
+   that cannot clip a background to text still prints a legible figure. The
+   currency symbol keeps its own muted fill (the ::first-letter rule). */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .budget-app-root #budTotalsTop .bud-total-v.is-left.is-pos {
+    background-image: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 38%, var(--color-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  .budget-app-root.bud-dark #budTotalsTop .bud-total-v.is-left.is-pos {
+    background-image: linear-gradient(100deg, var(--color-accent) 0%, var(--color-primary) 100%);
+  }
+}
+
+/* One fact per line: each fragment of the note is its own block, and the
+   spent tile's two-fact sentence is split by a line break in the markup. */
+.budget-app-root .bud-total-n {
+  margin-top: 10px;
+  font-size: var(--st-small);
+  line-height: 1.45;
+  color: var(--text-light);
+}
+.budget-app-root .bud-total-n > span { display: block; }
+/* The ' · ' between fragments stays in the text, out of sight. */
+.budget-app-root .bud-total-n > .bud-sep { display: none; }
+
+@media (max-width: 1100px) {
+  .budget-app-root .bud-totals {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 0;
+  }
+  .budget-app-root .bud-total:nth-child(odd) { border-left: 0; }
+}
+@media (max-width: 640px) {
+  .budget-app-root .bud-totals {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px 4px;
+    gap: 20px 0;
+  }
+  .budget-app-root .bud-total { padding: 0 16px; }
+  .budget-app-root .bud-total + .bud-total {
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+  }
+  .budget-app-root .bud-total-left.is-pos {
+    margin: 0 8px;
+    padding: 20px 12px;
+    border-top: 0;
+    border-radius: 20px;
+    background: var(--color-primary-light);
+  }
+}
+
+/* ------------------------------------------------------------
+   2. THE TABLE
+   ------------------------------------------------------------ */
+.budget-app-root .bud-table thead th {
+  font-weight: var(--st-weight-label);
+  color: var(--text-light);
+}
+
+/* Group bars: a tinted band with a dot in the group's colour. A custom group or
+   an undeclared type falls to the neutral dot. */
+.budget-app-root .bud-table tbody tr.type-row td {
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(127, 127, 127, .07);
+}
+.budget-app-root .bud-table tr.type-row { --bud-g: var(--text-light); }
+.budget-app-root .bud-table tr.type-row[data-type="income"],
+.budget-app-root .bud-table tr.type-row[data-type="services"] { --bud-g: var(--color-info); }
+.budget-app-root .bud-table tr.type-row[data-type="expense"] { --bud-g: var(--color-danger); }
+.budget-app-root .bud-table tr.type-row[data-type="debt"],
+.budget-app-root .bud-table tr.type-row[data-type="insurance"] { --bud-g: var(--color-warning); }
+.budget-app-root .bud-table tr.type-row[data-type="giving"] { --bud-g: var(--color-giving); }
+.budget-app-root .bud-table tr.type-row[data-type="savings"] { --bud-g: var(--color-success); }
+.budget-app-root .bud-table tr.type-row[data-type="investment"] { --bud-g: var(--color-investment); }
+.budget-app-root .bud-table tr.type-row[data-type="luxuries"] { --bud-g: var(--color-luxuries); }
+.budget-app-root .bud-table tr.type-row[data-type="transfer"] { --bud-g: var(--text-muted); }
+.budget-app-root .bud-grp-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 10px;
+  border-radius: 50%;
+  background: var(--bud-g, var(--text-light));
+}
+
+/* The Type chip: a little smaller and calmer than the legacy badge. */
+.budget-app-root .bud-table .category-badge {
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 3px 10px;
+}
+
+/* Figures: tabular, the Actual column a step up from the muted default. */
+.budget-app-root .bud-table td.num {
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.budget-app-root .bud-table td.num input { font-weight: 400; }
+
+/* Under the amount: what is left, or what is over, and the carried-in states. */
+.budget-app-root .bud-remaining {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-light);
+  margin-top: 6px;
+}
+.budget-app-root .bud-remaining.st-over {
+  font-size: 13px;
+  font-weight: 600;
+}
+.budget-app-root .bud-remaining-assumed {
+  font-style: normal;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, .14);
+  color: var(--text-muted);
+}
+.budget-app-root .bud-assumed-tag,
+.budget-app-root .bud-assumed-note {
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text-light);
+}
+
+@media (min-width: 601px) {
+  /* Amount cell: input over its caption, one column width, right edge shared. */
+  .budget-app-root .bud-table .bud-amt-wrap {
+    width: 150px;
+    margin-left: auto;
+  }
+  .budget-app-root .bud-table .bud-amt-wrap input[type=number].form-control {
+    width: 100%;
+  }
+  .budget-app-root .bud-table tbody tr:not(.type-row) input.form-control {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: 15px;
+  }
+  .budget-app-root .bud-table tbody tr:not(.type-row) td:first-child { font-weight: 600; }
+
+  /* Row buttons live in four slots, left to right: assume spent, fixed, clear,
+     delete. A row that has fewer buttons keeps the ones it has in THEIR slots
+     (income and transfers have no assume/fixed, an unsaved row has no clear),
+     so the delete button is always in the last slot and the column lines up.
+     --bud-slot is one button plus its margin. */
+  .budget-app-root .bud-table { --bud-slot: 36px; }
+  .budget-app-root .bud-table .bud-act {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    margin: 0 2px 0 0;
+    justify-content: center;
+    border-color: transparent;
+    color: var(--text-muted);
+  }
+  .budget-app-root .bud-table .bud-act:hover { border-color: var(--border-color); }
+  .budget-app-root .bud-table .bud-act.bud-assume-on { color: var(--color-accent); }
+  .budget-app-root .bud-table .bud-act.bud-fixed-on { color: var(--color-info); }
+  .budget-app-root .bud-table .bud-act-delete:hover { color: var(--color-danger-ink); }
+  .budget-app-root .bud-table .bud-act-fixed + .bud-act-delete { margin-left: var(--bud-slot); }
+  .budget-app-root .bud-table .bud-act-clear:first-child { margin-left: calc(var(--bud-slot) * 2); }
+  .budget-app-root .bud-table .bud-act-delete:first-child { margin-left: calc(var(--bud-slot) * 3); }
+}
+/* A touch screen at tablet width: the buttons are 44px, so the slot is too. */
+@media (min-width: 601px) and (pointer: coarse) {
+  .budget-app-root .bud-table { --bud-slot: 46px; }
+  .budget-app-root .bud-table .bud-act { width: 44px; height: 44px; }
+}

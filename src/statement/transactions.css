@@ -1,0 +1,308 @@
+/* Statement lane: transactions-lane owns this file (Transactions page restyle). */
+/*
+   "Option 3, statement type" for the Transactions page. The layout, the card
+   and the colours are the ones the page already had; what changes is the type
+   and the polish of the controls and rows (approved mockup:
+   _preview/option3-mockup.html, section "Transactions").
+
+   The page title and its sub-line are sized by foundation.css (the title IS the
+   page's statement here). This file does the rest: the filters and actions rows,
+   the table's headings, rows and figures, and the phone card.
+
+   Rules of this file
+     - Scoped to #view-transactions, which the shell owns. No rule here names
+       #txTable outside a media query: tests/lane-m-mobile-reach.test.cjs forbids
+       it, because the phone card rules in src/styles.css are the only ones that
+       may address the table by id. The phone block at the end repeats those
+       selectors on purpose, so it wins by source order at equal specificity.
+     - Amount cells are not touched in their markup. The figures harness and
+       scripts/reconcile-page.cjs read them as td.num[4] and the printed text is
+       the money formatter's own, so the "+" on income and the muted currency
+       symbol are drawn here, in CSS.
+     - Colour is tokens only. The category dot reads --cat-dot, which
+       views/transactions.js sets on the category cell (never on a figure).
+     - Touch targets: min-height is only lowered under (pointer: fine), so the
+       coarse-pointer rules in src/styles.css keep their 44px floor. */
+
+/* ------------------------------------------------------------
+   1. FILTERS AND ACTIONS
+   ------------------------------------------------------------ */
+.budget-app-root #view-transactions .tx-filters { gap: 12px; }
+.budget-app-root #view-transactions .tx-actions { gap: 8px; }
+
+/* One control height across the row: two selects and the search field, 40px,
+   the plugin's 12px field radius. */
+.budget-app-root #view-transactions .tx-filters .form-select-sm,
+.budget-app-root #view-transactions .tx-filters #txSearch {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+/* The search is the pill of the three. Its text starts a little in from the
+   curve; the selects keep their native chevron. */
+.budget-app-root #view-transactions .tx-filters #txSearch {
+  flex: 1 1 200px;
+  padding: 0 18px;
+  border-radius: 999px;
+}
+.budget-app-root #view-transactions .tx-whole {
+  font-size: var(--st-label);
+  gap: 10px;
+  color: var(--text-muted);
+}
+
+/* The row count reads as a quiet figure, not a caption. */
+.budget-app-root #view-transactions #txCount {
+  margin-right: 6px;
+  font-size: var(--st-body);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Buttons: one height, the mockup's small size. */
+.budget-app-root #view-transactions .tx-actions .btn-ghost,
+.budget-app-root #view-transactions .tx-actions .btn-gradient {
+  padding: 0 14px;
+  font-size: var(--st-small);
+  font-weight: 500;
+  line-height: 1;
+}
+.budget-app-root #view-transactions .tx-actions .btn-gradient { font-weight: 600; }
+@media (pointer: fine) {
+  .budget-app-root #view-transactions .tx-actions .btn-ghost,
+  .budget-app-root #view-transactions .tx-actions .btn-gradient { min-height: 34px; }
+}
+
+/* ------------------------------------------------------------
+   2. TABLE: headings, rows, hover
+   ------------------------------------------------------------ */
+.budget-app-root #view-transactions .table thead th {
+  font-size: var(--st-small);
+  font-weight: 500;
+  color: var(--text-light);
+}
+.budget-app-root #view-transactions .table tbody td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: var(--st-body);
+  line-height: 1.35;
+}
+/* A calm hover: a faint wash instead of the green tint. */
+.budget-app-root #view-transactions .table.table-hover tbody tr:hover { background: var(--line-soft); }
+
+/* Date: quiet, never wraps. Description: the row's own name, weight 500. */
+.budget-app-root #view-transactions .table tbody td:nth-child(1) {
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.budget-app-root #view-transactions .table tbody td:nth-child(2) {
+  min-width: 140px;
+  font-weight: 500;
+}
+.budget-app-root #view-transactions .table tbody td:nth-child(3) { white-space: nowrap; }
+
+/* Category: a colour dot, then the name. The cell holds the deferred picker
+   (a button until first use, then a <select>); the dot is drawn on its wrapper
+   so it survives the swap. No dot when the category has no usable colour. */
+.budget-app-root #view-transactions .table tbody td:nth-child(4) { white-space: nowrap; }
+.budget-app-root #view-transactions .table .cat-cell {
+  display: inline-flex;
+  align-items: center;
+}
+.budget-app-root #view-transactions .table td[data-dot] .cat-cell::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--cat-dot);
+}
+.budget-app-root #view-transactions .table .cat-cell-btn {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.budget-app-root #view-transactions .table .cat-cell .category-select { flex: 1 1 auto; }
+
+/* Amount: tabular, right-aligned, 16px. Spending is weight 500 in the text
+   colour; income (the cell that already carries .text-success) is green, 600,
+   with a "+". */
+.budget-app-root #view-transactions .table td.num {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.budget-app-root #view-transactions .table td.num.text-success {
+  position: relative;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+/* The sign is absolutely positioned: out-of-flow generated content is skipped
+   by ::first-letter, so the currency symbol rule below still lands on the "R"
+   and not on the "+". Its static position is the start of the number; the
+   negative margin pulls it just left of it. The cell is the positioned
+   ancestor (position: relative above): without one, the sign's containing block
+   is the page, so inside .table-responsive (overflow-x: auto) a scrolled table
+   moved the cells and left every "+" behind, unclipped. */
+.budget-app-root #view-transactions .table td.num.text-success::before {
+  content: '+';
+  position: absolute;
+  margin-left: -.7em;
+}
+/* The currency symbol, small and muted, as on the statement figures (the
+   foundation's ::first-letter treatment, applied to the cell it cannot name).
+   Two gates, both required: the household's symbol is one character (.bv-cur-1,
+   see controller) AND so is the one THIS row prints (.st-cur1, set by
+   views/transactions.js). A row on a foreign account prints that account's own
+   symbol or code ("USD 12,00", "Rp 5"), and ::first-letter would shrink only
+   its first letter. */
+.budget-app-root.bv-cur-1 #view-transactions .table td.num.st-cur1::first-letter {
+  font-size: .8em;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-light);
+  -webkit-text-fill-color: var(--text-light);
+}
+
+/* Excl. budget: the heading and the checkbox sit centred in their column. */
+.budget-app-root #view-transactions .table thead th:nth-child(6),
+.budget-app-root #view-transactions .table tbody td:nth-child(6) { text-align: center; }
+@media (pointer: fine) {
+  .budget-app-root #view-transactions .table input[type=checkbox] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Note field, level with the other inputs on the page. */
+.budget-app-root #view-transactions .table tbody td:nth-child(7) input {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+/* Split and Delete: quiet round icon buttons that show their edge on hover,
+   side by side (the cell no longer carries an inline nowrap). */
+.budget-app-root #view-transactions .table tbody td:last-child { white-space: nowrap; }
+.budget-app-root #view-transactions .table tbody td:last-child .btn-ghost-sm {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.budget-app-root #view-transactions .table tbody td:last-child .btn-ghost-sm:hover {
+  background: var(--line-soft);
+  border-color: var(--border-color);
+}
+.budget-app-root #view-transactions .table tbody td:last-child .btn-ghost-sm:last-child:hover { color: var(--color-danger-ink); }
+
+/* The empty state and the "Show more" row keep their own calm. */
+.budget-app-root #view-transactions .table tbody td[colspan] { font-size: var(--st-label); }
+
+/* ------------------------------------------------------------
+   3. A visible edge on fields and buttons
+   The mockup draws inputs and buttons with a firmer edge than the card's
+   hairline. color-mix() is Safari 16.2+, so the hairline stays as the fallback
+   and the firmer edge is added only where it parses.
+   ------------------------------------------------------------ */
+@supports (color: color-mix(in srgb, red, blue)) {
+  /* Not while focused or hovered: those states set the primary border in
+     src/styles.css (.form-control:focus, .btn-ghost:hover) at a lower
+     specificity than this rule, so without the :not() the firmer edge would
+     win and the focus ring's border would never show. */
+  .budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus),
+  .budget-app-root #view-transactions .tx-filters #txSearch:not(:focus),
+  .budget-app-root #view-transactions .tx-actions .btn-ghost:not(:hover),
+  .budget-app-root #view-transactions .table tbody td:nth-child(7) input:not(:focus) {
+    border-color: color-mix(in srgb, var(--text-primary) 30%, transparent);
+  }
+}
+
+/* ------------------------------------------------------------
+   4. PHONE (the plugin's own card breakpoint, 600px)
+   Each row is a compact card, laid out as in the mockup:
+     date                       amount
+     description                (spans both)
+     account                    category
+     note (full width)
+     Excl. budget checkbox      split / delete
+   The same selectors as the card rules in src/styles.css, later, so these win.
+   ------------------------------------------------------------ */
+@media (max-width: 600px) {
+  /* The two selects and the search take a full line each, as in the mockup. */
+  .budget-app-root #view-transactions .tx-filters .form-select-sm,
+  .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 100%; }
+
+  .budget-app-root #txTable tbody tr { gap: 6px 16px; padding: 14px 4px; }
+
+  .budget-app-root #txTable tbody td:nth-child(1) {
+    grid-column: 1; grid-row: 1;
+    font-size: var(--st-small);
+    font-weight: 400;
+  }
+  .budget-app-root #txTable tbody td:nth-child(5) {
+    grid-column: 2; grid-row: 1 / span 2;
+    align-self: center;
+    font-size: 18px;
+  }
+  .budget-app-root #txTable tbody td:nth-child(2) {
+    grid-column: 1; grid-row: 2;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .budget-app-root #txTable tbody td:nth-child(3) {
+    grid-column: 1; grid-row: 3;
+    text-align: left;
+    font-size: var(--st-small);
+    color: var(--text-muted);
+  }
+  .budget-app-root #txTable tbody td:nth-child(4) {
+    grid-column: 2; grid-row: 3;
+    text-align: right;
+  }
+  .budget-app-root #txTable tbody td:nth-child(4) .cat-cell { min-width: 0; }
+  .budget-app-root #txTable tbody td:nth-child(4) .cat-cell-btn {
+    width: auto;
+    justify-content: flex-end;
+    font-size: var(--st-small);
+  }
+  .budget-app-root #txTable tbody td:nth-child(7) { grid-column: 1 / -1; grid-row: 4; }
+  .budget-app-root #txTable tbody td:nth-child(6) {
+    grid-column: 1; grid-row: 5;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 10px;
+  }
+  .budget-app-root #txTable tbody td:nth-child(8) {
+    grid-column: 2; grid-row: 5;
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+
+  /* Labels. The cells whose meaning is plain from the card (date, description,
+     amount, account, category) print none; the checkbox keeps its words, set
+     after the box, and the note keeps a small caption because an empty text
+     field says nothing by itself. */
+  .budget-app-root #txTable tbody td:nth-child(-n+5)[data-label]::before { display: none; }
+  .budget-app-root #txTable tbody td:nth-child(6)[data-label]::before {
+    order: 2;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .budget-app-root #txTable tbody td:nth-child(7)[data-label]::before {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-light);
+  }
+}

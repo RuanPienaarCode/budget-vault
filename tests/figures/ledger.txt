@@ -1,17 +1,17 @@
 ## dashboard
 number	3 400	-	heroCard/div.hero-grid/div[0]/div.hero-num[1]
-money	R 12 100,00	12100	heroCard/@hero-budget
-money	R 15 500,00	15500	heroCard/@hero-budget
-money	R 2 000	2000	heroCard/div.hero-grid/div[0]/div.hero-sub[3]
-money	R 500	500	heroCard/div.hero-grid/div[0]/div.hero-sub[3]
-money	R 1 500	1500	heroCard/div.hero-grid/div[0]/div.hero-sub[4]
-number	1	-	heroCard/div.hero-grid/div[0]/div.hero-sub[4]
-money	R 30 000,00	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
-money	R 17 500,00	17500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
-percent	58%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 1 000	1000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]
-money	R 12 100,00	12100	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
+money	R 12 100	12100	heroCard/@hero-budget
+money	R 15 500	15500	heroCard/@hero-budget
+money	R 2 000	2000	heroCard/div.hero-grid/div[0]/div.hero-sub[3]/span.fact[0]
+money	R 500	500	heroCard/div.hero-grid/div[0]/div.hero-sub[3]/span.fact[2]
+money	R 1 500	1500	heroCard/div.hero-grid/div[0]/div.hero-sub[4]/span.fact
+number	1	-	heroCard/div.hero-grid/div[0]/div.hero-sub[4]/span.fact
+money	R 30 000	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
+money	R 17 500	17500	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
+percent	58%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact[0]
+money	R 1 000	1000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact[2]
+money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact[2]
+money	R 12 100	12100	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
 percent	78%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
 number	45	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
 number	1,0	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
@@ -22,16 +22,16 @@ money	R 0	0	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/d
 percent	0,4%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lv[0]
 money	R 133	133.33333333333334	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lm[2]
 money	R 28 900	28900	leftBody/@left-cash
-number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
-number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
-money	R 21 000	21000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]
+number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[0]
+number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[2]
+money	R 21 000	21000	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[2]
 money	R 14 500	14500	leftBody/@left-earmarked
 money	R 1 600	1600	leftBody/@left-committed
-number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
-number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]
+number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[0]
+number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[2]
 money	R 12 800	12800	leftBody/@left-free
-number	28	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
-money	R 457	457.14285714285717	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]
+number	28	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[0]
+money	R 457	457.14285714285717	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[2]
 money	$ 1 000	1000	leftBody/div.left-fx[1]/span.left-fx-txt[1]
 money	$ 1 000	1000	leftBody/div.left-fx[1]/span.left-fx-txt[1]
 money	$ 0	0	leftBody/div.left-fx[1]/span.left-fx-txt[1]
@@ -283,31 +283,31 @@ money	R 9 000,00	9000	budTable/tbody/tr[6]/td.num[3]
 money	R 0,00	0	budTable/tbody/tr[8]/td.num[2]/div.bud-amt-wrap/div.bud-remaining
 money	R 2 000,00	2000	budTable/tbody/tr[8]/td.num[3]
 money	R 0,00	0	budTable/tbody/tr[10]/td.num[3]
-money	R 30 000,00	30000	budTotalsTop/@bud-income
-money	R 30 000,00	30000	budTotalsTop/@bud-income-note
-money	R 17 500,00	17500	budTotalsTop/@bud-budgeted
+money	R 30 000	30000	budTotalsTop/@bud-income
+money	R 30 000	30000	budTotalsTop/@bud-income-note
+money	R 17 500	17500	budTotalsTop/@bud-budgeted
 percent	58%	-	budTotalsTop/@bud-budgeted-note
-money	R 2 000,00	2000	budTotalsTop/@bud-budgeted-setaside
-money	R 12 500,00	12500	budTotalsTop/@bud-unallocated
-money	R 12 100,00	12100	budTotalsTop/@bud-spent
+money	R 2 000	2000	budTotalsTop/@bud-budgeted-setaside
+money	R 12 500	12500	budTotalsTop/@bud-unallocated
+money	R 12 100	12100	budTotalsTop/@bud-spent
 percent	78%	-	budTotalsTop/@bud-note-spent
-money	R 500,00	500	budTotalsTop/@bud-note-spent
+money	R 500	500	budTotalsTop/@bud-note-spent
 money	R 1 000	1000	budTotalsTop/@bud-note-setaside
 money	R 2 000	2000	budTotalsTop/@bud-note-setaside
-money	R 1 500,00	1500	budTotalsTop/@bud-note-funds
+money	R 1 500	1500	budTotalsTop/@bud-note-funds
 number	1	-	budTotalsTop/@bud-note-funds
-money	R 30 000,00	30000	budTotalsBottom/@bud-income
-money	R 30 000,00	30000	budTotalsBottom/@bud-income-note
-money	R 17 500,00	17500	budTotalsBottom/@bud-budgeted
+money	R 30 000	30000	budTotalsBottom/@bud-income
+money	R 30 000	30000	budTotalsBottom/@bud-income-note
+money	R 17 500	17500	budTotalsBottom/@bud-budgeted
 percent	58%	-	budTotalsBottom/@bud-budgeted-note
-money	R 2 000,00	2000	budTotalsBottom/@bud-budgeted-setaside
-money	R 12 500,00	12500	budTotalsBottom/@bud-unallocated
-money	R 12 100,00	12100	budTotalsBottom/@bud-spent
+money	R 2 000	2000	budTotalsBottom/@bud-budgeted-setaside
+money	R 12 500	12500	budTotalsBottom/@bud-unallocated
+money	R 12 100	12100	budTotalsBottom/@bud-spent
 percent	78%	-	budTotalsBottom/@bud-note-spent
-money	R 500,00	500	budTotalsBottom/@bud-note-spent
+money	R 500	500	budTotalsBottom/@bud-note-spent
 money	R 1 000	1000	budTotalsBottom/@bud-note-setaside
 money	R 2 000	2000	budTotalsBottom/@bud-note-setaside
-money	R 1 500,00	1500	budTotalsBottom/@bud-note-funds
+money	R 1 500	1500	budTotalsBottom/@bud-note-funds
 number	1	-	budTotalsBottom/@bud-note-funds
 
 ## plan

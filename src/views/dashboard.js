@@ -48,6 +48,27 @@ const { poolAccounts } = require('../vocabulary');
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
 
+  /* ONE FACT PER LINE (Statement type, Oct 2026). The footnotes under a figure
+     used to be a single string joined with ' · '. They are now one block per
+     fact, so each reads on its own line under a large figure. A one-character
+     separator stays in the DOM between the blocks, hidden by CSS (.fact-sep),
+     so a reader that walks the text leaf by leaf (the figures ledger, the
+     reconciliation, the guard tests) still sees "2 accounts · 2 unconfirmed".
+     The parts, their order and their wording are unchanged. */
+  const factLines = parts => {
+    const out = [];
+    parts.filter(Boolean).forEach((part, i) => {
+      if (i) out.push(el('span', { class: 'fact-sep' }, '·'));
+      out.push(el('span', { class: 'fact' }, part));
+    });
+    return out;
+  };
+  /* A figure with seven or more digits does not fit the statement size in its
+     column; it steps down a size (see .is-long in statement/dashboard.css)
+     rather than overflowing the card. Counts digits, so the symbol, the
+     grouping and the decimal comma do not move the threshold. */
+  const longFig = text => ((String(text).match(/\d/g) || []).length >= 7 ? ' is-long' : '');
+
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
      were four bare calls in a row, with no catch anywhere between here and
@@ -781,10 +802,13 @@ module.exports = function registerDashboard(ctx) {
        committed" as "actually free" on any household with an earmarked fund.
        Each tile carries its own name now, derived from the class that already
        distinguishes it: is-cash → left-cash, is-short → left-short. */
-    const fig = (cls, value, label, meta) => el('div', { class: `left-fig ${cls}` },
-      el('div', { class: 'lv num', 'data-fig': `left-${cls.replace(/^is-/, '')}` }, value),
-      el('div', { class: 'll' }, label),
-      meta ? el('div', { class: 'lm' }, meta) : '');
+    const fig = (cls, value, label, metaParts) => {
+      const lines = factLines(metaParts);
+      return el('div', { class: `left-fig ${cls}` },
+        el('div', { class: `lv num${longFig(value)}`, 'data-fig': `left-${cls.replace(/^is-/, '')}` }, value),
+        el('div', { class: 'll' }, label),
+        lines.length ? el('div', { class: 'lm' }, lines) : '');
+    };
 
     /* Four independent facts about the cash figure, each only shown when it
        has something to say: how many accounts it counted, how many of those
@@ -917,7 +941,7 @@ module.exports = function registerDashboard(ctx) {
       class: `left-grid left-grid--n${terms}${showCardTerm ? ' left-grid--card' : ''}`,
     },
       fig('is-cash', dCash !== null ? money(dCash, 0) : '—',
-        i18n.t('dash.left.cash'), cashParts.join(' · ')));
+        i18n.t('dash.left.cash'), cashParts));
     if (showEarmark) {
       /* Named down to the accounts in the sub-line: "R23 000 is spoken for"
          with no way to see where invites the reader to assume it is wrong,
@@ -926,16 +950,16 @@ module.exports = function registerDashboard(ctx) {
       grid.append(op(), fig('is-earmarked', money(dEarmarked, 0),
         i18n.t('dash.left.earmarked'),
         (L.earmarkedFrom || []).length <= 2
-          ? (L.earmarkedFrom || []).map(e => e.name).join(' · ')
-          : i18n.t('dash.left.earmarkedFrom', { count: L.earmarkedFrom.length })));
+          ? (L.earmarkedFrom || []).map(e => e.name)
+          : [i18n.t('dash.left.earmarkedFrom', { count: L.earmarkedFrom.length })]));
     }
     grid.append(op(),
       fig('is-committed', money(dCommitted, 0),
-        i18n.t('dash.left.committed'), comParts.join(' · ') || i18n.t('dash.left.none')));
+        i18n.t('dash.left.committed'), comParts.length ? comParts : [i18n.t('dash.left.none')]));
     if (showCardTerm) {
       grid.append(op(), fig('is-card', money(dCard, 0),
         i18n.t('dash.left.cardDue'),
-        L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })));
+        [L.counts.card === 1 ? L.owedCards[0] || '' : i18n.t('dash.left.cards', { count: L.counts.card })]));
     }
     /* With the settled card out of the chain, `free` comes out of it too —
        committed.js already accounts for that (see the settlement-cycle
@@ -951,7 +975,7 @@ module.exports = function registerDashboard(ctx) {
       /* "Short", never a negative amount of free money — a minus sign in front
          of a figure labelled "actually free" is a sentence that means nothing. */
       fig(L.short ? 'is-short' : 'is-free', money(Math.abs(dFree ?? L.free), 0),
-        i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts.join(' · ')));
+        i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts));
     body.append(grid);
 
     /* One compact band per other currency, under the headline chain. Its own
@@ -1685,7 +1709,7 @@ module.exports = function registerDashboard(ctx) {
        audit). Grouped here by the line each one prints on. */
     const qualifiers = heroQualifiers(F, money);
     const linesOf = line => qualifiers.filter(q => q.line === line).map(q => q.text);
-    const subLine = parts => (parts.length ? el('div', { class: 'hero-sub hero-sub--ahead' }, parts.join(' · ')) : '');
+    const subLine = parts => (parts.length ? el('div', { class: 'hero-sub hero-sub--ahead' }, factLines(parts)) : '');
     const spentNoteParts = [...linesOf('spent')];
     /* ISSUE 40. The stat column states the WHOLE plan (R14 500) while the hero
        above it now measures against the spend envelopes alone (R10 500). Both
@@ -1720,8 +1744,9 @@ module.exports = function registerDashboard(ctx) {
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
     /* With no plan the big number is what was spent, not a remainder of it. */
-    const heroNum = el('div', { class: `hero-num${heroNegative ? ' hero-num--negative' : ''}` },
-      el('small', {}, cur), money(noBudget ? spent : Math.abs(available), 0).slice(cur.length + 1));
+    const heroText = money(noBudget ? spent : Math.abs(available), 0);
+    const heroNum = el('div', { class: `hero-num${heroNegative ? ' hero-num--negative' : ''}${longFig(heroText)}` },
+      el('small', {}, cur), heroText.slice(cur.length + 1));
     const meter = el('div', { class: `hero-meter${heroNegative ? ' over' : ''}` },
       el('i', { style: `width:${fillPct}%` }));
     if (markPct !== null) meter.append(el('span', { class: 'hero-mark', style: `left:${markPct}%`, 'aria-hidden': 'true' }));
@@ -1745,28 +1770,28 @@ module.exports = function registerDashboard(ctx) {
        fine; held out SILENTLY is not, and this is the most-read card in the
        app, so the sentence goes here rather than only on the page where the
        accounts live. */
-    const foreignNote = linesOf('foreign').join(' · ');
+    const foreignNote = factLines(linesOf('foreign'));
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
-        el('div', {}, el('div', { class: 'sv grad-txt' }, money(sum.income)),
-          inUncounted >= 1 ? el('div', { class: 'st' }, i18n.t('dash.stat.notIncome', { amount: money(inUncounted) })) : '')),
+        el('div', {}, el('div', { class: 'sv grad-txt' }, money(sum.income, 0)),
+          inUncounted >= 1 ? el('div', { class: 'st' }, i18n.t('dash.stat.notIncome', { amount: money(inUncounted, 0) })) : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.budgeted'))),
-        el('div', {}, el('div', { class: 'sv' }, money(plan.total)),
+        el('div', {}, el('div', { class: 'sv' }, money(plan.total, 0)),
           (budgetedPct !== null || setAsideNote)
-            ? el('div', { class: 'st' }, [
+            ? el('div', { class: 'st' }, factLines([
               budgetedPct === null ? '' : baseDiffers
                 ? i18n.t('dash.stat.allocatedOf', { pct: budgetedPct, amount: money(incomeBase, 0) })
                 : i18n.t('dash.stat.allocated', { pct: budgetedPct }),
               setAsideNote,
-            ].filter(Boolean).join(' · '))
+            ]))
             : '')),
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
-        el('div', {}, el('div', { class: 'sv' }, money(used.spent)),
+        el('div', {}, el('div', { class: 'sv' }, money(used.spent, 0)),
           usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
-    if (foreignNote) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
+    if (foreignNote.length) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
     /* A real <button>, not a plain <div> — this is the app's clearest
        statement of outstanding work and, until now, the one figure on the
        whole hero a reader could not act on or even reach from a keyboard.
@@ -1851,7 +1876,7 @@ module.exports = function registerDashboard(ctx) {
            the set-aside note instead on any vault without one. */
         el('div', { class: 'hero-sub', 'data-fig': 'hero-budget' }, noBudget
           ? i18n.t('dash.stat.spent')
-          : i18n.t('dash.hero.sub', { spent: money(used.spent), budgeted: money(bud.spend) })),
+          : i18n.t('dash.hero.sub', { spent: money(used.spent, 0), budgeted: money(bud.spend, 0) })),
         subLine(spentNoteParts),
         /* ISSUE 35. The window this card's figures stop at, and what is on the
            other side of it.
@@ -2625,8 +2650,8 @@ module.exports = function registerDashboard(ctx) {
       fill: 'currentColor', 'fill-opacity': '0.5', 'font-family': 'inherit',
     }).textContent = i18n.t('dash.split.centerLabel');
     add('text', {
-      x: cx, y: cy + 22, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '700',
-      fill: 'currentColor', 'font-family': 'inherit',
+      x: cx, y: cy + 22, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '600',
+      'letter-spacing': '-0.03em', fill: 'currentColor', 'font-family': 'inherit',
     }).textContent = money(total, 0);
 
     /* What this period is measured AGAINST. Averaged over COMPLETED periods

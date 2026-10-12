@@ -142,7 +142,7 @@ atAuditDate(async () => {
   const want = i18n.t('dash.scheduledAhead', { amount: 'R 6890' });
   ok(hero.includes(want),
     `the hero names what its figures stop short of — wanted "${want}", got: ${hero}`);
-  ok(hero.includes('R 35000.00'),
+  ok(hero.includes('R 35000'),
     `and prints the income that actually landed — got: ${hero}`);
   ok(!hero.includes('R 40000.00'),
     'never the whole-month figure that counted a gift three weeks away');

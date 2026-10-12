@@ -50,12 +50,13 @@ jobs:
             echo "If bun was upgraded locally, pin the new version in this workflow too." >&2
             exit 1
           fi
-          # styles.css is build output too: src/styles.css concatenated with the
-          # generated src/styles-presets.css. Without this check a stale committed
-          # stylesheet would ship palettes that no longer match their seeds, with
-          # the main.js check above passing happily alongside it.
-          if ! git diff --exit-code -- styles.css src/styles-presets.css; then
-            echo "styles.css / src/styles-presets.css do not match their sources —" >&2
+          # styles.css is build output too: the concatenation of the files in
+          # scripts/css-sources.cjs, including the generated src/styles-fonts.css
+          # and src/styles-presets.css. Without this check a stale committed
+          # stylesheet would ship palettes or fonts that no longer match their
+          # sources, with the main.js check above passing happily alongside it.
+          if ! git diff --exit-code -- styles.css src/styles-fonts.css src/styles-presets.css; then
+            echo "styles.css / src/styles-fonts.css / src/styles-presets.css do not match their sources —" >&2
             echo "run ./build.sh and commit the result." >&2
             exit 1
           fi

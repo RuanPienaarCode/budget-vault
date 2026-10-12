@@ -19,9 +19,11 @@
    never whether it covers what the views actually render.
 
    So: harvest every class name the source emits, and require a rule for it.
-   The check reads src/styles.css — the hand-written source — deliberately, not
-   the assembled root file. Had it read the build output it would have passed on
-   the broken build, since the root file was where the orphaned CSS was sitting.
+   The check reads the SOURCE files (scripts/css-sources.cjs: the legacy sheet,
+   the statement foundation and the three page lanes, the generated fonts and
+   palettes) deliberately, not the assembled root file. Had it read the build
+   output it would have passed on the broken build, since the root file was
+   where the orphaned CSS was sitting.
 
    NOT a lint for unused CSS. The reverse direction (a rule no view uses) is
    ordinary and fine: rules exist for markup in shell.js's static HTML, for
@@ -44,7 +46,8 @@ const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
 /* Both halves of the build input: the hand-written sheet and the generated
    palette blocks, because a class may legitimately be defined in either. */
-const css = read('src/styles.css') + read('src/styles-presets.css');
+const { assembled } = require('./helpers/css-sources.cjs');
+const css = assembled();
 const defined = new Set();
 for (const m of css.matchAll(/\.([A-Za-z][\w-]*)/g)) defined.add(m[1]);
 ok(defined.size > 400, `the stylesheet should define hundreds of classes, found ${defined.size}`);
@@ -113,7 +116,7 @@ ok(!used.has('env-') && !used.has('tone-') && !used.has('status-'),
    rule, or stops being emitted, fails this suite and must be deleted. */
 const KNOWN_UNSTYLED = [
   'acct-drawer-f', 'acct-fact', 'acct-owners', 'acct-ring',
-  'assets-hero-largest', 'bud-total', 'budget-reslice-list',
+  'assets-hero-largest', 'budget-reslice-list',
   'debt-card-overlap', 'num-sm', 'sav-banner-warn',
   'score-empty', 'score-gap-go',
 ];
@@ -122,8 +125,9 @@ const missing = [...used.keys()].filter(c => !defined.has(c)).sort();
 const unexpected = missing.filter(c => !KNOWN_UNSTYLED.includes(c));
 
 eq(unexpected, [],
-  'these classes are rendered by a view but have no rule in src/styles.css.\n'
-  + '    If you meant to style them, check you edited src/styles.css and NOT the\n'
+  'these classes are rendered by a view but have no rule in any stylesheet source.\n'
+  + '    If you meant to style them, check you edited src/styles.css or a src/statement/*.css\n'
+  + '    file and NOT the\n'
   + '    repo-root styles.css, which is build output and is overwritten on every\n'
   + '    build:\n'
   + unexpected.map(c => `      .${c}  <- ${[...used.get(c)].join(', ')}`).join('\n'));
@@ -133,27 +137,27 @@ for (const c of KNOWN_UNSTYLED) {
   ok(used.has(c),
     `KNOWN_UNSTYLED lists '${c}' but no view emits it any more — delete the entry`);
   ok(!defined.has(c),
-    `KNOWN_UNSTYLED lists '${c}' but src/styles.css now has a rule for it — delete the entry`);
+    `KNOWN_UNSTYLED lists '${c}' but the stylesheet now has a rule for it — delete the entry`);
 }
 eq([...KNOWN_UNSTYLED].sort(), [...KNOWN_UNSTYLED],
   'KNOWN_UNSTYLED is kept sorted so two people adding an entry conflict rather than duplicate');
 
 /* ---- 4. the build output is assembled from the source ------------------ */
 
-/* The other half of the same failure: root styles.css IS src/styles.css plus
-   the generated presets, so a hand edit to the root file is lost. Checking the
-   identity here means a stale or hand-edited build output fails the suite
-   rather than shipping. */
+/* The other half of the same failure: root styles.css IS the concatenation of
+   the sources scripts/css-sources.cjs lists, so a hand edit to the root file is
+   lost. Checking the identity here means a stale or hand-edited build output
+   fails the suite rather than shipping. */
 /* Compared by digest, not by content: these are a quarter of a megabyte each,
    and a deepStrictEqual on the strings prints both of them into the failure. */
 const sha = t => require('crypto').createHash('sha256').update(t).digest('hex').slice(0, 12);
 const built = read('styles.css');
-const assembled = read('src/styles.css') + read('src/styles-presets.css');
-ok(sha(built) === sha(assembled),
-  'repo-root styles.css is not src/styles.css + src/styles-presets.css '
-  + `(built ${sha(built)}/${built.length}B vs source ${sha(assembled)}/${assembled.length}B).\n`
+const assembledText = assembled();
+ok(sha(built) === sha(assembledText),
+  'repo-root styles.css is not the concatenation of the sources in scripts/css-sources.cjs '
+  + `(built ${sha(built)}/${built.length}B vs source ${sha(assembledText)}/${assembledText.length}B).\n`
   + '    Either you hand-edited the build output — it is overwritten on every build,\n'
-  + '    put the rule in src/styles.css instead — or you need to run npm run build.');
+  + '    put the rule in src/styles.css or a src/statement/*.css file instead — or you need to run npm run build.');
 
 console.log(`css-class-coverage: ${checks} checks passed `
   + `(${used.size} classes emitted, ${defined.size} defined, ${KNOWN_UNSTYLED.length} known unstyled)`);

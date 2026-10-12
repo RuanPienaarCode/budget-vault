@@ -50,6 +50,10 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.strictEqual(a, b, m); checks++; };
 
 const ROOT = path.join(__dirname, '..');
+/* Every shipped source, in cascade order (scripts/css-sources.cjs), plus the
+   assembled root file: a rule written into any lane sheet is checked here. */
+const { CSS_SOURCES } = require('./helpers/css-sources.cjs');
+const SHIPPED = [...CSS_SOURCES, 'styles.css'];
 
 /* Comments are blanked rather than stripped so line numbers still point at the
    real line — a failure that reports the wrong line is a failure someone has to
@@ -83,11 +87,11 @@ function scan(rel) {
   return { depth, orphans, wentNegativeAt };
 }
 
-/* Both are shipped: src/styles.css is the hand-written source and the root
+/* All are shipped: the source files are what people edit and the root
    styles.css is what the plugin actually loads in the vault. Checking only the
-   source would miss a build that mangled it; checking only the build would
+   sources would miss a build that mangled them; checking only the build would
    report the fault at a line nobody edits. */
-for (const rel of ['src/styles.css', 'styles.css']) {
+for (const rel of SHIPPED) {
   const { depth, orphans, wentNegativeAt } = scan(rel);
   eq(wentNegativeAt, 0,
     `${rel}: a '}' closes a rule that was never opened, at line ${wentNegativeAt} — ` +
@@ -120,7 +124,7 @@ for (const rel of ['src/styles.css', 'styles.css']) {
    real parser rejected the file ("CSS parse error"). A `*\/` with no open
    comment, or a `/*` never closed, is the same class of hand-edit as the
    orphaned body above, so it is pinned here the same way. */
-for (const rel of ['src/styles.css', 'styles.css']) {
+for (const rel of SHIPPED) {
   const file = path.join(ROOT, rel);
   const css = fs.readFileSync(file, 'utf8');
   let open = false, line = 1;
