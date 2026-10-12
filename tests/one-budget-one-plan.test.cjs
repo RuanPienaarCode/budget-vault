@@ -92,7 +92,7 @@ atAuditDate(async () => {
     const hero = nodes.get('heroCard').textContent;
     ok(/41%/.test(hero), `Dashboard: 41% of income budgeted — got ${hero}`);
     ok(/45% of spending budget used/.test(hero), `Dashboard: 45% of spending budget used — got ${hero}`);
-    ok(/R 14500\.00/.test(hero), 'Dashboard: Budgeted states the whole plan');
+    ok(/R 14500/.test(hero), 'Dashboard: Budgeted states the whole plan');
   }
 
   /* ---------------- the Score page ---------------- */

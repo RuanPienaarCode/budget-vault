@@ -30,7 +30,7 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
 /* Every money figure in a string, as a number: "R 10 500,00" -> 10500. */
-const moneys = s => [...String(s).matchAll(/R[\s\u00a0\u202f]?(\d(?:[\d\s\u00a0\u202f]*\d)?)(?:,(\d{2}))?/g)]
+const moneys = s => [...String(s).matchAll(/R[\s\u00a0\u202f]?(\d{1,3}(?:[\s\u00a0\u202f]\d{3})+|\d+)(?![\d%])(?:,(\d{2}))?/g)]
   .map(m => Number(m[1].replace(/[\s\u00a0\u202f]/g, '') + (m[2] ? '.' + m[2] : '')));
 const pctOf = (s, re) => { const m = String(s).match(re); return m ? Number(m[1]) : null; };
 

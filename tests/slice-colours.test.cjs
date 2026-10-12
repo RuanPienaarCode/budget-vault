@@ -158,10 +158,17 @@ ok(distinctColors([], { reserved: [GREY] }).length === 0, 'an empty list is an e
    Read out of the stylesheets rather than listed here: a copy would drift the
    first time a preset's grey was nudged, and drift silently. */
 const SRC = path.join(__dirname, '..', 'src');
+/* Read through the shared stylesheet helper (tests/helpers/css-sources.cjs): the
+   hand-written half is every source EXCEPT the generated palette blocks, so a
+   --ink-faint written into the statement foundation or a lane is held to the
+   same check as the legacy sheet's. */
+const cssSources = require('./helpers/css-sources.cjs').sources();
 const inkFaints = file => {
-  const at = path.join(SRC, file);
-  if (!fs.existsSync(at)) return null;
-  return [...fs.readFileSync(at, 'utf8').matchAll(/--ink-faint:\s*(#[0-9a-fA-F]{3,6})/g)]
+  const texts = file === 'styles.css'
+    ? cssSources.filter(s => s.rel !== 'src/styles-presets.css').map(s => s.text)
+    : cssSources.filter(s => s.rel === 'src/' + file).map(s => s.text);
+  if (!texts.length) return null;
+  return [...texts.join('').matchAll(/--ink-faint:\s*(#[0-9a-fA-F]{3,6})/g)]
     .map(m => ({ grey: m[1], file }));
 };
 

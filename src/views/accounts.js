@@ -121,6 +121,14 @@ module.exports = function registerAccounts(ctx) {
      says so rather than converting. */
   const acctMoney = (a, v, decimals = 2) =>
     ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
+  /* Is the symbol acctMoney() prints for this account exactly one code point?
+     The statement stylesheet shrinks the first letter of the drawer balance to
+     draw a small muted currency symbol, which is only right when that letter is
+     the whole symbol: this account may print its own ("USD", "Rp"), not the
+     household's. A conflicted account prints its CODE (symbolOf), so it never
+     qualifies. The class is appended after `num`; nothing reads this cell by
+     anything but its first class. */
+  const acctSymbolIsOneChar = a => Array.from(String(symbolOf(a, S.settings.currency)).trim()).length === 1;
 
   /* Round to the cent, then collapse -0 — the same two-step worth.js:91 applies
      to its own net figure, for the same reason: summing signed floats leaves a
@@ -1864,7 +1872,7 @@ module.exports = function registerAccounts(ctx) {
       : acctMoney(a, a.balance);
     box.append(el('div', { class: 'acct-drawer-h' },
       el('h3', {}, a.name),
-      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}` }, drawerBal)));
+      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}${acctSymbolIsOneChar(a) ? ' st-cur1' : ''}` }, drawerBal)));
 
     const grid = el('div', { class: 'acct-drawer-grid' });
     const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },

@@ -3,6 +3,45 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.51.0 — 2026-10-12
+
+A louder, clearer type system. The layout, cards, colours and menu are exactly
+as before; what changed is how the words and numbers are set. No figure changed
+value — the numbers ledger was compared value by value against 1.50.0.
+
+### Changed
+
+- **A new typeface, built in.** Budget Vault now ships the Geist font (SIL Open
+  Font Licence, credited in NOTICE) inside the plugin, so it looks the same on
+  desktop and phone and works offline. Chinese, Japanese and Hindi text falls
+  back to your system font as before.
+- **One statement figure per page.** The Dashboard's spending budget remaining
+  is set large, with the score, "actually free" and the Budget page's "Left to
+  budget" a step below it; secondary figures and tiles sit a clear step down
+  again. Sizes scale down on phones.
+- **Calmer labels.** The small all-capitals, letter-spaced labels are now
+  sentence case throughout the plugin, and long "A · B · C" notes on the
+  Dashboard and Budget totals read one fact per line.
+- **Numbers.** Figures use lined-up (tabular) digits, and the currency symbol
+  beside a large figure is smaller and muted. Summary figures on the Dashboard
+  and the Budget totals show whole rands; tables and inputs keep cents.
+- **Transactions.** Each row shows its category's colour as a dot, and income
+  reads in green with a "+".
+- **Budget.** Category group rows carry their group colour as a dot, and an
+  overspend reads in rose.
+- **Readable green on light.** Positive figures that were printed in the bright
+  success green on light tiles (Owed Money "Recovered", Savings growth, the
+  Accounts and Debt chips) now use the darker primary green, which reads at a
+  proper contrast. Dark theme is unchanged.
+
+### Fixed
+
+- A figure no longer wraps across two lines in the five-tile Savings row on a
+  wide screen.
+- A currency code such as "USD" on a foreign account is no longer partly
+  restyled; the smaller-symbol treatment applies only to a one-character
+  symbol.
+
 ## 1.50.0 — 2026-10-07
 
 A full audit of 1.49.1 — figures, saves, exports, iOS and the headless API —

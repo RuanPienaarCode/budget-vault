@@ -59,7 +59,7 @@ const FILES = {
     const strip = M.nodes.get('#budTotalsTop');
     const frag = find(strip, n => n.attrs && n.attrs['data-fig'] === 'bud-budgeted-setaside')[0];
     ok(frag, 'the Budgeted tile names its set-aside fragment');
-    const words = i18n.t('bud.total.setAsidePlanned', { amount: ctx.money(planned) });
+    const words = i18n.t('bud.total.setAsidePlanned', { amount: ctx.money(planned, 0) });
     ok(words !== 'bud.total.setAsidePlanned' && /planned for savings/.test(words),
       `the tile has a wording of its own that says the figure is planned: ${words}`);
     eq(textOf(frag).replace(/^ · /, ''), words, 'and it prints the PLANNED figure under it');

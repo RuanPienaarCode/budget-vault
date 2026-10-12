@@ -618,7 +618,18 @@ function mountApp(view) {
     const h = $(`#view-${v} h1`);
     if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
   }
+  /* The household's currency symbol decides one piece of styling: a one-character
+     symbol (R, $, a euro, a pound, a yen, a rupee ...) is drawn smaller and
+     muted on the big display figures (src/statement/foundation.css styles the
+     first letter of the printed text). A code such as CHF or A$ is left alone.
+     The class is re-derived on every render, so a settings change or a reload
+     from disk keeps it in step. */
+  function applyCurrencyClass() {
+    const sym = String((S.settings && S.settings.currency) || '').trim();
+    root.classList.toggle('bv-cur-1', Array.from(sym).length === 1);
+  }
   function render() {
+    applyCurrencyClass();
     if (!S.loaded) return;
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, score: ctx.renderScore,
@@ -1108,6 +1119,7 @@ function mountApp(view) {
   return {
     start: async () => {
       applyTheme();
+      applyCurrencyClass();
       if (plugin.settings.privacyLock) { lockGate(); return; }
       await connectVault();
     },

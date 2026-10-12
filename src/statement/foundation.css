@@ -1,0 +1,514 @@
+/* ============================================================
+   STATEMENT TYPE — the foundation (October 2026, "Option 3").
+
+   The plugin keeps its layout, its soft white cards, its drawer and its
+   colours. What changes is the type: one bundled typeface (Geist, see
+   src/styles-fonts.css), a dramatic size scale, large "statement" figures with
+   a quiet currency symbol, sentence-case labels, tabular lining numerals.
+
+   This file is a LAYER over src/styles.css. It is concatenated after it
+   (scripts/css-sources.cjs), so at equal specificity a rule here wins; nothing
+   in the legacy sheet was rewritten except the nineteen uppercase/spaced-out
+   label rules, which were deleted there because the label guard
+   (tests/statement-labels.test.cjs) forbids them anywhere under the root.
+
+   WHO OWNS WHAT
+     this file   the tokens, the --st-* scale, the .st-* classes, and the GLOBAL
+                 treatment of titles, card titles, labels, tables and the
+                 figure classes the views already emit.
+     dashboard.css / budget.css / transactions.css
+                 the statement-size (120/80px) figures and any layout-adjacent
+                 polish of those three pages. Each lane overrides what it needs
+                 by being LATER than this file; it must not edit this one.
+
+   COLOUR. Tokens only (--color-*, --surface, --body-bg, --border-color,
+   --text-primary|muted|light, --ink-faint). Colour marks facts: green = usable
+   (.is-free, .text-success), amber = committed (.is-committed, .text-warning),
+   rose = over/short (.is-short, .text-danger). Nothing here introduces a hex.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. TOKENS
+   Declared on the root, so they inherit into every page and dialog the root
+   hosts. Sizes are clamp(phone, fluid, desktop): the lower bound is the phone
+   size from the approved mockup, the upper bound the desktop size.
+   ------------------------------------------------------------ */
+.budget-app-root {
+  /* Geist first. The system stack that follows is the plugin's existing one,
+     unchanged: Geist is a Latin subset, so CJK and Devanagari text (zh, ja, hi)
+     falls through to the platform face exactly as it did before. */
+  --font-sans: 'BV Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Helvetica, Arial, sans-serif;
+
+  /* the scale */
+  --st-statement: clamp(56px, 10.5vw, 120px);   /* the one number a page is about      */
+  --st-display:   clamp(52px, 7.6vw, 80px);     /* a headline figure                    */
+  --st-score:     clamp(72px, 8vw, 96px);       /* the financial score                  */
+  --st-figure:    clamp(34px, 4.2vw, 44px);     /* tile figure                          */
+  --st-figure-sm: clamp(28px, 3vw, 32px);       /* row / strip figure                   */
+  --st-title:     clamp(40px, 6vw, 56px);       /* page title                           */
+  --st-card-title: 22px;
+  --st-body:      15px;
+  --st-label:     14px;                         /* a field or tile label                */
+  --st-small:     13px;                         /* notes, captions, table headings      */
+  --st-chip:      11.5px;                       /* pills and tags (were 9.5-10px caps)  */
+
+  /* tracking: tighter as the figure grows */
+  --st-track-statement: -0.055em;
+  --st-track-display:   -0.045em;
+  --st-track-score:     -0.05em;
+  --st-track-figure:    -0.03em;
+  --st-track-figure-sm: -0.02em;
+  --st-track-title:     -0.045em;
+  --st-track-card:      -0.02em;
+
+  --st-weight-figure: 600;
+  --st-weight-label:  500;
+
+  /* The currency symbol beside a display figure, as a fraction of the figure,
+     and the gap between it and the digits. The printed text is "R 48 000" (the
+     figures ledger reads it as one text node), so the gap is the space that is
+     already in the string, pulled in by a negative margin on the symbol.
+
+     The margin is in ems of the SYMBOL (the ::first-letter's own, smaller size),
+     and the space it closes up is a fraction of the FIGURE, so the right margin
+     depends on the size class. Three tokens, one per class of size, each worked
+     out to leave the same visible gap of about .09em of the figure between the
+     symbol and the first digit:
+       -figure     the 32-44px tiles and rows (the default: --st-cur-gap)
+       -display    the 80px figures ("Left to budget", "actually free")
+       -statement  the 120px page number
+     A rule that sets --st-cur to a display or statement size sets the matching
+     gap beside it, and a rule that steps a figure DOWN to a smaller size sets it
+     back (tests/statement-currency.test.cjs pins the pairing): the gap would
+     otherwise stay at the larger size's value and pull the symbol into the digit. */
+  --st-cur-statement: .34em;
+  --st-cur-display:   .36em;
+  --st-cur-figure:    .5em;
+  --st-cur-figure-sm: .56em;
+  --st-cur-gap-figure:    -.12em;
+  --st-cur-gap-display:   -.28em;
+  --st-cur-gap-statement: -.27em;
+  --st-cur-gap:           var(--st-cur-gap-figure);
+}
+
+/* ------------------------------------------------------------
+   2. BASE
+   ------------------------------------------------------------ */
+.budget-app-root {
+  font-size: var(--st-body);
+  font-optical-sizing: auto;
+}
+/* Tabular lining numerals wherever a figure sits in a column or a strip, so
+   digits line up and a changing value does not jiggle its neighbours. */
+.budget-app-root .num,
+.budget-app-root .table th,
+.budget-app-root .table td,
+.budget-app-root input[type=number],
+.budget-app-root .hero-sub b,
+.budget-app-root .st-fig {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* A table keeps the size it had (its cells set .875rem; the root's 14 -> 15px
+   change must not reach tables that inherit), now with a quiet sentence-case
+   heading row instead of the old tracked capitals. */
+.budget-app-root .table { font-size: 14px; }
+.budget-app-root .table thead th {
+  font-size: var(--st-small);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.budget-app-root .table .type-row td {
+  font-size: var(--st-label);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+@media (max-width: 768px) {
+  .budget-app-root .table thead th { font-size: 12px; letter-spacing: 0; }
+}
+
+/* ------------------------------------------------------------
+   3. THE CLASSES A PAGE LANE REACHES FOR
+   Each sets size, line-height, weight, tracking and numerals as ONE unit, and
+   publishes --st-cur (the currency symbol's size) for the ::first-letter rule
+   in section 6. They are plain classes: a lane adds one to an element it
+   already emits, or applies the same declarations to its own selector.
+   ------------------------------------------------------------ */
+.budget-app-root .st-statement {
+  font-size: var(--st-statement);
+  line-height: .92;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-statement);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-statement);
+  --st-cur-gap: var(--st-cur-gap-statement);
+}
+.budget-app-root .st-display {
+  font-size: var(--st-display);
+  line-height: .95;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-display);
+  --st-cur-gap: var(--st-cur-gap-display);
+}
+.budget-app-root .st-score {
+  font-size: var(--st-score);
+  line-height: .9;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-score);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.budget-app-root .st-figure {
+  font-size: var(--st-figure);
+  line-height: 1;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-figure);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-figure);
+}
+.budget-app-root .st-figure-sm {
+  font-size: var(--st-figure-sm);
+  line-height: 1.05;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-figure-sm);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-figure-sm);
+}
+.budget-app-root .st-title {
+  font-size: var(--st-title);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: var(--st-track-title);
+  color: var(--text-primary);
+}
+.budget-app-root .st-card-title {
+  font-size: var(--st-card-title);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: var(--st-track-card);
+  color: var(--text-primary);
+}
+.budget-app-root .st-label {
+  font-size: var(--st-label);
+  line-height: 1.4;
+  font-weight: var(--st-weight-label);
+  color: var(--text-muted);
+}
+.budget-app-root .st-small {
+  font-size: var(--st-small);
+  line-height: 1.45;
+  color: var(--text-light);
+}
+/* A separate symbol element, for a lane that prints the symbol on its own
+   (a <span>) rather than relying on section 6. Same look as the ::first-letter
+   symbol: smaller, regular weight, muted. */
+.budget-app-root .st-cur {
+  font-size: var(--st-cur, .5em);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-light);
+  -webkit-text-fill-color: var(--text-light);
+  margin-right: .12em;
+}
+/* Colour marks facts. These repeat the tones the views already use so a lane
+   can colour a NEW figure the same way without reaching for a hex. */
+.budget-app-root .st-usable { color: var(--color-primary); }
+.budget-app-root .st-committed { color: var(--color-warning-ink); }
+.budget-app-root .st-over { color: var(--color-danger-ink); }
+
+/* ------------------------------------------------------------
+   4. TITLES
+   ------------------------------------------------------------ */
+.budget-app-root .financial-period-banner-title {
+  font-size: var(--st-title);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: var(--st-track-title);
+}
+.budget-app-root .financial-period-banner .sub-note {
+  display: block;
+  margin-top: 10px;
+  font-size: var(--st-body);
+  line-height: 1.5;
+}
+.budget-app-root .financial-period-banner .sub-note:empty { display: none; }
+.budget-app-root .card-h h2,
+.budget-app-root .section-h h2,
+.budget-app-root .acct-deck-h h2,
+.budget-app-root .plan-free h2 {
+  font-size: var(--st-card-title);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: var(--st-track-card);
+}
+.budget-app-root .card-h .sub,
+.budget-app-root .section-h .sub {
+  font-size: var(--st-label);
+  letter-spacing: 0;
+  margin-top: 6px;
+}
+@media (max-width: 640px) {
+  .budget-app-root { --st-card-title: 20px; }
+}
+.budget-app-root .splash-title {
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+.budget-app-root .brand-text b {
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.budget-app-root .brand-sub {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.budget-app-root .topbar-avatar { letter-spacing: 0; }
+
+/* ------------------------------------------------------------
+   5. LABELS — sentence case, no tracking
+   The uppercase and the tracking were removed at the source (src/styles.css).
+   What is left is to give the small captions a size that reads on its own now
+   that capitals are not doing the work: 11px caps become 13px, regular case.
+   ------------------------------------------------------------ */
+.budget-app-root .hero-lbl,
+.budget-app-root .stat .sl,
+.budget-app-root .mini .l,
+.budget-app-root .acct-fact-l,
+.budget-app-root .acct-drawer-l,
+.budget-app-root .bud-total-l,
+.budget-app-root .pot-eyebrow,
+.budget-app-root .score-flow-eyebrow,
+.budget-app-root .drawer-section-label {
+  font-size: var(--st-small);
+  font-weight: var(--st-weight-label);
+  letter-spacing: 0;
+}
+/* A literal px, not the token: tests/css-phone-layout.test.cjs computes this
+   button's tap-target height from its font-size and cannot read a var(). */
+.budget-app-root .env-name {
+  font-size: 13px;
+  font-weight: var(--st-weight-label);
+  letter-spacing: 0;
+}
+.budget-app-root .donut-legend .donut-legend-head {
+  font-size: 12px;
+  font-weight: var(--st-weight-label);
+}
+.budget-app-root .score-ring-band {
+  font-size: var(--st-small);
+  font-weight: 600;
+}
+/* Pills and tags that were 9.5-10px capitals */
+.budget-app-root .kind,
+.budget-app-root .debt-plan .dp-tag,
+.budget-app-root .score-win-ribbon,
+.budget-app-root .score-ring-row-tag {
+  font-size: var(--st-chip);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+/* Other small labels and badges that carried positive tracking */
+.budget-app-root .acct-badge,
+.budget-app-root .acct-pill,
+.budget-app-root .tax-field > .l,
+.budget-app-root .chart-range-btn,
+.budget-app-root .assets-hero-badge,
+.budget-app-root .score-ring-band.is-part {
+  letter-spacing: 0;
+}
+
+/* ------------------------------------------------------------
+   6. FIGURES the views already emit
+   figure = 44px tiles, figure-small = 32px rows and strips. Statement-size
+   (120/80px) is deliberately NOT applied to anything here: that is the page
+   lanes' decision (dashboard / budget / transactions).
+   ------------------------------------------------------------ */
+
+/* figure — the headline number of a wide tile (.mini tiles sit four to a row
+   and print up to nine characters, so they take figure-small below) */
+.budget-app-root .health-fig .lv,
+.budget-app-root .left-fig .lv,
+.budget-app-root .pot-fig,
+.budget-app-root .assets-hero-num,
+.budget-app-root .score-ring-num {
+  font-size: var(--st-figure);
+  line-height: 1;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-figure);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-figure);
+}
+/* the ring is a fixed circle: the whole-score number fits at figure size, the
+   part-score number (which carries a "/ 100" beside it) steps down a size */
+.budget-app-root .score-ring-mid.is-part .score-ring-num { font-size: var(--st-figure-sm); }
+
+/* figure-small — a number in a row or a strip */
+.budget-app-root .stat .sv,
+.budget-app-root .mini .v,
+.budget-app-root .bud-total-v,
+.budget-app-root .acct-fact-v,
+.budget-app-root .acct-drawer-v,
+.budget-app-root .pot-fig-2,
+.budget-app-root .env-amt,
+.budget-app-root .plan-free .free-fig,
+.budget-app-root .score-flow-in,
+.budget-app-root .debt-plan .dp-date,
+.budget-app-root .loan-out .lo-big {
+  font-size: var(--st-figure-sm);
+  line-height: 1.05;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-figure-sm);
+  font-variant-numeric: tabular-nums lining-nums;
+  --st-cur: var(--st-cur-figure-sm);
+}
+.budget-app-root .mini .v { margin-top: 8px; }
+.budget-app-root .env-amt { margin-top: 10px; }
+.budget-app-root .plan-free .free-fig { margin-top: 8px; }
+
+/* A figure is one unit and never wraps mid-number. The thousands separator is a
+   plain space, so a figure wider than its tile used to break after the first
+   group ("R 3 079" over "818,25"). It now stays on one line, and the places
+   that are narrow enough to need it step the SIZE down instead (below, and
+   .is-long on the Dashboard and Budget statement figures). */
+.budget-app-root .health-fig .lv,
+.budget-app-root .left-fig .lv,
+.budget-app-root .pot-fig,
+.budget-app-root .assets-hero-num,
+.budget-app-root .score-ring-num,
+.budget-app-root .stat .sv,
+.budget-app-root .mini .v,
+.budget-app-root .acct-fact-v,
+.budget-app-root .acct-drawer-v,
+.budget-app-root .pot-fig-2,
+.budget-app-root .env-amt,
+.budget-app-root .plan-free .free-fig,
+.budget-app-root .score-flow-in,
+.budget-app-root .loan-out .lo-big {
+  white-space: nowrap;
+}
+/* A five-up KPI row (Savings, Tax) leaves a tile about 164px of text width at
+   1200-1440px; "R 3 079 818,25" at figure-small (32px) is 223px. So the row
+   takes a smaller figure: 22px prints it in 153px, and the clamp tracks the
+   window down to 18px at 1101px, where the row's own breakpoint (src/styles.css,
+   1100px) drops to three columns and the full figure-small size comes back. The
+   decimals stay: the printed text is not this rule's to change. */
+@media (min-width: 1101px) {
+  .budget-app-root .mini-kpis-5 .mini .v { font-size: clamp(18px, 1.8vw, 22px); }
+}
+
+/* The Savings KPI tile that prints a long text value keeps its small size (the
+   legacy rule is more specific than the line above). */
+.budget-app-root #savingsKpis > .mini:nth-child(4) .v { font-size: 18px; }
+
+/* A few smaller figures: same weight and numerals, no size change */
+.budget-app-root .acct-bal,
+.budget-app-root .acct-owner-net,
+.budget-app-root .sk-fig,
+.budget-app-root .sk2-fig,
+.budget-app-root .left-cycle .lc-p,
+.budget-app-root .src2-amt,
+.budget-app-root .lo-v,
+.budget-app-root .score-ring-row-pts,
+.budget-app-root .score-win-pts,
+.budget-app-root .score-gap-pts {
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -.01em;
+}
+.budget-app-root .sk-fig { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.budget-app-root .lo-v { font-weight: 600; }
+
+/* The hero number (Dashboard, Accounts). The Dashboard lane will take it to
+   statement size; here it is a "display" figure in the new face and weight.
+   The gradient fill the legacy sheet gave it is left to the lane. */
+.budget-app-root .hero-num {
+  font-size: var(--st-display);
+  line-height: .95;
+  font-weight: var(--st-weight-figure);
+  letter-spacing: var(--st-track-display);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.budget-app-root .hero-num small {
+  font-size: var(--st-cur-display);
+  font-weight: 400;
+  margin-right: .06em;
+}
+.budget-app-root .hero-sub {
+  font-size: var(--st-body);
+  line-height: 1.5;
+}
+.budget-app-root .hero-sub b { font-weight: 600; }
+
+/* THE CURRENCY SYMBOL on a display figure: smaller, regular weight and muted,
+   without splitting the printed text ("R 48 000" stays one text node, which
+   is what the figures ledger and the reconciliation harness read).
+   ::first-letter styles the symbol and nothing else, so it only works on a
+   BLOCK-level figure (not a flex container, not an inline element) whose text
+   STARTS with a one-character symbol. src/controller.js sets .bv-cur-1 on the
+   root only for such a household (R, $, an euro, a pound, a yen, a rupee ...);
+   a code such as CHF or A$ gets no styling, rather than one stray first letter.
+   money() prints the symbol first even for a negative ("R -4 200"), so a lone
+   minus is never the first character.
+   Only figures that ALWAYS begin with money are listed. A count or a percentage
+   ("58", "0%", "58% of the plan") must never be added: its first digit would
+   shrink. A lane that emits money in a new element adds the class .st-money. */
+.budget-app-root.bv-cur-1 .left-fig .lv::first-letter,
+.budget-app-root.bv-cur-1 .stat .sv:not(.text-warning)::first-letter,
+.budget-app-root.bv-cur-1 #dashPositionKpis .mini .v::first-letter,
+.budget-app-root.bv-cur-1 .bud-total-v::first-letter,
+.budget-app-root.bv-cur-1 .pot-fig::first-letter,
+.budget-app-root.bv-cur-1 .pot-fig-2::first-letter,
+.budget-app-root.bv-cur-1 .env-amt::first-letter,
+.budget-app-root.bv-cur-1 .score-flow-in::first-letter,
+.budget-app-root.bv-cur-1 .assets-hero-num::first-letter,
+/* .lo-big is deliberately NOT here: the loan calculators print the country
+   PROFILE's currency (tariffMoney), which can be a multi-letter code inside a
+   one-symbol household, and a stray shrunken first letter is worse than none. */
+.budget-app-root.bv-cur-1 .acct-drawer-v.st-cur1:not(.text-warning)::first-letter,
+.budget-app-root.bv-cur-1 .acct-hero .hero-num::first-letter,
+.budget-app-root.bv-cur-1 .st-money::first-letter {
+  font-size: var(--st-cur, .5em);
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-right: var(--st-cur-gap);
+  color: var(--text-light);
+  -webkit-text-fill-color: var(--text-light);
+}
+
+/* ------------------------------------------------------------
+   7. SUCCESS-COLOURED TEXT ON THE LIGHT THEME
+   --color-success (#22c55e) is a fill: right behind a bar or a dot, and 1.9-2.3:1
+   as text on the pale tiles and white cards of the light theme, under the 3:1
+   that even large text needs. The established ink for "usable / good" text is
+   --color-primary (the Dashboard and the Transactions page already use it), so
+   success text takes it here, light theme only: on a dark surface the green is
+   already 8:1 and stays as it is. Fills, bars, dots and borders are untouched.
+
+   .text-success is handled by re-pointing the variable its own rule reads, not
+   by a second `color`: a few elements carry .text-success AND a later colour
+   rule of their own (.acct-recon-txt, .sav-row-status, .assets-hero-num); that
+   colour has always won there, and a competing `color` here would repaint them
+   green. The other four have no rival colour, so they are set directly.
+   ------------------------------------------------------------ */
+.budget-app-root:not(.bud-dark) .text-success { --color-success: var(--color-primary); }
+.budget-app-root:not(.bud-dark) .acct-chip.up,
+.budget-app-root:not(.bud-dark) .debt-plan .dp-save,
+.budget-app-root:not(.bud-dark) .donut-legend .dl-delta.is-down,
+.budget-app-root:not(.bud-dark) .assets-hero-badge-ok { color: var(--color-primary); }
+
+/* A settled debt row is dimmed as a whole (opacity .55 on its cells in
+   src/styles.css), which takes the "settled" label from 7:1 to 2.6:1 on the
+   light theme: the dimming multiplies whatever ink is under it. A little less
+   dimming (.75, still visibly quieter than a live row) and the darker of the
+   two emeralds for the label bring it to 5:1. */
+.budget-app-root:not(.bud-dark) .debt-settled td { opacity: .75; }
+.budget-app-root:not(.bud-dark) .debt-settled .text-success { --color-success: var(--color-primary-dark); }
+
+/* The accounts ring's legend: a group that also holds money in another currency
+   prints "plus EUR 640" inside its figure. Beside the figure it left the name
+   about 70px ("Bank acc..."); under it, the figure is as wide as its own digits
+   and the name keeps the room. */
+.budget-app-root .acct-ring-legend .dl-val .acct-group-other {
+  display: block;
+  margin-left: 0;
+  text-align: right;
+}

@@ -13,15 +13,23 @@
    BOTH root main.js and root styles.css are BUILD OUTPUT. Neither is
    hand-edited:
      main.js     <- bundled from src/*.js
-     styles.css  <- src/styles.css (hand-written) + src/styles-presets.css
-   Edit src/styles.css for ordinary CSS work; edit scripts/presets.cjs to change
-   a palette. An edit made directly to root styles.css is lost on the next build. */
+     styles.css  <- the files listed in scripts/css-sources.cjs, in that order:
+                    src/styles-fonts.css (generated: scripts/fonts.cjs)
+                    src/styles.css (hand-written, legacy)
+                    src/statement/foundation.css + one file per page lane
+                    src/styles-presets.css (generated: scripts/gen-presets.cjs)
+   Edit src/styles.css or src/statement/*.css for ordinary CSS work; edit
+   scripts/presets.cjs to change a palette. An edit made directly to root
+   styles.css is lost on the next build. */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as esbuild from 'esbuild';
+
+const require = createRequire(import.meta.url);
 
 const root = dirname(fileURLToPath(import.meta.url));
 const rel = p => join(root, p);
@@ -29,17 +37,19 @@ const rel = p => join(root, p);
 /* Palette blocks first: styles.css is assembled from them below, and a failure
    here must stop the build rather than leave a stylesheet missing its palettes. */
 execFileSync(process.execPath, [rel('scripts/gen-presets.cjs')], { stdio: 'inherit' });
+/* The bundled typeface, embedded as a data URI (scripts/fonts.cjs says why).
+   Generated here, in the build the scorecard re-runs, so a clean checkout
+   reproduces src/styles-fonts.css byte for byte from assets/fonts/. */
+execFileSync(process.execPath, [rel('scripts/fonts.cjs')], { stdio: 'inherit' });
 
-/* Concatenated in this order so the preset blocks come last. They win on
-   specificity regardless (they carry the palette class), but keeping the
-   generated half at the end makes the assembled file readable.
+/* Concatenated in the order scripts/css-sources.cjs declares: fonts, the legacy
+   sheet, the statement foundation, the page lanes, and the preset blocks LAST.
+   The order is the cascade, and the same list feeds every CSS guard test, so the
+   build and the tests cannot disagree about what "the stylesheet" is.
 
    Done in Node rather than `cat` so the build behaves the same wherever the
    verifier runs it, and so the byte output cannot drift with a shell. */
-writeFileSync(
-  rel('styles.css'),
-  readFileSync(rel('src/styles.css'), 'utf8') + readFileSync(rel('src/styles-presets.css'), 'utf8'),
-);
+writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').assemble());
 
 /* minify: this source is commented far more heavily than most, and every one of
    those comments was being parsed by the engine on every plugin load — 175KB of

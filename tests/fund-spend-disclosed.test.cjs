@@ -74,7 +74,7 @@ atAuditDate(async () => {
     ctx.renderBudgets();
 
     const txt = textOf($('#budTotalsTop'));
-    const want = i18n.t('dash.fundedFromSavings', { amount: 'R 5000.00', count: 1 });
+    const want = i18n.t('dash.fundedFromSavings', { amount: 'R 5000', count: 1 });
     ok(txt.includes(want),
       `the Budget page names the R5 000 its total does not hold — wanted "${want}", got: ${txt}`);
     /* The same key the Dashboard uses, so the two screens cannot word one fact
@@ -85,7 +85,7 @@ atAuditDate(async () => {
        sentence prints whenever the PLAN holds a set-aside, so on this fixture
        it sits between "…used" and this fragment — the separator is what is
        pinned, not which fragment precedes it. */
-    ok(/ · R 5000\.00 more/.test(flat),
+    ok(/ · R 5000 more/.test(flat),
       `the fragment is separated from the sentence it follows — got: ${flat}`);
     ok(!/usedR /.test(flat), 'and never runs onto the end of it');
   }

@@ -79,9 +79,9 @@ async function mount(files) {
     const { ctx, $ } = await mount(filesWith(3000));
     ctx.renderBudgets();
     const totals = $('#budTotalsTop').textContent;
-    ok(totals.includes('R 4000.00'),
+    ok(totals.includes('R 4000'),
       'Total spent = 3000 real (already in periodSummary) + 1000 shortfall = 4000, the budgeted figure — not 7000');
-    ok(!totals.includes('R 7000.00'), 'never the naive real-spend-plus-whole-amount double count');
+    ok(!totals.includes('R 7000'), 'never the naive real-spend-plus-whole-amount double count');
 
     const rowText = $('#budTable').textContent;
     ok(rowText.includes('R 4000.00'),
@@ -93,9 +93,9 @@ async function mount(files) {
     const { ctx, $ } = await mount(filesWith(5500));
     ctx.renderBudgets();
     const totals = $('#budTotalsTop').textContent;
-    ok(totals.includes('R 5500.00'),
+    ok(totals.includes('R 5500'),
       'real spend already overran the assumption, so the overlay contributes nothing extra: Total spent == real spend exactly');
-    ok(!totals.includes('R 9500.00'), 'never 4000 (assumed) stacked on top of 5500 (real)');
+    ok(!totals.includes('R 9500'), 'never 4000 (assumed) stacked on top of 5500 (real)');
 
     const rowText = $('#budTable').textContent;
     ok(rowText.includes('R 5500.00'), 'the row\'s Actual also reads the real, larger figure');

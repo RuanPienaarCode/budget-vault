@@ -73,7 +73,7 @@ async function mount(files) {
      the stale-type bug bucketed Bonus into "Total budgeted" (expense) and
      left "Total income" at 10000, understating income by exactly Bonus's
      amount. */
-  ok(totals.includes('R 15000.00'),
+  ok(totals.includes('R 15000'),
     'Total income counts Bonus once catType overrides the stale stored Type cell — 10000 Salary + 5000 Bonus');
 
   /* Checked structurally, not by substring: the Type BADGE column deliberately

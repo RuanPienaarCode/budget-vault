@@ -28,90 +28,26 @@
         selector (same @media) that carries the floor's value — after, because
         the two tie on specificity and the later one must be the newer value.
 
-   Reads the build input — src/styles.css plus the generated
-   src/styles-presets.css, byte-for-byte what ships as styles.css, which is
-   the file the scorecard lints.
+   Reads the build input — every file scripts/css-sources.cjs lists (the legacy
+   sheet, the statement foundation and page lanes, the generated fonts and
+   palettes), byte-for-byte what ships as styles.css, which is the file the
+   scorecard lints.
      node tests/css-scorecard-lint.test.cjs */
-
-const fs = require('fs');
-const path = require('path');
 
 let checks = 0;
 const failures = [];
 const ok = (c, m) => { checks++; if (!c) failures.push(m); };
 
-const ROOT = path.join(__dirname, '..');
+/* ---- the stylesheet reader --------------------------------------------------
+   Shared with every other CSS guard: tests/helpers/css-sources.cjs reads the
+   whole ASSEMBLED stylesheet (fonts, legacy sheet, statement foundation, the
+   three page lanes, generated palettes) in cascade order, so a rule written
+   into any of them is checked. `line` is the line in the assembled sheet. */
+const { readRules, locate } = require('./helpers/css-sources.cjs');
 
-/* ---- a minimal stylesheet reader ------------------------------------------
-   Not a CSS parser: enough to walk rules and their declarations, which is all
-   these checks ask. Comments are blanked first (length-preserving, so line
-   numbers stay true); strings are skipped so the data: URL's own `;` cannot end
-   a declaration early; @media/@supports are descended into and recorded as the
-   context of the rules inside them; @keyframes frames are walked as rules. */
-function readRules(rel) {
-  const src = fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
-  const starts = [0];
-  for (let i = 0; i < src.length; i++) if (src[i] === '\n') starts.push(i + 1);
-  const lineOf = pos => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= pos) lo = mid; else hi = mid - 1; } return lo + 1; };
-  const skipString = i => { const q = src[i]; for (i++; i < src.length && src[i] !== q; i++) if (src[i] === '\\') i++; return i; };
-  const closeOf = open => {
-    let d = 0;
-    for (let i = open; i < src.length; i++) {
-      const c = src[i];
-      if (c === '"' || c === "'") i = skipString(i);
-      else if (c === '{') d++;
-      else if (c === '}' && --d === 0) return i;
-    }
-    throw new Error(`${rel}: unbalanced brace from line ${lineOf(open)}`);
-  };
-  const splitTop = s => {
-    const out = []; let d = 0, cur = '';
-    for (const c of s) { if (c === '(') d++; else if (c === ')') d--; if (c === ',' && d === 0) { out.push(cur); cur = ''; } else cur += c; }
-    out.push(cur);
-    return out.map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  };
-  const rules = [];
-  const walk = (from, to, context) => {
-    let i = from, start = from;
-    while (i < to) {
-      const c = src[i];
-      if (c === '"' || c === "'") { i = skipString(i) + 1; continue; }
-      if (c === ';') { start = ++i; continue; }
-      if (c !== '{') { i++; continue; }
-      const prelude = src.slice(start, i).replace(/\s+/g, ' ').trim();
-      const close = closeOf(i);
-      if (/^@(media|supports|layer|container|document|(-webkit-)?keyframes)\b/.test(prelude)) {
-        walk(i + 1, close, [...context, prelude]);
-      } else {
-        const decls = [];
-        let ds = i + 1, depth = 0;
-        for (let j = i + 1; j <= close; j++) {
-          const d = src[j];
-          if (d === '"' || d === "'") { j = skipString(j); continue; }
-          if (d === '(') depth++;
-          else if (d === ')') depth--;
-          else if ((d === ';' && depth === 0) || j === close) {
-            const text = src.slice(ds, j), colon = text.indexOf(':');
-            if (text.trim() && colon > 0) {
-              const prop = text.slice(0, colon).trim();
-              decls.push({ prop: prop.startsWith('--') ? prop : prop.toLowerCase(),
-                value: text.slice(colon + 1).trim(), line: lineOf(ds + (text.length - text.trimStart().length)) });
-            }
-            ds = j + 1;
-          }
-        }
-        rules.push({ file: rel, prelude, selectors: splitTop(prelude), context, decls, line: lineOf(i) });
-      }
-      i = start = close + 1;
-    }
-  };
-  walk(0, src.length, []);
-  return rules;
-}
-
-const rules = [...readRules('src/styles.css'), ...readRules('src/styles-presets.css')];
+const rules = readRules();
 ok(rules.length > 1000, `the reader should find over a thousand rules, found ${rules.length}`);
-const where = (r, d) => `${r.file}:${d ? d.line : r.line}  ${r.prelude.slice(0, 80)}`;
+const where = (r, d) => `${locate(d ? d.line : r.line)}  ${r.prelude.slice(0, 80)}`;
 
 /* ---- 1. no declaration block repeats a property ---------------------------- */
 const repeats = [];

@@ -772,7 +772,7 @@ async function mount(files, period = '2026-07') {
        category's own actual. */
     eq(sum.uncatIncome, 900, 'the incoming half of the uncategorised bucket is reported');
     const hero = nodes.get('heroCard').textContent;
-    ok(/R 900\.00 came in without a category/.test(hero),
+    ok(/R 900 came in without a category/.test(hero),
       `the Income tile discloses money that arrived without a category — got: ${hero}`);
     ok(!/1 100\.00 came in without a category/.test(hero),
       'and does not sweep the refund in with it');
@@ -810,7 +810,7 @@ async function mount(files, period = '2026-07') {
     const hero = nodes.get('heroCard').textContent;
     ok(/Missing categories/.test(hero), `the hero names the state out loud — got: ${hero}`);
     ok(/3 transactions — recategorise/.test(hero), `and says how many rows it touches — got: ${hero}`);
-    ok(/R 400\.00 came in without a category/.test(hero), 'the orphaned deposit is disclosed beside Income too');
+    ok(/R 400 came in without a category/.test(hero), 'the orphaned deposit is disclosed beside Income too');
     /* WHICH categories used to ride only on a hover title — unreachable by a
        tap, on the platform this plugin explicitly targets. They must be
        readable TEXT, not merely present as an attribute a touch never fires. */

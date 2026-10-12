@@ -75,3 +75,26 @@ which is retained here as it requires:
 
 Helvetica is a trademark of Linotype-Hell AG and/or its subsidiaries.
 PostScript is a registered trademark of Adobe Systems Incorporated.
+
+
+THIRD-PARTY FONTS
+-----------------
+
+The plugin's stylesheet embeds one typeface, Geist, as a single variable woff2
+file, so the interface looks the same offline and on every device. It is
+licensed under the SIL Open Font License, Version 1.1 (OFL-1.1), which permits
+bundling, use and redistribution with software, free of charge, on condition
+that the copyright notice and the licence travel with the font. The font file
+is in assets/fonts/ and the full licence text beside it:
+
+  Geist  (all interface text)
+    assets/fonts/geist-latin-wght-normal.woff2
+    assets/fonts/OFL-Geist.txt
+    Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font) Geist-Italic[wght].ttf: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)
+
+The OFL covers the font only; it does not change the licence of this plugin's
+own code, which stays as stated at the top of this notice. The woff2 file is a
+Latin subset used as supplied; this plugin does not alter the font. It is
+embedded in the stylesheet by scripts/fonts.cjs (src/styles-fonts.css, a
+generated file) under the family name "BV Geist", so that a copy of Geist
+installed on a reader's computer is never substituted.

@@ -18,13 +18,14 @@
      node tests/css-theme-token-parity.test.cjs */
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
-const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+/* The whole assembled sheet (tests/helpers/css-sources.cjs): a lane file that
+   read a dark-only token in a light rule would be the same hole. Generated
+   palette blocks are in it too, but they only DEFINE tokens. */
+const css = require('./helpers/css-sources.cjs').assembled();
 
 /* Innermost rules only: a body with no braces in it. A rule nested in
    @media or @supports still yields its own selector, because the captured
