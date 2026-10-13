@@ -234,6 +234,8 @@
 .budget-app-root .text-danger { color: var(--color-danger-ink); }
 .budget-app-root .text-warning { color: var(--color-warning-ink); }
 .budget-app-root .text-muted { color: var(--text-muted); }
+/* The small note under a figure (raised to --st-micro on phone). */
+.budget-app-root .fine-note { font-size: 11.5px; }
 .budget-app-root .num { font-variant-numeric: tabular-nums; }
 
 /* ---- Neutralise Obsidian's form chrome ---------------------------------
@@ -5321,6 +5323,7 @@
   --st-label:     14px;                         /* a field or tile label                */
   --st-small:     13px;                         /* notes, captions, table headings      */
   --st-chip:      11.5px;                       /* pills and tags (were 9.5-10px caps)  */
+  --st-micro:     12px;                         /* the floor for ANY text on a phone: src/statement/phone.css raises every smaller declaration to it (a 375px screen read at arm's length; iOS's own smallest text style is 11pt, and these were 8.8-11.7px) */
 
   /* tracking: tighter as the figure grows */
   --st-track-statement: -0.055em;
@@ -6128,6 +6131,8 @@
 .budget-app-root #dashBudget td.num { font-variant-numeric: tabular-nums lining-nums; }
 .budget-app-root #dashBudget td:nth-child(3) { font-weight: 600; }
 .budget-app-root #dashBudget td .text-muted { font-size: var(--st-small); }
+/* The category note under a name keeps its 11.5px (it was an inline style). */
+.budget-app-root #dashBudget td .text-muted.fine-note { font-size: 11.5px; }
 .budget-app-root #dashBudget td.text-danger { font-weight: 600; }
 
 /* ------------------------------------------------------------
@@ -6525,10 +6530,21 @@
   color: var(--text-light);
 }
 .budget-app-root #view-transactions .table tbody td {
-  padding-top: 12px;
-  padding-bottom: 12px;
   font-size: var(--st-body);
   line-height: 1.35;
+}
+/* Row height is a TABLE concern. It used to sit in the rule above, unscoped, and
+   its specificity (1,2,3) beat the phone card's `#txTable tbody td { padding: 0 }`
+   (1,1,2) in src/styles.css: every cell of every card kept 12px above and below,
+   which is 9 cells x 24px = the 120px of air that made a card 354px tall instead
+   of ~234px on a 375px phone (Oct 2026 phone audit, item 1). Scoped to 601px and
+   up, where the rows are table rows; under it the card owns its own spacing.
+   tests/phone-375.test.cjs pins that no unscoped rule here can pad these cells. */
+@media (min-width: 601px) {
+  .budget-app-root #view-transactions .table tbody td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 /* A calm hover: a faint wash instead of the green tint. */
 .budget-app-root #view-transactions .table.table-hover tbody tr:hover { background: var(--line-soft); }
@@ -6678,9 +6694,42 @@
    The same selectors as the card rules in src/styles.css, later, so these win.
    ------------------------------------------------------------ */
 @media (max-width: 600px) {
-  /* The two selects and the search take a full line each, as in the mockup. */
-  .budget-app-root #view-transactions .tx-filters .form-select-sm,
-  .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 100%; }
+  /* The header used to be 386px tall (each select and the search on a line of
+     its own, the whole-history box under them, the actions wrapping to three
+     rows) so no transaction was on the first screen. Now: the two selects share
+     one line, the search shares the next with the whole-history box, and the
+     actions are ONE rail that scrolls sideways inside the card. Placed after the
+     base rules above on purpose: they tie on specificity, so order decides. */
+  /* .card-h wraps. In a wrapping COLUMN the line is as wide as its widest item,
+     and a nowrap rail's widest is its whole length (991px): the filters and the
+     card stretched to match and the page scrolled sideways. One line, then. */
+  .budget-app-root #view-transactions .tx-head { flex-wrap: nowrap; }
+  .budget-app-root #view-transactions .tx-filters { gap: 10px 12px; }
+  .budget-app-root #view-transactions .tx-filters .form-select-sm {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 140px; min-width: 0; }
+  .budget-app-root #view-transactions .tx-filters .tx-whole { flex: none; min-height: 44px; }
+
+  /* The rail runs to the card's edges (negative margin = the 14px card-h side
+     padding, padded back inside) so a button scrolling away is cut by the
+     screen edge, not by an invisible box 14px short of it. The primary action
+     and the row count are ordered first: Save changes would otherwise be the
+     LAST item of a scrolling strip, off screen exactly when it matters. */
+  .budget-app-root #view-transactions .tx-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+  }
+  .budget-app-root #view-transactions .tx-actions::-webkit-scrollbar { display: none; }
+  .budget-app-root #view-transactions .tx-actions > * { flex: none; white-space: nowrap; }
+  .budget-app-root #view-transactions .tx-actions > #txCount { order: -2; }
+  .budget-app-root #view-transactions .tx-actions > #txSave { order: -1; }
 
   .budget-app-root #txTable tbody tr { gap: 6px 16px; padding: 14px 4px; }
 
@@ -6745,6 +6794,1199 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--text-light);
+  }
+}
+/* Statement lane: phone (max-width 600px and .is-phone) — type floors, gutters, tap targets, Transactions header. */
+/* THE PHONE LAYER (Oct 2026 phone audit, a 375x667 iPhone 6s/7/8/SE).
+
+   Ruan's mother reads this on a phone and said "the font and css is
+   unusable". A verifier and a static reviewer measured it at 375x667: dozens of
+   text nodes under 12px (the worst 8.8px), tap targets 24-40px, inputs under
+   16px (iOS zooms the page on focus), blocks sitting on the screen edge, a grey
+   strip down the left edge of every screen, a title clipped by its own page.
+
+   Rules of this file
+     - Everything is inside @media (max-width: 600px) (the plugin's one phone
+       breakpoint), inside @media (pointer: coarse), or keyed on body.is-phone
+       (Obsidian sets that class on the body whatever the orientation, so a
+       landscape phone, 601-932px wide, is still a phone). Nothing here applies
+       to a desktop window above 600px: tests/phone-375.test.cjs holds that.
+     - It is the last file before Lane B's stacked-card tables and the generated
+       palettes, and it repeats each base selector in full rather than using one
+       clever :is(): most of what it raises sits at (0,3,0) (.debt-plan .dp-note)
+       or in an id-scoped lane rule, and an override that is not at least as
+       specific loses.
+     - Tokens only, no hex. No container queries, no :has(): iOS 15 floor.
+     - Where phone-tables.css (loaded after this file) and this file both speak
+       the same selector, theirs stands. */
+
+@media (max-width: 600px) {
+
+  /* ----------------------------------------------------------------
+     1. TYPE FLOOR — nothing readable is smaller than --st-micro (12px).
+     Measured at 375px: .score-ring-num > small 8.84px, .acct-caret 9.6px, the
+     accounts pills and badges 10.5px, a dozen captions at 11px and forty at
+     11.5px. Each selector repeats its base rule's own selector.
+     Deliberately NOT here: SVG chart text (chart.js, Lane B), and the currency
+     symbol drawn at a fraction of a statement figure (.hero-num small, the
+     ::first-letter rule), which is 19px or more once the foundation sizes it.
+     ---------------------------------------------------------------- */
+  .budget-app-root .acct-caret,
+  .budget-app-root .acct-badge,
+  .budget-app-root .acct-seg-n,
+  .budget-app-root .acct-pill,
+  .budget-app-root .env-share,
+  .budget-app-root .owed-age,
+  .budget-app-root .asset-age,
+  .budget-app-root .debt-implied,
+  .budget-app-root .s2-caveat,
+  .budget-app-root .acct-owner-sub,
+  .budget-app-root .acct-mbar-l,
+  .budget-app-root .debt-plan .dp-src,
+  .budget-app-root .svc-next-hint,
+  .budget-app-root .note-chip,
+  .budget-app-root .env-sum-pct,
+  .budget-app-root .debt-order li::before,
+  .budget-app-root .score-flow-caption,
+  .budget-app-root .score-ring-tip-how,
+  .budget-app-root .score-ring-num small,
+  .budget-app-root .score-flow-in small,
+  .budget-app-root .ei-tick,
+  .budget-app-root .left-fig .lm,
+  .budget-app-root .left-cycle .lc-s,
+  .budget-app-root .left-disc .dd,
+  .budget-app-root .left-src,
+  .budget-app-root .health-fig .lm,
+  .budget-app-root .imp-map-hint,
+  .budget-app-root .mini .s2,
+  .budget-app-root .caveat-chip-btn,
+  .budget-app-root .acct-ring-note,
+  .budget-app-root .acct-cell-sub,
+  .budget-app-root .acct-chip,
+  .budget-app-root .tx-undo-note,
+  .budget-app-root .debt-plan .dp-note,
+  .budget-app-root .debt-plan .dp-tag,
+  .budget-app-root .loan-field .lf-h,
+  .budget-app-root .tax-field > .l,
+  .budget-app-root .bud-pull,
+  .budget-app-root .src-note,
+  .budget-app-root .sk-top,
+  .budget-app-root .kind,
+  .budget-app-root .env-rail-note,
+  .budget-app-root .ei-actual,
+  .budget-app-root .env-add,
+  .budget-app-root .env-count,
+  .budget-app-root .note-date,
+  .budget-app-root .score-hero-note,
+  .budget-app-root .score-win-ribbon,
+  .budget-app-root .score-flow-m-sub,
+  .budget-app-root .score-ring-tip-now,
+  .budget-app-root .score-ring-hint,
+  .budget-app-root .score-ring-row-now,
+  .budget-app-root .score-ring-row[aria-pressed="true"] .score-ring-row-how,
+  .budget-app-root .score-ring-row-tag,
+  .budget-app-root .env-sum-rem,
+  .budget-app-root .sav-row-status,
+  .budget-app-root .acct-deck-btn.sm,
+  .budget-app-root .status-pill,
+  .budget-app-root .category-badge,
+  .budget-onb-step,
+  .budget-onb-group,
+  .budget-onb-cat-group,
+  .budget-export-cats-type { font-size: var(--st-micro); }
+
+  /* Inline code is .9em of its parent, which is under 12px beside a 12-13px
+     note; max() keeps it .9em beside bigger text and lifts it to the floor
+     beside small. (max() is Safari 11.1+.) */
+  .budget-app-root code,
+  .budget-app-root .import-help code { font-size: max(0.9em, var(--st-micro)); }
+
+  /* The one-line cell labels the stacked Transactions and Budget cards print
+     from data-label (src/styles.css sets 0.68rem = 10.9px). */
+  .budget-app-root #txTable tbody td[data-label]::before,
+  .budget-app-root #budTable tbody td[data-label]::before { font-size: var(--st-micro); }
+
+  /* The note under a figure (dashboard, debts, owed, assets) — .fine-note,
+     11.5px on desktop in src/styles.css. */
+  .budget-app-root .fine-note,
+  .budget-app-root #dashBudget td .text-muted.fine-note { font-size: var(--st-micro); }
+
+  /* ----------------------------------------------------------------
+     2. PAGE TITLES
+     --st-title is clamp(40px, 6vw, 56px): 40px on any phone. The Afrikaans
+     "Leningsberekenaars" is ~367px wide at 40px in a 347px column and was cut
+     off by .main-content's overflow-x: hidden; "Savings & Investments" wrapped
+     to two 40px lines. 34px keeps the title the page's statement.
+     ---------------------------------------------------------------- */
+  .budget-app-root { --st-title: 34px; }
+  .budget-app-root .financial-period-banner-title { overflow-wrap: break-word; }
+
+  /* ----------------------------------------------------------------
+     3. THE CLOSED DRAWER MUST NOT PAINT
+     translateX(-100%) parks the drawer just off the left edge, but its
+     30px / 80px box-shadow reaches back onto the screen: a grey strip down the
+     left edge of EVERY view. The shadow belongs to an open drawer.
+     ---------------------------------------------------------------- */
+  .budget-app-root .app-drawer:not(.open) { box-shadow: none; }
+
+  /* ----------------------------------------------------------------
+     4. TAP TARGETS — 44x44 (Apple HIG) wherever the visible control can carry
+     it. Icon-only controls with no border or fill of their own grow by
+     min-size plus a negative margin, so the page's rhythm is untouched;
+     bordered or filled ones grow outright; the ones whose visible shape must
+     stay small (a 24px tick, a count chip, a status pill) keep it and borrow a
+     44px hit area from the ::after overlay below.
+     ---------------------------------------------------------------- */
+  .budget-app-root .topbar { padding: 0 0.5rem; gap: 0.25rem; }
+  .budget-app-root .topbar .ml-auto { gap: 0.25rem; }
+  .budget-app-root .menu-btn { width: 44px; height: 44px; }
+  .budget-app-root .topbar-icon-btn { width: 44px; height: 44px; }
+  .budget-app-root .topbar-avatar { width: 44px; height: 44px; }
+  .budget-app-root .drawer-close { width: 44px; height: 44px; }
+  .budget-app-root .header-period-pill .pnav-btn {
+    width: 44px;
+    height: 44px;
+    margin-block: -8px;
+  }
+  .budget-app-root .btn-ghost-sm { min-width: 44px; }
+  .budget-app-root .chart-range-btn { min-width: 44px; }
+  .budget-app-root .donut-legend .dl-note {
+    width: 44px;
+    height: 44px;
+    margin-block: -8px;
+    margin-inline: -4px -8px;
+  }
+  .budget-app-root .env-collapse,
+  .budget-app-root .env-del-ico {
+    width: 44px;
+    height: 44px;
+    margin-block: -9px;
+    margin-inline: -4px;
+  }
+  .budget-app-root .plan-del-ico { width: 44px; min-width: 44px; height: 44px; }
+  .budget-app-root .btn-sm { min-height: 44px; }
+  .budget-app-root .src2-del { min-width: 44px; }
+  .budget-app-root .bud-act { min-width: 44px; min-height: 44px; }
+  .budget-app-root .owed-acts > button { min-width: 44px; min-height: 44px; }
+  .budget-app-root .tx-whole { min-height: 44px; }
+  .budget-app-root input[type='checkbox'] { width: 44px; height: 44px; }
+  /* A tick inside a <label> borrows the label's 44px row as its target, so it
+     draws at a normal size rather than as a 44px empty box. */
+  .budget-app-root label input[type='checkbox'] { width: 24px; height: 24px; }
+  /* The bucket slider is the Plan page's main gesture: 8px of track, now in a
+     44px hit area (18px of padding either side; the track is still clipped to
+     the content box, so it is drawn 8px thick exactly as before). */
+  .budget-app-root .env-slider { height: 44px; padding-block: 18px; }
+  .budget-app-root .loan-range { min-height: 44px; }
+  .budget-app-root .import-help summary,
+  .budget-app-root .loan-amort > summary,
+  .budget-app-root .left-open > summary { padding-block: 13px; }
+
+  /* The coarse-pointer overlay of src/styles.css, repeated for any pane that
+     is phone-narrow: an invisible, centred 44px ::after that hit-tests as part
+     of the button and costs no layout. It is what lets the ticks, chips and
+     pills stay the size they are drawn. :where() keeps the position rule at
+     zero specificity so a button that positions itself (the score ring's
+     centre) still can. */
+  .budget-app-root :where(button:not(.mod-loading)) { position: relative; }
+  .budget-app-root button:not(.mod-loading)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+
+  /* ----------------------------------------------------------------
+     5. SIDE GUTTERS
+     .main-content is padding: 0.75rem 0 on a phone so cards run full-bleed;
+     these are not cards, and sat on the screen edge. 14px is the cards' own
+     inner gutter (.card-h, .body-pad), so their text lines up with it.
+     ---------------------------------------------------------------- */
+  .budget-app-root .mini-grid:not(#planEnvelopes),
+  .budget-app-root .kpi-caveat,
+  .budget-app-root .loan-tabs,
+  .budget-app-root .acct-strip,
+  .budget-app-root .tx-undo,
+  .budget-app-root .bud-shape-note,
+  .budget-app-root .acct-deck,
+  .budget-app-root .plan-free { margin-left: 14px; margin-right: 14px; }
+
+  /* ----------------------------------------------------------------
+     6. DASHBOARD
+     "Budget vs actual" is 511px of table in a 365px scroller. The bar column is
+     the decoration (Spent and Remaining carry the facts); the rows with a
+     colspan (group bars, the empty line) have their one cell at position 1, so
+     they do not match nth-child(4).
+     ---------------------------------------------------------------- */
+  .budget-app-root #dashBudget thead th:nth-child(4),
+  .budget-app-root #dashBudget tbody td:nth-child(4) { display: none; }
+
+  /* Hiding the bar still left 431px: the income rows print a sentence in the
+     Remaining cell ("received as planned") on one nowrap line, which alone made
+     that column 140px. It may wrap (the floor keeps a money figure, whose
+     thousands separator is a plain space, on one line) and the cells give back
+     a little side padding. */
+  .budget-app-root #dashBudget tbody td:nth-child(5) { white-space: normal; min-width: 5.75rem; }
+  .budget-app-root #dashBudget thead th,
+  .budget-app-root #dashBudget tbody td { padding-left: 0.25rem; padding-right: 0.25rem; }
+  .budget-app-root #dashBudget thead th:first-child,
+  .budget-app-root #dashBudget tbody td:first-child { padding-left: 0.2rem; }
+  .budget-app-root #dashBudget thead th:last-child,
+  .budget-app-root #dashBudget tbody td:last-child { padding-right: 0.2rem; }
+
+  /* The legend's change column was a fixed 84px (76px under 560px) with nowrap,
+     so a seven-digit change ran out of its box over the next column. The width
+     stays as a floor, so the rows line up, and grows to what it prints. */
+  .budget-app-root .donut-legend .dl-delta { width: auto; min-width: 76px; }
+
+  /* The hero figure never breaks inside a number. The step down for seven
+     digits or more (.is-long) is views/dashboard.js's. */
+  .budget-app-root #heroCard .hero-num { white-space: nowrap; }
+
+  /* ----------------------------------------------------------------
+     7. CONTRAST (phone layer only; the desktop palette is unchanged)
+     ---------------------------------------------------------------- */
+  .budget-app-root .bud-total-left .bud-total-n { color: var(--text-muted); }
+  .budget-app-root.bud-dark .ei-tick.done { color: var(--ink-on-accent); }
+  .budget-app-root:not(.bud-dark) .kind { color: var(--text-muted); }
+
+  /* ----------------------------------------------------------------
+     8. BUDGET: THE TOTALS BAND, COMPACTED
+     Four tiles one per line put the first category 1005px down the page. Two
+     columns for the two plain tiles above, "Left to budget" (the page's
+     statement) and the spent tile each across the full width: about 350px
+     shorter, every figure still at figure-small or above, DOM order untouched.
+     ---------------------------------------------------------------- */
+  .budget-app-root .bud-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px 4px;
+    gap: 14px 0;
+  }
+  .budget-app-root .bud-total { padding: 0 12px; }
+  .budget-app-root .bud-total + .bud-total {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .budget-app-root .bud-total-left,
+  .budget-app-root .bud-total:last-child { grid-column: 1 / -1; }
+  .budget-app-root .bud-total:nth-child(2) { border-left: 1px solid var(--border-color); }
+
+  /* The four header buttons wrapped to two rows of 44px. One sideways rail
+     instead, to the card's edges (14px = .card-h's side padding), with Save
+     first so the one button that matters is not the last thing on a scroller. */
+  .budget-app-root #view-budgets .card-h > .row {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+  }
+  .budget-app-root #view-budgets .card-h > .row::-webkit-scrollbar { display: none; }
+  .budget-app-root #view-budgets .card-h > .row > * { flex: none; white-space: nowrap; }
+  .budget-app-root #view-budgets .card-h > .row > #budSave { order: -1; }
+}
+
+/* ------------------------------------------------------------------
+   9. FORM FIELDS ON A TOUCH SCREEN
+   iOS zooms the whole page when a field with a computed font-size under 16px
+   takes focus, and does not zoom back: the most reliable cause of "unusable"
+   on an iPhone. 16px everywhere iOS can zoom, inside tables too (a 15px field
+   zooms exactly as a 12px one does); 44px tall, 40px inside a table row where
+   the row itself is the target. After the base rules so it wins; keyed on the
+   pointer, not the width, so an iPad and a landscape phone get it too.
+   ------------------------------------------------------------------ */
+@media (pointer: coarse) {
+  .budget-app-root .form-control,
+  .budget-app-root .form-select,
+  .budget-app-root .form-control-sm,
+  .budget-app-root .form-select-sm,
+  .budget-app-root .category-select,
+  .budget-app-root .acct-search input,
+  .budget-app-root .src-name-input,
+  .budget-app-root input[type='text'],
+  .budget-app-root input[type='search'],
+  .budget-app-root input[type='number'],
+  .budget-app-root input[type='date'],
+  .budget-app-root select,
+  .budget-app-root textarea { font-size: 16px; min-height: 44px; }
+
+  .budget-app-root .table .form-control,
+  .budget-app-root .table .form-control-sm,
+  .budget-app-root .table .form-select,
+  .budget-app-root .table .category-select { font-size: 16px; min-height: 40px; }
+
+  /* The id-scoped lane rules that set their own size: Transactions' filters
+     and note field, the Budget table's amount field. */
+  .budget-app-root #view-transactions .tx-filters .form-select-sm,
+  .budget-app-root #view-transactions .tx-filters #txSearch,
+  .budget-app-root #view-transactions .table tbody td:nth-child(7) input { font-size: 16px; min-height: 44px; }
+  .budget-app-root .bud-table tbody tr:not(.type-row) input.form-control { font-size: 16px; min-height: 44px; }
+}
+
+/* ------------------------------------------------------------------
+   10. A PHONE HELD SIDEWAYS
+   Obsidian puts .is-phone on the body whatever the orientation, but every card
+   rule above stops at 600px, and an iPhone on its side is 667-932px wide: it
+   got the desktop Budget table back (1013px of table in a ~660px window) and
+   the 868px Transactions one. The two stacked layouts (src/styles.css, "Transactions
+   + Budget: stacked rows", and transactions.css section 4) are repeated here,
+   keyed on body.is-phone, from 601px up. GENERATED from the 600px rules by
+   mirroring them one for one (a prefix and nothing else), and held to that by
+   tests/phone-375.test.cjs: change a portrait rule and the test names the
+   landscape twin that has to follow. A desktop window has no .is-phone, so this
+   never reaches one.
+   ------------------------------------------------------------------ */
+@media (min-width: 601px) {
+  body.is-phone .budget-app-root #txTable,
+  body.is-phone .budget-app-root #txTable tbody,
+  body.is-phone .budget-app-root #budTable,
+  body.is-phone .budget-app-root #budTable tbody {
+    display: block;
+    width: 100%;
+  }
+  body.is-phone .budget-app-root #txTable thead,
+  body.is-phone .budget-app-root #budTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  body.is-phone .budget-app-root #txTable tbody tr,
+  body.is-phone .budget-app-root #budTable tbody tr:not(.type-row) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    align-items: center;
+    padding: 0.7rem 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  body.is-phone .budget-app-root #txTable tbody tr:last-child,
+  body.is-phone .budget-app-root #budTable tbody tr:last-child {
+    border-bottom: none;
+  }
+  body.is-phone .budget-app-root #txTable tbody td,
+  body.is-phone .budget-app-root #budTable tbody td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  body.is-phone .budget-app-root #txTable tbody td[data-label]::before,
+  body.is-phone .budget-app-root #budTable tbody td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(5) {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 0.8rem;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: right;
+    font-size: 0.8rem;
+    overflow-wrap: break-word;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(4) {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(6) {
+    grid-column: 2;
+    grid-row: 3;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(6)[data-label]::before {
+    margin-bottom: 0;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(7) {
+    grid-column: 1;
+    grid-row: 4;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(8) {
+    grid-column: 2;
+    grid-row: 4;
+    white-space: nowrap;
+    text-align: right;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(7) input {
+    min-width: 100%;
+    box-sizing: border-box;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 600;
+    overflow-wrap: break-word;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(3) .bud-amt-wrap {
+    align-items: flex-start;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 2;
+    text-align: right;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(5) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(5) input {
+    min-width: 100%;
+    box-sizing: border-box;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(6) {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  body.is-phone .budget-app-root #budTable tbody td:nth-child(6):empty {
+    display: none;
+  }
+  body.is-phone .budget-app-root #budTable tbody tr.type-row {
+    display: block;
+  }
+  body.is-phone .budget-app-root #budTable tbody tr.type-row td {
+    display: block;
+    padding: 0.6rem 0.5rem;
+  }
+  body.is-phone .budget-app-root #txTable tbody td[colspan],
+  body.is-phone .budget-app-root #budTable tbody td[colspan] {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  body.is-phone .budget-app-root #txTable tbody tr {
+    gap: 6px 16px;
+    padding: 14px 4px;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: var(--st-small);
+    font-weight: 400;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(5) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-size: 18px;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
+    text-align: left;
+    font-size: var(--st-small);
+    color: var(--text-muted);
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 3;
+    text-align: right;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(4) .cat-cell {
+    min-width: 0;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(4) .cat-cell-btn {
+    width: auto;
+    justify-content: flex-end;
+    font-size: var(--st-small);
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(7) {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(6) {
+    grid-column: 1;
+    grid-row: 5;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 10px;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(8) {
+    grid-column: 2;
+    grid-row: 5;
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(-n+5)[data-label]::before {
+    display: none;
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(6)[data-label]::before {
+    order: 2;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(7)[data-label]::before {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-light);
+  }
+  @supports (content: "a" / "") {
+    body.is-phone .budget-app-root #txTable tbody td[data-label]::before,
+    body.is-phone .budget-app-root #budTable tbody td[data-label]::before {
+      content: attr(data-label) / "";
+    }
+  }
+  @supports (overflow-wrap: anywhere) {
+    body.is-phone .budget-app-root #txTable tbody td:nth-child(2),
+    body.is-phone .budget-app-root #txTable tbody td:nth-child(3),
+    body.is-phone .budget-app-root #budTable tbody td:nth-child(1) {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  /* The label size floor, and the same Transactions header as portrait (its rail
+     keeps no negative margin here: .card-h's side padding is 44px, not 14px). */
+  body.is-phone .budget-app-root #txTable tbody td[data-label]::before,
+  body.is-phone .budget-app-root #budTable tbody td[data-label]::before { font-size: var(--st-micro); }
+
+  body.is-phone .budget-app-root #view-transactions .tx-head { flex-wrap: nowrap; }
+  body.is-phone .budget-app-root #view-transactions .tx-filters { gap: 10px 12px; }
+  body.is-phone .budget-app-root #view-transactions .tx-filters .form-select-sm { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  body.is-phone .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 140px; min-width: 0; }
+  body.is-phone .budget-app-root #view-transactions .tx-filters .tx-whole { flex: none; min-height: 44px; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 0 2px;
+  }
+  body.is-phone .budget-app-root #view-transactions .tx-actions::-webkit-scrollbar { display: none; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > * { flex: none; white-space: nowrap; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > #txCount { order: -2; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > #txSave { order: -1; }
+
+  /* Same closed-drawer shadow rule as portrait. */
+  body.is-phone .budget-app-root .app-drawer:not(.open) { box-shadow: none; }
+}
+
+/* A phone on its side is still edge-to-edge up to 768px (the plugin's own
+   "full-bleed on mobile" rule), but the page banner's inset for that width sits
+   EARLIER in src/styles.css than the banner's base rule, so it loses to it and
+   the title and every loose block sat on the screen edge. The 14px gutter of
+   section 5, keyed on body.is-phone, for 601-768px. */
+@media (min-width: 601px) and (max-width: 768px) {
+  body.is-phone .budget-app-root .financial-period-banner { padding-left: 20px; padding-right: 20px; }
+  body.is-phone .budget-app-root .section-h { padding-left: 20px; padding-right: 20px; }
+  body.is-phone .budget-app-root .mini-grid:not(#planEnvelopes),
+  body.is-phone .budget-app-root .kpi-caveat,
+  body.is-phone .budget-app-root .loan-tabs,
+  body.is-phone .budget-app-root .acct-strip,
+  body.is-phone .budget-app-root .tx-undo,
+  body.is-phone .budget-app-root .bud-shape-note,
+  body.is-phone .budget-app-root .acct-deck,
+  body.is-phone .budget-app-root .plan-free { margin-left: 20px; margin-right: 20px; }
+}
+/* Statement lane: phone tables and charts — Debts, Owed, Assets, Services, Tax, Import as stacked cards gated on [role=table]; chart text lifted to a readable size. */
+
+/* ===========================================================================
+   PHONE TABLES — Debts, Owed Money, Assets, Services, Tax (steps, figures,
+   documents) and Import review.
+
+   These seven editing tables are 650-1250px wide, every cell an input, a
+   select or a button, inside a ~365px scroller. Measured on the 1.51.0 build at
+   375px: Debts 1195px with its identity column squeezed to 62px (names wrapped
+   one word per line) and Payment onwards off-screen; Owed 951; Assets 798;
+   Services 779 with Next billing, Active and delete past the edge; the Tax
+   tables 700-800; Import 650. Left as tables the controls are unreachable
+   without a sideways swipe that nothing on screen announces.
+
+   Under 600px each row becomes a card instead, the way Transactions, Budget
+   and Accounts already do (src/styles.css, "stacked rows" and the Accounts
+   phone block). Everything below follows that pattern:
+
+     - A grid on the <tr> is no longer a row to VoiceOver, so the whole layout
+       is gated on [role='table']. Each view calls dom.js tableCells, which
+       stamps the roles and a `data-label` per cell; a table that did not get
+       them keeps its table layout. The thead stays for assistive tech
+       (clipped, not display:none), and the visible column name is the cell's
+       own ::before.
+     - Cells are placed by column position (nth-child): the cells carry no
+       classes and the column ORDER is fixed by the render functions.
+     - The identity cell (name and sub-label) takes the card's full width, the
+       figures sit two to a row, and status and delete form the footer.
+     - Controls fill their grid cell. On a coarse pointer they are 44px tall and
+       16px type, which also stops iOS zooming in on focus.
+
+   The card rules are emitted TWICE from one template, once under
+   @media (max-width: 600px) and once under `.is-phone` (a landscape iPhone is
+   wider than 600px but Obsidian still marks it). tests/phone-tables-css.test.cjs
+   holds the two copies identical apart from that prefix, so edit both or
+   neither. Nothing here applies to a desktop window wider than 600px.
+
+   Desktop widths. The input widths these tables used to carry as inline
+   `style` (120px, 220px, ...) are rules below instead: an inline width beats
+   every stylesheet rule, so the card layout could never have made those inputs
+   fill their cell. The values are the same, so a desktop renders as before.
+   =========================================================================== */
+
+/* ---- the desktop input widths, moved here from inline style ---- */
+.budget-app-root #debtTable td:nth-child(2) > input { width: 120px; }
+.budget-app-root #debtTable td:nth-child(3) > input { width: 84px; }
+.budget-app-root #debtTable td:nth-child(4) > input { width: 110px; }
+.budget-app-root #debtTable td:nth-child(5) > input { width: 100px; }
+.budget-app-root #owedTable td:nth-child(2) > input { width: 220px; }
+.budget-app-root #owedTable td:nth-child(4) > input,
+.budget-app-root #owedTable td:nth-child(5) > input { width: 120px; }
+.budget-app-root #svcTable td:nth-child(5) > input { width: 140px; }
+.budget-app-root #taxStepsTable td:nth-child(3) > input { width: 120px; }
+.budget-app-root #taxStepsTable td:nth-child(4) > input { min-width: 220px; }
+.budget-app-root #taxFiguresTable td:nth-child(1) > input { width: 90px; }
+.budget-app-root #taxFiguresTable td:nth-child(2) > input { min-width: 180px; }
+.budget-app-root #taxFiguresTable td:nth-child(3) > input { min-width: 140px; }
+.budget-app-root #taxFiguresTable td:nth-child(4) > input { width: 130px; }
+.budget-app-root #taxDocsTable td:nth-child(5) > input { min-width: 180px; }
+
+/* A tick that wants a 44px target on a phone sits in a <label> (a checkbox
+   renders no ::after for the house overlay trick, and growing the glyph past
+   32px inflates the native tick). On a desktop the label is not there. */
+.budget-app-root .tbl-tick { display: contents; }
+
+@media (max-width: 600px) {
+  /* ---- shape: the table, its groups and its rows stop being table layout ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'],
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody,
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot { display: block; width: 100%; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > thead {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr,
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* The shorthand, not column-gap + row-gap: the scorecard's lint reads
+       column-gap as a multi-column property even on a grid. */
+    gap: 10px 12px;
+    align-items: start;
+    padding: 0.9rem 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr:last-child { border-bottom: 0; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td,
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr > td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+  /* A cell with nothing in it (a dup row's Exclude, a service with no
+     provider) would otherwise hold a grid slot and a gap open. */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:empty,
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr > td:empty { display: none; }
+
+  /* ---- a cell's own column name (dom.js tableCells). Visual only: the
+          clipped thead keeps role=columnheader, so the alt-text form (Safari
+          17.4+, in its own @supports block below) stops VoiceOver reading the
+          name twice. ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text-muted);
+  }
+
+  /* ---- controls fill their cell ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td input:not([type='checkbox']),
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td select {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* ---- the identity cell: name over sub-label, the whole card width, with the
+          note chip and flags that ride on the name wrapping beneath it ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:first-child { grid-column: 1 / -1; font-size: 1rem; overflow-wrap: break-word; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:first-child::before { display: none; }
+
+  /* ---- Debts: balance | rate / payment | extra / category / paid off /
+          clear by | interest / status | delete ---- */
+  .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(6),
+  .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(7) { grid-column: 1 / -1; }
+  .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(11) { align-self: end; justify-self: end; }
+  .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(10) { align-self: end; }
+
+  /* ---- Owed: description / amount / lent | due / status | actions ---- */
+  .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(2),
+  .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(3) { grid-column: 1 / -1; }
+  .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(6) { align-self: end; }
+  .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: end; justify-self: end; }
+  .budget-app-root #owedTable[role='table'] .owed-acts { gap: 8px; }
+
+  /* ---- Assets: kind | value / last valued / notes / remove ---- */
+  .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(4),
+  .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+  .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(6) { grid-column: 1 / -1; justify-self: end; width: auto; white-space: normal; }
+
+  /* ---- Services: provider under the name / amount | cycle / next billing /
+          active | delete. The group bars are a flex line, name and subtotal. ---- */
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / -1; margin-top: -6px; }
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(2)::before { display: none; }
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    align-self: center;
+  }
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
+  .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: center; justify-self: end; }
+  .budget-app-root #svcTable[role='table'] > tbody > tr.type-row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    padding: 0;
+    border-bottom: 0;
+  }
+  .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
+    display: block;
+    padding: 0.6rem 0.5rem;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+
+  /* ---- Tax steps: status | due / notes / remove ---- */
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 1 / -1; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+
+  /* ---- Tax figures: code / description / source | amount / remove. The
+          totals under them are a line each: code, "Total for", figure. ---- */
+  .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(1),
+  .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / -1; }
+  .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+  .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(1)::before { display: block; }
+  .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr.tax-fig-total {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0.6rem 0.25rem;
+  }
+  .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr.tax-fig-total > td:nth-child(2) { flex: 1 1 auto; }
+  .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr > td[data-label]::before { display: none; }
+
+  /* ---- Tax documents: source | status / file(s) / notes / remove ---- */
+  .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1; }
+  .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(4),
+  .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+  .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(6) { grid-column: 1 / -1; justify-self: end; }
+
+  /* ---- Import review: tick, date, amount on a line; description; category;
+          exclude. A statement is hundreds of rows, so this card is the
+          compact one and carries almost no labels. The amount comes after the
+          description in the DOM and is placed on the first line by row, which
+          moves nothing a keyboard visits: the ticks and the select keep their
+          order. ---- */
+  .budget-app-root #impTable[role='table'] > tbody > tr {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: center;
+    padding: 0.7rem 0.25rem;
+  }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(1) { grid-column: 1; grid-row: 1; font-size: 0.875rem; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 2; grid-row: 1; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 3; grid-row: 1; text-align: right; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(3) { grid-column: 1 / -1; grid-row: 2; overflow-wrap: break-word; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(6) {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(2)::before,
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(3)::before,
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(4)::before,
+  .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(5)::before { display: none; }
+  .budget-app-root #impTable[role='table'] .imp-near-why { max-width: none; }
+
+  /* ---- the lone cell of a row — the empty state, Import's "show more" —
+          spans the card. Last, so it outranks the nth-child placement above at
+          equal specificity. ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }
+
+  /* ---- Active, in a card: the tick sits in its label, on the line ---- */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .tbl-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .svc-next-hint { margin-top: 6px; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .debt-prog { min-width: 0; }
+  /* Import's category is a button that opens the picker, not a select: a field
+     of its own, the whole width of the card. */
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .cat-cell { display: block; min-width: 0; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .cat-cell-btn {
+    border-color: var(--border-color);
+    background: var(--surface);
+    font-size: 0.875rem;
+  }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .status-pill { white-space: nowrap; }
+  .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .btn-ghost-sm { min-width: 44px; }
+
+  @media (pointer: coarse) {
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td input:not([type='checkbox']),
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td select {
+      min-height: 44px;
+      font-size: 16px;
+    }
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .status-pill,
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .svc-next-hint,
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .tax-doc-link,
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .note-chip,
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .caveat-chip-btn { min-height: 44px; }
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .note-chip { min-width: 44px; }
+  }
+
+  @supports (content: "a" / "") {
+    .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[data-label]::before { content: attr(data-label) / ""; }
+  }
+}
+
+/* Landscape phone: the same cards, keyed on the class Obsidian puts on <body>. */
+/* ---- shape: the table, its groups and its rows stop being table layout ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'],
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody,
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot { display: block; width: 100%; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > thead {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr,
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* The shorthand, not column-gap + row-gap: the scorecard's lint reads
+     column-gap as a multi-column property even on a grid. */
+  gap: 10px 12px;
+  align-items: start;
+  padding: 0.9rem 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr:last-child { border-bottom: 0; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td,
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr > td {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+/* A cell with nothing in it (a dup row's Exclude, a service with no
+   provider) would otherwise hold a grid slot and a gap open. */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:empty,
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tfoot > tr > td:empty { display: none; }
+
+/* ---- a cell's own column name (dom.js tableCells). Visual only: the
+        clipped thead keeps role=columnheader, so the alt-text form (Safari
+        17.4+, in its own @supports block below) stops VoiceOver reading the
+        name twice. ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[data-label]::before {
+  content: attr(data-label);
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+
+/* ---- controls fill their cell ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td input:not([type='checkbox']),
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+/* ---- the identity cell: name over sub-label, the whole card width, with the
+        note chip and flags that ride on the name wrapping beneath it ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:first-child { grid-column: 1 / -1; font-size: 1rem; overflow-wrap: break-word; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td:first-child::before { display: none; }
+
+/* ---- Debts: balance | rate / payment | extra / category / paid off /
+        clear by | interest / status | delete ---- */
+.is-phone .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(6),
+.is-phone .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(7) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(11) { align-self: end; justify-self: end; }
+.is-phone .budget-app-root #debtTable[role='table'] > tbody > tr > td:nth-child(10) { align-self: end; }
+
+/* ---- Owed: description / amount / lent | due / status | actions ---- */
+.is-phone .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(2),
+.is-phone .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(3) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(6) { align-self: end; }
+.is-phone .budget-app-root #owedTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: end; justify-self: end; }
+.is-phone .budget-app-root #owedTable[role='table'] .owed-acts { gap: 8px; }
+
+/* ---- Assets: kind | value / last valued / notes / remove ---- */
+.is-phone .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(4),
+.is-phone .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #assetTable[role='table'] > tbody > tr > td:nth-child(6) { grid-column: 1 / -1; justify-self: end; width: auto; white-space: normal; }
+
+/* ---- Services: provider under the name / amount | cycle / next billing /
+        active | delete. The group bars are a flex line, name and subtotal. ---- */
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / -1; margin-top: -6px; }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(2)::before { display: none; }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+}
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: center; justify-self: end; }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: 0;
+  border-bottom: 0;
+}
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
+  display: block;
+  padding: 0.6rem 0.5rem;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+
+/* ---- Tax steps: status | due / notes / remove ---- */
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+
+/* ---- Tax figures: code / description / source | amount / remove. The
+        totals under them are a line each: code, "Total for", figure. ---- */
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(1),
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tbody > tr > td:nth-child(1)::before { display: block; }
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr.tax-fig-total {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0.6rem 0.25rem;
+}
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr.tax-fig-total > td:nth-child(2) { flex: 1 1 auto; }
+.is-phone .budget-app-root #taxFiguresTable[role='table'] > tfoot > tr > td[data-label]::before { display: none; }
+
+/* ---- Tax documents: source | status / file(s) / notes / remove ---- */
+.is-phone .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1; }
+.is-phone .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(4),
+.is-phone .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; }
+.is-phone .budget-app-root #taxDocsTable[role='table'] > tbody > tr > td:nth-child(6) { grid-column: 1 / -1; justify-self: end; }
+
+/* ---- Import review: tick, date, amount on a line; description; category;
+        exclude. A statement is hundreds of rows, so this card is the
+        compact one and carries almost no labels. The amount comes after the
+        description in the DOM and is placed on the first line by row, which
+        moves nothing a keyboard visits: the ticks and the select keep their
+        order. ---- */
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 0.7rem 0.25rem;
+}
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(1) { grid-column: 1; grid-row: 1; font-size: 0.875rem; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 2; grid-row: 1; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 3; grid-row: 1; text-align: right; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(3) { grid-column: 1 / -1; grid-row: 2; overflow-wrap: break-word; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; grid-row: 3; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(6) {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(2)::before,
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(3)::before,
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(4)::before,
+.is-phone .budget-app-root #impTable[role='table'] > tbody > tr > td:nth-child(5)::before { display: none; }
+.is-phone .budget-app-root #impTable[role='table'] .imp-near-why { max-width: none; }
+
+/* ---- the lone cell of a row — the empty state, Import's "show more" —
+        spans the card. Last, so it outranks the nth-child placement above at
+        equal specificity. ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }
+
+/* ---- Active, in a card: the tick sits in its label, on the line ---- */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .tbl-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .svc-next-hint { margin-top: 6px; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .debt-prog { min-width: 0; }
+/* Import's category is a button that opens the picker, not a select: a field
+   of its own, the whole width of the card. */
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .cat-cell { display: block; min-width: 0; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .cat-cell-btn {
+  border-color: var(--border-color);
+  background: var(--surface);
+  font-size: 0.875rem;
+}
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .status-pill { white-space: nowrap; }
+.is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .btn-ghost-sm { min-width: 44px; }
+
+@media (pointer: coarse) {
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td input:not([type='checkbox']),
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .status-pill,
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .svc-next-hint,
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .tax-doc-link,
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .note-chip,
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .caveat-chip-btn { min-height: 44px; }
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] .note-chip { min-width: 44px; }
+}
+
+@supports (content: "a" / "") {
+  .is-phone .budget-app-root :is(#debtTable, #owedTable, #assetTable, #svcTable, #taxStepsTable, #taxFiguresTable, #taxDocsTable, #impTable)[role='table'] > tbody > tr > td[data-label]::before { content: attr(data-label) / ""; }
+}
+
+/* ===========================================================================
+   CHART TEXT on a phone.
+
+   Every chart draws into a fixed 1000-unit viewBox that CSS scales to the card
+   (about 0.35 at 375px), and its text was written in those units: the axis
+   labels at font-size 13 rendered at 4.5px, savings.js's note at 9.5 and its
+   month labels at 12 came out at 3.3px and 4.2px, and the net-worth headings at
+   13 at 4.5px. A CSS font-size beats the SVG presentation attribute, so the fix
+   is here, in user units: 32 of them is 11px at that factor.
+
+   Four times the text takes four times the room, so the charts that draw it
+   thin their labels and move their rows when phoneWidth() (chart.js) says the
+   viewport is a phone: five x-axis labels instead of eight, a taller strip
+   under the plot, the net-worth rows spaced for 32-unit headings. That geometry
+   is chosen when the chart is drawn, so it keys on the same 600px line as this
+   rule and on nothing finer.
+
+   `text[data-fig]` is the net-worth bar totals, which were drawn stronger than
+   their headings and stay so.
+   =========================================================================== */
+@media (max-width: 600px) {
+  .budget-app-root .trend-svg-wrap svg text,
+  .budget-app-root .stack-wrap svg text {
+    font-size: 32px;
+    fill-opacity: 0.7;
+  }
+  .budget-app-root .stack-wrap svg text[data-fig] { fill-opacity: 0.9; }
+}
+/* A landscape phone is wider than 600px but not wide enough for 13-unit text
+   to be read: the trend and debt-plan axes are about 0.6 of their viewBox
+   there, so 20 units is 12px. The net-worth charts are left alone — the note
+   inside the savings growth chart does not fit a larger size. */
+@media (min-width: 601px) {
+  .is-phone .budget-app-root .trend-svg-wrap svg text {
+    font-size: 20px;
+    fill-opacity: 0.7;
+  }
+  .is-phone .budget-app-root .donut-wrap svg.donut { width: 280px; }
+}
+/* The dashboard donut is 210px wide (260px above 700px) for a 320-unit
+   viewBox, so its centre caption at 13 units was 8.5px. A phone gets a wider
+   donut rather than bigger type: the caption ("Categorised spending") already
+   fills the 176-unit hole at 13, and at 280px the scale is 0.875, which is
+   11.4px with no change to the text. */
+@media (max-width: 600px) {
+  .budget-app-root .donut-wrap svg.donut { width: 280px; }
+}
+
+/* The loan calculators' year-by-year schedule is read-only, so it stays a
+   table, but five money columns were 389px in a 365px scroller. Tighter cell
+   padding and a 12px floor (the 600px rule above it set 0.68rem headers) make
+   it fit with the figures still unwrapped. */
+@media (max-width: 600px) {
+  .budget-app-root .loan-amort .table thead th,
+  .budget-app-root .loan-amort .table tbody td {
+    padding: 0.5rem 0.3rem;
+    font-size: 0.75rem;
   }
 }
 /* ============================================================

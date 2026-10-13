@@ -84,10 +84,21 @@
   color: var(--text-light);
 }
 .budget-app-root #view-transactions .table tbody td {
-  padding-top: 12px;
-  padding-bottom: 12px;
   font-size: var(--st-body);
   line-height: 1.35;
+}
+/* Row height is a TABLE concern. It used to sit in the rule above, unscoped, and
+   its specificity (1,2,3) beat the phone card's `#txTable tbody td { padding: 0 }`
+   (1,1,2) in src/styles.css: every cell of every card kept 12px above and below,
+   which is 9 cells x 24px = the 120px of air that made a card 354px tall instead
+   of ~234px on a 375px phone (Oct 2026 phone audit, item 1). Scoped to 601px and
+   up, where the rows are table rows; under it the card owns its own spacing.
+   tests/phone-375.test.cjs pins that no unscoped rule here can pad these cells. */
+@media (min-width: 601px) {
+  .budget-app-root #view-transactions .table tbody td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 /* A calm hover: a faint wash instead of the green tint. */
 .budget-app-root #view-transactions .table.table-hover tbody tr:hover { background: var(--line-soft); }
@@ -237,9 +248,42 @@
    The same selectors as the card rules in src/styles.css, later, so these win.
    ------------------------------------------------------------ */
 @media (max-width: 600px) {
-  /* The two selects and the search take a full line each, as in the mockup. */
-  .budget-app-root #view-transactions .tx-filters .form-select-sm,
-  .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 100%; }
+  /* The header used to be 386px tall (each select and the search on a line of
+     its own, the whole-history box under them, the actions wrapping to three
+     rows) so no transaction was on the first screen. Now: the two selects share
+     one line, the search shares the next with the whole-history box, and the
+     actions are ONE rail that scrolls sideways inside the card. Placed after the
+     base rules above on purpose: they tie on specificity, so order decides. */
+  /* .card-h wraps. In a wrapping COLUMN the line is as wide as its widest item,
+     and a nowrap rail's widest is its whole length (991px): the filters and the
+     card stretched to match and the page scrolled sideways. One line, then. */
+  .budget-app-root #view-transactions .tx-head { flex-wrap: nowrap; }
+  .budget-app-root #view-transactions .tx-filters { gap: 10px 12px; }
+  .budget-app-root #view-transactions .tx-filters .form-select-sm {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  .budget-app-root #view-transactions .tx-filters #txSearch { flex: 1 1 140px; min-width: 0; }
+  .budget-app-root #view-transactions .tx-filters .tx-whole { flex: none; min-height: 44px; }
+
+  /* The rail runs to the card's edges (negative margin = the 14px card-h side
+     padding, padded back inside) so a button scrolling away is cut by the
+     screen edge, not by an invisible box 14px short of it. The primary action
+     and the row count are ordered first: Save changes would otherwise be the
+     LAST item of a scrolling strip, off screen exactly when it matters. */
+  .budget-app-root #view-transactions .tx-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+  }
+  .budget-app-root #view-transactions .tx-actions::-webkit-scrollbar { display: none; }
+  .budget-app-root #view-transactions .tx-actions > * { flex: none; white-space: nowrap; }
+  .budget-app-root #view-transactions .tx-actions > #txCount { order: -2; }
+  .budget-app-root #view-transactions .tx-actions > #txSave { order: -1; }
 
   .budget-app-root #txTable tbody tr { gap: 6px 16px; padding: 14px 4px; }
 

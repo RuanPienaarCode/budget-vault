@@ -50,6 +50,33 @@ function themeColors(root) {
   };
 }
 
+/* ------------------------------- phone -------------------------------
+
+   Every chart draws into a fixed 1000-unit viewBox that CSS scales to the
+   card, which on a 375px phone is a factor of about 0.35. SVG text written at
+   font-size 13 therefore rendered at 4.5px (measured on the 1.51.0 build), and
+   savings.js's 9.5 and 12 at 3.3 and 4.2px. The stylesheet's phone block
+   (src/statement/phone-tables.css) lifts chart text to PHONE_TEXT user units,
+   which is 11px at that factor — and text four times the size takes four
+   times the room, so the geometry that used to have slack (how many x-axis
+   labels fit, how much space sits under the plot, how far above a bar its
+   heading can hang) has to be asked the same question. phoneWidth() is that
+   question, read at render time: a chart is not redrawn when the phone is
+   turned, which is why the rule it feeds is the 600px line the stylesheet's
+   phone block also keys on, and nothing finer.
+
+   Guarded: the guard suite renders these in bare node, where there is no
+   window, and an embedded webview without matchMedia must fall back to the
+   desktop geometry rather than throw. */
+const PHONE_TEXT = 32;          // user units; keep in step with phone-tables.css
+const PHONE_MAX_LABELS = 5;
+function phoneWidth() {
+  try {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(max-width: 600px)').matches;
+  } catch (e) { return false; }
+}
+
 /* ---------------------------- slice colours ----------------------------
 
    Category colours are the user's, set in each Categories/<name>.md. Nothing
@@ -249,10 +276,31 @@ function gridlines(add, s, w, rows = 4) {
        dropped in favour of the end, which is the one that has to be there. */
 function axisLabels(add, s, labels, h, { maxLabels = 8, band = false } = {}) {
   const n = labels.length;
-  const stride = Math.max(1, Math.ceil(n / maxLabels));
+  /* On a phone the label text is PHONE_TEXT units tall instead of 13, so the
+     eight labels a 1000-unit axis used to carry (125 units apart) would overprint
+     — "Sep 2029" is about 150 units wide at that size. Fewer of them, and never
+     closer than the widest label needs: one and a half widths, because the two end
+     labels are anchored inward and the next one is centred on its point, so the
+     pair spans half of each plus the air between them.
+     Desktop keeps the old arithmetic exactly: `endRoom` falls back to the
+     half-stride it always used. */
+  const phone = phoneWidth();
+  let stride = Math.max(1, Math.ceil(n / (phone ? Math.min(maxLabels, PHONE_MAX_LABELS) : maxLabels)));
+  let endRoom = stride / 2;
+  if (phone) {
+    const pitch = band ? s.bandWidth : (n > 1 ? s.innerW / (n - 1) : s.innerW);
+    const widest = Math.max(0, ...labels.map(l => String(l).length)) * PHONE_TEXT * 0.58;
+    const minGap = widest * 1.5 + 12;
+    // Counted from the last point back, so first + every stride + last never
+    // exceeds the cap (n / cap alone can leave one over when the last label
+    // is not on a stride).
+    const cap = Math.max(2, Math.min(maxLabels, PHONE_MAX_LABELS));
+    stride = Math.max(1, Math.ceil((n - 1) / (cap - 1)), Math.ceil(minGap / pitch));
+    endRoom = Math.max(stride / 2, minGap / pitch);
+  }
   labels.forEach((text, i) => {
     const last = i === n - 1;
-    if (!last && (i % stride !== 0 || n - 1 - i < stride / 2)) return;
+    if (!last && (i % stride !== 0 || n - 1 - i < endRoom)) return;
     add('text', {
       x: band ? s.band(i) : s.x(i), y: h - 12,
       'text-anchor': i === 0 && !band ? 'start' : last && !band ? 'end' : 'middle',
@@ -462,7 +510,7 @@ function rangePills({ ranges, value, onPick, label }) {
 }
 
 module.exports = {
-  themeColors, createChart, scales, gridlines, axisLabels,
+  themeColors, createChart, scales, gridlines, axisLabels, phoneWidth, PHONE_TEXT,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints,
   SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,

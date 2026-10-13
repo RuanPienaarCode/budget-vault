@@ -50,6 +50,8 @@ class FakeEl {
   get firstChild() { return this.children[0] || null; }
   get lastChild() { return this.children[this.children.length - 1] || null; }
   get parentElement() { return this._parent || null; }
+  // The reflected colspan attribute, 1 when absent — what dom.js tableCells counts columns by.
+  get colSpan() { return Number(this.attrs.colspan) || 1; }
   get offsetWidth() { return 800; }
   get scrollTop() { return 0; }
   set scrollTop(_v) { /* keepScroll writes this back */ }

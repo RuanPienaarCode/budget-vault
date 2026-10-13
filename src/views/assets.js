@@ -12,7 +12,7 @@
    shown on every row and summarised above the table, because a net worth
    dominated by one number somebody typed four years ago should say so. */
 
-const { el, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -291,7 +291,7 @@ module.exports = function registerAssets(ctx) {
         /* Beside the Value field, updated in place by its own editor (the row
            is not rebuilt on a value edit — see renderAssetKpis). Empty unless
            the figure was typed below zero. */
-        const belowZeroNote = el('div', { class: 'text-muted', style: 'font-size:11.5px' });
+        const belowZeroNote = el('div', { class: 'text-muted fine-note' });
         const syncBelowZero = () => {
           belowZeroNote.textContent = typedBelowZero(a, 'value') !== null ? 'counts as 0 in the totals' : '';
         };
@@ -365,6 +365,9 @@ module.exports = function registerAssets(ctx) {
           'bought here is what balances it in net worth, rather than only the amount owed.')));
       }
       t.append(body);
+      /* Phone width stacks each row into a card (statement/phone-tables.css):
+         keep the column names and the table semantics (dom.js tableCells). */
+      tableCells(t, ['Item', 'Kind', 'Value', 'Last valued', 'Notes', null]);
     });
     /* Rebuilding the table drops focus to <body>, which ejects a keyboard or
        screen-reader user to the top of the page after every kind change. Same

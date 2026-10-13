@@ -5,7 +5,7 @@
    The arithmetic lives in ../debt-math (pure, separately tested); this file is
    presentation and editing only. */
 
-const { el, kpiTiles, keepScroll, icoEl, caveatChip } = require('../dom');
+const { el, kpiTiles, keepScroll, icoEl, caveatChip, tableCells } = require('../dom');
 const { debtMonthly } = require('../committed');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
@@ -27,7 +27,7 @@ const { symbolOf, isForeign } = require('../currency');
    several files, so every file in this app imports i18n the same way. */
 const i18n = require('../i18n');
 const {
-  themeColors, createChart, scales, gridlines, axisLabels,
+  themeColors, createChart, scales, gridlines, axisLabels, phoneWidth,
   linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
 } = require('../chart');
 
@@ -702,7 +702,7 @@ module.exports = function registerDebts(ctx) {
            derived cells — empty unless that figure was typed below zero. */
         const belowZero = {};
         for (const k of ['balance', 'rate', 'payment', 'extra']) {
-          belowZero[k] = el('div', { class: 'text-muted', style: 'font-size:11.5px' });
+          belowZero[k] = el('div', { class: 'text-muted fine-note' });
         }
 
         function refreshRow() {
@@ -761,7 +761,7 @@ module.exports = function registerDebts(ctx) {
                Interest tile above was taught not to make in 1.35.0. Said in
                the row, with the one thing that would make it knowable. */
             clearCell.append(el('span', { class: 'text-muted' }, 'rate unknown'),
-              el('div', { class: 'text-muted', style: 'font-size:11.5px' }, 'add the rate to project this debt'));
+              el('div', { class: 'text-muted fine-note' }, 'add the rate to project this debt'));
             interestCell.append(el('span', { class: 'text-muted' }, '—'));
           } else {
             const a = amortise(d.balance, d.rate, committed(d));
@@ -774,7 +774,7 @@ module.exports = function registerDebts(ctx) {
               interestCell.append(el('span', { class: 'text-danger num' }, `+${dMoney(d, monthlyInterest(d.balance, d.rate), 0)}/mo`));
             } else {
               clearCell.append(el('span', {}, monthLabel(addMonths(a.months, todayForMonths()))),
-                el('div', { class: 'text-muted', style: 'font-size:11.5px' }, humanMonths(a.months)));
+                el('div', { class: 'text-muted fine-note' }, humanMonths(a.months)));
               interestCell.append(dMoney(d, a.interest, 0));
             }
           }
@@ -801,23 +801,23 @@ module.exports = function registerDebts(ctx) {
 
         body.append(el('tr', { class: paidPill ? 'debt-settled' : '' },
           el('td', {}, el('div', { style: 'font-weight:600' }, d.name, ctx.noteButton('debt', d.name)),
-            el('div', { class: 'text-muted', style: 'font-size:11.5px' },
+            el('div', { class: 'text-muted fine-note' },
               [d.lender, d.type].filter(Boolean).join(' · ') || '—')),
           /* All four money cells go through editMoney — see its comment for
              why the parse and the `<key>Raw` handling belong together — and
              draw through shownFigure, so a figure kept below zero is redrawn
              as itself rather than as the blank its floored 0 would give. */
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'balance'),
-            style: 'width:120px', 'aria-label': `Balance owed on ${d.name}`,
+            'aria-label': `Balance owed on ${d.name}`,
             onchange: e => editMoney(d, 'balance', 'Balance', e, refreshAll) }), belowZero.balance),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'rate'),
-            style: 'width:84px', 'aria-label': `Annual interest rate on ${d.name}`,
+            'aria-label': `Annual interest rate on ${d.name}`,
             onchange: e => editMoney(d, 'rate', 'Rate', e, refreshAll) }), belowZero.rate),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'payment'),
-            style: 'width:110px', 'aria-label': `Monthly payment on ${d.name}`,
+            'aria-label': `Monthly payment on ${d.name}`,
             onchange: e => editMoney(d, 'payment', 'Payment', e, refreshAll) }), belowZero.payment),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'extra'),
-            style: 'width:100px', 'aria-label': `Extra paid each month on ${d.name}`,
+            'aria-label': `Extra paid each month on ${d.name}`,
             onchange: e => editMoney(d, 'extra', 'Extra', e, refreshAll) }), belowZero.extra),
           // A category that no longer exists in Categories/ (renamed, or a
           // hand-edited Debts.md) still gets an option of its own. Without it
@@ -842,6 +842,12 @@ module.exports = function registerDebts(ctx) {
           'No debts tracked. Add one above — you only need the balance, the rate and what you pay each month.')));
       }
       t.append(body);
+      /* Phone width stacks each row into a card (statement/phone-tables.css):
+         keep the column names and the table semantics (dom.js tableCells).
+         One label per thead column, in order; the actions column goes
+         unlabelled. */
+      tableCells(t, ['Debt', 'Balance', 'Rate %', 'Payment', 'Extra / month', 'Category', paidOffHeader,
+        'Clear by', 'Interest still to pay', 'Status', null]);
     });
 
     // Cycling a status is the main keyboard interaction here; rebuilding the
@@ -1044,7 +1050,8 @@ module.exports = function registerDebts(ctx) {
     const peak = Math.max(...lines.flatMap(l =>
       Array.from({ length: span + 1 }, (_, m) => at(l.series, m))));
     const max = Math.max(1, peak) * 1.08;
-    const s = scales({ w: W, h: H, count: span + 1, max, padB: 34 });
+    // 50 on a phone for the larger axis text — see chart.js, phoneWidth.
+    const s = scales({ w: W, h: H, count: span + 1, max, padB: phoneWidth() ? 50 : 34 });
     const { svg, add } = createChart({
       w: W, h: H,
       label: `Total owed over the next ${humanMonths(span)} under each payoff plan`,

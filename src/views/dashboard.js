@@ -15,7 +15,7 @@ const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency } = require('../currency');
 const {
-  themeColors, createChart, scales, gridlines, axisLabels,
+  themeColors, createChart, scales, gridlines, axisLabels, phoneWidth,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
   historicalRanges, rangeFor, rangePills,
 } = require('../chart');
@@ -1939,7 +1939,7 @@ module.exports = function registerDashboard(ctx) {
       const barCls = r.type === 'income' ? '' : (over || unbudgeted) ? ' bg-danger' : near ? ' bg-warning' : '';
       const bar = el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${barCls}`, style: `width:${pct}%` }));
       body.append(el('tr', {},
-        el('td', {}, cat, r.notes ? el('div', { class: 'text-muted', style: 'font-size:11.5px;margin-top:2px' }, r.notes.split('\n')[0]) : ''),
+        el('td', {}, cat, r.notes ? el('div', { class: 'text-muted fine-note', style: 'margin-top:2px' }, r.notes.split('\n')[0]) : ''),
         el('td', { class: 'num' }, r.budget ? money(r.budget) : '—'),
         el('td', { class: 'num' }, money(r.actual)),
         el('td', {}, bar),
@@ -2054,7 +2054,10 @@ module.exports = function registerDashboard(ctx) {
     const W = 1000, H = 300;
     const c = themeColors(root);
     const max = Math.max(1, ...data.flatMap(d => [d.spent, d.budget, d.income])) * 1.12;
-    const s = scales({ w: W, h: H, count: data.length, max });
+    /* More room under the plot on a phone, where the axis text is 32 units tall
+       rather than 13 (chart.js, phoneWidth): the labels' tops would otherwise
+       sit 5 units below the baseline they label. */
+    const s = scales({ w: W, h: H, count: data.length, max, padB: phoneWidth() ? 52 : 40 });
     const over = d => d.budget > 0 && d.spent > d.budget;
     const { svg, add } = createChart({
       w: W, h: H,
@@ -2353,7 +2356,7 @@ module.exports = function registerDashboard(ctx) {
          own flex wrap (.donut-wrap), which #trendChart is not. Same look,
          written locally rather than borrowing a rule tied to a layout this
          card does not have. */
-      wrap.append(el('p', { class: 'text-muted', style: 'margin:10px 0 0;font-size:11.5px;line-height:1.5' },
+      wrap.append(el('p', { class: 'text-muted fine-note', style: 'margin:10px 0 0;line-height:1.5' },
         i18n.t('dash.trend.inProgress')));
     }
   }

@@ -2,7 +2,7 @@
 /* Services — recurring subscriptions grouped by budget category, saved to
    Services.md. */
 
-const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -391,7 +391,7 @@ module.exports = function registerServices(ctx) {
               ...CYCLES.map(c => el('option', { value: c, ...(s.cycle === c ? { selected: '' } : {}) }, c)))),
             // dateInput, not a bare type="date": a hand-edited "end of month"
             // renders blank in a date input, hiding a value that is still on disk.
-            el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm', style: 'width:140px',
+            el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm',
               'aria-label': `Next billing date for ${s.name}` },
               v => { s.next = v; mark(); }),
             /* The typed date is a fossil the moment it passes — every value on
@@ -401,14 +401,22 @@ module.exports = function registerServices(ctx) {
                may be tracking a plan change the history cannot know about —
                see offeredNext for when it is held back. */
             ...(hintDate ? [svcNextHint(s, c, hintDate)] : [])),
-            el('td', {}, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
-              onchange: e => { s.active = e.target.checked; mark(); renderServices(); } })),
+            /* In a <label> so the phone card can give the tick a 44px target
+               without inflating the native glyph (a checkbox renders no
+               ::after for the house overlay trick). Inert on a desktop. */
+            el('td', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
+              onchange: e => { s.active = e.target.checked; mark(); renderServices(); } }))),
             el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,
               onclick: () => { S.services.splice(S.services.indexOf(s), 1); mark(); renderServices(); } }, '✕'))));
         }
       }
       if (!S.services.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No services yet.')));
       t.append(body);
+      /* Phone width stacks each row into a card (statement/phone-tables.css):
+         keep the column names and the table semantics (dom.js tableCells). A
+         group bar's subtotal sits in the last column, which tableCells counts
+         past the bar's colspan, so it is not mislabelled "Provider". */
+      tableCells(t, ['Service', 'Provider', 'Amount', 'Cycle', 'Next billing', 'Active', null]);
     });
   }
 

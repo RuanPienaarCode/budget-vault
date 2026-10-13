@@ -164,6 +164,22 @@ const planSrc = fs.readFileSync(path.join(ROOT, 'src', 'views', 'plan.js'), 'utf
 ok(!/`background:\s*linear-gradient/.test(planSrc) && /`background-image:\s*linear-gradient/.test(planSrc),
   'plan.js paints the overspent fill with background-image, not the background shorthand');
 
+/* ---- 3. the phone layer raises the floor to Apple's 44pt on a 375px phone -----
+   Section 2 held the 24px WCAG floor; the 13 Oct 2026 audit measured 32-40px
+   topbar and row controls on a 375x667 phone and tests/phone-375.test.cjs holds
+   the whole phone layer. These stay here, beside the 24px checks, so the two
+   floors are read together. The 24px checks above are unchanged. */
+for (const sel of ['.budget-app-root .menu-btn', '.budget-app-root .topbar-icon-btn', '.budget-app-root .topbar-avatar', '.budget-app-root .drawer-close', '.budget-app-root .header-period-pill .pnav-btn']) {
+  want(sel, 'width', SMALL, v => px(v) >= 44, 'be at least 44px wide on a phone');
+  want(sel, 'height', SMALL, v => px(v) >= 44, 'be at least 44px tall on a phone');
+  later(sel, 'width', SMALL);
+}
+{
+  const h = decl('.budget-app-root .env-slider', 'height', SMALL), pb = decl('.budget-app-root .env-slider', 'padding-block', SMALL);
+  ok(h && pb && px(h.value) >= 44 && px(h.value) - 2 * px(pb.value) === 8,
+    `.env-slider on a phone: a 44px hit area around the same 8px track, found ${h && h.value} / ${pb && pb.value}`);
+}
+
 if (failures.length) {
   console.log(`FAIL — css-phone-layout: ${failures.length} of ${checks} checks\n  - ${failures.join('\n  - ')}`);
   process.exit(1);
