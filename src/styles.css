@@ -212,6 +212,8 @@
 .budget-app-root .text-danger { color: var(--color-danger-ink); }
 .budget-app-root .text-warning { color: var(--color-warning-ink); }
 .budget-app-root .text-muted { color: var(--text-muted); }
+/* The small note under a figure (raised to --st-micro on phone). */
+.budget-app-root .fine-note { font-size: 11.5px; }
 .budget-app-root .num { font-variant-numeric: tabular-nums; }
 
 /* ---- Neutralise Obsidian's form chrome ---------------------------------

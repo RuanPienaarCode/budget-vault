@@ -51,6 +51,7 @@
   --st-label:     14px;                         /* a field or tile label                */
   --st-small:     13px;                         /* notes, captions, table headings      */
   --st-chip:      11.5px;                       /* pills and tags (were 9.5-10px caps)  */
+  --st-micro:     12px;                         /* the floor for ANY text on a phone: src/statement/phone.css raises every smaller declaration to it (a 375px screen read at arm's length; iOS's own smallest text style is 11pt, and these were 8.8-11.7px) */
 
   /* tracking: tighter as the figure grows */
   --st-track-statement: -0.055em;

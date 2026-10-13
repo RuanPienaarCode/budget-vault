@@ -44,6 +44,8 @@ const CSS_SOURCES = [
   'src/statement/dashboard.css',
   'src/statement/budget.css',
   'src/statement/transactions.css',
+  'src/statement/phone.css',
+  'src/statement/phone-tables.css',
   'src/styles-presets.css',
 ];
 

@@ -1,7 +1,7 @@
 'use strict';
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
-const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -118,7 +118,7 @@ module.exports = function registerOwed(ctx) {
         /* Beside the Amount field, updated in place by its editor (the row is
            not rebuilt on an amount edit — see the comment on that field).
            Empty unless the figure was typed below zero. */
-        const belowZeroNote = el('div', { class: 'text-muted', style: 'font-size:11.5px' });
+        const belowZeroNote = el('div', { class: 'text-muted fine-note' });
         const syncBelowZero = () => {
           belowZeroNote.textContent = typedBelowZero(o, 'amount') !== null ? 'counts as 0 in the totals' : '';
         };
@@ -127,7 +127,7 @@ module.exports = function registerOwed(ctx) {
           el('td', { style: 'font-weight:600' }, o.person, ctx.noteButton('owed', o.person),
             ...(age !== null && !settled
               ? [el('div', { class: 'owed-age' }, `out ${age} day${age === 1 ? '' : 's'}`)] : [])),
-          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description, style: 'width:220px',
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description,
             'aria-label': `Description for ${o.person}`,
             onchange: e => { o.description = e.target.value; mark(); } })),
           // Only the KPI tiles read the amount — refresh those, never this table,
@@ -172,9 +172,9 @@ module.exports = function registerOwed(ctx) {
              unlike the amount field, whose figure is read by the KPI tiles and
              not by the row itself. renderOwed(row) restores focus to the
              status pill, matching what the pill's own handler does. */
-          el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Date lent to ${o.person}` },
+          el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', 'aria-label': `Date lent to ${o.person}` },
             v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(row); })),
-          el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', style: 'width:120px', 'aria-label': `Due date for ${o.person}` },
+          el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
           el('td', {}, pill),
           el('td', {}, el('div', { class: 'owed-acts' },
@@ -185,6 +185,9 @@ module.exports = function registerOwed(ctx) {
       }
       if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No entries yet.')));
       t.append(body);
+      /* Phone width stacks each row into a card (statement/phone-tables.css):
+         keep the column names and the table semantics (dom.js tableCells). */
+      tableCells(t, ['Person', 'Description', 'Amount', 'Lent', 'Due date', 'Status', null]);
     });
     if (focusRow !== undefined && focusRow >= 0) {
       const pill = t.querySelectorAll('.status-pill')[focusRow];

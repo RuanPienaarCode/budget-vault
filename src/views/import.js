@@ -16,7 +16,7 @@
    prints — the date-reading banner — reached through the namespace import
    because `t` is already a local in several files. */
 const i18n = require('../i18n');
-const { el } = require('../dom');
+const { el, tableCells } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
   statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
@@ -789,12 +789,14 @@ module.exports = function registerImport(ctx) {
           + 'statement as a final figure. Tick to import it now anyway.'
         : '';
       body.append(el('tr', { class: cls.trim() },
+        /* Both ticks sit in a <label> so the phone card can give them a 44px
+           target (statement/phone-tables.css); inert on a desktop. */
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${previewMoney(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
+          el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${previewMoney(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
             // nearAuto stays TRUE once we have auto-unticked: it records that the
             // untick already happened, so a re-render (account switch, "show
             // more") leaves the user's decision — either way — alone.
-            ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked })),
+            ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked }))),
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, it.date),
         el('td', {}, it.desc, ...(it.near ? [
           el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
@@ -831,12 +833,12 @@ module.exports = function registerImport(ctx) {
             `matched "${it.matchedPattern}"`)] : [])),
         // `checked` reflects the model: after a partial-failure re-render the
         // ticks used to vanish while the rows stayed excluded.
-        el('td', {}, it.dup ? '' : el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
+        el('td', {}, it.dup ? '' : el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
           // manualExclude is the same sticky bit as nearAuto above: once the
           // reader has ticked either way, switching account must not silently
           // undo it on the next render.
           ...(it.excluded ? { checked: '' } : {}),
-          onchange: e => { it.excluded = e.target.checked; it.manualExclude = true; } }))));
+          onchange: e => { it.excluded = e.target.checked; it.manualExclude = true; } })))));
     }
     if (p.items.length > visible.length) {
       const rest = p.items.length - visible.length;
@@ -849,6 +851,11 @@ module.exports = function registerImport(ctx) {
       $('#impStats').textContent += ` · showing ${visible.length}, all ${p.items.length} will import`;
     }
     t.append(body);
+    /* Phone width stacks each row into a card (statement/phone-tables.css):
+       keep the column names and the table semantics (dom.js tableCells). The
+       first column (the Import tick, or the "dup" badge) has no visible header
+       and goes unlabelled. */
+    tableCells(t, [null, 'Date', 'Description', 'Amount', 'Category', 'Excl.']);
   }
 
   async function commitImport() {

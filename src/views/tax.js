@@ -6,7 +6,7 @@
    profile in locale.js (Settings.md `country`, default South Africa / SARS).
    Edit seeded sources to match your own banks, providers and income. */
 
-const { el, kpiTiles, dateInput, keepScroll, icoEl } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { safeSeg } = require('../vault-path');
@@ -258,18 +258,18 @@ module.exports = function registerTax(ctx) {
       // Free text doesn't feed the totals or the checks, so it only marks dirty —
       // same as the Steps/Docs notes fields. Code and amount refresh the totals
       // row and the callouts, but never this table's own body.
-      const txt = (obj, key, width) => el('input', { type: 'text', class: 'form-control form-control-sm',
-        value: obj[key], style: `min-width:${width}`, 'aria-label': `${key} for figure ${obj.code || ''}`.trim(),
+      const txt = (obj, key) => el('input', { type: 'text', class: 'form-control form-control-sm',
+        value: obj[key], 'aria-label': `${key} for figure ${obj.code || ''}`.trim(),
         onchange: e => { obj[key] = e.target.value; mark(); } });
       const refresh = () => { mark(); refreshDerived(t); };
       for (const f of figures) {
         body.append(el('tr', {},
-          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code, style: 'width:90px',
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code,
             'aria-label': `${loc.figureCodeLabel} for ${f.description || 'this figure'}`,
             onchange: e => { f.code = e.target.value.trim(); refresh(); } })),
-          el('td', {}, txt(f, 'description', '180px')),
-          el('td', {}, txt(f, 'source', '140px')),
-          el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num', style: 'width:130px',
+          el('td', {}, txt(f, 'description')),
+          el('td', {}, txt(f, 'source')),
+          el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num',
             value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
             'aria-label': `Amount for ${f.code || 'this figure'}`,
             /* normalizeAmount, the reader load.js applies to this very cell, so
@@ -304,8 +304,15 @@ module.exports = function registerTax(ctx) {
       }
       tbl.append(body);
       renderFigureTotals(t);
+      stampFigures(tbl);
     });
   }
+
+  /* Phone width stacks each row into a card (statement/phone-tables.css):
+     keep the column names and the table semantics (dom.js tableCells). The
+     totals rows live in a <tfoot> that renderFigureTotals swaps on its own, so
+     the stamp is re-applied there too; it is idempotent. */
+  const stampFigures = tbl => tableCells(tbl, [locale().figureCodeLabel, 'Description', 'Source', 'Amount', null]);
 
   /* Totals grouped by code: one row per code, which is the shape a return asks
      for (three banks' interest is one 4201 line, not three). Replaced on its
@@ -352,6 +359,7 @@ module.exports = function registerTax(ctx) {
         el('td', {})));
     }
     tbl.append(foot);
+    stampFigures(tbl);
   }
 
   const STEP_CYCLE = { todo: 'busy', busy: 'done', done: 'n/a', 'n/a': 'todo' };
@@ -382,9 +390,9 @@ module.exports = function registerTax(ctx) {
           // A step's due date is read by nothing but its own overdue styling —
           // the Deadline KPI comes off the season card, not from here.
           el('td', {}, dateInput(s.due, { class: `form-control form-control-sm ${stepOverdue(s) ? 'tax-overdue' : ''}`,
-            style: 'width:120px', 'aria-label': `Due date for ${s.step}` },
+            'aria-label': `Due date for ${s.step}` },
             (v, e) => { s.due = v; mark(); e.target.classList.toggle('tax-overdue', stepOverdue(s)); })),
-          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes, style: 'min-width:220px',
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes,
             'aria-label': `Notes for ${s.step}`,
             onchange: e => { s.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
@@ -393,6 +401,7 @@ module.exports = function registerTax(ctx) {
       }
       if (!t.steps.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No steps yet.')));
       tbl.append(body);
+      tableCells(tbl, ['Step', 'Status', 'Due', 'Notes', null]);
     });
     if (focusStep) {
       const i = t.steps.findIndex(s => s.step === focusStep);
@@ -442,7 +451,7 @@ module.exports = function registerTax(ctx) {
           el('td', { class: 'text-muted' }, d.source),
           el('td', {}, pill),
           el('td', {}, fileCell),
-          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'min-width:180px',
+          el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes,
             'aria-label': `Notes for ${d.name}`,
             onchange: e => { d.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
@@ -460,6 +469,7 @@ module.exports = function registerTax(ctx) {
       }
       if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
       tbl.append(body);
+      tableCells(tbl, ['Document', 'Source', 'Status', 'File', 'Notes', null]);
     });
     if (focusDoc) {
       const i = t.docs.findIndex(d => d.name === focusDoc);

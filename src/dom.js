@@ -56,7 +56,14 @@ function dateInput(value, attrs, commit) {
    prints each cell's `data-label` where the column header used to be. So stamp
    the ARIA roles explicitly, and give every body cell its column's name.
    `labels` is by column position; a falsy entry (the actions column) and any
-   spanning cell (group bars, empty state, "show more") get no label. */
+   spanning cell (group bars, empty state, "show more") get no label.
+
+   "Column position" is counted in COLUMNS, not in child nodes: a cell with a
+   colspan advances the count by its span. Until the Services and Tax tables
+   came here every spanning row was a lone cell, so the two readings agreed;
+   Services' group bar is a colspan-6 name followed by a subtotal in the LAST
+   column, and Tax's figure totals skip two, and by child index those cells
+   were labelled "Provider" and "Source". */
 function tableCells(table, labels) {
   table.setAttribute('role', 'table');
   for (const group of Array.from(table.children)) {
@@ -64,9 +71,12 @@ function tableCells(table, labels) {
     const head = group.tagName === 'THEAD';
     for (const tr of Array.from(group.children)) {
       tr.setAttribute('role', 'row');
-      Array.from(tr.children).forEach((cell, i) => {
+      let col = 0;
+      Array.from(tr.children).forEach(cell => {
         cell.setAttribute('role', head ? 'columnheader' : 'cell');
-        if (!head && labels[i] && !cell.hasAttribute('colspan')) cell.setAttribute('data-label', labels[i]);
+        const span = Number(cell.colSpan) || 1;   // the reflected attribute; 1 when absent
+        if (!head && labels[col] && !cell.hasAttribute('colspan')) cell.setAttribute('data-label', labels[col]);
+        col += span;
       });
     }
   }

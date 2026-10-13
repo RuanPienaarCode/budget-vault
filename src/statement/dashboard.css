@@ -344,6 +344,8 @@
 .budget-app-root #dashBudget td.num { font-variant-numeric: tabular-nums lining-nums; }
 .budget-app-root #dashBudget td:nth-child(3) { font-weight: 600; }
 .budget-app-root #dashBudget td .text-muted { font-size: var(--st-small); }
+/* The category note under a name keeps its 11.5px (it was an inline style). */
+.budget-app-root #dashBudget td .text-muted.fine-note { font-size: 11.5px; }
 .budget-app-root #dashBudget td.text-danger { font-weight: 600; }
 
 /* ------------------------------------------------------------

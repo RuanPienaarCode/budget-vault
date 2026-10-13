@@ -3,7 +3,7 @@
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { accountsOfType, accountType } = require('../vocabulary');
-const { themeColors, createChart, tip, parseColor, distinctColors } = require('../chart');
+const { themeColors, createChart, tip, parseColor, distinctColors, phoneWidth } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate } = require('../savings-math');
@@ -1038,7 +1038,13 @@ module.exports = function registerSavings(ctx) {
     const dated = last.capital + last.posted;
     const undated = s.undated;
 
-    const W = 1000, H = 250, padL = 8, padR = 8, padT = 22, padB = 28;
+    /* On a phone this chart's text is lifted to 32 units (chart.js,
+       phoneWidth), so the strip under the plot grows from 28 to 44 for the two
+       month labels, and the in-chart "Growth with no date" note is left to the
+       legend below: it sat in a 78-unit column in 9.5-unit type, and no
+       32-unit wording fits that. */
+    const phone = phoneWidth();
+    const W = 1000, H = phone ? 266 : 250, padL = 8, padR = 8, padT = 22, padB = phone ? 44 : 28;
     const innerW = W - padL - padR, innerH = H - padT - padB;
     /* The undated block gets its own column so it cannot be read as the last
        month of a curve. Reserved out of the plot width rather than drawn over
@@ -1146,15 +1152,17 @@ module.exports = function registerSavings(ctx) {
         x: labelX, 'text-anchor': 'middle', 'font-size': '9.5', 'font-weight': '600',
         fill: 'currentColor', 'fill-opacity': '0.6', 'font-family': 'inherit',
       };
-      add('text', { ...labelAttrs, y: labelY - 10 }, band).textContent = 'Growth with';
-      add('text', { ...labelAttrs, y: labelY }, band).textContent = 'no date';
+      if (!phone) {
+        add('text', { ...labelAttrs, y: labelY - 10 }, band).textContent = 'Growth with';
+        add('text', { ...labelAttrs, y: labelY }, band).textContent = 'no date';
+      }
     }
 
     // First and last month, at the two ends. Nothing between them: the shape is
     // the point, and a dense axis on a 60-month series is unreadable on a phone.
     const label = (x, anchor, text) => {
       add('text', {
-        x, y: H - 8, 'text-anchor': anchor, 'font-size': '12',
+        x, y: H - (phone ? 12 : 8), 'text-anchor': anchor, 'font-size': '12',
         fill: 'currentColor', 'fill-opacity': '0.5', 'font-family': 'inherit',
       }).textContent = text;
     };
@@ -1435,7 +1443,13 @@ module.exports = function registerSavings(ctx) {
        barH; the two rows keep the same 8px gap between a row's own heading
        text and its bar, and a ~26px gap between the two bars for the second
        heading to sit in. */
-    const W = 1000, H = 118, padL = 8, padR = 8, barH = 14;
+    /* A phone lifts the headings to 32 units (chart.js, phoneWidth), which
+       need ~35 units above their bar instead of 20 and a 36-unit band between
+       the two bars for the second heading, so the rows move down and the
+       viewBox grows to hold them. */
+    const phone = phoneWidth();
+    const W = 1000, H = phone ? 134 : 118, padL = 8, padR = 8, barH = 14;
+    const rowA = phone ? 46 : 30, rowB = phone ? 112 : 86;
     const scale = Math.max(totalAssets, totalDebts, 1);
     const innerW = W - padL - padR;
 
@@ -1600,8 +1614,8 @@ module.exports = function registerSavings(ctx) {
       }, band);
     };
 
-    row(30, assets, totalAssets, 'What you own', 0, 'worth-owned');
-    row(86, debts, totalDebts, 'What you owe', 1, 'worth-owed');
+    row(rowA, assets, totalAssets, 'What you own', 0, 'worth-owned');
+    row(rowB, debts, totalDebts, 'What you owe', 1, 'worth-owed');
 
     if (hoverable) {
       /* Positioned from the pointer rather than from the segment: a segment can

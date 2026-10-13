@@ -33,6 +33,8 @@ class FakeEl {
   querySelectorAll() { return []; }
   querySelector() { return null; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
+  // dom.js tableCells (the review table's roles and column names) reads this.
+  hasAttribute(k) { return k in this.attrs; }
   removeAttribute(k) { delete this.attrs[k]; }
   addEventListener() {}
   focus() {}
