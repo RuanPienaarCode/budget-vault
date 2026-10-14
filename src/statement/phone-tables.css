@@ -178,9 +178,42 @@
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
 
-  /* ---- Tax steps: status | due / notes / remove ---- */
-  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 1 / -1; }
-  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+  /* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
+          status pill | step name | remove. Line 2 is the two fields: due | notes,
+          each with its column name inline in front of it. Fifteen cards of about
+          250px (a label over every field, one field per line) were a page to
+          scroll rather than a list to scan; this is about 115px for a step whose
+          name fits two lines. A twelve-track grid so the two lines can divide the
+          width differently without a wrapper element: the DOM order, and so the
+          keyboard order, is still step, status, due, notes, remove. ---- */
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 6px 8px;
+    align-items: center;
+    padding: 0.5rem 0.25rem;
+  }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(1) { grid-column: 4 / span 7; grid-row: 1; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / span 3; grid-row: 1; justify-self: start; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(2)::before { display: none; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3) {
+    grid-column: 1 / span 6;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) {
+    grid-column: 7 / span 6;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3)::before,
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4)::before { flex: none; margin-bottom: 0; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3) > input,
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) > input { flex: 1 1 0; width: auto; min-width: 0; }
+  .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 11 / span 2; grid-row: 1; justify-self: end; }
 
   /* ---- Tax figures: code / description / source | amount / remove. The
           totals under them are a line each: code, "Total for", figure. ---- */
@@ -395,9 +428,42 @@
 }
 .is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
 
-/* ---- Tax steps: status | due / notes / remove ---- */
-.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) { grid-column: 1 / -1; }
-.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 1 / -1; justify-self: end; }
+/* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
+        status pill | step name | remove. Line 2 is the two fields: due | notes,
+        each with its column name inline in front of it. Fifteen cards of about
+        250px (a label over every field, one field per line) were a page to
+        scroll rather than a list to scan; this is about 115px for a step whose
+        name fits two lines. A twelve-track grid so the two lines can divide the
+        width differently without a wrapper element: the DOM order, and so the
+        keyboard order, is still step, status, due, notes, remove. ---- */
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px 8px;
+  align-items: center;
+  padding: 0.5rem 0.25rem;
+}
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(1) { grid-column: 4 / span 7; grid-row: 1; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(2) { grid-column: 1 / span 3; grid-row: 1; justify-self: start; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(2)::before { display: none; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3) {
+  grid-column: 1 / span 6;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) {
+  grid-column: 7 / span 6;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3)::before,
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4)::before { flex: none; margin-bottom: 0; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(3) > input,
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(4) > input { flex: 1 1 0; width: auto; min-width: 0; }
+.is-phone .budget-app-root #taxStepsTable[role='table'] > tbody > tr > td:nth-child(5) { grid-column: 11 / span 2; grid-row: 1; justify-self: end; }
 
 /* ---- Tax figures: code / description / source | amount / remove. The
         totals under them are a line each: code, "Total for", figure. ---- */
@@ -526,13 +592,23 @@
 }
 /* A landscape phone is wider than 600px but not wide enough for 13-unit text
    to be read: the trend and debt-plan axes are about 0.6 of their viewBox
-   there, so 20 units is 12px. The net-worth charts are left alone — the note
-   inside the savings growth chart does not fit a larger size. */
+   there, so 20 units is 12px.
+
+   The two Savings charts (.stack-wrap: net-worth bars and the growth chart)
+   were left out of that, and measured 8.1px (headings, bar totals), 7.5px
+   (month labels) and 5.9px (the "Growth with no date" note) at 667x375, scale
+   0.625. They get the same 20 units, 12.5px there. The note is the thing that
+   did not fit a larger size (a 78-unit column), so savings.js drops it on a
+   phone (chart.js phoneLayout) exactly as it already did in portrait, and
+   makes the same extra room under the plot and between the bars. chart.js's
+   PHONE_TEXT_WIDE is this number. */
 @media (min-width: 601px) {
-  .is-phone .budget-app-root .trend-svg-wrap svg text {
+  .is-phone .budget-app-root .trend-svg-wrap svg text,
+  .is-phone .budget-app-root .stack-wrap svg text {
     font-size: 20px;
     fill-opacity: 0.7;
   }
+  .is-phone .budget-app-root .stack-wrap svg text[data-fig] { fill-opacity: 0.9; }
   .is-phone .budget-app-root .donut-wrap svg.donut { width: 280px; }
 }
 /* The dashboard donut is 210px wide (260px above 700px) for a 320-unit

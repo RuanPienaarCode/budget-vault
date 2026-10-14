@@ -124,6 +124,78 @@ ok(units * 0.347 >= 11, `${units} user units is at least 11px on a 375px phone (
 ok(!rules.some(r => isPhoneCtx(r) && r.selectors.some(s => /svg text/.test(s)) && r.decls.some(d => d.prop === 'font-size' && parseFloat(d.value) < 28 && !/trend|donut/.test(r.selectors[0]))),
   'no phone chart rule sets a smaller size on the stack charts');
 
+/* ---- 6b. FOLLOW-UP: landscape chart text. The two Savings charts (.stack-wrap)
+        were left at their SVG attribute sizes sideways: 8.1px headings, 7.5px
+        month labels, 5.9px note at 667x375. They get PHONE_TEXT_WIDE under .is-phone. ---- */
+{
+  const wide = Number((/const PHONE_TEXT_WIDE = (\d+)/.exec(chartSrc) || [])[1]);
+  const L = r => r.context.length === 1 && r.context[0] === '@media (min-width: 601px)';
+  const rule = rules.find(r => L(r) && r.selectors.includes('.is-phone .budget-app-root .stack-wrap svg text'));
+  ok(rule, 'a landscape-phone rule lifts the Savings charts\' text (.is-phone .stack-wrap svg text, min-width 601px)');
+  const f = rule && rule.decls.find(d => d.prop === 'font-size');
+  ok(f && f.value === `${wide}px`, `the landscape chart text (${f && f.value}) is chart.js's PHONE_TEXT_WIDE (${wide})`);
+  // the Savings SVGs are drawn into a 1000-unit viewBox and come out about 0.625 of it at 667px (625px wide); 0.6 is the margin
+  ok(wide * 0.6 >= 11, `${wide} user units is at least 11px at the 0.6 scale a landscape phone draws these charts`);
+  ok(rules.some(r => L(r) && r.selectors.includes('.is-phone .budget-app-root .stack-wrap svg text[data-fig]')),
+    'the net-worth bar totals keep their stronger fill in landscape');
+  ok(!rules.some(r => r.context.length === 0 && r.selectors.some(s => /svg text/.test(s))),
+    'no chart-text rule applies without a phone fence (a desktop chart is not touched)');
+}
+
+/* ---- 7. FOLLOW-UP: the Tax steps card is two lines, not five. It was a label over
+        every field and one field per line: 15 cards of ~250px at 375px. Pinned as the
+        grid it must stay: at most two rows, no two cells on top of each other, the
+        status pill and the remove button on the first row with the name, the two fields
+        on the second. (The two copies themselves are held identical by section 3.) ---- */
+{
+  const STEPS = "#taxStepsTable[role='table']";
+  const portraitRules = rules.filter(r => isPhoneCtx(r));
+  const sel = tail => `.budget-app-root ${STEPS} > tbody > tr${tail}`;
+  const decl = (tail, prop) => {
+    const r = [...portraitRules].reverse().find(x => x.selectors.includes(sel(tail)) && x.decls.some(d => d.prop === prop));
+    return r && r.decls.find(d => d.prop === prop).value;
+  };
+  const tracks = /^repeat\((\d+), minmax\(0, 1fr\)\)$/.exec(decl('', 'grid-template-columns') || '');
+  ok(tracks, 'the Tax steps card declares an N-track equal grid');
+  const N = tracks ? Number(tracks[1]) : 0;
+  const place = {};
+  for (let i = 1; i <= 5; i++) {
+    const col = /^(\d+) \/ span (\d+)$/.exec(decl(` > td:nth-child(${i})`, 'grid-column') || '');
+    const row = Number(decl(` > td:nth-child(${i})`, 'grid-row'));
+    ok(col && row, `cell ${i} of a Tax step is placed on a row and a column span`);
+    if (col && row) place[i] = { row, from: Number(col[1]), to: Number(col[1]) + Number(col[2]) - 1 };
+  }
+  const cells = Object.values(place);
+  ok(cells.length === 5 && cells.every(c => c.row === 1 || c.row === 2), 'a Tax step card is at most two rows (every cell sits on row 1 or 2)');
+  ok(cells.every(c => c.from >= 1 && c.to <= N), `every cell sits inside the ${N} tracks`);
+  for (let a = 1; a <= 5; a++) for (let b = a + 1; b <= 5; b++) {
+    const A = place[a], B = place[b];
+    if (A && B && A.row === B.row) ok(A.to < B.from || B.to < A.from, `Tax step cells ${a} and ${b} do not overlap on row ${A.row}`);
+  }
+  // the first row: tick (status), name, remove. the second: due and notes.
+  ok(place[2] && place[1] && place[5] && [1, 2, 5].every(i => place[i].row === 1), 'the name, status pill and remove button share the first row');
+  ok(place[3] && place[4] && place[3].row === 2 && place[4].row === 2, 'the due date and the notes field share the second row');
+  // a pill ("To do", ~76px) needs three of twelve tracks at 375px; the remove button two (44px)
+  ok(place[2] && place[2].to - place[2].from + 1 >= 3, 'the status pill gets at least three tracks (~83px at 375px)');
+  ok(place[5] && place[5].to - place[5].from + 1 >= 2, 'the remove button gets at least two tracks (>= 44px at 375px)');
+  const pad = decl('', 'padding');
+  const padY = pad && /^([\d.]+)rem /.exec(pad);
+  ok(padY && Number(padY[1]) <= 0.6, `the card's vertical padding is compact (${pad})`);
+  // reading and keyboard order is the DOM's; no cell is reordered with `order`
+  ok(!portraitRules.some(r => r.selectors.some(s => s.includes('#taxStepsTable')) && r.decls.some(d => d.prop === 'order')),
+    'no Tax step cell is reordered with `order` — the keyboard order stays step, status, due, notes, remove');
+  // the two fields keep their column name inline, in front of the control
+  for (const i of [3, 4]) {
+    ok(decl(` > td:nth-child(${i})`, 'display') === 'flex', `Tax step cell ${i} lays its inline column name and its field out as a flex line`);
+  }
+  // views/tax.js was not asked to change behaviour: the five cells, in order, and the write paths
+  const taxSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'tax.js'), 'utf8');
+  const rs = /function renderSteps\(t, focusStep\) \{[\s\S]*?\n  \}\n/.exec(taxSrc);
+  ok(rs && /tableCells\(tbl, \['Step', 'Status', 'Due', 'Notes', null\]\)/.test(rs[0]), 'Tax steps still stamps Step | Status | Due | Notes | (actions) in that column order');
+  ok(rs && /s\.due = v/.test(rs[0]) && /s\.notes = e\.target\.value/.test(rs[0]) && /s\.status = STEP_CYCLE\[s\.status\]/.test(rs[0]) && /t\.steps\.splice/.test(rs[0]),
+    'and every write path (status, due, notes, remove) is still wired to the step it belongs to');
+}
+
 if (failures.length) {
   console.log(`FAIL — phone-tables-css: ${failures.length} of ${checks} checks\n  - ${failures.join('\n  - ')}`);
   process.exit(1);
