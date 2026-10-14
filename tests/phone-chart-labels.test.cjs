@@ -21,7 +21,7 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { axisLabels, scales, PHONE_TEXT } = require('../src/chart');
+const { axisLabels, scales, PHONE_TEXT, PHONE_TEXT_WIDE, phoneWidth, phoneLayout } = require('../src/chart');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -82,6 +82,34 @@ for (const [name, f] of [['short', i => `${i + 1}`], ['month', i => `Sep ${26 + 
   }
 }
 ok(Number.isFinite(worst), `sanity: ${checks} label sets checked, tightest gap ${worst.toFixed(0)} units`);
+
+/* ---- 4. phoneLayout(): a phone held sideways (landscape phone charts) -------
+   Obsidian puts .is-phone on <body> in either orientation, but a landscape
+   iPhone is 667px+, so (max-width: 600px) is false there. The Savings charts
+   draw their roomier geometry when EITHER is true, so a phone can be turned
+   after the chart was drawn without the text outgrowing its space. */
+{
+  const body = cls => ({ classList: { contains: c => cls.includes(c) } });
+  const win = narrow => ({ matchMedia: q => ({ matches: narrow && q === '(max-width: 600px)' }) });
+  const saved = global.document;
+  delete global.window; delete global.document;
+  ok(phoneLayout() === false, 'no window and no document (bare node): not a phone');
+  global.window = win(false); global.document = { body: body([]) };
+  ok(phoneWidth() === false && phoneLayout() === false, 'a wide window with no .is-phone is a desktop: the desktop geometry');
+  global.window = win(false); global.document = { body: body(['is-mobile']) };
+  ok(phoneLayout() === false, 'a tablet (.is-mobile without .is-phone) keeps the desktop geometry');
+  global.window = win(false); global.document = { body: body(['is-mobile', 'is-phone', 'is-ios']) };
+  ok(phoneWidth() === false, 'a landscape phone is wider than 600px, so phoneWidth() stays false (the axis thinning is unchanged)');
+  ok(phoneLayout() === true, 'but phoneLayout() is true for it: .is-phone on <body>');
+  global.window = win(true); global.document = { body: body([]) };
+  ok(phoneLayout() === true, 'a narrow window is a phone even before Obsidian has set .is-phone');
+  global.window = win(false); global.document = { body: null };
+  ok(phoneLayout() === false, 'a document with no <body> yet does not throw');
+  global.document = { get body() { throw new Error('boom'); } };
+  ok(phoneLayout() === false, 'a throwing document falls back to the desktop geometry');
+  ok(PHONE_TEXT_WIDE * 0.6 >= 11 && PHONE_TEXT_WIDE < PHONE_TEXT, `${PHONE_TEXT_WIDE} units is >= 11px at the landscape 0.6 scale and smaller than the portrait ${PHONE_TEXT}`);
+  delete global.window; if (saved) global.document = saved; else delete global.document;
+}
 
 delete global.window;
 console.log(`PASS phone-chart-labels (${checks} checks, tightest phone gap ${worst.toFixed(0)} units)`);

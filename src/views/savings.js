@@ -3,7 +3,7 @@
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { accountsOfType, accountType } = require('../vocabulary');
-const { themeColors, createChart, tip, parseColor, distinctColors, phoneWidth } = require('../chart');
+const { themeColors, createChart, tip, parseColor, distinctColors, phoneLayout } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate } = require('../savings-math');
@@ -1038,12 +1038,13 @@ module.exports = function registerSavings(ctx) {
     const dated = last.capital + last.posted;
     const undated = s.undated;
 
-    /* On a phone this chart's text is lifted to 32 units (chart.js,
-       phoneWidth), so the strip under the plot grows from 28 to 44 for the two
-       month labels, and the in-chart "Growth with no date" note is left to the
-       legend below: it sat in a 78-unit column in 9.5-unit type, and no
-       32-unit wording fits that. */
-    const phone = phoneWidth();
+    /* On a phone this chart's text is lifted (32 units upright, 20 on its
+       side; chart.js, phoneLayout), so the strip under the plot grows from 28
+       to 44 for the two month labels, and the in-chart "Growth with no date"
+       note is left to the legend below: it sat in a 78-unit column in 9.5-unit
+       type, and no 20- or 32-unit wording fits that (a 20-unit "Growth with"
+       is ~127 units and ran past the chart's right edge). */
+    const phone = phoneLayout();
     const W = 1000, H = phone ? 266 : 250, padL = 8, padR = 8, padT = 22, padB = phone ? 44 : 28;
     const innerW = W - padL - padR, innerH = H - padT - padB;
     /* The undated block gets its own column so it cannot be read as the last
@@ -1443,11 +1444,11 @@ module.exports = function registerSavings(ctx) {
        barH; the two rows keep the same 8px gap between a row's own heading
        text and its bar, and a ~26px gap between the two bars for the second
        heading to sit in. */
-    /* A phone lifts the headings to 32 units (chart.js, phoneWidth), which
+    /* A phone lifts the headings to 32 units, 20 on its side (chart.js, phoneLayout), which
        need ~35 units above their bar instead of 20 and a 36-unit band between
        the two bars for the second heading, so the rows move down and the
        viewBox grows to hold them. */
-    const phone = phoneWidth();
+    const phone = phoneLayout();
     const W = 1000, H = phone ? 134 : 118, padL = 8, padR = 8, barH = 14;
     const rowA = phone ? 46 : 30, rowB = phone ? 112 : 86;
     const scale = Math.max(totalAssets, totalDebts, 1);

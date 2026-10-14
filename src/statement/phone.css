@@ -175,6 +175,20 @@
   /* A tick inside a <label> borrows the label's 44px row as its target, so it
      draws at a normal size rather than as a 44px empty box. */
   .budget-app-root label input[type='checkbox'] { width: 24px; height: 24px; }
+  /* Transactions' Excl. budget tick is one of those labelled ones (views/
+     transactions.js, excludedCell): the label is the 44x44 target, the box in
+     it is drawn at 24px. Measured on the 1.51.0 build at 375x667 the box was
+     a 44x44 empty square. The box size is repeated for #txTable so it does not
+     depend on the `label input` rule above out-ranking a later one. */
+  .budget-app-root #txTable tbody td:nth-child(6) .tbl-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  .budget-app-root #txTable .tbl-tick input[type='checkbox'] { width: 24px; height: 24px; }
   /* The bucket slider is the Plan page's main gesture: 8px of track, now in a
      44px hit area (18px of padding either side; the track is still clipped to
      the content box, so it is drawn 8px thick exactly as before). */
@@ -615,6 +629,19 @@
 
   /* Same closed-drawer shadow rule as portrait. */
   body.is-phone .budget-app-root .app-drawer:not(.open) { box-shadow: none; }
+
+  /* The Excl. budget tick, as in portrait (section 4): a 44x44 label around a
+     24px box. Sideways the box was 32px (src/styles.css raises every checkbox
+     to 32 on a coarse pointer) with no label, so a 32px target. */
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(6) .tbl-tick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  body.is-phone .budget-app-root #txTable .tbl-tick input[type='checkbox'] { width: 24px; height: 24px; }
 }
 
 /* A phone on its side is still edge-to-edge up to 768px (the plugin's own

@@ -77,6 +77,27 @@ function phoneWidth() {
   } catch (e) { return false; }
 }
 
+/* A phone held sideways. Obsidian puts .is-phone on <body> whatever the
+   orientation, but a landscape iPhone is 667-932px wide, so phoneWidth() is
+   false there and the 32-unit text of the portrait rule does not apply. The
+   savings charts come out at about 0.62 of their 1000-unit viewBox there,
+   which left the SVG attribute sizes (13, 12 and 9.5 units) at 8, 7.5 and 6px
+   (measured at 667x375 on the 1.51.0 build). The stylesheet lifts them to
+   PHONE_TEXT_WIDE units (12.5px at that factor) under .is-phone, and text that
+   size needs the roomier geometry the portrait text gets, so those charts ask
+   phoneLayout() rather than phoneWidth(). It is the union on purpose: the
+   geometry is fixed when the chart is drawn and a phone can be turned
+   afterwards, so a chart drawn in either orientation has room for the text of
+   both. A desktop has no .is-phone and is untouched. */
+const PHONE_TEXT_WIDE = 20;     // user units; keep in step with phone-tables.css
+function phoneBody() {
+  try {
+    return typeof document !== 'undefined' && !!document.body
+      && document.body.classList.contains('is-phone');
+  } catch (e) { return false; }
+}
+function phoneLayout() { return phoneWidth() || phoneBody(); }
+
 /* ---------------------------- slice colours ----------------------------
 
    Category colours are the user's, set in each Categories/<name>.md. Nothing
@@ -510,7 +531,7 @@ function rangePills({ ranges, value, onPick, label }) {
 }
 
 module.exports = {
-  themeColors, createChart, scales, gridlines, axisLabels, phoneWidth, PHONE_TEXT,
+  themeColors, createChart, scales, gridlines, axisLabels, phoneWidth, phoneLayout, PHONE_TEXT, PHONE_TEXT_WIDE,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints,
   SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,

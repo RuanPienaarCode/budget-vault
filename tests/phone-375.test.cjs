@@ -205,6 +205,49 @@ want(`${R} .tx-whole`, 'min-height', [PORTRAIT], v => px(v) >= 44, 'keep the lab
   ok(keep, 'the overlay positions through :where(), so a self-positioned button (the score ring centre) keeps its own position');
 }
 
+/* ---- 5b. FOLLOW-UP: THE TRANSACTIONS "EXCL. BUDGET" TICK ----------------------------
+   A checkbox in no <label> was drawn as the 44px empty square the line above
+   gives every checkbox (32px sideways, from src/styles.css). Services' Active
+   and Import's tick already sit in a .tbl-tick label that carries the 44px
+   target while the box inside is drawn at 24px; Transactions' Excluded cell is
+   now one too (views/transactions.js excludedCell). The phone layer has to
+   size that label in BOTH orientations, and the desktop must not see it. */
+{
+  const TICK = `${R} #txTable tbody td:nth-child(6) .tbl-tick`;
+  const BOX = `${R} #txTable .tbl-tick input[type='checkbox']`;
+  for (const prop of ['min-width', 'min-height']) {
+    want(TICK, prop, [PORTRAIT], v => px(v) >= 44, `be at least 44px (${prop}): the label is the target`);
+    want(`body.is-phone ${TICK}`, prop, LANDSCAPE, v => px(v) >= 44, `be at least 44px (${prop}) sideways too`);
+  }
+  for (const prop of ['width', 'height']) {
+    want(BOX, prop, [PORTRAIT], v => px(v) >= 20 && px(v) <= 28, `draw the Excl. box at 20-28px (${prop}), not the 44px of a bare checkbox`);
+    want(`body.is-phone ${BOX}`, prop, LANDSCAPE, v => px(v) >= 20 && px(v) <= 28, `draw the Excl. box at 20-28px (${prop}) sideways, not the 32px a coarse pointer gives a bare one`);
+  }
+  // the landscape box rule must out-rank src/styles.css's 32px coarse rule: later, and more specific
+  {
+    const base = last(`${R} input[type='checkbox']`, 'width', ['@media (pointer: coarse)']) || last(`${R} input[type='checkbox']`, 'width', []);
+    const twin = last(`body.is-phone ${BOX}`, 'width', LANDSCAPE);
+    ok(base && twin && twin.line > base.line, 'the landscape Excl. box rule comes after the base checkbox size rules');
+  }
+  // portrait and landscape twins carry the same declarations
+  for (const [a, b] of [[TICK, `body.is-phone ${TICK}`], [BOX, `body.is-phone ${BOX}`]]) {
+    const pa = rules.find(r => JSON.stringify(r.context) === JSON.stringify([PORTRAIT]) && r.selectors.includes(a));
+    const pb = rules.find(r => JSON.stringify(r.context) === JSON.stringify(LANDSCAPE) && r.selectors.includes(b));
+    ok(pa && pb && pa.decls.map(d => d.prop + ':' + d.value).join(';') === pb.decls.map(d => d.prop + ':' + d.value).join(';'),
+      `the Excl. tick rule "${a.replace(R + ' ', '')}" has a landscape twin with the same declarations`);
+  }
+  // the markup half: the cell wraps the box in the label the CSS sizes
+  const txSrc = fs.readFileSync(path.join(ROOT, 'src/views/transactions.js'), 'utf8');
+  const cell = /function excludedCell\(item, mark\) \{[\s\S]*?\n  \}\n/.exec(txSrc);
+  ok(cell && /el\('label', \{ class: 'tbl-tick' \}, el\('input', \{ type: 'checkbox'/.test(cell[0]),
+    "views/transactions.js excludedCell wraps the non-parent checkbox in <label class='tbl-tick'>");
+  ok(cell && /'aria-label': i18n\.t\('tx\.aria\.exclude'/.test(cell[0]) && /onchange: e => \{ r\.excluded = e\.target\.checked; mark\(\); \}/.test(cell[0]),
+    'and keeps the input\'s own aria-label and change handler exactly');
+  // desktop: the label is display:contents (no box), asserted for the whole table family in phone-tables-css
+  ok(rules.some(r => r.context.length === 0 && r.selectors.includes(`${R} .tbl-tick`) && r.decls.some(d => d.prop === 'display' && d.value === 'contents')),
+    'on a desktop the .tbl-tick label adds no box (display: contents)');
+}
+
 /* ---- 6. ITEM 5: FIELDS DO NOT ZOOM THE PAGE ---------------------------------- */
 const COARSE = ['@media (pointer: coarse)'];
 for (const sel of ['.form-control', '.form-select', '.category-select', '.acct-search input', '.src-name-input', 'textarea']) {

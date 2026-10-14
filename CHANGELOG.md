@@ -3,6 +3,33 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.52.0 — 2026-10-14
+
+Budget Vault is now comfortable on a small phone (an iPhone 6s, 7, 8 or SE —
+375 points wide), in portrait and landscape. Desktop looks exactly as before,
+and no figure changed value.
+
+### Fixed
+
+- **Transactions.** Each transaction card is back to its intended height (it
+  had been drawn twice as tall), the filters sit two to a row and the action
+  buttons are one row you can swipe, so the first transaction is on the first
+  screen. The "Excl. budget" tick is a normal size with a large tap area.
+- **Tables that scrolled sideways.** Debts, Money owed, Assets, Services, Tax
+  and Import now show one card per row on a phone, with each field labelled,
+  instead of a desktop table several screens wide. Tax steps are compact
+  two-line cards.
+- **Readable text.** Nothing on a phone is set smaller than 12px, and chart
+  labels (spending trend, debt payoff, savings growth, net worth) are readable
+  instead of about 4px tall, in landscape too.
+- **Easier to tap.** Buttons and controls, the top bar included, have at least
+  a 44px target, and text fields use 16px type so the iPhone no longer zooms
+  in when you tap one.
+- **Smaller fixes.** Blocks no longer touch the screen edges, the Dashboard's
+  Budget vs actual table fits the screen, page titles no longer get cut off,
+  the closed menu no longer shades the left edge, the Budget totals sit in two
+  columns, and a few low-contrast labels are darker.
+
 ## 1.51.0 — 2026-10-12
 
 A louder, clearer type system. The layout, cards, colours and menu are exactly

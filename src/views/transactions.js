@@ -716,8 +716,16 @@ module.exports = function registerTransactions(ctx) {
   function excludedCell(item, mark) {
     const r = item._row;
     if (splitRole(r.split) !== SPLIT_PARENT) {
-      return el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
-        ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } });
+      /* In a .tbl-tick <label>, like Services' Active and Import's tick: on a
+         phone the bare checkbox was drawn as a 44px empty box (portrait) or a
+         32px one (landscape) because the page raises every checkbox to the tap
+         size, and a checkbox has no ::after to borrow a hit area from. The
+         label carries the 44px target and the box inside is drawn at 24px
+         (phone.css, #txTable .tbl-tick). On a desktop the label is
+         display:contents and adds no box. The aria-label and the handler are
+         the input's own, as they were. */
+      return el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
+        ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } }));
     }
     const parts = splitPartsOf(item._file, r);
     const gap = splitShortfall(r, parts);
