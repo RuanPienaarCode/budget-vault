@@ -218,6 +218,34 @@
 /* The empty state and the "Show more" row keep their own calm. */
 .budget-app-root #view-transactions .table tbody td[colspan] { font-size: var(--st-label); }
 
+/* THE TABLE FITS THE CARD (left over from the 14 Oct 2026 audit's L6-01 pass,
+   measured 15 Oct 2026 in the preview harness over the synthetic household's
+   whole history). It was 1076px in an 887px scroller at a 1024px window, the
+   row's Split and Delete buttons past the card edge, and 1076 in 1078 at 1280,
+   two pixels from scrolling. Nothing in it could give: 16px padding on eight
+   columns, an Account cell and a category button that never wrap (so the
+   longest account name and "Debt Repayments" each fixed a column, the button
+   inside a 130px floor), a 107px column held by the "Excl. budget" heading for
+   a 20px checkbox, and a Note input with an inline width:130px. Each now gives
+   what it can, wrapping before narrowing: the names and the heading wrap at
+   their spaces, the padding goes to 10px, and a max-width lowers the note's
+   inline width (a max-width beats a width) to a field that still holds a few
+   words. The table's narrowest is now 852px, so it fits the card from a ~990px
+   window and the columns share the room above that. Named by id, and so inside
+   this media query (lane-m-mobile-reach); scoped to a body that is not a phone,
+   because a landscape iPhone (601-932px, .is-phone) stacks these rows into
+   cards (phone.css) whose cells must not inherit a table's padding. */
+@media (min-width: 601px) {
+  body:not(.is-phone) .budget-app-root #txTable th,
+  body:not(.is-phone) .budget-app-root #txTable td { padding-inline: 10px; }
+  body:not(.is-phone) .budget-app-root #txTable tbody td:nth-child(3),
+  body:not(.is-phone) .budget-app-root #txTable tbody td:nth-child(4) { white-space: normal; }
+  body:not(.is-phone) .budget-app-root #txTable .cat-cell { min-width: 0; }
+  body:not(.is-phone) .budget-app-root #txTable .cat-cell-btn { white-space: normal; }
+  body:not(.is-phone) .budget-app-root #txTable thead th:nth-child(6) { white-space: normal; }
+  body:not(.is-phone) .budget-app-root #txTable td:nth-child(7) input { max-width: 7rem; }
+}
+
 /* ------------------------------------------------------------
    3. A visible edge on fields and buttons
    The mockup draws inputs and buttons with a firmer edge than the card's

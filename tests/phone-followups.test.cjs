@@ -120,8 +120,13 @@ const within = (n, tag) => descend(n).filter(e => e.tagName === tag);
   const desktop = draw('desktop'), landscape = draw('landscape'), portrait = draw('portrait');
   ok(desktop['worth-svg'] && desktop['growth-svg'], 'the household draws both Savings charts');
   eq([desktop['worth-svg'].h, desktop['growth-svg'].h], [118, 250], 'a desktop draws the original geometry (118 / 250 units tall)');
-  ok(desktop['growth-svg'].texts.includes('Growth with') && desktop['growth-svg'].texts.includes('no date'),
-    'and still prints the in-chart "Growth with no date" note (the household has undated growth, so the control is real)');
+  /* Until 15 Oct 2026 the desktop still printed the in-chart "Growth with" /
+     "no date" note here, and its first line was cut off by the chart's own
+     clip; it now leaves the note to the legend as the phone does
+     (savings-growth-label-clipped.test.cjs, which also holds that the
+     household's undated block is drawn, so this is not passing vacuously). */
+  ok(!desktop['growth-svg'].texts.includes('Growth with') && !desktop['growth-svg'].texts.includes('no date'),
+    'and, like the phone, leaves the "Growth with no date" note to the legend');
   eq([landscape['worth-svg'].h, landscape['growth-svg'].h], [134, 266], 'a landscape phone (.is-phone, wider than 600px) gets the roomier geometry');
   ok(!landscape['growth-svg'].texts.includes('Growth with') && !landscape['growth-svg'].texts.includes('no date'),
     'and drops the in-chart note, which does not fit a 78-unit column at 20 units (the legend below says the same thing)');

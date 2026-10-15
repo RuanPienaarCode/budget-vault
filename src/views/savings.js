@@ -1078,10 +1078,12 @@ module.exports = function registerSavings(ctx) {
 
     /* On a phone this chart's text is lifted (32 units upright, 20 on its
        side; chart.js, phoneLayout), so the strip under the plot grows from 28
-       to 44 for the two month labels, and the in-chart "Growth with no date"
-       note is left to the legend below: it sat in a 78-unit column in 9.5-unit
-       type, and no 20- or 32-unit wording fits that (a 20-unit "Growth with"
-       is ~127 units and ran past the chart's right edge). */
+       to 44 for the two month labels. The in-chart "Growth with no date" note
+       was left to the legend below here first: it sat in a 78-unit column in
+       9.5-unit type, and no 20- or 32-unit wording fits that (a 20-unit
+       "Growth with" is ~127 units and ran past the chart's right edge). Since
+       15 Oct 2026 a desktop leaves it to the legend too (see the undated
+       block below). */
     const phone = phoneLayout();
     const W = 1000, H = phone ? 266 : 250, padL = 8, padR = 8, padT = 22, padB = phone ? 44 : 28;
     const innerW = W - padL - padR, innerH = H - padT - padB;
@@ -1173,28 +1175,17 @@ module.exports = function registerSavings(ctx) {
       }, band);
       tip(add, node, `${money(undated)} of growth that no transaction dated — `
         + 'it is inside the balances you typed, so it can be totalled but not placed in time');
-      /* Was a bare "undated" here — its only explanation lived in the <title>
-         above, which touch-and-hold reaches and a screen reader never does
-         (createChart marks the svg role="img", which collapses every child
-         including this text) and a desktop pointer never sees either (the
-         HTML tooltip takes over hover, dropping the native title). The
-         legend right beside this chart already says it correctly — "Growth
-         with no date" — so this now says the same thing rather than a
-         second, cryptic phrase for the same block. Two lines, and a smaller
-         size, because the full phrase does not fit one line over a 78-unit
-         column without running past the chart's right edge: the 1.08
-         headroom factor in `span` above reserves enough vertical room for
-         the second line, on every series, not just this one. */
-      const labelX = x0 + blockW / 2;
-      const labelY = Math.min(yTop, yBot) - 7;
-      const labelAttrs = {
-        x: labelX, 'text-anchor': 'middle', 'font-size': '9.5', 'font-weight': '600',
-        fill: 'currentColor', 'fill-opacity': '0.6', 'font-family': 'inherit',
-      };
-      if (!phone) {
-        add('text', { ...labelAttrs, y: labelY - 10 }, band).textContent = 'Growth with';
-        add('text', { ...labelAttrs, y: labelY }, band).textContent = 'no date';
-      }
+      /* No caption over the block, on any screen. A desktop used to write
+         "Growth with" / "no date" above it in two 9.5-unit lines, the first 17
+         units over the block's top. When the undated growth is what the
+         balance closes on, that top is the series top, ~15 units under padT
+         (the 1.08 headroom in `span`), so the first line landed above the
+         plot, inside the band the worth-wipe clip discards: "Growth with" was
+         cut off and "no date" stood alone. The phone has never drawn either
+         line (see `phone` above), and the legend under the chart names the
+         block in full ("Growth with no date") with its swatch and figure, as
+         the tooltip above does on hover — so the block needs no caption of
+         its own. tests/savings-growth-label-clipped.test.cjs. */
     }
 
     // First and last month, at the two ends. Nothing between them: the shape is
