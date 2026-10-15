@@ -1,7 +1,7 @@
 'use strict';
 /* Dashboard — hero card, spending-trend SVG, category split, budget-vs-actual. */
 
-const { el, icoEl } = require('../dom');
+const { el, icoEl, longFig } = require('../dom');
 const { safeSeg } = require('../vault-path');
 const { typeOrder, typeRank } = require('../groups');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
@@ -10,10 +10,10 @@ const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso, isRealIsoDate } = require('../dates');
-const { balanceReadable } = require('../figures');
+const { balanceReadable, printedRemainder } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
-const { currenciesIn, symbolOf, isForeign, splitByCurrency } = require('../currency');
+const { currenciesIn, symbolOf, isForeign, splitByCurrency, formatSigned } = require('../currency');
 const {
   themeColors, createChart, scales, gridlines, axisLabels, phoneWidth,
   linePath, areaPath, areaGradient, arcPath, tip, trackPoints, distinctColors,
@@ -63,11 +63,9 @@ module.exports = function registerDashboard(ctx) {
     });
     return out;
   };
-  /* A figure with seven or more digits does not fit the statement size in its
-     column; it steps down a size (see .is-long in statement/dashboard.css)
-     rather than overflowing the card. Counts digits, so the symbol, the
-     grouping and the decimal comma do not move the threshold. */
-  const longFig = text => ((String(text).match(/\d/g) || []).length >= 7 ? ' is-long' : '');
+  /* longFig — the statement-size step-down for a figure of seven or more
+     digits (see .is-long in statement/dashboard.css) — is dom.js's now, shared
+     with the Budget page's totals; it was a copy of that one. */
 
   /* ------------------------------ card guards ---------------------------
      Each card draws behind its own try/catch. Before this the four sections
@@ -557,8 +555,22 @@ module.exports = function registerDashboard(ctx) {
     const asOfToday = todayIso();
     const entryOf = new Map(S.accounts.map((a, i) => [a, accounts[i]]));
     const accountOfRow = new Map();
+    /* One account lookup per DISTINCT folder label, per render (audit L8-04).
+       Both loops here walked every transaction FILE - one per account per month
+       - and called accountForLabel on each, whose safeSeg() runs on the label and
+       on up to two names per account; the same label resolved the same way
+       dozens of times. period.js's folded-key labelLookup() is the once-per-call
+       answer the other readers use, but it is not on ctx; this memoises
+       accountForLabel itself, so it IS the rule (ISSUE 61's lookup is
+       "exactly equivalent" to it) and cannot drift from it. Built per render and
+       never kept: accounts.js pushes into the SAME S.accounts array. */
+    const ownerCache = new Map();
+    const ownerOf = label => {
+      if (!ownerCache.has(label)) ownerCache.set(label, accountForLabel(label));
+      return ownerCache.get(label);
+    };
     for (const f of Object.values(S.txFiles)) {
-      const entry = entryOf.get(accountForLabel(f.label));
+      const entry = entryOf.get(ownerOf(f.label));
       if (!entry) continue;
       for (const r of f.rows) {
         accountOfRow.set(r, entry);
@@ -634,7 +646,7 @@ module.exports = function registerDashboard(ctx) {
       .map(s => s.row._row));
     /* And a third, for the settle-monthly cards only: their spending this cycle
        is what gets measured against the income that clears it. Each folder is
-       resolved to its account through accountForLabel — the SAME three-way
+       resolved to its account through accountForLabel (memoised as ownerOf above) — the SAME three-way
        rule (tx_label, name, safeSeg(name)) accountIndex and reconcile use.
        A raw `tx_label || name` comparison here missed any card whose name
        carries a filesystem-illegal character ("Visa/Gold" → folder
@@ -661,7 +673,7 @@ module.exports = function registerDashboard(ctx) {
     /* The partition only sorts lens-approved rows into their currency; which
        rows are approved is decided once, above, by the ledger. */
     for (const f of Object.values(S.txFiles)) {
-      const owner = accountForLabel(f.label);
+      const owner = ownerOf(f.label);
       const isCardFolder = owner ? cardAccounts.has(owner) : false;
       const g = txGroup(symbolOf(owner, home));
       for (const r of f.rows) {
@@ -851,8 +863,12 @@ module.exports = function registerDashboard(ctx) {
     /* ISSUE 45. Same set, same reason. `count` is passed as well as `amount`
        because i18n.t() selects the plural form off `count` alone. */
     if (L.confirmDay.count) {
+      /* The rows' NET is a signed part of the cash chain, so it takes the one
+         signed form ("−R 12 000", currency.js formatSigned), not formatAmount's
+         balance form ("R -12 000") that sat beside the donut's "−R 2 300" on
+         this very screen (2026-10-14 audit, L2a-N09). */
       cashParts.push(i18n.t('dash.left.confirmDay', {
-        count: L.confirmDay.count, amount: money(L.confirmDay.net, 0),
+        count: L.confirmDay.count, amount: formatSigned(S.settings.currency, L.confirmDay.net, 0, locale()),
       }));
     }
     /* NO "adds more than one currency" caveat on this figure, deliberately.
@@ -1020,7 +1036,7 @@ module.exports = function registerDashboard(ctx) {
         g.L.confirmDay.count
           ? i18n.t('dash.left.confirmDay', {
             count: g.L.confirmDay.count,
-            amount: ctx.moneyIn(g.sym, g.L.confirmDay.net, 0),
+            amount: formatSigned(g.sym, g.L.confirmDay.net, 0, locale()),
           }) : null,
         g.L.unreadableAccounts.length
           ? i18n.t('acct.hero.unreadable', { count: g.L.unreadableAccounts.length }) : null,
@@ -1645,7 +1661,16 @@ module.exports = function registerDashboard(ctx) {
        What IS known — what has been spent so far — is still shown. */
     const noBudget = !(S.budgets[S.period] || []).length;
     const available = bud.spend - spent;
-    const heroNegative = !noBudget && available < 0;
+    /* Over or under is decided in whole cents, not on the raw float: the sums of
+       signed amounts leave dust (-1e-12) that is neither over nor under, and
+       the hero must not announce "Over" for it. */
+    const heroNegative = !noBudget && Math.round(available * 100) < 0;
+    /* The big number is the difference of the two figures the sub-line prints
+       beside it, so the card adds up (2026-10-14 audit, L2a-N07). Rounding the
+       true remainder on its own printed 600 under "R 401 spent of R 1 000"
+       when the spend was R400,50; and a spend R0,30 over printed "0" under an
+       "Over the spending budget" label. See figures.js printedRemainder. */
+    const remainder = printedRemainder(bud.spend, spent);
     const meterMax = Math.max(spent, bud.spend, 1);
     const fillPct = Math.min(100, (spent / meterMax) * 100).toFixed(2);
     const markPct = bud.spend > 0 ? ((bud.spend / meterMax) * 100).toFixed(2) : null;
@@ -1744,7 +1769,7 @@ module.exports = function registerDashboard(ctx) {
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
     /* With no plan the big number is what was spent, not a remainder of it. */
-    const heroText = money(noBudget ? spent : Math.abs(available), 0);
+    const heroText = noBudget ? money(spent, 0) : money(Math.abs(remainder.value), remainder.decimals);
     const heroNum = el('div', { class: `hero-num${heroNegative ? ' hero-num--negative' : ''}${longFig(heroText)}` },
       el('small', {}, cur), heroText.slice(cur.length + 1));
     const meter = el('div', { class: `hero-meter${heroNegative ? ' over' : ''}` },
@@ -2463,14 +2488,26 @@ module.exports = function registerDashboard(ctx) {
       return { baseText: '—', text: i18n.t('dash.split.new'), cls: 'is-new' };
     }
     const avg = (base.totals[cat] || 0) / base.counted;
-    /* Both sides are the PRINTED whole-unit figures: `now` is the Spent
-       column's own value (already allocated by largest remainder, so it can
-       differ from a plain rounding of the raw amount by one unit) and the
-       baseline is rounded the way baseText prints it. Rounding after
-       instead is what let a row read one figure against another and call the
-       difference R1 more than it was; and
-       rounding the raw amount independently of the allocation is what let one
-       read R3 775 against R2 513 and call it +R1 261. */
+    /* `now` is the category's own UNROUNDED amount (2026-10-14 audit, L2a-N08),
+       and each side is rounded the way it prints, THEN subtracted: R 915 against
+       R 636 reads +R 279, not the +R 278 that subtracting first would give
+       beside two figures plainly 279 apart.
+
+       What is NOT an input is the Spent column's printed value. That column is
+       allocated by largest remainder so it sums to the centre total, which can
+       lift a row by a whole unit it never earned. A category that cost the same amount to
+       the cent in each of the four periods printed a Spent one unit above its
+       baseline and a Change of +R 1 — a movement that did not happen, in the one
+       column whose job is to say whether spending moved. Allocation is for
+       making a column add up; it is not evidence about a category.
+
+       This replaces the 2026-09-29 rule (the change is the difference of the
+       two PRINTED figures), written against the opposite symptom: R3 775 beside
+       R2 513 with a Change of +R1 261. Both cannot hold once allocation has
+       lifted a row. The change is now always the rounded true movement; on a
+       row the allocation lifted, the printed Spent is one unit above it, and
+       that is the lesser lie — a rounding difference between whole-unit
+       figures, not a change reported where there was none. */
     const r = v => Number(v.toFixed(0));
     const diff = r(now) - r(avg);
     /* DEADBAND, both ways. A move earns a colour only when it is worth noticing
@@ -2480,6 +2517,9 @@ module.exports = function registerDashboard(ctx) {
     const cls = Math.abs(diff) < base.floor || Math.abs(diff) < r(avg) * 0.03
       ? 'is-flat'
       : (diff > 0 ? 'is-up' : 'is-down');
+    /* The explicit-direction form: a plus or a typographic minus BEFORE the
+       symbol - the form currency.js formatSigned gives every signed part of a sum
+       (L2a-N09); this column is where it started. */
     const text = diff === 0
       ? money(0, 0)
       : `${diff > 0 ? '+' : '−'}${money(Math.abs(diff), 0)}`;
@@ -2594,7 +2634,7 @@ module.exports = function registerDashboard(ctx) {
 
     if (rest.length) {
       shown.push({
-        cat: `Other (${rest.length})`,
+        cat: i18n.t('dash.split.otherSlice', { count: rest.length }),
         amount: rest.reduce((t, x) => t + x.amount, 0),
         color: otherColor,
         other: true,
@@ -2664,13 +2704,11 @@ module.exports = function registerDashboard(ctx) {
        reassuring, wrong, and wrong in the direction that stops people looking. */
     const base = compareBaseline();
 
-    /* The figure the Change column reads for THIS period is the figure the
-       Spent column PRINTS (`rowMoney[i]` below), not the raw amount behind it.
-       The Spent column is allocated by largest remainder so it sums to the
-       centre total; the change used to be r(raw) − r(average), so a row could
-       print R3 775 beside a baseline of R2 513 and a Change of +R1 261. The
-       column's own promise (compareCell) is that the change is the difference
-       of the two figures printed beside it.
+    /* The figure the Change column reads for THIS period is the category's own
+       unrounded amount, NOT the Spent column's allocated value (`rowMoney[i]`
+       below): the allocation exists so the column sums to the centre total, and
+       a unit it moves a row by is not a change in that category's spending. See
+       compareCell for the 2026-10-14 reversal of the earlier rule.
 
        The window needs nothing extra: `spend` comes from periodSummary, which
        closes at today for the running period (ISSUE 35), and the baseline caps
@@ -2694,7 +2732,7 @@ module.exports = function registerDashboard(ctx) {
          each time. A change figure there would be arithmetic without meaning —
          the same reason the row has no drill-through. */
       const cmp = base && !x.other
-        ? compareCell(x.cat, rowMoney[i], base)
+        ? compareCell(x.cat, x.amount, base)
         : null;
       const face = () => [
         el('i', { style: `background:${x.color}` }),
@@ -2720,7 +2758,7 @@ module.exports = function registerDashboard(ctx) {
         el('button', {
           type: 'button', class: 'dl-note',
           'aria-label': i18n.t('dash.split.noteAria', { cat: x.cat }),
-          title: 'Open category note',
+          title: i18n.t('dash.split.noteAria', { cat: x.cat }),
           onclick: () => openCategoryFile(x.cat),
           /* An ARRAY, not the 'a|b' string the shell's data-ico attributes
              use — icoEl walks a list, and only controller.js splits on the
@@ -2864,6 +2902,16 @@ function heroQualifiers(F, money) {
   }
   const netted = (F && F.gap && F.gap.netted) || 0;
   if (netted >= 1) add('netted', 'spent', i18n.t('dash.hero.nettedOff', { amount: money(netted, 0) }), { amount: netted });
+  /* An amount typed into a budget row or a transaction that the loader could
+     not read counts as 0 in every figure above (2026-10-14 audit, L8-02). The
+     hero is the most-read card in the app and the plan's remaining figure falls
+     by exactly the unreadable amount, so the sentence is here and not only
+     beside the row. `count` selects the plural form. */
+  const unreadable = (F && F.unreadable) || {};
+  if (unreadable.count > 0) {
+    add('unreadable', 'spent', i18n.t('dash.hero.unreadable', { count: unreadable.count }),
+      { count: unreadable.count, budget: unreadable.budget || 0, tx: unreadable.tx || 0 });
+  }
   const sched = sum.scheduled || { income: 0, spend: 0 };
   const ahead = (sched.income || 0) + (sched.spend || 0);
   if (ahead > 0) add('scheduledAhead', 'scheduled', i18n.t('dash.scheduledAhead', { amount: money(ahead, 0) }), { amount: ahead });

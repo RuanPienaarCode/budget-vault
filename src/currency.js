@@ -216,4 +216,62 @@ function formatAmount(symbol, v, decimals, loc) {
   return `${symbol} ${sign}${parts[0]}${decimals > 0 ? loc.decimal + parts[1] : ''}`;
 }
 
-module.exports = { symbolOf, isForeign, currenciesIn, splitByCurrency, primaryTotal, formatAmount };
+/* A signed part of a sum, in the one form this app prints it: a minus sign
+   (U+2212) BEFORE the symbol, "−R 900", as the Dashboard's own changes and
+   differences already do. formatAmount's "R -900" is the form for a BALANCE
+   and stays that; the Score printed its signed parts in that form beside a
+   Dashboard printing "−R 2 300", and the same page read "R -900" in one row
+   and a plain "R 900" in the sentence over it (audit L2a-N09). The sign is
+   decided from the ROUNDED magnitude, as in formatAmount: a part that rounds to
+   nothing carries no minus.
+
+   The digits come through module.exports.formatAmount, not the local binding, so
+   anything that wraps the exported function (tests/helpers/figures.cjs records
+   every formatted amount that way, which is how the numbers ledger knows a
+   figure is money and what its raw value was) sees these amounts too. */
+function formatSigned(symbol, v, decimals, loc) {
+  const x = Number.isFinite(v) ? v : 0;
+  const body = module.exports.formatAmount(symbol, Math.abs(x), decimals, loc);
+  return (x < 0 && Number(fixedNoExponent(Math.abs(x), decimals)) !== 0 ? '\u2212' : '') + body;
+}
+
+/* "Held in other currencies" has two honest readings of the same account: the
+   balance the reader TYPED (stated) and that balance rolled forward through the
+   transactions since (implied). Which one a page prints beside its headline is
+   decided by the headline (Accounts prints stated; Savings and the Score print
+   implied, to agree with the Dashboard), but the sentence used to carry the
+   amount with no basis, so the same USD account read 0 on one page and 460 on
+   the next (audit L8-05). This is the ONE place that picks the amount, and it
+   hands back the basis and the other reading so the page can name it when the
+   two differ.
+
+   `stated` and `implied` are [symbol, total] lists in the shape
+   splitByCurrency().others has; `fold` (optional) maps either list to what the
+   page prints (the Score and Savings fold in assets and debts through
+   worth.js's otherCurrencyNet, which this module cannot import). Returns
+     shown     [symbol, total] pairs the page prints, on `basis`
+     other     the same pairs on the other basis
+     basis     'stated' | 'implied'
+     otherBasis
+     differs   the two readings disagree at the cent for some symbol
+   Nothing is converted. */
+function otherHoldings(stated, implied, basis, fold) {
+  const f = fold || (x => x);
+  const useStated = basis === 'stated';
+  const shown = f(useStated ? stated : implied) || [];
+  const elsewhere = f(useStated ? implied : stated) || [];
+  const cents = list => new Map((list || []).map(([sym, v]) => [sym, Math.round((Number(v) || 0) * 100)]));
+  const a = cents(shown), b = cents(elsewhere);
+  let differs = false;
+  for (const sym of new Set([...a.keys(), ...b.keys()])) {
+    if ((a.get(sym) || 0) !== (b.get(sym) || 0)) { differs = true; break; }
+  }
+  /* The other reading, listed over the symbols the page prints (a symbol the
+     other basis nets to nothing is a real 0 there, and "$ 0" is the answer,
+     not a missing entry) and then any symbol only that reading holds. */
+  const syms = [...shown.map(([sym]) => sym), ...elsewhere.map(([sym]) => sym).filter(sym => !a.has(sym))];
+  const other = syms.map(sym => [sym, (b.get(sym) || 0) / 100]);
+  return { shown, other, basis: useStated ? 'stated' : 'implied', otherBasis: useStated ? 'implied' : 'stated', differs };
+}
+
+module.exports = { symbolOf, isForeign, currenciesIn, splitByCurrency, primaryTotal, formatAmount, formatSigned, otherHoldings };

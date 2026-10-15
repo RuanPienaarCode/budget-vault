@@ -135,6 +135,14 @@ function unescMd(s) {
    never does). Scanned a character at a time rather than chained .replace()
    calls, so no escape this adds is ever seen by a later pass. */
 const MD_TEXT_ACTIVE = new Set(['\\', '`', '*', '_', '[', ']', '!', '<', '>', '#', '%', '$']);
+/* 2026-10-14 audit, L4a-10. C0 control characters other than tab, LF and CR
+   are dropped, the same set csv.js strips from the CSV exports (its CONTROLS).
+   A NUL in a bank description reached the Markdown exports as a literal NUL
+   byte — Obsidian renders it as nothing and a diff tool treats the note as
+   binary — while the CSV, XLSX and PDF writers had each already dropped it.
+   Tab is real text; LF and CR are handled as line breaks just below. Scanned
+   here, with the rest of the pass, rather than as a .replace() beforehand, so
+   the one-pass property in the header holds. */
 function escMdText(s) {
   const str = (s ?? '').toString();
   let out = '';
@@ -142,6 +150,7 @@ function escMdText(s) {
     const ch = str[i];
     if (ch === '\r') { if (str[i + 1] === '\n') i++; out += '<br>'; continue; }
     if (ch === '\n') { out += '<br>'; continue; }
+    if (ch < ' ' && ch !== '\t') continue;
     if (ch === '|') { out += '&#124;'; continue; }
     out += MD_TEXT_ACTIVE.has(ch) ? `\\${ch}` : ch;
   }
@@ -171,11 +180,38 @@ function parseFrontmatter(text) {
   const t = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   const m = t.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   const fm = {};
-  if (m) for (const line of m[1].split(/\r?\n/)) {
+  const fmLines = m ? m[1].split(/\r?\n/) : [];
+  for (let li = 0; li < fmLines.length; li++) {
+    const line = fmLines[li];
     const i = line.indexOf(':');
     if (i > 0) {
       const key = line.slice(0, i).trim();
       let val = line.slice(i + 1).trim();
+      /* 2026-10-14 audit, L3-09. A YAML BLOCK list — the shape Obsidian's own
+         Properties panel writes for any list property (`ignore_warnings:`,
+         `owners:`, `groups:`, `tags:`) — was read as an empty value, because
+         only the `key: value` line was looked at: the `  - item` lines under
+         it were each skipped as a line with no colon. Mutes on an account
+         stopped applying, a household's owners and groups vanished from
+         Settings.md, and the Ignore button then wrote ONE word over the whole
+         block. A key with nothing after the colon and `- item` lines under it
+         now reads as the bracketed list the one-line form gives, so every
+         existing list reader (acct-status, owners, groups) takes it as it
+         takes `[a, b]`. Items keep any quotes they were written with. */
+      if (val === '' && /^\S/.test(line)) {
+        const items = [];
+        let last = li;
+        for (let k = li + 1; k < fmLines.length; k++) {
+          const it = /^\s*-\s+(\S.*)$/.exec(fmLines[k]);
+          if (it) { items.push(it[1].trim()); last = k; continue; }
+          if (/^\s*(?:#.*)?$/.test(fmLines[k])) continue;   // blank or comment line inside the list
+          break;
+        }
+        if (items.length) {
+          val = `[${items.join(', ')}]`;
+          li = last;      // the items are this key's value, not keys of their own (`- note: x`)
+        }
+      }
       if (/^".*"$/.test(val)) val = unquoteYaml(val);
       /* A single-quoted value has one escape, `''` for a quote, and was never
          unquoted at all: `institution: 'Bob''s Bank'` — how YAML quotes a
@@ -232,7 +268,49 @@ function splitBarePipes(s) {
   cells.push(cur);
   return cells;
 }
-function parseMdTable(text) {
+/* 2026-10-14 audit, L3-10. WHICH table in a body is the plugin's?
+
+   Every reader here took the FIRST table in the text, so a small table a
+   household put above the plugin's — an insurer and a policy number over
+   Assets.md — was read as the Assets table: the real rows stopped counting,
+   and the next Save rewrote the household's table under the plugin's header.
+   The plugin's table is the one whose header row starts with the schema's own
+   first header ("Item", "Category", "Date", …), compared trimmed and
+   case-folded; `first` may be one such word or a list of them (the Tax
+   Figures table's first header follows the household's country).
+
+   When NO table starts with it — a header a household renamed or translated —
+   the first table is the plugin's, exactly as before this existed, so a file
+   that loaded yesterday still loads. With `first` left out nothing changes at
+   all. A table here is a run of consecutive lines that start with `|`; whatever
+   sits above the chosen one is the caller's lead, whatever sits below its
+   trail, so nothing is dropped either way. */
+function findTable(lines, first) {
+  const want = first == null ? null : [].concat(first).map(f => String(f).trim().toLowerCase());
+  let firstRun = null;
+  for (let i = 0; i < lines.length;) {
+    if (!lines[i].trim().startsWith('|')) { i++; continue; }
+    let j = i;
+    while (j < lines.length && lines[j].trim().startsWith('|')) j++;
+    if (!firstRun) firstRun = { start: i, end: j };
+    if (!want) return firstRun;
+    let inner = lines[i].trim().slice(1);
+    if (endsWithBarePipe(inner)) inner = inner.slice(0, -1);
+    if (want.includes(splitBarePipes(inner)[0].trim().toLowerCase())) return { start: i, end: j };
+    i = j;
+  }
+  return firstRun;
+}
+/* The text of just the chosen table, so the original first-table readers below
+   run unchanged over it. */
+function onlyTable(text, first) {
+  if (first == null) return text;
+  const lines = text.split(/\r?\n/);
+  const run = findTable(lines, first);
+  return run ? lines.slice(run.start, run.end).join('\n') : '';
+}
+function parseMdTable(text, first) {
+  text = onlyTable(text, first);
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
@@ -268,6 +346,12 @@ function parseMdTable(text) {
    that the in-memory model doesn't carry. */
 function patchFrontmatter(raw, updates) {
   const has = k => Object.prototype.hasOwnProperty.call(updates, k);
+  /* The block's own line ending (2026-10-14 audit, L3-11). It was always split
+     on \r?\n and joined with '\n', so patching a CRLF block handed back LF
+     lines under a body that kept CRLF. A block that arrives with CRLF now
+     leaves with CRLF — added keys included — and an LF block, which is every
+     file this app writes, joins exactly as before. */
+  const eol = typeof raw === 'string' && raw.includes('\r\n') ? '\r\n' : '\n';
   if (!raw || !raw.trim()) {
     return Object.keys(updates).filter(k => updates[k] != null).map(k => `${k}: ${updates[k]}`).join('\n');
   }
@@ -313,7 +397,12 @@ function patchFrontmatter(raw, updates) {
   for (const line of raw.split(/\r?\n/)) {
     if (isTopKey(line)) {
       const c = line.indexOf(':');
-      cur = { key: line.slice(0, c).trim(), blockScalar: BLOCK_SCALAR.test(line.slice(c + 1).trim()) };
+      const after = line.slice(c + 1).trim();
+      cur = { key: line.slice(0, c).trim(), blockScalar: BLOCK_SCALAR.test(after),
+        /* Can lines under it be a block LIST? Only when nothing follows the
+           colon (bar a comment). Anything else under a key with a value of its
+           own is a multi-line scalar or a nested map. */
+        listable: after === '' || after.startsWith('#'), opaque: false };
       open = { owner: cur, first: true, lines: [line] };
       segs.push(open);
     } else if (/^\s*#/.test(line) && !(cur && cur.blockScalar && /^\s/.test(line))) {
@@ -322,6 +411,17 @@ function patchFrontmatter(raw, updates) {
     } else if (cur) {
       if (!open) { open = { owner: cur, first: false, lines: [] }; segs.push(open); }
       open.lines.push(line);
+      /* 2026-10-14 audit, L3-09. Under a key the reader understands there are
+         three kinds of continuation: nothing, the `- item` lines of a block
+         list (parseFrontmatter reads those into the key's value, so a writer
+         that merges into that value has the whole list), and a block scalar's
+         text, which a caller replaces on purpose when it edits that key. Any
+         other non-blank line — a nested map's entries, the second line of a
+         plain scalar, list items under a key that already has a value — is
+         structure this module does not model and the reader never showed the
+         caller, so replacing the key would delete content nobody asked to
+         delete. Marked here, acted on below. */
+      if (line.trim() && !cur.blockScalar && (!cur.listable || !/^\s*-(?:\s|$)/.test(line))) cur.opaque = true;
     } else {
       segs.push({ owner: null, first: false, lines: [line] });
     }
@@ -331,9 +431,16 @@ function patchFrontmatter(raw, updates) {
   for (const s of segs) {
     const key = s.owner ? s.owner.key : null;
     if (key != null && has(key)) {
-      if (s.first) {
-        seen.add(key);
-        if (updates[key] != null) out.push(`${key}: ${updates[key]}`);  // replace (collapses block→scalar)
+      if (s.first) seen.add(key);
+      if (s.owner.opaque) {
+        /* A value with lines under it this module cannot read is left as the
+           household wrote it: the update is not applied, and not appended as a
+           second copy of the key either (`seen` above). The app argues, it
+           does not correct — a figure it could not read is never overwritten
+           by one it made up. */
+        out.push(...s.lines);
+      } else if (s.first) {
+        if (updates[key] != null) out.push(`${key}: ${updates[key]}`);  // replace (collapses a block LIST to a scalar)
       }
       // else: the rest of a replaced or removed key's value goes with it
     } else {
@@ -343,7 +450,7 @@ function patchFrontmatter(raw, updates) {
   for (const k of Object.keys(updates)) {
     if (!seen.has(k) && updates[k] != null) out.push(`${k}: ${updates[k]}`);
   }
-  return out.join('\n');
+  return out.join(eol);
 }
 
 /* Quote a value for use as a YAML frontmatter scalar. Everything written into
@@ -471,7 +578,8 @@ const yamlStr = v => `"${String(v ?? '')
    already give, over the same fixtures parseMdTable's own tests use, so the
    two cannot disagree about where a table starts or stops without a test
    going red. */
-function parseMdTableWithSeparator(text) {
+function parseMdTableWithSeparator(text, first) {
+  text = onlyTable(text, first);
   const rows = [];
   let sep = null;
   for (const line of text.split(/\r?\n/)) {
@@ -507,16 +615,11 @@ function parseMdTableWithSeparator(text) {
    Used to preserve whatever the plugin does not model around a table it owns
    (a paragraph above it, a `## heading` a household added below it) — never
    to reparse the table itself. */
-function splitAroundTable(text) {
+function splitAroundTable(text, first) {
   const lines = text.split(/\r?\n/);
-  let start = -1, end = lines.length;
-  for (let i = 0; i < lines.length; i++) {
-    const t = lines[i].trim();
-    if (!t.startsWith('|')) { if (start >= 0) { end = i; break; } continue; }
-    if (start < 0) start = i;
-  }
-  if (start < 0) return { before: text, after: '' };
-  return { before: lines.slice(0, start).join('\n'), after: lines.slice(end).join('\n') };
+  const run = findTable(lines, first);
+  if (!run) return { before: text, after: '' };
+  return { before: lines.slice(0, run.start).join('\n'), after: lines.slice(run.end).join('\n') };
 }
 
 /* Issue #67 — the lines a fresh save of a single-table or lead-paragraph
@@ -557,15 +660,30 @@ const GENERATED_LEAD_SENTENCES = [
 ];
 const isBlankLine = l => !l.trim();
 const isTitleLine = l => /^#\s/.test(l);
+const titleText = l => l.replace(/^#\s+/, '').trim().toLowerCase();
+/* Is `line`, a `# heading`, the plugin's own title for the slot whose fresh
+   line is `fresh`? It is when it reads as the title the plugin writes NOW, or
+   as one of `ownTitles` — names the plugin wrote there before (a plan renamed
+   since it was loaded had its old name as its title).
+
+   2026-10-14 audit, L3-12. ANY level-1 heading in the slot used to count, so a
+   household's own title — "# Our house and cars" over Assets.md — was replaced
+   by the plugin's fixed one on the next Save of the page. Text a person typed
+   is theirs; only a title the plugin itself wrote is the plugin's to
+   regenerate. */
+function ownTitleLine(line, fresh, ownTitles) {
+  const t = titleText(line);
+  return t === titleText(fresh) || (ownTitles || []).some(o => titleText(`# ${o}`) === t);
+}
 /* Is `line` still the plugin's own line for the slot whose fresh line is
-   `fresh`? A blank where a blank goes; a `# heading` where the title goes (the
-   title is live state — a renamed plan's heading must follow the new name, so
-   any level-1 heading in that slot is the plugin's to rewrite); the sentence
-   itself; or the same generated sentence in another wording. */
-function ownLeadLine(line, fresh) {
+   `fresh`? A blank where a blank goes; the plugin's own `# heading` where the
+   title goes (the title is live state — a renamed plan's heading must follow
+   the new name, see ownTitleLine for which headings are the plugin's); the
+   sentence itself; or the same generated sentence in another wording. */
+function ownLeadLine(line, fresh, ownTitles) {
   if (line === fresh) return true;
   if (isBlankLine(fresh)) return isBlankLine(line);
-  if (isTitleLine(fresh)) return isTitleLine(line);
+  if (isTitleLine(fresh)) return isTitleLine(line) && ownTitleLine(line, fresh, ownTitles);
   return GENERATED_LEAD_SENTENCES.some(re => re.test(fresh) && re.test(line));
 }
 
@@ -587,7 +705,7 @@ function ownLeadLine(line, fresh) {
    so every capture off real text starts one line "early" compared to the
    literal array a writer builds by hand. Dropped here, once, rather than
    adjusted at every call site. */
-function withLeadExtra(capturedBefore, freshLines) {
+function withLeadExtra(capturedBefore, freshLines, ownTitles) {
   if (capturedBefore == null) return freshLines;
   const content = capturedBefore.split(/\r?\n/).slice(1);
   const n = freshLines.length;
@@ -609,8 +727,11 @@ function withLeadExtra(capturedBefore, freshLines) {
   if (content.length < n) {
     let titled = false;
     const plugins = l => {
-      if (isTitleLine(l)) { const first = !titled; titled = true; return first && freshLines.some(isTitleLine); }
-      return freshLines.some(f => !isTitleLine(f) && ownLeadLine(l, f));
+      if (isTitleLine(l)) {
+        const first = !titled; titled = true;
+        return first && freshLines.some(f => isTitleLine(f) && ownTitleLine(l, f, ownTitles));
+      }
+      return freshLines.some(f => !isTitleLine(f) && ownLeadLine(l, f, ownTitles));
     };
     if (content.every(plugins)) return freshLines;
   }
@@ -624,7 +745,7 @@ function withLeadExtra(capturedBefore, freshLines) {
      the plugin wrote is duplicated and nothing the household wrote is lost.
      The previous all-or-nothing alignment check is the special case where
      every slot matched. */
-  const head = content.slice(0, n).map((l, i) => (ownLeadLine(l, freshLines[i]) ? freshLines[i] : l));
+  const head = content.slice(0, n).map((l, i) => (ownLeadLine(l, freshLines[i], ownTitles) ? freshLines[i] : l));
   return [...head, ...content.slice(n)];
 }
 
@@ -643,24 +764,56 @@ function withLeadExtra(capturedBefore, freshLines) {
    above the first one — so a save can put each one back relative to the
    section it followed rather than at a fixed line number that shifts every
    time a row is added or removed. */
-function extraContent(body, knownNames) {
+/* The name of the `## ` section a chunk of extraContent's split opens with:
+   its heading line, trimmed and case-folded. load.js's section() reads the
+   same words, so the two cannot disagree about which section is which. */
+const headingOf = chunk => chunk.split(/\r?\n/, 1)[0].trim().toLowerCase();
+
+/* 2026-10-14 audit, L3-04 and L3-05.
+
+   L3-04 — a section is known only when its heading IS the section's name
+   (trimmed, case-folded). This matched on the heading STARTING with the name,
+   so a household's own `## Documents still to request` was taken for the real
+   `## Documents` — both here (its prose was thrown away as "the table's
+   own") and in load.js's section() (first prefix match wins, so the real
+   table was read from the wrong chunk, or not at all). Every other heading is
+   the household's: an extra, replayed whole in the place it was found. A
+   known heading that appears a SECOND time is an extra too — only the first
+   is ever read as the section, so the second would otherwise be dropped.
+
+   L3-05 — prose between a known heading and its table (`leads`, by section
+   name) is kept too. Only what came AFTER the table was ever captured, so a
+   paragraph typed under `## Money in` and above its table was deleted by the
+   next Save. `firstHeaders` maps a section name to the first header of its
+   table (markdown.js findTable) so a small table of the household's in the
+   same section is not mistaken for it. */
+function extraContent(body, knownNames, firstHeaders) {
   const chunks = body.split(/\r?\n##\s+/);
   const extras = [];
+  const leads = {};
+  const seen = new Set();
   let lastKnown = null;
   for (const raw of chunks.slice(1)) {
-    const name = knownNames.find(n => raw.trim().toLowerCase().startsWith(n));
-    if (name) {
+    const name = knownNames.find(n => headingOf(raw) === n);
+    if (name && !seen.has(name)) {
+      seen.add(name);
       lastKnown = name;
-      const extra = splitAroundTable(raw).after.trim();
+      const { before, after } = splitAroundTable(raw, (firstHeaders || {})[name]);
+      /* `before` opens with the heading line itself, then the blank line the
+         plugin writes under it; what a person typed is whatever else is there,
+         trimmed of the blank lines around it. */
+      const lead = before.split(/\r?\n/).slice(1).join('\n').replace(/^\s*\n|\s+$/g, '');
+      if (lead.trim()) leads[name] = lead;
+      const extra = after.trim();
       if (extra) extras.push({ after: name, raw: extra });
     } else {
       extras.push({ after: lastKnown, raw: ('## ' + raw).trim() });
     }
   }
-  return { lead: chunks[0], extras };
+  return { lead: chunks[0], extras, leads };
 }
 
 module.exports = {
   escMd, unescMd, escMdText, parseFrontmatter, parseMdTable, patchFrontmatter, yamlStr, unquoteYaml,
-  parseMdTableWithSeparator, splitAroundTable, freshLeadLines, withLeadExtra, extraContent,
+  parseMdTableWithSeparator, splitAroundTable, freshLeadLines, withLeadExtra, extraContent, headingOf, findTable,
 };

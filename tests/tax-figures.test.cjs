@@ -183,10 +183,13 @@ ok(overCgt.some(m => !m.ok), 'gains over the annual exclusion warn');
   ok(/40%/.test(textOf(za.figureChecks(fifty, 2027, filed))),
     'R50 000 is over even the 2027 limit and warns');
 
-  // Same shape for the capital-gains annual exclusion. Its 2027 value is NOT
-  // changed here — red team 1 could not reach a primary source for the reported
-  // rise to R50 000, and this audit does not code a figure it has not read.
-  // Year-keying it now means that correction is a one-line data edit later.
+  // Same shape for the capital-gains annual exclusion, year-keyed in facts.js.
+  // The 2027 row now carries R50 000 (2026-10-14 audit, L2b-04: SARS's CGT page,
+  // "Last Updated: 26/02/2026", read 15 Oct 2026); it was held at R40 000 until
+  // that primary source had been read. This assertion checks the 2026 year, so
+  // it still states R40 000 - the exclusion in force for the year it names -
+  // and the 2027 figure is pinned in tests/facts-cgt-annual-exclusion-2027.test.cjs,
+  // not here.
   ok(/40 000,00 annual exclusion/.test(
     textOf(za.figureChecks([{ code: '4250', description: '', source: '', amount: 60000 }], 2026, filed))),
   'the CGT exclusion is stated for the year it was checked against');

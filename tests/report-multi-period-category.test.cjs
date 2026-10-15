@@ -46,8 +46,15 @@ const near = (a, b, m) => ok(Math.abs(a - b) < 0.005, `${m} (got ${a}, want ${b}
 
 const AUG = `${B}/Transactions/Cheque/2026-08.md`;
 const SEP = `${B}/Transactions/Cheque/2026-09.md`;
+/* August gets the same budget September has. Budget vs Actual compares only the
+   periods that HAVE a budget (2026-10-14 audit, L2b-01 — tests/report-like-for-
+   like-periods.test.cjs), while Spend by Category covers every period; "one
+   category, one total" is therefore a promise about a selection whose periods
+   are ALL budgeted, and that is the selection this suite pins. Where a period
+   is left out the two tables differ by design, and the document says which. */
 const files = () => ({
   ...SEED,
+  [`${B}/Budgets/2026-08.md`]: SEED[`${B}/Budgets/2026-09.md`],
   [`${B}/Categories/Gifts.md`]: '---\ntype: expense\ncolor: "#aa66aa"\n---\n',
   [AUG]: SEED[AUG] + '| 2026-08-15 | Gift shop | Gifts | -1000.00 |  |  |  |\n',
   [SEP]: SEED[SEP] + '| 2026-09-01 | Gift shop refund | Gifts | 600.00 |  |  |  |\n',

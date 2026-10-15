@@ -348,8 +348,8 @@ const card = {
   eq(L.committed, 2610, 'only the bond is still coming — the fibre was due on the 2nd');
   eq(L.free, 9790, 'free is cash less what is committed');
   eq(L.short, false, 'not short');
-  eq(L.days, 12, '13 Aug to 25 Aug is 12 days');
-  eq(Math.round(L.perDay), 816, 'per-day divides what is free by the days left');
+  eq(L.days, 13, '13 Aug to 25 Aug is 13 days, today counted (2026-10-14 audit, L2a-N12)');
+  eq(Math.round(L.perDay), 753, 'per-day divides what is free by the days left');
   eq(L.counts, { service: 0, debt: 1, card: 0, notImported: 0 }, 'the counts describe what was actually counted');
   eq(L.items.length, 1, 'RULE 5: every counted charge is disclosed');
 }
@@ -417,13 +417,22 @@ const card = {
   eq(L.perDay, null, 'there is no daily allowance to quote when there is nothing free');
 }
 {
-  // The last day of a period: no division by zero, and no whole balance quoted
-  // as a daily rate.
+  // The last day of a period has ONE day left, today (L2a-N12), and the whole
+  // balance is that day's allowance. A period already over has none, and no
+  // division by zero.
   const L = whatsLeft({
     accounts: [{ name: 'Cheque', implied: 1000, dated: true, inBudget: true }],
     services: [], debts: [], rows: [], periodStart: P_START, periodEnd: P_END, today: P_END,
   });
-  eq(L.days, 0, 'the last day has no days left');
+  eq(L.days, 1, 'the last day has one day left');
+  eq(L.perDay, 1000, 'and what is free is that day\'s allowance');
+}
+{
+  const L = whatsLeft({
+    accounts: [{ name: 'Cheque', implied: 1000, dated: true, inBudget: true }],
+    services: [], debts: [], rows: [], periodStart: P_START, periodEnd: P_END, today: '2026-08-26',
+  });
+  eq(L.days, 0, 'a period already over has no days left');
   eq(L.perDay, null, 'and quotes no per-day figure');
 }
 {
@@ -660,8 +669,8 @@ const card = {
   eq(L.committedOther, 0, 'no debit orders in this fixture');
   eq(L.free, 148, 'free is cash less what is STILL a claim on it — the card is not, once it has its own band');
   eq(L.short, false, 'R148 with nothing else committed is not short');
-  eq(L.days, 12, '10 Aug to 22 Aug is 12 days');
-  eq(Math.round(L.perDay * 100) / 100, Math.round((148 / 12) * 100) / 100,
+  eq(L.days, 13, '10 Aug to 22 Aug is 13 days, today counted');
+  eq(Math.round(L.perDay * 100) / 100, Math.round((148 / 13) * 100) / 100,
     'perDay must divide the SAME free the headline shows, not the card-inclusive figure');
 }
 

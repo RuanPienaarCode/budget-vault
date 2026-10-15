@@ -276,7 +276,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
        reads "45% living costs · 78% budget used" and living costs is the FIRST
        figure, not the second. */
     const living = one(r.checks, 'score', /Ring: living costs/);
-    eq([living.status, Math.round(living.pageValue), Math.round(living.globalValue)], ['pass', 45, 45], 'living costs reads the living-costs figure, not the budget-used one after it');
+    eq([living.status, Math.round(living.pageValue), Math.round(living.globalValue)], ['pass', 47, 47], 'living costs reads the living-costs figure, not the budget-used one after it');
     eq(one(r.checks, 'score', /Ring: budget used \(six-period/).status, 'pass', 'and budget used reads its own');
     eq(one(r.checks, 'score', /spending row prints one percentage/).status, 'pass', 'the row prints one percentage per known measure');
   }

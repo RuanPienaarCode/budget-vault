@@ -6,13 +6,14 @@ const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./cons
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { normalizeCode, normalizeCadence } = require('./fx');
-const { parseFrontmatter, parseMdTable, parseMdTableWithSeparator, unescMd,
-  splitAroundTable, extraContent } = require('./markdown');
-const { parseCsv, uncsvCell } = require('./csv');
+const { parseFrontmatter, parseMdTableWithSeparator, unescMd,
+  splitAroundTable, extraContent, headingOf, findTable } = require('./markdown');
+const { parseDelimited, sniffDelimiter, uncsvCell } = require('./csv');
 /* One declaration per flat table drives this loader's reads AND the views'
    writes — ADR-0003. The generic reader is called here ONLY; downstream
    consumers of transaction rows still go through tx-role.js. */
 const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
+const { PLAN_TABLES, TAX_TABLES } = require('./table-schema');
 const { setLanguage, defaultLanguage } = require('./i18n');
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
@@ -27,13 +28,55 @@ function fmNum(v) {
   return s ? normalizeAmount(s) : null;
 }
 
-/* ADR-0007 · Heading slice before parseMdTable. The chunk under one `## Heading`,
-   lower-cased and prefix-matched; the one definition Plans and Tax share. */
+/* ADR-0007 · Heading slice before parseMdTable. The chunk under one `## Heading`;
+   the one definition Plans and Tax share.
+
+   2026-10-14 audit, L3-04. The heading must BE the section's name (trimmed,
+   case-folded, markdown.js headingOf — the same reading extraContent uses),
+   not merely start with it. The first PREFIX match used to win, so a
+   household's `## Documents still to request` above or below the real
+   `## Documents` was read as the Documents table: the document list came back
+   empty or wrong, and the next Save wrote that over the real one. Anything
+   that is not exactly a known heading is an extra, kept whole. */
 function section(body, name) {
   for (const chunk of body.split(/\r?\n##\s+/).slice(1)) {
-    if (chunk.trim().toLowerCase().startsWith(name)) return chunk;
+    if (headingOf(chunk) === name) return chunk;
   }
   return '';
+}
+
+/* One plan or tax table, read the way the four flat tables are (L3-05):
+   rows with a blank first cell are KEPT — "R750 deposit, name it later" is the
+   row a household types by hand, and `.filter(c => c[0])` dropped it from the
+   page, from the Tax totals, and from the file on the next Save — and a cell
+   past the schema's own columns is carried verbatim (attachExtraCells), with
+   the table-level half (extraColsOf) kept beside the rows so a hand-added
+   column, or the tail of a bare `[[a|b]]` wikilink the table splits in two,
+   is written back where it was. A row with nothing in any cell is not a row.
+   `first` is the first header of the plugin's table in this section, so a
+   small table of the household's own above it is not mistaken for it. */
+function readSectionTable(body, name, spec, map) {
+  const { header, sep, dataRows } = parseMdTableWithSeparator(section(body, name), spec.first);
+  const rows = [];
+  for (const c of dataRows) {
+    if (c.every(x => !x)) continue;
+    rows.push(attachExtraCells(map(c), spec.known, c));
+  }
+  return { rows, extraCols: extraColsOf(spec.known, header, sep, dataRows) };
+}
+
+/* Does the text open with a frontmatter block that CLOSES? A leading BOM is
+   not content (parseFrontmatter strips it the same way). The block may be
+   empty (`---` straight over `---`). */
+const stripBom = text => (text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text);
+const startsFence = text => /^---[ \t]*\r?\n/.test(stripBom(text));
+const hasFrontmatterBlock = text => /^---\r?\n(?:[\s\S]*?\r?\n)?---/.test(stripBom(text));
+/* A flat-table file that has words in it and no table row at all. An absent or
+   empty file is a new one (never written), not an unreadable one. */
+function lacksTable(text) {
+  if (!text || !text.trim()) return false;
+  const body = parseFrontmatter(text).body;
+  return body.trim() !== '' && !body.split(/\r?\n/).some(l => l.trim().startsWith('|'));
 }
 
 /* ADR-0007 · fmBool is tri-state. absent → undefined, written → true/false,
@@ -55,15 +98,15 @@ function fmBool(v) {
    L3-20 (2026-10-07 audit): lead/trail come back in the file's OWN line
    ending (its first break decides), so a CRLF file is not written back half
    LF. `tx` is CONTRACT 1 with serializeTxFile — see verbatimAroundTable. */
-function tableParts(text) {
+function tableParts(text, first) {
   if (!text) {
     return { lead: null, trail: null, header: undefined, sep: null, dataRows: [], tx: { lead: '', trail: '', sep: '' } };
   }
   const eol = lineEndingOf(text) || '\n';
   const inFileEol = s => (eol === '\n' ? s : s.split('\n').join(eol));
-  const { before, after } = splitAroundTable(parseFrontmatter(text).body);
-  const { header, sep, dataRows } = parseMdTableWithSeparator(text);
-  return { lead: inFileEol(before), trail: inFileEol(after), header, sep, dataRows, tx: verbatimAroundTable(text) };
+  const { before, after } = splitAroundTable(parseFrontmatter(text).body, first);
+  const { header, sep, dataRows } = parseMdTableWithSeparator(text, first);
+  return { lead: inFileEol(before), trail: inFileEol(after), header, sep, dataRows, tx: verbatimAroundTable(text, first) };
 }
 
 /* CONTRACT 1 (2026-10-07 audit, L3-02 + L3-22's separator half): a month
@@ -74,7 +117,7 @@ function tableParts(text) {
    '\n' + rows + trail is the file again. No table: all of it is lead. No
    frontmatter: lead starts at the top. LF-normalised and BOM-free, because the
    serializer writes '\n' throughout (a CRLF piece in an LF file is L3-20). */
-function verbatimAroundTable(text) {
+function verbatimAroundTable(text, first) {
   const t = (text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text).replace(/\r\n/g, '\n');
   const { body } = parseFrontmatter(t);
   let rest = body;
@@ -83,10 +126,12 @@ function verbatimAroundTable(text) {
     rest = nl < 0 ? '' : body.slice(nl + 1);
   }
   const lines = rest.split('\n');
-  const start = lines.findIndex(l => l.trim().startsWith('|'));
-  if (start < 0) return { lead: rest, trail: '', sep: '' };
-  let end = start;
-  while (end < lines.length && lines[end].trim().startsWith('|')) end++;
+  /* `first`: the plugin's table, not a household's small one above it (L3-10,
+     markdown.js findTable) — the same choice the row reader makes, so the lead
+     and the rows can never come from two different tables. */
+  const run = findTable(lines, first);
+  if (!run) return { lead: rest, trail: '', sep: '' };
+  const { start, end } = run;
   const next = start + 1 < end ? lines[start + 1] : '';
   return {
     lead: lines.slice(0, start).map(l => l + '\n').join(''),
@@ -108,7 +153,7 @@ function verbatimAroundTable(text) {
    empty words), so a nameless row is listed and counted like any other. A
    row with nothing in ANY cell is still not a row. */
 function readFlatTable(schema, text) {
-  const { lead, trail, header, sep, dataRows } = tableParts(text);
+  const { lead, trail, header, sep, dataRows } = tableParts(text, schema.columns[0].header);
   const known = knownColumns(schema, header, dataRows);
   const rows = [];
   for (const c of dataRows) {
@@ -139,7 +184,14 @@ module.exports = function registerLoad(ctx) {
   }
 
   async function doLoadVault() {
+    /* ADR-0007 · Unreadable files are recorded, not swallowed. Every fallback
+       below still opens the app; S.unreadableFiles ({ rel, why }, rel relative
+       to the budget folder) names what it fell back past, for the page banner. */
+    const unreadable = [];
+    S.unreadableFiles = unreadable;
     const settingsTxt = await readFile('Settings.md');
+    if (!settingsTxt || !settingsTxt.trim()) unreadable.push({ rel: 'Settings.md', why: 'missing' });
+    else if (!hasFrontmatterBlock(settingsTxt)) unreadable.push({ rel: 'Settings.md', why: 'frontmatter' });
     if (settingsTxt) {
       const { fm } = parseFrontmatter(settingsTxt);
       if (fm.month_start_day) {
@@ -246,6 +298,12 @@ module.exports = function registerLoad(ctx) {
     const acctBase = ctx.basePath();
     for (const { file: f, text: acctText } of await read(acctFiles)) {
       const { fm, body, raw } = parseFrontmatter(acctText);
+      /* An account file that OPENS a frontmatter block and never closes it:
+         the fence is lost, not absent. A note with no `---` at all is a
+         hand-made account and legitimately has no properties (L3-07). */
+      if (startsFence(acctText) && !hasFrontmatterBlock(acctText)) {
+        unreadable.push({ rel: f.path.slice(acctBase.length + 1), why: 'frontmatter' });
+      }
       S.accounts.push({
         name: f.basename,
         /* The file this account WAS read from, from its own path — loadNotes'
@@ -344,7 +402,7 @@ module.exports = function registerLoad(ctx) {
          month_start_day/period_days, so it is never frozen from disk), but a
          paragraph a household added above or below the table has nowhere
          else to live and was being destroyed on the next save. */
-      const { before, after } = splitAroundTable(body);
+      const { before, after } = splitAroundTable(body, 'Category');
       /* 2026-10-07 round-trip audit — what a Budget Save must give back, read
          here, written by budget-file.js. extraCols/extraCells (L3-25): a column
          added after Notes is carried the ISSUE 69 way; c[0]..c[3] were all
@@ -356,7 +414,7 @@ module.exports = function registerLoad(ctx) {
          uncategorised spend, so in S.budgets it would claim that spend as its
          Actual (and persistedRows() deleted it at Save). The Budget page says
          it is counted nowhere. A row with nothing in any cell is not kept. */
-      const { header, sep, dataRows } = parseMdTableWithSeparator(text);
+      const { header, sep, dataRows } = parseMdTableWithSeparator(text, 'Category');
       const rows = [], unnamed = [], order = [];
       for (const c of dataRows) {
         if (c.every(x => !x)) continue;
@@ -437,7 +495,7 @@ module.exports = function registerLoad(ctx) {
          6-column file with a hand-added Balance column also has 7 cells on
          disk, and treating position 6 as Split there would read the reader's
          figure through splitRole and lose it outright. */
-      const { header, sep, dataRows, tx } = tableParts(text);
+      const { header, sep, dataRows, tx } = tableParts(text, SCHEMAS.transactions.columns[0].header);
       const splitCol = SCHEMAS.transactions.columns[6];
       const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
       const known = hasSplitHeader ? 7 : 6;
@@ -471,21 +529,33 @@ module.exports = function registerLoad(ctx) {
     });
 
     /* Data/Categorisation Rules.csv, the one CSV this app writes AND reads.
-       Every cell goes through uncsvCell, the reader's half of csvCell's
-       formula guard: without it a learned rule starting with = + - @ came
-       back with the guard's apostrophe and never matched its merchant again,
-       and each import appended another dead copy (2026-10-07 audit, L3-06).
-       The header row and each rule's cells past its category are kept, so
-       categories.js rulesCsv can write the household's own columns back
-       instead of rebuilding the file from two (L3-14). */
+       ADR-0007 · The rules CSV is the household's file, read as they saved it.
+       Delimiter sniffed, BOM dropped, every cell through uncsvCell; lines that
+       are not rules are kept in S.rulesExtras, and a file that yields no rule
+       at all sets S.rulesUnreadable so no rules write can empty it. */
     S.rules = [];
     S.rulesHeader = null;
+    S.rulesExtras = [];
+    S.rulesLoaded = [];
+    S.rulesUnreadable = false;
     const rulesCsv = await readFile('Data/Categorisation Rules.csv');
     if (rulesCsv) {
-      const rows = parseCsv(rulesCsv).map(row => row.map(uncsvCell));
+      const rulesText = rulesCsv.charCodeAt(0) === 0xFEFF ? rulesCsv.slice(1) : rulesCsv;
+      const rows = parseDelimited(rulesText, sniffDelimiter(rulesText)).map(row => row.map(uncsvCell));
       if (rows.length) S.rulesHeader = rows[0];
+      let prev = null;
       for (const row of rows.slice(1)) {
-        if (row.length >= 2 && row[0]) S.rules.push({ pattern: row[0], category: row[1], extra: row.slice(2) });
+        if (row.length >= 2 && row[0]) {
+          prev = { pattern: row[0], category: row[1], extra: row.slice(2) };
+          S.rules.push(prev);
+        } else {
+          S.rulesExtras.push({ prev, cells: row });
+        }
+      }
+      S.rulesLoaded = S.rules.slice();
+      if (rows.length > 1 && !S.rules.length) {
+        S.rulesUnreadable = true;
+        unreadable.push({ rel: 'Data/Categorisation Rules.csv', why: 'table' });
       }
     }
 
@@ -495,6 +565,7 @@ module.exports = function registerLoad(ctx) {
     S.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
     {
       const t = readFlatTable(SCHEMAS.owed, owedTxt);
+      if (lacksTable(owedTxt)) unreadable.push({ rel: 'Owed Money.md', why: 'table' });
       S.owedLead = t.lead; S.owedTrail = t.trail; S.owedExtraCols = t.extraCols;
       S.owed.push(...t.rows);
     }
@@ -504,6 +575,7 @@ module.exports = function registerLoad(ctx) {
     S.debtsFm = (debtTxt && parseFrontmatter(debtTxt).raw) || 'kind: debts';
     {
       const t = readFlatTable(SCHEMAS.debts, debtTxt);
+      if (lacksTable(debtTxt)) unreadable.push({ rel: 'Debts.md', why: 'table' });
       S.debtsLead = t.lead; S.debtsTrail = t.trail; S.debtsExtraCols = t.extraCols;
       for (const d of t.rows) {
         /* post() — the one fix-up a single cell cannot express (ADR-0003).
@@ -526,6 +598,7 @@ module.exports = function registerLoad(ctx) {
     S.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
     {
       const t = readFlatTable(SCHEMAS.assets, assetTxt);
+      if (lacksTable(assetTxt)) unreadable.push({ rel: 'Assets.md', why: 'table' });
       S.assetsLead = t.lead; S.assetsTrail = t.trail; S.assetsExtraCols = t.extraCols;
       S.assets.push(...t.rows);
     }
@@ -535,6 +608,7 @@ module.exports = function registerLoad(ctx) {
     S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
     {
       const t = readFlatTable(SCHEMAS.services, svcTxt);
+      if (lacksTable(svcTxt)) unreadable.push({ rel: 'Services.md', why: 'table' });
       S.servicesLead = t.lead; S.servicesTrail = t.trail; S.servicesExtraCols = t.extraCols;
       S.services.push(...t.rows);
     }
@@ -566,7 +640,27 @@ module.exports = function registerLoad(ctx) {
          next heading. Both survive a save now — see markdown.js's
          extraContent for the rule and plan.js's serializePlan for where each
          piece lands. */
-      const plan67 = extraContent(body, ['money in', 'envelopes', 'items']);
+      const plan67 = extraContent(body, ['money in', 'envelopes', 'items'],
+        { 'money in': PLAN_TABLES['money in'].first, envelopes: PLAN_TABLES.envelopes.first, items: PLAN_TABLES.items.first });
+      /* unescMd, not a bare trim, on every free-text cell: plan.js writes them
+         through escMd, and a read that does not reverse it re-escapes the cell
+         on every save — the same pair table-schema.js's verbatim() carries.
+         Tint is written back verbatim so a hand-picked colour survives, and an
+         absent one renders as no wash rather than as the string "". */
+      const sources = readSectionTable(body, 'money in', PLAN_TABLES['money in'], c => ({
+        name: unescMd(c[0] || ''), kind: unescMd(c[1] || 'Other'), ...cellMoney('amount', c[2]),
+        date: unescMd(c[3] || ''), ...cellVocab('status', c[4], ['expected', 'received'], 'received'),
+        notes: unescMd(c[5] || ''),
+      }));
+      const envelopes = readSectionTable(body, 'envelopes', PLAN_TABLES.envelopes, c => ({
+        name: unescMd(c[0] || ''), ...cellMoney('amount', c[1]), note: unescMd(c[2] || ''),
+        tint: unescMd(c[3] || ''),
+      }));
+      const items = readSectionTable(body, 'items', PLAN_TABLES.items, c => ({
+        name: unescMd(c[0] || ''), envelope: unescMd(c[1] || ''), ...cellMoney('amount', c[2]),
+        ...cellMoney('spent', c[3]), ...cellVocab('status', c[4], ['planned', 'part', 'done'], 'planned'),
+        category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
+      }));
 
       S.plans[f.basename] = {
         /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
@@ -576,28 +670,20 @@ module.exports = function registerLoad(ctx) {
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         leadRaw: plan67.lead, extras: plan67.extras,
+        /* L3-05: prose a household typed between a heading and its table, and
+           a column or cell tail past the plugin's own, per table. */
+        sectionLeads: plan67.leads,
+        extraCols: { sources: sources.extraCols, envelopes: envelopes.extraCols, items: items.extraCols },
+        /* L3-12: the titles THIS file's heading may be — what the plugin wrote
+           there: the name it was loaded under, and the file's own name. A plan
+           renamed since has its heading follow; any other heading is the
+           household's (markdown.js ownTitleLine). */
+        ownTitles: [(fm.plan || '').toString().trim(), f.basename].filter(Boolean),
         started: (fm.started || '').toString().trim(),
         status: (fm.status || 'active').toString().trim(),
-        sources: parseMdTable(section(body, 'money in')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), kind: unescMd(c[1] || 'Other'), ...cellMoney('amount', c[2]),
-          // unescMd, not a bare trim: plan.js writes this through escMd, and a
-          // read that does not reverse it re-escapes the cell on every save —
-          // the same pair table-schema.js's verbatim() carries.
-          date: unescMd(c[3] || ''), ...cellVocab('status', c[4], ['expected', 'received'], 'received'),
-          notes: unescMd(c[5] || ''),
-        })),
-        // Tint is written back verbatim so a hand-picked colour survives, and
-        // an absent one renders as no wash rather than as the string "".
-        // unescMd for the same reason `date` above carries it.
-        envelopes: parseMdTable(section(body, 'envelopes')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), ...cellMoney('amount', c[1]), note: unescMd(c[2] || ''),
-          tint: unescMd(c[3] || ''),
-        })),
-        items: parseMdTable(section(body, 'items')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), envelope: unescMd(c[1] || ''), ...cellMoney('amount', c[2]),
-          ...cellMoney('spent', c[3]), ...cellVocab('status', c[4], ['planned', 'part', 'done'], 'planned'),
-          category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
-        })),
+        sources: sources.rows,
+        envelopes: envelopes.rows,
+        items: items.rows,
       };
     }
     // Keep the open plan if it still exists; otherwise fall to the first by
@@ -650,11 +736,34 @@ module.exports = function registerLoad(ctx) {
          The intro paragraph is locale-derived (loc.authority/yearSpan), so it
          is never frozen from disk — only whatever a household added of their
          own, above it or under one of the tables, survives verbatim. */
-      const tax67 = extraContent(body, ['progress', 'documents', 'figures']);
+      const tax67 = extraContent(body, ['progress', 'documents', 'figures'],
+        { progress: TAX_TABLES.progress.first, documents: TAX_TABLES.documents.first, figures: TAX_TABLES.figures.first });
+      /* L3-05, as for Plans: blank-first rows kept (a Figures row "code to look
+         up" is the one that was also left out of the totals), extra columns and
+         cell tails carried. unescMd on `due` and the free text: views/tax.js
+         writes them through escMd, and a read that does not reverse it
+         re-escaped the cell on every save (`June \| maybe` gained a backslash
+         per save) — ISSUE 76's plan.js fix, which never reached this table. */
+      const steps = readSectionTable(body, 'progress', TAX_TABLES.progress, c => ({
+        step: unescMd(c[0] || ''), ...cellVocab('status', c[1], ['todo', 'busy', 'done', 'n/a'], 'todo'),
+        due: unescMd(c[2] || ''), notes: unescMd(c[3] || ''),
+      }));
+      const docs = readSectionTable(body, 'documents', TAX_TABLES.documents, c => ({
+        name: unescMd(c[0] || ''), source: unescMd(c[1] || ''),
+        ...cellVocab('status', c[2], ['needed', 'uploaded', 'n/a'], 'needed'),
+        file: unescMd(c[3] || ''), notes: unescMd(c[4] || ''),
+      }));
+      // Absent on every page written before the Figures table existed — an
+      // empty list keeps those loading unchanged.
+      const figures = readSectionTable(body, 'figures', TAX_TABLES.figures, c => ({
+        code: unescMd(c[0] || ''), description: unescMd(c[1] || ''),
+        source: unescMd(c[2] || ''), ...cellMoney('amount', c[3]),
+      }));
       S.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
-        leadRaw: tax67.lead, extras: tax67.extras,
+        leadRaw: tax67.lead, extras: tax67.extras, sectionLeads: tax67.leads,
+        extraCols: { steps: steps.extraCols, docs: docs.extraCols, figures: figures.extraCols },
         /* The two frontmatter vocabularies go through cellVocab, the reader
            the tables below already use: case is folded (`Provisional` is a
            provisional taxpayer), and a word outside the vocabulary reads as
@@ -675,25 +784,9 @@ module.exports = function registerLoad(ctx) {
         assessment_resultRaw: assessResult.raw,
         assessment_income: assessIncome.value,
         assessment_incomeRaw: assessIncome.raw,
-        steps: parseMdTable(section(body, 'progress')).slice(1).filter(c => c[0]).map(c => ({
-          step: unescMd(c[0]), ...cellVocab('status', c[1], ['todo', 'busy', 'done', 'n/a'], 'todo'),
-          // unescMd, not a bare trim: views/tax.js writes this through escMd,
-          // and a read that does not reverse it re-escaped the cell on every
-          // save (`June \| maybe` gained a backslash per save) — ISSUE 76's
-          // plan.js fix, which never reached this table.
-          due: unescMd(c[2] || ''), notes: unescMd(c[3] || ''),
-        })),
-        docs: parseMdTable(section(body, 'documents')).slice(1).filter(c => c[0]).map(c => ({
-          name: unescMd(c[0]), source: unescMd(c[1] || ''),
-          ...cellVocab('status', c[2], ['needed', 'uploaded', 'n/a'], 'needed'),
-          file: unescMd(c[3] || ''), notes: unescMd(c[4] || ''),
-        })),
-        // Absent on every page written before the Figures table existed — an
-        // empty list keeps those loading unchanged.
-        figures: parseMdTable(section(body, 'figures')).slice(1).filter(c => c[0]).map(c => ({
-          code: unescMd(c[0]), description: unescMd(c[1] || ''),
-          source: unescMd(c[2] || ''), ...cellMoney('amount', c[3]),
-        })),
+        steps: steps.rows,
+        docs: docs.rows,
+        figures: figures.rows,
       };
     }
     if (!S.taxYear || !S.tax[S.taxYear]) S.taxYear = Object.keys(S.tax).sort().pop() || null;

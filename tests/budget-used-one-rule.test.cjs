@@ -59,7 +59,7 @@ const txFile = rows => `---\n${TX_FM}\n---\n${HEAD}${rows.map(
   r => `| ${r[0]} | ${r[1]} | ${r[2] || ''} | ${r[3].toFixed(2)} | ${r[4] || ''} |  |\n`).join('')}`;
 const P = '2026-07';
 const files = {
-  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ninput_mode: manual\ncurrency: "R"\ncountry: za\n---\n',
   [`${B}/Categories/Salary.md`]: '---\ntype: income\ncolor: "#33aa66"\n---\n',
   [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\nfixed: true\n---\n',
   [`${B}/Categories/Emergency.md`]: '---\ntype: savings\ncolor: "#888888"\n---\n',

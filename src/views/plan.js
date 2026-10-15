@@ -31,6 +31,7 @@
 const { el, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
+const { PLAN_TABLES, plainTableLines } = require('../table-schema');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { planSummary, barSegments, SOURCE_KINDS, sharePct, envelopeShares,
@@ -1032,30 +1033,29 @@ module.exports = function registerPlan(ctx) {
       'Money that arrives once, divided on purpose.',
       'Source `status` is `received` or `expected`; item `status` is `planned`, `part` or `done`.',
       'An envelope\'s amount is what you placed in it — it need not equal the items inside.',
-    ]));
+    ]), p.ownTitles);
     const extrasAfter = name => (p.extras || []).filter(e => e.after === name)
       .flatMap(e => ['', ...e.raw.split(/\r?\n/)]);
+    /* L3-05: prose a household typed between a `##` heading and its table goes
+       back in that place (load.js sectionLeads), and a column or cell tail they
+       added past the plugin's own is written after it (extraCols). */
+    const leadOf = name => (p.sectionLeads && p.sectionLeads[name] ? [...p.sectionLeads[name].split(/\r?\n/), ''] : []);
+    const ec = name => (p.extraCols && p.extraCols[name]) || null;
     const lines = ['---', ...fm.split('\n'), '---', ...leadLines, ...extrasAfter(null),
-      '## Money in', '',
-      '| Source | Kind | Amount | Date | Status | Notes |',
-      '|--------|------|-------:|------|--------|-------|'];
-    for (const s of p.sources) {
-      lines.push(`| ${escMd(s.name)} | ${escMd(s.kind || 'Other')} | ${cash(s, 'amount')} | ${escMd(s.date || '')} | ${word(s, 'status', 'received')} | ${escMd(s.notes || '')} |`);
-    }
+      '## Money in', '', ...leadOf('money in'),
+      ...plainTableLines(PLAN_TABLES['money in'], null, p.sources.map(s =>
+        [escMd(s.name), escMd(s.kind || 'Other'), cash(s, 'amount'), escMd(s.date || ''), word(s, 'status', 'received'), escMd(s.notes || '')]),
+      p.sources, ec('sources'))];
     lines.push(...extrasAfter('money in'));
-    lines.push('', '## Envelopes', '',
-      '| Envelope | Amount | Note | Tint |',
-      '|----------|-------:|------|------|');
-    for (const e of p.envelopes) {
-      lines.push(`| ${escMd(e.name)} | ${cash(e, 'amount')} | ${escMd(e.note || '')} | ${escMd(e.tint || '')} |`);
-    }
+    lines.push('', '## Envelopes', '', ...leadOf('envelopes'),
+      ...plainTableLines(PLAN_TABLES.envelopes, null, p.envelopes.map(e =>
+        [escMd(e.name), cash(e, 'amount'), escMd(e.note || ''), escMd(e.tint || '')]),
+      p.envelopes, ec('envelopes')));
     lines.push(...extrasAfter('envelopes'));
-    lines.push('', '## Items', '',
-      '| Item | Envelope | Amount | Spent | Status | Category | Notes |',
-      '|------|----------|-------:|------:|--------|----------|-------|');
-    for (const i of p.items) {
-      lines.push(`| ${escMd(i.name)} | ${escMd(i.envelope || '')} | ${cash(i, 'amount')} | ${cash(i, 'spent')} | ${word(i, 'status', 'planned')} | ${escMd(i.category || '')} | ${escMd(i.notes || '')} |`);
-    }
+    lines.push('', '## Items', '', ...leadOf('items'),
+      ...plainTableLines(PLAN_TABLES.items, null, p.items.map(i =>
+        [escMd(i.name), escMd(i.envelope || ''), cash(i, 'amount'), cash(i, 'spent'), word(i, 'status', 'planned'), escMd(i.category || ''), escMd(i.notes || '')]),
+      p.items, ec('items')));
     lines.push(...extrasAfter('items'));
     lines.push('');
     return lines.join('\n');
@@ -1072,8 +1072,14 @@ module.exports = function registerPlan(ctx) {
   async function savePlan() {
     const p = P();
     if (!p) return;
-    // From `file`, never from a re-sanitised name — see the note in load.js.
-    const path = `Plans/${p.file}.md`;
+    /* The path the plan was READ from (ISSUE 97), and only a plan with no
+       record — one created this session — falls back to the flat default.
+       `Plans/${p.file}.md` alone forked a plan filed in a subfolder: load.js
+       reads Plans/ recursively, but the edit landed in a new top-level copy and
+       the nested original was left stale, then both claimed one key on the next
+       load (2026-10-14 audit, L3-07). `file` is still the name, never a
+       re-sanitised one — see the note in load.js. */
+    const path = p.rel || `Plans/${p.file}.md`;
     try {
       await writeFile(path, serializePlan(S.planName));
     } catch (e) {

@@ -21,7 +21,7 @@ const { balanceReadable } = require('../figures');
    this view's arithmetic, not that module's. */
 /* isForeign beside them for the money sorters below: they ask splitByCurrency's
    own question of one account at a time. */
-const { symbolOf, isForeign, splitByCurrency: splitAccounts, primaryTotal } = require('../currency');
+const { symbolOf, isForeign, splitByCurrency: splitAccounts, primaryTotal, otherHoldings } = require('../currency');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -982,6 +982,16 @@ module.exports = function registerAccounts(ctx) {
       }
       return bits.join('');
     })() : '';
+    /* The sentence under the headline prints the STATED amount, like the
+       headline, through the one helper Savings and the Score use (currency.js
+       otherHoldings), and says so when the implied reading — the balance rolled
+       forward through the transactions since — is a different figure. The same
+       USD account read 0 here and 460 on Savings with nothing to tell them
+       apart (audit L8-05). */
+    const held = otherHoldings(others, balances.implied.others, 'stated');
+    const heldLine = otherCurrenciesLine(held.shown)
+      + (held.shown.length && held.differs
+        ? i18n.t('acct.hero.otherAsStated', { list: otherCurrenciesList(held.other) }) : '');
     const w = worth(primary, null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     /* Counted over `scoped`, not `rows`. Filtered to one owner, these used to
@@ -1054,7 +1064,7 @@ module.exports = function registerAccounts(ctx) {
       el('div', { class: 'hero-sub' },
         i18n.t('acct.hero.sub', { assets: money(assets), liabilities: money(liabilities) })
         + (elsewhere ? i18n.t('acct.hero.elsewhere') : '')
-        + (conv ? convLine : otherCurrenciesLine(others))
+        + (conv ? convLine : heldLine)
         // TODO(i18n): acct.hero.unreadable — "{count} account balance could
         // not be read and is left out of this total." (plural: "balances").
         + (unreadable.length ? i18n.t('acct.hero.unreadable', { count: unreadable.length }) : '')
@@ -2502,9 +2512,9 @@ module.exports = function registerAccounts(ctx) {
        trade than a second click. */
     const opt = fieldsForType(preType, null);
     const r = await askFields(app, i18n.t('acct.new.title'), [
-      { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: 'e.g. Easy Equities TFSA' },
+      { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder') },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
-      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: 'e.g. Easy Equities' },
+      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: i18n.t('acct.new.institutionPlaceholder') },
       ...ownerField(defaults && defaults.owner),
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
       { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text',

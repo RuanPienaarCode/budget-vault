@@ -145,7 +145,8 @@ async function render(files) {
     eq(lefts.rows, [
       [i18n.t('score.flow.chip.leftInBudget'), ctx.money(3400, 0)],
       [i18n.t('score.flow.chip.setAsideToMove'), ctx.money(18000, 0)],
-      [i18n.t('score.flow.chip.overAllocated'), ctx.money(-5500, 0)],
+      /* A signed PART of a sum is one form since 2026-10-14: a minus before the symbol. */
+      [i18n.t('score.flow.chip.overAllocated'), '\u2212' + ctx.money(5500, 0)],
       [i18n.t('score.flow.chip.together'), ctx.money(15900, 0)],
     ], 'over-allocated: the row says so, keeps its sign so the column still adds up, and together does not move');
     eq(notYetSub(root), i18n.t('score.flow.sub.overAllocated', { inBudget: ctx.money(3400, 0), beyond: ctx.money(5500, 0) })

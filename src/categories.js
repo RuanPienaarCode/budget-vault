@@ -278,6 +278,7 @@ module.exports = function registerCategories(ctx) {
      rule pointing at the same category, so this is the difference between a
      file that stabilises and one that grows with the history forever. */
   async function learnRules(pairs) {
+    if (!rulesWritable()) return 0;
     // ruleText: the matcher's own normalisation, so "already have it" means
     // exactly what prepareRules will make of the pattern.
     const have = new Set(S.rules.map(r => ruleText(r.pattern)));
@@ -349,6 +350,7 @@ module.exports = function registerCategories(ctx) {
      anything automatic. */
   async function correctRule(rule, newCat) {
     if (!rule || !newCat || rule.category === newCat) return false;
+    if (!rulesWritable()) return false;
     rule.category = newCat;
     await writeRulesCsv();
     return true;
@@ -369,16 +371,53 @@ module.exports = function registerCategories(ctx) {
      cells up to the header's width and lines up with the rest. A loaded row
      that was shorter than the header is written back exactly as short. */
   const RULES_HEAD = ['pattern', 'category'];
+  /* 2026-10-14 audit, L3-03. A line the loader could not turn into a rule — a
+     `# comment`, a pattern still waiting for its category, a category with no
+     pattern — is written back exactly where it stood: after the rule it
+     followed, or straight under the header when it opened the file. load.js
+     keeps each as {prev, cells}, `prev` being the last rule read above it.
+     When a tidy has removed that rule the line moves up to the nearest rule
+     above it that survives (S.rulesLoaded is the file's own order), so a note
+     a household left is never dropped because a neighbour was. */
   function rulesCsv(rules) {
     const head = Array.isArray(S.rulesHeader) && S.rulesHeader.length ? S.rulesHeader : RULES_HEAD;
     const pad = Math.max(0, head.length - RULES_HEAD.length);
     const line = cells => cells.map(csvCell).join(',');
-    const body = rules.map(r =>
-      line([r.pattern, r.category, ...(Array.isArray(r.extra) ? r.extra : new Array(pad).fill(''))]));
+    const live = new Set(rules);
+    const loaded = S.rulesLoaded || [];
+    const anchorOf = e => {
+      if (!e.prev || live.has(e.prev)) return e.prev || null;
+      for (let i = loaded.indexOf(e.prev) - 1; i >= 0; i--) if (live.has(loaded[i])) return loaded[i];
+      return null;
+    };
+    const under = new Map();                     // rule (or null = top) -> its kept lines
+    for (const e of S.rulesExtras || []) {
+      const a = anchorOf(e);
+      if (!under.has(a)) under.set(a, []);
+      under.get(a).push(line(e.cells));
+    }
+    const body = [...(under.get(null) || [])];
+    for (const r of rules) {
+      body.push(line([r.pattern, r.category, ...(Array.isArray(r.extra) ? r.extra : new Array(pad).fill(''))]));
+      if (under.has(r)) body.push(...under.get(r));
+    }
     return line(head) + '\n' + (body.length ? body.join('\n') + '\n' : '');
   }
 
-  function writeRulesCsv() {
+  /* A rules file the loader read as content but found no rule in (load.js:
+     S.rulesUnreadable) is never rewritten. Rewriting means serialising S.rules,
+     which is empty here, so the next learn would replace the household's file
+     with one rule — the hundreds-to-1 loss of the 2026-10-14 audit. Every path that
+     writes the file asks first, says why in plain words, and the file stays
+     as it is. Returns true when it is safe to go on. */
+  function rulesWritable() {
+    if (!S.rulesUnreadable) return true;
+    toast('Data/Categorisation Rules.csv has lines this app could not read as rules (it expects one rule per line: pattern, then category, separated by commas), so nothing was changed. Open it in a text editor and fix it, then reload.', true);
+    return false;
+  }
+
+  async function writeRulesCsv() {
+    if (!rulesWritable()) return;
     return writeFile('Data/Categorisation Rules.csv', rulesCsv(S.rules));
   }
 
@@ -397,6 +436,7 @@ module.exports = function registerCategories(ctx) {
      the delete is abandoned if that write fails: a tidy that cannot leave a
      way back does not happen. */
   async function cleanupRules() {
+    if (!rulesWritable()) return 0;
     /* Each description goes in with the category its row is filed under,
        which is the household's own evidence that a broad rule spans more
        than one kind of spending (rule-cleanup.js `ambiguous`). A split

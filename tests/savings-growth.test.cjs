@@ -168,13 +168,16 @@ async function mount(files) {
 (async () => {
   const { nodes, calls } = await mount(FILES);
 
+  /* The harness household is country za: its decimal mark is a comma, and the
+     rates below print in it (audit 2026-10-14, L2a-N09; they printed a point). */
+
   /* ---- 1. the tile ---- */
   const tiles = byCls(nodes.get('savingsKpis'), 'mini').map(flat);
   const growthTile = tiles.find(t => t.startsWith('Growth'));
   ok(growthTile, `a Growth tile is drawn — got ${JSON.stringify(tiles)}`);
   ok(growthTile.includes(`▲ ${money(15000)}`),
     `the tile totals the growth nobody recorded — got "${growthTile}"`);
-  ok(growthTile.includes(`+25.0% on ${money(60000, 0)} put in`),
+  ok(growthTile.includes(`+25,0% on ${money(60000, 0)} put in`),
     `and states what it is a return ON — got "${growthTile}"`);
   ok(/1 of 2 missing a starting amount or date/.test(growthTile),
     `and admits the account it could not measure — got "${growthTile}"`);
@@ -188,8 +191,11 @@ async function mount(files) {
 
   ok(fund.includes(`in ${money(60000, 0)}`), `capital in is stated — got "${fund}"`);
   ok(fund.includes(`▲ ${money(15000, 0)}`), `and the growth beside it — got "${fund}"`);
-  ok(fund.includes('+25.0% total'), `with the return as a rate — got "${fund}"`);
-  ok(/≈ \+14\.9% a year/.test(fund), `annualised, and marked approximate — got "${fund}"`);
+  ok(fund.includes('+25,0% total'), `with the return as a rate — got "${fund}"`);
+  /* 1.25 over 577 days, opening -> the 2026-08-01 balance (no row follows it): the
+     period ends where the growth was measured, not on the pinned clock (audit
+     2026-10-14, L2a-N10). It read +14,9% when it ran on to the pinned day. */
+  ok(/≈ \+15,2% a year/.test(fund), `annualised, and marked approximate — got "${fund}"`);
   ok(fund.includes('since 2025-01-01'), `over a stated period — got "${fund}"`);
 
   /* The identity a reader can check by eye: the two figures on the card add up

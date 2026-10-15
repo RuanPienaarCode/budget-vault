@@ -16,7 +16,10 @@ const { poolAccounts, isSetAsideType } = require('./vocabulary');
    saving-rate walk below and the Savings page's own flows cannot disagree
    about which rows are real. */
 const { supersededBySplit } = require('./tx-role');
-const { daysBetween } = require('./dates');
+const { daysBetween, isRealIsoDate, todayIso } = require('./dates');
+/* One definition of "how far is this account's record known" (committed.js),
+   so the Score's idea of an imported account and the Dashboard's cannot drift. */
+const { knownTo } = require('./committed');
 
 /* Account types that make up the savings pool, and the category types that
    mark a movement WITHIN it. One set, used for both, because they are the same
@@ -101,6 +104,7 @@ module.exports = function registerHealthData(ctx) {
        inside savingContribution() above, once, for the ring and the flow card. */
 
     const periods = [];
+    const spans = [];
     for (let i = 1; i <= want; i++) {
       const p = shiftPeriod(cur, -i);
       /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
@@ -108,6 +112,7 @@ module.exports = function registerHealthData(ctx) {
       const F = periodFigures(p);
       const spend = F.trend;
       const { start, end } = F.range;
+      spans.push({ period: p, start, end });
       const savings = savingContribution(p);
       /* ADR-0007 · Three spend slices per period, and one of them budget-scoped.
          essential / consumption / fixed are household-wide; consumptionBudget is
@@ -144,6 +149,44 @@ module.exports = function registerHealthData(ctx) {
         counted: spend.count > 0 || Object.keys(householdNet).length > 0,
       });
     }
+
+    /* L1-04 / L2a-N04: leave an incompletely imported period OUT of the averages.
+       `counted` is "the household did anything in it", which a period whose
+       statements stop weeks before its end satisfies: the Score jumped seven points
+       the morning a period closed, with no file changed. Complete = every
+       household-currency, in-budget account that has rows (and a row inside the
+       window, so a closed account cannot block every period) is imported to or
+       past the period's last day. importedTo only, not the balance-confirmed leg
+       of knownTo: a typed balance brings no rows in. Strict by design. */
+    const today = todayIso();
+    /* Manual entry has no import to be behind: the newest row is simply the
+       last thing typed, which says nothing about whether the period is whole
+       (a household typing expenses by hand rarely has one dated the last day). */
+    const importing = S.settings.input_mode !== 'manual';
+    const windowStart = spans.reduce((m, s) => (s.start < m ? s.start : m), spans.length ? spans[0].start : '');
+    const feeders = [];
+    for (const a of importing ? (S.accounts || []) : []) {
+      if (a.in_budget === false || isForeign(a, S.settings.currency)) continue;
+      const e = idx.get(a);
+      if (!e || !e.rows.length) continue;
+      let newest = '', inWindow = false;
+      for (const r of e.rows) {
+        if (!isRealIsoDate(r.date) || r.date > today) continue;
+        if (r.date > newest) newest = r.date;
+        if (r.date >= windowStart) inWindow = true;
+      }
+      if (!inWindow) continue;
+      feeders.push({ name: a.name, through: knownTo({ importedTo: newest }, today) || '' });
+    }
+    const incompletePeriods = [];
+    periods.forEach((per, i) => {
+      if (!per.counted) return;
+      const behind = feeders.filter(f => f.through < spans[i].end).map(f => f.name);
+      if (!behind.length) return;
+      per.counted = false;
+      incompletePeriods.push({ period: spans[i].period, start: spans[i].start, end: spans[i].end, behind });
+    });
+    incompletePeriods.sort((a, b) => a.start.localeCompare(b.start));
 
     /* ADR-0007 · Net worth and earmarks are measured on household-currency
        accounts, and the rest is named (ISSUE 28): a ratio over mixed currencies
@@ -198,6 +241,12 @@ module.exports = function registerHealthData(ctx) {
          (ISSUE 56/57): accounts, assets, debts and receivables, one net per symbol. */
       worthOtherCurrencies: otherCurrencyNet(netWorthFull, scoreOthers),
       metrics, earmarks, target, debtInterest,
+      /* The trailing periods left out of the averages because an in-budget
+         account's records stop before they end (L1-04), oldest first, each with
+         the accounts holding it up. metrics.countedPeriods is the count of those
+         actually used, so "Averaged over your last N completed periods" is true
+         without this; it is here for any surface that wants to say why N fell. */
+      incompletePeriods,
       hasFixed: fixedCats.size > 0,
       /* ADR-0007 · debtsRecorded reads the currency-filtered debts. False means the
          pillar's full marks are an ASSUMPTION, and the surfaces say so. */

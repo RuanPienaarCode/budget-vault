@@ -17,6 +17,7 @@
 const { normalizePath, TFile, TFolder } = require('obsidian');
 const { collapsePath, hiddenSegment } = require('./vault-path');
 const { patchFrontmatter } = require('./markdown');
+const { lineEndingOf } = require('./table-schema');
 
 /* One path segment as macOS, iOS and iCloud Drive compare it: case-folded and
    in NFC. Those filesystems are case-insensitive AND normalisation-insensitive
@@ -94,24 +95,255 @@ function destinationProblem(folder, { configDir, budgetFolder } = {}) {
   return hidden ? { kind: 'hidden', folder: hidden } : null;
 }
 
+
+/* ---------------------------------------------------------------------------
+   What this app wrote, and what changed under it since.
+
+   Every whole-file writer in the app serialises from state captured at LOAD
+   and hands io.writeFile a complete new file, and nothing compared the file
+   with what that state was read from. A row typed on the phone (iCloud), or in
+   the markdown view, between the load and the Save was deleted by the Save
+   (2026-10-14 audit, L3-01); the same Save, run on a file renamed in the
+   meantime, created a second copy of it at the old path (L3-06).
+
+   The vault watcher cannot fix that by reloading, because a page with unsaved
+   edits defers its reload (and must — it is the only copy of those edits), so
+   the change sits unread while the Save button stays lit. The fix is on the
+   WRITE side: the watcher reports what it saw (observeChange), and a write to
+   a file the page has not read since refuses instead of overwriting.
+
+   Two records, both kept on the PLUGIN object (the same place `_lastWrite`
+   lives, for the same reason: main.js's Settings.md updater and the setup
+   wizard build their own io and must see the same facts as the view's):
+
+     own    path -> [{ h, at }]   what THIS app wrote there, as a content hash.
+                                  An event whose file now holds exactly one of
+                                  those hashes is our own echo and is ignored;
+                                  anything else is somebody else's edit.
+                                  This replaced a single global 2-second window
+                                  that dropped ANY budget change landing within
+                                  2 s of ANY write (L3-02): a phone edit that
+                                  arrived just after a Save was never loaded,
+                                  and the next Save deleted it.
+     stale  path -> { seq, folder } paths changed (or moved, or deleted) by
+                                  someone else since the page last read them.
+                                  Cleared per path by readFile (the caller now
+                                  holds the file's current bytes) and wholesale
+                                  by a completed full reload.
+
+   Hashes, not content: a month of transactions is tens of kilobytes and the
+   record only has to answer "is this the thing I wrote". A 53-bit hash plus
+   the length makes a false "yes" astronomically unlikely, and a false "yes"
+   would only ever mean one skipped refusal — the pre-fix behaviour. */
+const OWN_TTL_MS = 30000;
+const GONE = 'gone', DIR = 'dir', BIN = 'bin';
+function hashText(str) {
+  const s = String(str);
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)) + ':' + s.length;
+}
+function ledgerOf(plugin) {
+  if (!plugin._writeLedger) {
+    plugin._writeLedger = { own: new Map(), stale: new Map(), seq: 0, pending: new Set(), listeners: new Set() };
+  }
+  return plugin._writeLedger;
+}
+/* Files whose writers are NOT built from load-time state, so a change under
+   them is no reason to refuse. Settings.md: main.js's updater re-reads the file
+   and patches the one key it was asked to (and the Settings page must keep
+   working the moment a phone has edited the file). Exchange Rates.md: replaced
+   wholesale from the provider's answer, never merged with what was there.
+   tests/save-refuses-stale-files.test.cjs pins both names against their owners. */
+const FRESH_WRITERS = ['settings.md', 'exchange rates.md'];
+const isTextPath = p => /\.(md|csv|txt|json)$/i.test(p);
+
 function makeIo({ vault, plugin }) {
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
   // outside the view — the Settings.md updater in main.js — can stamp it too and
   // be recognised as our own, suppressing a redundant watcher reload.
+  /* Stamped AFTER a write succeeds, never before. It used to run before the
+     write as well, so a write that threw (a locked file, a full disk) still
+     muted the watcher for two seconds (2026-10-14 audit, L8 Info). Nothing
+     reads it to decide anything any more — the watcher compares content, see
+     the ledger above — but lastWriteAt() is still published and must not lie. */
   const stampWrite = () => { plugin._lastWrite = Date.now(); };
+  const L = ledgerOf(plugin);
 
   const basePath = () => normalizePath(plugin.settings.budgetFolder);
   const relPath = p => normalizePath(basePath() + '/' + p);
+  const keyOf = p => foldSeg(p);
+  /* The budget-relative form of a vault path, for a message a person reads. */
+  const relOf = p => {
+    const base = basePath();
+    return p.startsWith(base + '/') ? p.slice(base.length + 1) : p;
+  };
+
+  /* ---- own-write record ---- */
+  function ownRemember(path, mark) {
+    const k = keyOf(path);
+    const now = Date.now();
+    const list = (L.own.get(k) || []).filter(e => now - e.at < OWN_TTL_MS);
+    const entry = { h: mark, at: now };
+    list.push(entry);
+    if (list.length > 8) list.shift();
+    L.own.set(k, list);
+    // Undo, for a write that failed: remove exactly this entry.
+    return () => {
+      const cur = L.own.get(k);
+      if (!cur) return;
+      const i = cur.indexOf(entry);
+      if (i >= 0) cur.splice(i, 1);
+      if (!cur.length) L.own.delete(k);
+    };
+  }
+  function ownIs(path, mark) {
+    const now = Date.now();
+    return (L.own.get(keyOf(path)) || []).some(e => e.h === mark && now - e.at < OWN_TTL_MS);
+  }
+  /* A delete event for something beneath a folder this app trashed. */
+  function ownGone(path) {
+    if (ownIs(path, GONE)) return true;
+    const k = keyOf(path) + '/';
+    const now = Date.now();
+    for (const [p, list] of L.own) {
+      if (k.startsWith(p + '/') && list.some(e => e.h === GONE && now - e.at < OWN_TTL_MS)) return true;
+    }
+    return false;
+  }
+
+  /* ---- stale record ---- */
+  function markStale(path, folder) {
+    L.stale.set(keyOf(path), { seq: ++L.seq, folder: !!folder });
+  }
+  function staleHit(path) {
+    const k = keyOf(path);
+    if (L.stale.has(k)) return true;
+    for (const [p, v] of L.stale) if (v.folder && k.startsWith(p + '/')) return true;
+    return false;
+  }
+  const isFreshWriter = rel => FRESH_WRITERS.includes(foldSeg(rel));
+  async function settled() {
+    while (L.pending.size) await Promise.all(Array.from(L.pending));
+  }
+  /* The refusal. Plain words, no placeholders left unfilled, and a code the
+     callers (and tests) can test for; the callers already catch a write error
+     and toast it, so this message is what the reader sees there. io.js speaks
+     no language of its own, so the text comes from the table at throw time
+     (required lazily, as destinationProblem does with report.js — this is the
+     first module every boot path loads). */
+  function staleError(rel) {
+    let message;
+    try {
+      message = require('./i18n').t('io.stale.message', { file: rel });
+    } catch (e) { message = null; }
+    if (!message || message === 'io.stale.message') {
+      message = `${rel} was changed outside this page after it loaded, so nothing was written`;
+    }
+    const err = new Error(message);
+    err.code = 'STALE';
+    err.rel = rel;
+    for (const fn of Array.from(L.listeners)) { try { fn({ rel, path: relPath(rel) }); } catch (e) { /* a listener must not mask the refusal */ } }
+    return err;
+  }
+  /* Throws STALE when somebody else changed, moved or deleted this path since
+     the page last read it. Waits first for any change event still being
+     judged, so a Save clicked in the instant between an edit arriving and the
+     watcher classifying it cannot slip through. */
+  async function assertFresh(path, rel) {
+    await settled();
+    if (isFreshWriter(rel)) return;
+    if (staleHit(path)) throw staleError(rel);
+  }
+
+  /* observeChange(file, oldPath, kind) — the watcher's report. Resolves to
+     { own: true } when the change is this app's own echo (nothing to do), or
+     { own: false } when somebody else made it (the path is now stale and the
+     caller schedules its reload). `kind` is optional: a rename is recognised by
+     its oldPath, a delete by the file no longer being in the vault. */
+  async function judge(file, oldPath, kind) {
+    const path = file && file.path;
+    if (typeof path !== 'string') return { own: false };
+    const dir = Array.isArray(file.children);
+    /* Obsidian hands modify, create and delete the file alone, and a delete's
+       file is no longer in the index — so the three need no label from the
+       caller: a file that is gone was deleted, one that is there changed. */
+    const k = typeof oldPath === 'string' ? 'rename'
+      : (kind === 'delete' || (!kind && !vault.getAbstractFileByPath(path))) ? 'delete' : 'modify';
+    if (k === 'rename') {
+      markStale(oldPath, dir);
+      markStale(path, dir);
+      return { own: false };
+    }
+    if (k === 'delete') {
+      if (ownGone(path)) return { own: true };
+      markStale(path, dir);
+      return { own: false };
+    }
+    // create / modify. No record lives in a folder, so a folder appearing
+    // invalidates nothing: it is ours (ensureFolder) or it just reloads.
+    if (dir) return { own: ownIs(path, DIR) };
+    if (!isTextPath(path)) {
+      if (ownIs(path, BIN)) return { own: true };
+      markStale(path, false);
+      return { own: false };
+    }
+    const text = await vault.cachedRead(file);
+    if (ownIs(path, hashText(text))) return { own: true };
+    markStale(path, false);
+    return { own: false };
+  }
+  function observeChange(file, oldPath, kind) {
+    const p = (async () => {
+      try { return await judge(file, oldPath, kind); } catch (e) {
+        if (file && typeof file.path === 'string') markStale(file.path, false);
+        return { own: false };
+      }
+    })();
+    L.pending.add(p);
+    const done = () => { L.pending.delete(p); };
+    p.then(done, done);
+    return p;
+  }
+  /* A full reload brackets itself: staleMark() before it reads anything,
+     staleClear(mark) once it has completed. Only marks made BEFORE the mark
+     are cleared — a change that lands while the reload is reading is newer
+     than what the reload read and must survive it. */
+  const staleMark = () => L.seq;
+  function staleClear(mark) {
+    for (const [k, v] of Array.from(L.stale)) if (v.seq <= mark) L.stale.delete(k);
+    return L.stale.size;
+  }
+  const isStaleFile = rel => staleHit(relPath(rel));
+  function onStaleWrite(fn) {
+    L.listeners.add(fn);
+    return () => { L.listeners.delete(fn); };
+  }
 
   async function ensureFolder(path) {
     if (!path || path === '/') return;
     if (vault.getAbstractFileByPath(path)) return;
     await ensureFolder(path.split('/').slice(0, -1).join('/'));
-    try { await vault.createFolder(path); } catch (e) { /* raced into existence */ }
+    const undo = ownRemember(path, DIR);
+    try { await vault.createFolder(path); } catch (e) { undo(); /* raced into existence */ }
   }
   async function readFile(rel) {
-    const f = vault.getFileByPath(relPath(rel));
-    return f ? await vault.cachedRead(f) : null;
+    const path = relPath(rel);
+    const f = vault.getFileByPath(path);
+    const text = f ? await vault.cachedRead(f) : null;
+    /* The caller now holds this file's CURRENT bytes, so whatever it writes
+       back is built on them: whatever made the path stale is no longer a
+       reason to refuse. (Writers that read first — the rules file, the deleted
+       log, the Settings updater — rely on this; load-time writers never call
+       it between the load and the Save.) */
+    L.stale.delete(keyOf(path));
+    return text;
   }
   // Defence in depth: refuse any write that resolves outside the budget
   // folder. normalizePath does NOT strip "../", so a label like
@@ -146,13 +378,15 @@ function makeIo({ vault, plugin }) {
   }
   async function writeVaultFile(rel, content) {
     const path = guardedVaultPath(rel);
-    stampWrite();
-    const f = vault.getFileByPath(path);
-    if (f) { await vault.modify(f, content); }
-    else {
-      await ensureFolder(path.split('/').slice(0, -1).join('/'));
-      await vault.create(path, content);
-    }
+    const undo = ownRemember(path, hashText(content));
+    try {
+      const f = vault.getFileByPath(path);
+      if (f) { await vault.modify(f, content); }
+      else {
+        await ensureFolder(path.split('/').slice(0, -1).join('/'));
+        await vault.create(path, content);
+      }
+    } catch (e) { undo(); throw e; }
     stampWrite();
     return path;
   }
@@ -167,13 +401,15 @@ function makeIo({ vault, plugin }) {
   async function writeVaultBinary(rel, bytes) {
     const path = guardedVaultPath(rel);
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    stampWrite();
-    const f = vault.getFileByPath(path);
-    if (f) { await vault.modifyBinary(f, buf); }
-    else {
-      await ensureFolder(path.split('/').slice(0, -1).join('/'));
-      await vault.createBinary(path, buf);
-    }
+    const undo = ownRemember(path, BIN);
+    try {
+      const f = vault.getFileByPath(path);
+      if (f) { await vault.modifyBinary(f, buf); }
+      else {
+        await ensureFolder(path.split('/').slice(0, -1).join('/'));
+        await vault.createBinary(path, buf);
+      }
+    } catch (e) { undo(); throw e; }
     stampWrite();
     return path;
   }
@@ -195,11 +431,11 @@ function makeIo({ vault, plugin }) {
   async function createVaultFileIfAbsent(rel, content) {
     const path = guardedVaultPath(rel);
     if (vaultPathTaken(path)) return false;
-    stampWrite();
     await ensureFolder(path.split('/').slice(0, -1).join('/'));
     let wrote = true;
-    try { await vault.create(path, content); } catch (e) { wrote = false; }
-    stampWrite();
+    const undo = ownRemember(path, hashText(content));
+    try { await vault.create(path, content); } catch (e) { wrote = false; undo(); }
+    if (wrote) stampWrite();
     return wrote;
   }
   /* Guarded folder creation for user-named destinations (the wizard's
@@ -208,28 +444,39 @@ function makeIo({ vault, plugin }) {
   async function ensureVaultFolder(rel) {
     await ensureFolder(guardedVaultPath(rel));
   }
+  /* Refuses (code 'STALE') when somebody else changed, moved or deleted this
+     path since the page last read it — see the ledger above. That includes the
+     file being GONE: a writer addressing a path the page loaded must not bring
+     a moved file back as a second copy (L3-06). A path no event ever named is
+     simply new, and is created. */
   async function writeFile(rel, content) {
     const path = guardedPath(rel);
-    stampWrite();
-    const f = vault.getFileByPath(path);
-    if (f) { await vault.modify(f, content); }
-    else {
-      await ensureFolder(path.split('/').slice(0, -1).join('/'));
-      await vault.create(path, content);
-    }
+    await assertFresh(path, rel);
+    const undo = ownRemember(path, hashText(content));
+    try {
+      const f = vault.getFileByPath(path);
+      if (f) { await vault.modify(f, content); }
+      else {
+        await ensureFolder(path.split('/').slice(0, -1).join('/'));
+        await vault.create(path, content);
+      }
+    } catch (e) { undo(); throw e; }
     stampWrite();
   }
   /* Binary sibling of writeFile — same containment guard. Used for uploaded
      tax documents (PDFs, images). */
   async function writeBinary(rel, data) {
     const path = guardedPath(rel);
-    stampWrite();
-    const f = vault.getFileByPath(path);
-    if (f) { await vault.modifyBinary(f, data); }
-    else {
-      await ensureFolder(path.split('/').slice(0, -1).join('/'));
-      await vault.createBinary(path, data);
-    }
+    await assertFresh(path, rel);
+    const undo = ownRemember(path, BIN);
+    try {
+      const f = vault.getFileByPath(path);
+      if (f) { await vault.modifyBinary(f, data); }
+      else {
+        await ensureFolder(path.split('/').slice(0, -1).join('/'));
+        await vault.createBinary(path, data);
+      }
+    } catch (e) { undo(); throw e; }
     stampWrite();
   }
   /* THE body-preserving write, as a named operation. note-file.js calls this
@@ -245,9 +492,17 @@ function makeIo({ vault, plugin }) {
      break, so adding one would grow the file on every save. Returns the
      patched block, because accounts.js must re-capture it (each patch is
      computed against the PREVIOUS block, or saves undo each other). */
+  /* One line ending for the whole file: the body's, or failing that the
+     captured block's, or LF. The block used to be joined with '\n' onto a body
+     that kept its own '\r\n', so a Windows-edited note came back with a CRLF
+     body under an LF frontmatter — mixed endings, a whole-file diff under sync
+     (2026-10-14 audit, L3-11). The captured block is read as LF first so
+     patchFrontmatter sees the same lines whatever the file's ending. */
   async function patchFile(rel, raw, body, updates) {
-    const fm = patchFrontmatter(raw, updates);
-    await writeFile(rel, `---\n${fm}\n---${body}`);
+    const eol = lineEndingOf(body) || lineEndingOf(raw) || '\n';
+    const lf = patchFrontmatter(String(raw == null ? '' : raw).replace(/\r\n/g, '\n'), updates);
+    const fm = eol === '\n' ? lf : lf.replace(/\n/g, eol);
+    await writeFile(rel, `---${eol}${fm}${eol}---${body}`);
     return fm;
   }
   /* Delete, as the only deletion this plugin performs.
@@ -272,8 +527,28 @@ function makeIo({ vault, plugin }) {
      so rather than claim a success. */
   async function trashFile(file) {
     if (!file) return false;
-    stampWrite();
-    await vault.trash(file, false);
+    /* Re-asked here, after whatever dialog the caller put the reader through
+       (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
+       a path that no longer resolves to THIS file means it is gone (nothing to
+       delete — said as false, not as a success) or was deleted and replaced by
+       a different file (a sync, another pane), which this would otherwise trash
+       at the old path. categories.js carried the check for itself; plans, tax
+       years, accounts and notes did not.
+
+       "This file" is the same object, or — because a vault may rebuild its
+       index and hand back a fresh object for an unchanged file — the same path
+       with the same creation time (both without stat only in the bare-node
+       harness). A FOLDER has no content of its own to be mistaken for another,
+       so it only has to still exist. */
+    const isFolder = Array.isArray(file.children);
+    const now = isFolder ? vault.getFolderByPath(file.path) : vault.getFileByPath(file.path);
+    if (!now) return false;
+    const same = isFolder || now === file || (now.path === file.path
+      && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
+    if (!same) throw staleError(relOf(file.path));
+    await assertFresh(file.path, relOf(file.path));
+    const undo = ownRemember(file.path, GONE);
+    try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
     stampWrite();
     return true;
   }
@@ -471,6 +746,9 @@ function makeIo({ vault, plugin }) {
   return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath, vaultPathTaken,
+    /* The change ledger (see the block above makeIo): the watcher reports what
+       it saw, a full reload brackets itself, the controller hears refusals. */
+    observeChange, staleMark, staleClear, isStaleFile, onStaleWrite,
     /* destinationProblem (module level, above) bound to THIS vault: its own
        config folder (vault.configDir, read at call time) and the configured
        budget folder. `opts` still overrides either, for a caller that knows

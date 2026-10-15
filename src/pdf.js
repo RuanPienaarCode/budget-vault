@@ -234,11 +234,47 @@ function layoutDocument(doc, opts) {
     return nat;
   }
 
-  function computeColWidths(head, rows, align, weights, size) {
+  /* Columns a table asks never to have shortened — `keepWhole: [{ col, widest }]`
+     on the block. A column of DATES is the case: "2026-09-17" cut to "2026-09…"
+     keeps neither day nor sense, and a fixed weight that holds ten Helvetica
+     characters does not hold ten in the system face the image path measures
+     with (2026-10-14 audit, L4A-05). `widest` is a string at least as wide as
+     anything the column holds ('0000-00-00' for an ISO date — digits are the
+     widest glyphs in every face this runs under); the column is sized from
+     that and from its real cells, measured at the size being tried, under the
+     measure the layout was handed. */
+  function wholeColumns(block, n) {
+    const out = new Map();
+    for (const k of (block && block.keepWhole) || []) {
+      if (k && Number.isInteger(k.col) && k.col >= 0 && k.col < n) out.set(k.col, k.widest ? String(k.widest) : '');
+    }
+    return out;
+  }
+
+  function computeColWidths(head, rows, align, weights, size, whole) {
     const n = head.length;
     if (weights && weights.length === n) {
       const total = weights.reduce((a, b) => a + b, 0) || 1;
-      return weights.map(w => contentWidth * w / total);
+      const widths = weights.map(w => contentWidth * w / total);
+      if (whole && whole.size) {
+        /* Each kept column takes what it measures (never less than the weight
+           gave it), and the rest SHARE what is left in proportion to their
+           weights — the room comes out of the descriptions, never out of a
+           figure. If the kept columns alone would fill the page there is
+           nothing sensible to share and the weights stand. */
+        const natural = naturalColWidths(head, rows, align, size);
+        for (const [c, widest] of whole) {
+          const sample = widest ? measure(widest, 'regular', size) + CELL_PAD * 2 : 0;
+          widths[c] = Math.max(widths[c], natural[c], sample);
+        }
+        const keptSum = [...whole.keys()].reduce((s, c) => s + widths[c], 0);
+        const others = widths.map((w, c) => c).filter(c => !whole.has(c));
+        const weightLeft = others.reduce((s, c) => s + weights[c], 0);
+        if (others.length && weightLeft > 0 && keptSum < contentWidth) {
+          for (const c of others) widths[c] = (contentWidth - keptSum) * weights[c] / weightLeft;
+        }
+      }
+      return widths;
     }
     const natural = naturalColWidths(head, rows, align, size);
     const total = natural.reduce((a, b) => a + b, 0);
@@ -338,16 +374,17 @@ function layoutDocument(doc, opts) {
     const align = block.align || head.map(() => 'left');
     const boldRows = new Set(block.boldRows || []);
     const weights = block.weights;
+    const whole = wholeColumns(block, head.length);
     function fitsAtSize(sz) {
       if (weights && weights.length === head.length) {
-        return numericFits(head, rows, align, computeColWidths(head, rows, align, weights, sz), sz, boldRows);
+        return numericFits(head, rows, align, computeColWidths(head, rows, align, weights, sz, whole), sz, boldRows);
       }
       return numericNaturalTotal(head, rows, align, sz) <= contentWidth;
     }
     let size = TABLE_FONT_START;
     while (size > TABLE_FONT_FLOOR && !fitsAtSize(size)) size--;
-    const colWidths = computeColWidths(head, rows, align, weights, size);
-    const plan = { head, rows, align, colWidths, size, boldRows, width: colWidths.reduce((a, b) => a + b, 0) };
+    const colWidths = computeColWidths(head, rows, align, weights, size, whole);
+    const plan = { head, rows, align, colWidths, size, boldRows, whole, width: colWidths.reduce((a, b) => a + b, 0) };
     plans.set(block, plan);
     return plan;
   }
@@ -405,7 +442,7 @@ function layoutDocument(doc, opts) {
       for (let c = 0; c < plan.head.length; c++) {
         const raw = plan.rows[r][c] == null ? '' : plan.rows[r][c];
         const font = isBold ? 'bold' : 'regular';
-        const text = fitCell(raw, plan.colWidths[c], plan.size, plan.align[c] === 'right', font);
+        const text = fitCell(raw, plan.colWidths[c], plan.size, plan.align[c] === 'right' || plan.whole.has(c), font);
         drawCell(text, cx, y, plan.colWidths[c], rH, font, plan.size, plan.align[c]);
         cx += plan.colWidths[c];
       }

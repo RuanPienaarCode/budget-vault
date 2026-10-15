@@ -52,6 +52,7 @@ const DOC_LABEL_KEYS = [
   'title', 'titleSummary', 'category', 'type', 'total', 'average', 'budgeted', 'period', 'from', 'to',
   'budget', 'actual', 'remaining', 'used', 'notes', 'date', 'description', 'account', 'currency', 'amount',
   'flag', 'excluded', 'splitParent', 'splitPart', 'subtotal', 'summaryHeading', 'transactionsHeading',
+  'flagTransfer', 'flagOutside', 'flagForeign', 'flagFund', 'flagScheduled', 'inProgress',
   'generated', 'range', 'categories', 'allCategories', 'periodLine', 'periodUncat',
   'noteFilter', 'noteForeign', 'noteInProgress', 'noteWide', 'noteTx',
   'amountsIn', 'noteNoBudget', 'exactHeading', 'noteExact', 'noteExactOnly', 'noteExactThrough',
@@ -66,6 +67,7 @@ module.exports = function registerBudgetExport(ctx) {
     S, app, plugin, money, toast, writeVaultFile, writeVaultBinary, fileAtVaultPath, vaultPathTaken, destinationProblem,
     currentPeriod, shiftPeriod, periodRange, periodMonthName, periodTitle, periodSummary, txInPeriod,
     periodsForMonths, earliestDataMonth, budgetVsActualRows, categoryActualsInRange, txInRange, locale,
+    budgetUsed, ledgerEnv,
   } = ctx;
 
   /* The same two per-row helpers views/transactions.js builds for its own
@@ -87,6 +89,9 @@ module.exports = function registerBudgetExport(ctx) {
   const docLabels = () => {
     const out = {};
     for (const k of DOC_LABEL_KEYS) out[k] = i18n.t(`bx.doc.${k}`, KEEP);
+    /* An assume-spent row's tag, the Budget page's own word for it. */
+    out.assumedRow = i18n.t('bud.assumed.tag');
+    out.assumedNone = i18n.t('bud.assumed.note');
     /* Sheet names stay English on purpose: Excel forbids a handful of
        characters and caps them at 31, and a formula someone writes against
        'Summary'!C2 should survive the household changing its language. */
@@ -114,7 +119,10 @@ module.exports = function registerBudgetExport(ctx) {
     if (p && p.kind === 'traversal') return i18n.t('report.field.folderTraversal');
     if (p && p.kind === 'configDir') return i18n.t('bx.problem.configDir', { folder: p.folder });
     if (p && p.kind === 'hidden') return i18n.t('bx.problem.hiddenFolder', { folder: p.folder });
-    return p ? i18n.t('report.field.folderManaged', { folder: p.folder }) : null;
+    /* The export's own words. This used to borrow the Report's
+       ("a report saved here would be read back as data…"), which told someone
+       exporting a PDF about a report they were not making (L4A-11). */
+    return p ? i18n.t('bx.problem.managedFolder', { folder: p.folder }) : null;
   }
 
   /* `path` as the vault already spells it, when a file differing only by
@@ -160,6 +168,27 @@ module.exports = function registerBudgetExport(ctx) {
      with no rule gets calendar years only. */
   const budgetExportPresets = () => datePresets({ today: todayIso(), taxYearRange: (locale() || {}).taxYearRange });
 
+  /* What the Budget page and the Dashboard hero print beside "spent" that the
+     numbers alone do not say, in the hero's own sentences (the Dashboard's own
+     i18n keys — a third wording of one fact is how two pages come to disagree).
+     Two of them change what the figure MEANS and no rendering carried either
+     (L4A-04):
+       assumed            the Spent figure includes budget counted as already
+                          spent with no transaction behind it — said on the same
+                          line as the figure (`inline`)
+       fundedFromSavings  spending a fund paid for, held out of every figure
+     Amounts to the cent, like every other figure in the file. */
+  function caveatsFor(assumedAmount, funds) {
+    const out = [];
+    if (assumedAmount >= 1) {
+      out.push({ key: 'assumed', inline: true, text: i18n.t('dash.hero.assumedIncluded', { amount: money(assumedAmount) }) });
+    }
+    if (funds && funds.count > 0) {
+      out.push({ key: 'fundedFromSavings', text: i18n.t('dash.fundedFromSavings', { amount: money(funds.spend), count: funds.count }) });
+    }
+    return out;
+  }
+
   function periodsFor(answer) {
     if (isDates(answer)) {
       return datesOk(answer) ? periodsEndingIn({
@@ -180,10 +209,18 @@ module.exports = function registerBudgetExport(ctx) {
     const now = currentPeriod();
     const periods = keys.map(p => {
       const { start, end } = periodRange(p);
+      const used = budgetUsed(p);
+      const summary = periodSummary(p);
       return {
         key: p, name: periodMonthName(p), title: periodTitle(p), start, end,
         rows: budgetVsActualRows(p),
-        summary: periodSummary(p),
+        summary,
+        /* The Budget page's Total spent for this period — ADR-0005's
+           budgetUsed(p).spent, which the headline prints under that name. The
+           summary's `spend` is the gross outflow, set-aside money included
+           (L4A-01); the model never re-derives either. */
+        spent: used.spent,
+        caveats: caveatsFor(used.assumed, summary.fundedFromSavings),
         /* In date mode the transactions are the exact-date ones, gathered once
            below — not each period's list, which would run past both ends. */
         txs: withRows && answer.includeTx && !isDates(answer) ? txInPeriod(p) : [],
@@ -192,7 +229,9 @@ module.exports = function registerBudgetExport(ctx) {
     let exact = null;
     if (isDates(answer) && datesOk(answer)) {
       const { rows, through, summary } = categoryActualsInRange(answer.from, answer.to);
-      exact = { from: answer.from, to: answer.to, through, rows, summary,
+      /* A window has no budget handed to it, so nothing is assume-spent in it:
+         only the funds sentence applies. */
+      exact = { from: answer.from, to: answer.to, through, rows, summary, caveats: caveatsFor(0, summary && summary.fundedFromSavings),
         txs: withRows && answer.includeTx ? txInRange(answer.from, through) : [] };
     }
     return buildModel({
@@ -200,6 +239,10 @@ module.exports = function registerBudgetExport(ctx) {
       periods, content: answer.content, categories: answer.categories, includeTx: answer.includeTx,
       generated: nowLocalMinute(), currency: (S.settings || {}).currency || '',
       inProgress: keys.includes(now) ? now : null,
+      /* What the transaction listing flags rows against: the household's own
+         ledger env (the BUDGET lens's vetoes) and today, which the running
+         period's figures close at. The model owns no clock and no vault. */
+      env: ledgerEnv(), today: todayIso(),
     });
   }
 

@@ -258,6 +258,25 @@
   }
   .budget-app-root .bud-table tbody tr:not(.type-row) td:first-child { font-weight: 600; }
 
+  /* THE TABLE FITS THE CARD (audit L6-01). It measured 1104px in a 1078px card
+     at 1280 (the row's delete button outside it) and 1104px in 902 at 1024.
+     Nothing in it could give: the Notes input carries style="width:230px" (an
+     inline width no stylesheet rule beats, so the column was 262px), "no
+     transaction expected" sat on a nowrap line (td.num is nowrap) and fixed the
+     whole Actual column at 165px, and the Type badge is nowrap. Each now gives
+     what it can, and in this order of cost to the reader: a max-width lowers
+     the inline 230px (a max-width beats a width, as min-width does for the
+     stacked Transactions note) to a field that still holds a sentence; a
+     caption and a badge wrap where they must; the cell padding goes from 16px
+     to 12px. 1104 becomes 874px, which fits from a ~1000px window. Below the
+     600px line the table is stacked cards and none of this applies (the
+     landscape phone's card keeps its own min-width, which outranks the cap). */
+  .budget-app-root .bud-table tbody tr:not(.type-row) td:nth-child(5) input.form-control { max-width: 10rem; }
+  .budget-app-root .bud-table .category-badge { white-space: normal; }
+  .budget-app-root .bud-table td.num .bud-assumed-note { white-space: normal; }
+  .budget-app-root .bud-table thead th,
+  .budget-app-root .bud-table tbody td { padding-inline: 12px; }
+
   /* Row buttons live in four slots, left to right: assume spent, fixed, clear,
      delete. A row that has fewer buttons keeps the ones it has in THEIR slots
      (income and transfers have no assume/fixed, an unsaved row has no clear),

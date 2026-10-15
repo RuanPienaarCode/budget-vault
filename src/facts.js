@@ -212,16 +212,30 @@ const ZA_YEAR_LIMITS = [
   {
     from: 2027,
     tfsa: 46000,
-    cgt: 40000,
+    cgt: 50000,
     /* SARS raised the annual TFSA contribution limit from R36 000 to R46 000
        effective 1 March 2026 (the 2027 tax year) — verified 10 Aug 2026.
 
-       The CGT annual exclusion is deliberately NOT changed here. A rise to
-       R50 000 was reported during the audit and could NOT be confirmed against
-       a primary source; the exclusion has been R40 000 since 2016/17, which
-       makes a jump notable enough to want a citation first. Two agents agreeing
-       is how the fabricated transfer-duty table survived, so this waits. */
-    cgtVerified: false,
+       The CGT annual exclusion rose from R40 000 to R50 000 in the same Budget.
+       It was held back at R40 000 for two months because the rise was reported
+       by a second-hand source and a jump after nine unchanged years wanted a
+       citation first ("two agents agreeing is how the fabricated transfer-duty
+       table survived"). The primary source has now been read: SARS's CGT page
+       (https://www.sars.gov.za/tax-rates/income-tax/capital-gains-tax-cgt/,
+       "Last Updated: 26/02/2026") lists, under its "25 February 2026 - No
+       changes in percentages but changes to exclusions" heading, "Annual
+       exclusion of R50 000 capital gain or capital loss is granted to
+       individuals and special trusts". Read 15 October 2026 (2026-10-14 audit,
+       L2b-04). The Tax page had been telling a saver with R45 000 of gains that
+       about R2 000 of them fed into taxable income.
+
+       `cgtVerified` is true, and stays only as the record that this row's CGT
+       figure was checked: it used to be false and nothing read it, which is the
+       worst form of a caveat. Re-read the page when the next Budget publishes
+       (late February 2027). */
+    cgtVerified: true,
+    cgtSource: 'https://www.sars.gov.za/tax-rates/income-tax/capital-gains-tax-cgt/',
+    cgtVerifiedOn: '2026-10-15',
   },
   { from: 2017, tfsa: 36000, cgt: 40000, cgtVerified: true },
 ];

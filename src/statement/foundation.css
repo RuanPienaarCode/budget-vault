@@ -496,12 +496,16 @@
 .budget-app-root:not(.bud-dark) .donut-legend .dl-delta.is-down,
 .budget-app-root:not(.bud-dark) .assets-hero-badge-ok { color: var(--color-primary); }
 
-/* A settled debt row is dimmed as a whole (opacity .55 on its cells in
-   src/styles.css), which takes the "settled" label from 7:1 to 2.6:1 on the
-   light theme: the dimming multiplies whatever ink is under it. A little less
-   dimming (.75, still visibly quieter than a live row) and the darker of the
-   two emeralds for the label bring it to 5:1. */
-.budget-app-root:not(.bud-dark) .debt-settled td { opacity: .75; }
+/* A settled debt row used to be dimmed as a whole - opacity .55 on its cells in
+   src/styles.css, then .75 here - on the claim that this brought the settled
+   label "to 5:1". It did not: the "Settled" pill is a button.status-pill, not the
+   .text-success span the re-point below reaches, and it measured 3.09:1 (the
+   muted note beside it 3.9:1) against the 4.5:1 the plugin holds everything
+   else to (audit L5-04, Obsidian 1.14.4's real app.css). Opacity multiplies the
+   ink, so a quieter row cannot be built from it. The row is quieter through its
+   ink token and a dimmed progress bar now (src/styles.css, .debt-settled), and
+   the one thing left to do here is the label: the darker of the two emeralds
+   for the "settled" text. */
 .budget-app-root:not(.bud-dark) .debt-settled .text-success { --color-success: var(--color-primary-dark); }
 
 /* The accounts ring's legend: a group that also holds money in another currency

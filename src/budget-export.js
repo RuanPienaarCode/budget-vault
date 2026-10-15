@@ -34,8 +34,9 @@
    so tests/budget-export.test.cjs drives it in bare node. */
 
 const { csvCell } = require('./csv');
-const { budgetRowStatus } = require('./money-flow');
+const { budgetRowStatus, budgetSpent } = require('./money-flow');
 const { splitRole } = require('./tx-role');
+const { stamp, LENSES } = require('./ledger');
 const { EXPORT_DIR, safeName, transactionsCsv } = require('./exporter');
 
 /* The six spans the dialog offers, in calendar MONTHS — the same unit
@@ -134,42 +135,13 @@ function datePresets({ today, taxYearRange }) {
   return out;
 }
 
-/* ONE ROUNDING, for every rendering. Half a cent rounds AWAY FROM ZERO, on
-   the DECIMAL value of the figure.
-
-   The three renderings of one model used to round three ways: the workbook
-   with Math.round(v * 100) / 100, the CSV with toFixed(2), the PDF through
-   formatAmount (toFixed too). An Average over two periods lands on half a
-   cent whenever the total is an odd number of cents, and there they split —
-   R0,03 over two months printed 0.01 in the CSV and the PDF and 0.02 in the
-   workbook; 21.7% of two-period cent totals disagreed, and on the first real
-   vault checked one category's This-tax-year Average differed by R0,01
-   between files written by the same click (2026-10-07 audit, L4A-04). Both
-   old rules were also wrong on their own terms: 0.015, 2.675 and 1.005 are
-   stored a hair BELOW their half, so toFixed printed 0.01, 2.67 and 1.00, and
-   Math.round(1.005 * 100) is 100.
-
-   The owner's ruling: half-up on the decimal value, one helper all three
-   share. The figure is first read at fifteen significant digits — the most a
-   double carries faithfully, which is exactly what strips the binary
-   residue (0.01499999999999999944 reads as 0.0150000000000000) — and then
-   rounded in decimal by moving the point in the STRING ("…e2"), so no
-   multiplication reintroduces the residue it just removed. Away from zero
-   for negatives, because that is Excel's own ROUND and what "half-up" means
-   for money; never -0. Non-finite values pass through: each rendering already
-   says what it does with those, and this is not the place to change it.
-   Values past 1e15 have no cents left to round in a double and come back as
-   they went in. tests/export-one-average.test.cjs sweeps every cent total
-   from -R5 to R5 over 2-12 periods against an integer-cents reference. */
-function roundCents(v) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return n;
-  const a = Math.abs(n);
-  if (a < 1e-6) return 0;
-  if (a >= 1e15) return n;
-  const r = Number(`${Math.round(Number(`${a.toPrecision(15)}e2`))}e-2`);
-  return n < 0 && r !== 0 ? -r : r;
-}
+/* roundCents lives in amount.js, the pure money module, so the exports, the
+   report's JSON and the re-slice modal share ONE implementation (it was spelled
+   out in budget-export.js and again in reslice.js, and report.js required this
+   whole module just to reach it). Re-exported below for the tests that name it
+   here. The rule - half a cent away from zero on the decimal value, never -0 -
+   is documented where it now lives. */
+const { roundCents } = require('./amount');
 /* A money figure as every rendering prints it: unreadable is 0, as the CSV,
    the workbook and formatAmount have each always treated it. */
 const cents = v => roundCents(Number(v) || 0);
@@ -179,7 +151,29 @@ const cents = v => roundCents(Number(v) || 0);
    printed 10.01s, not 20.01. Rounding a value read off the row is not
    re-deriving it: `remaining` is still figures.js's own. */
 const centsRow = r => ({ ...r, budget: cents(r.budget), actual: cents(r.actual), remaining: cents(r.remaining) });
-const centsSummary = s => (s ? { ...s, income: cents(s.income), spend: cents(s.spend), uncatSpend: cents(s.uncatSpend) } : null);
+/* The headline's three figures, and the one the page calls Total spent.
+
+   `spend` is the ledger's GROSS outflow — every non-income row the budget lens
+   keeps, the money set aside into savings and investments included. `spent` is
+   the figure the Budget page prints under that name: ADR-0005's budgetSpent(),
+   spend LESS what was set aside, PLUS the assume-spent provision. The PDF's
+   "Income X · Spent Y" line used to print the first under the second's name,
+   and on the vault this was found on 44 of 52 periods disagreed with the page
+   it was made from by exactly the money moved into investments (2026-10-14
+   audit, L4A-01).
+
+   The view hands the period's own `budgetUsed(p).spent` in, which already
+   carries the provision (only a saved budget has assume-spent rows to
+   provide for). Where none is handed in — a date-range window, which has no
+   budget, and any hand-built period — the same rule runs over the summary's
+   own operands, so the two readings differ only by the provision a window
+   has no budget to hold. */
+const spentOf = (s, given) => cents(given !== undefined && given !== null
+  ? given
+  : budgetSpent({ spend: s.spend, setAside: s.setAside }));
+const centsSummary = (s, spent) => (s
+  ? { ...s, income: cents(s.income), spend: cents(s.spend), uncatSpend: cents(s.uncatSpend), spent: spentOf(s, spent) }
+  : null);
 
 /* Per-type subtotals over the rows actually shown. `remaining` comes from
    budgetRowStatus over the summed operands — the row rule, applied to a row
@@ -198,6 +192,46 @@ function subtotalsOf(rows) {
   }));
 }
 
+/* Two periods can share a name: a fortnightly or weekly pay cycle names its
+   periods for the month they END in, so two fortnights of August are both
+   "August 2026" — and then the Summary has two identical column headers, the
+   Budget CSV two identical Period values, and the reader cannot say which
+   fortnight a figure belongs to (2026-10-14 audit, L4A-09). A repeated name
+   gets its dates beside it; a name that is already unique is left exactly as
+   it was, so a monthly household's files do not move. The key (what
+   `inProgress` and every lookup go by) is never touched. */
+function nameRepeats(list) {
+  const seen = new Map();
+  for (const p of list) seen.set(p.name, (seen.get(p.name) || 0) + 1);
+  return list.map(p => (seen.get(p.name) > 1 && p.start && p.end ? { ...p, name: `${p.name} (${p.start} to ${p.end})` } : p));
+}
+
+/* Why the budget figures above a transaction do not count it — as keys, which
+   the three renderings word in the household's language.
+
+   The BUDGET lens's own vetoes (ledger.js, LENSES.BUDGET.drop: excluded,
+   nonBudget, foreign, earmarkedOut, transfer), read off the stamped row, in the
+   lens's order — plus the two reasons the lens does not see: a split parent
+   (superseded by its parts; the lens vetoes it as excluded already, but a
+   parent is better named for what it is), and a row dated later than `today`,
+   which the running period's figures close at (periodSummary → summaryInRange
+   (start, today)). A split PART is counted, and is named only so the listing
+   can show which rows make up a split.
+
+   Without a stamped row (a hand-built period, no env to stamp against) only
+   what the row itself says can be flagged: its Excluded cell and its split
+   role — what the listing did before the ledger was asked. */
+function flagKeys(t, stamped, today) {
+  const role = splitRole(t.split);
+  if (role === 'parent') return ['splitParent'];
+  const out = [];
+  if (stamped) { for (const k of LENSES.BUDGET.drop) if (stamped[k]) out.push(k); }
+  else if (t.excluded) out.push('excluded');
+  if (role === 'part') out.push('splitPart');
+  if (today && t.date > today) out.push('scheduled');
+  return out;
+}
+
 /* `categories`: null means "no filter"; an ARRAY means "exactly these", and an
    empty array is therefore "none", not "all". The dialog refuses to submit an
    empty pick; the model must not quietly widen one into a full export. */
@@ -209,8 +243,8 @@ function subtotalsOf(rows) {
    really cover: today, when the range runs on into the future, because the
    ledger counts what has happened and schedules the rest. `txs` replace the
    per-period lists, so the transactions are the exact-date ones too. */
-function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact, typeOrder }) {
-  const list = periods || [];
+function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact, typeOrder, env, today }) {
+  const list = nameRepeats(periods || []);
   const only = Array.isArray(categories) ? new Set(categories) : null;
   const keep = cat => !only || only.has(cat);
 
@@ -280,15 +314,31 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
       /* The period's own income/spend/uncategorised line is a statement about
          the WHOLE period. Under a category filter it would sit above a table
          it no longer describes, so it is withheld rather than mislabelled. */
-      summary: only ? null : centsSummary(p.summary),
+      summary: only ? null : centsSummary(p.summary, p.spent),
+      /* The sentences the Budget page and the Dashboard hero print beside this
+         period's Spent — what its assume-spent rows put into it and what a
+         fund paid for outside it ([{ key, text, inline }], worded by the view
+         from the hero's own i18n keys). Like the headline above they describe
+         the WHOLE period, so a category filter withholds them with it. */
+      caveats: only ? [] : (p.caveats || []),
     }))
     : [];
 
   const txSource = exact ? (exact.txs || []) : list.reduce((all, p) => all.concat(p.txs || []), []);
   /* Listed, never summed — but printed three times, so rounded once like
      every other figure: a hand-typed 3-decimal amount used to print 10.00 in
-     the CSV (exporter.js's toFixed) and 10.01 in the workbook. */
-  const transactions = includeTx ? txSource.filter(t => !only || only.has(t.cat)).map(t => ({ ...t, amount: cents(t.amount) })) : null;
+     the CSV (exporter.js's toFixed) and 10.01 in the workbook.
+
+     `why` is the reasons the budget figures do not count the row (flagKeys).
+     Stamped here, once, against the household's own env — the rows the period
+     tables were built from went through the same BUDGET lens, so the listing
+     and the tables answer "is this row in the figures?" by one rule. */
+  const stampedOf = includeTx && env ? new Map(stamp(txSource, env).map(s => [s.row, s])) : null;
+  const transactions = includeTx
+    ? txSource.filter(t => !only || only.has(t.cat)).map(t => ({
+      ...t, amount: cents(t.amount), why: flagKeys(t, stampedOf ? stampedOf.get(t) : null, today),
+    }))
+    : null;
 
   const exactRows = exact ? (exact.rows || []).filter(r => keep(r.cat)).map(centsRow) : null;
 
@@ -313,7 +363,8 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
          of it is uncategorised. Withheld under a category filter for the
          reason the period headline is: it describes money the table no longer
          shows. */
-      totals: only ? null : centsSummary(exact.summary),
+      totals: only ? null : centsSummary(exact.summary, exact.spent),
+      caveats: only ? [] : (exact.caveats || []),
       periodFrom: first ? first.start : null, periodTo: last ? last.end : null,
     } : null,
     inProgress: inProgress && list.some(p => p.key === inProgress) ? inProgress : null,
@@ -389,7 +440,7 @@ function modelToCsv(model, { symbolFor } = {}) {
       for (const r of b.rows) {
         body.push([csvCell(label(b.period)), csvCell(b.period.start || ''), csvCell(b.period.end || ''),
           csvCell(r.cat), csvCell(r.type || ''), csvCell(cur),
-          num(r.budget), num(r.actual), num(r.remaining), csvCell(r.notes || '')].join(','));
+          num(r.budget), num(r.actual), num(r.remaining), csvCell(rowNotes(r, LABELS))].join(','));
       }
     }
     files.push({
@@ -409,6 +460,8 @@ const LABELS = {
   period: 'Period', from: 'From', to: 'To', budget: 'Budget', actual: 'Actual', remaining: 'Remaining', used: 'Used', notes: 'Notes',
   date: 'Date', description: 'Description', account: 'Account', currency: 'Currency', amount: 'Amount', flag: 'Flag',
   excluded: 'excluded', splitParent: 'split parent', splitPart: 'split part',
+  flagTransfer: 'transfer', flagOutside: 'non-budget account', flagForeign: 'other currency',
+  flagFund: 'paid from a fund', flagScheduled: 'scheduled', inProgress: '(in progress)', assumedRow: 'already spent', assumedNone: 'no transaction expected',
   subtotal: 'Total {type}',
   summaryHeading: 'Summary by category', transactionsHeading: 'Transactions',
   generated: 'Generated', range: 'Range', categories: 'Categories', allCategories: 'All categories',
@@ -417,7 +470,7 @@ const LABELS = {
   noteForeign: 'Accounts in {list} are not included in any figure here — there is no exchange rate in this file to combine them with.',
   noteInProgress: '{period} is still in progress, so its figures are for part of a period and pull the average down.',
   noteWide: 'The month-by-month columns do not fit on a page for this many periods — the Excel and CSV exports carry every month.',
-  noteTx: 'Excluded, transfer and split-parent rows are listed and flagged; they are not part of the budget figures above.',
+  noteTx: 'Rows that are not part of the budget figures above are still listed, and each carries its reason in the Flag column — excluded, a transfer, a non-budget account, another currency, paid from a fund, scheduled (dated after today), or a split parent.',
   amountsIn: 'Amounts in {currency}.',
   noteNoBudget: 'No budget was set for this period, so these are actual figures only.',
   exactHeading: 'Actual by category · {from} to {to}',
@@ -458,11 +511,25 @@ function caveats(model, L) {
   return out;
 }
 
-const txFlag = (t, L) => {
-  const role = splitRole(t.split);
-  if (role === 'parent') return L.splitParent;
-  return [t.excluded ? L.excluded : '', role === 'part' ? L.splitPart : ''].filter(Boolean).join(', ');
+/* The per-period sentences, each led by the period (or the exact window) it
+   is about — for the About sheet, where nothing else says which period an
+   assume-spent provision or a fund payout belongs to. */
+function periodCaveats(model) {
+  const out = [];
+  for (const b of model.budgets) for (const c of b.caveats || []) out.push(`${b.period.name}: ${c.text}`);
+  const x = model.exact;
+  if (x) for (const c of x.caveats || []) out.push(`${x.from} to ${x.through}: ${c.text}`);
+  return out;
+}
+
+const FLAG_LABEL = {
+  excluded: 'excluded', splitParent: 'splitParent', splitPart: 'splitPart', nonBudget: 'flagOutside',
+  foreign: 'flagForeign', earmarkedOut: 'flagFund', transfer: 'flagTransfer', scheduled: 'flagScheduled',
 };
+/* A key this module has no word for (a veto added to the lens later) prints as
+   the key itself: a visible unfamiliar word beats a row that is silently
+   unflagged, which is the bug this replaced. */
+const txFlag = (t, L) => (t.why || flagKeys(t, null, null)).map(k => L[FLAG_LABEL[k]] || k).join(', ');
 
 /* Rows with each type's subtotal directly UNDER its group, as [{row}|{sub}].
 
@@ -489,6 +556,17 @@ function grouped(rows, subtotals) {
   return out;
 }
 
+/* A row's Notes cell: the household's own note, then — for an assume-spent
+   row — the Budget page's tag for it. Such a row's Actual is its whole budget
+   with no transaction behind it, and the page says so beside the figure
+   ("already spent"); the file read without the page must too. Appended to the
+   cell rather than added as a column, so no CSV column moves (L4A-04). */
+const rowNotes = (r, L) => [r.notes, r.assumed ? assumedTag(r, L) : ''].filter(Boolean).join(' · ');
+/* "already spent", and — when nothing real moved in the category, which the
+   row carries as realSpend 0 — "no transaction expected": the Budget page's
+   tag and its sub-note, on the same condition it prints them. */
+const assumedTag = (r, L) => (r.realSpend === 0 ? `${L.assumedRow} — ${L.assumedNone}` : L.assumedRow);
+
 /* The Dashboard's rule for the Remaining cell (views/dashboard.js's budget
    table): printed when the row has a budget, or is an unbudgeted overspend —
    and BLANK otherwise. Without it an income row with no budget line printed
@@ -513,7 +591,12 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
   const head = cells => cells.map(v => ({ v, s: 'head' }));
   const sym = symbolFor || (() => '');
 
-  const sumRows = [head([L.category, L.type, ...model.periods.map(p => p.name), L.total, L.average, L.budgeted])];
+  /* The running period marked as the CSV marks it (L4A-08): its Summary
+     header and its Period cell on the Budget sheet say it is part-way through,
+     because the figure under it is for part of a period and pulls the Average
+     down. The workbook is the rendering a person opens; it said nothing. */
+  const lab = p => (p.key === model.inProgress ? `${p.name} ${L.inProgress}` : p.name);
+  const sumRows = [head([L.category, L.type, ...model.periods.map(lab), L.total, L.average, L.budgeted])];
   for (const g of grouped(model.summary.rows, model.summary.subtotals)) {
     if (g.row) { const r = g.row; sumRows.push([r.cat, r.type || '', ...r.byPeriod.map(m), m(r.total), m(r.average), m(r.budget)]); }
     else { const t = g.sub; sumRows.push([{ v: fill(L.subtotal, { type: t.type || '' }), s: 'bold' }, '', ...t.byPeriod.map(mb), mb(t.total), mb(t.average), mb(t.budget)]); }
@@ -534,7 +617,7 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
   if (model.content === 'full' && model.budgets.length) {
     const rows = [head([L.period, L.from, L.to, L.category, L.type, L.budget, L.actual, L.remaining, L.notes])];
     for (const b of model.budgets) {
-      for (const r of b.rows) rows.push([b.period.name, b.period.start || '', b.period.end || '', r.cat, r.type || '', m(r.budget), m(r.actual), showsRemaining(r) ? m(r.remaining) : null, r.notes || '']);
+      for (const r of b.rows) rows.push([lab(b.period), b.period.start || '', b.period.end || '', r.cat, r.type || '', m(r.budget), m(r.actual), showsRemaining(r) ? m(r.remaining) : null, rowNotes(r, L)]);
     }
     sheets.push({ name: L.sheetBudget, rows, freezeRows: 1, widths: [18, 12, 12, 28, 12, 14, 14, 14, 40] });
   }
@@ -552,6 +635,7 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
     [],
     ...exactNotes(model, L).map(c => [c]),
     ...caveats(model, L).map(c => [c]),
+    ...periodCaveats(model).map(c => [c]),
     ...(model.transactions ? [[L.noteTx]] : []),
   ];
   sheets.push({ name: L.sheetAbout, rows: about, widths: [16, 60] });
@@ -576,8 +660,14 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
      the other two on half a cent (L4A-04). */
   const fmt = v => (money ? money(cents(v)) : num(v));
   const rfmt = (v, row) => (rowMoney ? rowMoney(cents(v), row) : fmt(v));
-  const headline = t => fill(L.periodLine, { income: fmt(t.income), spend: fmt(t.spend) })
-    + ((Number(t.uncatSpend) || 0) ? fill(L.periodUncat, { uncat: fmt(t.uncatSpend) }) : '');
+  /* `inline` qualifiers say what the Spent figure itself includes, so they
+     ride on the same line (" · includes R 500 already spent"), as they do
+     under the Budget page's tile. The others are sentences of their own, and
+     follow it as notes. */
+  const headline = (t, cav) => fill(L.periodLine, { income: fmt(t.income), spend: fmt(t.spent) })
+    + ((Number(t.uncatSpend) || 0) ? fill(L.periodUncat, { uncat: fmt(t.uncatSpend) }) : '')
+    + (cav || []).filter(c => c.inline).map(c => ` · ${c.text}`).join('');
+  const sentences = cav => (cav || []).filter(c => !c.inline).map(c => ({ type: 'note', text: c.text }));
   const wide = model.periods.length > PDF_MAX_PERIOD_COLS;
   const cols = wide ? [] : model.periods;
   const blocks = [];
@@ -587,7 +677,10 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   if (model.exact) {
     blocks.push({ type: 'heading', text: fill(L.exactHeading, { from: model.exact.from, to: model.exact.through }) });
     for (const c of exactNotes(model, L)) blocks.push({ type: 'note', text: c });
-    if (model.exact.totals) blocks.push({ type: 'note', text: headline(model.exact.totals) });
+    if (model.exact.totals) {
+      blocks.push({ type: 'note', text: headline(model.exact.totals, model.exact.caveats) });
+      blocks.push(...sentences(model.exact.caveats));
+    }
     const xRows = [], xBold = [];
     for (const g of grouped(model.exact.rows, model.exact.subtotals)) {
       if (g.row) xRows.push([g.row.cat, g.row.type || '', fmt(g.row.actual)]);
@@ -598,15 +691,35 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   const hasPeriods = !model.exact || model.periods.length > 0;
   if (wide) blocks.push({ type: 'note', text: L.noteWide });
 
+  /* A HEADING ROW per type, not a Type column. With nothing naming the type,
+     the Summary printed its rows grouped by type with a subtotal only under a
+     group of two or more, so "Total expense" sat directly beneath a run of
+     one-row groups of other types and read as the total of every line above it
+     (on the vault this was found on: eight rows of eight different types, then
+     a "Total expense" covering two of them - 2026-10-14 audit, L4A-03). Wave A
+     fixed that with a Type column; on the real 12-month landscape export that
+     column's width took the category names down to the 6 pt font floor and
+     truncated three of them. A heading row above each group (the Budget page's
+     type bar) separates the groups just as well and costs no width: it lives
+     in the Category column, bold, with the figure cells blank. The workbook
+     and CSV keep their Type column - a spreadsheet is filtered and pivoted on
+     it, and its width is free. A group of one still needs no subtotal. */
   const head = [L.category, ...cols.map(p => p.name), L.total, L.average, L.budgeted];
   const rows = [], boldRows = [];
+  const blank = head.slice(1).map(() => '');
+  let lastType;
   /* The month-by-month table is up to fifteen money columns wide, and "R " in
      every one of two hundred cells cost it a font size and truncated the
-     category names ("Discovery 32 Day notice sa…"). With a plain formatter
+     category names ("Unit trust savings acco…"). With a plain formatter
      handed in, the cells carry the number and the unit is said ONCE, above. */
   const cell = v => (plainMoney ? plainMoney(cents(v)) : fmt(v));
   for (const g of grouped(model.summary.rows, model.summary.subtotals)) {
     const x = g.row || g.sub;
+    if (g.row && (lastType === undefined || (x.type || '') !== lastType)) {
+      lastType = x.type || '';
+      boldRows.push(rows.length);
+      rows.push([lastType || '-', ...blank]);
+    }
     if (g.sub) boldRows.push(rows.length);
     rows.push([g.row ? x.cat : fill(L.subtotal, { type: x.type || '' }),
       ...(wide ? [] : x.byPeriod.map(v => cell(v))), cell(x.total), cell(x.average), cell(x.budget)]);
@@ -623,7 +736,10 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
        "where does March start" becomes a search. */
     blocks.push({ type: 'pagebreak' });
     blocks.push({ type: 'heading', text: b.period.title ? `${b.period.name} · ${b.period.title}` : b.period.name });
-    if (b.summary) blocks.push({ type: 'note', text: headline(b.summary) });
+    if (b.summary) {
+      blocks.push({ type: 'note', text: headline(b.summary, b.caveats) });
+      blocks.push(...sentences(b.caveats));
+    }
     /* A period nobody budgeted. Row by row the Dashboard's rule calls every
        expense in it an unbudgeted overspend — right for one stray category,
        wrong for a whole month with no plan, where it printed forty negative
@@ -657,6 +773,11 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
       rows: model.transactions.map(t => [t.date, t.desc || '', t.label || '', t.cat || '', rfmt(t.amount, t), txFlag(t, L)]),
       align: ['left', 'left', 'left', 'left', 'right', 'left'],
       weights: [1.1, 3.2, 1.6, 1.8, 1.5, 1.2],
+      /* The date is never cut: its weight holds ten Helvetica characters and
+         not ten in the face the image PDF (zh/ja/hi) measures with, where every
+         date lost its day (L4A-05). pdf.js sizes it from what a date measures
+         under the layout's own measure. */
+      keepWhole: [{ col: 0, widest: '0000-00-00' }],
     });
   }
 

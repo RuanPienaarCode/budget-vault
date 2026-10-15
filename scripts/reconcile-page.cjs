@@ -31,41 +31,17 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian } = require('../tests/helpers/harness.cjs');
 stubObsidian();
-const { dispatchedViews, pinClock, mountFor, harvestView } = require('../tests/helpers/figures.cjs');
+const { dispatchedViews, pinClock, mountFor, harvestView, readVault } = require('../tests/helpers/figures.cjs');
 
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
 
 /* ---- reading a real vault ----------------------------------------------
-   The vault as { path: text }, read the way Obsidian holds it, because that is
-   what every page reads: markdown, the `.csv` files (the loader reads
-   Data/Categorisation Rules.csv), and every folder that would otherwise vanish.
-   A folder with nothing the loader reads in it — empty, or holding only a PDF —
-   is kept as `<folder>/.folder`, the in-memory vault's own marker
-   (tests/helpers/harness.cjs). Until 2026-10-07 this kept `.md` alone: the
-   census printed "rules: 0" for a vault holding hundreds, and an account whose
-   Transactions folder was empty read "no folder" instead of "no transactions
-   yet" — so on the audited vault the reconciliation's Accounts page counted
-   two muted accounts as needing attention that the app does not (audit H-1).
-   Dot-files and dot-folders stay out, as they stay out of Obsidian's tree. */
-function readVault(root) {
-  const out = {};
-  const walk = (dir, prefix) => {
-    let kept = 0;
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (e.name.startsWith('.')) continue;
-      const abs = path.join(dir, e.name);
-      const rel = prefix ? `${prefix}/${e.name}` : e.name;
-      if (e.isDirectory()) { walk(abs, rel); kept++; }
-      else if (e.name.endsWith('.md') || e.name.endsWith('.csv')) { out[rel] = fs.readFileSync(abs, 'utf8'); kept++; }
-    }
-    /* A kept sub-folder carries its own marker if it needs one, and its path
-       alone makes this folder exist in the in-memory tree. */
-    if (!kept && prefix) out[`${prefix}/.folder`] = '';
-  };
-  walk(root, '');
-  return out;
-}
+   readVault lives in tests/helpers/figures.cjs, shared with scripts/figures.cjs.
+   It was a copy here (fixed on 7 Oct 2026, audit H-1, to keep the `.csv` files
+   and a marker for every folder that would otherwise vanish) while
+   scripts/figures.cjs kept its own `.md`-only loop: run over one real vault the
+   two scripts then loaded different trees (audit L8-11, 15 Oct 2026). */
 
 /* --household: the committed synthetic household instead of a real vault.
 
@@ -797,8 +773,13 @@ function runChecks(G, pages) {
        by a unit, and nothing checked that they do. A row prints R 2 400 spent,
        R 4 000 usual, and "−R 1 500".
 
-       Per row, in whole currency units (all three are printed at 0 decimals, so
-       tol 0.51 means exact). The sign is a glyph in the delta's own text
+       Per row, in whole currency units (all three are printed at 0 decimals).
+       Since the 14 Oct 2026 audit the Change column is the rounded TRUE
+       movement, not the difference of the two printed figures: an identical
+       charge every period printed "+R 1" because the Spent column's
+       largest-remainder allocation lifted that row by a unit. The printed
+       parts may now differ from the printed change by that one unit, so tol
+       is 1.01. The sign is a glyph in the delta's own text
        ("+R 1 600", "−R 1 600"), not part of the harvested figure, so it is read
        from the leaf's context. A row with no baseline ("new", "—") has no sum
        to check and is not counted. */
@@ -815,7 +796,7 @@ function runChecks(G, pages) {
       const sign = /^\s*[\u2212-]/.test(own) ? -1 : 1;
       const shownChange = sign * figValue(r.delta), want = figValue(r.val) - figValue(r.base);
       compared.push(i);
-      if (!near(shownChange, want, 0.51)) bad.push(`row ${i}: ${figValue(r.val)} − ${figValue(r.base)} = ${want}, page prints ${shownChange}`);
+      if (!near(shownChange, want, 1.01)) bad.push(`row ${i}: ${figValue(r.val)} − ${figValue(r.base)} = ${want}, page prints ${shownChange}`);
     }
     C.add({ page: D, name: 'Donut legend: Change = Spent − baseline (per row)', formula: 'the Change column is the Spent column minus the 3M / prev column, after the rounding the page prints', kind: 'count',
       pageValue: compared.length ? compared.length - bad.length : null,

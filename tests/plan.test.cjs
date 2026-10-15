@@ -362,10 +362,12 @@ const roundTrip = async plan =>
       ],
     };
     const back = await roundTrip(nasty);
-    // The blank-named source is dropped on the way back in — a row with no name
-    // is not a source, and the loader filters it. Compare against that reality
-    // rather than pretending an empty row round-trips.
-    eq(back.sources, [nasty.sources[0]], 'an adversarial source survives; a nameless row is dropped');
+    // The blank-named source is KEPT on the way back in (2026-10-14 audit,
+    // L3-05): a row with no name but an amount is one a household typed ("R750
+    // deposit, name it later"), and dropping it deleted that amount on the next
+    // Save. The writer's `Other` for a blank kind is what it reads back as.
+    eq(back.sources, [nasty.sources[0], { ...nasty.sources[1], kind: 'Other' }],
+      'an adversarial source survives; a nameless row is kept, not dropped');
     eq(back.envelopes, nasty.envelopes, 'an adversarial envelope survives field-for-field');
     eq(back.items, nasty.items, 'an adversarial item survives field-for-field');
     eq(back.name, nasty.name, 'a plan name holding a pipe and curly quotes survives the frontmatter');

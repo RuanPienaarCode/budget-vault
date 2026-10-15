@@ -78,8 +78,30 @@ function ruleText(s) {
    51ms at 1,200 rows and 2,000 rules on desktop, several hundred on a phone. */
 function prepareRules(rules) {
   return (rules || [])
-    .map(r => ({ p: ruleText(r.pattern), category: r.category }))
+    .map(r => {
+      const p = ruleText(r.pattern);
+      const alt = withoutCountrySuffix(p);
+      return alt ? { p, alt, category: r.category } : { p, category: r.category };
+    })
     .filter(r => r.p);
+}
+
+/* The pattern as the IMPORTER would have left a description that ended the
+   same way. Discovery prints a country code on card rows ("PNP ROSEBANK ZA")
+   and views/import.js strips it (`loc.stripDescSuffix`, ' ZA') before it
+   categorises, so a rule typed or pasted WITH the suffix could never match the
+   description it was copied from (2026-10-14 audit, L1-14: a number of rules in
+   the vault the audit read were dead for exactly that reason). '' when the
+   pattern has no such tail, or nothing would be left of it.
+
+   Held as a second pattern, `alt`, tried by matchRule only when nothing else
+   matched - see there for why that ordering makes it safe. The suffix itself is
+   the one the ZA profile strips; it is spelled here because this module is
+   profile-free, and a household whose bank adds nothing is unaffected: it has
+   no description ending " za" and no rule that does. */
+function withoutCountrySuffix(p) {
+  if (!p.endsWith(' za')) return '';
+  return p.slice(0, -3).trim();
 }
 
 /* Resolve a description against prepared rules and return the WINNING rule.
@@ -125,7 +147,9 @@ function hits(d, p) {
    matcher answers it, rather than with a bare includes() that ignores the
    word boundaries above. */
 function patternMatches(d, p) {
-  return d === p || hits(d, p);
+  if (d === p || hits(d, p)) return true;
+  const alt = withoutCountrySuffix(p);
+  return !!alt && (d === alt || hits(d, alt));
 }
 
 /* Can `general` answer for `specific` on every description, ever? That is,
@@ -170,6 +194,17 @@ function matchRule(desc, rules) {
   for (const r of rules) {
     if (r.p === d) return r;
     if (r.p.length > bestLen && hits(d, r.p)) { best = r; bestLen = r.p.length; }
+  }
+  if (best) return best;
+  /* Only when no rule matched as written: a pattern that ends " za" is tried
+     again without it (see withoutCountrySuffix). Second pass and strictly a
+     fallback, so it can turn "no category" into one but can never change which
+     rule wins a description some rule already matched - no existing
+     categorisation, learned rule or cleanup verdict moves. */
+  for (const r of rules) {
+    if (!r.alt) continue;
+    if (r.alt === d) return r;
+    if (r.alt.length > bestLen && hits(d, r.alt)) { best = r; bestLen = r.alt.length; }
   }
   return best;
 }

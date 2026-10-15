@@ -22,7 +22,8 @@
 
    Pinned:
      1. transactionRow: every text cell is escMdText(cell), once; the currency
-        cell is the household's own symbol and is not touched; a pipe can never
+        cell is escaped like the rest (a plain symbol is unchanged; see
+        tests/transactions-export-symbol-escaped.test.cjs); a pipe can never
         split a cell;
      2. transactionsMarkdown's "Filtered by" line and categoriesMarkdown's
         names, colours and type headings get the same escape (a colour
@@ -78,7 +79,7 @@ const ACTIVE = [DESC, '![x](', '<Garden>', '[[Smart Budget]]', '%%', '<img'];
     eq(cells.length, txHeaderLines()[0].split('|').length - 2, 'the row keeps the header\'s cell count');
     eq([cells[1], cells[2], cells[3], cells[7]], [E(DESC), E(LABEL), E(CAT), E(NOTE)],
       'description, account, category and note are each escMdText(cell) — the statement\'s text, shown, not obeyed');
-    eq(cells[4], '$', 'the currency cell is the household\'s own symbol, printed as part of a figure, and is not escaped');
+    eq(cells[4], E('$'), 'the currency cell is escaped like the other text cells (2026-10-14, L4b-03: a symbol is household text too; `\\$` renders as `$`)');
     eq([cells[5], cells[6], cells[8]], ['R -50.00', 'yes', 'part'], 'the app\'s own values are untouched');
     for (const raw of ACTIVE) ok(!line.includes(raw), `nothing active survives in the row: ${JSON.stringify(raw)}`);
     ok(!line.includes('\\\\'), 'and nothing is escaped twice');

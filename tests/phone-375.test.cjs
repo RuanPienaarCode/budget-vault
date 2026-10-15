@@ -85,11 +85,13 @@ const OK_CTX = [
 ];
 const LANDSCAPE = ['@media (min-width: 601px)'];
 const LANDSCAPE_GUTTER = ['@media (min-width: 601px) and (max-width: 768px)'];
+/* The Dashboard table-fit twins (section 11 of phone.css, audit L5-03): only the narrowest landscape phone needs them. */
+const LANDSCAPE_NARROW = ['@media (min-width: 601px) and (max-width: 700px)'];
 const isCtx = (c, list) => list.some(x => JSON.stringify(x) === JSON.stringify(c));
 for (const r of phoneRules) {
   const c = r.context;
   const portrait = isCtx(c, OK_CTX);
-  const wide = c.length >= 1 && (c[0] === LANDSCAPE[0] || c[0] === LANDSCAPE_GUTTER[0]);
+  const wide = c.length >= 1 && (c[0] === LANDSCAPE[0] || c[0] === LANDSCAPE_GUTTER[0] || c[0] === LANDSCAPE_NARROW[0]);
   ok(portrait || wide, `phone.css line ${r.line}: "${r.prelude.slice(0, 70)}" sits in ${c.join(' ') || 'no @media'} — it would apply to a desktop window; only the phone breakpoint, (pointer: coarse) or body.is-phone are allowed`);
   if (wide) ok(r.selectors.every(s => s.startsWith('body.is-phone ')), `phone.css line ${r.line}: a rule above 600px must be keyed on body.is-phone, found "${r.prelude.slice(0, 80)}"`);
 }
@@ -185,7 +187,7 @@ want(`${R} .header-period-pill .pnav-btn`, 'height', [PORTRAIT], v => px(v) >= 4
 want(`${R} .header-period-pill .pnav-btn`, 'margin-block', [PORTRAIT], v => px(v) === -8, 'hand the extra 16px back so the pill keeps its 52px height');
 for (const [sel, prop] of [['.btn-ghost-sm', 'min-width'], ['.chart-range-btn', 'min-width'], ['.donut-legend .dl-note', 'width'], ['.donut-legend .dl-note', 'height'],
   ['.env-collapse', 'width'], ['.env-collapse', 'height'], ['.plan-del-ico', 'width'], ['.plan-del-ico', 'height'], ['.btn-sm', 'min-height'],
-  ['.src2-del', 'min-width'], ['.bud-act', 'min-width'], ['.bud-act', 'min-height'], ['.tx-whole', 'min-height'], ['.env-slider', 'height'], ['.loan-range', 'min-height']]) {
+  ['.src2-del', 'min-width'], ['.bud-act', 'min-width'], ['.bud-act', 'min-height'], ['.tx-whole', 'min-height'], ['.env-slider', 'height'], ['.loan-range', 'height']]) {
   want(`${R} ${sel}`, prop, [PORTRAIT], v => px(v) >= 44, `be at least 44px (${prop})`);
 }
 want(`${R} .owed-acts > button`, 'min-width', [PORTRAIT], v => px(v) >= 44, 'be at least 44px wide');
@@ -193,9 +195,9 @@ want(`${R} input[type='checkbox']`, 'width', [PORTRAIT], v => px(v) >= 44, 'be a
 want(`${R} label input[type='checkbox']`, 'width', [PORTRAIT], v => px(v) >= 20 && px(v) < 44, 'draw at a normal size inside its 44px label');
 want(`${R} .tx-whole`, 'min-height', [PORTRAIT], v => px(v) >= 44, 'keep the labelled tick a 44px target');
 /* the slider's visible track stays 8px: height less both paddings. */
-{
-  const h = last(`${R} .env-slider`, 'height', [PORTRAIT]), pb = last(`${R} .env-slider`, 'padding-block', [PORTRAIT]);
-  ok(h && pb && px(h.value) - 2 * px(pb.value) === 8, `the .env-slider track stays 8px inside its 44px hit area, found ${h && h.value} / ${pb && pb.value}`);
+for (const sl of ['.env-slider', '.loan-range']) {
+  const h = last(`${R} ${sl}`, 'height', [PORTRAIT]), pb = last(`${R} ${sl}`, 'padding-block', [PORTRAIT]);
+  ok(h && pb && px(h.value) - 2 * px(pb.value) === 8, `the ${sl} track stays 8px inside its 44px hit area, found ${h && h.value} / ${pb && pb.value}`);
 }
 {
   const ov = rules.find(r => JSON.stringify(r.context) === JSON.stringify([PORTRAIT]) && r.selectors.includes(`${R} button:not(.mod-loading)::after`));

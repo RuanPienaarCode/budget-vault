@@ -667,6 +667,15 @@ module.exports = function registerDebts(ctx) {
       const tracked = S.debts.filter(d => d.original > 0);
       const paidOffHeader = tracked.length && tracked.every(d => d.original === d.balance)
         ? 'Paid off (since you added it)' : 'Paid off';
+      /* A debt with NO Original of its own carries a stand-in equal to its
+         balance (ADR-0007, `originalStated: false`) - fine as a divisor, but a
+         share computed from it is always 0%, and in a book where other debts
+         state a real Original that zero reads as "nothing paid" beside their
+         real shares (2026-10-14 audit, L2b-08). Such a row prints the dash the
+         column already uses for "no original". Only in a book that HAS a stated
+         Original: when none does, the header above already says the share
+         counts from the day the debt was added, and every 0% is labelled. */
+      const someStated = S.debts.some(d => d.originalStated !== false && d.original > 0);
       t.append(el('thead', {}, el('tr', {},
         el('th', { scope: 'col' }, 'Debt'),
         el('th', { scope: 'col', class: 'num' }, 'Balance'),
@@ -712,7 +721,7 @@ module.exports = function registerDebts(ctx) {
           const paidOff = d.original > 0 ? Math.min(100, Math.max(0, ((d.original - d.balance) / d.original) * 100)) : 0;
           barFill.style.width = `${paidOff}%`;
           payoffCell.empty();
-          const prog = d.original > 0
+          const prog = d.original > 0 && !(someStated && d.originalStated === false)
             ? el('div', { class: 'debt-prog' }, el('div', { class: 'cat-bar' }, barFill),
               el('span', { class: 'num' }, `${Math.round(paidOff)}%`))
             : el('span', { class: 'text-muted' }, '—');
@@ -729,8 +738,17 @@ module.exports = function registerDebts(ctx) {
              Not for a debt with no rate (DEBT-1): the schedule is worked
              forward at the rate, and at a missing one it was worked at 0% —
              "on this plan it would be R249 500 by now" for a bond that has
-             been accruing interest all along. */
-          if (d.status !== 'paid' && !rateUnknown(d)) {
+             been accruing interest all along.
+
+             Nor from a stand-in Original (2026-10-14 audit, F4 follow-up). A
+             blank Original is loaded as the balance itself, `originalStated:
+             false` (ADR-0007) - a divisor, not a figure the household gave.
+             The schedule was started from it on the debt's start date, so the
+             line said "From R 900 000.00 ..." about a starting balance nobody
+             stated and then called today's real balance the outlier. The
+             Paid off share beside it is already withheld for the same reason
+             (someStated, above); this is the second line of the same cell. */
+          if (d.status !== 'paid' && !rateUnknown(d) && d.originalStated !== false) {
             const exp = expectedBalance(d, todayIso());
             if (exp) {
               const gap = d.balance - exp.expected;

@@ -69,17 +69,24 @@ function ownership(pairs) {
   }], 'a service due before today on an account not imported since is held as not-imported');
 }
 
-/* ---- 1b. a due date before the period opened is last period's ----
+/* ---- 1b. a due date before the period opened is held too ----
    Gym last charged 1 August on a card last imported mid-August: its
-   September charge fell due on the 1st, before this period began on the
-   22nd. Whatever happened to it, it is not a claim on THIS period's cash. */
+   September and October charges fell due on the 1st of each month, and the
+   statement holding them has not been imported. Until 2026-10-14 only a date
+   inside THIS period was held, on the argument that an earlier one "is last
+   period's"; that dropped every monthly debit order for the whole of a new
+   period whenever the account was imported weeks before it opened (L1-01,
+   tests/committed-period-boundary.test.cjs). Cash is what the balance holds
+   plus the rows imported since, so a charge neither of them contains
+   overstates it whichever period it belongs to. */
 {
   const rows = monthly('GYMCO DEBIT', 300, ['2026-07-01', '2026-08-01']);
   const c = { ...card(), importedTo: '2026-08-15', balanceDate: '2026-08-10' };
   eq(serviceCommitments({
     services: [gym], rows, from: TODAY, to: P_END, periodStart: P_START,
     accountOfRow: ownership([[rows, c]]),
-  }), [], 'only a due date between the period start and today is held');
+  }).map(i => [i.basis, i.due, i.occurrences, i.amount, i.asOf]), [['not-imported', '2026-09-01', 2, 600, '2026-08-15']],
+  'every due date the account has not been imported to is held, whichever side of the period start it falls');
 }
 
 /* ---- 2. NEGATIVE CONTROL: imported past the due date, still dropped ----

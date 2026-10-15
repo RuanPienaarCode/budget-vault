@@ -272,9 +272,9 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   const money = v => 'R ' + Number(v).toFixed(2);
   const doc = bx.modelToDoc(m, { money, plainMoney: v => Number(v).toFixed(2) });
   const sum = doc.blocks.filter(b => b.type === 'table')[0];
-  eq(sum.rows.map(r => r[0]), ['Salary', 'Household', 'Rent', 'Total housing', 'Electricity', 'Spotify'],
-    'each subtotal sits directly under ITS group — and a group of one has none, the row being its own total');
-  eq(sum.boldRows, [3], 'bold marks follow the subtotal to where it now is');
+  eq(sum.rows.map(r => r[0]), ['income', 'Salary', 'housing', 'Household', 'Rent', 'Total housing', 'utilities', 'Electricity', 'luxuries', 'Spotify'],
+    'a heading row opens each type; each subtotal sits directly under ITS group - and a group of one has none, the row being its own total');
+  eq(sum.boldRows, [0, 2, 5, 6, 8], 'bold marks the four type heading rows and the one subtotal, wherever they now are');
   ok(sum.rows.every(r => r.slice(1).every(c => !/R/.test(c))), 'month-by-month cells carry no currency symbol: fifteen columns of "R " cost a font size and truncated names');
   ok(doc.blocks.some(b => b.type === 'note' && /Amounts in R\b/.test(b.text)), 'the unit is stated once, above the table');
 
@@ -389,7 +389,7 @@ const META = { generated: '2026-09-17 10:30', currency: 'R', inProgress: null };
   ok(/€/.test(notes), 'held-out currency is stated');
   ok(/July 2026/.test(notes) && /in progress|not finished/i.test(notes), 'the in-progress period is stated — its column is a part-month beside whole ones');
   const tables = doc.blocks.filter(b => b.type === 'table');
-  eq(tables[0].head, ['Category', 'June 2026', 'July 2026', 'Total', 'Average', 'Budgeted'], 'summary table');
+  eq(tables[0].head, ['Category', 'June 2026', 'July 2026', 'Total', 'Average', 'Budgeted'], 'summary table - no Type column (it cost the category names their width); a heading row per type separates the groups instead (L4A-03, tests/budget-export-pdf-layout.test.cjs)');
   ok(tables[0].rows.every(r => r.length === tables[0].head.length), 'every PDF row is as wide as its header (exporter.test item 11\'s failure, not repeated here)');
   eq(tables[0].align.slice(1).every(a => a === 'right'), true, 'amount columns right-aligned');
   ok(tables[0].boldRows.length >= 1, 'subtotal rows are marked bold');

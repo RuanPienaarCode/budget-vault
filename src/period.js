@@ -237,24 +237,38 @@ module.exports = function registerPeriod(ctx) {
      built from S.txFiles and cannot see a folder with no month file yet. */
   function accountsWithFolder() {
     const set = new Set();
+    const lookup = labelLookup();
     for (const name of S.txFolders || []) {
-      const a = accountForLabel(name);
+      const a = lookup(name);
       if (a) set.add(a);
     }
     return set;
   }
 
-  /* Labels belonging to `budget: false` accounts. Resolved per call rather than
-     cached because periodSummary runs six times over for the dashboard trend
-     and an account can be toggled between any two of them. */
-  function nonBudgetLabels() {
-    const out = new Set();
+  /* The three folder sets every veto reads, resolved in ONE pass (audit L8-04).
+     Each getter used to walk every transaction file through accountForLabel,
+     whose safeSeg() runs on the label and on up to two names per account:
+     files x accounts x 3 per ledger() call, 70% of a half-second Dashboard
+     render on the vault this was found on. The folded-key lookup (ISSUE 61) is
+     built once here and each folder resolved once. Rebuilt per call and never
+     kept: accounts.js pushes into the SAME S.accounts array, so a memo keyed on
+     its identity would go stale; cost is (names + files) safeSeg passes. */
+  function folderSets() {
+    const nonBudget = new Set(), earmarked = new Set(), foreign = new Map();
+    const lookup = labelLookup();
+    const home = S.settings.currency;
     for (const f of Object.values(S.txFiles)) {
-      const a = accountForLabel(f.label);
-      if (a && !a.in_budget) out.add(f.label);
+      const a = lookup(f.label);
+      if (!a) continue;
+      if (!a.in_budget) nonBudget.add(f.label);
+      if (isEarmarkedAccount(a)) earmarked.add(f.label);
+      if (isForeign(a, home)) foreign.set(f.label, symbolOf(a, home));
     }
-    return out;
+    return { nonBudget, earmarked, foreign };
   }
+
+  /* Labels belonging to `budget: false` accounts. */
+  function nonBudgetLabels() { return folderSets().nonBudget; }
 
   /* ADR-0007 · Earmarked outgoings leave the budget. ISSUE 41 — money leaving a
      declared fund is not this period's spend; money arriving is income. */
@@ -300,9 +314,10 @@ module.exports = function registerPeriod(ctx) {
   function movedToFunds(p, todayArg) {
     const foreign = foreignLabels();
     const labels = new Map();
+    const lookup = labelLookup();       // L8-04: once per call, not a safeSeg scan per folder
     for (const f of Object.values(S.txFiles)) {
       if (foreign.has(f.label)) continue;
-      const a = accountForLabel(f.label);
+      const a = lookup(f.label);
       if (isEarmarkedAccount(a) || isPoolAccount(a)) {
         labels.set(f.label, a);
       }
@@ -324,32 +339,19 @@ module.exports = function registerPeriod(ctx) {
   function transfersIntoFunds(rows, poolLabels) {
     const foreign = foreignLabels();
     const ownLabels = new Set();
+    const lookup = labelLookup();       // L8-04: once per call, not a safeSeg scan per folder
     for (const f of Object.values(S.txFiles)) {
       if (foreign.has(f.label) || poolLabels.has(f.label)) continue;
-      if (accountForLabel(f.label)) ownLabels.add(f.label);
+      if (lookup(f.label)) ownLabels.add(f.label);
     }
     return savedFromOutside(rows, poolLabels, declaredCatType, { ownLabels, regular: true });
   }
 
-  function earmarkedLabels() {
-    const out = new Set();
-    for (const f of Object.values(S.txFiles)) {
-      const a = accountForLabel(f.label);
-      if (isEarmarkedAccount(a)) out.add(f.label);
-    }
-    return out;
-  }
+  function earmarkedLabels() { return folderSets().earmarked; }
   /* ADR-0007 · Foreign folders are held out and named. ISSUE 28 — no rate to
      convert with; a SECOND set beside nonBudgetLabels() because the disclosure
      for "opted out" is not the sentence for "cannot be added together". */
-  function foreignLabels() {
-    const out = new Map();
-    for (const f of Object.values(S.txFiles)) {
-      const a = accountForLabel(f.label);
-      if (a && isForeign(a, S.settings.currency)) out.set(f.label, symbolOf(a, S.settings.currency));
-    }
-    return out;
-  }
+  function foreignLabels() { return folderSets().foreign; }
   function catType(name) { return S.categories.find(c => c.name === name)?.type || null; }
   /* ADR-0007 · catKnown is a separate question from catType. "No category" and
      "category file gone" are different answers, both reachable. */
@@ -445,10 +447,11 @@ module.exports = function registerPeriod(ctx) {
      reads, resolved once per call. `fixedCats` rides along for the HOUSEHOLD
      lens's `fixed` slice. */
   function ledgerEnv() {
+    const sets = folderSets();
     return {
-      nonBudgetLabels: nonBudgetLabels(),
-      foreignLabels: foreignLabels(),
-      earmarkedLabels: earmarkedLabels(),
+      nonBudgetLabels: sets.nonBudget,
+      foreignLabels: sets.foreign,
+      earmarkedLabels: sets.earmarked,
       fixedCats: new Set(S.categories.filter(c => c.fixed).map(c => c.name)),
       catType, catKnown,
     };

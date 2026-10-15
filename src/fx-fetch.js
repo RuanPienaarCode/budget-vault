@@ -113,9 +113,15 @@ ${rows}
 }
 
 /* Read the cache back. Deliberately parses the FRONTMATTER and the TABLE, not
-   one or the other: the table is what a person edits when they want to pin a
-   rate by hand, and a reader who corrects a number in the table and finds the
-   app ignoring it would rightly conclude the file is decoration. */
+   one or the other: the rates come from the table, the date they apply to from
+   the frontmatter, and a file missing either is not trusted.
+
+   This is NOT where a person pins a rate by hand. The file is a cache (its own
+   note says so), and the next refresh replaces the whole table from the
+   provider's answer, so a number typed into it lasts until then
+   (2026-10-14 audit, L3-14: this comment used to say the opposite, inviting an
+   edit the app would quietly overwrite). There is no hand-pinned rate in this
+   app. */
 /* One frontmatter field of the cache file, unquoted, or '' — the one reader
    both parseRatesFile and parseFetchedAt use. null when there is no
    frontmatter at all. */

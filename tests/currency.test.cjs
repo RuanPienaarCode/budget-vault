@@ -94,7 +94,11 @@ const acct = (name, currency) => ({ name, currency });
 {
   const mod = require('../src/currency');
   const api = Object.keys(mod).sort();
-  eq(api, ['currenciesIn', 'formatAmount', 'isForeign', 'primaryTotal', 'splitByCurrency', 'symbolOf'],
+  /* formatSigned (a minus before the symbol, for a signed PART of a sum) and
+     otherHoldings (which of two readings of a foreign balance a page prints, and
+     the other beside it) joined on 2026-10-14; both are display, neither
+     converts, rates or filters. */
+  eq(api, ['currenciesIn', 'formatAmount', 'formatSigned', 'isForeign', 'otherHoldings', 'primaryTotal', 'splitByCurrency', 'symbolOf'],
     'read-only helpers plus the partition — still no convert(), no rate, no filter');
 
   /* splitByCurrency and primaryTotal joined the API for the same kind of

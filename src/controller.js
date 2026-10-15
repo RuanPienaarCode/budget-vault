@@ -245,7 +245,7 @@ function wireDropZone($, toast, zoneSel, inputSel, handle) {
       await handle(f);
     } catch (e) {
       console.error(`Budget: the ${zoneSel} drop-zone handler failed`, e);
-      toast(`Could not process "${(f && f.name) || 'that file'}" (${(e && e.message) || e})`, true);
+      toast(i18n.t('ctl.toast.fileFailed', { name: (f && f.name) || i18n.t('ctl.toast.thatFile'), error: (e && e.message) || e }), true);
     }
   };
   zone.addEventListener('click', () => input.click());
@@ -260,6 +260,98 @@ function wireDropZone($, toast, zoneSel, inputSel, handle) {
     zone.classList.remove('dragover');
     if (e.dataTransfer.files[0]) accept(e.dataTransfer.files[0]);
   });
+}
+
+/* The reload debounce, extracted so it can be driven in bare node (the closure
+   it used to live in needs a full DOM shell).
+
+   "Never while dirty" means DEFER, not discard. Obsidian emits nothing further
+   for a change it has already delivered, so every bare `return` on this path is
+   permanent: the file changed, we declined to read it, and nothing will ever
+   ask again. The wait can be very long (an abandoned import review stays dirty
+   for the rest of the session), so it backs off — doubling to a half-minute
+   ceiling — rather than polling at a fixed interval.
+
+   There is deliberately NO "one of our own writes landed during the debounce,
+   drop this" branch any more. It was a global two-second window: any budget
+   change within 2 s of ANY write was discarded, so a phone edit arriving just
+   after a Save was never loaded and the next Save deleted it (2026-10-14
+   audit, L3-02). Our own echoes no longer reach the scheduler at all — the
+   watcher asks io.observeChange, which recognises them by CONTENT. */
+const RELOAD_RETRY_MAX = 30000;
+function makeReloadScheduler({ hasDirty, isEditing, reload, set = setTimeout, clear = clearTimeout }) {
+  let timer = null;
+  function schedule(delay) {
+    clear(timer);
+    timer = set(async () => {
+      // Unsaved work in the view — come back for this change later.
+      if (hasDirty()) return schedule(Math.min(delay * 2, RELOAD_RETRY_MAX));
+      // Mid-edit: come back later rather than dropping the change on the floor.
+      if (isEditing()) return schedule(1500);
+      await reload();
+    }, delay);
+  }
+  return { schedule, cancel: () => clear(timer) };
+}
+
+/* What the view does when io refuses a Save as stale: say so once, drop the
+   debounced reload (this one supersedes it), and reload — then be ready to say
+   it again for the next refusal. Extracted for bare node, like the scheduler. */
+function makeRefusalHandler({ tell, cancel, reload }) {
+  let pending = false;
+  return ({ rel }) => {
+    if (pending) return;
+    pending = true;
+    tell(rel);
+    cancel();
+    Promise.resolve().then(reload).catch(() => {}).then(() => { pending = false; });
+  };
+}
+
+/* One plain-words sentence for the files the loader found present but could
+   not read (S.unreadableFiles = [{ rel, why }], why ∈ 'missing' | 'frontmatter'
+   | 'table'), or '' when there are none. Without it a Settings.md that lost its
+   closing fence loaded as defaults and every figure below quietly assumed them
+   (2026-10-14 audit, L8-03). `list` is read defensively — the loader owns the
+   field and may not have set it. */
+const UNREADABLE_WHY = {
+  missing: 'load.unreadable.why.missing',
+  frontmatter: 'load.unreadable.why.frontmatter',
+  table: 'load.unreadable.why.table',
+};
+function unreadableSummary(list, t = i18n.t) {
+  const items = (Array.isArray(list) ? list : []).filter(x => x && typeof x.rel === 'string' && x.rel);
+  if (!items.length) return '';
+  const shown = items.slice(0, 4).map(x => t('load.unreadable.item', {
+    file: x.rel, why: t(UNREADABLE_WHY[x.why] || 'load.unreadable.why.other'),
+  }));
+  if (items.length > shown.length) shown.push('…');
+  return t('load.unreadable.head', { list: shown.join('; ') }) + ' ' + t('load.unreadable.tail');
+}
+
+/* The loader records Settings.md as { why: 'missing' } whenever the file is
+   absent or empty. On a vault that has never been set up that is the NORMAL
+   state, not a fault: the setup wizard is about to write the file, and a banner
+   announcing "Settings.md could not be read, so the figures use defaults" over
+   the wizard's own modal would greet a brand-new household with an alarm about
+   something it has not been asked to do yet (2026-10-14 audit, L8-03 follow-up
+   found while fixing the banner). The plugin's `onboarded` flag is the
+   controller's only knowledge of "the wizard is still pending": it flips to
+   true when setup finishes, when an existing budget is adopted, and when the
+   wizard is dismissed past its first screen — from then on a missing
+   Settings.md is something the reader should be told. Every OTHER unreadable
+   file (a lost closing fence, a table that vanished) is a fault whether or not
+   setup has run, because it can only exist if the file was there. */
+function visibleUnreadable(list, onboarded) {
+  const items = Array.isArray(list) ? list : [];
+  if (onboarded) return items;
+  return items.filter(x => !(x && x.rel === 'Settings.md' && x.why === 'missing'));
+}
+
+/* The sentence the banner prints: '' when there is nothing to say. Split from
+   the closure so a bare node test can drive it. */
+function unreadableBannerText(list, onboarded, t = i18n.t) {
+  return unreadableSummary(visibleUnreadable(list, onboarded), t);
 }
 
 /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
@@ -301,8 +393,15 @@ async function reloadFromDisk(ctx, S, $, disableSaveButtons) {
   // transactions; keeping it would re-import every row as "new".
   S.pendingImport = null;
   $('#importReview').classList.add('hidden');
+  /* The write-side stale record (io.js, the ledger above makeIo) is bracketed
+     by this reload: marks made before it began are lifted once it COMPLETES —
+     the state in memory is then the disk's — and marks made while it was
+     reading survive, because they are newer than what it read. A reload that
+     throws lifts nothing: the state underneath is unknown. */
+  const staleMark = typeof ctx.staleMark === 'function' ? ctx.staleMark() : 0;
   try {
     await ctx.loadVault();
+    if (typeof ctx.staleClear === 'function') ctx.staleClear(staleMark);
   } finally {
     disableSaveButtons();
   }
@@ -387,6 +486,10 @@ function mountApp(view) {
     txFoldersIgnored: [],      // ISSUE 97 — Transactions/ folder paths whose leaf name a shallower folder already claimed
     rules: [],                 // {pattern, category, extra} — extra: the row's own cells past category
     rulesHeader: null,         // Data/Categorisation Rules.csv's own header row, written back by categories.js rulesCsv
+    rulesLoaded: [],           // the file's own rule order — an extras anchor is only kept while its rule still exists (load.js)
+    rulesExtras: [],           // {prev, cells} — lines of the rules file the reader does not understand, replayed on save
+    rulesUnreadable: false,    // true when the rules file could not be read as rules: saving is refused rather than rewriting it
+    unreadableFiles: [],       // {rel, why} — files present but unreadable (L8-03); the shell banner prints these
     assets: [],                // {name, type, value, valued, notes} — owned, but not an account
     assetsFm: '',              // Assets.md verbatim frontmatter, re-emitted by the serializer
     // ISSUE 67/69 — <x>Lead/<x>Trail: raw text around the table (a paragraph
@@ -628,9 +731,38 @@ function mountApp(view) {
     const sym = String((S.settings && S.settings.currency) || '').trim();
     root.classList.toggle('bv-cur-1', Array.from(sym).length === 1);
   }
+  /* The one banner for files that are present but unreadable (S.unreadableFiles,
+     set by the loader). Built here rather than in the static shell because it
+     exists only when something is wrong, and it sits above every page —
+     whichever one the reader is on — since the figures on all of them are
+     built from the same defaults. It is held by reference, not looked up by
+     id: the shell/controller id contract (tests/shell-contract) covers ids the
+     shell DEFINES, and a banner the shell does not define must not be queried
+     as if it did. A shell-defined hidden element is no alternative — it would
+     be a box that vanishes with its margin, which tests/vanishing-margin
+     forbids. `onboarded` is the plugin's own "setup has run" flag; see
+     visibleUnreadable for why a fresh vault must not be greeted by this. */
+  let unreadableEl = null;
+  function renderUnreadableBanner() {
+    const scroll = $('.bud-scroll');
+    if (!scroll) return;
+    const text = unreadableBannerText(S.unreadableFiles, plugin.settings.onboarded);
+    if (!text) {
+      if (unreadableEl) unreadableEl.remove();
+      unreadableEl = null;
+      return;
+    }
+    if (!unreadableEl || !unreadableEl.isConnected) {
+      unreadableEl = el('div', { class: 'kpi-caveat bv-unreadable-banner', role: 'status' },
+        el('span', { class: 'kpi-caveat-txt' }, ''));
+      scroll.insertBefore(unreadableEl, scroll.firstChild);
+    }
+    unreadableEl.firstChild.textContent = text;
+  }
   function render() {
     applyCurrencyClass();
     if (!S.loaded) return;
+    renderUnreadableBanner();
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, score: ctx.renderScore,
        transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
@@ -759,7 +891,7 @@ function mountApp(view) {
        reloading takes effect without re-mounting the shell. */
     applyInputMode(root, S.settings.input_mode);
     switchView(S.view === 'connect' ? 'dashboard' : S.view);
-    toast(`Loaded ${Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0)} transactions`);
+    toast(i18n.t('ctl.toast.loaded', { count: Object.values(S.txFiles).reduce((a, f) => a + f.rows.length, 0) }));
   }
 
   /* ------------------------- privacy splash gate -------------------------
@@ -846,50 +978,43 @@ function mountApp(view) {
 
   /* Reload when budget files change on disk (sync, manual edits) — but never
      while there are unsaved edits in the view, and not for our own writes.
+     The debounce and its deferral are makeReloadScheduler's (above).
 
-     "Never while dirty" means DEFER, not discard. Obsidian emits nothing
-     further for a change it has already delivered, so every bare `return` on
-     this path is permanent: the file changed, we declined to read it, and
-     nothing will ever ask again. The view then sits on stale data until
-     someone happens to hit Reload by hand. That was already understood for the
-     mid-edit case, which has always rescheduled — but the dirty case dropped,
-     and it is the one that lasts. `hasDirty()` covers an abandoned import
-     review (S.pendingImport) and any unsaved draft, which can stay true for
-     the rest of the session.
-
-     Backing off rather than polling at a fixed interval for the same reason:
-     the wait can be very long, and a 1.5s timer that never converges runs for
-     as long as the app is open. Doubling to a half-minute ceiling costs
-     nothing and still picks the change up promptly once the view goes clean. */
-  const RELOAD_RETRY_MAX = 30000;
-  let reloadTimer = null;
-  function scheduleReload(delay) {
-    clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(async () => {
-      /* Another of OUR writes landed during the debounce. This one really is
-         discarded rather than deferred: it is our own echo, the state already
-         matches disk, and retrying would reload the vault and pop the toast
-         after every single save. */
-      if (Date.now() - ctx.lastWriteAt() < 2000) return;
-      // Unsaved work in the view — come back for this change later.
-      if (hasDirty()) return scheduleReload(Math.min(delay * 2, RELOAD_RETRY_MAX));
-      // Mid-edit: come back later rather than dropping the change on the floor.
-      if (isEditing()) return scheduleReload(1500);
-      await connectVault();
-      if (S.loaded) toast('Reloaded — files changed in the vault');
-    }, delay);
+     "Our own writes" is decided by CONTENT, by io.observeChange: a modify whose
+     file now holds exactly what this app last wrote there is our echo and is
+     ignored; anything else is somebody else's edit, which also marks the path
+     stale so a Save over it refuses (io.js). Before, a global two-second window
+     after any write decided it — and dropped a phone edit that landed inside
+     it, for good (2026-10-14 audit, L3-02). */
+  async function reloadForChange() {
+    await connectVault();
+    if (S.loaded) toast(i18n.t('ctl.toast.reloadedChanged'));
   }
+  const reloads = makeReloadScheduler({ hasDirty, isEditing, reload: reloadForChange });
   const onFsChange = (file, oldPath) => {
     if (!fsChangeInBudget(ctx.basePath(), file, oldPath)) return;
-    if (Date.now() - ctx.lastWriteAt() < 2000) return;
-    /* No hasDirty() gate here — scheduleReload owns that decision now, so the
-       change is remembered and retried instead of being dropped at the door. */
-    scheduleReload(800);
+    ctx.observeChange(file, oldPath).then(r => {
+      if (!r.own) reloads.schedule(800);
+    });
   };
   view.registerEvent(vault.on('modify', file => onFsChange(file)));
   view.registerEvent(vault.on('create', file => onFsChange(file)));
   view.registerEvent(vault.on('delete', file => onFsChange(file)));
   view.registerEvent(vault.on('rename', (file, oldPath) => onFsChange(file, oldPath)));
+
+  /* A Save that io refused because the file changed under the page (code
+     'STALE'). The writer has already toasted "could not save"; this says why,
+     once, where it stays on screen, and reloads — the unsaved edit is on a
+     stale copy and is dropped with it, which is what the notice tells the
+     reader to redo. A forced reload, not the debounced one: the debounced one
+     defers while the page is dirty, and the page being dirty is exactly why we
+     are here. Single-flight, so a loop that hits three stale files in a row
+     reloads once and says it once. */
+  const offStale = ctx.onStaleWrite(makeRefusalHandler({
+    tell: rel => new Notice(i18n.t('io.stale.notice', { file: rel }), 12000),
+    cancel: () => reloads.cancel(),
+    reload: reloadForChange,
+  }));
 
   /* An account or category note renamed in Obsidian's OWN file explorer.
      Obsidian repairs every `[[wikilink]]` pointing at it, which covers the
@@ -914,10 +1039,10 @@ function mountApp(view) {
        happened in Obsidian — this is only the plugin's own follow-up write —
        so the early return still stands, just no longer silent about it. */
     try { moved = await ctx.repointNotes(move.kind, move.from, move.to); } catch (e) {
-      return toast(`Could not re-point notes for the "${move.from}" → "${move.to}" rename (${e.message || e})`, true);
+      return toast(i18n.t('ctl.toast.repointFailed', { from: move.from, to: move.to, error: e.message || e }), true);
     }
     if (!moved) return;
-    toast(`Re-pointed ${moved} note${moved === 1 ? '' : 's'} from "${move.from}" to "${move.to}"`);
+    toast(i18n.t('ctl.toast.repointed', { count: moved, from: move.from, to: move.to }));
     if (S.view === 'notes') ctx.renderNotes();
   }));
 
@@ -1002,7 +1127,7 @@ function mountApp(view) {
       // and a throw here — inside a catch that is already reporting a failure
       // — must not become a second, unhandled one on top of the first.
       closeDrawer();
-      toast(`Could not reload from disk (${e.message || e})`, true);
+      toast(i18n.t('ctl.toast.reloadFailed', { error: e.message || e }), true);
       try {
         render();
       } catch (renderErr) {
@@ -1010,7 +1135,7 @@ function mountApp(view) {
       }
       return;
     }
-    closeDrawer(); render(); toast('Reloaded from disk');
+    closeDrawer(); render(); toast(i18n.t('ctl.toast.reloadedDisk'));
   });
   $('#txSave').addEventListener('click', ctx.saveTransactions);
   $('#txAdd').addEventListener('click', ctx.addTransaction);
@@ -1066,7 +1191,7 @@ function mountApp(view) {
     try {
       await plugin.saveSettings();
     } catch (err) {
-      toast(`Could not save that setting (${err.message || err})`, true);
+      toast(i18n.t('settings.err.save', { error: err.message || err }), true);
     }
     ctx.replan();
   });
@@ -1129,7 +1254,8 @@ function mountApp(view) {
        re-reads the whole vault into a dead view and then throws on the first
        null query result. */
     destroy: () => {
-      clearTimeout(reloadTimer);
+      reloads.cancel();
+      offStale();
       clearTimeout(S._q);
       clearTimeout(S._acctQ);
       clearTimeout(S._noteQ);
@@ -1141,7 +1267,7 @@ function mountApp(view) {
     // connectVault directly (it already gates on hasDirty before scheduling).
     reload: async () => {
       if (hasDirty()) {
-        new Notice('Budget: unsaved changes — reload skipped. Save (or "Reload from disk" to discard), then retry.', 7000);
+        new Notice(i18n.t('ctl.notice.unsavedReloadSkipped'), 7000);
         return;
       }
       await connectVault();
@@ -1211,4 +1337,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, reloadFromDisk, applyInputMode, wireDropZone };
+module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

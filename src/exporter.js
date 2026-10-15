@@ -125,7 +125,7 @@ function txHeaderLines() {
    cell" case, proven against the same fixture value
    tests/vault-roundtrip.test.cjs uses ("multi<br>line" on disk, "multi\nline"
    in state). */
-const { escMd, escMdText } = require('./markdown');
+const { escMdText } = require('./markdown');
 /* escMdText — the escape for text in a GENERATED note (markdown.js). The two
    Markdown files this module writes are generated notes Obsidian renders, and
    the text in them is the household's and the bank's: a Description is
@@ -304,14 +304,20 @@ function categoriesCsv(categories) {
    the Report's detail table alike, which is why the Report no longer escapes
    its own copy first (that would double every backslash). The date is a cell
    a household can hand-type too, so it gets the same treatment; an ISO date
-   holds nothing it would change. The currency cell is the household's own
-   configured symbol, printed as part of a figure — escMdText's header keeps
-   those out, and `$` there could never open inline maths — so it stays on
-   escMd, which keeps it inside its cell. Amount, Excluded and Split are the
-   app's own values. */
+   holds nothing it would change. The currency cell goes the same way: it is
+   an account's `currency:` frontmatter, typed by a household or arriving in
+   a synced note, and this cell prints it ALONE, not inside a figure. It used
+   to stay on escMd (pipes and line breaks only) on the reasoning that `$`
+   cannot open inline maths — true of `$`, and of no other string that fits
+   in the field: `$![s](https://attacker.example/p.png)` printed an image
+   Obsidian fetched on every open (2026-10-14 audit, L4b-03). A real symbol
+   (R, €, kr) comes out byte for byte as before; `$` comes out `\$`, which
+   every reader renders as `$`. The symbol inside the Amount cell is
+   `money()`'s output and is the view's formatter's to keep safe. Excluded and
+   Split are the app's own values. */
 function transactionRow(r, money, symbolFor) {
   const sym = symbolFor ? symbolFor(r) : (r && r._symbol) || '';
-  return `| ${escMdText(r.date)} | ${escMdText(r.desc)} | ${escMdText(r.label)} | ${escMdText(r.cat)} | ${escMd(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMdText(r.note)} | ${splitRole(r.split)} |`;
+  return `| ${escMdText(r.date)} | ${escMdText(r.desc)} | ${escMdText(r.label)} | ${escMdText(r.cat)} | ${escMdText(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMdText(r.note)} | ${splitRole(r.split)} |`;
 }
 
 /* `money(amount, row)` is the view's own formatter, injected because the
@@ -375,7 +381,10 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
       ? [`Totals cover ${kept.length} of ${rows.length} rows — excluded, transfer and non-budget rows are listed but not counted.`, '']
       : []),
     ...(foreignSymbols.length
-      ? [`Rows in ${foreignSymbols.join(', ')} are listed in their own currency and are NOT included in the totals above — `
+      /* The same symbols as the Currency cell, so the same escape: this line
+         printed them raw (2026-10-14 audit, L4b-03) and an image in a symbol
+         was fetched from here too. */
+      ? [`Rows in ${foreignSymbols.map(escMdText).join(', ')} are listed in their own currency and are NOT included in the totals above — `
         + 'there is no exchange rate in this file to combine them with.', '']
       : []),
     ...txHeaderLines(),

@@ -14,6 +14,31 @@
 
    Pure — no DOM, no obsidian import. */
 
+/* ---- the shapes normalizeAmount accepts, kept beside it so the reasons stay with them ---- */
+const COMMA_GROUPED = /^\d{1,3}(,\d{3})+(\.\d+)?$/;
+const LAKH_GROUPED = /^\d{1,2}(,\d{2})*,\d{3}(\.\d+)?$/;
+const TAIL_UNIT = /(?:\p{Sc}|\p{L}{2,4}|[^\x00-\x7F])$/u;
+
+/* ISO 4217 codes in use, plus the short non-ISO markers a statement really
+   prints after a figure. Used ONLY to decide whether letters stuck straight to
+   a number are a currency ("50CHF", "100kr") or a typo ("2OO"); a code
+   separated from the number by a space does not need to be listed. A currency
+   missing from this list still reads when it is written with a space, which is
+   how a bank writes a code. */
+const UNIT_WORDS = new Set((
+  'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY ' +
+  'COP CRC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR ' +
+  'IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR ' +
+  'MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD ' +
+  'SHP SLE SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV WST XAF XCD XOF ' +
+  'XPF YER ZAR ZMW ZWL KR KC RM FT ZL LEI RP RS SFR FR DH'
+).toLowerCase().split(' '));
+function isGluedUnit(u) {
+  if (/^\p{Sc}$/u.test(u)) return true;          // a currency sign
+  if (/[^\x00-\x7F]/.test(u)) return true;       // "zł", "Kč", "円" - no ASCII shorthand competes for these
+  return UNIT_WORDS.has(u.toLowerCase());
+}
+
 /* Parse a statement amount cell to a Number, or null if empty/unparseable.
    Tolerates the spread of bank export styles: "R 1 234.56", "$1,234.56",
    decimal-comma "1 234,56" / "1.234,56", parenthesised negatives "(123.45)",
@@ -160,10 +185,31 @@ function normalizeAmount(raw, opts) {
   if (bare !== s) { s = bare; sign(); }
   /* Trailing: "1234.56 ZAR", "1 234,56 €", "50CHF", "1,200円". No lookbehind
      available, so the guard is explicit instead: only strip when what remains
-     still ENDS in a digit, which "15 000 about" would not survive either. */
-  const tail = s.replace(
-    /[\s\u00A0]*(?:\p{Sc}|\p{L}{2,4}|[^\x00-\x7F])$/u, '');
-  if (tail !== s && /\d$/.test(tail.trim())) s = tail.trim();
+     still ENDS in a digit, which "15 000 about" would not survive either.
+
+     Two changes from the 2026-10-14 audit, both about a unit that was not one.
+
+     (1) GLUED letters are a unit only when they are known to be one. The strip
+     took any 2-4 letters after the number, so "1 5OO" (the letter O typed for
+     zero) lost its "OO" and read as 15, and "2OO" as 2: `readable: true`, a
+     plausible wrong number, which is the one outcome this module exists to
+     refuse (L8-01). A code SEPARATED from the number by a space is still read
+     as a unit - nobody types "2 OO" - and so is a glued symbol, a glued
+     non-ASCII marker ("zł", "Kč", "円") or a glued known code ("50CHF").
+
+     (2) The unit is found from the END of the string and the whitespace before
+     it trimmed afterwards. The pattern used to START with an unbounded
+     whitespace run and was tried from every position, so a run of n spaces
+     cost O(n^2) - 80 000 spaces took 6.4 s, reached from
+     detectHeaderlessColumns on every non-date cell (L4b-02). Anchored on the
+     unit alone it fails in constant time at each start. */
+  const unit = TAIL_UNIT.exec(s);
+  if (unit) {
+    const before = s.slice(0, unit.index);
+    const spaced = /[\s\u00A0]$/.test(before);
+    const head = before.trim();
+    if (/\d$/.test(head) && (spaced || isGluedUnit(unit[0]))) s = head;
+  }
   s = s.replace(/[\s\u00A0\u202F']/g, '');
   /* A trailing percent is a unit suffix, exactly like the currency prefix
      stripped above, and it is dropped for the same reason. Debts.md's `Rate`
@@ -189,11 +235,28 @@ function normalizeAmount(raw, opts) {
      it uses — see inferGrouping above. This is what stops "250.000" reading
      as 250 in a column whose other rows are plainly dot-grouped. */
   else if (opts && opts.grouping === 'dot' && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
-  else s = s.replace(/,/g, '');                                                       // thousands comma
+  /* A comma is a thousands separator only where it sits in a thousands
+     position. It used to be stripped wherever it was, so "7,000,00" (a typed
+     7,000.00 with the point slipped to a comma) read as 700 000 and "1,234,56"
+     as 123 456, both `readable: true` (L8-01). Three-digit groups cover the
+     US/UK style; the Indian lakh style groups the last three and then pairs
+     ("5,00,000"). Anything else with a comma - a stray group size, a leading
+     comma - is not a number this function can vouch for, so it is refused and
+     the caller shows the cell's own text. The decimal-comma branch above has
+     already taken "1 234,56" and "12,5", so this is only reached by cells
+     whose commas are claimed to be thousands. */
+  else if (s.includes(',')) {
+    if (!COMMA_GROUPED.test(s) && !LAKH_GROUPED.test(s)) return null;
+    s = s.replace(/,/g, '');
+  }
   // A bare ".50" is a real cell (some exports drop the leading zero), and it
   // must parse rather than fall to null and be served as zero by parseNum.
   if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(s)) return null;
   const n = Number(s);
+  /* 400 digits is a string the gate above accepts and a number JS cannot hold:
+     Number() gives Infinity, which import then wrote into a month file as the
+     word "Infinity" and the loader read back as 0 (L4b-04). */
+  if (!Number.isFinite(n)) return null;
   return neg ? -n : n;
 }
 
@@ -224,9 +287,55 @@ function normalizeAmount(raw, opts) {
    each call site that would be free to drift from this one. */
 function parseNum(s) {
   const t = (s ?? '').toString().trim();
-  if (/^-?\d+(\.\d+)?$/.test(t)) return { ok: true, value: parseFloat(t), readable: true };
+  /* Finite only: a 400-digit plain decimal passes the shape test and parses to
+     Infinity, which is not a canonical on-disk figure but a cell nobody can
+     read back (L4b-04). It falls through to normalizeAmount, which says null. */
+  if (/^-?\d+(\.\d+)?$/.test(t) && Number.isFinite(parseFloat(t))) return { ok: true, value: parseFloat(t), readable: true };
   const n = normalizeAmount(t);
   return { ok: false, value: n ?? 0, raw: t, readable: n != null };
 }
 
-module.exports = { normalizeAmount, inferGrouping, parseNum };
+/* ONE ROUNDING, for every rendering and every suggestion. Half a cent rounds AWAY FROM ZERO, on
+   the DECIMAL value of the figure.
+
+   The three renderings of one model used to round three ways: the workbook
+   with Math.round(v * 100) / 100, the CSV with toFixed(2), the PDF through
+   formatAmount (toFixed too). An Average over two periods lands on half a
+   cent whenever the total is an odd number of cents, and there they split —
+   R0,03 over two months printed 0.01 in the CSV and the PDF and 0.02 in the
+   workbook; 21.7% of two-period cent totals disagreed, and on the first real
+   vault checked one category's This-tax-year Average differed by R0,01
+   between files written by the same click (2026-10-07 audit, L4A-04). Both
+   old rules were also wrong on their own terms: 0.015, 2.675 and 1.005 are
+   stored a hair BELOW their half, so toFixed printed 0.01, 2.67 and 1.00, and
+   Math.round(1.005 * 100) is 100.
+
+   The owner's ruling: half-up on the decimal value, one helper all three
+   share. The figure is first read at fifteen significant digits — the most a
+   double carries faithfully, which is exactly what strips the binary
+   residue (0.01499999999999999944 reads as 0.0150000000000000) — and then
+   rounded in decimal by moving the point in the STRING ("…e2"), so no
+   multiplication reintroduces the residue it just removed. Away from zero
+   for negatives, because that is Excel's own ROUND and what "half-up" means
+   for money; never -0. Non-finite values pass through: each rendering already
+   says what it does with those, and this is not the place to change it.
+   Values past 1e15 have no cents left to round in a double and come back as
+   they went in. tests/export-one-average.test.cjs sweeps every cent total
+   from -R5 to R5 over 2-12 periods against an integer-cents reference.
+
+   Moved here from budget-export.js (Wave B, 15 Oct 2026): src/reslice.js had
+   its own copy, aligned to this one by hand in Wave A, and src/report.js
+   required the whole export module for this one function. reslice.js keeps the
+   signed -0 it has always returned for a hair below zero at its own call site
+   (tests/reslice.test.cjs holds it); everything else reads this. */
+function roundCents(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return n;
+  const a = Math.abs(n);
+  if (a < 1e-6) return 0;
+  if (a >= 1e15) return n;
+  const r = Number(`${Math.round(Number(`${a.toPrecision(15)}e2`))}e-2`);
+  return n < 0 && r !== 0 ? -r : r;
+}
+
+module.exports = { normalizeAmount, inferGrouping, parseNum, roundCents };

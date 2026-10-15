@@ -405,8 +405,20 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
    - a view NOT in the set that grows real i18n usage must be promoted, so
      the inventory cannot silently rot as views migrate. */
 {
-  const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js', 'score.js', 'report.js', 'plan.js']);
+  const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js', 'score.js', 'report.js']);
   TRANSLATED_VIEWS.add('budget-export.js');
+  /* PARTLY KEYED is not the same as translated (2026-10-14 audit, L8-09).
+     views/plan.js sat in TRANSLATED_VIEWS with about 140 English literals in
+     it — its headings, buttons, envelope and source dialogs — beside the ~40
+     strings it does key. Counting it as "done" told a contributor that
+     hardcoding English there was a regression when the page is, by design,
+     still English-only (Plan, like Notes, is waiting for its own translation
+     pass). The two claims are different, so the set is: a view here keeps the
+     floor on its existing keyed strings (the keys it has must not be gutted)
+     but is NOT held to "translated", and is NOT asked to be promoted while it
+     stays under the floor for a full page. Moving plan.js into
+     TRANSLATED_VIEWS is the definition of finishing it. */
+  const PARTLY_KEYED = new Set(['plan.js']);
   /* A floor of 30 assumes a PAGE. views/budget-export.js is a button's worth
      of view — its dialog lives in src/budget-export-modal.js and its document
      labels are looked up in a loop — so every string it shows is translated
@@ -421,7 +433,10 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
   };
   for (const f of fs.readdirSync(VIEWS).filter(f => f.endsWith('.js'))) {
     const n = usage(f);
-    if (TRANSLATED_VIEWS.has(f)) {
+    if (PARTLY_KEYED.has(f)) {
+      ok(n >= 30,
+        `views/${f} is PARTLY keyed but carries only ${n} i18n uses — the strings it does key must stay keyed`);
+    } else if (TRANSLATED_VIEWS.has(f)) {
       ok(n >= (SMALL_VIEW_FLOOR[f] || 30),
         `views/${f} is in TRANSLATED_VIEWS but carries only ${n} i18n uses — translated views must stay translated`);
     } else {

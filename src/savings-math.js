@@ -235,7 +235,23 @@ function totalReturn(account, rows, typeOf, opts) {
   const returnPct = capitalIn > 0 ? (growth / capitalIn) * 100 : null;
 
   const since = ISO_DATE.test(a.inception_date || '') ? a.inception_date : f.first;
-  const days = since ? daysBetween(since, today) : null;
+  /* The stretch of time the growth above was MEASURED over. A typed balance is a
+     fact about one day, `balance_updated`; running the clock to today instead
+     made the same R5 000 of growth read a lower yearly rate every morning the
+     balance was not retyped (a third lower ten months on — audit 2026-10-14,
+     L2a-N10). So the period
+     ends on the balance date when no row follows it, and on the LAST row dated
+     after it (up to today; a later one is in no balance yet) when rows do — the
+     point to which the vault actually knows this account. No readable balance
+     date, nothing to anchor on: today stands, as before. */
+  let endIso = today;
+  if (ISO_DATE.test(a.balance_updated || '') && a.balance_updated <= today) {
+    endIso = a.balance_updated;
+    for (const r of rows || []) {
+      if (isRealIsoDate(r.date) && r.date > endIso && r.date <= today) { endIso = r.date; }
+    }
+  }
+  const days = since ? daysBetween(since, endIso) : null;
   const years = days !== null && days > 0 ? days / DAYS_PER_YEAR : null;
 
   /* ADR-0007 · Annualised return is approximate (not money-weighted) and

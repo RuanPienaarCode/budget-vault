@@ -768,6 +768,10 @@ class OnboardingWizard extends Modal {
       body.createDiv({ cls: 'budget-onb-choice-title', text: i18n.t('wiz.rates.' + mode + '.title') });
       body.createDiv({ cls: 'budget-onb-choice-desc', text: i18n.t('wiz.rates.' + mode + '.desc') });
     }
+    /* The provider's attribution, under the cards and not inside one: the 'on'
+       card is a <label>, and a click on a link inside a label also selects the
+       card — reading who supplies the rates must not switch the fetch on. */
+    appendRatesAttribution(c.createEl('p', { cls: 'setting-item-description' }));
     if (chosen !== 'on') return;
     new Setting(c)
       .setName(i18n.t('wiz.rates.code'))
@@ -1514,4 +1518,26 @@ class OnboardingWizard extends Modal {
   }
 }
 
-module.exports = { OnboardingWizard, STARTER_CATEGORIES };
+/* The exchange-rate provider's required attribution (2026-10-14 audit, L7-01).
+   open.er-api.com is a free endpoint run by ExchangeRate-API, and its terms ask
+   for a visible "Rates By Exchange Rate API" link back to exchangerate-api.com
+   wherever its data is used. The saved rates note already credits it
+   (fx-fetch.js); this is the same credit on the two screens where the reader
+   decides to switch the fetch on — the wizard's rates step and the Exchange
+   rates setting. Lives here, not in settings-tab.js, because settings-tab.js
+   already imports this file (the reverse would be a cycle). The link text is
+   the provider's own wording and is deliberately not translated. Opened with
+   window.open like the settings tab's feedback and support buttons; the default
+   action is cancelled so Obsidian's own link handler does not open it twice. */
+const RATES_ATTRIBUTION_TEXT = 'Rates By Exchange Rate API';
+const RATES_ATTRIBUTION_URL = 'https://www.exchangerate-api.com';
+function appendRatesAttribution(parent) {
+  const a = parent.createEl('a', { text: RATES_ATTRIBUTION_TEXT, href: RATES_ATTRIBUTION_URL });
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    window.open(RATES_ATTRIBUTION_URL, '_blank');
+  });
+  return a;
+}
+
+module.exports = { OnboardingWizard, STARTER_CATEGORIES, appendRatesAttribution };

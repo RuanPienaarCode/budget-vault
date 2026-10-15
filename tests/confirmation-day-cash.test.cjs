@@ -146,7 +146,12 @@ atAuditDate(async () => {
      English literal, and with `count` passed because t() picks the plural off
      `count` alone. */
   const left = nodes.get('leftBody').textContent;
-  const want = i18n.t('dash.left.confirmDay', { count: 5, amount: 'R 26500' });
+  /* The net is a signed part, printed by currency.js formatSigned with the
+     household's own marks (Wave B, lane B4: it used to go through ctx.money,
+     which this test stubs without grouping). The signed FORM is pinned in
+     tests/signed-money-one-helper.test.cjs; this line pins that the card says
+     the net of these five rows. */
+  const want = i18n.t('dash.left.confirmDay', { count: 5, amount: require('../src/currency').formatSigned('R', 26500, 0, ctx.locale()) });
   ok(left.includes(want),
     `the cash card names the confirmation-day activity behind its figure — wanted "${want}", got: ${left}`);
 

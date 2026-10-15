@@ -140,7 +140,6 @@ function periodFlow({
   const inc = Number(income) > 0 ? Number(income) : 0;
   const spent = Math.max(0, Number(spentTotal) || 0);
   const bud = Math.max(0, Number(budgeted) || 0);
-  const saving = Math.max(0, Number(savingContribution) || 0);
   const fixed = fixedCats instanceof Set ? fixedCats : new Set(fixedCats || []);
   /* ADR-0007 · periodFlow inputs. Committed and the savings-typed slice are cut
      out of `spent`, which is GROSS (the BUDGET lens, as of today), so they read
@@ -151,24 +150,39 @@ function periodFlow({
      audited vault, L2a-07). tests/flow-committed-gross.test.cjs. */
   const byCat = grossOutByCat || spendByCat || {};
 
-  let committed = 0, debtRepayments = 0, housing = 0, subscriptions = 0, committedSavingsTyped = 0;
-  /* ADR-0007 · Savings-typed spend tracked before living, fixed-flagged or
-     not, so the fixed part can be told apart below. */
-  let savingsTypedSpend = 0;
+  /* ONE RULE FOR EVERY RAND OF GROSS SPEND (audit 2026-10-14, L2a-N02). Each
+     rand of `spent` lands in exactly one of three bands, tested in this order:
+       1. it left under a set-aside category (savings / investment) -> saving
+       2. it left under a category flagged fixed                    -> committed
+       3. everything else                                           -> living
+     so committed + living + saving = spent. Saving was a SECOND reading of
+     "saved" (arrivals in a savings account, paired) beside the category-type
+     set-aside cut out of Living: an investment order to an account the vault
+     does not hold was in no band, a car repair paired into a fund was in two,
+     and the bands missed income in 17 of 21 periods on the audited vault. */
+  let committed = 0, debtRepayments = 0, housing = 0, subscriptions = 0;
   for (const [cat, amt] of Object.entries(byCat)) {
     const type = catType ? catType(cat) : null;
-    if (isSetAsideType(type) && amt > 0) { savingsTypedSpend += amt; }
-    if (!cat || !fixed.has(cat) || !(amt > 0)) { continue; }
+    /* A set-aside category is saving whether or not it is flagged fixed, so it
+       never counts here. */
+    if (!cat || !fixed.has(cat) || !(amt > 0) || isSetAsideType(type)) { continue; }
     committed += amt;
     if (type === 'debt') { debtRepayments += amt; }
     else if (HOUSING_TYPES.has(type)) { housing += amt; }
     else if (SUBSCRIPTION_TYPES.has(type)) { subscriptions += amt; }
-    if (isSetAsideType(type)) { committedSavingsTyped += amt; }
   }
   /* A fixed-flagged category can never claim more than the period actually
      spent — a category that happened to net a refund this period must not
      invent money nobody paid out. */
   committed = Math.min(committed, spent);
+  /* Saving is the set-aside SENT (`setAsideSpent`, ADR-0005's own term), the same
+     figure "Set aside, still to move" subtracts below, so the card has one
+     reading of it. A fixed-flagged savings category is saving, not a committed
+     bill: "Nothing reached savings" beside an order that did is the worse
+     sentence. `savingContribution` (a Transfer into a savings account is not
+     spending) feeds no band; it rides along as `movedToFunds`. Never more than
+     what is left of `spent` once committed is out. */
+  const saving = Math.min(Math.max(0, Number(setAsideSpent) || 0), Math.max(0, spent - committed));
   /* The remainder, by construction rather than by naming every possible
      type: whatever a fixed category carries that is not debt, housing,
      utilities, insurance or a service still belongs in "committed & fixed
@@ -183,12 +197,20 @@ function periodFlow({
     .reduce((s, d) => s + monthlyInterest(d.balance, d.rate), 0);
   const interest = Math.min(interestRaw, debtRepayments);
 
-  /* ADR-0007 · Living excludes savings-typed spend once: the outgoing leg is
-     inside `spent`, its incoming leg is already `saving`, and the fixed part
-     already left via `committed`. */
-  const nonCommittedSavingsTyped = Math.max(0, savingsTypedSpend - committedSavingsTyped);
-  const living = Math.max(0, spent - committed - nonCommittedSavingsTyped);
+  /* Living is what is left of gross spend once the other two bands are out, so
+     the three add up to `spent` (see the rule above). The last band is the
+     income that is left over; with nothing left it is zero and the Overspent
+     row below carries the excess. */
+  const living = Math.max(0, spent - committed - saving);
   const notYetSpent = Math.max(0, inc - committed - living - saving);
+  /* Spent past income. Gross spend less income, NOT -together: `together` also
+     carries the assume-spent provision, money the plan holds as spent that has
+     not left yet, so "you spent N more than came in" would overstate it by the
+     provision (and the bands, which add up to what was actually paid, would
+     stop adding to income). src/period.js's periodDeficit makes the same cut
+     — "excludes the assume-spent overlay". With a provision the lefts chip
+     still prints it, in Together. */
+  const overspent = Math.max(0, spent - inc);
 
   /* ADR-0007 · The two lefts. Against the ONE numerator (ADR-0005): built on
      gross, this chip answered a different question from the Dashboard hero's
@@ -206,8 +228,22 @@ function periodFlow({
      income − gross spend − the assume-spent provision; a part keeps its sign. */
   const setAside = Math.max(0, Number(budgetSetAside) || 0);
   const setAsideToMove = setAside - Math.max(0, Number(setAsideSpent) || 0);
-  const neverBudgeted = inc - (bud + setAside);
-  const together = leftInBudget + setAsideToMove + neverBudgeted;
+  /* FOUR lefts since 2026-10-14 (audit L2a-N01). `neverBudgeted` is measured
+     against the income the PLAN states (incomeBaseFor: the base this card's
+     "Share of income budgeted" divides by and the Budget page's "Over-budgeted"
+     tile uses), not against `inc`, what has landed so far. Against `inc` it
+     moved with every salary: "Budgeted beyond income" read one figure the day
+     before payday and the whole plan before the salary landed, beside a Budget
+     page saying a third figure for the same plan. The gap between the incomes is the fourth
+     left, `incomeToCome` (landed − planned, negative while income is still to
+     arrive), so Together is still income landed − gross spend − provision. With
+     no plan income and the period running there is no plan to measure against
+     (the Budget page prints no tile): the landed income stands in. */
+  const planIncome = incomeBaseFor({ budgetIncome, actualIncome: inc, periodFinished });
+  const incomeBase = planIncome > 0 ? planIncome : inc;
+  const neverBudgeted = incomeBase - (bud + setAside);
+  const incomeToCome = inc - incomeBase;
+  const together = leftInBudget + setAsideToMove + neverBudgeted + incomeToCome;
 
   /* Against the income the PLAN states, via the shared rule above — NOT
      against `inc`, which is what has landed so far. Dividing by `inc` made
@@ -251,11 +287,23 @@ function periodFlow({
     leftInBudget: roundRand(leftInBudget),
     setAsideToMove: roundRand(setAsideToMove),
     neverBudgeted: roundRand(neverBudgeted),
+    incomeToCome: roundRand(incomeToCome),
   };
-  displayLefts.together = displayLefts.leftInBudget + displayLefts.setAsideToMove + displayLefts.neverBudgeted;
+  displayLefts.together = displayLefts.leftInBudget + displayLefts.setAsideToMove + displayLefts.neverBudgeted
+    + displayLefts.incomeToCome;
+
+  /* The Overspent row, printed so that the printed bands less it still equal the
+     printed income: the sum of the three rounded bands less the rounded income,
+     not the rounded excess on its own (which can differ by a rand). */
+  const overspentDisplay = overspent > 0
+    ? Math.max(0, displayBands[0] + displayBands[1] + displayBands[2] - roundRand(inc)) : 0;
 
   return {
     income: inc,
+    /* Money that crossed into a savings account from the household's own
+       accounts this period (a Transfer is not spending, so it is in no band). */
+    movedToFunds: Math.max(0, Number(savingContribution) || 0),
+    overspent, overspentDisplay,
     bands: {
       committed, living, saving, notYetSpent,
       display: {
@@ -269,7 +317,7 @@ function periodFlow({
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
     budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, spent: spentByRule, allocatedOfIncome, budgetUsed },
-    lefts: { leftInBudget, setAsideToMove, neverBudgeted, together, display: displayLefts },
+    lefts: { leftInBudget, setAsideToMove, neverBudgeted, incomeToCome, together, display: displayLefts },
   };
 }
 
