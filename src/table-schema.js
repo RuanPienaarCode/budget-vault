@@ -782,7 +782,66 @@ function mdTableFile({ fm, fallback, title, prose, schema, rows, leadRaw, trailR
   return lines.join(eol);
 }
 
+/* Plans and Tax are several tables in one file, each under its own `## `
+   heading, and are written by hand-laid templates in views/plan.js and
+   views/tax.js rather than from a SCHEMAS entry (their cells carry <key>Raw
+   round-tripping the schema reader does not model). What they DO share with
+   the flat tables is how a table is found and kept: `first` is the table's
+   first header (markdown.js findTable), `known` the number of columns the
+   plugin writes — a cell past it is the household's and is carried
+   (attachExtraCells / extraColsOf) — and `header`/`sep` the cells it writes,
+   declared here once so load.js's reader and the views' writers agree on them
+   (2026-10-14 audit, L3-05). The separator cells are the shipped bytes. */
+const PLAN_TABLES = {
+  'money in': { first: 'Source', known: 6,
+    header: ['Source', 'Kind', 'Amount', 'Date', 'Status', 'Notes'],
+    sep: ['--------', '------', '-------:', '------', '--------', '-------'] },
+  envelopes: { first: 'Envelope', known: 4,
+    header: ['Envelope', 'Amount', 'Note', 'Tint'],
+    sep: ['----------', '-------:', '------', '------'] },
+  items: { first: 'Item', known: 7,
+    header: ['Item', 'Envelope', 'Amount', 'Spent', 'Status', 'Category', 'Notes'],
+    sep: ['------', '----------', '-------:', '------:', '--------', '----------', '-------'] },
+};
+/* The Figures table's first header is the household's COUNTRY word for a
+   source code (locale.js figureCodeLabel), so any of them identifies it.
+   tests/plan-tax-hand-typed-content.test.cjs holds this list to locale.js. */
+const TAX_FIGURE_FIRST_HEADERS = ['Source code', 'Code', 'Form line', 'Box', 'Label', 'Line', 'Item'];
+const TAX_TABLES = {
+  progress: { first: 'Step', known: 4,
+    header: ['Step', 'Status', 'Due', 'Notes'],
+    sep: ['------', '--------', '-----', '-------'] },
+  documents: { first: 'Document', known: 5,
+    header: ['Document', 'Source', 'Status', 'File', 'Notes'],
+    sep: ['----------', '--------', '--------', '------', '-------'] },
+  figures: { first: TAX_FIGURE_FIRST_HEADERS, known: 4,
+    header: [null, 'Description', 'Source', 'Amount'],   // null: the country's own word, supplied by the writer
+    sep: ['------', '-------------', '--------', '--------'] },
+};
+
+/* The lines of one such table: header, separator, a row per entry of
+   `cellRows`, with the household's extra columns after the plugin's own.
+   `rows[i].extraCells` belong to `cellRows[i]`; `extraCols` is what
+   extraColsOf captured at load (null when the file had none, which leaves
+   every byte exactly as the hand-laid templates wrote it). A row with more
+   extra cells than the header named keeps the surplus, as rowLineWithExtras
+   does for the flat tables. */
+function plainTableLines(spec, headerCells, cellRows, rows, extraCols) {
+  const head = headerCells || spec.header;
+  if (!extraCols) {
+    return [`| ${head.join(' | ')} |`, `|${spec.sep.join('|')}|`, ...cellRows.map(c => `| ${c.join(' | ')} |`)];
+  }
+  const n = extraCols.headers.length;
+  const lines = [`| ${head.concat(extraCols.headers).join(' | ')} |`, `|${spec.sep.concat(extraCols.sep).join('|')}|`];
+  cellRows.forEach((c, i) => {
+    const extra = (rows[i] && rows[i].extraCells) || [];
+    lines.push(`| ${c.concat(Array.from({ length: n }, (_, k) => extra[k] ?? ''), extra.slice(n)).join(' | ')} |`);
+  });
+  return lines;
+}
+
 module.exports = {
+  PLAN_TABLES, TAX_TABLES, TAX_FIGURE_FIRST_HEADERS, plainTableLines,
   SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,
   attachExtraCells, extraColsOf, headerLinesWithExtras, rowLineWithExtras,
   knownColumns, lineEndingOf, keepsDigits,

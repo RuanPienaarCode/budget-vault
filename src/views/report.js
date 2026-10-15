@@ -67,7 +67,7 @@ const { debtInterestCoverage } = require('../health-math');
 const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
 const {
-  REPORT_DIR, reportPaths, mergeCategoryRows, mergeSpendByCategory,
+  REPORT_DIR, reportPaths, mergeCategoryRows, mergeSpendByCategory, budgetComparison,
   financialReportMarkdown, financialReportJson, copyBody,
 } = require('../report');
 /* Namespace import: see views/dashboard.js's own comment on why every view
@@ -98,7 +98,7 @@ module.exports = function registerReport(ctx) {
      vaultPathTaken — io.js's "is this path already used?", asked the way
      macOS and iOS answer it (case-folded, NFC); see onDisk() below. */
   const {
-    S, $, app, plugin, money, toast,
+    S, $, app, plugin, money, moneyIn, locale, toast,
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder, destinationProblem, vaultPathTaken,
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
     periodsForMonths, earliestDataMonth, periodSummary, catKnown,
@@ -616,7 +616,7 @@ module.exports = function registerReport(ctx) {
     /* ADR-0007 · The exported report states the app's own budget-used pair.
        ADR-0005's operands, summed per period the additive way every figure
        here is; the share is derived once, in prepareReportData. */
-    let setAsideSpend = 0, assumedSpend = 0, budgetSpendOnly = 0, movedSoFar = 0;
+    let setAsideSpend = 0, assumedSpend = 0, budgetSpendOnly = 0, movedSoFar = 0, budgetUsedSpend = 0;
     /* REPORT-3 (2026-10-07 audit) — the set-aside the PLAN holds, the Y of
        "R X of R Y saved so far": planFigures(p).setAside, the figure the
        Dashboard hero prints, summed over the selection. */
@@ -664,13 +664,21 @@ module.exports = function registerReport(ctx) {
        already follow so two documents about one household list them alike. */
     const foreignLabels = new Set();
     const foreignSymbols = [];
-    for (const p of periods) {
+    /* L2b-01 — which periods feed the BUDGET comparisons (budget used, Budget
+       vs Actual, saved so far). The plain totals below run over every period;
+       the comparisons run over the periods that HAVE a spending budget, so a
+       numerator is never set against a denominator built from fewer periods
+       (src/report.js, budgetComparison, has the audit evidence). Each period's
+       snapshot is read once, up front, and the loop below works from it. */
+    const figs = periods.map(p => ({ p, F: periodFigures(p) }));
+    const cmp = budgetComparison(figs.map(({ p, F }) => ({ name: periodMonthName(p), budgeted: F.used.budgeted })));
+    const compared = new Set(cmp.use);
+    for (const [i, { p, F }] of figs.entries()) {
       /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
          ISSUE 84 — this loop asked six seams for one period; periodFigures is
          the assembly that exists to answer all six at once, and the exported
          document is precisely where two of them disagreeing is least
          recoverable. */
-      const F = periodFigures(p);
       const sum = F.summary;
       income += sum.income; spend += sum.spend; net += sum.net;
       uncountedIncome += F.uncountedIncome || 0;
@@ -685,14 +693,17 @@ module.exports = function registerReport(ctx) {
          The table lists every envelope, so the total states every envelope. */
       const plan = F.plan;
       budgetIncome += plan.income; budgetSpend += plan.total;
-      setAsidePlanned += plan.setAside || 0;
       /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
          numerator and its denominator can never come from two calls. */
       const bu = F.used;
-      setAsideSpend += bu.setAside || 0;
-      assumedSpend += bu.assumed || 0;
-      budgetSpendOnly += bu.budgeted || 0;
-      movedSoFar += movedToFunds(p) || 0;
+      if (compared.has(i)) {
+        setAsidePlanned += plan.setAside || 0;
+        budgetUsedSpend += sum.spend;
+        setAsideSpend += bu.setAside || 0;
+        assumedSpend += bu.assumed || 0;
+        budgetSpendOnly += bu.budgeted || 0;
+        movedSoFar += movedToFunds(p) || 0;
+      }
 
       splitByPeriod.push({ split: F.split, byCat: sum.byCat, spend: sum.spend, uncatSpend: sum.uncatSpend });
       const ff = sum.fundedFromSavings || { spend: 0, count: 0 };
@@ -718,7 +729,7 @@ module.exports = function registerReport(ctx) {
        and silently absent from the other. See mergeCategoryRows' own header
        and this file's buildReportData/financialReportMarkdown for why a real
        MERGE across the rename is not attempted: see R5's note there. */
-    const categories = mergeCategoryRows(periods.map(p => budgetVsActualRows(p)), ['budget', 'actual'])
+    const categories = mergeCategoryRows(cmp.use.map(i => budgetVsActualRows(periods[i])), ['budget', 'actual'])
       .sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.cat.localeCompare(b.cat))
       .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
     /* `orphaned` — catKnown() is the SAME predicate period.js's own catType()
@@ -807,9 +818,11 @@ module.exports = function registerReport(ctx) {
          figure beside it are one reading. See ADR-0007's src/report.js entry.
          `setAsidePlanned` rides along for the "saved so far" sentence. */
       budgetUsed: {
-        spend, setAside: setAsideSpend, assumed: assumedSpend,
+        spend: budgetUsedSpend, setAside: setAsideSpend, assumed: assumedSpend,
         budgeted: budgetSpendOnly, moved: movedSoFar, setAsidePlanned,
       },
+      /* L2b-01 — what the three budget comparisons cover. */
+      budgetPeriods: { compared: cmp.withBudget, total: cmp.total, leftOut: cmp.leftOut },
       categories, spendByCategory,
       categoryGap: merged.gap,
       fundedFromSavings: { spend: fundedSpend, count: fundedCount },
@@ -890,7 +903,10 @@ module.exports = function registerReport(ctx) {
          "Re-create (overwrite)" means modifying it, not a create that throws
          "File already exists." beside it. */
       if (formats.has('md')) {
-        const md = financialReportMarkdown(data, money);
+        /* The formatter every page prints another currency through, and the
+           household's own decimal mark — the two things a pure module cannot
+           know (src/report.js, financialReportMarkdown's `fmt`). */
+        const md = financialReportMarkdown(data, money, { moneyIn, decimal: locale().decimal });
         try {
           written.md = { path: await writeVaultFile(onDisk(paths.mdPath), md), text: md };
         } catch (e) { errors.push(e.message || String(e)); }

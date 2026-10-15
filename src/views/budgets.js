@@ -2,7 +2,7 @@
 /* Budget page — per-period category amounts, edited as a draft and saved to
    Budgets/<period>.md. */
 
-const { el, icoEl, tableCells } = require('../dom');
+const { el, icoEl, tableCells, longFig, caveatChip } = require('../dom');
 const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
    setup wizard — see the header of budget-file.js for why it stopped being
@@ -19,6 +19,7 @@ const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
 const { sharePercentLabel } = require('../share-percents');
+const { amountUnreadable, remainderDecimals } = require('../figures');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
@@ -471,7 +472,14 @@ module.exports = function registerBudgets(ctx) {
        fragment — the tile's own sentence, or an earlier fragment. */
     const sep = () => ((spentNote || gapParts.length) ? ' · ' : '');
     if (gapUncat >= 1) addPart('bud-note-uncat', i18n.t('dash.split.uncatNote', { amount: money(gapUncat, 0) }));
-    if (gapNetted >= 1) addPart('bud-note-netted', i18n.t('dash.split.nettedNote', { amount: money(gapNetted, 0) }));
+    /* The Dashboard hero's sentence, not the donut's. "Total spent" reads GROSS
+       (ADR-0005) and these refunds are NOT taken off it; the donut's subtitle
+       says "netted off" because its slices are net per category, and that
+       wording printed here told a reader the opposite of what the figure had
+       done (2026-10-14 audit, L2b-02). The hero's key, so the two pages cannot
+       word one fact differently; it carries no leading separator, so sep()
+       supplies it exactly when something stands to the left. */
+    if (gapNetted >= 1) addPart('bud-note-netted', sep() + i18n.t('dash.hero.nettedOff', { amount: money(gapNetted, 0) }));
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
        accounts for what this tile's gross figure holds that the table below it
        nets away, and this accounts for what periodSummary never counted at
@@ -552,7 +560,11 @@ module.exports = function registerBudgets(ctx) {
     if (plan.unallocated !== null) {
       const unallocated = plan.unallocated;
       unallocatedTile = {
-        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'), value: money(Math.abs(unallocated), 0),
+        /* To the cent when a real over/left figure would round to R0
+           (2026-10-14 audit, L2a-N07): "Over-budgeted R 0" says the plan is
+           over and states no amount. */
+        label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'),
+        value: money(Math.abs(unallocated), remainderDecimals(unallocated)),
         /* One name for both branches. The tile prints a MAGNITUDE and the
            label carries the direction, so a reconciliation must compare it to
            |unallocated| — reading it as a signed figure is how the check on
@@ -635,11 +647,8 @@ module.exports = function registerBudgets(ctx) {
     return [...(lead ? [el('span', { class: 'bud-sep' }, NOTE_SEP)] : []), el('span', { 'data-fig': pt.fig }, ...out)];
   }
 
-  /* Seven or more digits: a totals figure steps down a size (.is-long in
-     statement/budget.css) rather than overflowing its tile. Counts
-     digits, so the symbol, the grouping and a decimal comma do not move the
-     threshold. The same rule as views/dashboard.js's longFig. */
-  const longFig = text => ((String(text).match(/\d/g) || []).length >= 7 ? ' is-long' : '');
+  /* longFig (.is-long in statement/budget.css) is dom.js's, shared with the
+     Dashboard hero — see there. */
 
   // Same three tiles above and below the table, so the totals are in reach
   // from either end of a long category list.
@@ -746,6 +755,12 @@ module.exports = function registerBudgets(ctx) {
            Dashboard row reading what had really arrived. `over`, `unbudgeted`
            and `remaining` are budgetRowStatus's, the Dashboard's own. */
         const row = rowOf.get(d.category);
+        /* The loader reads an amount cell it cannot parse as 0 and keeps the
+           reader's text in amountRaw. Without this the Budget field was
+           blank and nothing said why a typed figure had stopped counting
+           (2026-10-14 audit, L8-02). figures.js amountUnreadable is the one
+           test, shared with the Dashboard hero's count. */
+        const unreadableAmt = amountUnreadable(d);
         const assumed = row.assumed;
         const isIncome = type === 'income';
         /* Whether this category is a fixed, committed bill — its own read
@@ -818,7 +833,14 @@ module.exports = function registerBudgets(ctx) {
           // stale and the category file is where to fix it.
           el('td', {}, typeBadge(d.type)),
           el('td', { class: 'num' }, el('div', { class: 'bud-amt-wrap' },
-            el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '',
+            el('input', { ...(unreadableAmt
+              /* A number input cannot hold text it cannot parse — the browser
+                 shows it blank — so a cell the loader could not read is shown
+                 in a text field, verbatim, with the reason beside it. The
+                 same handler below retypes it: a valid entry replaces the raw,
+                 and until then a save writes the reader's own text back. */
+              ? { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm', value: d.amountRaw, 'aria-invalid': 'true' }
+              : { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '' }),
               'aria-label': i18n.t('bud.aria.amount', { category: d.category }),
               /* normalizeAmount, not `parseFloat(...) || 0` — the guard
                  views/assets.js documents. An empty field is what a plain
@@ -832,6 +854,7 @@ module.exports = function registerBudgets(ctx) {
                 if (v === null) { toast(i18n.t('acct.err.notNumber', { field: i18n.t('bud.col.amount') }), true); renderBudgets(); return; }
                 d.amount = v; d.amountRaw = null; mark(); renderBudgets();
               } }),
+            unreadableAmt ? caveatChip(i18n.t('bud.amount.unreadableChip'), i18n.t('bud.amount.unreadable', { raw: d.amountRaw })) : '',
             remainingEl,
             // Only offered where it means something. On an ordinary row the
             // figure would be written into a budget that transactions will then
@@ -1027,7 +1050,17 @@ module.exports = function registerBudgets(ctx) {
     // null removes the key outright rather than writing `assume_spent: false` —
     // absent is this flag's own default, so turning it off should leave the file
     // as it would have been had it never been turned on.
-    await ctx.patchFile(cat.rel, raw, body, { assume_spent: on ? 'true' : null });
+    /* A failed write is said, not swallowed (2026-10-14 audit, L8-07). The
+       button's onclick drops the promise, so a rejection here was an unhandled
+       rejection and no toast: the toggle looked pressed or not by luck, and the
+       reader had no way to know the category file never changed. The in-memory
+       flag is only flipped after the write lands, so a failure leaves the page
+       showing what the file says. */
+    try {
+      await ctx.patchFile(cat.rel, raw, body, { assume_spent: on ? 'true' : null });
+    } catch (e) {
+      return toast(i18n.t('bud.err.toggle', { category: name, error: e.message || e }), true);
+    }
     cat.assumeSpent = on;
     renderBudgets();
     toast(i18n.t(on ? 'bud.assumed.on' : 'bud.assumed.off', { category: name }));
@@ -1054,7 +1087,12 @@ module.exports = function registerBudgets(ctx) {
     const text = await readFile(cat.rel);
     if (text == null) return toast(i18n.t('bud.fixed.noFile', { category: name }), true);
     const { raw, body } = parseFrontmatter(text);
-    await ctx.patchFile(cat.rel, raw, body, { fixed: on ? 'true' : null });
+    try {
+      await ctx.patchFile(cat.rel, raw, body, { fixed: on ? 'true' : null });
+    } catch (e) {
+      // See toggleAssumeSpent: the page keeps showing what the file says.
+      return toast(i18n.t('bud.err.toggle', { category: name, error: e.message || e }), true);
+    }
     cat.fixed = on;
     renderBudgets();
     toast(i18n.t(on ? 'bud.fixed.on' : 'bud.fixed.off', { category: name }));

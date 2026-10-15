@@ -19,19 +19,21 @@ number	6	-	healthSub/
 money	R 63 500	63500	leftBody/@left-cash
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[0]
 money	R 15 000	15000	leftBody/@left-earmarked
-money	R 2 000	2000	leftBody/@left-committed
-number	2	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[0]
+money	R 11 000	11000	leftBody/@left-committed
+number	3	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[0]
 number	1	-	leftBody/div.left-grid[0]/div.left-fig[4]/div.lm[2]/span.fact[2]
-money	R 46 500	46500	leftBody/@left-free
-number	22	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[0]
-money	R 2 114	2113.6363636363635	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[2]
-number	4	-	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
-money	R 300	300	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
-money	R 1 200	1200	leftBody/details.left-open/table.left-disc/tr[0]/td.da[1]
-money	R 600	600	leftBody/details.left-open/table.left-disc/tr[1]/td.da[1]
-number	2	-	leftBody/details.left-open/table.left-disc/tr[2]/td[0]/div.dd[1]
-money	R 100	100	leftBody/details.left-open/table.left-disc/tr[2]/td[0]/div.dd[1]
-money	R 200	200	leftBody/details.left-open/table.left-disc/tr[2]/td.da[1]
+money	R 37 500	37500	leftBody/@left-free
+number	23	-	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[0]
+money	R 1 630	1630.4347826086957	leftBody/div.left-grid[0]/div.left-fig[6]/div.lm[2]/span.fact[2]
+money	R 9 000	9000	leftBody/details.left-open/table.left-disc/tr[0]/td[0]/div.dd[1]
+money	R 9 000	9000	leftBody/details.left-open/table.left-disc/tr[0]/td.da[1]
+number	4	-	leftBody/details.left-open/table.left-disc/tr[1]/td[0]/div.dd[1]
+money	R 300	300	leftBody/details.left-open/table.left-disc/tr[1]/td[0]/div.dd[1]
+money	R 1 200	1200	leftBody/details.left-open/table.left-disc/tr[1]/td.da[1]
+money	R 600	600	leftBody/details.left-open/table.left-disc/tr[2]/td.da[1]
+number	2	-	leftBody/details.left-open/table.left-disc/tr[3]/td[0]/div.dd[1]
+money	R 100	100	leftBody/details.left-open/table.left-disc/tr[3]/td[0]/div.dd[1]
+money	R 200	200	leftBody/details.left-open/table.left-disc/tr[3]/td.da[1]
 number	22	-	leftSub/
 number	26	-	trendChart/svg/rect[0]/title
 money	R 13 200,00	13200	trendChart/svg/rect[0]/title
@@ -116,7 +118,7 @@ money	R 0	0	dashPositionKpis/div.mini[3]/div.s[1]
 ## score
 number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
+number	1,1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
 money	R 13 217	13216.666666666666	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[0]/title
@@ -134,10 +136,10 @@ money	R 30 000	30000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-r
 number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 money	R 137 000	137000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
-number	0.38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
+number	0,38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[4]/title
 number	5	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	25	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
+number	1,1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
 money	R 13 217	13216.666666666666	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[5]/title
@@ -155,10 +157,10 @@ money	R 30 000	30000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-r
 number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 money	R 137 000	137000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
-number	0.38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
+number	0,38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/svg.score-ring/g/circle.score-ring-seg[8]/title
 number	46	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]
 number	100	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-hold[0]/button.score-ring-mid/div.score-ring-num[0]/small
-number	1.1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+number	1,1	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 15 000	15000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	6	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 money	R 13 217	13216.666666666666	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[0]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
@@ -176,7 +178,7 @@ money	R 30 000	30000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-r
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
 number	20	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[3]/span.score-ring-row-pts[2]
 money	R 137 000	137000	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
-number	0.38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
+number	0,38	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-body[1]/span.score-ring-row-now[1]
 number	2	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	15	-	scoreHero/div.score-hero/div.score-ring-wrap[0]/div.score-ring-legend[1]/button.score-ring-row[4]/span.score-ring-row-pts[2]
 number	6	-	scoreHero/div.score-hero/p.score-hero-sub[0]
@@ -190,7 +192,7 @@ number	20	-	scoreGood/div.score-win[0]/div.score-win-body/div.score-win-pts[2]
 number	19	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreGood/div.score-win[1]/div.score-win-body/div.score-win-pts[2]
 number	20	-	scoreWork/div.score-gap[0]/div.score-gap-h[0]/div.score-gap-pts[1]
-number	1.1	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
+number	1,1	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 money	R 15 000	15000	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 number	6	-	scoreWork/div.score-gap[0]/div.score-gap-now[2]
 money	R 13 217	13216.666666666666	scoreWork/div.score-gap[0]/div.score-gap-now[2]
@@ -203,7 +205,7 @@ money	R 6 000	6000	scoreWork/div.score-gap[1]/p.score-gap-do[0]
 percent	20%	-	scoreWork/div.score-gap[1]/p.score-gap-do[0]
 number	13	-	scoreWork/div.score-gap[2]/div.score-gap-h[0]/div.score-gap-pts[1]
 money	R 137 000	137000	scoreWork/div.score-gap[2]/div.score-gap-now[2]
-number	0.38	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
+number	0,38	-	scoreWork/div.score-gap[2]/div.score-gap-now[2]
 money	R 943 000	943000	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 number	3	-	scoreWork/div.score-gap[2]/p.score-gap-do[0]
 money	R 30 000	30000	view-score/@score-flow-in
@@ -280,6 +282,21 @@ money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[1]/span.sk2-fig[1]
 money	R 0,00	0	planPot/div.split-key2[3]/div.sk2-row[2]/span.sk2-fig[1]
 
 ## notes
+number	0	-	notesKpis/div.mini[0]/div.v[1]
+number	0	-	notesKpis/div.mini[1]/div.v[1]
+number	0	-	notesKpis/div.mini[2]/div.v[1]
+number	2026	-	noteAbout/option[9]
+number	2026	-	noteAbout/option[10]
+number	2026	-	noteAbout/option[11]
+number	2026	-	noteAbout/option[12]
+number	2026	-	noteAbout/option[13]
+number	2026	-	noteAbout/option[14]
+number	2026	-	noteAbout/option[15]
+number	2026	-	noteAbout/option[16]
+number	2026	-	noteAbout/option[17]
+number	2026	-	noteAbout/option[18]
+number	2026	-	noteAbout/option[19]
+number	2026	-	noteAbout/option[20]
 
 ## report
 number	3	-	reportPeriodPills/div.chart-range/button.chart-range-btn[1]
@@ -291,8 +308,10 @@ money	R 137 000,00	137000	savingsKpis/div.mini[0]/div.v[1]
 money	R 15 000,00	15000	savingsKpis/div.mini[1]/div.v[1]
 money	R 0,00	0	savingsKpis/div.mini[2]/div.v[1]
 money	R 5 000,00	5000	savingsKpis/div.mini[3]/div.v[1]
-percent	50.0%	-	savingsKpis/div.mini[3]/div.s[2]
+percent	50,0%	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 10 000	10000	savingsKpis/div.mini[3]/div.s[2]
+number	1	-	savingsKpis/div.mini[3]/div.s[2]
+number	1	-	savingsKpis/div.mini[3]/div.s[2]
 money	R 80 000	80000	savingsStale/div.sav-banner/div.kpi-caveat-txt
 money	R 145 000	145000	savingsWorth/@worth-owned-total
 money	R 15 000,00	15000	savingsWorth/@worth-owned-seg/rect/title
@@ -331,7 +350,7 @@ money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.sav-list/di
 money	R 15 000,00	15000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/button.v[0]
 money	R 10 000	10000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/div.s2[1]
 money	R 5 000	5000	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/div.s2[1]/span.num
-percent	50.0%	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/div.s2[2]
+percent	50,0%	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/div.s2[2]
 number	333	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/div.sav-detail/div.s2[3]/span.caveat-chip/button.caveat-chip-btn
 
 ## accounts
@@ -741,3 +760,117 @@ money	R 77 484	?	loanCarAmort/tbody/tr[4]/td.num[3]
 money	R 0	0	loanCarAmort/tbody/tr[4]/td.num[4]
 
 ## import
+
+## report-3m
+money	R 90 000,00	90000	report-3m/Income & Spend/Income/c1
+money	R 27 950,00	27950	report-3m/Income & Spend/Spend/c1
+money	R 62 050,00	62050	report-3m/Income & Spend/Net/c1
+money	R 30 000,00	30000	report-3m/Income & Spend/Budgeted income/c1
+money	R 14 600,00	14600	report-3m/Income & Spend/Total budgeted/c1
+money	R 1 500,00	1500	report-3m/Income & Spend/p1
+money	R 14 600,00	14600	report-3m/Income & Spend/p1
+percent	10%	-	report-3m/Income & Spend/p1
+number	2	-	report-3m/Income & Spend/p2
+number	3	-	report-3m/Income & Spend/p2
+number	2026	-	report-3m/Income & Spend/p2
+number	2026	-	report-3m/Income & Spend/p2#2
+number	3	-	report-3m/Income & Spend/p2#2
+money	R 18 000,00	18000	report-3m/Spend by Category/Rent/c1
+percent	64%	-	report-3m/Spend by Category/Rent/c2
+money	R 9 500,00	9500	report-3m/Spend by Category/Groceries/c1
+percent	34%	-	report-3m/Spend by Category/Groceries/c2
+money	R 250,00	250	report-3m/Spend by Category/Gym/c1
+percent	1%	-	report-3m/Spend by Category/Gym/c2
+money	R 200,00	200	report-3m/Spend by Category/Software/c1
+percent	1%	-	report-3m/Spend by Category/Software/c2
+money	R 30 000,00	30000	report-3m/Budget vs Actual/Salary/c2
+money	R 30 000,00	30000	report-3m/Budget vs Actual/Salary/c3
+money	R 0,00	0	report-3m/Budget vs Actual/Salary/c4
+money	R 4 200,00	4200	report-3m/Budget vs Actual/Groceries/c2
+money	R 1 500,00	1500	report-3m/Budget vs Actual/Groceries/c3
+money	R 2 700,00	2700	report-3m/Budget vs Actual/Groceries/c4
+money	R 1 200,00	1200	report-3m/Budget vs Actual/Gym/c2
+money	R 0,00	0	report-3m/Budget vs Actual/Gym/c3
+money	R 1 200,00	1200	report-3m/Budget vs Actual/Gym/c4
+money	R 9 000,00	9000	report-3m/Budget vs Actual/Rent/c2
+money	R 0,00	0	report-3m/Budget vs Actual/Rent/c3
+money	R 9 000,00	9000	report-3m/Budget vs Actual/Rent/c4
+money	R 200,00	200	report-3m/Budget vs Actual/Software/c2
+money	R 0,00	0	report-3m/Budget vs Actual/Software/c3
+money	R 200,00	200	report-3m/Budget vs Actual/Software/c4
+money	R 5 000,00	5000	report-3m/Savings & Investment Growth/Total growth/c1
+percent	50,0%	-	report-3m/Savings & Investment Growth/Rate of growth/c1
+money	R 8 000,00	8000	report-3m/Debt/Total balance/c1
+money	R 600,00	600	report-3m/Debt/Committed per month/c1
+money	R 133,33	133.33333333333334	report-3m/Debt/Interest this month/c1
+money	R 8 000,00	8000	report-3m/Debt/Card/c1
+percent	20%	-	report-3m/Debt/Card/c2
+money	R 133,33	133.33333333333334	report-3m/Debt/Card/c3
+money	R 137 000,00	137000	report-3m/Net Worth/Net worth/c1
+money	R 145 000,00	145000	report-3m/Net Worth/Owned/c1
+money	R 8 000,00	8000	report-3m/Net Worth/Owed/c1
+number	6	-	report-3m/Financial Health/p1
+number	46	-	report-3m/Financial Health/Score/c1
+number	1.1	-	report-3m/Financial Health/Emergency fund/c1
+number	6	-	report-3m/Financial Health/Emergency fund/c1
+percent	0%	-	report-3m/Financial Health/Saving rate/c1
+percent	0,4%	-	report-3m/Financial Health/Debt interest share of income/c1
+
+## report-12m
+money	R 210 000,00	210000	report-12m/Income & Spend/Income/c1
+money	R 80 450,00	80450	report-12m/Income & Spend/Spend/c1
+money	R 129 550,00	129550	report-12m/Income & Spend/Net/c1
+money	R 30 000,00	30000	report-12m/Income & Spend/Budgeted income/c1
+money	R 14 600,00	14600	report-12m/Income & Spend/Total budgeted/c1
+money	R 1 500,00	1500	report-12m/Income & Spend/p1
+money	R 14 600,00	14600	report-12m/Income & Spend/p1
+percent	10%	-	report-12m/Income & Spend/p1
+number	6	-	report-12m/Income & Spend/p2
+number	7	-	report-12m/Income & Spend/p2
+number	2026	-	report-12m/Income & Spend/p2
+number	2026	-	report-12m/Income & Spend/p2#2
+number	2026	-	report-12m/Income & Spend/p2#3
+number	2026	-	report-12m/Income & Spend/p2#4
+number	2026	-	report-12m/Income & Spend/p2#5
+number	2026	-	report-12m/Income & Spend/p2#6
+number	7	-	report-12m/Income & Spend/p2#2
+money	R 54 000,00	54000	report-12m/Spend by Category/Rent/c1
+percent	67%	-	report-12m/Spend by Category/Rent/c2
+money	R 26 000,00	26000	report-12m/Spend by Category/Groceries/c1
+percent	33%	-	report-12m/Spend by Category/Groceries/c2
+money	R 250,00	250	report-12m/Spend by Category/Gym/c1
+percent	0%	-	report-12m/Spend by Category/Gym/c2
+money	R 200,00	200	report-12m/Spend by Category/Software/c1
+percent	0%	-	report-12m/Spend by Category/Software/c2
+money	R 30 000,00	30000	report-12m/Budget vs Actual/Salary/c2
+money	R 30 000,00	30000	report-12m/Budget vs Actual/Salary/c3
+money	R 0,00	0	report-12m/Budget vs Actual/Salary/c4
+money	R 4 200,00	4200	report-12m/Budget vs Actual/Groceries/c2
+money	R 1 500,00	1500	report-12m/Budget vs Actual/Groceries/c3
+money	R 2 700,00	2700	report-12m/Budget vs Actual/Groceries/c4
+money	R 1 200,00	1200	report-12m/Budget vs Actual/Gym/c2
+money	R 0,00	0	report-12m/Budget vs Actual/Gym/c3
+money	R 1 200,00	1200	report-12m/Budget vs Actual/Gym/c4
+money	R 9 000,00	9000	report-12m/Budget vs Actual/Rent/c2
+money	R 0,00	0	report-12m/Budget vs Actual/Rent/c3
+money	R 9 000,00	9000	report-12m/Budget vs Actual/Rent/c4
+money	R 200,00	200	report-12m/Budget vs Actual/Software/c2
+money	R 0,00	0	report-12m/Budget vs Actual/Software/c3
+money	R 200,00	200	report-12m/Budget vs Actual/Software/c4
+money	R 5 000,00	5000	report-12m/Savings & Investment Growth/Total growth/c1
+percent	50,0%	-	report-12m/Savings & Investment Growth/Rate of growth/c1
+money	R 8 000,00	8000	report-12m/Debt/Total balance/c1
+money	R 600,00	600	report-12m/Debt/Committed per month/c1
+money	R 133,33	133.33333333333334	report-12m/Debt/Interest this month/c1
+money	R 8 000,00	8000	report-12m/Debt/Card/c1
+percent	20%	-	report-12m/Debt/Card/c2
+money	R 133,33	133.33333333333334	report-12m/Debt/Card/c3
+money	R 137 000,00	137000	report-12m/Net Worth/Net worth/c1
+money	R 145 000,00	145000	report-12m/Net Worth/Owned/c1
+money	R 8 000,00	8000	report-12m/Net Worth/Owed/c1
+number	6	-	report-12m/Financial Health/p1
+number	46	-	report-12m/Financial Health/Score/c1
+number	1.1	-	report-12m/Financial Health/Emergency fund/c1
+number	6	-	report-12m/Financial Health/Emergency fund/c1
+percent	0%	-	report-12m/Financial Health/Saving rate/c1
+percent	0,4%	-	report-12m/Financial Health/Debt interest share of income/c1

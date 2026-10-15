@@ -2,7 +2,7 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
-const { el, icoEl, tableCells } = require('../dom');
+const { el, icoEl, tableCells, caveatChip } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr, parseMdTableWithSeparator } = require('../markdown');
 const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
@@ -67,6 +67,34 @@ module.exports = function registerTransactions(ctx) {
   };
   const rowSymbolIsOneChar = r => Array.from(rowPrintedSymbol(r)).length === 1;
 
+  /* Is this row's Amount a cell the loader could not read AT ALL — as opposed
+     to one merely written in a non-canonical format ("1 234,56", "R1,234.56")
+     that normalizeAmount reads correctly and the loader keeps in amountRaw for
+     a lossless write-back? `amountRaw != null` alone answers the wrong
+     question and would call a correct amount unreadable; only when
+     normalizeAmount ALSO fails has the table schema's parse forced `amount`
+     to a fabricated 0 (amount.js: a fallback "must not be a plausible wrong
+     number"). The same line figures.js balanceReadable draws for an account. */
+  const amountUnreadable = r => r.amountRaw != null && normalizeAmount(r.amountRaw) === null;
+
+  /* The Amount cell. An unreadable one prints the text that is in the file with
+     a chip that says so, instead of "R 0,00" (2026-10-14 audit, L8-02): the
+     row used to look like a free transaction and nothing on this page, the
+     Dashboard or an export said a cell had not been read. The Accounts page
+     does this for a balance (acct.balance.unreadable). The cell cannot be
+     fixed here — the amount is the one column this table never edits — so the
+     chip names the file that can. `num` stays the first class: the figures
+     harness addresses the cell as td.num[4]. */
+  function amountCell(item) {
+    const r = item._row;
+    if (amountUnreadable(r)) {
+      return el('td', { class: 'num text-warning' }, r.amountRaw, ' ',
+        caveatChip(i18n.t('tx.amount.unreadable'),
+          i18n.t('tx.amount.unreadableWhy', { raw: r.amountRaw, file: txFileRel(item._file.label, item._file.month) })));
+    }
+    return el('td', { class: `num${r.amount > 0 ? ' text-success' : ''}${rowSymbolIsOneChar(r) ? ' st-cur1' : ''}` }, rowMoney(r.amount, r));
+  }
+
   /* Category changes made here teach the auto-categoriser too (not just the
      import review): desc → category, flushed to the rules CSV on save. A Map
      so re-picking the same transaction keeps only the final choice. */
@@ -117,26 +145,13 @@ module.exports = function registerTransactions(ctx) {
     return n;
   }
 
-  // TODO(i18n): still plain English — see the same note above
-  // categoriseFilteredTransactions for why (tests/i18n.test.cjs's invariant 6
-  // fails the build on a key this file cannot also add to lang/en.js). Keys
-  // wanted:
-  //   tx.ruleFix.title      "Update the matching rule too?"
-  //   tx.ruleFix.msg        "Rows matching "{pattern}" are filed as {old} by a
-  //                          rule. {reach} Update it to {new} only if they all
-  //                          belong there. If this one is an exception, choose
-  //                          Just this row."
-  //   tx.ruleFix.reach      {count} plural —
-  //                          one:   "It decides 1 of your transactions, and
-  //                                  every future import like it."
-  //                          other: "It decides {count} of your transactions,
-  //                                  and every future import of them."
-  //   tx.ruleFix.reachNone  "It decides none of the transactions already in
-  //                          your vault, only future imports." (its own key, so
-  //                          no language's zero rule has to carry it)
-  //   tx.ruleFix.keep       "Just this row"
-  //   tx.ruleFix.confirm    "Update the rule"
-  //   tx.ruleFix.done       "Rule "{pattern}" now points to {new} (it was {old})."
+  /* Worded through tx.ruleFix.* (2026-10-14 audit, L8-09): this dialog was
+     plain English in a translated view while the lang tables could not take a
+     new key from this file. The reach sentence is a plural on the number of
+     transactions the rule decides, with the none case its own key
+     (tx.ruleFix.reachNone) so no language's zero rule has to carry it. The
+     message points at the "Just this row" button by name, so tx.ruleFix.keep
+     and the name inside tx.ruleFix.msg are one phrase per language. */
   /* The correction path learnRules deliberately has none of ("an established
      rule is never silently overwritten" — categories.js). A recategorisation
      here that disagrees with the rule CURRENTLY governing the description is
@@ -177,19 +192,16 @@ module.exports = function registerTransactions(ctx) {
     if (!rule || rule.category === newCat) return;
     const old = rule.category;
     const n = ruleReach(rule);
-    const reach = n === 0 ? 'It decides none of the transactions already in your vault, only future imports.'
-      : n === 1 ? 'It decides 1 of your transactions, and every future import like it.'
-        : `It decides ${n} of your transactions, and every future import of them.`;
+    const reach = n === 0 ? i18n.t('tx.ruleFix.reachNone') : i18n.t('tx.ruleFix.reach', { count: n });
     const go = await confirmModal(app, {
-      title: 'Update the matching rule too?',
-      message: `Rows matching "${rule.pattern}" are filed as ${old} by a rule. ${reach} `
-        + `Update it to ${newCat} only if they all belong there. If this one is an exception, choose Just this row.`,
-      cancelText: 'Just this row',
-      confirmText: 'Update the rule',
+      title: i18n.t('tx.ruleFix.title'),
+      message: i18n.t('tx.ruleFix.msg', { pattern: rule.pattern, old, reach, cat: newCat }),
+      cancelText: i18n.t('tx.ruleFix.keep'),
+      confirmText: i18n.t('tx.ruleFix.confirm'),
       primary: 'cancel',
     });
     if (!go) return;
-    if (await correctRule(rule, newCat)) toast(`Rule "${rule.pattern}" now points to ${newCat} (it was ${old}).`);
+    if (await correctRule(rule, newCat)) toast(i18n.t('tx.ruleFix.done', { pattern: rule.pattern, cat: newCat, old }));
   }
 
   /* Not ctx.dirtyFlag: dirtiness here is per transaction FILE (f.dirty), and
@@ -315,15 +327,31 @@ module.exports = function registerTransactions(ctx) {
        file. The Dashboard's scope is one phrase: its two halves below are one
        drill-through, never applied apart. Literal English, never i18n. */
     const names = [];
+    /* `labels` — the same filters again, in the reader's language, for the
+       confirmation that names what a bulk action will touch. `filters` and
+       `names` are literal English because they are written INTO a file (the
+       export's "Filtered by" line, its file name); the delete dialog is read
+       by a person, and printed "account: Cheque" and "the rows the Dashboard
+       counts…" in English over an Afrikaans page (2026-10-14 audit, L8-09).
+       Same entries, same order, so `filters.length` and `labels.length`
+       always agree. */
+    const labels = [];
     const catName = cat === '__none__' ? 'Uncategorised' : cat === MISSING ? 'Missing categories' : cat;
-    if (acc) { filters.push(`account: ${acc}`); names.push(`account ${acc}`); }
-    if (cat) { filters.push(`category: ${catName}`); names.push(`category ${catName}`); }
-    if (q) { filters.push(`search: "${$('#txSearch').value.trim()}"`); names.push(`search ${q}`); }
+    const catLabel = cat === '__none__' ? i18n.t('tx.uncategorised') : cat === MISSING ? i18n.t('dash.stat.missing') : cat;
+    if (acc) { filters.push(`account: ${acc}`); names.push(`account ${acc}`); labels.push(i18n.t('tx.filter.account', { name: acc })); }
+    if (cat) { filters.push(`category: ${catName}`); names.push(`category ${catName}`); labels.push(i18n.t('tx.filter.category', { name: catLabel })); }
+    if (q) {
+      const typed = $('#txSearch').value.trim();
+      filters.push(`search: "${typed}"`); names.push(`search ${q}`); labels.push(i18n.t('tx.filter.search', { text: typed }));
+    }
     /* Named for the export and the bulk actions, which describe what is on
        screen: a file or a confirmation that omitted this would list a filter
        narrower than the one that was applied. */
-    if (scoped) { filters.push('the rows the Dashboard counts: inside the budget, home currency, not paid from a savings fund'); names.push('Dashboard rows'); }
-    if (today !== null) filters.push('dated up to today only');
+    if (scoped) {
+      filters.push('the rows the Dashboard counts: inside the budget, home currency, not paid from a savings fund');
+      names.push('Dashboard rows'); labels.push(i18n.t('tx.filter.dashboard'));
+    }
+    if (today !== null) { filters.push('dated up to today only'); labels.push(i18n.t('tx.filter.today')); }
     return {
       rows,
       hiddenOutside,
@@ -332,7 +360,15 @@ module.exports = function registerTransactions(ctx) {
       hiddenFund,
       token: `${acc}|${cat}|${q}|${whole}|${S.period}|${inBudgetFor !== null ? 'in' : 'all'}`,
       range: whole ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
+      /* The same range for a FILE NAME: literal English like `names` above.
+         The month name and the period's dates are English already
+         (period.js); only the whole-history phrase follows the interface
+         language, so an Afrikaans reader's export was "Transactions Hele
+         geskiedenis.csv" and the same selection from a phone set to English
+         was a second file beside it (2026-10-14 audit, L4a-07). */
+      fileRange: whole ? 'Whole history' : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
       filters,
+      labels,
       names,
     };
   }
@@ -557,7 +593,7 @@ module.exports = function registerTransactions(ctx) {
            in the text colour, income is green. No inline weight here, because
            an inline style would beat the stylesheet. `num` stays the first
            class: the figures harness addresses this cell as td.num[4]. */
-        el('td', { class: `num${r.amount > 0 ? ' text-success' : ''}${rowSymbolIsOneChar(r) ? ' st-cur1' : ''}` }, rowMoney(r.amount, r)),
+        amountCell(item),
         el('td', {}, excludedCell(item, mark)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
@@ -657,10 +693,6 @@ module.exports = function registerTransactions(ctx) {
        with different categories, so learning from them would teach the
        auto-categoriser a rule that contradicts itself on every import. */
     renderTransactions();
-    // TODO(i18n): plain English below, not i18n.t() — see the note above
-    // categoriseFilteredTransactions. Key wanted:
-    //   tx.split.uncategorised  "{n} of the new parts still need a category."
-    //
     // The split MODAL itself (src/modal.js — not an owner file here) does not
     // gate on every part having a category, only on the remainder being zero
     // and every part being positive: a 60/40 split can be committed with the
@@ -671,7 +703,7 @@ module.exports = function registerTransactions(ctx) {
     const stillUncategorised = rows.filter(p => !p.cat).length;
     toast(i18n.t('tx.split.done', { n: rows.length })
       + (stillUncategorised
-        ? ` ${stillUncategorised} of the new parts still need a category.`
+        ? ' ' + i18n.t('tx.split.uncategorised', { count: stillUncategorised })
         : ''));
   }
 
@@ -771,10 +803,11 @@ module.exports = function registerTransactions(ctx) {
      it is pressed "Reload from disk" is a working undo.
 
      No toast, deliberately. Every string this app shows goes through the
-     twelve language tables, tests/i18n.test.cjs fails the build on a key
-     referenced from src/ before it exists in all of them, and this file may
-     not add one (see the TODO(i18n) notes above categoriseFilteredTransactions
-     for the same constraint met three times already). The row itself is the
+     twelve language tables, and when this was written a new key could not be
+     added from here (the constraint met three times in this file, since
+     lifted — the bulk actions above are keyed now). The un-split has still
+     been left without a toast: that is a wording decision of its own, not
+     something to slip into a wave about other strings. The row itself is the
      feedback here in a way it is not after a delete: the chip is replaced by an
      ordinary unticked checkbox, the parts are visibly gone, and Save lights up. */
   async function unsplitTransaction(item) {
@@ -935,27 +968,18 @@ module.exports = function registerTransactions(ctx) {
      button as the one door to disk. That also means it does not need
      delete's own "nothing may be unsaved" gate: it is just more of the same
      kind of in-memory edit a reader can already make one row at a time. */
-  // TODO(i18n): this whole action is still plain English, not i18n.t() —
-  // tests/i18n.test.cjs's invariant 6 fails the build the moment a NEW key is
-  // referenced from src/ before it exists in every lang/*.js table, and this
-  // file may only add lang/en.js keys, never lang files themselves. Keys
-  // wanted, once someone with lang/ access adds them (English text alongside
-  // each — reuses tx.bulk.none / tx.col.category / tx.uncategorised, which
-  // already exist and ARE used below. The "pick a filter first" toast has its
-  // own key, tx.bulkCat.needFilter (all 12 languages): tx.bulk.needFilter
-  // talks about DELETING, and read as a warning on an action that deletes
-  // nothing):
-  //   tx.bulkCat.button  "Set category"
-  //   tx.bulkCat.title   "Set category for these rows"
-  //   tx.bulkCat.msg     "{count} rows will be set to {cat}." ({count} plural)
-  //   tx.bulkCat.confirm "Set category ({count})" ({count} plural)
-  //   tx.bulkCat.done    "{count} rows recategorised — remember to Save." ({count} plural)
+  /* Worded through tx.bulkCat.* (2026-10-14 audit, L8-09): the dialog titles,
+     the confirmation, the done toast and the button were plain English in a
+     translated view. The three counted sentences are plurals on the number of
+     rows; the "pick a filter first" toast has its own key, tx.bulkCat.needFilter
+     — tx.bulk.needFilter talks about DELETING, and read as a warning on an
+     action that deletes nothing. */
   async function categoriseFilteredTransactions() {
     const { rows, filters } = filteredRows();
     if (!filters.length) return toast(i18n.t('tx.bulkCat.needFilter'), true);
     if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
 
-    const values = await askFields(app, 'Set category for these rows', [
+    const values = await askFields(app, i18n.t('tx.bulkCat.title'), [
       {
         key: 'cat', type: 'select',
         label: i18n.t('tx.col.category'),
@@ -969,9 +993,9 @@ module.exports = function registerTransactions(ctx) {
     const cat = values.cat || '';
 
     const go = await confirmModal(app, {
-      title: 'Set category for these rows',
-      message: `${rows.length} row${rows.length === 1 ? '' : 's'} will be set to ${cat || i18n.t('tx.uncategorised')}.`,
-      confirmText: `Set category (${rows.length})`,
+      title: i18n.t('tx.bulkCat.title'),
+      message: i18n.t('tx.bulkCat.msg', { count: rows.length, cat: cat || i18n.t('tx.uncategorised') }),
+      confirmText: i18n.t('tx.bulkCat.confirm', { count: rows.length }),
     });
     if (!go) return;
 
@@ -981,7 +1005,7 @@ module.exports = function registerTransactions(ctx) {
     }
     $('#txSave').disabled = false;
     renderTransactions();
-    toast(`${rows.length} row${rows.length === 1 ? '' : 's'} recategorised — remember to Save.`);
+    toast(i18n.t('tx.bulkCat.done', { count: rows.length }));
   }
 
   /* Built once and inserted beside the real #txDeleteFiltered button — there
@@ -1002,10 +1026,9 @@ module.exports = function registerTransactions(ctx) {
     if (bulkCatBtn) return;
     const delBtn = $('#txDeleteFiltered');
     if (!delBtn || !delBtn.parentNode) return;
-    // TODO(i18n): 'Set category' — see tx.bulkCat.button above.
     const btn = el('button', {
       type: 'button', class: 'btn-ghost',
-    }, icoEl(['tags', 'tag', 'circle-check', 'check-circle']), ' Set category');
+    }, icoEl(['tags', 'tag', 'circle-check', 'check-circle']), ' ' + i18n.t('tx.bulkCat.button'));
     btn.addEventListener('click', categoriseFilteredTransactions);
     delBtn.parentNode.insertBefore(btn, delBtn);
     bulkCatBtn = btn;
@@ -1013,7 +1036,7 @@ module.exports = function registerTransactions(ctx) {
 
   async function deleteFilteredTransactions() {
     if (Object.values(S.txFiles).some(f => f.dirty)) return toast(i18n.t('tx.bulk.dirty'), true);
-    const { rows, range, filters } = filteredRows();
+    const { rows, range, filters, labels } = filteredRows();
     if (!filters.length) return toast(i18n.t('tx.bulk.needFilter'), true);
     if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
 
@@ -1023,7 +1046,7 @@ module.exports = function registerTransactions(ctx) {
     const splits = rows.filter(t => splitRole(t._row.split)).length;
     const go = await confirmModal(app, {
       title: i18n.t('tx.bulk.title'),
-      message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: filters.join(', ') })
+      message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: labels.join(', ') })
         + ' ' + i18n.t('tx.bulk.backup', { path: DELETED_LOG })
         + (splits ? ' ' + i18n.t('tx.bulk.splits', { count: splits }) : ''),
       confirmText: i18n.t('tx.bulk.confirm', { count: rows.length }),
@@ -1064,7 +1087,12 @@ module.exports = function registerTransactions(ctx) {
       }
     } catch (e) {
       renderTransactions();
-      return toast(i18n.t('tx.bulk.failed', { count: files, error: (e && e.message) || e }), true);
+      /* Nothing written yet is its own sentence: the plural key is chosen on
+         `count`, and fr / pt / hi give 0 their singular, so "Stopped after
+         {count} files" at 0 printed a hard-coded "1" (2026-10-14 audit,
+         L8-08). */
+      const error = (e && e.message) || e;
+      return toast(files === 0 ? i18n.t('tx.bulk.failedNone', { error }) : i18n.t('tx.bulk.failed', { count: files, error }), true);
     }
     /* The receipt describes rows this may just have removed, and it holds them
        by object identity — an undo run afterwards would find fewer than it
@@ -1072,7 +1100,14 @@ module.exports = function registerTransactions(ctx) {
        CSV, which is the better way back. */
     S.lastImport = null;
     ctx.render();
-    toast(i18n.t('tx.bulk.done', { count: removed, files, path: DELETED_LOG }));
+    /* tx.bulk.done is chosen on the ROW count and names "{files} files", which
+       is always at least two by then (one row is one file; many rows in one
+       file is the case below) — so the plural of "file" never rides on the
+       row count's category. Many rows in ONE file used to print "from 1
+       files" (2026-10-14 audit, L8-08). */
+    toast(removed > 1 && files === 1
+      ? i18n.t('tx.bulk.doneOneFile', { count: removed, path: DELETED_LOG })
+      : i18n.t('tx.bulk.done', { count: removed, files, path: DELETED_LOG }));
   }
 
   /* ------------------------- where a row goes in its file ---------------------
@@ -1318,7 +1353,7 @@ module.exports = function registerTransactions(ctx) {
     if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
     S.txFiles[key].rows.push(row);
     renderTransactions();
-    toast(`Added ${money(amount)} · ${label} · ${month}`);
+    toast(i18n.t('tx.add.done', { amount: money(amount), account: label, month }));
   }
 
   /* Guarded per-file, deliberately not around the whole loop-plus-learn: a
@@ -1374,20 +1409,50 @@ module.exports = function registerTransactions(ctx) {
      produce a file that matches neither the vault nor what the reader is about
      to save, and the disagreement would only surface later, in a spreadsheet,
      with nothing to explain it. */
-  /* io.js destinationProblem's answer, in the Report's own words — the same
-     three sentences views/report.js's folderProblem shows under its field. */
+  /* io.js destinationProblem's answer, in the Report's own words for the three
+     reasons that are not about what is written (views/report.js's
+     folderProblem shows the same sentences under its field) — and its own
+     for the managed folder: the Report's says "a report saved here would be
+     read back in", about a document this click never makes (2026-10-14
+     audit, L4a-11). */
   function destinationReason(p) {
     if (p.kind === 'traversal') return i18n.t('report.field.folderTraversal');
     if (p.kind === 'configDir') return i18n.t('bx.problem.configDir', { folder: p.folder });
     if (p.kind === 'hidden') return i18n.t('bx.problem.hiddenFolder', { folder: p.folder });
-    return i18n.t('report.field.folderManaged', { folder: p.folder });
+    return i18n.t('tx.export.folderManaged', { folder: p.folder });
+  }
+
+  /* `path` as the vault already spells it, when a file differing only by case
+     is there.
+
+     macOS and iOS resolve paths case-insensitively; Obsidian's index does
+     not. An "exports/Transactions Whole history.csv" from an earlier export
+     IS the file "Exports/Transactions Whole history.csv" names on those
+     devices, and the dialog below says so (vaultPathTaken folds case) — but
+     writeVaultFile missed the index's exact key, called vault.create, and
+     Vault.create (app.js 1.13.7) asks the ADAPTER whether the path exists,
+     case-insensitively there, and throws "File already exists.": the reader
+     agreed to a replacement and got "Could not write the export"
+     (2026-10-14 audit, L4a-06). Asked only when vaultPathTaken says the path
+     is used and the exact key is not; Obsidian's own
+     getAbstractFileByPathInsensitive does the finding, and an Obsidian
+     without it keeps the path as asked (the dialog still names it).
+
+     The same four lines as views/budget-export.js and views/report.js carry
+     (onDisk in each) — a dedupe candidate once one of them can be shared;
+     those files are not this one's to touch. */
+  function onDisk(path) {
+    if (ctx.fileAtVaultPath(path) || !ctx.vaultPathTaken(path)) return path;
+    const v = app.vault;
+    const hit = v && typeof v.getAbstractFileByPathInsensitive === 'function' ? v.getAbstractFileByPathInsensitive(path) : null;
+    return hit && hit.path && ctx.fileAtVaultPath(hit.path) ? hit.path : path;
   }
 
   async function exportTransactions() {
     if (Object.values(S.txFiles).some(f => f.dirty)) {
       return toast(i18n.t('tx.export.dirty'), true);
     }
-    const { rows, range, filters, names } = filteredRows();
+    const { rows, range, fileRange, filters, names } = filteredRows();
     if (!rows.length) return toast(i18n.t('tx.export.empty'), true);
 
     /* Ask where, every time, with last time's answer prefilled.
@@ -1411,7 +1476,7 @@ module.exports = function registerTransactions(ctx) {
     if (!answer) return;                       // cancelled — say nothing, do nothing
 
     /* Named after the active filters as well as the range — see exportPaths. */
-    const paths = exportPaths(range, answer.folder, names);
+    const named = exportPaths(fileRange, answer.folder, names);
     /* Refused BEFORE the first write, for the reasons the Report and the
        budget export already refuse (2026-10-07 audit, TX-EXPORT-DEST). This
        export had none of them: into <budget>/Categories the next vault load
@@ -1424,8 +1489,13 @@ module.exports = function registerTransactions(ctx) {
        rebased); asked of the folder as TYPED, because exportPaths drops a
        ".." segment and so cannot be what is checked, and of the folder the
        files would land in. */
-    const problem = ctx.destinationProblem(answer.folder) || ctx.destinationProblem(paths.dir);
+    const problem = ctx.destinationProblem(answer.folder) || ctx.destinationProblem(named.dir);
     if (problem) return toast(destinationReason(problem), true);
+    /* Each file at the spelling the vault already has it under (onDisk), so
+       the dialog below names the file that will really be replaced and the
+       write modifies it instead of asking Obsidian to create a second one. */
+    const paths = { ...named, txCsv: onDisk(named.txCsv), txMd: onDisk(named.txMd),
+      catCsv: onDisk(named.catCsv), catMd: onDisk(named.catMd) };
     /* An export REPLACES what is at its paths — that is its contract, and what
        someone who has just fixed a category and exported again wants. It is
        also how the reader's own Household/Categories.md was overwritten with

@@ -176,6 +176,26 @@
   background-color: var(--body-bg);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  /* Obsidian's app.css puts `user-select: none` on <body> and it inherits, so on
+     a phone not one word in this app could be selected or copied (a merchant, a
+     reference, an account number). Text is selectable again here; the things a
+     finger DRIVES keep `none` just below. Both spellings: Safari reads only the
+     -webkit- one before 17. */
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* Controls, the drawer and top bar, a <summary> toggle, the column-resize grip
+   and charts (a drag on a chart scrubs its readout) stay unselectable: a tap or
+   drag on them must never leave a blue selection behind. Form fields are not
+   listed on purpose; WebKit refuses typed text in a field under `none`. */
+.budget-app-root button,
+.budget-app-root summary,
+.budget-app-root .app-drawer,
+.budget-app-root .topbar,
+.budget-app-root .acct-grip,
+.budget-app-root svg {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Ambient background — emerald/gold glow + hairline gradient behind all content */
@@ -251,6 +271,87 @@
   white-space: normal;
   cursor: pointer;
 }
+/* ---- The same reset, on an iPad ---------------------------------------
+   app.css ships `.is-tablet button:not(.clickable-icon) { padding: 4px 20px }`
+   (0,2,1). The reset above is (0,1,1) and nearly every component class is
+   (0,2,0), so on an iPad about 65 of this plugin's buttons lost their padding
+   to the host's: the Plan done-tick became a 42x24 pill, the Import drop zone
+   96px tall instead of 168px, every icon-only button 42px wide, the drawer's
+   rows 38px instead of 52px (audit L5-02, measured against Obsidian 1.14.4's
+   real app.css at 820px, host render vs the same page with the host sheet
+   removed). The iPhone is untouched: it is .is-phone, and the host rule is
+   .is-tablet only.
+
+   Re-declaring each class at a higher specificity is the only way back in: a
+   (0,2,0) rule cannot beat (0,2,1), and the buttons carry no class we could
+   exclude them from the host rule with. So:
+
+     - `body.is-tablet .budget-app-root button` (0,2,2) restores the reset to
+       the host's level. Every icon-only button, tick and text-link button gets
+       its `padding: 0` back from this one rule.
+     - Each class that carries a padding of its own is stated again as
+       `button:where(.cls)`. :where() keeps the twin at (0,2,2), so it beats the
+       host and still LOSES to every (0,3,0)+ component rule (`.acct-deck-btn.sm`,
+       `.bud-table .bud-act`, the id-scoped Transactions rules), which already
+       beat the host and are the intended values. The twins tie each other, so
+       they are listed in their base rules' source order, media variants in
+       place; tests/css-tablet-button-padding.test.cjs holds value, context and
+       order against the base rules.
+   A new button class that sets its own padding needs its twin here; the test
+   names it. Every selector begins `body.is-tablet`, so nothing below can reach
+   a desktop window or a phone. */
+body.is-tablet .budget-app-root button { padding: 0; }
+body.is-tablet .budget-app-root button:where(.drawer-link) { padding: 11px 12px; }
+body.is-tablet .budget-app-root button:where(.stat) { padding: 16px 0; }
+body.is-tablet .budget-app-root button:where(.btn-ghost) { padding: 0.4rem 0.9rem; }
+body.is-tablet .budget-app-root button:where(.btn-gradient) { padding: 0.4rem 1rem; }
+body.is-tablet .budget-app-root button:where(.category-badge) { padding: 0.25rem 0.65rem; }
+body.is-tablet .budget-app-root button:where(.acct-recon-btn) { padding: 3px 10px; }
+body.is-tablet .budget-app-root button:where(.kpi-caveat-btn) { padding: 3px 10px; }
+body.is-tablet .budget-app-root button:where(.caveat-chip-btn) { padding: 2px 9px; }
+body.is-tablet .budget-app-root button:where(.svc-next-hint) { padding: 1px 7px; }
+body.is-tablet .budget-app-root button:where(.acct-owner-row) { padding: 9px 10px; }
+body.is-tablet .budget-app-root button:where(.acct-deck-btn) { padding: 5px 13px; }
+body.is-tablet .budget-app-root button:where(.acct-seg) { padding: 6px 15px; }
+body.is-tablet .budget-app-root button:where(.acct-drawer-act) { padding: 5px 13px; }
+body.is-tablet .budget-app-root button:where(.tx-undo-btn) { padding: 7px 15px; }
+body.is-tablet .budget-app-root button:where(.status-pill) { padding: 0.25rem 0.7rem; }
+body.is-tablet .budget-app-root button:where(.loan-tab) { padding: 8px 16px; }
+body.is-tablet .budget-app-root button:where(.tax-doc-link) { padding: 0.2rem 0.6rem; }
+body.is-tablet .budget-app-root button:where(.upload-area) { padding: 2.5rem 1.5rem; }
+body.is-tablet .budget-app-root button:where(.chart-range-btn) { padding: 7px 13px; }
+@media (max-width: 700px) {
+  body.is-tablet .budget-app-root button:where(.chart-range-btn) { padding: 8px 14px; }
+}
+body.is-tablet .budget-app-root button:where(.btn-ghost-sm) { padding: 0.35rem 0.7rem; }
+@media (pointer: coarse) {
+  body.is-tablet .budget-app-root button:where(.btn-ghost-sm) { padding: 0.55rem 0.9rem; }
+}
+body.is-tablet .budget-app-root button:where(.cat-cell-btn) { padding: 0.25rem 0.5rem; }
+body.is-tablet .budget-app-root button:where(.splash-btn) { padding: 0.7rem 2rem; }
+body.is-tablet .budget-app-root button:where(.plan-seg) { padding: 6px 15px; }
+body.is-tablet .budget-app-root button:where(.env-name) { padding: 5px 0; }
+body.is-tablet .budget-app-root button:where(.ei-name) { padding: 4px 0; }
+body.is-tablet .budget-app-root button:where(.env-add) { padding: 4px 11px; }
+body.is-tablet .budget-app-root button:where(.report-btn) { padding: 0.55rem 1.5rem; }
+body.is-tablet .budget-app-root button:where(.note-chip) { padding: 2px 7px; }
+body.is-tablet .budget-app-root button:where(.score-ring-mid) { padding: 0 18%; }
+body.is-tablet .budget-app-root button:where(.score-ring-row) { padding: 11px 12px; }
+body.is-tablet .budget-app-root button:where(.btn-sm) { padding: 7px 14px; }
+body.is-tablet .budget-app-root button:where(.src2-main) { padding: 2px 0; }
+body.is-tablet .budget-app-root button:where(.env-sum) { padding: 10px 14px; }
+body.is-tablet .budget-app-root button:where(.sav-row) { padding: 13px 14px; }
+body.is-tablet .budget-app-root button:where(.sav-sheet-fence) { padding-top: 10px; }
+@media (max-width: 700px) {
+  body.is-tablet .budget-app-root button:where(.sav-row) { padding: 12px; }
+}
+body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px; }
+/* The split dialog is a Modal, outside .budget-app-root, so it cannot use the
+   block above; its delete button is (0,1,0) against the host's (0,2,1) and
+   loses on an iPad. (0,2,1) here is enough: the plugin's sheet loads after
+   app.css, so a tie goes to it. */
+.is-tablet button.budget-split-del { padding: 0 8px; }
+
 .budget-app-root select {
   height: auto;
   margin: 0;
@@ -292,8 +393,13 @@
 .budget-app-root h2 { margin: 0; }
 .budget-app-root p { margin: 0 0 0.8em; }
 .budget-app-root code {
-  font-size: 0.85em;
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  /* max(): .85em of a 12px note is 10.2px, of an 11.8px one 10.0px; the 11px
+     floor only ever lifts a chip that sits beside small text (audit L6-05). */
+  font-size: max(0.85em, 11px);
+  /* 4%, not 7%: the chip sits under --ink-faint notes, and a 7% tint over the
+     pale light-theme tile took that ink to 4.39:1 and 4.49:1 (audit L5-04). The
+     fill is what gives, not the text. */
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
@@ -1207,14 +1313,25 @@
    (verified: --color-warning-ink's #9a5c09 measures 5.18:1 on
    --color-warning-light, better than the #a16207 it replaces) and to the raw
    fill in dark mode. Keeping both here would have been two mechanisms doing
-   the same job. */
+   the same job.
+   .badge-debt is one step darker than its siblings (orange-800, not -700):
+   #c2410c measured 4.13:1 on its own 14% orange tint over the pale tile of a
+   real light-theme render (audit L5-04); #9a3412 is 5.8:1 there. */
 .budget-app-root:not(.bud-dark) .badge-income,
 .budget-app-root:not(.bud-dark) .badge-services   { color: #0369a1; }
-.budget-app-root:not(.bud-dark) .badge-debt       { color: #c2410c; }
+.budget-app-root:not(.bud-dark) .badge-debt       { color: #9a3412; }
 .budget-app-root:not(.bud-dark) .badge-savings    { color: #15803d; }
 .budget-app-root:not(.bud-dark) .badge-giving     { color: #be185d; }
 .budget-app-root:not(.bud-dark) .badge-luxuries   { color: #0f766e; }
 .budget-app-root:not(.bud-dark) .badge-investment { color: #6d28d9; }
+/* Dark theme: --color-giving (#e83e8c) on its own 14% tint was 4.47:1, a hair
+   under AA at this size. A touch lighter (#ef5ca4, 4.9:1+ on all four dark
+   surfaces). Behind the same color-mix guard as the tint it sits on: without
+   color-mix the badge already falls back to a pale fill (see the @supports not
+   block below), and a lighter ink there would only widen that gap. */
+@supports (color: color-mix(in srgb, red, blue)) {
+  .budget-app-root.bud-dark .badge-giving { color: #ef5ca4; }
+}
 
 /* ============================================================
    CATEGORY USAGE BARS (Budget page)
@@ -1353,7 +1470,7 @@
 
 .budget-app-root .acct-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .budget-app-root .acct-badge {
-  font-size: 10.5px; font-weight: 600; letter-spacing: .3px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .3px;
   padding: 2px 8px; border-radius: 999px;
   border: 1px solid var(--border-color); color: var(--text-muted);
 }
@@ -1410,6 +1527,36 @@
   color: var(--color-primary);
 }
 .budget-app-root .kpi-caveat-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* The "some files could not be read" banner (controller.js, renderUnreadableBanner).
+   It reuses .kpi-caveat for its flex row and its :empty rule, but a caveat is
+   deliberately quiet and this reports a file the app could not read, so it is a
+   bordered card in the warning tone: the warning fill, the warning INK for the
+   border (the fill amber is 2.2:1 on white; the ink is AA, and in the dark
+   theme points back at the fill), the primary ink for the sentence so it reads
+   at 4.5:1 on the fill in both themes. A direct child of .bud-scroll, outside
+   .main-content, so it carries that column's gutters itself: the 1200px column
+   less its 2.5rem side padding on a desktop, 14px on a phone like every other
+   loose block. Quiet in size (13px, no icon, no animation): it must be seen,
+   not shout over a page whose figures are still the best answer there is. */
+.budget-app-root .bv-unreadable-banner {
+  width: calc(100% - 5rem);
+  max-width: calc(1200px - 5rem);
+  margin: 1rem auto 0;
+  padding: 10px 14px;
+  background: var(--color-warning-light);
+  border: 1px solid var(--color-warning-ink);
+  border-radius: var(--radius);
+}
+.budget-app-root .bv-unreadable-banner .kpi-caveat-txt {
+  font-size: 13px; line-height: 1.45; color: var(--text-primary);
+}
+@media (max-width: 768px) {
+  .budget-app-root .bv-unreadable-banner {
+    width: auto; max-width: none; margin: 0.75rem 14px 0;
+    margin-left: 14px; margin-right: 14px;
+  }
+}
 
 /* Tap-to-expand caveat chip — dom.js's caveatChip(). A real button that
    reveals its own detail line on tap, so the substance a `title=` used to
@@ -1600,7 +1747,7 @@
 .budget-app-root .acct-seg[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
 .budget-app-root .acct-seg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .acct-seg-n {
-  font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
   background: rgba(127, 127, 127, .18); color: var(--text-muted);
 }
 /* Fixed dark ink, not var(--text-primary): --color-warning is the same bright
@@ -1683,6 +1830,26 @@
 }
 .budget-app-root #acctTable th:first-child,
 .budget-app-root #acctTable td:first-child { min-width: 210px; }
+/* The columns the drawer repeats drop in two steps between a phone and a
+   laptop (audit L6-01). With the state cell wrapping and the goal label under
+   its bar, the table needs about 1061px for all eight columns; the card is the
+   window less ~122px (the rail and the page gutters), capped at 1078px. So all
+   eight fit from a ~1190px window; below it the sparkline (Period) and the
+   confirmed date go, which is 826px and fits from ~950px; below that the
+   phone's set goes (Change, Progress as well), 587px, which fits down to the
+   760px rule that already drops them. Each step is the window width where the
+   table, already as narrow as it can wrap, no longer fits the card.
+   :not(.is-sized) because a reader who dragged a column edge chose a fixed
+   layout and their stored widths; hiding columns under it would make those
+   widths mean something else. display:none and nothing that re-lays the table
+   out, so the VoiceOver gate on the [role='table'] card layout is untouched. */
+@media (max-width: 1180px) {
+  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop:nth-child(4),
+  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop:nth-child(6) { display: none; }
+}
+@media (max-width: 960px) {
+  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop { display: none; }
+}
 .budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .budget-app-root .acct-cell-sub { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
 .budget-app-root .acct-bal {
@@ -1700,7 +1867,12 @@
 .budget-app-root .acct-chip.up { color: var(--color-success); border-color: var(--color-success); background: var(--color-success-light); }
 .budget-app-root .acct-chip.down { color: var(--color-danger-ink); border-color: var(--color-danger); background: var(--color-danger-light); }
 .budget-app-root svg.acct-spark { display: block; width: 96px; height: 24px; }
-.budget-app-root .acct-goal { display: inline-flex; align-items: center; }
+/* flex-wrap: the label may drop under its bar. Bar and label were one nowrap
+   row (88px + 8px + "63% of R 100 000"), 195px that the Progress column could
+   not give back; wrapped, the column's floor is the label alone and the table
+   was 88px narrower at the same window (audit L6-01). The label itself stays
+   nowrap, below, so a figure never breaks mid-number. */
+.budget-app-root .acct-goal { display: inline-flex; align-items: center; flex-wrap: wrap; row-gap: 3px; }
 .budget-app-root .acct-mbar {
   width: 88px; height: 6px; border-radius: 6px; background: var(--border-color);
   overflow: hidden; display: inline-block; vertical-align: middle; flex: none;
@@ -1730,7 +1902,7 @@
 .budget-app-root .acct-mbar--split i.seg-growth.neg { background: var(--color-danger); }
 .budget-app-root .acct-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .budget-app-root .acct-dash { color: var(--ink-faint); }
-.budget-app-root .acct-caret { opacity: .4; font-size: .8em; }
+.budget-app-root .acct-caret { opacity: .4; font-size: 11px; }
 .budget-app-root .table thead th.is-sorted button { color: var(--text-primary); }
 .budget-app-root .table thead th.is-sorted .acct-caret { opacity: 1; color: var(--color-primary); }
 .budget-app-root .table thead th button {
@@ -1782,7 +1954,7 @@
 }
 .budget-app-root .table tbody tr.acct-empty td { padding: 34px 12px; text-align: center; color: var(--text-muted); font-size: 13px; border-bottom: none; }
 .budget-app-root .acct-pill {
-  font-size: 10.5px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .3px; white-space: nowrap;
   padding: 2px 9px; border-radius: 999px; display: inline-block;
   border: 1px solid var(--border-color); color: var(--text-muted);
 }
@@ -1810,7 +1982,7 @@
 .budget-app-root .acct-drawer-h h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
 .budget-app-root .acct-drawer-v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .budget-app-root .acct-drawer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; margin-bottom: 4px; }
-.budget-app-root .acct-drawer-l { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; }
+.budget-app-root .acct-drawer-l { font-size: 11.5px; color: var(--ink-faint); font-weight: 600; }
 .budget-app-root .acct-drawer-val { font-size: 14px; font-weight: 600; margin-top: 3px; }
 .budget-app-root .acct-drawer-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .budget-app-root .acct-drawer-act {
@@ -1961,7 +2133,35 @@
 .budget-app-root .debt-dti { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 12.5px; }
 .budget-app-root .debt-prog { display: flex; align-items: center; gap: 8px; min-width: 120px; }
 .budget-app-root .debt-prog .cat-bar { min-width: 70px; flex: 1; }
-.budget-app-root .debt-settled td { opacity: 0.55; }
+/* THE DEBTS TABLE FITS THE CARD (audit L6-01). Eleven columns, nine of them
+   fixed-width controls inside 16px cell padding, were 1373px in a 902-1078px
+   card at every window width: Status and the remove button were past its edge.
+   The four money inputs are narrower (phone-tables.css, where their widths
+   live), and here: 10px cell padding, the Category select capped at 8rem (it
+   was 212px, the width of its longest option; the closed select still shows a
+   category name and the full list is one click away), and the progress cell's
+   floors lowered so its bar and its "on this plan it would be R ..." pill can
+   narrow. 1373 becomes 1061px, which fits the 1078px card from a ~1190px
+   window; below that the table scrolls sideways as it always has, because an
+   eleven-column editing table has no further column it can drop without
+   hiding a figure. Not on a phone: a landscape iPhone (601-932px, .is-phone)
+   stacks these rows into cards whose controls fill their cell, and a max-width
+   or a padding written for the table would follow them in. */
+@media (min-width: 601px) {
+  body:not(.is-phone) .budget-app-root #debtTable th,
+  body:not(.is-phone) .budget-app-root #debtTable td { padding-inline: 10px; }
+  body:not(.is-phone) .budget-app-root #debtTable td:nth-child(6) > select { max-width: 8rem; }
+  body:not(.is-phone) .budget-app-root #debtTable .debt-prog { min-width: 92px; }
+  body:not(.is-phone) .budget-app-root #debtTable .debt-prog .cat-bar { min-width: 52px; }
+}
+/* A settled debt is quieter than a live one, but NOT through opacity on its
+   cells: opacity multiplies the ink, and the row's whole job is still to be
+   read. At .55/.75 the "Settled" pill measured 3.09:1 (3.13:1 on the dark
+   theme) and the muted note and dash beside it 3.9:1 (audit L5-04, Obsidian
+   1.14.4's real app.css). The row's text steps down to the muted ink token
+   instead, and only the progress bar - a fill, carrying no words - is dimmed. */
+.budget-app-root .debt-settled td { color: var(--text-muted); }
+.budget-app-root .debt-settled .debt-prog .cat-bar { opacity: 0.55; }
 
 /* Loan calculators: a responsive grid of small forms, each with its own
    results panel. Same iOS-15 discipline as the Debt view above. */
@@ -2006,9 +2206,14 @@
   border-color: var(--color-primary); color: var(--text-primary); box-shadow: var(--shadow-md);
 }
 
-/* iOS renders an unstyled range as a thin grey line that is easy to miss on a
-   dark card; give it a visible track and a comfortable hit area. */
-.budget-app-root .loan-range { width: 100%; min-height: 28px; accent-color: var(--color-primary); }
+/* The loan sliders (deposit %, term, balance) are styled with the Plan page's
+   .env-slider rules, further down, which they share: an explicit track and
+   thumb. They were once `width: 100%; min-height: 28px; accent-color`, and that
+   did nothing useful inside Obsidian: app.css's `input[type='range']` rule has
+   already set appearance:none and a 6px track, so accent-color had no native
+   slider left to paint and min-height only stretched the host's track box into
+   a 28px (44px on a phone) grey slab with a small thumb floating in it. Audit
+   L5-01, measured against Obsidian 1.14.4's real app.css. */
 .budget-app-root .loan-check { grid-template-columns: auto 1fr; align-items: center; gap: 8px; }
 .budget-app-root .loan-check .lf-h { grid-column: 1 / -1; }
 
@@ -2016,7 +2221,12 @@
   cursor: pointer; font-size: 13px; font-weight: 600; padding: 6px 0; color: var(--text-muted);
 }
 
-.budget-app-root .svc-inactive td { opacity: 0.5; }
+.budget-app-root .svc-inactive td { color: var(--text-muted); }
+/* Was `opacity: 0.5` on the cells: opacity multiplies the INK, and --text-primary
+   at half strength over the pale tile is ~3.5:1 (the muted notes beside it
+   lower), the shape the settled-debt row had before audit L5-04 took opacity
+   off it. An inactive service is quieter through its ink token, not by being
+   made harder to read. */
 
 /* Tax view: step statuses (todo/busy/done/n-a) + document statuses
    (needed/uploaded/n-a — needed shares .tax-busy's warning look). */
@@ -2066,6 +2276,15 @@
 
 /* Budget page: "remaining" line under each amount input */
 .budget-app-root .bud-amt-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; }
+/* An Amount the loader could not read is shown in a text field, verbatim, with
+   aria-invalid="true" (views/budgets.js; a number input would draw it blank).
+   The warning ink for the border, plus an inset 1px ring of it so the border
+   reads as 2px without moving the layout. (0,3,1) beats the host's
+   input[type=text]:hover border colour. */
+.budget-app-root .bud-amt-wrap input[aria-invalid="true"] {
+  border-color: var(--color-warning-ink);
+  box-shadow: inset 0 0 0 1px var(--color-warning-ink);
+}
 .budget-app-root .bud-remaining {
   font-size: 11.5px; color: var(--ink-faint); margin-top: 3px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -2359,11 +2578,33 @@
 
 /* Donut sits beside its legend on a wide card and above it on a narrow one. */
 .budget-app-root .donut-wrap { display: flex; align-items: center; gap: 40px; flex-wrap: wrap; }
-.budget-app-root .donut-wrap svg.donut { width: 260px; height: auto; flex: none; display: block; }
+/* 280px, not 260: the centre caption ("Categorised spending") is 13 units in a
+   320-unit viewBox, which 260px drew at 10.6px; 280px is 11.4px (audit L6-05)
+   and is the width the phone already uses. The 700px rule below still takes it
+   down to 210px beside a narrow pane. */
+.budget-app-root .donut-wrap svg.donut { width: 280px; height: auto; flex: none; display: block; }
 /* Positioned so the net-worth tooltip below can be placed against the chart
    rather than against the page. */
 .budget-app-root .stack-wrap { width: 100%; position: relative; }
 .budget-app-root .stack-wrap svg { width: 100%; height: auto; display: block; }
+/* The Savings charts draw into a 1000-unit viewBox that scales with its card
+   (about 0.85 at a 1024px window, 1.0 from ~1200px), so their text, written in
+   those units, came out at 8.1px ("Growth with no date", 9.5 units), 10.2px
+   (the month labels, 12 units) and 11px (headings, 13) at 1024 (audit L6-05).
+   A CSS font-size beats the SVG presentation attribute — the phone pass
+   (statement/phone-tables.css, "CHART TEXT on a phone") relies on the same
+   thing — so 13 units is the floor here: 11.05px at the 0.85 scale. That file
+   loads after this one, so its 32 / 20 unit phone sizes still win. A narrower
+   pane draws the chart smaller still; only a taller viewBox fixes that, which
+   is chart code, not a stylesheet.
+   The two-line "Growth with / no date" note rides the same rule. Its first
+   line is already clipped by the top of the viewBox when the undated block
+   reaches the top of the plot (the synthetic household's does: only "no date"
+   shows, at 1024 and at 1280); the larger type does not cause that, but it does
+   not cure it either. The cure is savings.js drawing the note the way it does on
+   a phone, i.e. not at all, the legend beneath already says "Growth with no
+   date" (reported to the orchestrator as a snippet). */
+.budget-app-root .stack-wrap svg text { font-size: 13px; }
 
 /* ---------------- net-worth composition bar (Savings & Investments) --------
    Each segment carries its own colour inline as --seg-soft / --seg-glow, read
@@ -3101,7 +3342,7 @@
 .budget-app-root .import-help summary:focus-visible { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
 .budget-app-root .import-help p, .budget-app-root .import-help ul { margin: 8px 0 0; }
 .budget-app-root .import-help ul { padding-left: 20px; }
-.budget-app-root .import-help code { font-size: 0.9em; }
+.budget-app-root .import-help code { font-size: max(0.9em, 11px); }
 
 /* ============================================================
    AUDIT FIXES — 2026-07-29
@@ -3362,6 +3603,7 @@
   .budget-app-root .env-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .env-amt-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
   .budget-app-root .env-slider:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+  .budget-app-root .loan-range:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .ei-tick:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .ei-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .env-add:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -3652,6 +3894,12 @@
   padding: 2px 7px; border-radius: 6px; white-space: nowrap;
   background: rgba(127, 127, 127, .16); color: var(--color-accent);
 }
+/* The light theme's accent teal is the chip's own fill colour, so as text on
+   its 14% tint it was rgb(13,148,136) on rgb(209,232,230), 2.93:1 (audit L6-04).
+   The text takes the muted ink, as the phone layer has since the October phone
+   pass; the tint is what carries the accent. The dark accent is a pale mint on
+   a dark tint and clears 4.5 on every palette, so it stays. */
+.budget-app-root:not(.bud-dark) .kind { color: var(--text-muted); }
 .budget-app-root .src-when {
   display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
   font-size: 12px; color: var(--text-muted); margin-top: 5px;
@@ -3720,7 +3968,7 @@
 .budget-app-root .env-name:hover .env-name-ico,
 .budget-app-root .env-name:focus .env-name-ico { opacity: 1; color: var(--color-primary); }
 .budget-app-root .env-share {
-  font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; flex: none;
+  font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; flex: none;
   background: rgba(127, 127, 127, .16); color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -3742,23 +3990,27 @@
    padding is hit area, and the track is clipped to the content box. Nothing
    may set the `background` shorthand here, inline or not — it resets the clip
    (views/plan.js paints its overspent fill with background-image). */
-.budget-app-root .env-slider {
+.budget-app-root .env-slider,
+.budget-app-root .loan-range {
   -webkit-appearance: none; appearance: none; width: 100%; height: 24px; padding-block: 8px;
   border-radius: 999px; background-color: rgba(127, 127, 127, .2); background-clip: content-box;
   outline: none; cursor: pointer;
 }
 /* A 22px thumb because this is dragged with a thumb on a phone, not a mouse —
    below about 20px the control is reliably missable at arm's length. */
-.budget-app-root .env-slider::-webkit-slider-thumb {
+.budget-app-root .env-slider::-webkit-slider-thumb,
+.budget-app-root .loan-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 22px; height: 22px;
   border-radius: 50%; background: var(--surface); border: 2px solid var(--color-primary);
   box-shadow: var(--shadow-sm);
 }
-.budget-app-root .env-slider::-moz-range-thumb {
+.budget-app-root .env-slider::-moz-range-thumb,
+.budget-app-root .loan-range::-moz-range-thumb {
   width: 22px; height: 22px; border-radius: 50%; background: var(--surface);
   border: 2px solid var(--color-primary);
 }
 .budget-app-root .env-slider:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.budget-app-root .loan-range:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 .budget-app-root .env-rail-note {
   display: flex; justify-content: space-between; gap: 10px;
   font-size: 11.5px; color: var(--ink-faint); margin-top: 7px;
@@ -3792,10 +4044,13 @@
 .budget-app-root .ei-tick {
   width: 24px; height: 24px; margin-block: -3px; border-radius: 5px; flex: none; cursor: pointer;
   border: 1px solid var(--border-color); background: transparent;
-  display: grid; place-items: center; font-size: 10px; line-height: 1;
+  display: grid; place-items: center; font-size: 12px; line-height: 1;
   color: var(--text-muted); padding: 0;
 }
 .budget-app-root .ei-tick.done { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+/* White on the dark theme's brighter emerald is 2.54:1; the dark theme owns a
+   near-black ink for text laid over an accent fill (audit L6-04). */
+.budget-app-root.bud-dark .ei-tick.done { color: var(--ink-on-accent); }
 .budget-app-root .ei-tick.part { border-color: var(--color-warning); color: var(--color-warning-ink); }
 .budget-app-root .ei-tick:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 /* flex:1 rather than the default flex:0 1 auto. As a shrink-only item the name
@@ -4007,7 +4262,8 @@
   .budget-app-root .env:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color)); }
   .budget-app-root .env-share { background: color-mix(in srgb, var(--text-primary) 9%, transparent); }
   .budget-app-root .kind { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
-  .budget-app-root .env-slider { background-color: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+  .budget-app-root .env-slider,
+  .budget-app-root .loan-range { background-color: color-mix(in srgb, var(--text-primary) 10%, transparent); }
   .budget-app-root .plan-free { background: color-mix(in srgb, var(--color-gold) 7%, transparent); }
   .budget-app-root .plan-free.is-over { background: color-mix(in srgb, var(--color-danger) 7%, transparent); }
 }
@@ -5105,14 +5361,26 @@
    Review / one-tap-fix pair the old deck card offered — same buttons, same
    handlers (rowActions() in accounts.js), just printed once per row instead
    of once per card. */
+/* The state cell wraps at every width, and the actions take a line of their own
+   under the pill and its reason. It was nowrap above 760px, so the pill, the
+   reason and up to three buttons were ONE 453px line: at 1024 and at 1280px
+   alike the table measured 1443px in a 902-1078px card, the reason and
+   Review / "Use R ..." / Ignore ran past the card edge and the Notes chip sat
+   outside it (audit L6-01, Obsidian 1.14.4's real app.css). With the cell
+   wrapping it is 195px and the table 1149px; the Progress cell and the two
+   steps further down take it the rest of the way. A flex row, not an
+   inline-flex run beside the pill: an inline-flex container's children cannot
+   wrap their own text, so the reason alone (display:block inside it) held the
+   cell at its full one-line width. */
 .budget-app-root .acct-col-state {
-  white-space: nowrap;
+  white-space: normal;
 }
 .budget-app-root .acct-row-acts {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
-  margin-left: 8px;
-  vertical-align: middle;
+  margin: 6px 0 0;
 }
 .budget-app-root .acct-deck-btn.sm {
   padding: 3px 10px;
@@ -5127,11 +5395,13 @@
    click target (accountRow opens the drawer on click) — stop the click from
    also toggling the drawer. Handled in JS via stopPropagation on each
    button; this rule only keeps the buttons from visually merging into the
-   pill they sit beside. */
+   pill above them. */
 .budget-app-root .acct-pill + .acct-row-acts {
-  margin-left: 8px;
+  margin-left: 0;
 }
-.budget-app-root .acct-row-why { display: block; font-size: 12px; color: var(--text-muted); margin: 2px 0 6px; white-space: normal; }
+/* The reason is the first item of the actions row and takes its whole line, so
+   the buttons start on the next one and the sentence wraps inside the cell. */
+.budget-app-root .acct-row-why { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--text-muted); white-space: normal; }
 
 /* ---- Accounts at a phone width -------------------------------------------
    The 760px rule near the top of the Accounts section promises "a phone gets

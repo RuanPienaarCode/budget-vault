@@ -38,14 +38,21 @@
    Desktop widths. The input widths these tables used to carry as inline
    `style` (120px, 220px, ...) are rules below instead: an inline width beats
    every stylesheet rule, so the card layout could never have made those inputs
-   fill their cell. The values are the same, so a desktop renders as before.
+   fill their cell. The values are the same, so a desktop renders as before (Debts' four money
+   inputs are the one exception, narrowed by the Oct 2026 desktop-reach pass).
    =========================================================================== */
 
 /* ---- the desktop input widths, moved here from inline style ---- */
-.budget-app-root #debtTable td:nth-child(2) > input { width: 120px; }
-.budget-app-root #debtTable td:nth-child(3) > input { width: 84px; }
-.budget-app-root #debtTable td:nth-child(4) > input { width: 110px; }
-.budget-app-root #debtTable td:nth-child(5) > input { width: 100px; }
+/* Debts' four money inputs are narrower than the 120/84/110/100px they were
+   moved here at: eleven columns of fixed-width controls were 1373px in a
+   902-1078px card (audit L6-01). A balance prints at most ~10 digits, a rate 5,
+   a payment 8; these are what those take with their own padding. The cell
+   padding, the Category select and the progress cell give the rest, in
+   src/styles.css (body:not(.is-phone) #debtTable). */
+.budget-app-root #debtTable td:nth-child(2) > input { width: 100px; }
+.budget-app-root #debtTable td:nth-child(3) > input { width: 68px; }
+.budget-app-root #debtTable td:nth-child(4) > input { width: 88px; }
+.budget-app-root #debtTable td:nth-child(5) > input { width: 84px; }
 .budget-app-root #owedTable td:nth-child(2) > input { width: 220px; }
 .budget-app-root #owedTable td:nth-child(4) > input,
 .budget-app-root #owedTable td:nth-child(5) > input { width: 120px; }

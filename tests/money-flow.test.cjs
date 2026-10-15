@@ -55,12 +55,17 @@ const base = {
   close(f.bands.notYetSpent, 19140.05, 'not-yet-spent matches the mockup reference');
 }
 
-/* ---- 1b. bands still sum to income once saving is non-zero ---- */
+/* ---- 1b. bands still sum to income once saving is non-zero ----
+   Saving is the set-aside SENT (audit 2026-10-14, L2a-N02): it is inside gross
+   spend, so it is cut out of living costs rather than added on top of them.
+   tests/score-flow-one-rule.test.cjs pins the rule in full. */
 {
-  const f = periodFlow({ ...base, savingContribution: 5000, spentTotal: 20859.95 });
+  const f = periodFlow({ ...base, setAsideSpent: 5000 });
   const sum = f.bands.committed + f.bands.living + f.bands.saving + f.bands.notYetSpent;
   close(sum, f.income, 'bands still sum to income with real saving');
   ok(f.bands.saving === 5000, 'saving is carried through unchanged');
+  close(f.bands.living, 11459.95 - 5000, 'and comes out of living costs: it was paid, it is not extra');
+  close(f.bands.notYetSpent, 19140.05, 'so what is not yet spent does not move');
 }
 
 /* ---- 2. committed nests its own sub-parts correctly ---- */
@@ -186,9 +191,13 @@ const base = {
     'the printed bands sum to the printed income, exactly');
 
   const L = f.lefts.display;
-  ok(L.leftInBudget + L.neverBudgeted === L.together, 'the printed lefts add up, exactly');
-  ok(L.leftInBudget === 38730 && L.neverBudgeted === -653 && L.together === 38077,
-    'the reference vault prints 38 730 − 653 = 38 077, not the 38 078 a separate rounding gave');
+  /* Four lefts since 2026-10-14: the plan's income not yet landed is its own row. */
+  ok(L.leftInBudget + L.setAsideToMove + L.neverBudgeted + L.incomeToCome === L.together, 'the printed lefts add up, exactly');
+  /* 653 was one left measured against the income LANDED (40 240); against the
+     plan's 40 795 it is the 98 the plan claims beyond its income plus the 555
+     of the income still to come, and the sum is the same 38 077. */
+  ok(L.leftInBudget === 38730 && L.neverBudgeted === -98 && L.incomeToCome === -555 && L.together === 38077,
+    'the reference vault prints 38 730 − 98 − 555 = 38 077, not the 38 078 a separate rounding gave');
   ok(Math.abs(L.together - f.lefts.together) <= 1, 'printed together stays within a rand of the raw identity');
 
   /* Deficit period: the bands no longer partition the income, so there is no

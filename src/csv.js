@@ -12,12 +12,22 @@
 
 function parseDelimited(text, delim) {
   const rows = []; let row = [], field = '', inQ = false;
+  /* Whether everything in `field` so far is whitespace - what `field.trim() ===
+     ''` used to answer, kept as a running flag. trim() copies the field, and it
+     ran at EVERY quote met in an unquoted field, so a field holding n quotes
+     cost O(n^2): 400 000 characters took 9.5 s on a parse that runs on the main
+     thread over untrusted statement text (2026-10-14 audit, L4b-01). `\s` is
+     the same character set trim() strips, so the answer is identical; the
+     generated-text comparison in tests/csv-quote-scan-linear.test.cjs holds it
+     to that. */
+  let blank = true;
+  const add = c => { field += c; if (blank && !/\s/.test(c)) blank = false; };
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (inQ) {
-      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
-      else field += ch;
-    } else if (ch === '"' && field.trim() === '') {
+      if (ch === '"') { if (text[i + 1] === '"') { add('"'); i++; } else inQ = false; }
+      else add(ch);
+    } else if (ch === '"' && blank) {
       /* ISSUE 51. A quote opens a quoted field only at the START of one.
 
          This read `else if (ch === '"')` — a quote ANYWHERE entered quoting
@@ -42,13 +52,13 @@ function parseDelimited(text, delim) {
          already returned for it. */
       inQ = true;
     }
-    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === delim) { row.push(field); field = ''; blank = true; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
-      row.push(field); field = '';
+      row.push(field); field = ''; blank = true;
       if (row.length > 1 || row[0] !== '') rows.push(row);
       row = [];
-    } else field += ch;
+    } else add(ch);
   }
   if (field !== '' || row.length) { row.push(field); rows.push(row); }
   return rows;

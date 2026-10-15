@@ -113,8 +113,12 @@ const MINE = 'exports/budget summary june 2026 to july 2026 - summary.csv';
     eq(problem('.Obsidian'), i18n.t('bx.problem.configDir', { folder: '.obsidian' }), 'in any case');
     eq(problem('../outside'), i18n.t('report.field.folderTraversal'), '".." is refused, not silently dropped (it used to write to outside/)');
     eq(problem('Exports/../Budget/Categories'), i18n.t('report.field.folderTraversal'), 'a ".." anywhere, before whatever it collapses onto');
-    eq(problem('Budget/categories'), i18n.t('report.field.folderManaged', { folder: 'Categories' }), 'a managed folder in another case');
-    eq(problem('Budget\\Categories'), i18n.t('report.field.folderManaged', { folder: 'Categories' }), 'or typed with a backslash');
+    /* The export's own wording (L4A-11): this dialog used to borrow the Report's
+       report.field.folderManaged and tell someone exporting a PDF about "a
+       report saved here". */
+    eq(problem('Budget/categories'), i18n.t('bx.problem.managedFolder', { folder: 'Categories' }), 'a managed folder in another case');
+    eq(problem('Budget\\Categories'), i18n.t('bx.problem.managedFolder', { folder: 'Categories' }), 'or typed with a backslash');
+    ok(!/report/i.test(problem('Budget/Categories')), 'and it does not call the export a report');
     for (const f of ['Exports', 'Admin/Tax 2026', 'obsidian-notes', 'Budget/Exports', './Exports', 'Exports.2026']) {
       eq(problem(f), null, `an ordinary folder is accepted: "${f}"`);
     }

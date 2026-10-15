@@ -191,9 +191,11 @@
   .budget-app-root #txTable .tbl-tick input[type='checkbox'] { width: 24px; height: 24px; }
   /* The bucket slider is the Plan page's main gesture: 8px of track, now in a
      44px hit area (18px of padding either side; the track is still clipped to
-     the content box, so it is drawn 8px thick exactly as before). */
-  .budget-app-root .env-slider { height: 44px; padding-block: 18px; }
-  .budget-app-root .loan-range { min-height: 44px; }
+     the content box, so it is drawn 8px thick exactly as before). The loan
+     calculators' sliders share the rule; they were `min-height: 44px`, which
+     stretched the whole host track into a 44px grey slab (audit L5-01). */
+  .budget-app-root .env-slider,
+  .budget-app-root .loan-range { height: 44px; padding-block: 18px; }
   .budget-app-root .import-help summary,
   .budget-app-root .loan-amort > summary,
   .budget-app-root .left-open > summary { padding-block: 13px; }
@@ -660,4 +662,230 @@
   body.is-phone .budget-app-root .bud-shape-note,
   body.is-phone .budget-app-root .acct-deck,
   body.is-phone .budget-app-root .plan-free { margin-left: 20px; margin-right: 20px; }
+}
+
+/* ------------------------------------------------------------------
+   11. A PHONE HELD SIDEWAYS, CONTINUED: THE FLOOR, THE TARGETS, THE CONTRAST
+   Sections 1, 4, 6 and 7 above are inside @media (max-width: 600px), so an
+   iPhone on its side (667-932px, still body.is-phone) got the desktop sizes
+   back: 53 text nodes under 12px (.score-ring-num small 8.8px, .acct-caret
+   9.6px, .ei-tick 10px, .env-share 10.5px), input.env-slider 24px,
+   input.loan-range 28px, the Import <summary> 20px (audit L5-03, 667x375
+   against Obsidian 1.14.4's real app.css). Each of those portrait rules is
+   repeated here keyed on body.is-phone, declaration for declaration: a prefix
+   and nothing else, generated from the portrait rules by mirroring them one
+   for one, and held to it by tests/phone-landscape-floor-and-targets.test.cjs
+   (change a portrait rule and the test names the twin that has to follow).
+   A desktop window has no .is-phone, so this never reaches one.
+
+   Left out on purpose, each checked by that test: the cell-label and Excl.
+   tick rules (twinned in section 10), the ::after hit-area overlay (the
+   (pointer: coarse) rule in src/styles.css already applies sideways), and the
+   top bar's padding and gap (fit tweaks for a 375px bar). The Dashboard
+   table-fit rules are twinned only at 601-700px: the table is 645px in a
+   625px scroller at 667px wide and fits from 736px, so a 932px phone keeps its
+   bar column.
+   ------------------------------------------------------------------ */
+@media (min-width: 601px) {
+
+  /* ---- 1. TYPE FLOOR (portrait: section 1) ---- */
+  body.is-phone .budget-app-root .acct-caret,
+  body.is-phone .budget-app-root .acct-badge,
+  body.is-phone .budget-app-root .acct-seg-n,
+  body.is-phone .budget-app-root .acct-pill,
+  body.is-phone .budget-app-root .env-share,
+  body.is-phone .budget-app-root .owed-age,
+  body.is-phone .budget-app-root .asset-age,
+  body.is-phone .budget-app-root .debt-implied,
+  body.is-phone .budget-app-root .s2-caveat,
+  body.is-phone .budget-app-root .acct-owner-sub,
+  body.is-phone .budget-app-root .acct-mbar-l,
+  body.is-phone .budget-app-root .debt-plan .dp-src,
+  body.is-phone .budget-app-root .svc-next-hint,
+  body.is-phone .budget-app-root .note-chip,
+  body.is-phone .budget-app-root .env-sum-pct,
+  body.is-phone .budget-app-root .debt-order li::before,
+  body.is-phone .budget-app-root .score-flow-caption,
+  body.is-phone .budget-app-root .score-ring-tip-how,
+  body.is-phone .budget-app-root .score-ring-num small,
+  body.is-phone .budget-app-root .score-flow-in small,
+  body.is-phone .budget-app-root .ei-tick,
+  body.is-phone .budget-app-root .left-fig .lm,
+  body.is-phone .budget-app-root .left-cycle .lc-s,
+  body.is-phone .budget-app-root .left-disc .dd,
+  body.is-phone .budget-app-root .left-src,
+  body.is-phone .budget-app-root .health-fig .lm,
+  body.is-phone .budget-app-root .imp-map-hint,
+  body.is-phone .budget-app-root .mini .s2,
+  body.is-phone .budget-app-root .caveat-chip-btn,
+  body.is-phone .budget-app-root .acct-ring-note,
+  body.is-phone .budget-app-root .acct-cell-sub,
+  body.is-phone .budget-app-root .acct-chip,
+  body.is-phone .budget-app-root .tx-undo-note,
+  body.is-phone .budget-app-root .debt-plan .dp-note,
+  body.is-phone .budget-app-root .debt-plan .dp-tag,
+  body.is-phone .budget-app-root .loan-field .lf-h,
+  body.is-phone .budget-app-root .tax-field > .l,
+  body.is-phone .budget-app-root .bud-pull,
+  body.is-phone .budget-app-root .src-note,
+  body.is-phone .budget-app-root .sk-top,
+  body.is-phone .budget-app-root .kind,
+  body.is-phone .budget-app-root .env-rail-note,
+  body.is-phone .budget-app-root .ei-actual,
+  body.is-phone .budget-app-root .env-add,
+  body.is-phone .budget-app-root .env-count,
+  body.is-phone .budget-app-root .note-date,
+  body.is-phone .budget-app-root .score-hero-note,
+  body.is-phone .budget-app-root .score-win-ribbon,
+  body.is-phone .budget-app-root .score-flow-m-sub,
+  body.is-phone .budget-app-root .score-ring-tip-now,
+  body.is-phone .budget-app-root .score-ring-hint,
+  body.is-phone .budget-app-root .score-ring-row-now,
+  body.is-phone .budget-app-root .score-ring-row[aria-pressed="true"] .score-ring-row-how,
+  body.is-phone .budget-app-root .score-ring-row-tag,
+  body.is-phone .budget-app-root .env-sum-rem,
+  body.is-phone .budget-app-root .sav-row-status,
+  body.is-phone .budget-app-root .acct-deck-btn.sm,
+  body.is-phone .budget-app-root .status-pill,
+  body.is-phone .budget-app-root .category-badge,
+  body.is-phone .budget-onb-step,
+  body.is-phone .budget-onb-group,
+  body.is-phone .budget-onb-cat-group,
+  body.is-phone .budget-export-cats-type {
+    font-size: var(--st-micro);
+  }
+  body.is-phone .budget-app-root code,
+  body.is-phone .budget-app-root .import-help code {
+    font-size: max(0.9em, var(--st-micro));
+  }
+  body.is-phone .budget-app-root .fine-note,
+  body.is-phone .budget-app-root #dashBudget td .text-muted.fine-note {
+    font-size: var(--st-micro);
+  }
+
+  /* ---- 4. TAP TARGETS (portrait: section 4) ---- */
+  body.is-phone .budget-app-root .menu-btn {
+    width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root .topbar-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root .topbar-avatar {
+    width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root .drawer-close {
+    width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root .header-period-pill .pnav-btn {
+    width: 44px;
+    height: 44px;
+    margin-block: -8px;
+  }
+  body.is-phone .budget-app-root .btn-ghost-sm {
+    min-width: 44px;
+  }
+  body.is-phone .budget-app-root .chart-range-btn {
+    min-width: 44px;
+  }
+  body.is-phone .budget-app-root .donut-legend .dl-note {
+    width: 44px;
+    height: 44px;
+    margin-block: -8px;
+    margin-inline: -4px -8px;
+  }
+  body.is-phone .budget-app-root .env-collapse,
+  body.is-phone .budget-app-root .env-del-ico {
+    width: 44px;
+    height: 44px;
+    margin-block: -9px;
+    margin-inline: -4px;
+  }
+  body.is-phone .budget-app-root .plan-del-ico {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root .btn-sm {
+    min-height: 44px;
+  }
+  body.is-phone .budget-app-root .src2-del {
+    min-width: 44px;
+  }
+  body.is-phone .budget-app-root .bud-act {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  body.is-phone .budget-app-root .owed-acts > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  body.is-phone .budget-app-root .tx-whole {
+    min-height: 44px;
+  }
+  body.is-phone .budget-app-root input[type='checkbox'] {
+    width: 44px;
+    height: 44px;
+  }
+  body.is-phone .budget-app-root label input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+  body.is-phone .budget-app-root .env-slider,
+  body.is-phone .budget-app-root .loan-range {
+    height: 44px;
+    padding-block: 18px;
+  }
+  body.is-phone .budget-app-root .import-help summary,
+  body.is-phone .budget-app-root .loan-amort > summary,
+  body.is-phone .budget-app-root .left-open > summary {
+    padding-block: 13px;
+  }
+
+  /* ---- 6. DASHBOARD (portrait: section 6; the table-fit half is below, at 601-700px) ---- */
+  body.is-phone .budget-app-root .donut-legend .dl-delta {
+    width: auto;
+    min-width: 76px;
+  }
+  body.is-phone .budget-app-root #heroCard .hero-num {
+    white-space: nowrap;
+  }
+
+  /* ---- 7. CONTRAST (portrait: section 7) ---- */
+  body.is-phone .budget-app-root .bud-total-left .bud-total-n {
+    color: var(--text-muted);
+  }
+  body.is-phone .budget-app-root.bud-dark .ei-tick.done {
+    color: var(--ink-on-accent);
+  }
+  body.is-phone .budget-app-root:not(.bud-dark) .kind {
+    color: var(--text-muted);
+  }
+}
+
+@media (min-width: 601px) and (max-width: 700px) {
+  body.is-phone .budget-app-root #dashBudget thead th:nth-child(4),
+  body.is-phone .budget-app-root #dashBudget tbody td:nth-child(4) {
+    display: none;
+  }
+  body.is-phone .budget-app-root #dashBudget tbody td:nth-child(5) {
+    white-space: normal;
+    min-width: 5.75rem;
+  }
+  body.is-phone .budget-app-root #dashBudget thead th,
+  body.is-phone .budget-app-root #dashBudget tbody td {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  body.is-phone .budget-app-root #dashBudget thead th:first-child,
+  body.is-phone .budget-app-root #dashBudget tbody td:first-child {
+    padding-left: 0.2rem;
+  }
+  body.is-phone .budget-app-root #dashBudget thead th:last-child,
+  body.is-phone .budget-app-root #dashBudget tbody td:last-child {
+    padding-right: 0.2rem;
+  }
 }

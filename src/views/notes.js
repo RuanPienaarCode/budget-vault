@@ -20,7 +20,7 @@
 
 const { el, kpiTiles, icoEl } = require('../dom');
 const { askFields, confirmModal } = require('../modal');
-const { yamlStr } = require('../markdown');
+const { yamlStr, parseFrontmatter } = require('../markdown');
 const { todayIso } = require('../dates');
 const {
   NOTES_DIR, KIND_LABELS, NOTE_KINDS, noteForLink, isTracked,
@@ -43,7 +43,7 @@ const {
 const SEP = '\u001F';
 
 module.exports = function registerNotes(ctx) {
-  const { S, $, app, vault, toast, writeFile, readFile, fileAt, mdFilesUnder } = ctx;
+  const { S, $, app, toast, writeFile, readFile, fileAt, mdFilesUnder } = ctx;
 
   /* No ctx.registerDirty and no ctx.dirtyFlag, DELIBERATELY: every edit here
      (new note, re-subject, delete) writes to disk in the same interaction, so
@@ -367,9 +367,16 @@ module.exports = function registerNotes(ctx) {
     return true;
   }
 
+  /* parseFrontmatter, the reader loadNotes already used to find this note's
+     subject — not a regex of this file's own (2026-10-14 audit, L3-08). The
+     copy did not strip a leading BOM, so a BOM'd note LOADED with its subject
+     and then, on a re-point (the About chooser, the rename watcher), looked
+     like a note with no frontmatter: patchFile prepended a second block and
+     the household's own properties became body text. One reader means the
+     loader and the writer cannot disagree about where a block starts. */
   function splitFm(text) {
-    const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    return m ? { raw: m[1], body: text.slice(m[0].length) } : { raw: '', body: `\n${text}` };
+    const { raw, body } = parseFrontmatter(text);
+    return { raw, body };
   }
 
   async function repointOne(n) {
@@ -422,15 +429,24 @@ module.exports = function registerNotes(ctx) {
       confirmText: 'Delete note',
     });
     if (!go) return;
-    // vault.trash(file, false) — the SYSTEM-trash flag is false, so the file
-    // lands in the vault's own .trash and is recoverable from inside Obsidian.
-    // Same call categories.js makes when a category file is deleted; a note is
-    // prose the user typed, so it earns at least the same care.
+    /* ctx.trashFile (io.js), not vault.trash: the file was resolved BEFORE the
+       dialog and the reader spent seconds inside it. trashFile asks again
+       afterwards — false when the note is gone, a STALE refusal when a
+       different file now sits at the path (a sync landing under the same
+       name) or another device changed it since it was read — which a bare
+       vault.trash(f) did not: it trashed whatever was there, and announced
+       "Note deleted" for a note that had already gone (2026-10-14 audit,
+       L3-13). It is still the vault's own .trash (system-trash flag false),
+       recoverable from inside Obsidian — a note is prose the user typed, so it
+       earns at least the care categories.js and plan.js take. Read off ctx at
+       call time, as views/accounts.js does. */
+    let trashed;
     try {
-      await vault.trash(f, false);
+      trashed = await ctx.trashFile(f);
     } catch (e) {
-      return toast(`Could not delete that note: ${e.message || e}`, true);
+      return toast(`Could not delete that note: ${(e && e.message) || e}`, true);
     }
+    if (!trashed) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
     await ctx.loadNotes();
     renderNotes();
     toast('Note deleted');

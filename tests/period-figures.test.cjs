@@ -110,9 +110,21 @@ const FILES = {
   {
     const dom = makeDom();
     const { el } = require('../src/dom');
-    Object.assign(ctx, { $: dom.$, root: dom.root, el, money: v => `R ${Number(v).toFixed(2)}`, toast() {}, switchView() {}, fileAt() { return null; }, app: { workspace: { getLeaf() { return { openFile() {} }; } } } });
+    /* A real element for the root, not `dom.root` (undefined): the spending-split
+       card reads root.classList to pick its theme colours, so with a bare stub
+       it threw inside its error boundary on every run, was never drawn, and this
+       suite stayed green while printing the stack (audit L8 Info, 15 Oct 2026). */
+    Object.assign(ctx, { $: dom.$, root: dom.$('#root'), el, money: v => `R ${Number(v).toFixed(2)}`, toast() {}, switchView() {}, fileAt() { return null; }, app: { workspace: { getLeaf() { return { openFile() {} }; } } } });
     require('../src/views/dashboard')(ctx);
-    ctx.renderDashboard();
+    /* Any card that fails inside its boundary logs "<card> failed to render" and
+       the page carries on; a suite that only reads other cards would never
+       know. Record the logs and require silence. */
+    const logged = [];
+    const realErr = console.error;
+    console.error = (...a) => { logged.push(a.map(String).join(' ')); };
+    try { ctx.renderDashboard(); } finally { console.error = realErr; }
+    eq(logged.filter(l => /failed to render/.test(l)), [], 'no Dashboard card fails inside its error boundary (the spending split used to)');
+    ok(/R 700\.00|R 300\.00/.test(dom.$('#dashSplitSub').textContent), 'the spending-split card is drawn (its note names the uncategorised and netted parts)');
     const table = dom.$('#dashBudget').textContent;
     ok(table.includes('R 1100.00'), 'Dashboard table: Groceries remaining is the snapshot\'s 1 100');
     ok(table.includes('R -900.00'), 'Dashboard table: Fuel\'s unbudgeted spend prints its negative remaining');

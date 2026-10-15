@@ -196,6 +196,19 @@ function kpiTiles(container) {
   };
 }
 
+/* The size step for a statement figure that will not fit its column: seven or
+   more digits steps down one size (the `.is-long` rule in statement/*.css)
+   rather than overflowing the card. Counts DIGITS, so the symbol, the grouping
+   and a decimal comma do not move the threshold, and a figure printed to cents
+   steps down sooner than the same figure in whole rand, which is the point.
+
+   One helper, here, because it was two copies (views/dashboard.js and
+   views/budgets.js) that each said they were the same rule as the other, and
+   only one of them was pinned by a test: a mutation of the Dashboard's copy
+   survived the whole suite (2026-10-14 audit, L8-06). Returns the class WITH
+   its leading space, so a caller appends it straight onto a class string. */
+const longFig = text => ((String(text).match(/\d/g) || []).length >= 7 ? ' is-long' : '');
+
 /* ---- inert, with a floor-safe fallback --------------------------------
    `inert` is the whole mechanism behind two features: the closed drawer
    leaving the tab order, and the privacy gate making the covered app
@@ -236,4 +249,4 @@ function setInert(elm, on) {
   }
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells };
+module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells, longFig };

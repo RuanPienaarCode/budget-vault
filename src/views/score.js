@@ -19,6 +19,8 @@ const i18n = require('../i18n');
 const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
 const { sharePercentLabel } = require('../share-percents');
+const { formatSigned, otherHoldings } = require('../currency');
+const { otherCurrencyNet, worth } = require('../worth');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -30,6 +32,13 @@ module.exports = function registerScore(ctx) {
     S, $, root, money, healthSnapshot, periodMonthName, currentPeriod,
     periodSpend, periodSummary, budgetTotals, budgetUsed, catType, locale, periodFigures,
   } = ctx;
+
+  /* A signed PART of a sum, in the one form (currency.js formatSigned). */
+  const signedMoney = v => formatSigned(S.settings.currency, v, 0, locale());
+  /* A decimal figure with the household's own mark: toFixed() prints a point,
+     and the Dashboard beside this page printed "2,1 months" where this printed
+     "2.1" for the same number (audit L2a-N09). */
+  const decimalNumber = (v, places) => v.toFixed(places).replace('.', locale().decimal);
 
   function renderScore() {
     const hero = $('#scoreHero');
@@ -84,13 +93,6 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
-    /* ISSUE 56. The net-worth disclosure, held for whereYouAre() rather than
-       threaded through buildScoreRing -> renderWork -> whereYouAre as a fifth
-       argument. Four signature changes to carry one string is how a fix
-       reaches three of four call sites; this page already computes exactly one
-       snapshot per render (see this file's header), so one variable holding it
-       cannot go stale between them. */
-    worthOthers = snap.worthOtherCurrencies || [];
     renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies);
     renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
@@ -190,9 +192,6 @@ module.exports = function registerScore(ctx) {
     const large = len / RING_R > Math.PI ? 1 : 0;
     return `M ${x0.toFixed(2)},${y0.toFixed(2)} A ${RING_R},${RING_R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
   }
-
-  /* Set once per render by renderScore, read by whereYouAre. See ISSUE 56. */
-  let worthOthers = [];
 
   function buildScoreRing(breakdown, M, target, earmarks) {
     const wrap = el('div', { class: 'score-ring-wrap' });
@@ -635,7 +634,7 @@ module.exports = function registerScore(ctx) {
     if (key === 'reserves') {
       if (M.months === null) { return null; }
       const base = i18n.t('score.now.reserves', {
-        months: M.months.toFixed(1), target, amount: money(earmarks.total, 0),
+        months: decimalNumber(M.months, 1), target, amount: money(earmarks.total, 0),
       });
       /* Audit finding #1's second half: the reader is told they have "3.9
          months covered" but never told what a month of "essential" spending
@@ -704,13 +703,20 @@ module.exports = function registerScore(ctx) {
        property, loan and lending sat outside it. Same wording key the Accounts
        hero and the Savings page use, so three screens cannot word one fact
        three ways. */
-    const otherLine = worthOthers && worthOthers.length
-      ? ' ' + i18n.t('acct.hero.otherCurrencies', {
-        list: worthOthers.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · '),
-      })
+    /* One helper picks the amount and names the basis (currency.js
+       otherHoldings): this page prints the IMPLIED balance book, like the
+       Dashboard and Savings, and says so when the balance the reader typed
+       reads differently (audit L8-05). */
+    const book = ctx.bookFigures().balances;
+    const w = worth(book.implied.accounts, S.debts, S.assets, S.settings.currency, S.owed);
+    const held = otherHoldings(book.stated.others, book.implied.others, 'implied', accts => otherCurrencyNet(w, accts));
+    const listOf = pairs => pairs.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
+    const otherLine = held.shown.length
+      ? ' ' + i18n.t('acct.hero.otherCurrencies', { list: listOf(held.shown) })
+        + (held.differs ? ' ' + i18n.t('acct.hero.otherAsImplied', { list: listOf(held.other) }) : '')
       : '';
     return i18n.t('score.now.wealth', {
-      times: M.netWorthMultiple.toFixed(2), amount: money(M.netWorth || 0, 0),
+      times: decimalNumber(M.netWorthMultiple, 2), amount: money(M.netWorth || 0, 0),
     }) + otherLine;
   }
 
@@ -765,22 +771,14 @@ module.exports = function registerScore(ctx) {
     const win = ctx.periodWindowAsOf(cur);
     const grossOutByCat = win ? ctx.tally(ctx.ledger(win.start, win.stop), ctx.LENSES.BUDGET).grossOutByCat : {};
 
-    /* Contributions into savings/investment accounts THIS period — the same
-       signal health-data.js averages over six periods for the score's own
-       saving pillar, read here for one. */
-    /* THE SAME "saved" THE SCORE MEANS, from the same function.
-
-       This used to read splitFlows' gross contributions, which counts every
-       arrival in a pool account including one that came from another pool
-       account. On a real vault it reported R4 270 saved in a period whose only
-       movement was R4 270 travelling from a baby fund into an emergency fund,
-       while the score's ring on the very same screen counted that as nothing.
-       The window differs on purpose — this card is one period, the ring is six
-       — but the MEASURE must not, or the two are not comparable at all. */
-    /* Read off health-data.js's savingContribution(p) — household-currency
-       rows, household-currency pool, the same pairing — rather than a second
-       assembly here. This card is one period, the ring is six; the window
-       differs on purpose and the measure must not. */
+    /* Money moved into savings/investment accounts from the household's own
+       accounts THIS period, from health-data.js's savingContribution(p) — the
+       measure the score's ring averages over six periods. It is no longer the
+       Saving BAND (2026-10-14, audit L2a-N02: that band is the set-aside SENT,
+       one reading shared with the set-aside cut out of Living and with "Set
+       aside, still to move"); it is carried so the band's empty-state sentence
+       can say that money moved between the household's own accounts when
+       nothing went out under a savings category. */
     const savingContribution = ctx.savingContribution(cur);
 
     return periodFlow({
@@ -874,7 +872,13 @@ module.exports = function registerScore(ctx) {
         name: i18n.t('score.flow.saving'), amount: b.saving, display: b.display.saving, pct: b.percents.saving,
         sub: b.saving > 0
           ? i18n.t('score.flow.sub.pctOfIncome', { pct: pct(b.percents.saving) })
-          : i18n.t('score.flow.sub.savingZero'),
+          /* The Saving band is what went out under a savings or investment
+             category. A household that saves by moving money between its own
+             accounts has none of that, and "Nothing reached savings" beside a
+             transfer that did reach them would be false: say what moved. */
+          : (flow.movedToFunds > 0.005
+            ? i18n.t('score.flow.sub.savingMoved', { amount: money(flow.movedToFunds, 0) })
+            : i18n.t('score.flow.sub.savingZero')),
       },
       {
         key: 'notYetSpent', cls: 'is-notYetSpent',
@@ -884,20 +888,20 @@ module.exports = function registerScore(ctx) {
     ];
 
     /* Variant A's honest-overspend row (redesign): when this period actually
-       spent more than came in — `lefts.together` is money-flow's own
-       `income − gross spend − assume-spent provision` identity (since
-       2026-10-07, when the set-aside got its own left), always exact —
-       "Not yet spent" is replaced outright rather than shown reading zero next to a positive
-       "money in" figure that implies there is still something left. Nothing
-       here recomputes the deficit: `overspend` is just `-together`, the
-       same figure `periodDeficit` already argues about elsewhere in the app. */
-    const overspend = -lefts.together;
-    if (overspend > 0.005) {
-      const overspendDisplay = -lefts.display.together;
+       spent more than came in, "Not yet spent" is replaced outright rather than
+       shown reading zero next to a positive "money in" figure that implies
+       there is still something left. `overspent` is money-flow's own gross
+       spend less income (2026-10-14, audit L2a-N02): the three bands above add
+       up to what was paid, so the bands less this row equal the income. It was
+       `-lefts.together`, which also carries the assume-spent provision and so
+       left the bands and the row 1 100 short of the income on the vault this
+       was found on; the Together row on the chip still prints it. */
+    if (flow.overspent > 0.005) {
+      const overspendDisplay = flow.overspentDisplay;
       const overPct = flow.income > 0 ? Math.round((overspendDisplay / flow.income) * 100) : 0;
       rows[rows.length - 1] = {
         key: 'overspent', cls: 'is-overspent', capBar: true,
-        name: i18n.t('score.flow.overspent.name'), amount: overspend, display: overspendDisplay, pct: overPct,
+        name: i18n.t('score.flow.overspent.name'), amount: flow.overspent, display: overspendDisplay, pct: overPct,
         sub: i18n.t('score.flow.overspent.sub', { amount: money(overspendDisplay, 0) }),
       };
     }
@@ -1228,7 +1232,8 @@ module.exports = function registerScore(ctx) {
        worth a row — silent when the household's plan, its spend and its
        income all landed on nothing this period. */
     const leftsAllZero = Math.abs(lefts.leftInBudget) < 0.005 && Math.abs(lefts.setAsideToMove) < 0.005
-      && Math.abs(lefts.neverBudgeted) < 0.005 && Math.abs(lefts.together) < 0.005;
+      && Math.abs(lefts.neverBudgeted) < 0.005 && Math.abs(lefts.incomeToCome) < 0.005
+      && Math.abs(lefts.together) < 0.005;
     if (!leftsAllZero) {
       /* Display figures, not raw — "Together" must be the visible sum of the
          rows above it, which independent money(v, 0) rounding broke by a
@@ -1240,14 +1245,28 @@ module.exports = function registerScore(ctx) {
          counted the plan's savings envelopes as income nobody had planned. A
          plan claiming more than its income reads negative there — said in
          words ("Budgeted beyond income") and kept signed, so the column still
-         adds up. Every part a reader adds is on screen. */
+         adds up. Every part a reader adds is on screen.
+
+         2026-10-14 (audit L2a-N01): "never budgeted" is measured against the
+         PLAN's income, the figure the Budget page prints for the same label,
+         so the income that has not landed yet is its own row — signed, taken
+         off, and named "still to come" — and Together is still what is left of
+         the income that HAS landed. Every part is printed in the one signed
+         form (a minus sign before the symbol), not the "R -900" a balance
+         takes, because these are parts of a sum, not balances. */
       const showSetAside = bud.setAside > 0.005 || Math.abs(lefts.setAsideToMove) >= 0.005;
-      const leftRows = [[i18n.t('score.flow.chip.leftInBudget'), money(lefts.display.leftInBudget, 0)]];
-      if (showSetAside) { leftRows.push([i18n.t('score.flow.chip.setAsideToMove'), money(lefts.display.setAsideToMove, 0)]); }
+      const leftRows = [[i18n.t('score.flow.chip.leftInBudget'), signedMoney(lefts.display.leftInBudget)]];
+      if (showSetAside) { leftRows.push([i18n.t('score.flow.chip.setAsideToMove'), signedMoney(lefts.display.setAsideToMove)]); }
       leftRows.push([lefts.neverBudgeted < -0.005 ? i18n.t('score.flow.chip.overAllocated') : i18n.t('score.flow.chip.neverBudgeted'),
-        money(lefts.display.neverBudgeted, 0)]);
-      leftRows.push([i18n.t('score.flow.chip.together'), money(lefts.display.together, 0)]);
-      wrap.append(buildChip(showSetAside ? i18n.t('score.flow.chip.leftsThree') : i18n.t('score.flow.chip.lefts'), leftRows));
+        signedMoney(lefts.display.neverBudgeted)]);
+      if (Math.abs(lefts.incomeToCome) >= 0.005) {
+        leftRows.push([lefts.incomeToCome < 0 ? i18n.t('score.flow.chip.incomeToCome') : i18n.t('score.flow.chip.incomeAbovePlan'),
+          signedMoney(lefts.display.incomeToCome)]);
+      }
+      leftRows.push([i18n.t('score.flow.chip.together'), signedMoney(lefts.display.together)]);
+      const kinds = 2 + (showSetAside ? 1 : 0) + (Math.abs(lefts.incomeToCome) >= 0.005 ? 1 : 0);
+      wrap.append(buildChip(kinds === 4 ? i18n.t('score.flow.chip.leftsFour')
+        : (kinds === 3 ? i18n.t('score.flow.chip.leftsThree') : i18n.t('score.flow.chip.lefts')), leftRows));
     }
 
     return wrap;

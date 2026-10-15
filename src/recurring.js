@@ -572,4 +572,8 @@ module.exports = {
   /* 2026-10-07 audit — the Services page's readings, added beside the ones
      committed.js consumes rather than changing them (see their header). */
   settledPrice, comparePriceNow, nextDue,
+  /* 2026-10-14 audit, L1-01. committed.js steps a monthly or annual service
+     forward from its last charge with the SAME clamped month arithmetic the
+     Services page's hint uses, rather than carrying a third copy of it. */
+  addCycles,
 };

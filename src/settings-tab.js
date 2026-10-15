@@ -5,7 +5,7 @@
 
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
 const { DEFAULT_SETTINGS, TYPE_ORDER, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODE_DEFAULT, inputMode } = require('./constants');
-const { OnboardingWizard } = require('./onboarding');
+const { OnboardingWizard, appendRatesAttribution } = require('./onboarding');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 /* Namespace import, not `const { t }`: this codebase already binds `t` as a
    parameter name in 22 places (`.addText(t => …)`, `el('tr', …)` neighbours in
@@ -579,6 +579,16 @@ class BudgetSettingTab extends PluginSettingTab {
         });
       });
 
+    /* Always shown, on or off: the setting above is the one place that tells
+       the reader a network request exists, so the same place names who receives
+       it. The link text is the provider's required attribution. */
+    const sourceRow = new Setting(containerEl)
+      .setName(i18n.t('settings.exchangeRates.source'))
+      .setDesc(i18n.t('settings.exchangeRates.sourceDesc'));
+    /* Obsidian's Setting always has a descEl; the bare-node tests' stand-in
+       Setting does not, and the tab must still build under it. */
+    if (sourceRow.descEl) appendRatesAttribution(sourceRow.descEl.createDiv());
+
     /* Only worth showing when rates are actually on: a cadence for a feature
        that makes no requests is a control over nothing, and this tab already
        hides the rest of the currency block the same way. display() re-runs on
@@ -1066,6 +1076,11 @@ class BudgetSettingTab extends PluginSettingTab {
           type: 'dropdown', key: 'exchange_rates', defaultValue: 'off',
           options: FX_OPTIONS(),
         },
+      },
+      {
+        name: i18n.t('settings.exchangeRates.source'),
+        desc: i18n.t('settings.exchangeRates.sourceDesc'),
+        render: setting => { appendRatesAttribution(setting.descEl.createDiv()); },
       },
       {
         name: i18n.t('settings.rateRefresh.name'),

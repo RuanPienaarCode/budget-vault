@@ -233,7 +233,14 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
    for a real wiring break, and the wrong one for a test that never meant to
    opt out of it. Registering it here lets those call sites stay direct
    (`ctx.noteButton(...)`) rather than defensive, so a genuine break in the app
-   still fails loudly. */
+   still fails loudly.
+
+   It also destructures `$` off the ctx at register time, so whatever `ctx.$` is
+   when this runs is what the Notes page will draw into for good. makeCtx() gives
+   an inert stand-in; a caller that wants Notes to render (tests/helpers/figures.cjs
+   mountFor) must put its real DOM on the ctx BEFORE calling this (audit L2b-10,
+   15 Oct 2026: the swap came after, and both golden ledgers had an empty notes
+   section). */
 async function loadInto(ctx) {
   require('../../src/io')(ctx);
   require('../../src/period')(ctx);

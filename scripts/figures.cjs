@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian } = require('../tests/helpers/harness.cjs');
 stubObsidian();
-const { harvestAll } = require('../tests/helpers/figures.cjs');
+const { harvestAll, readVault } = require('../tests/helpers/figures.cjs');
 
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
@@ -30,23 +30,11 @@ const has = n => argv.includes(`--${n}`);
 
 /* ---- reading a real vault off disk --------------------------------------
    The harness vault is a flat { 'path/to/file.md': contents } map, so a live
-   run is just a recursive read. Only .md is loaded — the app reads nothing
-   else, and slurping a vault's attachments into memory would be a lot of bytes
-   to no purpose. */
-function readVault(root) {
-  const out = {};
-  const walk = (dir, prefix) => {
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (e.name.startsWith('.')) continue;
-      const abs = path.join(dir, e.name);
-      const rel = prefix ? `${prefix}/${e.name}` : e.name;
-      if (e.isDirectory()) walk(abs, rel);
-      else if (e.name.endsWith('.md')) out[rel] = fs.readFileSync(abs, 'utf8');
-    }
-  };
-  walk(root, '');
-  return out;
-}
+   run is a recursive read — by the SAME rule scripts/reconcile-page.cjs uses
+   (tests/helpers/figures.cjs readVault: markdown, the `.csv` the loader reads,
+   a marker for each folder that would otherwise vanish). This file used to keep
+   its own `.md`-only loop, so the two scripts harvested different trees from
+   one vault (audit L8-11, 15 Oct 2026). */
 
 (async () => {
   const vaultPath = flag('vault');

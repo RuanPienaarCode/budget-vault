@@ -174,12 +174,12 @@ const lastToast = ctx => ctx._toasts[ctx._toasts.length - 1] || {};
 
     /* ---- 3. folders the next load would read back are refused --------------- */
     const REFUSED = [
-      [`${B}/Categories`, i18n.t('report.field.folderManaged', { folder: 'Categories' })],
-      [`${B.toLowerCase()}/categories`, i18n.t('report.field.folderManaged', { folder: 'Categories' })],
-      [`${B}/Accounts`, i18n.t('report.field.folderManaged', { folder: 'Accounts' })],
-      [`${B}/Plans`, i18n.t('report.field.folderManaged', { folder: 'Plans' })],
-      [`${B}/Notes`, i18n.t('report.field.folderManaged', { folder: 'Notes' })],
-      [`${B}/Transactions/Exports`, i18n.t('report.field.folderManaged', { folder: 'Transactions' })],
+      [`${B}/Categories`, i18n.t('tx.export.folderManaged', { folder: 'Categories' })],
+      [`${B.toLowerCase()}/categories`, i18n.t('tx.export.folderManaged', { folder: 'Categories' })],
+      [`${B}/Accounts`, i18n.t('tx.export.folderManaged', { folder: 'Accounts' })],
+      [`${B}/Plans`, i18n.t('tx.export.folderManaged', { folder: 'Plans' })],
+      [`${B}/Notes`, i18n.t('tx.export.folderManaged', { folder: 'Notes' })],
+      [`${B}/Transactions/Exports`, i18n.t('tx.export.folderManaged', { folder: 'Transactions' })],
       ['.obsidian/plugins/budget-app', i18n.t('bx.problem.configDir', { folder: '.obsidian' })],
       ['../outside', i18n.t('report.field.folderTraversal')],
       ['.obsidian-notes', i18n.t('bx.problem.hiddenFolder', { folder: '.obsidian-notes' })],
@@ -192,7 +192,7 @@ const lastToast = ctx => ctx._toasts[ctx._toasts.length - 1] || {};
       eq(written(ctx, before), [], `"${folder}": nothing is written`);
       const t = lastToast(ctx);
       ok(t.bad, `"${folder}": the refusal is said, as an error`);
-      eq(t.msg, reason, `"${folder}": in the Report's own words`);
+      eq(t.msg, reason, `"${folder}": in the Transactions export's own sentence for a managed folder (L4a-11)`);
       eq(ctx.plugin.settings.exportFolder, 'Exports', `"${folder}": and it is not remembered as the next default`);
     }
     {

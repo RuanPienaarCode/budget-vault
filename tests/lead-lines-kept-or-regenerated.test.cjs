@@ -82,7 +82,10 @@ eq(withLeadExtra(cap(['', '# Budget — 2026-10', '', RN1, '', 'A paragraph of o
 eq(withLeadExtra(cap(['Typed right under the fence.', '# Budget — 2026-10', '', RN25, '', 'More of ours.', '']), BUD),
   ['Typed right under the fence.', '# Budget — 2026-10', '', RN25, '', 'More of ours.', ''],
   'text typed directly under the fence is kept — it used to be replaced by the blank line the plugin writes there');
-eq(withLeadExtra(cap(['', '# Old plan name', '', 'Our own intro.', '']), freshLeadLines('New plan name', ['Plugin sentence.'])),
+/* 2026-10-14 audit, L3-12: the title follows live state only when the old one
+   was the plugin's own (the caller names the titles it wrote before); a
+   heading the household typed is theirs — tests/table-above-and-own-title. */
+eq(withLeadExtra(cap(['', '# Old plan name', '', 'Our own intro.', '']), freshLeadLines('New plan name', ['Plugin sentence.']), ['Old plan name']),
   ['', '# New plan name', '', 'Our own intro.', ''],
   'the title follows live state (a renamed plan) even beside a household\'s own sentence');
 

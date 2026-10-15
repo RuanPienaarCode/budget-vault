@@ -92,7 +92,8 @@ for (const n of [2, 3, 4, 6, 12]) {
     const xlsAvg = val(sheet.rows[1][2 + n + 1]);
     const doc = bx.modelToDoc(m, { money: fmt, plainMoney: plain });
     const table = doc.blocks.filter(b => b.type === 'table')[0];
-    const pdfAvg = n > bx.PDF_MAX_PERIOD_COLS ? null : table.rows[0][table.rows[0].length - 2];
+    /* rows[0] is the type's heading row (L4A-03), rows[1] the category */
+    const pdfAvg = n > bx.PDF_MAX_PERIOD_COLS ? null : table.rows[1][table.rows[1].length - 2];
     if (csvAvg !== want || xlsAvg.toFixed(2) !== want || pdfAvg !== want.replace('.', ',')) {
       assert.fail(`${cents / 100} over ${n} periods: CSV ${csvAvg}, workbook ${xlsAvg}, PDF ${pdfAvg}, decimal half-up ${want}`);
     }
@@ -144,6 +145,8 @@ checks++;
   const pdf = Buffer.from(new Uint8Array(ctx.vault._store.get(written.find(p => p.endsWith('.pdf'))))).toString('latin1');
   const drawn = [...pdf.matchAll(/\(((?:\\.|[^\\)])*)\) Tj/g)].map(m => m[1]);
   const at = drawn.indexOf('Parking');
+  /* the type is a heading row above the group, not a column (L4A-03) */
+  ok(drawn.indexOf('expense') > -1 && drawn.indexOf('expense') < at, 'the expense group opens with its heading row');
   eq(drawn.slice(at, at + 6), ['Parking', '0,03', '0,00', '0,03', '0,02', '10,00'], 'PDF summary row: June 0,03 · July 0,00 · total 0,03 · average 0,02 · budgeted 10,00');
   console.log(`PASS export-one-average (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

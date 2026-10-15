@@ -8,27 +8,53 @@ Most budgeting apps ask you to upload your bank statements and trust someone els
 
 Every account, budget and transaction is a plain markdown file in your own vault, on your own devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours.
 
-Out of the box the plugin makes **zero network requests**, so your financial history can't be uploaded, analysed or sold. There is exactly one thing that can change that, and only if you switch it on: if you hold money in more than one currency, you can ask the plugin to fetch daily exchange rates so those accounts can be added into your totals. It is off by default, the setup wizard asks about it outright, and when it is on it sends a three-letter currency code and nothing else — no balances, no account names, nothing about your vault. The rates are saved as an ordinary note in your budget folder that you can read, edit or delete.
+Out of the box the plugin makes **zero network requests**, so your financial history can't be uploaded, analysed or sold. There is exactly one thing that can change that, and only if you switch it on: if you hold money in more than one currency, you can ask the plugin to fetch exchange rates so those accounts can be added into your totals. It is off by default, the setup wizard asks about it outright, and when it is on it sends a three-letter currency code and nothing else — no balances, no account names, nothing about your vault. The rates are saved as an ordinary note in your budget folder that you can read, edit or delete. The next section names who it asks.
+
+### The one remote service
+
+Only when **Exchange rates** is switched on (Settings → Budget Vault, or the setup wizard's rates step), the plugin asks **open.er-api.com** — the free rates endpoint run by [ExchangeRate-API](https://www.exchangerate-api.com) — for the day's rates, at the daily, weekly or monthly rhythm you pick. The request is `https://open.er-api.com/v6/latest/<CODE>`, where `<CODE>` is your home currency's three-letter code (for example `ZAR`).
+
+- **What is sent:** that three-letter currency code, and nothing else of yours. As with any request over the internet, the service can also see the IP address the request came from.
+- **Why:** so accounts you hold in other currencies can be added into your totals at a rate you can see, with the date it is for.
+- **What comes back:** a table of rates, saved as `Exchange Rates.md` in your budget folder. Every converted figure is printed with the date of its rate.
+- **If you leave it off:** no request is ever made, and accounts in other currencies are named beside your totals instead of being added into them.
+
+The provider asks for this credit wherever its rates are used: [Rates By Exchange Rate API](https://www.exchangerate-api.com). The same link sits beside the setting and in the wizard.
 
 Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your budget follows you to every device — synced by a service you chose, not one we picked.
 
 ## What it does
 
 - **Dashboard** — spending trend, budget vs actual
+- **Score** — where the money went this period, and how healthy the month was
 - **Transactions** — search, filter and edit your full history
-- **Budgets** — per category, per period, with live "left / over" feedback
+- **Budget** — per category, per period, with live "left / over" feedback
+- **Plan** — set money aside for what is coming, before it arrives
 - **CSV import** — drop a bank statement, review, commit
 - **Auto-categorisation** — rules learned from your corrections
-- **Savings, accounts, owed money, subscriptions, tax** — a screen each
-- Payday-aligned periods, and full support on iOS and Android
+- **Report** — a one-note financial report (Markdown and/or JSON), for a month, a year or any span
+- **Budget export** — your budget as a PDF, an Excel workbook or CSV, for the last month, quarter, year, a tax year or any two dates
+- **Accounts, assets, debt, owed money, services, tax, savings and loan calculators** — a screen each
+- **Notes** — ordinary notes that can point at a category or an account
+- **Several currencies** — accounts in other currencies are named beside your totals, and added into them if you switch on exchange rates (see above)
+- **Twelve languages** — English, Afrikaans, Deutsch, Español, Français, हिन्दी, Bahasa Indonesia, 日本語, Português, isiXhosa, 中文 and isiZulu; set separately from the country
+- Payday-aligned periods, and full support on iOS and Android — including a small phone
 
 ## Install
+
+**From Obsidian's community plugins (the usual way):**
+
+1. Settings → Community plugins → turn off Restricted mode → Browse
+2. Search for **Budget Vault**, then Install and Enable
+3. Open it from the wallet icon
+
+**By hand** (to try a build that is not released yet):
 
 1. Copy `manifest.json`, `main.js` and `styles.css` into `<your vault>/.obsidian/plugins/budget-app/`
 2. Settings → Community plugins → turn off Restricted mode → enable Budget Vault
 3. Open it from the wallet icon
 
-A setup wizard runs on first launch. On mobile, repeat step 2 once — Restricted mode is per-device.
+A setup wizard runs on first launch. On mobile, repeat the enable step once — Restricted mode is per-device.
 
 > **Open the vault, not the budget folder.** Obsidian loads plugins from
 > `<vault root>/.obsidian/plugins/`, so Budget Vault only exists in the vault
@@ -68,7 +94,7 @@ Two folders sit **outside** the budget folder, at the top of your vault, because
 
 ### Debts.md
 
-Columns are read by **position**, not by header name, so keep all twelve in this order — a table missing one silently shifts every later value into the wrong field:
+Columns are read by **position**, not by header name, so keep the first twelve in this order — a table missing one silently shifts every later value into the wrong field. A thirteenth, **Currency**, is optional and always last: a file without it loads exactly as before.
 
 | Column | Meaning |
 |---|---|
@@ -84,6 +110,7 @@ Columns are read by **position**, not by header name, so keep all twelve in this
 | Category | Budget category whose transactions pay this debt. Blank means untracked. |
 | Status | `active` or `paid`. |
 | Notes | Anything else. |
+| Currency | *Optional, last.* The currency symbol this debt is stated in, e.g. `$`. Blank means the household's own currency. |
 
 The plugin rewrites the whole table on save, so a file created through **New debt** always has the right shape. This matters only if you write one by hand.
 

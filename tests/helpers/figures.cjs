@@ -144,14 +144,18 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
   if (settings) opts.settings = settings;
   if (budgetFolder) opts.budgetFolder = budgetFolder;
   const ctx = makeCtx(files, opts);
-  const S = await loadInto(ctx);
-  if (period) S.period = period;
-
+  /* The DOM is wired BEFORE loadInto, not after. views/notes.js (registered by
+     loadInto, because it publishes the noteButton chip five other views render)
+     destructures `$` off the ctx at register time; with the swap done afterwards
+     it kept the harness's inert stand-in, drew nothing, and every golden ledger
+     carried an empty `## notes` section (audit L2b-10, 15 Oct 2026). */
   const { $, nodes } = makeDom();
   ctx.$ = $;
   ctx.$$ = () => [];
   ctx.root = $('#root');
   ctx.view = { containerEl: $('#root') };
+  const S = await loadInto(ctx);
+  if (period) S.period = period;
 
   /* The real formatter, wired the way controller.js wires it: moneyIn takes an
      explicit symbol (an account prints its OWN currency), money defaults to the
@@ -358,7 +362,74 @@ function harvestView(ctx, nodes, raws, { view, fn }) {
   return { view, error: null, figures };
 }
 
-/* Every view, each on its own mount. */
+/* ---- the generated report ------------------------------------------------
+   The Report page renders a form; its figures live in the document Create
+   writes. harvestView cannot see them, which is how a 12-month report printing
+   "165% of spending budget used" passed every guard (audit L2b-10, 15 Oct 2026).
+   So the document is generated the way a reader does — through the real page,
+   with the Period pill set — and its markdown is harvested with the same
+   number rules as the DOM.
+
+   Addressed by section and row: `<view>/<## heading>/<first cell>/c<column>` for
+   a table row, `<view>/<## heading>/p<n>` for the nth prose line. Content paths,
+   like the DOM addresses, so they move when a row is renamed and not when a row
+   is added elsewhere. The header (front matter, title, "Generated at", the
+   disclaimer) is left out: the stamp is a date and a time, not a figure. */
+function harvestReportMarkdown(view, md, raws) {
+  const moneyStrings = [...raws.entries()]
+    .map(([str, set]) => ({ str, raw: set.size === 1 ? [...set][0] : null, ambiguous: set.size > 1 }))
+    .sort((a, b) => b.str.length - a.str.length);
+  const figures = [];
+  let heading = null, prose = 0;
+  const seen = new Map();
+  for (const line of String(md).split('\n')) {
+    const h = /^##\s+(.*\S)\s*$/.exec(line);
+    if (h) { heading = h[1]; prose = 0; continue; }
+    /* Skipped: nothing before the first heading, blank lines, a table's rule
+       line, and an italic-only caption (`_Aug 1 – Sep 30, 2026_` is the span the
+       section covers, a pair of dates, not a figure). */
+    if (heading === null || !line.trim() || /^\|[\s|:-]+\|?\s*$/.test(line) || /^_[^_]*_$/.test(line.trim())) continue;
+    const cells = line.startsWith('|') ? line.replace(/^\||\|\s*$/g, '').split('|').map(c => c.trim()) : null;
+    const parts = cells
+      ? cells.map((c, i) => ({ text: c, at: i === 0 ? null : `c${i}` }))
+      : [{ text: line, at: `p${++prose}` }];
+    const rowKey = cells ? (cells[0] || '(blank)') : null;
+    for (const part of parts) {
+      if (part.at === null) continue;
+      const base = `${view}/${heading}/${rowKey ? `${rowKey}/` : ''}${part.at}`;
+      /* A row label repeated in one section (two "Total" rows) gets an index. */
+      const n = seen.get(base) || 0; seen.set(base, n + 1);
+      const address = n ? `${base}[${n}]` : base;
+      const again = new Map();     // the same figure twice in one cell is told apart by occurrence
+      for (const num of numbersIn(part.text, moneyStrings)) {
+        const k = `${num.kind}|${num.text}`, o = (again.get(k) || 0) + 1; again.set(k, o);
+        figures.push({ view, address: o > 1 ? `${address}#${o}` : address, kind: num.kind, text: num.text, raw: num.raw,
+          ambiguous: !!num.ambiguous, context: { own: part.text, parent: line.slice(0, 140) } });
+      }
+    }
+  }
+  return figures;
+}
+
+/* The two multi-period documents. 'current' is the page the Report view
+   already renders; 3m and 12m are the ones with no other witness. */
+async function harvestReports(files, { period, settings, budgetFolder } = {}) {
+  const { createReport } = require('./report-page.cjs');
+  const out = [];
+  for (const pill of ['3m', '12m']) {
+    const view = `report-${pill}`;
+    const M = await mountFor(files, { period, settings, budgetFolder });
+    try {
+      const r = await createReport(M, { pill, json: false });
+      if (!r.md) { out.push({ view, error: `no document written (${r.toasts.join('; ') || 'no toast'})`, figures: [] }); continue; }
+      out.push({ view, error: null, figures: harvestReportMarkdown(view, r.md, M.raws) });
+    } catch (e) { out.push({ view, error: e.message, figures: [] }); }
+  }
+  return out;
+}
+
+/* Every view, each on its own mount, then the generated 3- and 12-month
+   reports. */
 async function harvestAll(files, { period = '2026-09', today = '2026-09-02', settings, budgetFolder } = {}) {
   const unpin = pinClock(today);
   try {
@@ -368,8 +439,41 @@ async function harvestAll(files, { period = '2026-09', today = '2026-09-02', set
       const { ctx, nodes, raws } = await mountFor(files, { period, settings, budgetFolder });
       results.push(harvestView(ctx, nodes, raws, v));
     }
+    results.push(...await harvestReports(files, { period, settings, budgetFolder }));
     return results;
   } finally { unpin(); }
 }
 
-module.exports = { dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves, ownText };
+/* ---- reading a real vault off disk -------------------------------------
+   ONE reader for scripts/figures.cjs and scripts/reconcile-page.cjs (audit L8-11).
+   The vault as { path: text }, read the way Obsidian holds it, because that is
+   what every page reads: markdown, the `.csv` files (the loader reads
+   Data/Categorisation Rules.csv), and every folder that would otherwise vanish.
+   A folder with nothing the loader reads in it — empty, or holding only a PDF —
+   is kept as `<folder>/.folder`, the in-memory vault's own marker
+   (tests/helpers/harness.cjs). Until 2026-10-07 this kept `.md` alone: the
+   census printed "rules: 0" for a vault holding hundreds, and an account whose
+   Transactions folder was empty read "no folder" instead of "no transactions
+   yet" — so on the audited vault the reconciliation's Accounts page counted
+   two muted accounts as needing attention that the app does not (audit H-1).
+   Dot-files and dot-folders stay out, as they stay out of Obsidian's tree. */
+function readVault(root) {
+  const out = {};
+  const walk = (dir, prefix) => {
+    let kept = 0;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith('.')) continue;
+      const abs = path.join(dir, e.name);
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      if (e.isDirectory()) { walk(abs, rel); kept++; }
+      else if (e.name.endsWith('.md') || e.name.endsWith('.csv')) { out[rel] = fs.readFileSync(abs, 'utf8'); kept++; }
+    }
+    /* A kept sub-folder carries its own marker if it needs one, and its path
+       alone makes this folder exist in the in-memory tree. */
+    if (!kept && prefix) out[`${prefix}/.folder`] = '';
+  };
+  walk(root, '');
+  return out;
+}
+
+module.exports = { readVault, harvestReportMarkdown, harvestReports, dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves, ownText };

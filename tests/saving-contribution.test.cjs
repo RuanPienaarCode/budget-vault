@@ -41,7 +41,7 @@ const TX = rows => '---\nkind: transactions\n---\n\n'
   + rows.map(r => `| ${r} |`).join('\n') + '\n';
 
 const FILES = {
-  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\n---\n',
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ninput_mode: manual\ncurrency: "R"\n---\n',
   [`${B}/Categories/Salary.md`]: '---\ntype: income\n---\n',
   [`${B}/Categories/Groceries.md`]: '---\ntype: expense\n---\n',
   [`${B}/Categories/Saving.md`]: '---\ntype: savings\n---\n',

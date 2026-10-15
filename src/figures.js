@@ -22,7 +22,7 @@ const { isForeign, symbolOf, splitByCurrency } = require('./currency');
 const { assumedActual, budgetRowStatus, categoryGap: gapOf, incomeBaseFor, allocatedShare } = require('./money-flow');
 const { accountType } = require('./vocabulary');
 const { netByOwner } = require('./owners');
-const { normalizeAmount } = require('./amount');
+const { normalizeAmount, parseNum } = require('./amount');
 const { todayIso } = require('./dates');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
@@ -31,6 +31,58 @@ const { todayIso } = require('./dates');
    balance book, the Dashboard's what's-left accounts and the Accounts page all
    hold an unreadable balance out on this one test. */
 const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
+
+/* The same rule for a row's AMOUNT cell (2026-10-14 audit, L8-02). The loader
+   reads a cell it cannot parse as 0 and keeps the reader's own text in
+   `amountRaw` — for budget rows and transaction rows alike — so that the next
+   save writes their text back rather than a fabricated "0.00". But amountRaw
+   is set for every cell that is not already canonical, and "1 234,56" is real
+   money that merely fails the strict test; only a cell parseNum calls
+   unreadable yielded no number at all. Asking `.readable` here, rather than
+   re-parsing in each view, is the same one-test discipline balanceReadable
+   gives balances: on the vault this was found against, a budget cell typed
+   "7000.00.00" took R7 000 out of the plan, the hero's remaining figure fell
+   by exactly that, and nothing on any page said an amount had been typed. */
+const amountUnreadable = row => !!row && row.amountRaw != null && !parseNum(row.amountRaw).readable;
+
+/* The figure to print for a remainder, in whole currency units except where
+   that would erase it (2026-10-14 audit, L2a-N07).
+
+   Whole-rand printing (1.51.0) rounds a real R0,30 over-budget to "0" under an
+   "Over the spending budget" label: the label says over, the figure says
+   nothing, and a reader cannot tell a household that is R0,30 over from one
+   that is on the line. So a remainder that is not nothing but rounds to
+   nothing is printed to the cent — the same boundary rule sharePercentLabel
+   applies to 0% and 100%. 'Not nothing' is half a cent or more: the sums of
+   signed cents leave dust like 1e-12 that must still read as a clean zero.
+
+   Returns the decimals to hand to money(). */
+function remainderDecimals(v) {
+  const cents = Math.abs(Math.round(v * 100));
+  return cents > 0 && Math.abs(v).toFixed(0) === '0' ? 2 : 0;
+}
+
+/* The remainder between two figures that are themselves printed in whole
+   units, taken from the figures AS PRINTED (L2a-N07). The hero prints "R 401
+   spent of R 1 000" under a big number; rounding the true remainder
+   (599,50) on its own printed 600, and 401 + 600 is not 1 000 — three numbers
+   on one card that do not add. The difference of the two rounded parts always
+   does, so that is what is printed, and rounding is monotonic, so it can
+   never flip the sign of the true remainder: the only way it and the true
+   figure can disagree is by both being zero-ish, which remainderDecimals then
+   handles (parts equal, true figures not: print the cents).
+
+   Rounds the way formatAmount does (toFixed on the magnitude), not Math.round,
+   so a half-unit rounds the same way it prints. { value, decimals } for
+   money(Math.abs(value), decimals); value carries the sign. */
+function printedRemainder(budget, spent) {
+  const whole = v => (v < 0 ? -1 : 1) * Number(Math.abs(v).toFixed(0));
+  const diff = whole(budget) - whole(spent);
+  if (diff !== 0) return { value: diff, decimals: 0 };
+  const exact = budget - spent;
+  const decimals = remainderDecimals(exact);
+  return { value: decimals ? Math.round(exact * 100) / 100 : 0, decimals };
+}
 
 module.exports = function registerFigures(ctx) {
   const { S, summaryInRange, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
@@ -193,7 +245,28 @@ module.exports = function registerFigures(ctx) {
       fundedFromSavings: summary.fundedFromSavings || { spend: 0, count: 0 },
       foreign: summary.foreign,
       uncountedIncome: (summary.uncatIncome || 0) + ((summary.unknown && summary.unknown.income) || 0),
+      unreadable: unreadableAmounts(p),
     };
+  }
+
+  /* How many amounts this period's figures are counting as 0 because the cell
+     could not be read (L8-02). Budget rows of the saved file, and the
+     transaction rows in the period that the budget figures actually read:
+     not excluded, not in a `budget: false` account. A row the totals already
+     hold out is not what makes the figure wrong, and saying "1 amount could
+     not be read" about money the hero never counted would be a caveat with
+     no figure under it. A pure count: the sentence, and where it goes, are
+     the hero's. */
+  function unreadableAmounts(p) {
+    const { start, end } = periodRange(p);
+    const out = { budget: (S.budgets[p] || []).filter(amountUnreadable).length, tx: 0 };
+    const held = ctx.nonBudgetLabels();
+    for (const f of Object.values(S.txFiles)) {
+      if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7) || held.has(f.label)) continue;
+      for (const r of f.rows) if (!r.excluded && r.date >= start && r.date <= end && amountUnreadable(r)) out.tx++;
+    }
+    out.count = out.budget + out.tx;
+    return out;
   }
 
   /* The book: every account reconciled ONCE, and the figures the Dashboard's
@@ -303,3 +376,6 @@ module.exports = function registerFigures(ctx) {
   ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };
 module.exports.balanceReadable = balanceReadable;
+module.exports.amountUnreadable = amountUnreadable;
+module.exports.remainderDecimals = remainderDecimals;
+module.exports.printedRemainder = printedRemainder;

@@ -25,21 +25,58 @@ const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { isCreditCard } = require('../committed');
 const { symbolOf, isForeign } = require('../currency');
+const { todayIso, isoDayNumber } = require('../dates');
 
-/* ISSUE 62 — see the call site. Returns the reading the file's own order
-   supports; the household default when the file is silent or both readings
-   fit (no ambiguous rows, or a single row). */
-function decideDayFirst(rawDates, householdDayFirst) {
+/* ISSUE 62 — see the call site. Decides which way round the day and month go
+   in a file's dates and returns { dayFirst, assumed }.
+
+   The household profile is only the tie-breaker: a statement is written in
+   date order and covers a stretch of weeks, and today is a limit on it, so the
+   file's own evidence is read first, in this order -
+     1. a reading that fails to read dates the other one reads is wrong;
+     2. a reading that puts any row after TODAY is wrong - a statement cannot
+        hold a transaction that has not happened;
+     3. of what is left, the reading that keeps the rows in date order wins;
+     4. of what is left, the reading with the SHORTER SPAN wins.
+   Steps 2 and 4 are new (2026-10-14 audit, L2b-05). The old rule stopped at 3,
+   so a month-first export whose days were all 12 or less - in order under both
+   readings - went to the household default without a word and was dated months
+   apart, with rows after today.
+
+   `assumed` is true only when all four steps tie and the household default had
+   to decide. The review then says which convention it assumed instead of
+   showing parsed ISO dates that hide the guess. Only rows that read differently
+   under the two readings matter; a file with none (ISO dates, or every day
+   above 12) returns the household reading with nothing assumed. `today` is
+   injected, as everywhere in the pure code. */
+function decideDayFirst(rawDates, householdDayFirst, today) {
   const under = df => rawDates.map(d => parseStatementDate(d, df)).filter(Boolean);
   const monotonic = ds => {
     let asc = true, desc = true;
     for (let i = 1; i < ds.length; i++) { if (ds[i] < ds[i - 1]) asc = false; if (ds[i] > ds[i - 1]) desc = false; }
     return asc || desc;
   };
-  const a = under(householdDayFirst), b = under(!householdDayFirst);
-  if (a.length < 2 || a.join() === b.join()) return householdDayFirst;
-  const ma = monotonic(a), mb = monotonic(b);
-  return (!ma && mb) ? !householdDayFirst : householdDayFirst;
+  const span = ds => {
+    // A loop, not Math.max(...): a statement can run to tens of thousands of rows.
+    let lo = Infinity, hi = -Infinity;
+    for (const d of ds) { const n = isoDayNumber(d); if (n < lo) lo = n; if (n > hi) hi = n; }
+    return ds.length ? hi - lo : 0;
+  };
+  const hh = under(householdDayFirst), ot = under(!householdDayFirst);
+  const keep = { dayFirst: householdDayFirst, assumed: false };
+  if (!hh.length || hh.join() === ot.join()) return keep;
+  const swap = { dayFirst: !householdDayFirst, assumed: false };
+  // A step decides only when exactly one reading passes it.
+  const pick = (householdPasses, otherPasses) => (householdPasses === otherPasses ? null : householdPasses ? keep : swap);
+  const late = ds => !!today && ds.some(d => d > today);
+  const spanH = span(hh), spanO = span(ot);
+  const verdict =
+    pick(hh.length >= ot.length, ot.length >= hh.length) ||
+    pick(!late(hh), !late(ot)) ||
+    pick(monotonic(hh), monotonic(ot)) ||
+    pick(spanH <= spanO, spanO <= spanH);
+  if (verdict) return verdict;
+  return { dayFirst: householdDayFirst, assumed: true };
 }
 
 module.exports = function registerImport(ctx) {
@@ -166,7 +203,7 @@ module.exports = function registerImport(ctx) {
 
     const index = dedupIndex();
     const items = [];
-    let skipped = 0;
+    let skipped = 0, noted = 0;
     const label0 = detectAccountLabel(file.name, rows);
 
     /* Auto-categorisation is O(rows × rules); chunk with a progress bar for
@@ -222,8 +259,14 @@ module.exports = function registerImport(ctx) {
        Ambiguous rows (both parts <= 12) are where the two readings differ; if
        one ordering is monotonic and the other is not, the monotonic one wins
        and the review says which was used. */
-    const dayFirst = decideDayFirst(dataRows.map(r => (iDate !== -1 ? r[iDate] : '')), loc.dayFirst);
-    const dateReading = dayFirst === loc.dayFirst ? null : (dayFirst ? 'day-first' : 'month-first');
+    const reading = decideDayFirst(dataRows.map(r => (iDate !== -1 ? r[iDate] : '')), loc.dayFirst, todayIso());
+    const dayFirst = reading.dayFirst;
+    /* Three states for the banner: the file overruled the household
+       ('day-first' / 'month-first'), the file could not decide so the
+       household's convention was ASSUMED ('assumed-…'), or nothing was in
+       question (null). */
+    const dateReading = reading.assumed ? (dayFirst ? 'assumed-day-first' : 'assumed-month-first')
+      : dayFirst === loc.dayFirst ? null : (dayFirst ? 'day-first' : 'month-first');
     const showBar = dataRows.length > 1500;
     if (showBar) importProgress('start', 'Categorising transactions…');
     const CHUNK = Math.max(250, Math.ceil(dataRows.length / 15));
@@ -245,6 +288,9 @@ module.exports = function registerImport(ctx) {
       /* Amount: a single signed column when present, else credit (positive) /
          debit (negated — statements list debits as positive numbers). */
       let amount = iAmount !== -1 ? num(r[iAmount]) : null;
+      // A non-blank amount cell that normalizeAmount refused: the only thing a
+      // row is "unparseable" FOR, as far as the money goes (see below).
+      const unreadable = [iAmount, iDebit, iCredit, iFee].some(i => i !== -1 && (r[i] || '').trim() !== '' && num(r[i]) == null);
       if (amount == null && iCredit !== -1) {
         const c = num(r[iCredit]);
         // Money in is normally written as a plain positive number, but an
@@ -294,6 +340,14 @@ module.exports = function registerImport(ctx) {
         items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: matched ? matched.category : '',
           matchedPattern: matched ? matched.p : '',
           include: true, excluded: false, transferTo: '' });
+      } else if (date && desc && (amount === 0 || (amount == null && !unreadable))) {
+        /* A dated, described line with NO MONEY on it: the 0.00 an FNB
+           statement prints for a waived fee, the notice Capitec prints for a
+           declined withdrawal. Nothing was misread - there is simply no amount
+           to import - so it is counted apart rather than as "unparseable",
+           which told the reader the importer had failed on rows it had read
+           perfectly well (2026-10-14 audit, L2b-06). */
+        noted++;
       } else if (date || amount != null) {
         // Looked like a transaction and wasn't usable — worth reporting.
         skipped++;
@@ -360,7 +414,7 @@ module.exports = function registerImport(ctx) {
       if (!range) range = { min: it.date, max: it.date };
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
-    S.pendingImport = { items, label: label0, index, range, skipped, filename: file.name,
+    S.pendingImport = { items, label: label0, index, range, skipped, noted, filename: file.name,
       // What the FILE says it is, kept beside what the user picked — the two
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
@@ -629,11 +683,23 @@ module.exports = function registerImport(ctx) {
     const labels = [...new Set([
       ...S.accounts.map(a => a.tx_label || a.name),
       ...Object.values(S.txFiles).map(f => f.label)])].sort();
+    /* Nothing detected is a QUESTION, not a default (2026-10-14 audit, L6-06).
+       This used to end with `if (!p.label && labels.length) p.label =
+       accSel.value`, which took whatever a browser selects when no option is
+       marked — the first account alphabetically — and left Import rows
+       enabled: one tap posted a whole statement to an account the reader never
+       chose, with the sign verdict, the duplicate count and the transfer
+       suggestions all computed against that guess. The reader is the only one
+       who can say which account a hand-saved export belongs to, so the select
+       opens on a placeholder, p.label stays empty, and the button below stays
+       off until they pick. The placeholder goes once a label is set (a
+       re-render follows every pick), so it is never offered as a destination. */
+    if (!p.label) accSel.append(el('option', { value: '', selected: '' }, 'Choose an account…'));
     for (const l of labels) accSel.append(el('option', { value: l, ...(l === p.label ? { selected: '' } : {}) }, l));
-    if (!p.label && labels.length) p.label = accSel.value;
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };
     /* The account is only settled HERE — by the user's pick, by an account made
-       on the spot, or by the default above when detection came back empty. The
+       on the spot, or by detection. When detection came back empty it is NOT
+       settled, and nothing below is allowed to behave as if it were. The
        self-transfer suggestion is a function of that account, so it is
        recomputed every render rather than left as parse-time guesswork; rows
        the reader has decided on carry manualExclude and are skipped. */
@@ -680,12 +746,20 @@ module.exports = function registerImport(ctx) {
     const curRange = periodRange(cur);
     const inCurrent = it => it.date >= curRange.start && it.date <= curRange.end;
     const curCount = p.items.filter(inCurrent).length;
+    /* No account yet means no duplicate check has been made — flagItems ran
+       against an empty label and "0 duplicates skipped" would read as a clean
+       result for a question nobody has asked. Said plainly instead; the count
+       appears with the first pick. */
     $('#impStats').textContent =
-      `${p.filename} — ${p.items.length} rows · ${newOnes.length} new · ${dupes} duplicates skipped` +
+      `${p.filename} — ${p.items.length} rows` +
+      (p.label
+        ? ` · ${newOnes.length} new · ${dupes} duplicates skipped`
+        : ' · choose an account to check which of these are already in the vault') +
       (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
       (pendings ? ` · ${pendings} still pending (unticked)` : '') +
       ` · ${auto} auto-categorised` +
       (p.skipped ? ` · ${p.skipped} unparseable` : '') +
+      (p.noted ? ` · ${p.noted} with no amount (not imported)` : '') +
       /* An exact duplicate is the one decision on this screen the reader
          cannot override — it renders a "dup" badge instead of a checkbox,
          with no explanation. The dedupe itself is sound and this is
@@ -710,7 +784,11 @@ module.exports = function registerImport(ctx) {
       const noteEl = $('#impDateReading');
       if (noteEl) {
         noteEl.classList.remove('hidden');
-        noteEl.textContent = i18n.t(p.dateReading === 'day-first' ? 'imp.dateReading.dayFirst' : 'imp.dateReading.monthFirst');
+        // Two-way ternaries of literal keys, not a lookup table: the plural-count
+        // guard (tests/i18n-plural-count-guard.test.cjs) resolves exactly that shape.
+        noteEl.textContent = String(p.dateReading).startsWith('assumed')
+          ? i18n.t(p.dateReading === 'assumed-day-first' ? 'imp.dateReading.assumedDayFirst' : 'imp.dateReading.assumedMonthFirst')
+          : i18n.t(p.dateReading === 'day-first' ? 'imp.dateReading.dayFirst' : 'imp.dateReading.monthFirst');
       }
     }
     const recEl = $('#impReconcile');
@@ -763,7 +841,10 @@ module.exports = function registerImport(ctx) {
         + 'Nothing will import until they agree — pick the right account above, or correct the number on the account itself. '
         + 'A statement written into the wrong account looks entirely normal afterwards and is very hard to unpick.'
       : '';
-    $('#impCommit').disabled = ident.state === 'mismatch';
+    /* Off until an account is chosen (see the placeholder above) as well as
+       on a mismatch; commitImport refuses an empty label too, so this is the
+       tell and that is the backstop. */
+    $('#impCommit').disabled = ident.state === 'mismatch' || !p.label;
 
     const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
@@ -1175,3 +1256,5 @@ module.exports = function registerImport(ctx) {
   // the state runImport's own first call already produced.
   ctx.provide({ handleStatementFile, commitImport, renderImport, renderImportReview, remapImport, cancelImport, undoImport });
 };
+
+module.exports.decideDayFirst = decideDayFirst;

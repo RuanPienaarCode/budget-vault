@@ -40,7 +40,7 @@ const table = rows => '---\nkind: transactions\n---\n\n'
   + '| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n'
   + rows.map(r => `| ${r[0]} | ${r[1]} | ${r[2]} | ${r[3].toFixed(2)} | ${r[4] || ''} |  |  |`).join('\n') + '\n';
 const files = {
-  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n---\n',
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ninput_mode: manual\ncurrency: "R"\ncountry: za\nemergency_target_months: 6\n---\n',
   [`${B}/Categories/Salary.md`]: '---\ntype: income\n---\n',
   [`${B}/Categories/Windfall.md`]: '---\ntype: income\n---\n',
   [`${B}/Categories/Groceries.md`]: '---\ntype: expense\n---\n',

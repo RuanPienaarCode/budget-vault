@@ -14,7 +14,7 @@
 
 const { ISO_DATE, isRealIsoDate, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
 const { isPoolAccount, accountType } = require('./vocabulary');
-const { matchCharges, chargeStats, nextExpected, findRecurringCredit, STEP_DAYS } = require('./recurring');
+const { matchCharges, chargeStats, chargeStatus, addCycles, normDesc, findRecurringCredit, STEP_DAYS } = require('./recurring');
 
 /* ADR-0007 · Whole-month placement window. An instalment with no known
    payment day is only claimed inside a window of 28 days or more. */
@@ -38,16 +38,25 @@ const median = arr => {
   const m = a.length >> 1;
   return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
 };
-/* ADR-0007 · Days of the month are a circle (ISSUE 74). A cluster straddling
-   the month end is lifted, medianed and folded back; NaN days are dropped. */
+/* ADR-0007 · Days of the month are a circle (ISSUE 74). A cluster inside half
+   the circle is an ordinary median; a wider spread is the circular median, the
+   day minimising the summed circular distance on a 31-day circle. The lift-by-31
+   rule this replaces was only right across the month END: payments on the 14th,
+   15th, 16th and one on the 30th gave the 7th, a week early (L2b-03). A tie goes
+   to the lower day; NaN days are dropped. */
+const MONTH_CIRCLE = 31;
+const circularGap = (a, b) => { const x = Math.abs(a - b); return Math.min(x, MONTH_CIRCLE - x); };
 const usualDay = days => {
   const ds = days.filter(d => Number.isFinite(d) && d >= 1 && d <= 31);
   if (!ds.length) return 0;
   const lo = Math.min(...ds), hi = Math.max(...ds);
   if (hi - lo <= 15) return median(ds);
-  const lifted = ds.map(d => (d < 16 ? d + 31 : d));
-  const m = median(lifted);
-  return m > 31 ? m - 31 : m;
+  let best = 0, bestCost = Infinity;
+  for (let d = 1; d <= MONTH_CIRCLE; d++) {
+    const cost = ds.reduce((t, x) => t + circularGap(x, d), 0);
+    if (cost < bestCost) { best = d; bestCost = cost; }
+  }
+  return best;
 };
 
 /* The first date on or after `from` that falls on day-of-month `d`, clamped to
@@ -200,10 +209,13 @@ function serviceCommitments({ services, rows, from, to, periodStart, accountOfRo
 
     /* Derived first, typed second. Every next-billing date in the reference
        vault was months in the past; the charge history knows better. */
-    const due = nextExpected(seen, s.cycle) || (ISO_DATE.test(s.next || '') ? s.next : null);
+    const typedNext = ISO_DATE.test(s.next || '') ? s.next : null;
 
     const derived = stats && stats.recent > 0;
-    const amount = derived ? stats.recent : Math.abs(s.amount || 0);
+    /* A typed figure below zero counts as 0, as the Services page counts it
+       (Math.abs held a typed -50 as a R50 commitment beside a row saying it
+       counted as 0). A charge history, when there is one, still decides. */
+    const amount = derived ? stats.recent : Math.max(0, s.amount || 0);
     if (!amount) continue;
 
     /* NOT IMPORTED YET. A charge due between the period start and today that
@@ -217,38 +229,44 @@ function serviceCommitments({ services, rows, from, to, periodStart, accountOfRo
        to: always priced from its charges, since the account comes from one. */
     const payer = payerOf(charged, accountOfRow);
     const asOf = payer ? knownTo(payer, from) : null;
-    const held = (dueOn, n) => ({
-      kind: 'service', name: s.name, detail: s.provider || '',
-      due: dueOn, amount: amount * n, occurrences: n, unit: amount,
-      basis: 'not-imported', account: payer.name, asOf,
-    });
+    const held = (dueOn, n) => heldItem({ name: s.name, detail: s.provider || '', due: dueOn, unit: amount, n, payer, asOf });
 
     /* ADR-0007 · How many charges remain (ISSUE 47). Sub-monthly services are
        walked date by date; monthly and annual keep the one-charge-per-period
        rule exactly. */
     const step = STEP_DAYS[s.cycle];
     if (!step) {
-      /* Unchanged since 1.20 apart from that window: at most one charge per
+      /* Unchanged since 1.20 apart from the window: at most one charge per
          period, so evidence of one is evidence there is nothing left to come. */
       if (charged.some(c => c.date >= periodStart)) continue;
-      if (!due || due > to) continue;
-      if (due < from) {
-        /* Held only while its account's records are OLDER than its day. */
-        if (due >= periodStart && asOf && asOf < due) out.push(held(due, 1));
-        continue;
-      }
+      const { missed, upcoming } = placeCycle({
+        last: seen && seen.last, typed: typedNext, cycle: s.cycle, from, to, asOf,
+        /* Silent for more than two cycles, counted to the day its account is
+           known to: the row on the Services page already asks whether it was
+           cancelled, and stepping it into a new period would answer that for
+           the reader. Counted to the account's date, not to today, so a service
+           is not "lapsed" merely because its statement has not been imported. */
+        lapsed: chargeStatus(seen, s.cycle, asOf || from).state === 'overdue',
+      });
+      if (missed.length) out.push(held(missed[0], missed.length));
+      if (!upcoming) continue;
       out.push({
         kind: 'service', name: s.name, detail: s.provider || '',
-        due, amount, occurrences: 1, unit: amount,
+        due: upcoming, amount, occurrences: 1, unit: amount,
         basis: derived ? 'charged' : 'stated',
       });
       continue;
     }
 
-    /* The same question per occurrence: the cadence dates between the period
-       start and yesterday that no charge cleared, after the account's date. */
-    const past = asOf && periodStart < from
-      ? remainingCharges({ anchor: seen && seen.last, next: s.next, step, from: periodStart,
+    /* The same question per occurrence: the cadence dates between the first day
+       the account's records do not cover and yesterday that no charge cleared.
+       That is the period start or the day after the account's date, whichever
+       is EARLIER — starting at the period start dropped every charge between a
+       cheque account's last import and the boundary (2026-10-14 audit, L1-01).
+       A service silent for more than two cycles to that date is not held. */
+    const pastFrom = asOf ? (isoFromDayNumber(isoDayNumber(asOf) + 1) < periodStart ? isoFromDayNumber(isoDayNumber(asOf) + 1) : periodStart) : periodStart;
+    const past = asOf && pastFrom < from && chargeStatus(seen, s.cycle, asOf).state !== 'overdue'
+      ? remainingCharges({ anchor: seen && seen.last, next: s.next, step, from: pastFrom,
         to: isoFromDayNumber(isoDayNumber(from) - 1), charges: charged }).filter(d => d > asOf)
       : [];
     if (past.length) out.push(held(past[0], past.length));
@@ -271,6 +289,145 @@ function serviceCommitments({ services, rows, from, to, periodStart, accountOfRo
       unit: amount,
       basis: derived ? 'charged' : 'stated',
     });
+  }
+  return out;
+}
+
+/* The row a charge the account's records have not reached yet is carried as:
+   its own `basis`, the account it belongs to and the day that account is known
+   to, so the card can say "not imported yet" instead of asserting a miss. */
+function heldItem({ name, detail, due, unit, n, payer, asOf }) {
+  return {
+    kind: 'service', name, detail,
+    due, amount: unit * n, occurrences: n, unit,
+    basis: 'not-imported', account: payer.name, asOf,
+  };
+}
+
+/* Where a monthly or annual charge falls against the window (L1-01). Walks the
+   cycle from the LAST real charge with addCycles (anchored on its own day, so
+   the 31st survives February). `missed` is every date before `from` that the
+   account's records have not reached (after `asOf`): held whichever side of the
+   period start it falls, since neither the cash nor a statement holds it; a date
+   the records DO reach with no charge was really missed and is dropped.
+   `upcoming` is the first date inside the window; at most one a period. A lapsed
+   service yields neither. With no history the typed date is used, never stepped. */
+const MAX_CYCLES = 60;
+function placeCycle({ last, typed, cycle, from, to, asOf, lapsed }) {
+  const missed = [];
+  let upcoming = null;
+  if (last && ISO_DATE.test(last)) {
+    if (lapsed) return { missed, upcoming };
+    for (let k = 1; k <= MAX_CYCLES; k++) {
+      const due = addCycles(last, cycle, k);
+      if (due > to) break;
+      if (due >= from) { upcoming = due; break; }
+      if (asOf && due > asOf) missed.push(due);
+    }
+  } else if (typed && typed >= from && typed <= to) {
+    upcoming = typed;
+  }
+  return { missed, upcoming };
+}
+
+/* Debit orders nobody listed (L2a-N05 / L1-10): HELD like a not-imported Service,
+   in the shape the Dashboard already renders (name = category, detail = the
+   description). The bar is findRecurringCredit's: high, and [] is a good answer.
+   A group is one payer, category and exact amount (description only where there
+   is no category); it must be charged once in each of the last three months, on
+   about one day, from an in-budget account that is not a card or a savings pool,
+   and not lapsed. Category and amount, not description: the real orders shared
+   their bank wording or changed its letters monthly. Anything a Services row or
+   a debt already counts (rows matched, or its name/category) is left to it. */
+const ORDER_MONTHS = 3;
+const DAY_DRIFT = 4;
+const monthNumber = iso => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7));
+const fold = x => String(x || '').trim().toLowerCase();
+
+function debitOrderCommitments({ rows, services, debts, from, to, periodStart, accountOfRow }) {
+  if (!accountOfRow || !rows || !rows.length) return [];
+
+  const counted = new Set();
+  const named = new Set();
+  for (const sv of services || []) {
+    if (!sv) continue;
+    for (const c of matchCharges(sv, rows).all || []) counted.add(c);
+    if (fold(sv.name)) named.add(fold(sv.name));
+    if (fold(sv.category)) named.add(fold(sv.category));
+  }
+  for (const d of debts || []) { if (d && fold(d.category)) named.add(fold(d.category)); }
+
+  /* A fixed payment to a card is the card's balance moving, which
+     cardCommitments already holds; its other leg (the same amount landing on a
+     card within DAY_DRIFT days) is what tells it from an order. One leg pairs
+     with ONE outflow, the nearest: "any equal outflow nearby" let a card
+     settlement on the 2nd claim a same-amount fund order on the 3rd too. */
+  const cents = x => Math.round(Math.abs(x) * 100);
+  const outByCents = new Map();
+  for (const r of rows) {
+    if (!r || !(r.amount < 0) || !isRealIsoDate(r.date) || isCreditCard(accountOfRow.get(r))) continue;
+    const k = cents(r.amount);
+    if (!outByCents.has(k)) outByCents.set(k, []);
+    outByCents.get(k).push(r);
+  }
+  const paidToCard = new Set();
+  for (const c of rows) {
+    if (!c || !(c.amount > 0) || !isRealIsoDate(c.date) || !isCreditCard(accountOfRow.get(c))) continue;
+    let best = null, bestGap = Infinity;
+    for (const r of outByCents.get(cents(c.amount)) || []) {
+      if (paidToCard.has(r)) continue;
+      const gap = Math.abs(isoDaysBetween(c.date, r.date));
+      if (gap <= DAY_DRIFT && gap < bestGap) { best = r; bestGap = gap; }
+    }
+    if (best) paidToCard.add(best);
+  }
+  const paysCard = r => paidToCard.has(r);
+
+  const groups = new Map();
+  for (const r of rows) {
+    if (!r || typeof r.amount !== 'number' || !(r.amount < 0) || !isRealIsoDate(r.date) || r.date > from) continue;
+    const payer = accountOfRow.get(r);
+    if (!payer || payer.inBudget === false || isCreditCard(payer) || isPoolAccount(payer)) continue;
+    if (paysCard(r)) continue;
+    const category = String(r.cat || '').trim();
+    const key = category || normDesc(r.desc);
+    if (!key) continue;
+    const gk = `${payer.name}\u0000${key}\u0000${Math.round(Math.abs(r.amount) * 100)}`;
+    if (!groups.has(gk)) groups.set(gk, { payer, rows: [] });
+    groups.get(gk).rows.push(r);
+  }
+
+  const out = [];
+  for (const { payer, rows: list } of groups.values()) {
+    if (list.length < ORDER_MONTHS) continue;
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    const recent = list.slice(-ORDER_MONTHS);
+    const months = recent.map(r => monthNumber(r.date));
+    if (!months.every((m, i) => i === 0 || m === months[i - 1] + 1)) continue;
+    const newest = recent[recent.length - 1];
+    const newestDay = day(newest.date);
+    if (recent.some(r => circularGap(day(r.date), newestDay) > DAY_DRIFT)) continue;
+    const unit = Math.abs(newest.amount);
+    if (!(unit > 0)) continue;
+    if (list.some(r => counted.has(r))) continue;
+    const category = String(newest.cat || '').trim();
+    if (category && named.has(fold(category))) continue;
+
+    const asOf = knownTo(payer, from);
+    const seen = chargeStats(list);
+    const { missed, upcoming } = placeCycle({
+      last: newest.date, typed: null, cycle: 'monthly', from, to, asOf,
+      lapsed: chargeStatus(seen, 'monthly', asOf || from).state === 'overdue',
+    });
+    const name = category || String(newest.desc || '').trim();
+    const detail = String(newest.desc || '').trim();
+    if (missed.length) out.push({ ...heldItem({ name, detail, due: missed[0], unit, n: missed.length, payer, asOf }), source: 'debit-order' });
+    if (upcoming) {
+      out.push({
+        kind: 'service', name, detail, due: upcoming, amount: unit, occurrences: 1, unit,
+        basis: 'charged', source: 'debit-order',
+      });
+    }
   }
   return out;
 }
@@ -416,7 +573,7 @@ function cardsOwed(accounts) {
 
 /* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
    `cardRows` from settle-monthly cards, `incomeRows` from in-budget accounts
-   only; `free` may be negative, `perDay` is null on the last day. */
+   only; `free` may be negative, `perDay` is null once the period is over. */
 function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, cardRows, cardRefundRows, accountOfRow, periodStart, periodEnd, today }) {
   const now = ISO_DATE.test(today || '') ? today : null;
   const to = periodEnd;
@@ -460,6 +617,7 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
 
   const items = [
     ...serviceCommitments({ services, rows, from, to, periodStart, accountOfRow }),
+    ...debitOrderCommitments({ rows, services, debts, from, to, periodStart, accountOfRow }),
     ...debtCommitments({ debts, rows, settleRows, from, to, periodStart, periodDays, today: now }),
     ...cardCommitments({ accounts, from, to }),
   ].sort((a, b) => (b.amount - a.amount));
@@ -468,7 +626,11 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
   /* ADR-0007 · Card settlement kept separable from debit orders: a different
      kind of claim, and folded together R17 000 of card hides R95 of Spotify. */
   const cardDue = items.filter(i => i.kind === 'card').reduce((s, i) => s + i.amount, 0);
-  const daysLeft = now ? Math.max(0, daysBetween(now, periodEnd)) : null;
+  /* Counted INCLUSIVELY: today is a day still to spend in, and the window
+     above opens on today (a charge due today is still to come). Counting from
+     tomorrow read "0 days" on the last day and "1 day" on the one before, and
+     divided today's money across one day too few (2026-10-14 audit, L2a-N12). */
+  const daysLeft = now ? (now <= periodEnd ? daysBetween(now, periodEnd) + 1 : 0) : null;
   const committedOther = committed - cardDue;
 
   /* ADR-0007 · The owed remainder is per card: balances the chain did not
@@ -600,5 +762,5 @@ function daysBetween(a, b) {
 
 module.exports = {
   WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
-  cashOnHand, cardsOwed, serviceCommitments, debtCommitments, cardCommitments, whatsLeft, debtMonthly,
+  knownTo, cashOnHand, cardsOwed, serviceCommitments, debitOrderCommitments, debtCommitments, cardCommitments, whatsLeft, debtMonthly,
 };

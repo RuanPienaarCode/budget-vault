@@ -153,7 +153,7 @@ atAuditDate(async () => {
 
   /* And the per-day rate is drawn from the same figure as the headline —
      committed.js's own rule that every "free" on this card is ONE number. */
-  ok(left.includes('R 618/day'),
+  ok(left.includes('R 597/day'),
     `the per-day rate divides the free figure, not the cash pile — got: ${left}`);
 
   console.log(`PASS earmarked-cash (${checks} checks)`);

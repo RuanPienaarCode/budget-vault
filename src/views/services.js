@@ -9,7 +9,13 @@ const { askFields } = require('../modal');
 const { ISO_DATE, todayIso } = require('../dates');
 const { matchCharges, chargeStats, nextDue, chargeStatus, comparePriceNow } = require('../recurring');
 const { isSplitPart } = require('../tx-role');
+/* The Dashboard's own test for "is this account imported that far". */
+const { knownTo } = require('../committed');
 const { symbolOf, isForeign } = require('../currency');
+/* typedBelowZero / shownFigure: a negative typed into Amount is kept and shown
+   while every total counts it as 0 — see worth.js and views/owed.js, which this
+   page now follows (the 7 Oct 2026 decision for Assets, Owed Money and Debts). */
+const { typedBelowZero } = require('../worth');
 /* Namespace import, this repo's convention wherever a bare `t` could be
    shadowed — and it is here: renderServices binds `const t = $('#svcTable')`. */
 const i18n = require('../i18n');
@@ -24,7 +30,14 @@ module.exports = function registerServices(ctx) {
      calendar, and the difference is a month's worth of it every year on a page
      whose whole job is a monthly total. */
   const PER_MONTH = { weekly: 365.25 / 12 / 7, fortnightly: 365.25 / 12 / 14, monthly: 1, annual: 1 / 12 };
-  function monthlyEquiv(s) { return s.amount * (PER_MONTH[s.cycle] ?? 1); }
+  /* Floored at 0, in the arithmetic only. A negative Amount is a slip (or a
+     credit the household wanted to jot down) and this used to SUBTRACT it:
+     -50 typed against a R528 list printed R279 for Per month, and -96 000
+     printed "Per month R -95 671,00" — a cost that does not exist, stated as
+     the page's headline. The typed figure itself stays in the file and in the
+     field, and the row says it counts as 0, exactly as Owed Money does for its
+     Amount (views/owed.js; tests/typed-negative-kept.test.cjs). */
+  function monthlyEquiv(s) { return Math.max(0, s.amount) * (PER_MONTH[s.cycle] ?? 1); }
 
   /* ---------------------- what a total may add up -------------------------
 
@@ -151,6 +164,15 @@ module.exports = function registerServices(ctx) {
     const home = S.settings.currency;
     const homeSym = symbolOf(null, home);
     const pools = new Map();   // symbol -> the rows charged in it
+    const today = todayIso();
+    /* Which account each row came from and how far each account's rows reach
+       (2026-10-14 audit, L2b-07): the hint's tooltip must not say a date "has
+       passed with no charge" for an account that is not imported that far — the
+       Dashboard calls the same charge "not imported yet". Same facts, same
+       test (committed.js knownTo): the newest row on or before today, or the
+       day the balance was confirmed, whichever is later. */
+    const accountOfRow = new Map();
+    const importedTo = new Map();
     for (const f of Object.values(S.txFiles)) {
       const acct = typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(f.label) : null;
       const foreign = isForeign(acct, home);
@@ -158,13 +180,14 @@ module.exports = function registerServices(ctx) {
       if (!pools.has(sym)) pools.set(sym, []);
       const pool = pools.get(sym);
       for (const r of f.rows) {
+        if (acct && ISO_DATE.test(r.date || '') && r.date <= today && r.date > (importedTo.get(acct) || '')) importedTo.set(acct, r.date);
         if (isSplitPart(r)) continue;
         const stamped = foreign ? { ...r, _symbol: sym } : r;
+        if (acct) accountOfRow.set(stamped, acct);
         rows.push(stamped);
         pool.push(stamped);
       }
     }
-    const today = todayIso();
     const out = new Map();
     for (const s of S.services) {
       const own = isForeign(s, home) ? symbolOf(s, home) : homeSym;
@@ -187,6 +210,12 @@ module.exports = function registerServices(ctx) {
          half-built. */
       const seen = chargeStats(m.all);
       const status = chargeStatus(seen, s.cycle, today);
+      /* The account that pays it: the one holding its newest charge. `through`
+         is the day that account's records are known to, null when there is none
+         to read (an orphan folder, no dated row, no confirmed balance). */
+      const newest = seen && seen.last ? [...(m.all || [])].reverse().find(r => r.date === seen.last) : null;
+      const payer = newest ? accountOfRow.get(newest) : null;
+      const through = payer ? knownTo({ importedTo: importedTo.get(payer) || '', balanceDate: payer.balance_updated || '' }, today) : null;
       /* The symbols this service was actually billed in, other than its own —
          named on the row so a reader can see WHY no price verdict is offered
          rather than just noticing one is missing. */
@@ -214,6 +243,8 @@ module.exports = function registerServices(ctx) {
            nextDue, not nextExpected: the hint OFFERS this date, so it is
            stepped past dates that have already gone (SVC-3, recurring.js). */
         next: nextDue(seen, s.cycle, today),
+        /* Where the payer's records stop, for the hint's tooltip. */
+        paidFrom: payer ? { name: payer.name, through, byImport: through === (importedTo.get(payer) || null) } : null,
         related: m.related,
       });
     }
@@ -338,7 +369,10 @@ module.exports = function registerServices(ctx) {
     const stale = !s.next || s.next < todayIso();
     const { last, first, skipped } = c.next;
     const title = `Last charged ${last}, billed every ${CYCLE_NOUN[s.cycle] || 'month'}, so the next charge is due ${date}.`
-      + (skipped ? ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.` : '');
+      + (skipped ? (c.paidFrom && c.paidFrom.through && c.paidFrom.through < first
+        /* The records stop before the date: nothing says it did not happen. */
+        ? ` ${first} has passed, but ${c.paidFrom.name} is not imported yet that far (${c.paidFrom.byImport ? 'last import' : 'balance confirmed'} ${c.paidFrom.through}), so this is the next date after today.`
+        : ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.`) : '');
     const btn = el('button', { type: 'button', class: 'svc-next-hint', title,
       'aria-label': `Set next billing for ${s.name} to ${date}` },
     icoEl(['calendar-check', 'calendar']), stale ? `due ${date}` : date);
@@ -362,6 +396,15 @@ module.exports = function registerServices(ctx) {
           el('td', { colspan: '6' }, cat),
           el('td', { class: 'num' }, subtotalText(groups[cat]))));
         for (const s of groups[cat]) {
+          /* Beside the Amount field, updated in place by its own editor (the row
+             is not rebuilt on an amount edit — see renderServicesKpis). Empty
+             unless the figure is below zero, whether typed now or already in a
+             hand-edited Services.md. */
+          const belowZeroNote = el('div', { class: 'text-muted fine-note' });
+          const syncBelowZero = () => {
+            belowZeroNote.textContent = typedBelowZero(s, 'amount') !== null ? 'counts as 0 in the totals' : '';
+          };
+          syncBelowZero();
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
           const hintDate = offeredNext(s, c);
@@ -379,8 +422,8 @@ module.exports = function registerServices(ctx) {
               onchange: e => {
                 const v = normalizeAmount(e.target.value);
                 if (v === null) { toast('Amount must be a number', true); e.target.value = s.amount || ''; return; }
-                s.amount = v; s.amountRaw = null; refresh();
-              } })),
+                s.amount = v; s.amountRaw = null; refresh(); syncBelowZero();
+              } }), belowZeroNote),
             /* ISSUE 33. Driven off table-schema's CYCLES, so the picker can
                never offer a value the reader's file cannot hold — or fail to
                offer one it can. The old two-option list was the visible half of

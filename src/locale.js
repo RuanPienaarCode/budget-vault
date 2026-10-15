@@ -74,11 +74,9 @@ const sumCodes = (figures, ...codes) => (figures || [])
 
    Verified against sars.gov.za on 10 August 2026:
      - TFSA annual limit R36 000 through 2026, R46 000 from 2027.
-     - CGT annual exclusion R40 000. A rise to R50 000 from 2027 was reported
-       during the audit but could NOT be confirmed against a primary source, so
-       it is deliberately NOT coded here. Year-keying it now makes that a
-       one-line data edit once someone reads the figure rather than a code
-       change. Verifying it is an open item. */
+     - CGT annual exclusion R40 000 through 2026, R50 000 from 2027 - read from
+       SARS's CGT page on 15 October 2026 (see the 2027 row in facts.js, which
+       records the source). */
 /* Year-keyed limits live in src/facts.js — the reason they are keyed at all
    is that figureChecks used to receive the tax year and never read it, so a
    2027 page asserted a 2026 threshold and told a compliant saver they owed a

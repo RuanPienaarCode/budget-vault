@@ -118,8 +118,11 @@ for (const [name, fn] of Object.entries(CHECKS)) {
 /* the view half of item 4: budgets.js counts digits and appends the class to the
    figure, after `bud-total-v` (the figures harness reads the first class) */
 const bud = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'budgets.js'), 'utf8');
-ok(/const longFig = text => \(\(String\(text\)\.match\(\/\\d\/g\) \|\| \[\]\)\.length >= 7 \? ' is-long' : ''\);/.test(bud),
-  'budgets.js counts digits the way the Dashboard does (seven or more)');
+/* longFig moved to src/dom.js (2026-10-14 audit, L8-06): one copy, imported by
+   both pages. tests/long-fig-shared.test.cjs pins the helper's behaviour; this
+   pins that the Budget page still reads it from there. */
+ok(/const \{[^}]*\blongFig\b[^}]*\} = require\('\.\.\/dom'\);/.test(bud),
+  'budgets.js takes longFig from dom.js, the one copy the Dashboard reads too');
 ok(/class: `bud-total-v\$\{[^`]*\}\$\{longFig\(t\.value\)\}`/.test(bud), 'the totals figure appends is-long after bud-total-v');
 
 /* NEGATIVE CONTROLS: break each invariant in a copy of the sheet; the check must notice */

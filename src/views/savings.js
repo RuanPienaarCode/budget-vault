@@ -11,7 +11,7 @@ const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
 const { sharePercents } = require('../share-percents');
-const { symbolOf, isForeign, splitByCurrency, currenciesIn } = require('../currency');
+const { symbolOf, isForeign, splitByCurrency, currenciesIn, otherHoldings } = require('../currency');
 /* Namespace import: see src/views/dashboard.js's own comment — `t` is taken
    as a local in several sibling files, so every view in this app imports i18n
    the same way regardless of whether this particular file happens to clash. */
@@ -158,8 +158,16 @@ module.exports = function registerSavings(ctx) {
        The Savings and Investments tiles below keep `otherTag(…others)` on
        purpose: those two figures ARE account sums, so the accounts half is the
        whole of what they hold out. */
+    /* The amount comes from the one helper (currency.js otherHoldings) that
+       Accounts and the Score use, on this page's IMPLIED basis; when the balance
+       the reader typed reads differently the sentence says so, rather than the
+       same USD account printing 0 on Accounts and 460 here (audit L8-05). */
+    const held = otherHoldings(balances.stated.others, balances.implied.others, 'implied',
+      accts => otherCurrencyNet(w, accts));
     tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
-      'what you own minus what you owe' + otherLine(otherCurrencyNet(w, worthOthers)));
+      'what you own minus what you owe' + otherLine(held.shown)
+      + (held.shown.length && held.differs
+        ? ` That counts the transactions since the balance was last typed; as typed, ${otherList(held.other)}.` : ''));
     tile('Savings', money(totalSavings), '', kpiNote(sPlit.others, 'savings'));
     tile('Investments', money(totalInvest), '', kpiNote(iPlit.others, 'investment'));
     growthTile(tile, entries);
@@ -196,7 +204,9 @@ module.exports = function registerSavings(ctx) {
      test the pooled figures on this page are allowed to gate on. */
   const homeEntry = e => !split([e.account]).others.length;
 
-  const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  /* The household's own decimal mark: "+13.7%" beside a Budget page printing
+     "100,2%" on the same household (audit L2a-N09). */
+  const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1).replace('.', ctx.locale().decimal)}%`;
 
   /* growthTotals itself now lives in savings-math.js (2026-08-29 audit, M4) —
      see that module's own header on `growthTotals` for the `measured`/
@@ -241,8 +251,20 @@ module.exports = function registerSavings(ctx) {
         ? `${foreignEntries.length} account${foreignEntries.length > 1 ? 's are' : ' is'} in another currency — a combined rate would divide one currency by another, so each is shown on its own card below`
         : 'no account has a Starting amount set — use "Add starting amount" on an account below');
     }
+    /* The caveat each card behind this tile carries, in the cards' own words:
+       growth is balance less what went in, and when the records begin after the
+       account did (or none exist) everything missing from them reads as growth.
+       The tile pools exactly the accounts that are in `g` (measured, home
+       currency) and used to print the flattering total with none of the cards'
+       warnings: on the vault this was found on, two of the ten accounts behind
+       it said "growth may be overstated" and the tile said nothing (audit
+       L2a-N06). Counted over the same set growthTotals counts. */
+    const overstated = entries.filter(homeEntry)
+      .filter(e => { const r = ret(e); return chartable(e.account, r) && (r.trust === 'history-gap' || r.trust === 'no-records'); })
+      .length;
     const sub = [
       growthRate(g) !== null ? `${pct(growthRate(g))} on ${money(g.rateCapital, 0)} put in` : null,
+      overstated ? `${overstated} of ${g.measured} may be overstated — records start late` : null,
       g.unmeasured ? `${g.unmeasured} of ${g.total} missing a starting amount or date` : null,
       g.negCapital ? `${g.negCapital} taken out more than put in — left out of the rate` : null,
       /* Named, never silently dropped — currency.js:14 is explicit that this
@@ -653,6 +675,22 @@ module.exports = function registerSavings(ctx) {
               `${g >= 0 ? '▲' : '▼'} ${acctMoney(a, Math.abs(g), 0)}`));
           }
           if (flows.withdrawals) line.append(` · taken out ${acctMoney(a, flows.withdrawals, 0)}`);
+          /* No starting amount, so put in / growth / taken out are only what the
+             records hold, and they do not add up to the balance above them. The
+             difference is what the account held before its records begin
+             (accountFlows' `opening`, the figure that makes the identity hold);
+             said out loud, so the line is a sum a reader can finish. On the two
+             funds measured the unexplained part was larger than the balance's
+             whole recorded history (audit L2a-N13). */
+          if (flows.opening >= 0.5) {
+            line.append(` · ${acctMoney(a, flows.opening, 0)} before your records begin`);
+          } else if (flows.opening <= -0.5) {
+            /* The records add up to MORE than the balance, so there is no
+               opening to name (a negative one is not a thing an account holds):
+               money went out that the records do not show, and the sentence
+               says that rather than printing "R -1 200 before your records". */
+            line.append(` · its records add up to ${acctMoney(a, -flows.opening, 0)} more than the balance`);
+          }
           card.append(line);
 
           /* And say so outright where the silence is most likely to mislead.
@@ -1277,7 +1315,8 @@ module.exports = function registerSavings(ctx) {
        function), which is the same trade the Accounts ring makes. */
     /* ISSUE 44 — implied balances, the same as-of the Dashboard's cash card,
        read off the balance book (figures.js) the KPIs above also read. */
-    const { accounts: homeAccounts, others: worthOthers } = bookFigures().balances.implied;
+    const book = bookFigures().balances;
+    const { accounts: homeAccounts, others: worthOthers } = book.implied;
     /* worth.js is the one place net worth is computed — see its own header —
        and this chart used to re-derive `totalAssets`/`totalDebts`/`net` from
        the very same grouped arrays instead of reading it, which meant it also
@@ -1311,9 +1350,17 @@ module.exports = function registerSavings(ctx) {
        alone would have disclosed a third of what had just been held out — and
        the figure this chart is headed by is a net worth, so a per-symbol net is
        the shape that answers "what is missing from it". */
-    const worthOther = otherCurrencyNet(w, worthOthers);
+    /* The amount and its basis come from the same helper, with the same fold,
+       as the Net worth tile above (audit L8-05). The caption used to print the
+       implied amount alone, so a dollar account with a deposit dated after its
+       typed balance read one figure in this caption and another, "as typed",
+       on the tile - same page, same account, nothing to say which was which. */
+    const held = otherHoldings(book.stated.others, worthOthers, 'implied', accts => otherCurrencyNet(w, accts));
+    const worthOther = held.shown;
     const worthNote = worthOther.length
       ? `${otherList(worthOther)} held in other currencies is not drawn here — a share of one currency's total cannot include another's.`
+        + (held.differs
+          ? ` That counts the transactions since the balance was last typed; as typed, ${otherList(held.other)}.` : '')
       : '';
 
     /* Assets-page rows, grouped by their own kind — the house, the car and the

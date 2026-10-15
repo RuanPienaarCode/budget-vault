@@ -131,8 +131,8 @@ async function main() {
     eq(parts.length, 2, 'both parts were written');
     const last = ctx._toasts.at(-1);
     ok(!last.bad, 'a completed split is not reported as an error');
-    ok(/1 of the new parts still need a category/.test(last.msg),
-      'the toast names how many of the new parts are still uncategorised');
+    ok(/1 of the new parts still needs a category/.test(last.msg),
+      'the toast names how many of the new parts are still uncategorised (a plural entry now, tx.split.uncategorised: "1 … needs", "2 … need" — 2026-10-14, L8-09)');
   }
 
   /* ---- a fully-categorised split says nothing extra ---- */
@@ -144,7 +144,7 @@ async function main() {
     await ctx.splitTransaction(item);
 
     const last = ctx._toasts.at(-1);
-    ok(!/still need a category/.test(last.msg), 'nothing extra is said when every part already has a category');
+    ok(!/still needs? a category/.test(last.msg), 'nothing extra is said when every part already has a category');
   }
 
   console.log(`transactions-split-uncategorised-hint.test.cjs — ${checks} checks OK`);

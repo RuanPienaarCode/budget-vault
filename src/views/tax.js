@@ -9,6 +9,7 @@
 const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
+const { TAX_TABLES, plainTableLines } = require('../table-schema');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { todayIso, daysUntil } = require('../dates');
@@ -724,27 +725,26 @@ module.exports = function registerTax(ctx) {
     ]));
     const extrasAfter = name => (t.extras || []).filter(e => e.after === name)
       .flatMap(e => ['', ...e.raw.split(/\r?\n/)]);
+    /* L3-05: prose typed between a heading and its table, and columns or cell
+       tails added past the plugin's own, go back where they were (load.js). */
+    const leadOf = name => (t.sectionLeads && t.sectionLeads[name] ? [...t.sectionLeads[name].split(/\r?\n/), ''] : []);
+    const ec = name => (t.extraCols && t.extraCols[name]) || null;
     const lines = ['---', ...fm.split('\n'), '---', ...leadLines, ...extrasAfter(null),
-      '## Progress', '',
-      '| Step | Status | Due | Notes |',
-      '|------|--------|-----|-------|'];
-    // `due` is plain text in memory (load.js reads it through unescMd), so
-    // escMd here is the one escape it gets — the pair that keeps it stable.
-    for (const s of t.steps) lines.push(`| ${escMd(s.step)} | ${word(s, 'status', 'todo')} | ${escMd(s.due)} | ${escMd(s.notes)} |`);
+      '## Progress', '', ...leadOf('progress'),
+      // `due` is plain text in memory (load.js reads it through unescMd), so
+      // escMd here is the one escape it gets — the pair that keeps it stable.
+      ...plainTableLines(TAX_TABLES.progress, null, t.steps.map(s =>
+        [escMd(s.step), word(s, 'status', 'todo'), escMd(s.due), escMd(s.notes)]), t.steps, ec('steps'))];
     lines.push(...extrasAfter('progress'));
-    lines.push('', '## Documents', '',
-      '| Document | Source | Status | File | Notes |',
-      '|----------|--------|--------|------|-------|');
-    for (const d of t.docs) lines.push(`| ${escMd(d.name)} | ${escMd(d.source)} | ${word(d, 'status', 'needed')} | ${escMd(d.file)} | ${escMd(d.notes)} |`);
+    lines.push('', '## Documents', '', ...leadOf('documents'),
+      ...plainTableLines(TAX_TABLES.documents, null, t.docs.map(d =>
+        [escMd(d.name), escMd(d.source), word(d, 'status', 'needed'), escMd(d.file), escMd(d.notes)]), t.docs, ec('docs')));
     lines.push(...extrasAfter('documents'));
     // Emit the header even when empty so the section is discoverable in the
     // raw file rather than appearing only once a figure is added.
-    lines.push('', '## Figures', '',
-      `| ${loc.figureCodeLabel} | Description | Source | Amount |`,
-      '|------|-------------|--------|--------|');
-    for (const f of (t.figures || [])) {
-      lines.push(`| ${escMd(f.code)} | ${escMd(f.description)} | ${escMd(f.source)} | ${cash(f, 'amount')} |`);
-    }
+    lines.push('', '## Figures', '', ...leadOf('figures'),
+      ...plainTableLines(TAX_TABLES.figures, [loc.figureCodeLabel, ...TAX_TABLES.figures.header.slice(1)], (t.figures || []).map(f =>
+        [escMd(f.code), escMd(f.description), escMd(f.source), cash(f, 'amount')]), t.figures || [], ec('figures')));
     lines.push(...extrasAfter('figures'));
     lines.push('');
     return lines.join('\n');

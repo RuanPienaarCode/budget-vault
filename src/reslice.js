@@ -18,6 +18,7 @@
    node without a stub, like the rest of the maths modules. */
 
 const { ISO_DATE, isoDayNumber } = require('./dates');
+const { roundCents: sharedRoundCents } = require('./amount');
 
 /* How long the stranded periods were, inferred from their own names.
 
@@ -46,14 +47,21 @@ function inferIntervalFromKeys(keys) {
   return best;
 }
 
-/* Money rounds to cents, and rounds HALF AWAY FROM ZERO rather than JS's
-   Math.round, which rounds -0.5 to -0.0 and would flip the sign of a small
-   negative line. Budget rows are positive in practice, but the serializer
-   writes whatever it is handed and a stray -0 in a file is a puzzle nobody
-   should have to solve. */
+/* Money rounds to cents, and rounds HALF AWAY FROM ZERO on the DECIMAL value
+   rather than JS's Math.round, which rounds -0.5 to -0.0 and would flip the sign
+   of a small negative line. Budget rows are positive in practice, but the
+   serializer writes whatever it is handed.
+
+   The rounding itself is amount.js's roundCents, the one the exports and the
+   report share (audit L8, 15 Oct 2026: this file and budget-export.js each had
+   their own, and 1.005 gave 1 here and 1.01 there until Wave A aligned them by
+   hand; Wave B made them one). The ONE thing kept here is the sign of a hair
+   below zero: tests/reslice.test.cjs holds a SIGNED zero for a negative amount
+   that rounds away, where the export's helper returns a plain 0. The sign is
+   applied from the input, so every other result is amount.js's own. */
 function roundCents(n) {
-  const s = n < 0 ? -1 : 1;
-  return s * Math.round(Math.abs(n) * 100) / 100;
+  const r = sharedRoundCents(n);
+  return r === 0 && Number(n) < 0 ? -0 : r;
 }
 
 /* One suggestion per source row.

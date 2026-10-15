@@ -20,7 +20,7 @@ const fund = (name, extra = '') => `---\ntype: savings\nbalance: 1000.00\nbalanc
      rebate    tax rebate lands in Cheque (Excluded), moved   all three legs Excluded: not counted
                on to Old Fund (Excluded)                      */
 const FILES = {
-  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\n---\n',
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ninput_mode: manual\ncurrency: "R"\n---\n',
   [`${B}/Categories/Salary.md`]: cat('income'),
   [`${B}/Categories/Windfall.md`]: cat('income'),
   [`${B}/Categories/Interest.md`]: cat('income', 'interest: true\n'),

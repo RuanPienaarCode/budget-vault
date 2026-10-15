@@ -173,9 +173,10 @@ class BudgetPlugin extends Plugin {
          unmodeled keys verbatim. It also treats the key as data, where the
          regex interpolated it into a pattern unescaped. */
       const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      const eol = m && m[0].includes('\r\n') ? '\r\n' : '\n';
       const block = patchFrontmatter(m ? m[1] : '', { [key]: value });
       text = m
-        ? `---\n${block}\n---` + text.slice(m[0].length)
+        ? `---${eol}${block}${eol}---` + text.slice(m[0].length)
         : `---\n${block}\n---\n\n` + text;
     } else {
       // No Settings.md yet — create it with defaults plus the requested key,
